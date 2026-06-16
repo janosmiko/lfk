@@ -431,7 +431,7 @@ All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify th
 
 All keybindings can be overridden. Only specify the keys you want to change -- defaults apply for everything else. See [`keybindings.md`](keybindings.md) for the full list.
 
-The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
+The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The log viewer additionally honors `filter` (live text filter: `~`fuzzy, regex auto-detected, `\`literal) and `severity_up`/`severity_down` (step the minimum log severity shown). The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
 
 | Field | Default | Action |
 |---|---|---|
@@ -451,7 +451,9 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `toggle_line_numbers` | `#` | Toggle line numbers (diff, log viewers). |
 | `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers; also folds tree-view branches in the Object/API Explorers, alongside `Space`). |
 | `toggle_fold_all` | `Z` | Toggle all folds (YAML, diff viewers). |
-| `toggle_follow` | `f` | Toggle follow / auto-scroll (log viewer). |
+| `toggle_follow` | `F` | Toggle follow / auto-scroll (log viewer). Moved from `f`, which now opens the log filter. |
+| `severity_up` | `+` | Raise the minimum log severity shown (log viewer). |
+| `severity_down` | `-` | Lower the minimum log severity shown (log viewer). Shares the `-` default with `sort_reset`, but they apply in separate contexts (log viewer vs. resource list). |
 | `toggle_timestamps` | `s` | Toggle timestamps (log viewer). |
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
