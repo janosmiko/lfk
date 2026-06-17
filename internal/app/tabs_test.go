@@ -1179,27 +1179,28 @@ func TestTabSwitchPreservesYAMLViewerState(t *testing.T) {
 // TestTabSwitchPreservesLogViewerState pins the save->switch->restore contract
 // for the inline log viewer before/after the logViewState extraction. The log
 // viewer persists most of its state per tab; this guards a representative
-// subset (lines, scroll, follow, cursor, title, containers) plus deep-copy of
-// the lines slice.
+// subset (rawLines, scroll, follow, cursor, title, containers) plus deep-copy
+// of the rawLines slice. logLines in TabState now stores the raw stream; the
+// displayed projection is rebuilt by rebuildLogView on loadTab.
 func TestTabSwitchPreservesLogViewerState(t *testing.T) {
 	m := Model{
 		tabs: []TabState{
 			{}, // Tab A: receives the active model's log state on save.
 			{ // Tab B: carries its own persisted log viewer state.
 				logLines:      []string{"b-1", "b-2"},
-				logScroll:     12,
+				logScroll:     1,
 				logFollow:     false,
-				logCursor:     3,
+				logCursor:     1,
 				logTitle:      "Logs: b",
 				logContainers: []string{"main"},
 			},
 		},
 		activeTab: 0,
 		// Mirror Tab A's log state into the active model so saveCurrentTab
-		// has something to persist.
+		// has something to persist. Use rawLines (the authoritative buffer).
 		logView: logViewState{
-			lines:      []string{"a-1", "a-2", "a-3"},
-			scroll:     44,
+			rawLines:   []string{"a-1", "a-2", "a-3"},
+			scroll:     0,
 			follow:     true,
 			cursor:     1,
 			title:      "Logs: a",
@@ -1211,22 +1212,25 @@ func TestTabSwitchPreservesLogViewerState(t *testing.T) {
 	m.saveCurrentTab()
 	m.loadTab(1)
 	assert.Equal(t, []string{"b-1", "b-2"}, m.logView.lines)
-	assert.Equal(t, 12, m.logView.scroll)
+	assert.Equal(t, 1, m.logView.scroll)
 	assert.False(t, m.logView.follow)
-	assert.Equal(t, 3, m.logView.cursor)
+	assert.Equal(t, 1, m.logView.cursor)
 	assert.Equal(t, "Logs: b", m.logView.title)
 	assert.Equal(t, []string{"main"}, m.logView.containers)
 
 	// Switch back to Tab A: its persisted log state must round-trip intact.
+	// follow=true causes clampLogOffsets to pin cursor to n-1 and scroll to the
+	// bottom of the output via logMaxScrollAndSkip.
 	m.saveCurrentTab()
 	m.loadTab(0)
 	assert.Equal(t, []string{"a-1", "a-2", "a-3"}, m.logView.lines)
-	assert.Equal(t, 44, m.logView.scroll)
+	assert.Equal(t, m.logMaxScroll(), m.logView.scroll, "follow mode pins scroll to the bottom")
+	assert.Equal(t, len(m.logView.lines)-1, m.logView.cursor, "follow mode pins cursor to the last line")
 	assert.True(t, m.logView.follow, "Tab B's follow flag must not bleed into Tab A")
 	assert.Equal(t, "Logs: a", m.logView.title)
 
-	// Deep-copy guard: mutating the restored slice must not corrupt the stored tab.
-	m.logView.lines[0] = "mutated"
+	// Deep-copy guard: mutating the restored rawLines must not corrupt the stored tab.
+	m.logView.rawLines[0] = "mutated"
 	assert.Equal(t, "a-1", m.tabs[0].logLines[0], "loadTab must deep-copy logLines")
 }
 

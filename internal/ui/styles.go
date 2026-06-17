@@ -313,14 +313,12 @@ var (
 				Bold(true)
 
 	// SelectedSearchHighlightStyle highlights the currently selected search
-	// match (the one n/N steps to). Uses the same dark fg as the regular
-	// SearchHighlightStyle so the text stays legible on the warning bg
-	// regardless of theme; the underline is the visual differentiator that
-	// separates "current match" from the other matches on the row, not the
-	// fg color. Previously fg was ColorSelectedBg, which painted blue text
-	// on a yellow bg in the default theme — visibly low contrast.
+	// match (the one n/N steps to). The distinct purple background (vs the
+	// warning-yellow used by regular matches) and underline together make the
+	// current match visually unambiguous across themes. Foreground stays the
+	// same dark base color so text remains legible on both backgrounds.
 	SelectedSearchHighlightStyle = lipgloss.NewStyle().
-					Background(lipgloss.Color(ColorWarning)).
+					Background(lipgloss.Color(ColorPurple)).
 					Foreground(lipgloss.Color(ColorBase)).
 					Bold(true).
 					Underline(true)

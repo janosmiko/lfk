@@ -803,7 +803,7 @@ func TestP4LogKeyF(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
 	m.logView.follow = false
-	result, _ := m.handleKey(keyMsg("f"))
+	result, _ := m.handleKey(keyMsg("F"))
 	rm := result.(Model)
 	assert.True(t, rm.logView.follow)
 }

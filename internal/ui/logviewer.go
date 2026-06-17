@@ -22,11 +22,11 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 // (e.g. with the side preview pane). The output is one row shorter than the
 // default rendering. Callers that pass omitFooter=true must render their own
 // footer via RenderLogFooter.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int, omitFooter bool) string {
-	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
+func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int, omitFooter bool, filterActive bool, filterInput, filterQuery string, sevThreshold int) string {
+	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, filterQuery, sevThreshold)
 	var footer string
 	if !omitFooter {
-		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers)
+		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers, filterActive, filterInput)
 	}
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -82,15 +82,16 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 
 	// Build visible lines, handling wrapping.
 	var rendered []string
+	var cursorRow, cursorCol int
 	if wrap {
-		rendered = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol, wrapTopSkip)
+		rendered, cursorRow, cursorCol = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol, wrapTopSkip)
 	} else {
-		rendered = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
+		rendered, cursorRow, cursorCol = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
 	}
 
 	// Highlight search matches in rendered lines.
 	if searchQuery != "" {
-		rendered = highlightSearchMatches(rendered, searchQuery)
+		rendered = highlightSearchMatches(rendered, searchQuery, cursorRow, cursorCol)
 	}
 
 	// Pad to fill content height. Cap at contentHeight too: if the line
@@ -136,7 +137,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 }
 
 // renderLogTitleBar builds the title bar with status indicators for the log viewer.
-func renderLogTitleBar(title string, lines []string, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string) string {
+func renderLogTitleBar(title string, lines []string, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, filterQuery string, sevThreshold int) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -169,6 +170,12 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 	if searchQuery != "" {
 		indicators = append(indicators, HelpKeyStyle.Render("[/"+searchQuery+"]"))
 	}
+	if filterQuery != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[F:"+filterQuery+"]"))
+	}
+	if sevThreshold > 0 {
+		indicators = append(indicators, HelpKeyStyle.Render("[≥"+LogLevelName(sevThreshold)+"]"))
+	}
 
 	titleText := " " + title + " "
 	if len(indicators) > 0 {
@@ -193,7 +200,7 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 // Exported so callers can render the footer at a wider terminal width than the
 // log column itself (e.g. when the side preview pane is on and the hint bar
 // must span the full screen below the JoinHorizontal'd panes \u2014 issue #71).
-func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool) string {
+func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool, filterActive bool, filterInput string) string {
 	if statusMsg != "" {
 		style := HelpKeyStyle
 		if statusIsErr {
@@ -204,6 +211,11 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 	if searchActive {
 		modeInd := SearchModeIndicator(searchInput)
 		prompt := HelpKeyStyle.Render(ActiveKeybindings.Search) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
+		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
+	}
+	if filterActive {
+		modeInd := SearchModeIndicator(filterInput)
+		prompt := HelpKeyStyle.Render(ActiveKeybindings.Filter) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + filterInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (esc:clear  enter:keep)")
 		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
 	}
 	if visualMode {
@@ -231,6 +243,8 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "y", Desc: "copy"},
 		{Key: ActiveKeybindings.Search, Desc: "search"},
+		{Key: ActiveKeybindings.Filter, Desc: "filter"},
+		{Key: ActiveKeybindings.SeverityDown + "/" + ActiveKeybindings.SeverityUp, Desc: "severity"},
 	}
 	if searchQuery != "" {
 		hints = append(hints, HintEntry{Key: ActiveKeybindings.NextMatch + "/" + ActiveKeybindings.PrevMatch, Desc: "next/prev"})
@@ -250,17 +264,30 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 
 // highlightSearchMatches highlights occurrences of query in each line.
 // Supports substring, regex, and fuzzy search modes via HighlightMatch.
-func highlightSearchMatches(lines []string, query string) []string {
+// curRow is the rendered-slice index of the cursor line (-1 if none).
+// curCol is the absolute visual column of the current match start on that row
+// (-1 when curRow is -1). The cursor row's match at curCol is styled with
+// SelectedSearchHighlightStyle; all other matches use LogSearchHighlightStyle.
+func highlightSearchMatches(lines []string, query string, curRow, curCol int) []string {
 	result := make([]string, len(lines))
 	for i, line := range lines {
-		result[i] = HighlightMatch(line, query)
+		if i == curRow && curRow >= 0 {
+			result[i] = HighlightMatchCurrentAtCol(line, query, LogSearchHighlightStyle, SelectedSearchHighlightStyle, curCol)
+		} else {
+			result[i] = HighlightMatch(line, query)
+		}
 	}
 	return result
 }
 
-// renderPlainLines renders lines without wrapping.
-func renderPlainLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol int) []string {
+// renderPlainLines renders lines without wrapping. It also returns cursorRow
+// (the index in result of the cursor line, or -1 if not visible) and cursorCol
+// (the absolute visual column of the search-match start on the cursor row, or
+// -1 when cursorRow is -1 or the cursor is in visual-selection mode).
+func renderPlainLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol int) ([]string, int, int) {
 	var result []string
+	cursorRow := -1
+	cursorCol := -1
 
 	end := min(scroll+height, len(lines))
 
@@ -326,6 +353,14 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 					cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 				}
 				line = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
+				// Record where in the result slice this cursor row lands and its
+				// search-match column. The gutter indicator is 1 visual cell; the
+				// optional line-number gutter follows; then content at visualCurCol.
+				cursorRow = len(result)
+				cursorCol = 1 + visualCurCol
+				if lineNumbers {
+					cursorCol = 1 + lineNumWidth + visualCurCol
+				}
 			}
 		} else {
 			line = " " + line
@@ -333,7 +368,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 
 		result = append(result, line)
 	}
-	return result
+	return result, cursorRow, cursorCol
 }
 
 // renderWrappedLines renders lines with wrapping, accounting for scroll position.
@@ -341,7 +376,11 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 // the renderer can pin a too-tall final source line's tail to the bottom row
 // when following — without it, long log lines wrapping past viewH lose their
 // most recent sub-lines off the bottom.
-func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol, topSkip int) []string {
+//
+// It also returns cursorRow (index in result of the first wrapped sub-line of
+// the cursor line, or -1 if not visible/in visual mode) and cursorCol (absolute
+// visual column of the search-match start on that row, or -1 when cursorRow=-1).
+func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol, topSkip int) ([]string, int, int) {
 	// Reserve 1 column for cursor gutter.
 	gutterWidth := 1
 	availWidth := width - gutterWidth
@@ -356,6 +395,8 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	// correspond to the scroll offset. For wrapping, scroll refers to source
 	// lines; topSkip drops sub-lines from the very top of lines[scroll].
 	var result []string
+	cursorRow := -1
+	cursorCol := -1
 
 	skipped := 0
 	end := len(lines)
@@ -412,6 +453,12 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 						cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 					}
 					wl = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
+					// Record cursor position for search-match current highlighting.
+					cursorRow = len(result)
+					cursorCol = 1 + visualCurCol
+					if lineNumbers {
+						cursorCol = 1 + lineNumWidth + visualCurCol
+					}
 				}
 			} else {
 				wl = " " + wl
@@ -420,7 +467,7 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 			result = append(result, wl)
 		}
 	}
-	return result
+	return result, cursorRow, cursorCol
 }
 
 // WrapLine splits a line into chunks of at most width runes.

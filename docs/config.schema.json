@@ -330,6 +330,8 @@
         "help": { "type": "string" },
         "filter": { "type": "string" },
         "search": { "type": "string" },
+        "severity_up": { "type": "string" },
+        "severity_down": { "type": "string" },
         "next_match": { "type": "string" },
         "prev_match": { "type": "string" },
         "toggle_preview": { "type": "string" },

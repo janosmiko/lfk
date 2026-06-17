@@ -372,7 +372,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 
 	// Initialize log viewer state.
 	m.mode = modeLogs
-	m.logView.lines = nil
+	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.follow = true
 	m.logView.wrap = false

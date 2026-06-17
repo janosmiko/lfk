@@ -475,7 +475,7 @@ func (m Model) handleLogKeyC() (tea.Model, tea.Cmd) {
 		m.logView.historyCancel()
 		m.logView.historyCancel = nil
 	}
-	m.logView.lines = nil
+	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.cursor = 0
 	m.logView.visualMode = false

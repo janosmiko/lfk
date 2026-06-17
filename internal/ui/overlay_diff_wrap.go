@@ -79,13 +79,14 @@ func subAt(subs []string, i int) string {
 }
 
 // styleDiffSub applies the diff color (and search highlight, if any) to one
-// wrapped sub-line.
-func styleDiffSub(text string, style lipgloss.Style, searchQuery string) string {
+// wrapped sub-line. isCurrent marks this line as the current n/N match so it
+// gets the distinct current-match style instead of the regular highlight.
+func styleDiffSub(text string, style lipgloss.Style, searchQuery string, isCurrent bool) string {
 	if text == "" {
 		return ""
 	}
 	if searchQuery != "" {
-		return style.Render(highlightDiffSearchInLine(text, searchQuery))
+		return style.Render(highlightDiffSearchInLine(text, searchQuery, isCurrent))
 	}
 	return style.Render(text)
 }
@@ -108,7 +109,9 @@ func unifiedLineParts(dl diffLine, st diffUnifiedStyles) (string, string, lipglo
 // truncated. The block cursor and visual selection are not drawn in wrap mode
 // (they need fixed-width column math); the cursor line still gets its ">"
 // indicator and search matches are still highlighted.
-func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines, colWidth, gutterWidth int, lineNumbers bool, searchQuery string, cursor, cursorSide int, st diffSideStyles) []string {
+// currentMatchLine is the original diff line index of the n/N current match
+// (-1 means none); matching rows use the distinct current-match highlight.
+func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines, colWidth, gutterWidth int, lineNumbers bool, searchQuery string, cursor, cursorSide, currentMatchLine int, st diffSideStyles) []string {
 	leftNum, rightNum := diffLineNumsBefore(raw, vis, scroll)
 	sep := st.separator.Render(" | ")
 	emptyGutter := strings.Repeat(" ", gutterWidth)
@@ -132,6 +135,7 @@ func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLine
 		}
 
 		dl := raw[vl.Original]
+		isCurrent := currentMatchLine >= 0 && vl.Original == currentMatchLine
 		leftText, rightText, leftStyle, rightStyle, showLeftNum, showRightNum := sideBySideParts(dl, st)
 
 		leftSubs := wrapColumn(leftText, colWidth)
@@ -151,8 +155,8 @@ func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLine
 					}
 				}
 			}
-			lcell := padToWidth(styleDiffSub(subAt(leftSubs, r), leftStyle, searchQuery), colWidth)
-			rcell := padToWidth(styleDiffSub(subAt(rightSubs, r), rightStyle, searchQuery), colWidth)
+			lcell := padToWidth(styleDiffSub(subAt(leftSubs, r), leftStyle, searchQuery, isCurrent), colWidth)
+			rcell := padToWidth(styleDiffSub(subAt(rightSubs, r), rightStyle, searchQuery, isCurrent), colWidth)
 			rows = append(rows, li+lg+lcell+sep+ri+rg+rcell)
 		}
 
@@ -186,7 +190,9 @@ func sideBySideParts(dl diffLine, st diffSideStyles) (leftText, rightText string
 // long values are truncated to the column width and the block cursor and
 // visual selection are drawn. Extracted from RenderDiffView so the wrap and
 // non-wrap paths can share the surrounding layout scaffolding.
-func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines, colWidth, gutterWidth int, lineNumbers bool, searchQuery string, cursor int, vp DiffVisualParams, normalStyle, removedStyle, addedStyle, cursorStyle, separatorStyle lipgloss.Style) []string { //nolint:gocyclo // diff row layout: inherent per-status (=/</>) branching
+// currentMatchLine is the original diff line index of the n/N current match
+// (-1 means none); matching rows use the distinct current-match highlight.
+func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines, colWidth, gutterWidth int, lineNumbers bool, searchQuery string, cursor, currentMatchLine int, vp DiffVisualParams, normalStyle, removedStyle, addedStyle, cursorStyle, separatorStyle lipgloss.Style) []string { //nolint:gocyclo // diff row layout: inherent per-status (=/</>) branching
 	visible := vis[scroll:]
 	if len(visible) > maxLines {
 		visible = visible[:maxLines]
@@ -227,6 +233,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 		dl := raw[vl.Original]
 
 		isSelected := vp.VisualMode && visIdx >= selStart && visIdx <= selEnd
+		isCurrent := currentMatchLine >= 0 && vl.Original == currentMatchLine
 
 		var leftCol, rightCol, leftGutter, rightGutter string
 		switch dl.status {
@@ -237,8 +244,8 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 				leftText, rightText = applyDiffVisualSelection(dl.left, dl.right, vp, visIdx, selStart, selEnd, colWidth)
 			} else {
 				if searchQuery != "" {
-					leftText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery))
-					rightText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery))
+					leftText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery, isCurrent))
+					rightText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery, isCurrent))
 				} else {
 					leftText = normalStyle.Render(truncateToWidth(dl.left, colWidth))
 					rightText = normalStyle.Render(truncateToWidth(dl.right, colWidth))
@@ -265,7 +272,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			if isSelected && vp.CursorSide == 0 {
 				leftText = applyDiffVisualSide(dl.left, vp, visIdx, selStart, selEnd)
 			} else if searchQuery != "" {
-				leftText = removedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery))
+				leftText = removedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery, isCurrent))
 			} else {
 				leftText = removedStyle.Render(truncateToWidth(dl.left, colWidth))
 			}
@@ -284,7 +291,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			if isSelected && vp.CursorSide == 1 {
 				rightText = applyDiffVisualSide(dl.right, vp, visIdx, selStart, selEnd)
 			} else if searchQuery != "" {
-				rightText = addedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery))
+				rightText = addedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery, isCurrent))
 			} else {
 				rightText = addedStyle.Render(truncateToWidth(dl.right, colWidth))
 			}
@@ -308,7 +315,9 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 // buildWrappedUnifiedRows renders unified diff content rows with hard line
 // wrapping. The cursor line keeps its ">" indicator; column cursor and visual
 // selection are not drawn in wrap mode.
-func buildWrappedUnifiedRows(raw []diffLine, vis []VisibleDiffLine, scroll, contentMaxLines, contentWidth, gutterWidth int, lineNumbers bool, searchQuery string, cursor int, st diffUnifiedStyles, cursorStyle lipgloss.Style) []string {
+// currentMatchLine is the original diff line index of the n/N current match
+// (-1 means none); matching rows use the distinct current-match highlight.
+func buildWrappedUnifiedRows(raw []diffLine, vis []VisibleDiffLine, scroll, contentMaxLines, contentWidth, gutterWidth int, lineNumbers bool, searchQuery string, cursor, currentMatchLine int, st diffUnifiedStyles, cursorStyle lipgloss.Style) []string {
 	rows := make([]string, 0, contentMaxLines)
 	lineNum := unifiedLineNumBefore(vis, scroll)
 	emptyGutter := strings.Repeat(" ", gutterWidth)
@@ -325,6 +334,7 @@ func buildWrappedUnifiedRows(raw []diffLine, vis []VisibleDiffLine, scroll, cont
 			continue
 		}
 
+		isCurrent := currentMatchLine >= 0 && vl.Original == currentMatchLine
 		prefix, text, style := unifiedLineParts(raw[vl.Original], st)
 		subs := wrapColumn(prefix+text, contentWidth)
 		for r := 0; r < len(subs) && len(rows) < contentMaxLines; r++ {
@@ -336,7 +346,7 @@ func buildWrappedUnifiedRows(raw []diffLine, vis []VisibleDiffLine, scroll, cont
 					gutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, lineNum))
 				}
 			}
-			rows = append(rows, rowInd+gutter+styleDiffSub(subs[r], style, searchQuery))
+			rows = append(rows, rowInd+gutter+styleDiffSub(subs[r], style, searchQuery, isCurrent))
 		}
 		lineNum++
 	}

@@ -105,7 +105,7 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			// Reset container selection and log viewer state before restarting.
 			m.logView.selectedContainers = nil
 			m.logView.containers = nil
-			m.logView.lines = nil
+			m.resetLogBuffer()
 			m.logView.scroll = 0
 			m.logView.follow = true
 			m.logView.tailLines = ui.ConfigLogTailLines
@@ -155,7 +155,7 @@ func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
 	m.logView.podFilterActive = false
 	m.logView.selectedContainers = nil
 	m.logView.containers = nil
-	m.logView.lines = nil
+	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.tailLines = ui.ConfigLogTailLines
 	m.logView.hasMoreHistory = true
@@ -417,7 +417,7 @@ func (m *Model) restartLogStreamForContainerFilter() tea.Cmd {
 	// Clear single-container override so startLogStream uses --all-containers --prefix,
 	// which is required for the prefix-based container filtering to work.
 	m.actionCtx.containerName = ""
-	m.logView.lines = nil
+	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.cursor = 0
 	m.logView.follow = true

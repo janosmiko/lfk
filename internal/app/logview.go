@@ -17,7 +17,9 @@ import (
 // behaviour; the streaming channel and cancel funcs are live handles, not
 // values to deep-copy.
 type logViewState struct {
-	lines          []string           // buffered log lines
+	lines          []string           // buffered log lines (filtered projection of rawLines)
+	rawLines       []string           // full unfiltered stream (source of lines)
+	rawSev         []int              // per-rawLine severity rank; rawSev[i] is for rawLines[i]; populated when sevThreshold>0
 	scroll         int                // scroll offset (top visible source line)
 	wrapTopSkip    int                // wrap mode: number of sub-lines to skip from the top of lines[scroll]
 	follow         bool               // auto-scroll to bottom
@@ -70,6 +72,12 @@ type logViewState struct {
 	// Jump to line (digits + G).
 	lineInput string
 
+	// Filter state (live text filter + min-severity threshold).
+	filterActive bool      // true while the live text-filter input is open
+	filterInput  TextInput // text input buffer for the live filter
+	filterQuery  string    // applied text filter (live)
+	sevThreshold int       // 0=off, else minimum ui.Sev* rank
+
 	// Search state.
 	searchActive  bool
 	searchInput   TextInput
@@ -86,6 +94,12 @@ func (s logViewState) copy() logViewState {
 	cp := s
 	if s.lines != nil {
 		cp.lines = append([]string(nil), s.lines...)
+	}
+	if s.rawLines != nil {
+		cp.rawLines = append([]string(nil), s.rawLines...)
+	}
+	if s.rawSev != nil {
+		cp.rawSev = append([]int(nil), s.rawSev...)
 	}
 	if s.multiItems != nil {
 		cp.multiItems = append([]model.Item(nil), s.multiItems...)

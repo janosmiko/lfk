@@ -35,12 +35,12 @@ func (m Model) viewLogs() string {
 	// keeps its built-in footer for the standalone (no-preview) layout.
 	omitInnerFooter := previewWidth > 0
 
-	logView := ui.RenderLogViewer(m.logView.lines, m.logView.scroll, logWidth, viewH, m.logView.follow, m.logView.wrap, m.logView.lineNumbers, m.logView.timestamps, m.logView.previous, m.logView.hidePrefixes, m.logView.title, m.logView.searchQuery, m.logView.searchInput.Value, m.logView.searchActive, canSwitchPod, canFilterContainers, m.logView.hasMoreHistory, m.logView.loadingHistory, statusMsg, statusIsErr, m.logView.cursor, m.logView.visualMode, m.logView.visualStart, m.logView.visualType, m.logView.visualCol, m.logView.visualCurCol, m.logView.wrapTopSkip, omitInnerFooter)
+	logView := ui.RenderLogViewer(m.logView.lines, m.logView.scroll, logWidth, viewH, m.logView.follow, m.logView.wrap, m.logView.lineNumbers, m.logView.timestamps, m.logView.previous, m.logView.hidePrefixes, m.logView.title, m.logView.searchQuery, m.logView.searchInput.Value, m.logView.searchActive, canSwitchPod, canFilterContainers, m.logView.hasMoreHistory, m.logView.loadingHistory, statusMsg, statusIsErr, m.logView.cursor, m.logView.visualMode, m.logView.visualStart, m.logView.visualType, m.logView.visualCol, m.logView.visualCurCol, m.logView.wrapTopSkip, omitInnerFooter, m.logView.filterActive, m.logView.filterInput.Value, m.logView.filterQuery, m.logView.sevThreshold)
 
 	if previewWidth > 0 {
 		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logView.previewScroll, true)
 		panes := lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
-		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers)
+		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers, m.logView.filterActive, m.logView.filterInput.Value)
 		return lipgloss.JoinVertical(lipgloss.Left, panes, footer)
 	}
 	return logView
@@ -296,10 +296,16 @@ func (m Model) viewDiff() string {
 	if m.hasStatusMessage() {
 		footerOverride = m.renderStatusHint()
 	}
-	if m.diffView.unified {
-		return ui.RenderUnifiedDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
+	// Compute the original diff line index of the current n/N match so the
+	// renderer can apply the distinct current-match highlight to that line.
+	currentMatchLine := -1
+	if len(m.diffView.matchLines) > 0 && m.diffView.matchIdx >= 0 && m.diffView.matchIdx < len(m.diffView.matchLines) {
+		currentMatchLine = m.diffView.matchLines[m.diffView.matchIdx]
 	}
-	return ui.RenderDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
+	if m.diffView.unified {
+		return ui.RenderUnifiedDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, currentMatchLine, vp, footerOverride)
+	}
+	return ui.RenderDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, currentMatchLine, vp, footerOverride)
 }
 
 func (m Model) logViewHeight() int {

@@ -344,7 +344,9 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
-| `f` | Toggle follow mode (auto-scroll to new logs) |
+| `F` | Toggle follow mode (auto-scroll to new logs) |
+| `f` | Filter log lines live (`~`fuzzy, regex auto-detected, `\`literal); narrows the view to matching lines |
+| `i` / `o` | Lower / raise the minimum log severity shown — cycles **off → INFO+ → WARN+ → ERROR+** (all source levels merge into these three). Structured logs use the parsed level; plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO. So INFO+ hides debug/trace, WARN+ shows only warn/error lines, ERROR+ only error/failure lines |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |

@@ -457,7 +457,9 @@ func (m *Model) saveCurrentTab() {
 	t.expandedGroup = m.expandedGroup
 	t.allGroupsExpanded = m.allGroupsExpanded
 	t.mode = m.mode
-	t.logLines = append([]string(nil), m.logView.lines...)
+	t.logLines = append([]string(nil), m.logView.rawLines...)
+	t.logFilterQuery = m.logView.filterQuery
+	t.logSevThreshold = m.logView.sevThreshold
 	t.logScroll = m.logView.scroll
 	t.logWrapTopSkip = m.logView.wrapTopSkip
 	t.logFollow = m.logView.follow
@@ -588,7 +590,10 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 
 	// Restore per-tab view mode and log state.
 	m.mode = t.mode
-	m.logView.lines = append([]string(nil), t.logLines...)
+	m.logView.rawLines = append([]string(nil), t.logLines...)
+	m.logView.rawSev = nil
+	m.logView.filterQuery = t.logFilterQuery
+	m.logView.sevThreshold = t.logSevThreshold
 	m.logView.scroll = t.logScroll
 	m.logView.wrapTopSkip = t.logWrapTopSkip
 	m.logView.follow = t.logFollow
@@ -610,6 +615,9 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logView.visualCol = t.logVisualCol
 	m.logView.visualCurCol = t.logVisualCurCol
 	m.logView.scrollOption = t.logScrollOption
+	// Rebuild the filtered view after all offset/follow fields are restored so
+	// clampLogOffsets operates on the correct follow flag and cursor position.
+	m.rebuildLogView()
 	m.logView.parentKind = t.logParentKind
 	m.logView.parentName = t.logParentName
 	m.logView.savedPodName = t.logSavedPodName
@@ -759,12 +767,15 @@ func (m *Model) cloneCurrentTab() TabState {
 		eventGrouping:           m.eventGrouping,
 		expandedGroup:           m.expandedGroup,
 		allGroupsExpanded:       m.allGroupsExpanded,
-		logCursor:               m.logView.cursor,
-		logVisualMode:           false, // don't clone visual mode into new tabs
-		logVisualStart:          0,
-		logVisualType:           'V',
-		logVisualCol:            0,
-		logVisualCurCol:         0,
+
+		// logFilterQuery/logSevThreshold are intentionally left zero: a cloned tab
+		// starts with no active log filter.
+		logCursor:       m.logView.cursor,
+		logVisualMode:   false, // don't clone visual mode into new tabs
+		logVisualStart:  0,
+		logVisualType:   'V',
+		logVisualCol:    0,
+		logVisualCurCol: 0,
 	}
 	// New tabs inherit the active tab's security state because they
 	// start on the same cluster; navigateChildCluster will rebuild

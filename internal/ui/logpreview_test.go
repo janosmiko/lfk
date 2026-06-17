@@ -1181,3 +1181,63 @@ func TestRenderLogPreviewPane_PostgresTitleIndicator(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLogLine_Log4j_OpenSearch(t *testing.T) {
+	in := `[2026-06-17T01:50:33,660][INFO ][o.o.j.s.JobSweeper       ] [opensearch-cluster-masters-0] Running full sweep`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewLog4j {
+		t.Fatalf("kind = %v, want Log4j", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	want := map[string]string{
+		"time":    "2026-06-17T01:50:33,660",
+		"level":   "Info",
+		"logger":  "o.o.j.s.JobSweeper",
+		"message": "[opensearch-cluster-masters-0] Running full sweep",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("field %q = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
+func TestParseLogLine_Log4j_WithPodPrefix(t *testing.T) {
+	in := `[pod/opensearch-cluster-masters-0/opensearch] [2026-06-17T02:53:37,799][WARN ][o.o.j.s.JobSweeper] [node] slow`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewLog4j {
+		t.Fatalf("kind = %v, want Log4j (pod prefix should be stripped first)", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	if got["level"] != "Warning" {
+		t.Errorf("level = %q, want Warning", got["level"])
+	}
+}
+
+func TestParseLogLine_Glog_AbseilFullDate(t *testing.T) {
+	// Dragonfly / Abseil glog: 8-digit YYYYMMDD date.
+	in := `W20260429 10:55:50.349922    12 common.cc:346] ReportError: Operation canceled`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewKlog {
+		t.Fatalf("kind = %v, want Klog (glog 8-digit date)", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	if got["level"] != "Warning" {
+		t.Errorf("level = %q, want Warning", got["level"])
+	}
+	if got["message"] != "ReportError: Operation canceled" {
+		t.Errorf("message = %q", got["message"])
+	}
+	if got["caller"] != "common.cc:346" {
+		t.Errorf("caller = %q, want common.cc:346", got["caller"])
+	}
+}

@@ -77,7 +77,7 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	}
 	// Initialize log viewer state.
 	m.mode = modeLogs
-	m.logView.lines = nil
+	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.follow = true
 	m.logView.wrap = false

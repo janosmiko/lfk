@@ -44,6 +44,10 @@ const (
 	// the default `log_line_prefix='%m [%p] '` setting (the value used
 	// by the upstream postgres Docker image).
 	LogPreviewPostgres
+	// LogPreviewLog4j covers the log4j2/log4j bracketed console pattern
+	// `[timestamp][LEVEL][logger] message` emitted by OpenSearch,
+	// Elasticsearch, Kafka, Spark, and many other JVM/log4j2 workloads.
+	LogPreviewLog4j
 )
 
 // LogPreviewField is a single key/value pair extracted from a structured log line.
@@ -133,6 +137,11 @@ func ParseLogLine(line string) ParsedLogPreview {
 		p.Fields = fields
 		return p
 	}
+	if fields, ok := parseLog4jFields(rest); ok {
+		p.Kind = LogPreviewLog4j
+		p.Fields = fields
+		return p
+	}
 	if fields, ok := parseLogfmtFields(rest); ok {
 		p.Kind = LogPreviewLogfmt
 		p.Fields = fields
@@ -145,12 +154,14 @@ func ParseLogLine(line string) ParsedLogPreview {
 //
 //	LMMDD HH:MM:SS.uuuuuu threadid file:line] msg
 //
-// L is one of I/W/E/F (Info/Warning/Error/Fatal). The thread id is
+// L is one of I/W/E/F (Info/Warning/Error/Fatal). The date is klog's
+// 4-digit MMDD or the 8-digit YYYYMMDD emitted by Abseil/glog (used by
+// Dragonfly and other C++ Abseil-logging apps). The thread id is
 // right-aligned with leading whitespace in real klog output, so \s+ is
 // used between the time and the thread id. The trailing `]` after the
 // file:line is the signature element that distinguishes klog from
 // free-form text that happens to start with a capital letter.
-var klogLine = regexp.MustCompile(`^([IWEF])(\d{4}) (\d{2}:\d{2}:\d{2}\.\d+)\s+(\d+)\s+([^:\s]+:\d+)\]\s*(.*)$`)
+var klogLine = regexp.MustCompile(`^([IWEF])(\d{8}|\d{4}) (\d{2}:\d{2}:\d{2}\.\d+)\s+(\d+)\s+([^:\s]+:\d+)\]\s*(.*)$`)
 
 var klogLevelName = map[byte]string{
 	'I': "Info",
@@ -376,6 +387,33 @@ func parseJavaFields(s string) ([]LogPreviewField, bool) {
 	return nil, false
 }
 
+// log4jLine matches the log4j2/log4j bracketed console pattern
+// `[timestamp][LEVEL][logger] message`. A known level word in the second
+// bracket is the discriminator, so the matcher does not misfire on other
+// bracketed text. The leading [logger] bracket of the remainder is
+// optional. Levels are normalised via javaLevelName.
+var log4jLine = regexp.MustCompile(`^\[([^\]]+)\]\[\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\s*\]\s*(.*)$`)
+
+func parseLog4jFields(s string) ([]LogPreviewField, bool) {
+	m := log4jLine.FindStringSubmatch(s)
+	if m == nil {
+		return nil, false
+	}
+	rest := m[3]
+	fields := []LogPreviewField{
+		{Key: "time", Value: m[1]},
+		{Key: "level", Value: javaLevelName[m[2]]},
+	}
+	if strings.HasPrefix(rest, "[") {
+		if i := strings.IndexByte(rest, ']'); i > 0 {
+			fields = append(fields, LogPreviewField{Key: "logger", Value: strings.TrimSpace(rest[1:i])})
+			rest = strings.TrimSpace(rest[i+1:])
+		}
+	}
+	fields = append(fields, LogPreviewField{Key: "message", Value: rest})
+	return fields, true
+}
+
 // postgresLine matches the PostgreSQL server log produced by the
 // default `log_line_prefix='%m [%p] '`:
 //
@@ -571,6 +609,8 @@ func RenderLogPreviewPane(line string, width, height, scroll int, omitFooter boo
 		titleText += HelpKeyStyle.Render("[JAVA]")
 	case LogPreviewPostgres:
 		titleText += HelpKeyStyle.Render("[POSTGRES]")
+	case LogPreviewLog4j:
+		titleText += HelpKeyStyle.Render("[LOG4J]")
 	default:
 		titleText += HelpKeyStyle.Render("[TEXT]")
 	}

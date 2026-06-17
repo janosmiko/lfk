@@ -400,6 +400,8 @@ func helpSections() []helpSection {
 				{"c", "Toggle previous container logs"},
 				{kb.Search, "Search in logs"},
 				{"", "Up/Down inside log search recalls previous queries (persistent across sessions)."},
+				{kb.Filter, "Filter log lines live (~fuzzy, regex auto, \\literal); narrows the view"},
+				{kb.SeverityDown + "/" + kb.SeverityUp, "Lower/raise min severity: off -> INFO+ -> WARN+ -> ERROR+ (plain text by keyword)"},
 				{kb.NextMatch, "Next search match"},
 				{kb.PrevMatch, "Previous search match"},
 				{"123" + kb.NextMatch + "/123" + kb.PrevMatch, "Jump to Nth next/previous match"},

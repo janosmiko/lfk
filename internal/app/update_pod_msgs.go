@@ -88,7 +88,7 @@ func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 			}
 			m.pendingAction = ""
 			m.logView.savedPodName = ""
-			m.logView.lines = nil
+			m.resetLogBuffer()
 			m.logView.scroll = 0
 			m.logView.follow = true
 			m.logView.tailLines = ui.ConfigLogTailLines
