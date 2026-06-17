@@ -113,6 +113,10 @@ func (m *Model) startLogStream() tea.Cmd {
 	// On auto-reconnect, force --tail=0 so we only pick up new lines from
 	// the next container rather than re-pulling history we already have.
 	reconnecting := m.logView.reconnecting
+	if !reconnecting {
+		// Fresh open: clear any stale pending-start state from a prior stream.
+		m.logView.pendingContainerStart = false
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logView.cancel = cancel

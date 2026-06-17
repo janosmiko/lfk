@@ -115,9 +115,22 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	// A line arrived — the stream is producing output, so any pending
-	// auto-reconnect backoff is no longer relevant.
+	// auto-reconnect backoff is no longer relevant. (Reset for transient
+	// "waiting to start" notices too, so a slow image pull keeps polling past
+	// the give-up cap instead of stalling.)
 	if m.logView.autoReconnectAttempt > 0 {
 		m.logView.autoReconnectAttempt = 0
+	}
+	if isKubectlTransientError(msg.line) {
+		// Container hasn't started yet. Flag the pending start so a
+		// specific-container stream reconnects when it ends, and show the
+		// notice only once — not one copy per reconnect poll.
+		if m.logView.pendingContainerStart {
+			return m, m.waitForLogLine()
+		}
+		m.logView.pendingContainerStart = true
+	} else {
+		m.logView.pendingContainerStart = false
 	}
 	m.appendRawLogLine(msg.line)
 	// Bound the live buffer so a long-running follow doesn't grow memory
@@ -174,12 +187,21 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 // scrolled away from the tail (logFollow=false) they're reading history,
 // not watching live — no point re-arming the stream on their behalf.
 func (m Model) shouldAutoReconnectLogs() bool {
-	return m.mode == modeLogs &&
-		m.logView.follow &&
-		!m.logView.isMulti &&
-		!m.logView.previous &&
-		m.actionCtx.kind == "Pod" &&
-		m.actionCtx.containerName == ""
+	if m.mode != modeLogs || !m.logView.follow || m.logView.isMulti ||
+		m.logView.previous || m.actionCtx.kind != "Pod" {
+		return false
+	}
+	if m.actionCtx.containerName == "" {
+		// All-containers single-Pod stream: kubectl exits on every
+		// init-container transition; reconnect to pick up the next one.
+		return true
+	}
+	// A specific container was selected. kubectl logs -c <name> exits
+	// immediately with a "waiting to start" error while the container is
+	// ContainerCreating/PodInitializing. Reconnect only while that pending
+	// state holds; once it has produced real output, a normal stream-end is
+	// terminal (the user opted into that one stream).
+	return m.logView.pendingContainerStart
 }
 
 // updateLogStreamRestart fires when a scheduled auto-reconnect is due. If
