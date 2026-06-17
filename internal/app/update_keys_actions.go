@@ -258,7 +258,10 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 		if m.namespace == "" && len(m.selectedNamespaces) == 0 {
 			m.namespace = m.defaultNamespaceForContext()
 		}
-		m.setStatusMessage("All namespaces mode OFF (ns: "+m.namespace+")", false)
+		// Report the effective scope: a restored single selection lives in
+		// selectedNamespaces (not m.namespace), so building the hint from
+		// m.namespace alone could still show "(ns: )".
+		m.setStatusMessage("All namespaces mode OFF (ns: "+m.effectiveNamespace()+")", false)
 	}
 	m.cancelAndReset()
 	m.requestGen++

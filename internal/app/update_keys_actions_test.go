@@ -137,6 +137,9 @@ func TestActionKeyAllNamespacesOffKeepsRestoredSelection(t *testing.T) {
 	assert.False(t, off.allNamespaces)
 	assert.Equal(t, map[string]bool{"team-a": true}, off.selectedNamespaces)
 	assert.Empty(t, off.namespace, "single-namespace selection takes precedence; no default fallback needed")
+	// Status hint must reflect the restored selection, not the empty
+	// m.namespace (would otherwise read "(ns: )").
+	assert.Contains(t, off.statusMessage, "ns: team-a")
 }
 
 func TestActionKeyAllNamespacesNoOpAtClusters(t *testing.T) {
