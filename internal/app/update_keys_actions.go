@@ -250,6 +250,14 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 		m.nsSelectionNegated = m.savedNsSelectionNegated
 		m.savedSelectedNamespaces = nil
 		m.savedNsSelectionNegated = false
+		// With no concrete namespace to return to (started in all-namespaces
+		// mode, or the namespace was cleared by a prior navigation) and no
+		// restored single selection, fall back to the default namespace.
+		// Otherwise effectiveNamespace returns "" and the fetch silently stays
+		// on every namespace, so the toggle looks like a no-op.
+		if m.namespace == "" && len(m.selectedNamespaces) == 0 {
+			m.namespace = m.defaultNamespaceForContext()
+		}
 		m.setStatusMessage("All namespaces mode OFF (ns: "+m.namespace+")", false)
 	}
 	m.cancelAndReset()
