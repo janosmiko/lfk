@@ -963,13 +963,16 @@ func TestPopulateResourceDetailsExt_ServiceAccount(t *testing.T) {
 
 // --- populateResourceDetailsExt: PriorityClass ---
 
+// PriorityClass has no spec: value, globalDefault, and preemptionPolicy are
+// top-level fields on the object. These tests pass them via obj (matching real
+// Kubernetes), not the spec argument.
 func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 	t.Run("default PriorityClass", func(t *testing.T) {
 		ti := &model.Item{Name: "high-priority"}
-		spec := map[string]any{
+		obj := map[string]any{
 			"globalDefault": true,
 		}
-		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 
 		assert.Equal(t, "high-priority (default)", ti.Name)
 		assert.Equal(t, "default", ti.Status)
@@ -977,10 +980,10 @@ func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 
 	t.Run("non-default PriorityClass", func(t *testing.T) {
 		ti := &model.Item{Name: "low-priority"}
-		spec := map[string]any{
+		obj := map[string]any{
 			"globalDefault": false,
 		}
-		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 
 		assert.Equal(t, "low-priority", ti.Name)
 	})
@@ -1074,23 +1077,34 @@ func TestPopulateResourceDetailsExt_IngressClass_ControllerAndParameters(t *test
 func TestPopulateResourceDetailsExt_PriorityClass_ValueAndPreemption(t *testing.T) {
 	t.Run("value 1000 and preemption Never", func(t *testing.T) {
 		ti := &model.Item{Name: "high-priority"}
-		spec := map[string]any{
+		obj := map[string]any{
 			"value":            float64(1000),
 			"preemptionPolicy": "Never",
 		}
-		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 
 		colMap := columnsToMap(ti.Columns)
 		assert.Equal(t, "1000", colMap["Value"])
 		assert.Equal(t, "Never", colMap["Preemption Policy"])
 	})
 
+	t.Run("value as int64 (unstructured numeric form)", func(t *testing.T) {
+		ti := &model.Item{Name: "high-priority"}
+		obj := map[string]any{
+			"value": int64(2000000000),
+		}
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
+
+		colMap := columnsToMap(ti.Columns)
+		assert.Equal(t, "2000000000", colMap["Value"])
+	})
+
 	t.Run("zero value emitted", func(t *testing.T) {
 		ti := &model.Item{Name: "zero-priority"}
-		spec := map[string]any{
+		obj := map[string]any{
 			"value": float64(0),
 		}
-		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 
 		colMap := columnsToMap(ti.Columns)
 		assert.Equal(t, "0", colMap["Value"])
@@ -1098,11 +1112,11 @@ func TestPopulateResourceDetailsExt_PriorityClass_ValueAndPreemption(t *testing.
 
 	t.Run("empty preemption policy suppressed", func(t *testing.T) {
 		ti := &model.Item{Name: "some-priority"}
-		spec := map[string]any{
+		obj := map[string]any{
 			"value":            float64(500),
 			"preemptionPolicy": "",
 		}
-		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 
 		colMap := columnsToMap(ti.Columns)
 		_, found := colMap["Preemption Policy"]
