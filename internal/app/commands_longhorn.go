@@ -16,13 +16,13 @@ import (
 // satisfies the webhook without removing replicas/engines (a node that still
 // holds data is rejected on purpose and the error is surfaced).
 func (m Model) forceDeleteLonghornNode() tea.Cmd {
-	ctx := m.actionCtx.context
+	kctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
-	logger.Info("Force deleting Longhorn node", "name", name, "namespace", ns, "context", ctx)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Force delete Longhorn node "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		if err := m.client.ForceDeleteLonghornNode(ctx, ns, rt, name); err != nil {
+	logger.Info("Force deleting Longhorn node", "name", name, "namespace", ns, "context", kctx)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Force delete Longhorn node "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		if err := m.client.ForceDeleteLonghornNode(ctx, kctx, ns, rt, name); err != nil {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Force deleted Longhorn node %s", name)}
@@ -34,7 +34,7 @@ func (m Model) forceDeleteLonghornNode() tea.Cmd {
 // disables scheduling; Longhorn rebuilds each replica on another node before
 // removing it here, so no data is lost.
 func (m Model) setLonghornNodeEviction(evict bool) tea.Cmd {
-	ctx := m.actionCtx.context
+	kctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
@@ -46,9 +46,9 @@ func (m Model) setLonghornNodeEviction(evict bool) tea.Cmd {
 		doneMsg = fmt.Sprintf("Replica eviction cancelled for %s", name)
 	}
 
-	logger.Info("Setting Longhorn node eviction", "name", name, "evict", evict, "namespace", ns, "context", ctx)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, taskName, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		if err := m.client.SetLonghornNodeEviction(ctx, ns, rt, name, evict); err != nil {
+	logger.Info("Setting Longhorn node eviction", "name", name, "evict", evict, "namespace", ns, "context", kctx)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, taskName, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		if err := m.client.SetLonghornNodeEviction(ctx, kctx, ns, rt, name, evict); err != nil {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: doneMsg}

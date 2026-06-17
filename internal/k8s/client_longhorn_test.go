@@ -79,6 +79,30 @@ func TestGetResources_LonghornNode_ReplicaCountColumn(t *testing.T) {
 	assert.Equal(t, "0", got["node-c"])
 }
 
+// TestWithLonghornReplicaCounts_DoesNotMutateInput guards against the
+// informer-cache path accumulating duplicate REPLICAS columns: the function
+// must not mutate the (memoized) input items, and repeated calls must each
+// yield exactly one REPLICAS column.
+func TestWithLonghornReplicaCounts_DoesNotMutateInput(t *testing.T) {
+	dc := newFakeDynClient(newLonghornReplica("r1", "node-a"))
+	c := newFakeClient(nil, dc)
+	items := []model.Item{{Name: "node-a"}}
+
+	out1 := c.withLonghornReplicaCounts(t.Context(), "", "longhorn-system", longhornNodeRT, items)
+	out2 := c.withLonghornReplicaCounts(t.Context(), "", "longhorn-system", longhornNodeRT, items)
+
+	assert.Empty(t, items[0].Columns, "input items must not be mutated")
+	for _, out := range [][]model.Item{out1, out2} {
+		count := 0
+		for _, kv := range out[0].Columns {
+			if kv.Key == LonghornReplicaColumn {
+				count++
+			}
+		}
+		assert.Equal(t, 1, count, "each call must produce exactly one REPLICAS column")
+	}
+}
+
 // TestGetResources_NonLonghorn_NoReplicaColumn ensures the REPLICAS column is
 // scoped to Longhorn nodes and does not leak onto other resource types.
 func TestGetResources_NonLonghorn_NoReplicaColumn(t *testing.T) {
@@ -105,7 +129,7 @@ func TestForceDeleteLonghornNode(t *testing.T) {
 	dc := newFakeDynClient(newLonghornNode("node1", true, false))
 	c := newFakeClient(nil, dc)
 
-	err := c.ForceDeleteLonghornNode("", "longhorn-system", longhornNodeRT, "node1")
+	err := c.ForceDeleteLonghornNode(t.Context(), "", "longhorn-system", longhornNodeRT, "node1")
 	require.NoError(t, err)
 
 	_, getErr := dc.Resource(longhornNodeGVR).Namespace("longhorn-system").
@@ -120,15 +144,19 @@ func TestSetLonghornNodeEviction_Enable(t *testing.T) {
 	dc := newFakeDynClient(newLonghornNode("node1", true, false))
 	c := newFakeClient(nil, dc)
 
-	err := c.SetLonghornNodeEviction("", "longhorn-system", longhornNodeRT, "node1", true)
+	err := c.SetLonghornNodeEviction(t.Context(), "", "longhorn-system", longhornNodeRT, "node1", true)
 	require.NoError(t, err)
 
 	obj, getErr := dc.Resource(longhornNodeGVR).Namespace("longhorn-system").
 		Get(t.Context(), "node1", metav1.GetOptions{})
 	require.NoError(t, getErr)
 
-	evict, _, _ := unstructured.NestedBool(obj.Object, "spec", "evictionRequested")
-	sched, _, _ := unstructured.NestedBool(obj.Object, "spec", "allowScheduling")
+	evict, evictFound, evictErr := unstructured.NestedBool(obj.Object, "spec", "evictionRequested")
+	sched, schedFound, schedErr := unstructured.NestedBool(obj.Object, "spec", "allowScheduling")
+	require.NoError(t, evictErr)
+	require.NoError(t, schedErr)
+	require.True(t, evictFound, "spec.evictionRequested should exist")
+	require.True(t, schedFound, "spec.allowScheduling should exist")
 	assert.True(t, evict, "evictionRequested must be true")
 	assert.False(t, sched, "allowScheduling must be false during eviction")
 }
@@ -139,13 +167,19 @@ func TestSetLonghornNodeEviction_Cancel(t *testing.T) {
 	dc := newFakeDynClient(newLonghornNode("node1", false, true))
 	c := newFakeClient(nil, dc)
 
-	err := c.SetLonghornNodeEviction("", "longhorn-system", longhornNodeRT, "node1", false)
+	err := c.SetLonghornNodeEviction(t.Context(), "", "longhorn-system", longhornNodeRT, "node1", false)
 	require.NoError(t, err)
 
 	obj, getErr := dc.Resource(longhornNodeGVR).Namespace("longhorn-system").
 		Get(t.Context(), "node1", metav1.GetOptions{})
 	require.NoError(t, getErr)
 
-	evict, _, _ := unstructured.NestedBool(obj.Object, "spec", "evictionRequested")
+	evict, evictFound, evictErr := unstructured.NestedBool(obj.Object, "spec", "evictionRequested")
+	sched, schedFound, schedErr := unstructured.NestedBool(obj.Object, "spec", "allowScheduling")
+	require.NoError(t, evictErr)
+	require.NoError(t, schedErr)
+	require.True(t, evictFound, "spec.evictionRequested should exist")
+	require.True(t, schedFound, "spec.allowScheduling should exist")
 	assert.False(t, evict, "evictionRequested must be false after cancel")
+	assert.False(t, sched, "allowScheduling must remain disabled after cancel")
 }

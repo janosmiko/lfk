@@ -42,11 +42,11 @@ type OverlayConfirmConfig struct {
 	WrapWidth int
 }
 
-// wrapConfirmText word-wraps text to width on whitespace boundaries so words
-// (and hyphenated resource names) stay intact. A single token longer than
-// width is hard-split into width-sized chunks so no line exceeds width and
-// lipgloss never re-wraps with its hyphen-breaking default. Confirm text is
-// ASCII, so byte length is a safe column proxy.
+// wrapConfirmText word-wraps text to width display columns on whitespace
+// boundaries so words (and hyphenated resource names) stay intact. A single
+// token wider than width is hard-split on rune boundaries so no line exceeds
+// width and lipgloss never re-wraps with its hyphen-breaking default. Widths
+// use lipgloss.Width so multibyte/wide characters are measured correctly.
 func wrapConfirmText(text string, width int) []string {
 	if width <= 0 {
 		return []string{text}
@@ -60,15 +60,16 @@ func wrapConfirmText(text string, width int) []string {
 		}
 	}
 	for word := range strings.FieldsSeq(text) {
-		for len(word) > width {
+		for lipgloss.Width(word) > width {
 			flush()
-			lines = append(lines, word[:width])
-			word = word[width:]
+			head, rest := splitAtWidth(word, width)
+			lines = append(lines, head)
+			word = rest
 		}
 		switch {
 		case cur == "":
 			cur = word
-		case len(cur)+1+len(word) <= width:
+		case lipgloss.Width(cur)+1+lipgloss.Width(word) <= width:
 			cur += " " + word
 		default:
 			flush()
@@ -77,6 +78,21 @@ func wrapConfirmText(text string, width int) []string {
 	}
 	flush()
 	return lines
+}
+
+// splitAtWidth returns the longest prefix of s whose display width is <= width
+// and the remainder, splitting on rune boundaries so multibyte characters are
+// never cut in half.
+func splitAtWidth(s string, width int) (string, string) {
+	w := 0
+	for i, r := range s {
+		rw := lipgloss.Width(string(r))
+		if w+rw > width {
+			return s[:i], s[i:]
+		}
+		w += rw
+	}
+	return s, ""
 }
 
 // RenderOverlayConfirm renders a confirm overlay per cfg.

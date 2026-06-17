@@ -26,6 +26,10 @@ const LonghornReplicaColumn = "REPLICAS"
 // One extra LIST per refresh (not per node): replicas are listed once and
 // grouped by node. Best-effort — a failure leaves the column unset rather than
 // failing the whole node list, so the table still renders.
+//
+// Returns a new slice with per-item copies of Columns: the informer-cache path
+// reuses memoized model.Items across refreshes, so appending to the original
+// Columns slice would accumulate duplicate REPLICAS columns on unchanged rows.
 func (c *Client) withLonghornReplicaCounts(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, items []model.Item) []model.Item {
 	if !model.IsLonghornNode(rt) || len(items) == 0 {
 		return items
@@ -35,13 +39,14 @@ func (c *Client) withLonghornReplicaCounts(ctx context.Context, contextName, nam
 		logger.Warn("counting Longhorn replicas for node column", "context", contextName, "error", err)
 		return items
 	}
-	for i := range items {
-		items[i].Columns = append(items[i].Columns, model.KeyValue{
-			Key:   LonghornReplicaColumn,
-			Value: strconv.Itoa(counts[items[i].Name]),
-		})
+	out := make([]model.Item, len(items))
+	copy(out, items)
+	for i := range out {
+		col := model.KeyValue{Key: LonghornReplicaColumn, Value: strconv.Itoa(counts[out[i].Name])}
+		// Fresh Columns slice so memoized cache items are never mutated.
+		out[i].Columns = append(append([]model.KeyValue(nil), out[i].Columns...), col)
 	}
-	return items
+	return out
 }
 
 // longhornReplicaCountsByNode lists longhorn.io/replicas and returns a map of
@@ -86,7 +91,7 @@ func (c *Client) longhornReplicaCountsByNode(ctx context.Context, contextName, n
 // patch succeeds, the node is left with allowScheduling=false. The error is
 // surfaced to the caller and a retry is safe (the patch is idempotent), but
 // re-enable scheduling manually if abandoning the delete.
-func (c *Client) ForceDeleteLonghornNode(contextName, namespace string, rt model.ResourceTypeEntry, name string) error {
+func (c *Client) ForceDeleteLonghornNode(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, name string) error {
 	logger.Info("Force deleting Longhorn node", "context", contextName, "namespace", namespace, "name", name)
 	res, err := c.longhornNodeResource(contextName, namespace, rt)
 	if err != nil {
@@ -94,10 +99,10 @@ func (c *Client) ForceDeleteLonghornNode(contextName, namespace string, rt model
 	}
 
 	patch := []byte(`{"spec":{"allowScheduling":false}}`)
-	if _, err := res.Patch(context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err := res.Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("disabling scheduling on Longhorn node %s: %w", name, err)
 	}
-	if err := res.Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
+	if err := res.Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
 		return fmt.Errorf("deleting Longhorn node %s: %w", name, err)
 	}
 	return nil
@@ -110,7 +115,7 @@ func (c *Client) ForceDeleteLonghornNode(contextName, namespace string, rt model
 // scheduling is disabled, and then rebuilds each replica on another node
 // before removing it from this one (data-safe). When evict is false it clears
 // spec.evictionRequested, leaving scheduling untouched.
-func (c *Client) SetLonghornNodeEviction(contextName, namespace string, rt model.ResourceTypeEntry, name string, evict bool) error {
+func (c *Client) SetLonghornNodeEviction(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, name string, evict bool) error {
 	logger.Info("Setting Longhorn node eviction", "context", contextName, "namespace", namespace, "name", name, "evict", evict)
 	res, err := c.longhornNodeResource(contextName, namespace, rt)
 	if err != nil {
@@ -121,7 +126,7 @@ func (c *Client) SetLonghornNodeEviction(contextName, namespace string, rt model
 	if evict {
 		patch = []byte(`{"spec":{"allowScheduling":false,"evictionRequested":true}}`)
 	}
-	if _, err := res.Patch(context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err := res.Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("setting eviction=%t on Longhorn node %s: %w", evict, name, err)
 	}
 	return nil
