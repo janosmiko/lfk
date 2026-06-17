@@ -337,6 +337,7 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.portForwardInput.Clear()
 		m.pfAvailablePorts = nil
 		m.pfPortCursor = -1
+		m.pfOpenInBrowserAfterStart = false
 		return m, nil
 	case "j", "down":
 		if len(m.pfAvailablePorts) > 0 && m.pfPortCursor < len(m.pfAvailablePorts)-1 {
@@ -372,6 +373,7 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				// An empty local port (":80") is fine — kubectl picks one.
 				m.setStatusMessage("Port mapping needs a remote port (e.g., 8080:80)", true)
 				m.overlay = overlayNone
+				m.pfOpenInBrowserAfterStart = false
 				return m, scheduleStatusClear()
 			}
 			localPort = parts[0]
@@ -383,6 +385,7 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		default:
 			m.setStatusMessage("Port mapping required (e.g., 8080:80)", true)
 			m.overlay = overlayNone
+			m.pfOpenInBrowserAfterStart = false
 			return m, scheduleStatusClear()
 		}
 		portMapping := localPort + ":" + remotePort

@@ -119,6 +119,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Exec", Description: "Exec into pod behind service", Key: "s"},
 			{Label: "Attach", Description: "Attach to pod behind service", Key: "A"},
 			{Label: "Port Forward", Description: "Forward local port to service", Key: "p"},
+			{Label: "Port Forward & Open", Description: "Forward a local port and open it in the browser", Key: "O"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this service", Key: "D"},

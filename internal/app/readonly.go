@@ -34,6 +34,7 @@ var mutatingActions = map[string]bool{
 	"Debug Pod":            true,
 	"Debug Mount":          true,
 	"Port Forward":         true,
+	"Port Forward & Open":  true,
 	"Cordon":               true,
 	"Uncordon":             true,
 	"Drain":                true,
@@ -111,6 +112,8 @@ func isUnionAllowedActionForKind(kind, label string) bool {
 			return true
 		}
 		return false
+	case "Port Forward & Open":
+		return kind == "Service"
 	case "Restart":
 		return model.IsRestartableKind(kind)
 	default:

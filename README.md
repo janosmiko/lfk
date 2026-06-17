@@ -382,7 +382,7 @@ All search and filter inputs support three modes, auto-detected from the query s
 - Teleport between levels with `0` / `1` / `2` (clusters / resource types / resources)
 - Sort by any column with `>` / `<`, flip direction with `=`, reset with `-`
 - Check firing Prometheus/Alertmanager alerts with `@` and namespace quotas with `Q`
-- Open an Ingress host - or an active port-forward's localhost URL - in your browser with `Ctrl+O`
+- Open an Ingress host - or an active port-forward's localhost URL - in your browser with `Ctrl+O`; on a Service, `Ctrl+O` starts a port forward and opens it
 - Save the selected resource manifest to a file with `W`
 - Spin up a throwaway kind/k3d/minikube cluster without leaving lfk: `Ctrl+N` at the cluster list
 - Capture a Pod's network traffic with `c` - live decode plus pcap export (kubectl-debug or kubeshark)

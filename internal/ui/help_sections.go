@@ -105,6 +105,7 @@ func helpSections() []helpSection {
 				{helpKeyDisplay(kb.PasteApply), "Apply resource from clipboard (kubectl apply)"},
 				{"", "Port forwarding: use action menu (" + kb.ActionMenu + ") on Pod/Service/Deployment/StatefulSet/DaemonSet"},
 				{"", "Auto-navigates to Port Forwards list after creation; shows resolved local port"},
+				{helpKeyDisplay(kb.OpenBrowser), "Open in browser: Ingress host, port-forward URL, or (Service) forward a port and open it"},
 			},
 		},
 		{

@@ -485,8 +485,18 @@ func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 
 func (m Model) handleExplorerActionKeyOpenBrowser() (tea.Model, tea.Cmd, bool) {
 	kind := m.selectedResourceKind()
-	if kind != "Ingress" && kind != "__port_forwards__" && kind != "__port_forward_entry__" {
-		m.setStatusMessage("Open in browser is only available for Ingress resources and port forwards", true)
+	// Ingresses and port forwards have a directly openable URL. A Service has
+	// none, so Ctrl+O instead starts a port forward and opens the resolved
+	// localhost URL once it is ready (the "Port Forward & Open" action, which
+	// is read-only gated in executeAction).
+	var action string
+	switch kind {
+	case "Ingress", "__port_forwards__", "__port_forward_entry__":
+		action = "Open in Browser"
+	case "Service":
+		action = "Port Forward & Open"
+	default:
+		m.setStatusMessage("Open in browser is only available for Ingress, Service, and port forwards", true)
 		return m, scheduleStatusClear(), true
 	}
 	sel := m.selectedMiddleItem()
@@ -494,7 +504,7 @@ func (m Model) handleExplorerActionKeyOpenBrowser() (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	m.actionCtx = m.buildActionCtx(sel, kind)
-	ret, cmd := m.executeAction("Open in Browser")
+	ret, cmd := m.executeAction(action)
 	return ret, cmd, true
 }
 
