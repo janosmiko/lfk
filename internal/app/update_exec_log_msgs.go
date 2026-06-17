@@ -125,6 +125,13 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 	// displayed projection, so without a filter we shift them by the dropped
 	// count, and with a filter we re-project (offsets re-clamped there).
 	if trimmed, drop := capLogLines(m.logView.rawLines); drop > 0 {
+		// Count how many of the dropped raw lines were visible under the active
+		// filter before trimming, so we shift the projected offsets by the
+		// VISIBLE delta (not the raw drop count).
+		visibleDrop := 0
+		if m.logFilterActive() {
+			visibleDrop = m.countVisibleRaw(m.logView.rawLines[:drop])
+		}
 		m.logView.rawLines = trimmed
 		if len(m.logView.rawSev) > 0 {
 			cut := min(drop, len(m.logView.rawSev))
@@ -133,6 +140,12 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 			m.logView.rawSev = retained
 		}
 		if m.logFilterActive() {
+			// Shift by the visible delta so a non-following viewport keeps its
+			// place; follow mode re-pins to the bottom below regardless.
+			m.logView.scroll = shiftLogOffset(m.logView.scroll, visibleDrop)
+			m.logView.cursor = shiftLogOffset(m.logView.cursor, visibleDrop)
+			m.logView.visualStart = shiftLogOffset(m.logView.visualStart, visibleDrop)
+			m.logView.wrapTopSkip = 0
 			m.rebuildLogView()
 		} else {
 			m.logView.lines = m.logView.rawLines
@@ -207,18 +220,24 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	// async fetch resolved before they navigated), in which case keep them
 	// at 0 so the newly revealed older lines come into view.
 	prepended := len(newOlderLines)
+	// How many prepended lines are visible under the active filter (the amount
+	// the projected offsets must grow by); raw count otherwise.
+	visiblePrepended := prepended
+	if m.logFilterActive() {
+		visiblePrepended = m.countVisibleRaw(newOlderLines)
+	}
 	m.logView.rawLines = append(newOlderLines, m.logView.rawLines...)
 	m.logView.rawSev = nil // ordering changed; recompute lazily when needed
+	if m.logView.cursor > 0 || m.logView.scroll > 0 {
+		m.logView.scroll += visiblePrepended
+		if m.logView.cursor >= 0 {
+			m.logView.cursor += visiblePrepended
+		}
+	}
 	if m.logFilterActive() {
 		m.rebuildLogView()
 	} else {
 		m.logView.lines = m.logView.rawLines
-		if m.logView.cursor > 0 || m.logView.scroll > 0 {
-			m.logView.scroll += prepended
-			if m.logView.cursor >= 0 {
-				m.logView.cursor += prepended
-			}
-		}
 	}
 	m.logView.tailLines += ui.ConfigLogTailLines
 

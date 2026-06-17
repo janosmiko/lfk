@@ -292,3 +292,24 @@ func TestLogView_FilterPromptWhenActive(t *testing.T) {
 		t.Errorf("expected filter prompt footer (esc:clear), got:\n%s", out)
 	}
 }
+
+func TestCountVisibleRaw(t *testing.T) {
+	var m Model
+	lines := []string{
+		`{"level":"info","msg":"a"}`,  // info bucket
+		`{"level":"error","msg":"b"}`, // error bucket
+		"plain no keyword",            // info default
+		"connection failed",           // error keyword
+	}
+	if got := m.countVisibleRaw(lines); got != 4 {
+		t.Fatalf("no filter: got %d, want 4", got)
+	}
+	m.logView.sevThreshold = ui.LogError
+	if got := m.countVisibleRaw(lines); got != 2 {
+		t.Fatalf("ERROR+: got %d, want 2 (two error-bucket lines)", got)
+	}
+	m.logView.filterQuery = "failed"
+	if got := m.countVisibleRaw(lines); got != 1 {
+		t.Fatalf("ERROR+ & \"failed\": got %d, want 1", got)
+	}
+}

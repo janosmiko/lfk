@@ -83,6 +83,24 @@ func (m *Model) appendRawLogLine(line string) {
 	m.logView.lines = append(m.logView.lines, line)
 }
 
+// countVisibleRaw returns how many of the given raw log lines pass the active
+// filters (text + severity). Used to shift the projected offsets by the VISIBLE
+// delta when raw lines are trimmed or prepended while a filter is active, so a
+// non-following viewport keeps its place instead of jumping.
+func (m *Model) countVisibleRaw(lines []string) int {
+	n := 0
+	for _, ln := range lines {
+		if m.logView.sevThreshold > 0 && ui.LineLogLevel(ln) < m.logView.sevThreshold {
+			continue
+		}
+		if m.logView.filterQuery != "" && !ui.MatchLine(ln, m.logView.filterQuery) {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // severityStep raises (+1) or lowers (-1) the minimum-severity threshold by
 // one level, clamped to [off, LogError], then re-projects the view. The
 // threshold cycles off -> INFO+ -> WARN+ -> ERROR+ (debug is never a
