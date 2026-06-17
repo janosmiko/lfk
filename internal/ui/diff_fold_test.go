@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -161,6 +162,16 @@ func TestHighlightDiffSearchInLine(t *testing.T) {
 		result := highlightDiffSearchInLine("Hello World", "hello", false)
 		assert.Contains(t, result, "Hello")
 		assert.GreaterOrEqual(t, len(result), len("Hello World"))
+	})
+
+	t.Run("current match uses a distinct style from non-current", func(t *testing.T) {
+		setTestColorProfile(t)
+		normal := highlightDiffSearchInLine("hello world", "world", false)
+		current := highlightDiffSearchInLine("hello world", "world", true)
+		// The current match must render with a different (distinct) style than
+		// the non-current matches; the underlying plain text is unchanged.
+		assert.NotEqual(t, normal, current, "current match should differ from non-current")
+		assert.Equal(t, "hello world", ansi.Strip(current), "plain text preserved")
 	})
 }
 
