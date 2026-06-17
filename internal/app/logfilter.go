@@ -101,13 +101,15 @@ func (m *Model) clampLogOffsets() {
 		m.logView.wrapTopSkip = 0
 	}
 	if m.logView.follow {
-		m.logView.scroll = 0
-		m.logView.wrapTopSkip = 0
 		if n > 0 {
 			m.logView.cursor = n - 1
 		} else {
 			m.logView.cursor = -1
 		}
+		// Pin the viewport to the bottom of the filtered output. Setting
+		// scroll to 0 here would show the TOP of the results until the next
+		// streamed line re-pinned it (filter edits don't run ensureLogCursorVisible).
+		m.logView.scroll, m.logView.wrapTopSkip = m.logMaxScrollAndSkip()
 		return
 	}
 	if m.logView.cursor >= n {

@@ -68,6 +68,10 @@ func TestLineLogLevel_PlainTextKeywords(t *testing.T) {
 		{"no false positive", "preferred replica selected", LogInfo},
 		// Error wins over warn when both present
 		{"error beats warn", "warning: this will error out", LogError},
+		// A structured level field that is present but UNMAPPED stays
+		// authoritative (INFO) and must NOT be keyword-scanned from the
+		// message text (here the message says "failed" but level is "audit").
+		{"unmapped structured level stays info", `{"level":"audit","msg":"operation failed"}`, LogInfo},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

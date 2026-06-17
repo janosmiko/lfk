@@ -1219,11 +1219,13 @@ func TestTabSwitchPreservesLogViewerState(t *testing.T) {
 	assert.Equal(t, []string{"main"}, m.logView.containers)
 
 	// Switch back to Tab A: its persisted log state must round-trip intact.
-	// follow=true causes clampLogOffsets to pin cursor to n-1 and scroll to 0.
+	// follow=true causes clampLogOffsets to pin cursor to n-1 and scroll to the
+	// bottom of the output via logMaxScrollAndSkip.
 	m.saveCurrentTab()
 	m.loadTab(0)
 	assert.Equal(t, []string{"a-1", "a-2", "a-3"}, m.logView.lines)
-	assert.Equal(t, 0, m.logView.scroll)
+	assert.Equal(t, m.logMaxScroll(), m.logView.scroll, "follow mode pins scroll to the bottom")
+	assert.Equal(t, len(m.logView.lines)-1, m.logView.cursor, "follow mode pins cursor to the last line")
 	assert.True(t, m.logView.follow, "Tab B's follow flag must not bleed into Tab A")
 	assert.Equal(t, "Logs: a", m.logView.title)
 

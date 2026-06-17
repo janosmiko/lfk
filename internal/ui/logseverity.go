@@ -65,6 +65,11 @@ func LineLogLevel(line string) int {
 			if b, ok := levelBucket(f.Value); ok {
 				return b
 			}
+			// A structured level field is present but its token is unknown.
+			// Structured logs are authoritative: don't fall back to scanning
+			// the message text (which could up/down-rank by coincidence).
+			// Treat an unrecognized structured level as INFO.
+			return LogInfo
 		}
 	}
 	return keywordLevel(line)

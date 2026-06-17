@@ -92,14 +92,19 @@ func TestHighlightMatchCurrentAtCol_RegexCurrentCol(t *testing.T) {
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "foo bar foo"
-	// "foo" matches at col 0 and col 8; current at col 8 -> second is current.
-	out := HighlightMatchCurrentAtCol(line, "foo", normal, current, 8)
+	// `f.o` has a regex metacharacter -> regex mode; matches "foo" at col 0
+	// and col 8; current at col 8 -> second is current.
+	const q = "f.o"
+	if mode, _ := DetectSearchMode(q); mode != SearchRegex {
+		t.Fatalf("query %q should be regex mode, got %v", q, mode)
+	}
+	out := HighlightMatchCurrentAtCol(line, q, normal, current, 8)
 	plain := ansi.Strip(out)
 	if plain != line {
 		t.Fatalf("plain text changed: %q", plain)
 	}
 	// Output must differ from uniform highlight.
-	if out == HighlightMatchStyled(line, "foo", normal) {
+	if out == HighlightMatchStyled(line, q, normal) {
 		t.Fatal("current match not styled differently from the rest")
 	}
 }

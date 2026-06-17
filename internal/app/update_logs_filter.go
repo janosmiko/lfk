@@ -9,6 +9,9 @@ import (
 func (m Model) handleLogKeyFilter() (Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
 	m.logView.filterActive = true
 	m.logView.filterInput.Set(m.logView.filterQuery)
+	// Drop any pending count prefix so a digit typed before `f` can't leak
+	// into the next motion after the filter input closes.
+	m.logView.lineInput = ""
 	return m, nil
 }
 
