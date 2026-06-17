@@ -80,6 +80,89 @@ func TestUpdateLogLine_DoneSpecificContainerStreamEnds(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// A specific container that is still ContainerCreating makes kubectl logs
+// -c <name> exit immediately with a "waiting to start" error. The viewer must
+// keep that container's stream alive via auto-reconnect so logs appear once
+// the container starts — otherwise it's stuck on the error forever.
+func TestUpdateLogLine_SpecificContainerWaitingToStartReconnects(t *testing.T) {
+	ch := make(chan string, 1)
+	transient := `error: container "external-dns" in pod "external-dns-5fccb74474-gj9sk" is waiting to start: ContainerCreating`
+	m := Model{
+		mode: modeLogs,
+		logView: logViewState{
+			ch:     ch,
+			follow: true,
+		},
+		tabs:              []TabState{{}},
+		logReaderInFlight: make(map[chan string]bool),
+		actionCtx: actionContext{
+			kind:          "Pod",
+			name:          "external-dns-5fccb74474-gj9sk",
+			containerName: "external-dns",
+		},
+	}
+
+	// The "waiting to start" notice arrives once and flags a pending start.
+	result, _ := m.Update(logLineMsg{line: transient, ch: ch})
+	m = result.(Model)
+	assert.True(t, m.logView.pendingContainerStart)
+	assert.Equal(t, []string{transient}, m.logView.rawLines, "notice shown once")
+
+	// The stream then ends (kubectl exited) — a reconnect must be scheduled
+	// even though a specific container was selected.
+	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
+	m = result.(Model)
+	assert.NotNil(t, cmd, "specific-container stream waiting to start must reconnect")
+}
+
+// Across reconnect polls the same "waiting to start" notice must not be
+// appended repeatedly — show it once, not one copy per poll.
+func TestUpdateLogLine_SpecificContainerTransientDeduped(t *testing.T) {
+	ch := make(chan string, 1)
+	transient := `error: container "external-dns" in pod "p" is waiting to start: ContainerCreating`
+	m := Model{
+		mode: modeLogs,
+		logView: logViewState{
+			ch:                    ch,
+			follow:                true,
+			rawLines:              []string{transient},
+			pendingContainerStart: true,
+		},
+		tabs:              []TabState{{}},
+		logReaderInFlight: make(map[chan string]bool),
+		actionCtx:         actionContext{kind: "Pod", name: "p", containerName: "external-dns"},
+	}
+	result, cmd := m.Update(logLineMsg{line: transient, ch: ch})
+	m = result.(Model)
+	assert.Equal(t, []string{transient}, m.logView.rawLines, "duplicate notice suppressed")
+	assert.True(t, m.logView.pendingContainerStart)
+	assert.NotNil(t, cmd, "reader re-armed to keep draining")
+}
+
+// Once real output arrives the pending flag clears, and a subsequent
+// stream-end for that specific container no longer reconnects.
+func TestUpdateLogLine_SpecificContainerRealOutputClearsPending(t *testing.T) {
+	ch := make(chan string, 1)
+	m := Model{
+		mode: modeLogs,
+		logView: logViewState{
+			ch:                    ch,
+			follow:                true,
+			pendingContainerStart: true,
+		},
+		tabs:              []TabState{{}},
+		logReaderInFlight: make(map[chan string]bool),
+		actionCtx:         actionContext{kind: "Pod", name: "p", containerName: "external-dns"},
+	}
+	result, _ := m.Update(logLineMsg{line: "2026-06-17T10:00:00Z serving metrics on :7979", ch: ch})
+	m = result.(Model)
+	assert.False(t, m.logView.pendingContainerStart, "real output means the container started")
+
+	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
+	m = result.(Model)
+	assert.Nil(t, cmd, "a started specific container that ends normally must not reconnect")
+}
+
 // Deployment/StatefulSet/etc. use --max-log-requests with a selector — a
 // single "done" doesn't reliably mean a container transition, so we don't
 // auto-reconnect. No sentinel marker is written either.

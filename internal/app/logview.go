@@ -55,6 +55,13 @@ type logViewState struct {
 	// Auto-reconnect for multi-container Pods.
 	autoReconnectAttempt int
 	reconnecting         bool
+	// pendingContainerStart is set while the stream keeps hitting a "waiting
+	// to start" (ContainerCreating / PodInitializing) error. It enables
+	// auto-reconnect for a specific-container stream — kubectl logs -c <name>
+	// exits immediately when the container hasn't started, so without it the
+	// viewer would be stuck on that error and never pick up logs once the
+	// container starts. Cleared as soon as real output arrives.
+	pendingContainerStart bool
 
 	// Container filter state.
 	containers         []string // available container names for current pod
