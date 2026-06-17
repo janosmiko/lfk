@@ -173,7 +173,7 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 		indicators = append(indicators, HelpKeyStyle.Render("[F:"+filterQuery+"]"))
 	}
 	if sevThreshold > 0 {
-		indicators = append(indicators, HelpKeyStyle.Render("[≥"+SeverityName(sevThreshold)+"]"))
+		indicators = append(indicators, HelpKeyStyle.Render("[≥"+LogLevelName(sevThreshold)+"]"))
 	}
 
 	titleText := " " + title + " "

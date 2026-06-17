@@ -30,16 +30,28 @@ func TestRebuildLogView_NoFilterAliasesRaw(t *testing.T) {
 func TestRebuildLogView_Severity(t *testing.T) {
 	var m Model
 	m.logView.rawLines = []string{
+		`{"level":"debug","msg":"d"}`,
 		`{"level":"info","msg":"a"}`,
+		`{"level":"warn","msg":"w"}`,
 		`{"level":"error","msg":"b"}`,
-		"\tcontinuation of the error",
-		`{"level":"debug","msg":"c"}`,
 	}
-	m.logView.sevThreshold = ui.SevError
+	// INFO+ drops debug.
+	m.logView.sevThreshold = ui.LogInfo
 	m.rebuildLogView()
-	// error line + its continuation tail (inherits error) survive; info/debug drop.
+	if len(m.logView.lines) != 3 {
+		t.Fatalf("INFO+: want 3 (info/warn/error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+	// WARN+ keeps warn+error.
+	m.logView.sevThreshold = ui.LogWarn
+	m.rebuildLogView()
 	if len(m.logView.lines) != 2 {
-		t.Fatalf("got %d lines, want 2 (error + continuation): %v", len(m.logView.lines), m.logView.lines)
+		t.Fatalf("WARN+: want 2 (warn/error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+	// ERROR+ keeps only error.
+	m.logView.sevThreshold = ui.LogError
+	m.rebuildLogView()
+	if len(m.logView.lines) != 1 {
+		t.Fatalf("ERROR+: want 1 (error), got %d: %v", len(m.logView.lines), m.logView.lines)
 	}
 }
 
@@ -77,36 +89,38 @@ func TestRebuildLogView_EmptyResultClampsAndExitsVisual(t *testing.T) {
 	}
 }
 
-func TestRebuildLogView_LeadingUnknownShownThenKnownFiltered(t *testing.T) {
+func TestRebuildLogView_PlainTextKeywordFiltering(t *testing.T) {
 	var m Model
-	// A leading line with no detectable level (and no prior level to inherit)
-	// is SHOWN at an ERROR threshold — we never hide what we can't classify.
-	// Once a known level appears, below-threshold known lines are hidden.
+	// Plain-text lines (no structured level) are bucketed by keyword scan,
+	// defaulting to INFO. This is the user-facing contract for text logs.
 	m.logView.rawLines = []string{
-		"\tat com.example.Foo.bar(Foo.java:42)", // unknown, no predecessor -> shown
-		`{"level":"info","msg":"chatter"}`,      // known INFO < ERROR -> hidden
-		`{"level":"error","msg":"boom"}`,        // known ERROR -> shown
+		"Running full sweep",            // no keyword -> INFO
+		"disk space warning: 90% used",  // warn keyword -> WARN
+		"connection error: timeout",     // error keyword -> ERROR
+		"DEBUG entering reconcile loop", // debug keyword -> DEBUG
 	}
-	m.logView.sevThreshold = ui.SevError
+	// off (no filter active) -> all 4 shown.
 	m.rebuildLogView()
-	if len(m.logView.lines) != 2 {
-		t.Fatalf("want 2 lines (leading-unknown + error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	if len(m.logView.lines) != 4 {
+		t.Fatalf("off: want 4, got %d: %v", len(m.logView.lines), m.logView.lines)
 	}
-}
-
-func TestRebuildLogView_PlainTextNeverBlanked(t *testing.T) {
-	var m Model
-	// A purely plain-text log (no detectable levels anywhere) must never be
-	// blanked by the severity filter — all lines are shown at any threshold.
-	m.logView.rawLines = []string{
-		"Running full sweep",
-		"Start running AD hourly cron.",
-		"connection established",
-	}
-	m.logView.sevThreshold = ui.SevError
+	// INFO+ -> hide debug, show the other 3.
+	m.logView.sevThreshold = ui.LogInfo
 	m.rebuildLogView()
 	if len(m.logView.lines) != 3 {
-		t.Fatalf("plain-text log must not be blanked; want 3 lines, got %d: %v", len(m.logView.lines), m.logView.lines)
+		t.Fatalf("INFO+: want 3 (no debug), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+	// WARN+ -> only warn + error lines.
+	m.logView.sevThreshold = ui.LogWarn
+	m.rebuildLogView()
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("WARN+: want 2 (warn+error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+	// ERROR+ -> only the error line.
+	m.logView.sevThreshold = ui.LogError
+	m.rebuildLogView()
+	if len(m.logView.lines) != 1 {
+		t.Fatalf("ERROR+: want 1 (error), got %d: %v", len(m.logView.lines), m.logView.lines)
 	}
 }
 
@@ -137,7 +151,7 @@ func TestTabPersistence_FilterRoundTrip(t *testing.T) {
 	var m Model
 	m.logView.rawLines = []string{"keep a", "drop", "keep b"}
 	m.logView.filterQuery = "keep"
-	m.logView.sevThreshold = ui.SevWarn
+	m.logView.sevThreshold = ui.LogWarn
 	m.rebuildLogView()
 
 	var ts TabState
@@ -151,7 +165,7 @@ func TestTabPersistence_FilterRoundTrip(t *testing.T) {
 	m2.logView.sevThreshold = ts.logSevThreshold
 	m2.rebuildLogView()
 
-	if m2.logView.filterQuery != "keep" || m2.logView.sevThreshold != ui.SevWarn {
+	if m2.logView.filterQuery != "keep" || m2.logView.sevThreshold != ui.LogWarn {
 		t.Fatalf("filter state not restored: q=%q sev=%d", m2.logView.filterQuery, m2.logView.sevThreshold)
 	}
 	if len(m2.logView.rawLines) != 3 {
@@ -190,36 +204,41 @@ func TestFilterInput_LiveNarrows(t *testing.T) {
 }
 
 func TestSeverityStep(t *testing.T) {
-	// Severity constants: SevUnknown=0, SevTrace=1, SevDebug=2, SevInfo=3,
-	// SevWarn=4, SevError=5, SevFatal=6.
+	// Thresholds cycle off(0) -> INFO -> WARN -> ERROR, clamped at ERROR.
 	var m Model
 	m.logView.rawLines = []string{
+		`{"level":"debug","msg":"d"}`,
 		`{"level":"info","msg":"a"}`,
 		`{"level":"warn","msg":"b"}`,
 		`{"level":"error","msg":"c"}`,
 	}
 	m.rebuildLogView()
 	m = m.severityStep(+1)
-	if m.logView.sevThreshold != ui.SevTrace {
-		t.Fatalf("after +1 want SevTrace(%d), got %d", ui.SevTrace, m.logView.sevThreshold)
+	if m.logView.sevThreshold != ui.LogInfo {
+		t.Fatalf("after +1 want LogInfo(%d), got %d", ui.LogInfo, m.logView.sevThreshold)
 	}
-	// Step up to SevWarn (3 more steps from SevTrace=1).
-	for range 3 {
-		m = m.severityStep(+1)
+	if len(m.logView.lines) != 3 {
+		t.Fatalf("INFO+ should show 3 (info/warn/error), got %d", len(m.logView.lines))
 	}
-	if m.logView.sevThreshold != ui.SevWarn {
-		t.Fatalf("after reaching SevWarn want %d, got %d", ui.SevWarn, m.logView.sevThreshold)
+	m = m.severityStep(+1)
+	if m.logView.sevThreshold != ui.LogWarn {
+		t.Fatalf("after +2 want LogWarn(%d), got %d", ui.LogWarn, m.logView.sevThreshold)
 	}
 	if len(m.logView.lines) != 2 {
-		t.Fatalf("warn+ should show 2 lines (warn+error), got %d", len(m.logView.lines))
+		t.Fatalf("WARN+ should show 2 (warn/error), got %d", len(m.logView.lines))
 	}
+	// Clamp at ERROR.
 	for range 10 {
 		m = m.severityStep(+1)
 	}
-	if m.logView.sevThreshold != ui.SevFatal {
-		t.Fatalf("should clamp at SevFatal, got %d", m.logView.sevThreshold)
+	if m.logView.sevThreshold != ui.LogError {
+		t.Fatalf("should clamp at LogError(%d), got %d", ui.LogError, m.logView.sevThreshold)
 	}
-	for range 20 {
+	if len(m.logView.lines) != 1 {
+		t.Fatalf("ERROR+ should show 1 (error), got %d", len(m.logView.lines))
+	}
+	// Clamp at off.
+	for range 10 {
 		m = m.severityStep(-1)
 	}
 	if m.logView.sevThreshold != 0 {
@@ -229,16 +248,16 @@ func TestSeverityStep(t *testing.T) {
 
 func TestAppendRawLogLine_SeverityFilter(t *testing.T) {
 	var m Model
-	m.logView.sevThreshold = ui.SevError
-	m.appendRawLogLine(`{"level":"info","msg":"a"}`)
-	m.appendRawLogLine(`{"level":"error","msg":"b"}`)
-	m.appendRawLogLine("\tcontinuation tail")
-	if len(m.logView.rawLines) != 3 {
-		t.Fatalf("rawLines = %d, want 3", len(m.logView.rawLines))
+	m.logView.sevThreshold = ui.LogError
+	m.appendRawLogLine(`{"level":"info","msg":"a"}`)  // structured INFO -> hidden
+	m.appendRawLogLine(`{"level":"error","msg":"b"}`) // structured ERROR -> shown
+	m.appendRawLogLine("plain tail with no keyword")  // plain -> INFO default -> hidden
+	m.appendRawLogLine("connection failure detected") // plain error keyword -> shown
+	if len(m.logView.rawLines) != 4 {
+		t.Fatalf("rawLines = %d, want 4", len(m.logView.rawLines))
 	}
-	// error line + its continuation tail (inherits error) shown; info dropped.
 	if len(m.logView.lines) != 2 {
-		t.Fatalf("lines = %d, want 2 (error+continuation): %v", len(m.logView.lines), m.logView.lines)
+		t.Fatalf("lines = %d, want 2 (json error + plain failure line): %v", len(m.logView.lines), m.logView.lines)
 	}
 }
 
@@ -248,7 +267,7 @@ func TestLogView_FilterAndSeverityIndicators(t *testing.T) {
 	m.logView.title = "logs"
 	m.logView.rawLines = []string{`{"level":"error","msg":"boomtoken"}`}
 	m.logView.filterQuery = "boomtoken"
-	m.logView.sevThreshold = ui.SevWarn
+	m.logView.sevThreshold = ui.LogWarn
 	m.rebuildLogView()
 	out := stripANSI(m.View())
 	if !strings.Contains(out, "[F:boomtoken]") {

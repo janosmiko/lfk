@@ -346,7 +346,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `F` | Toggle follow mode (auto-scroll to new logs) |
 | `f` | Filter log lines live (`~`fuzzy, regex auto-detected, `\`literal); narrows the view to matching lines |
-| `i` / `o` | Lower / raise the minimum log severity shown (off → info → warn → error → ...); level read via the same parser as the preview pane. Lines with no detectable level (plain-text logs) are always shown — the filter only hides lines whose level is known and below the threshold |
+| `i` / `o` | Lower / raise the minimum log severity shown — cycles **off → INFO+ → WARN+ → ERROR+** (all source levels merge into these three). Structured logs use the parsed level; plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO. So INFO+ hides debug/trace, WARN+ shows only warn/error lines, ERROR+ only error/failure lines |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |

@@ -24,15 +24,16 @@ func (m *Model) ensureRawSev() {
 	}
 	sev := make([]int, len(m.logView.rawLines))
 	for i, ln := range m.logView.rawLines {
-		sev[i] = ui.LineSeverity(ln)
+		sev[i] = ui.LineLogLevel(ln)
 	}
 	m.logView.rawSev = sev
 }
 
 // rebuildLogView recomputes lines from rawLines applying the live text filter
 // and the severity threshold, then clamps cursor/scroll into the new range.
-// Continuation lines (no detected level) inherit the previous line's severity
-// so a stack trace stays attached to its ERROR.
+// Each line is bucketed (debug/info/warn/error) by its structured level when
+// present, else by a plain-text keyword scan (defaulting to info); a line is
+// shown when its bucket is at or above the threshold.
 func (m *Model) rebuildLogView() {
 	if !m.logFilterActive() {
 		m.logView.lines = append([]string(nil), m.logView.rawLines...)
@@ -43,26 +44,9 @@ func (m *Model) rebuildLogView() {
 		m.ensureRawSev()
 	}
 	out := make([]string, 0, len(m.logView.rawLines))
-	lastRank := ui.SevUnknown
 	for i, ln := range m.logView.rawLines {
-		if m.logView.sevThreshold > 0 {
-			// Continuation lines (no own level) inherit the previous detected
-			// severity so a stack trace stays attached to its ERROR. This applies
-			// to severity filtering only; text filtering matches each line on its
-			// own content (grep-like).
-			r := m.logView.rawSev[i]
-			if r == ui.SevUnknown {
-				r = lastRank
-			} else {
-				lastRank = r
-			}
-			// Hide only lines whose level is KNOWN and below the threshold. Lines
-			// with no detectable level anywhere (plain-text logs, leading lines
-			// before any level) are always shown — a severity filter has nothing
-			// to filter on them, so blanking them would only confuse.
-			if r != ui.SevUnknown && r < m.logView.sevThreshold {
-				continue
-			}
+		if m.logView.sevThreshold > 0 && m.logView.rawSev[i] < m.logView.sevThreshold {
+			continue
 		}
 		if m.logView.filterQuery != "" && !ui.MatchLine(ln, m.logView.filterQuery) {
 			continue
@@ -87,14 +71,9 @@ func (m *Model) appendRawLogLine(line string) {
 		return
 	}
 	if m.logView.sevThreshold > 0 {
-		r := ui.LineSeverity(line)
+		r := ui.LineLogLevel(line)
 		m.logView.rawSev = append(m.logView.rawSev, r)
-		if r == ui.SevUnknown {
-			r = m.lastKnownRawSev()
-		}
-		// Hide only when the level is KNOWN and below threshold; lines with no
-		// detectable level are always shown (see rebuildLogView).
-		if r != ui.SevUnknown && r < m.logView.sevThreshold {
+		if r < m.logView.sevThreshold {
 			return
 		}
 	}
@@ -104,21 +83,12 @@ func (m *Model) appendRawLogLine(line string) {
 	m.logView.lines = append(m.logView.lines, line)
 }
 
-// lastKnownRawSev returns the most recent non-unknown severity rank in rawSev
-// (excluding the just-appended last entry), for continuation-line inheritance.
-func (m *Model) lastKnownRawSev() int {
-	for i := len(m.logView.rawSev) - 2; i >= 0; i-- {
-		if m.logView.rawSev[i] != ui.SevUnknown {
-			return m.logView.rawSev[i]
-		}
-	}
-	return ui.SevUnknown
-}
-
 // severityStep raises (+1) or lowers (-1) the minimum-severity threshold by
-// one level, clamped to [off, SevFatal], then re-projects the view.
+// one level, clamped to [off, LogError], then re-projects the view. The
+// threshold cycles off -> INFO+ -> WARN+ -> ERROR+ (debug is never a
+// threshold, only a line bucket).
 func (m Model) severityStep(delta int) Model {
-	m.logView.sevThreshold = max(0, min(m.logView.sevThreshold+delta, ui.SevFatal))
+	m.logView.sevThreshold = max(0, min(m.logView.sevThreshold+delta, ui.LogError))
 	(&m).rebuildLogView()
 	return m
 }
