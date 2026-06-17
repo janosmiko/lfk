@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.11](https://github.com/janosmiko/lfk/compare/v0.14.10...v0.14.11) (2026-06-17)
+
+
+### Bug Fixes
+
+* **templates:** make workloads + Service/Ingress compose out of the box ([#451](https://github.com/janosmiko/lfk/issues/451)) ([44bd98b](https://github.com/janosmiko/lfk/commit/44bd98b8bc63fe7bcc0bddd19606025f08ad1c29))
+
 ## [0.14.10](https://github.com/janosmiko/lfk/compare/v0.14.9...v0.14.10) (2026-06-17)
 
 
