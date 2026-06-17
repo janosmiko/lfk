@@ -622,6 +622,16 @@ func (m Model) resolveNamespace() string {
 	return m.namespace
 }
 
+// defaultNamespaceForContext returns the namespace to scope to when none is
+// set: the active context's kubeconfig namespace when a client is available,
+// falling back to "default". Guards against a nil client (test models).
+func (m Model) defaultNamespaceForContext() string {
+	if m.client != nil {
+		return m.client.DefaultNamespace(m.nav.Context)
+	}
+	return "default"
+}
+
 // loadRevisions fetches the revision history for a deployment.
 func (m Model) loadRevisions() tea.Cmd {
 	sel := m.selectedMiddleItem()

@@ -99,6 +99,49 @@ func TestActionKeyAllNamespacesSavedSelectionSurvivesTabSwitch(t *testing.T) {
 	assert.Equal(t, map[string]bool{"alpha": true, "beta": true}, m.selectedNamespaces)
 }
 
+// TestActionKeyAllNamespacesOffFallsBackToDefault covers the repro where the
+// app is in all-namespaces mode with no concrete namespace to return to
+// (m.namespace == "" and no saved selection): toggling OFF must scope to the
+// default namespace instead of silently staying on every namespace.
+func TestActionKeyAllNamespacesOffFallsBackToDefault(t *testing.T) {
+	m := baseExplorerModel()
+	m.allNamespaces = true
+	m.namespace = ""
+	m.selectedNamespaces = nil
+	m.savedSelectedNamespaces = nil
+
+	ret, _, handled := m.handleExplorerActionKey(runeKey('A'))
+	require.True(t, handled)
+	off := ret.(Model)
+
+	assert.False(t, off.allNamespaces)
+	assert.Equal(t, "default", off.namespace)
+	assert.Equal(t, "default", off.effectiveNamespace(), "must scope the fetch, not return empty (all namespaces)")
+	assert.Contains(t, off.statusMessage, "ns: default")
+}
+
+// TestActionKeyAllNamespacesOffKeepsRestoredSelection ensures the default
+// fallback does not clobber a restored single-namespace selection.
+func TestActionKeyAllNamespacesOffKeepsRestoredSelection(t *testing.T) {
+	m := baseExplorerModel()
+	m.selectedNamespaces = map[string]bool{"team-a": true}
+	m.namespace = ""
+	m.allNamespaces = false
+
+	// Toggle ON (stash), then OFF (restore).
+	ret, _, _ := m.handleExplorerActionKey(runeKey('A'))
+	on := ret.(Model)
+	ret, _, _ = on.handleExplorerActionKey(runeKey('A'))
+	off := ret.(Model)
+
+	assert.False(t, off.allNamespaces)
+	assert.Equal(t, map[string]bool{"team-a": true}, off.selectedNamespaces)
+	assert.Empty(t, off.namespace, "single-namespace selection takes precedence; no default fallback needed")
+	// Status hint must reflect the restored selection, not the empty
+	// m.namespace (would otherwise read "(ns: )").
+	assert.Contains(t, off.statusMessage, "ns: team-a")
+}
+
 func TestActionKeyAllNamespacesNoOpAtClusters(t *testing.T) {
 	m := baseExplorerModel()
 	m.nav.Level = model.LevelClusters
