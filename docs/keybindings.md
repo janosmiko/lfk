@@ -346,7 +346,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `F` | Toggle follow mode (auto-scroll to new logs) |
 | `f` | Filter log lines live (`~`fuzzy, regex auto-detected, `\`literal); narrows the view to matching lines |
-| `i` / `o` | Lower / raise the minimum log severity shown (off → info → warn → error → ...); level read via the same parser as the preview pane |
+| `i` / `o` | Lower / raise the minimum log severity shown (off → info → warn → error → ...); level read via the same parser as the preview pane. Lines with no detectable level (plain-text logs) are always shown — the filter only hides lines whose level is known and below the threshold |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |

@@ -56,7 +56,11 @@ func (m *Model) rebuildLogView() {
 			} else {
 				lastRank = r
 			}
-			if r < m.logView.sevThreshold {
+			// Hide only lines whose level is KNOWN and below the threshold. Lines
+			// with no detectable level anywhere (plain-text logs, leading lines
+			// before any level) are always shown — a severity filter has nothing
+			// to filter on them, so blanking them would only confuse.
+			if r != ui.SevUnknown && r < m.logView.sevThreshold {
 				continue
 			}
 		}
@@ -88,7 +92,9 @@ func (m *Model) appendRawLogLine(line string) {
 		if r == ui.SevUnknown {
 			r = m.lastKnownRawSev()
 		}
-		if r < m.logView.sevThreshold {
+		// Hide only when the level is KNOWN and below threshold; lines with no
+		// detectable level are always shown (see rebuildLogView).
+		if r != ui.SevUnknown && r < m.logView.sevThreshold {
 			return
 		}
 	}

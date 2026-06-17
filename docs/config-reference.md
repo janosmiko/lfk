@@ -453,7 +453,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `toggle_fold_all` | `Z` | Toggle all folds (YAML, diff viewers). |
 | `toggle_follow` | `F` | Toggle follow / auto-scroll (log viewer). Moved from `f`, which now opens the log filter. |
 | `severity_up` | `o` | Raise the minimum log severity shown (log viewer). |
-| `severity_down` | `i` | Lower the minimum log severity shown (log viewer). Shares the `i` default with `label_editor` / `security_ignore_toggle`, but they apply in separate contexts (log viewer vs. resource list). |
+| `severity_down` | `i` | Lower the minimum log severity shown (log viewer). Lines with no detectable level (plain-text logs) are always shown. Shares the `i` default with `label_editor` / `security_ignore_toggle`, but they apply in separate contexts (log viewer vs. resource list). |
 | `toggle_timestamps` | `s` | Toggle timestamps (log viewer). |
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |

@@ -77,18 +77,36 @@ func TestRebuildLogView_EmptyResultClampsAndExitsVisual(t *testing.T) {
 	}
 }
 
-func TestRebuildLogView_FirstLineContinuationDropped(t *testing.T) {
+func TestRebuildLogView_LeadingUnknownShownThenKnownFiltered(t *testing.T) {
 	var m Model
-	// First line has no detectable level (SevUnknown -> inherits SevUnknown=0),
-	// so at an ERROR threshold it is dropped; the error line survives.
+	// A leading line with no detectable level (and no prior level to inherit)
+	// is SHOWN at an ERROR threshold — we never hide what we can't classify.
+	// Once a known level appears, below-threshold known lines are hidden.
 	m.logView.rawLines = []string{
-		"\tat com.example.Foo.bar(Foo.java:42)",
-		`{"level":"error","msg":"boom"}`,
+		"\tat com.example.Foo.bar(Foo.java:42)", // unknown, no predecessor -> shown
+		`{"level":"info","msg":"chatter"}`,      // known INFO < ERROR -> hidden
+		`{"level":"error","msg":"boom"}`,        // known ERROR -> shown
 	}
 	m.logView.sevThreshold = ui.SevError
 	m.rebuildLogView()
-	if len(m.logView.lines) != 1 {
-		t.Fatalf("want 1 line (only the error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("want 2 lines (leading-unknown + error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+}
+
+func TestRebuildLogView_PlainTextNeverBlanked(t *testing.T) {
+	var m Model
+	// A purely plain-text log (no detectable levels anywhere) must never be
+	// blanked by the severity filter — all lines are shown at any threshold.
+	m.logView.rawLines = []string{
+		"Running full sweep",
+		"Start running AD hourly cron.",
+		"connection established",
+	}
+	m.logView.sevThreshold = ui.SevError
+	m.rebuildLogView()
+	if len(m.logView.lines) != 3 {
+		t.Fatalf("plain-text log must not be blanked; want 3 lines, got %d: %v", len(m.logView.lines), m.logView.lines)
 	}
 }
 
