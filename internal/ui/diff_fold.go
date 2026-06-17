@@ -172,9 +172,14 @@ func ExpandDiffFoldForLine(regions []DiffFoldRegion, foldState []bool, origIdx i
 
 // highlightDiffSearchInLine applies search highlighting to a plain text line.
 // Supports substring, regex, and fuzzy search modes via HighlightMatch.
-func highlightDiffSearchInLine(line, query string) string {
+// When isCurrent is true, the entire line uses SelectedSearchHighlightStyle
+// (the current-match color) rather than the default search highlight.
+func highlightDiffSearchInLine(line, query string, isCurrent bool) string {
 	if query == "" {
 		return line
+	}
+	if isCurrent {
+		return HighlightMatchStyled(line, query, SelectedSearchHighlightStyle)
 	}
 	return HighlightMatch(line, query)
 }

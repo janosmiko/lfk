@@ -62,7 +62,7 @@ func TestHighlightSearchMatches(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := highlightSearchMatches(tt.lines, tt.query)
+			result := highlightSearchMatches(tt.lines, tt.query, -1, -1)
 			assert.Equal(t, len(tt.lines), len(result), "result length should match input length")
 			for i, matched := range tt.wantMatch {
 				if !matched {
@@ -162,7 +162,7 @@ func TestRenderPlainLines(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := renderPlainLines(tt.lines, tt.scroll, tt.height, tt.width,
+			result, _, _ := renderPlainLines(tt.lines, tt.scroll, tt.height, tt.width,
 				tt.lineNumbers, tt.lineNumWidth, tt.cursor, -1, -1, -1, 0, 0, 0)
 			assert.Equal(t, tt.wantCount, len(result), "rendered line count")
 			for _, sub := range tt.wantSubstr {
@@ -180,7 +180,7 @@ func TestRenderPlainLines(t *testing.T) {
 
 	t.Run("cursor line has cursor indicator glyph", func(t *testing.T) {
 		lines := []string{"hello", "world"}
-		result := renderPlainLines(lines, 0, 2, 80, false, 0, 0, -1, -1, -1, 0, 0, 0)
+		result, _, _ := renderPlainLines(lines, 0, 2, 80, false, 0, 0, -1, -1, -1, 0, 0, 0)
 		// Cursor line should contain the bar cursor indicator.
 		assert.Contains(t, result[0], "\u258e", "cursor line should have indicator glyph")
 		// Non-cursor line should start with a space.
@@ -189,7 +189,7 @@ func TestRenderPlainLines(t *testing.T) {
 
 	t.Run("scroll beyond end produces empty result", func(t *testing.T) {
 		lines := []string{"a", "b"}
-		result := renderPlainLines(lines, 5, 3, 80, false, 0, -1, -1, -1, -1, 0, 0, 0)
+		result, _, _ := renderPlainLines(lines, 5, 3, 80, false, 0, -1, -1, -1, -1, 0, 0, 0)
 		assert.Empty(t, result)
 	})
 
@@ -221,7 +221,7 @@ func TestRenderPlainLines(t *testing.T) {
 		require.LessOrEqual(t, ansi.StringWidth(line), width-1,
 			"test premise: visible width must fit so the NEW visual-truncate keeps every char")
 
-		result := renderPlainLines(
+		result, _, _ := renderPlainLines(
 			[]string{line},
 			0, 1, width,
 			false, 0,

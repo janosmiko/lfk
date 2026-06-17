@@ -532,6 +532,79 @@ func SearchModeIndicator(rawQuery string) string {
 	}
 }
 
+// HighlightMatchCurrentAtCol highlights every match of rawQuery in line with
+// normalStyle, except the occurrence whose start is at visual column currentCol,
+// which uses currentStyle. currentCol < 0 (or no match starting there) means all
+// matches use normalStyle. Substring and regex modes only; fuzzy falls back to
+// uniform normalStyle (a fuzzy "current occurrence" is ill-defined).
+func HighlightMatchCurrentAtCol(line, rawQuery string, normalStyle, currentStyle lipgloss.Style, currentCol int) string {
+	if rawQuery == "" {
+		return line
+	}
+	mode, query := DetectSearchMode(rawQuery)
+	if query == "" || mode == SearchFuzzy {
+		return HighlightMatchStyled(line, rawQuery, normalStyle)
+	}
+	plain := ansi.Strip(line)
+	var spans [][2]int
+	switch mode {
+	case SearchRegex:
+		re, err := compileSearchRegex(query)
+		if err != nil {
+			return HighlightMatchStyled(line, rawQuery, normalStyle)
+		}
+		for _, mm := range re.FindAllStringIndex(plain, -1) {
+			spans = append(spans, [2]int{mm[0], mm[1]})
+		}
+	default: // substring
+		plainLower := strings.ToLower(plain)
+		queryLower := strings.ToLower(query)
+		if len(plainLower) != len(plain) {
+			return HighlightMatchStyled(line, rawQuery, normalStyle)
+		}
+		for pos := 0; ; {
+			idx := strings.Index(plainLower[pos:], queryLower)
+			if idx < 0 {
+				break
+			}
+			s := pos + idx
+			e := s + len(queryLower)
+			spans = append(spans, [2]int{s, e})
+			pos = e
+		}
+	}
+	if len(spans) == 0 {
+		return line
+	}
+	return highlightSpansPerStyle(line, plain, spans, normalStyle, currentStyle, currentCol)
+}
+
+// highlightSpansPerStyle is highlightSpans but applies currentStyle to the span
+// whose start visual column equals currentCol, and normalStyle to the rest.
+func highlightSpansPerStyle(line, plain string, spans [][2]int, normalStyle, currentStyle lipgloss.Style, currentCol int) string {
+	var b strings.Builder
+	pos := 0
+	for _, sp := range spans {
+		s, e := sp[0], sp[1]
+		if s > pos {
+			posCol := ansi.StringWidth(plain[:pos])
+			startCol := ansi.StringWidth(plain[:s])
+			b.WriteString(ansi.Cut(line, posCol, startCol))
+		}
+		style := normalStyle
+		if currentCol >= 0 && ansi.StringWidth(plain[:s]) == currentCol {
+			style = currentStyle
+		}
+		b.WriteString(style.Render(plain[s:e]))
+		pos = e
+	}
+	if pos < len(plain) {
+		posCol := ansi.StringWidth(plain[:pos])
+		b.WriteString(ansi.TruncateLeft(line, posCol, ""))
+	}
+	return b.String()
+}
+
 // FindColumnInLine returns the rune column of the first match of rawQuery in
 // line, or -1 if not found. Used for cursor positioning after search.
 func FindColumnInLine(line, rawQuery string) int {

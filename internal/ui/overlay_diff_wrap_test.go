@@ -21,7 +21,7 @@ func TestRenderDiffView_WrapShowsFullLine(t *testing.T) {
 	left := "a: 1\n" + longDiffLine()
 	right := "a: 1\n" + longDiffLine()
 
-	wrapped := stripANSI(RenderDiffView(left, right, "l", "r", 0, 80, 30, false, true, "", nil, nil, false, "", 0, DiffVisualParams{}, ""))
+	wrapped := stripANSI(RenderDiffView(left, right, "l", "r", 0, 80, 30, false, true, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
 	assert.GreaterOrEqual(t, strings.Count(wrapped, "x"), wrapFillLen, "wrap must render the whole line, not truncate it")
 	assert.NotContains(t, wrapped, "~", "wrap mode must not emit the truncation marker")
 }
@@ -30,7 +30,7 @@ func TestRenderDiffView_NoWrapTruncates(t *testing.T) {
 	left := "a: 1\n" + longDiffLine()
 	right := "a: 1\n" + longDiffLine()
 
-	truncated := stripANSI(RenderDiffView(left, right, "l", "r", 0, 80, 30, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, ""))
+	truncated := stripANSI(RenderDiffView(left, right, "l", "r", 0, 80, 30, false, false, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
 	assert.Contains(t, truncated, "~", "non-wrap mode truncates long lines with a marker")
 	assert.Less(t, strings.Count(truncated, "x"), wrapFillLen, "non-wrap mode must drop the truncated tail")
 }
@@ -38,7 +38,7 @@ func TestRenderDiffView_NoWrapTruncates(t *testing.T) {
 func TestRenderDiffView_WrapKeepsColumnAlignment(t *testing.T) {
 	left := "a: 1\n" + longDiffLine()
 	right := "a: 1\n" + longDiffLine()
-	out := stripANSI(RenderDiffView(left, right, "l", "r", 0, 80, 30, false, true, "", nil, nil, false, "", 0, DiffVisualParams{}, ""))
+	out := stripANSI(RenderDiffView(left, right, "l", "r", 0, 80, 30, false, true, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
 	// Every wrapped content row keeps the side-by-side separator.
 	for line := range strings.SplitSeq(out, "\n") {
 		if strings.Contains(line, "xxx") {
@@ -76,7 +76,7 @@ func TestRenderDiffView_NoWrapDoesNotBleed(t *testing.T) {
 	right := "a: 1\nlongkey: " + strings.Repeat("Z", 300) + "\nz: 9\n"
 	for _, lineNumbers := range []bool{true, false} {
 		for w := 60; w <= 200; w++ {
-			out := stripANSI(RenderDiffView(left, right, "left", "right", 0, w, 24, lineNumbers, false, "", nil, nil, false, "", 0, DiffVisualParams{}, ""))
+			out := stripANSI(RenderDiffView(left, right, "left", "right", 0, w, 24, lineNumbers, false, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
 			for line := range strings.SplitSeq(out, "\n") {
 				if strings.ContainsAny(line, "QZ") && !strings.Contains(line, "|") {
 					t.Fatalf("w=%d lineNumbers=%v: diff content bled past its column (row has content but no separator): %q", w, lineNumbers, line)
@@ -92,7 +92,7 @@ func TestRenderUnifiedDiffView_WrapShowsFullLine(t *testing.T) {
 	left := "a: 1\n" + longDiffLine()
 	right := "a: 1\n" + longDiffLine()
 
-	wrapped := stripANSI(RenderUnifiedDiffView(left, right, "l", "r", 0, 80, 30, false, true, "", nil, nil, false, "", 0, DiffVisualParams{}, ""))
+	wrapped := stripANSI(RenderUnifiedDiffView(left, right, "l", "r", 0, 80, 30, false, true, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
 	assert.GreaterOrEqual(t, strings.Count(wrapped, "x"), wrapFillLen, "unified wrap must render the whole line")
 	assert.NotContains(t, wrapped, "~", "unified wrap must not truncate")
 }
@@ -101,7 +101,7 @@ func TestRenderUnifiedDiffView_NoWrapTruncates(t *testing.T) {
 	left := "a: 1\n" + longDiffLine()
 	right := "a: 1\n" + longDiffLine()
 
-	truncated := stripANSI(RenderUnifiedDiffView(left, right, "l", "r", 0, 80, 30, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, ""))
+	truncated := stripANSI(RenderUnifiedDiffView(left, right, "l", "r", 0, 80, 30, false, false, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
 	// Non-wrap unified must truncate itself rather than leak the line past the
 	// border and let lipgloss re-wrap it uncontrollably.
 	assert.Contains(t, truncated, "~", "non-wrap unified truncates long lines")

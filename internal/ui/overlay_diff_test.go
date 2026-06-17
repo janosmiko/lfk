@@ -96,7 +96,7 @@ func TestRenderUnifiedDiffView(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := RenderUnifiedDiffView(tt.left, tt.right, tt.leftName, tt.rightName, tt.scroll, tt.width, tt.height, tt.lineNums, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
+			result := RenderUnifiedDiffView(tt.left, tt.right, tt.leftName, tt.rightName, tt.scroll, tt.width, tt.height, tt.lineNums, false, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, "")
 			for _, sub := range tt.wantSubstr {
 				assert.Contains(t, result, sub, "result should contain %q", sub)
 			}
@@ -116,7 +116,7 @@ func TestRenderDiffViewHonorsFooterOverride(t *testing.T) {
 	override := "[STATUS] Copied 1 line"
 	result := RenderDiffView(
 		"a: 1", "a: 2", "before", "after",
-		0, 140, 30, false, false, "", nil, nil, false, "", 0,
+		0, 140, 30, false, false, "", nil, nil, false, "", 0, -1,
 		DiffVisualParams{}, override,
 	)
 	assert.Contains(t, result, override, "override must appear in the rendered output")
@@ -128,7 +128,7 @@ func TestRenderUnifiedDiffViewHonorsFooterOverride(t *testing.T) {
 	override := "[STATUS] Copied 1 line"
 	result := RenderUnifiedDiffView(
 		"a: 1", "a: 2", "before", "after",
-		0, 140, 30, false, false, "", nil, nil, false, "", 0,
+		0, 140, 30, false, false, "", nil, nil, false, "", 0, -1,
 		DiffVisualParams{}, override,
 	)
 	assert.Contains(t, result, override, "override must appear in the rendered output")
@@ -141,7 +141,7 @@ func TestRenderUnifiedDiffViewHonorsFooterOverride(t *testing.T) {
 func TestRenderDiffViewEmptyOverrideUsesDefault(t *testing.T) {
 	result := RenderDiffView(
 		"a: 1", "a: 2", "before", "after",
-		0, 140, 30, false, false, "", nil, nil, false, "", 0,
+		0, 140, 30, false, false, "", nil, nil, false, "", 0, -1,
 		DiffVisualParams{}, "",
 	)
 	assert.Contains(t, result, "side", "default hint must be drawn when override is empty")

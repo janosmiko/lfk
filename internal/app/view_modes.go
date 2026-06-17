@@ -296,10 +296,16 @@ func (m Model) viewDiff() string {
 	if m.hasStatusMessage() {
 		footerOverride = m.renderStatusHint()
 	}
-	if m.diffView.unified {
-		return ui.RenderUnifiedDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
+	// Compute the original diff line index of the current n/N match so the
+	// renderer can apply the distinct current-match highlight to that line.
+	currentMatchLine := -1
+	if len(m.diffView.matchLines) > 0 && m.diffView.matchIdx >= 0 && m.diffView.matchIdx < len(m.diffView.matchLines) {
+		currentMatchLine = m.diffView.matchLines[m.diffView.matchIdx]
 	}
-	return ui.RenderDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
+	if m.diffView.unified {
+		return ui.RenderUnifiedDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, currentMatchLine, vp, footerOverride)
+	}
+	return ui.RenderDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, currentMatchLine, vp, footerOverride)
 }
 
 func (m Model) logViewHeight() int {

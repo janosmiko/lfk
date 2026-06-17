@@ -82,15 +82,16 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 
 	// Build visible lines, handling wrapping.
 	var rendered []string
+	var cursorRow, cursorCol int
 	if wrap {
-		rendered = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol, wrapTopSkip)
+		rendered, cursorRow, cursorCol = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol, wrapTopSkip)
 	} else {
-		rendered = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
+		rendered, cursorRow, cursorCol = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
 	}
 
 	// Highlight search matches in rendered lines.
 	if searchQuery != "" {
-		rendered = highlightSearchMatches(rendered, searchQuery)
+		rendered = highlightSearchMatches(rendered, searchQuery, cursorRow, cursorCol)
 	}
 
 	// Pad to fill content height. Cap at contentHeight too: if the line
@@ -263,17 +264,30 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 
 // highlightSearchMatches highlights occurrences of query in each line.
 // Supports substring, regex, and fuzzy search modes via HighlightMatch.
-func highlightSearchMatches(lines []string, query string) []string {
+// curRow is the rendered-slice index of the cursor line (-1 if none).
+// curCol is the absolute visual column of the current match start on that row
+// (-1 when curRow is -1). The cursor row's match at curCol is styled with
+// SelectedSearchHighlightStyle; all other matches use LogSearchHighlightStyle.
+func highlightSearchMatches(lines []string, query string, curRow, curCol int) []string {
 	result := make([]string, len(lines))
 	for i, line := range lines {
-		result[i] = HighlightMatch(line, query)
+		if i == curRow && curRow >= 0 {
+			result[i] = HighlightMatchCurrentAtCol(line, query, LogSearchHighlightStyle, SelectedSearchHighlightStyle, curCol)
+		} else {
+			result[i] = HighlightMatch(line, query)
+		}
 	}
 	return result
 }
 
-// renderPlainLines renders lines without wrapping.
-func renderPlainLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol int) []string {
+// renderPlainLines renders lines without wrapping. It also returns cursorRow
+// (the index in result of the cursor line, or -1 if not visible) and cursorCol
+// (the absolute visual column of the search-match start on the cursor row, or
+// -1 when cursorRow is -1 or the cursor is in visual-selection mode).
+func renderPlainLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol int) ([]string, int, int) {
 	var result []string
+	cursorRow := -1
+	cursorCol := -1
 
 	end := min(scroll+height, len(lines))
 
@@ -339,6 +353,14 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 					cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 				}
 				line = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
+				// Record where in the result slice this cursor row lands and its
+				// search-match column. The gutter indicator is 1 visual cell; the
+				// optional line-number gutter follows; then content at visualCurCol.
+				cursorRow = len(result)
+				cursorCol = 1 + visualCurCol
+				if lineNumbers {
+					cursorCol = 1 + lineNumWidth + visualCurCol
+				}
 			}
 		} else {
 			line = " " + line
@@ -346,7 +368,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 
 		result = append(result, line)
 	}
-	return result
+	return result, cursorRow, cursorCol
 }
 
 // renderWrappedLines renders lines with wrapping, accounting for scroll position.
@@ -354,7 +376,11 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 // the renderer can pin a too-tall final source line's tail to the bottom row
 // when following — without it, long log lines wrapping past viewH lose their
 // most recent sub-lines off the bottom.
-func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol, topSkip int) []string {
+//
+// It also returns cursorRow (index in result of the first wrapped sub-line of
+// the cursor line, or -1 if not visible/in visual mode) and cursorCol (absolute
+// visual column of the search-match start on that row, or -1 when cursorRow=-1).
+func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol, topSkip int) ([]string, int, int) {
 	// Reserve 1 column for cursor gutter.
 	gutterWidth := 1
 	availWidth := width - gutterWidth
@@ -369,6 +395,8 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	// correspond to the scroll offset. For wrapping, scroll refers to source
 	// lines; topSkip drops sub-lines from the very top of lines[scroll].
 	var result []string
+	cursorRow := -1
+	cursorCol := -1
 
 	skipped := 0
 	end := len(lines)
@@ -425,6 +453,12 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 						cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 					}
 					wl = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
+					// Record cursor position for search-match current highlighting.
+					cursorRow = len(result)
+					cursorCol = 1 + visualCurCol
+					if lineNumbers {
+						cursorCol = 1 + lineNumWidth + visualCurCol
+					}
 				}
 			} else {
 				wl = " " + wl
@@ -433,7 +467,7 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 			result = append(result, wl)
 		}
 	}
-	return result
+	return result, cursorRow, cursorCol
 }
 
 // WrapLine splits a line into chunks of at most width runes.

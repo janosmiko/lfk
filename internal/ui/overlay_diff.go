@@ -106,7 +106,9 @@ type DiffVisualParams struct {
 // verbatim in place of the default key-binding hint bar. Callers use this
 // to surface status messages (copy feedback, errors) without resorting
 // to post-render line surgery.
-func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
+// currentMatchLine is the original diff line index of the current n/N match
+// (-1 means none); that line gets the distinct SelectedSearchHighlightStyle.
+func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, currentMatchLine int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -155,9 +157,9 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	if wrap {
 		// Wrap mode: long values wrap within their column instead of truncating.
 		st := diffSideStyles{removed: removedStyle, added: addedStyle, normal: normalStyle, cursor: cursorStyle, separator: separatorStyle}
-		rows = buildWrappedDiffRows(rawDiffLines, visLines, scroll, maxLines, colWidth, gutterWidth, lineNumbers, searchQuery, cursor, vp.CursorSide, st)
+		rows = buildWrappedDiffRows(rawDiffLines, visLines, scroll, maxLines, colWidth, gutterWidth, lineNumbers, searchQuery, cursor, vp.CursorSide, currentMatchLine, st)
 	} else {
-		rows = buildSideBySideRows(rawDiffLines, visLines, scroll, maxLines, colWidth, gutterWidth, lineNumbers, searchQuery, cursor, vp, normalStyle, removedStyle, addedStyle, cursorStyle, separatorStyle)
+		rows = buildSideBySideRows(rawDiffLines, visLines, scroll, maxLines, colWidth, gutterWidth, lineNumbers, searchQuery, cursor, currentMatchLine, vp, normalStyle, removedStyle, addedStyle, cursorStyle, separatorStyle)
 	}
 
 	// Pad rows to fill available height so content fills the border.
@@ -243,7 +245,9 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 // RenderUnifiedDiffView renders a unified diff view of two YAML resources
 // with search highlighting and fold support. footerOverride behaves the
 // same as in RenderDiffView.
-func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
+// currentMatchLine is the original diff line index of the current n/N match
+// (-1 means none); that line gets the distinct SelectedSearchHighlightStyle.
+func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, currentMatchLine int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -297,6 +301,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 
 		isSelected := vp.VisualMode && vi >= selStart && vi <= selEnd
 		isCursorLine := vi == cursor
+		isCurrentMatch := currentMatchLine >= 0 && vl.Original == currentMatchLine
 
 		// Truncate to the content width so the border never re-wraps the line.
 		prefix, text, style := unifiedLineParts(dl, uStyles)
@@ -306,7 +311,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		case isSelected:
 			content = applyDiffVisualSide(plain, vp, vi, selStart, selEnd)
 		case searchQuery != "":
-			content = style.Render(highlightDiffSearchInLine(plain, searchQuery))
+			content = style.Render(highlightDiffSearchInLine(plain, searchQuery, isCurrentMatch))
 		default:
 			content = style.Render(plain)
 		}
@@ -370,7 +375,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		// the last line so it stays reachable.
 		maxScroll = max(totalContent-1, 0)
 		scroll = min(max(scroll, 0), maxScroll)
-		rendered = append(rendered, buildWrappedUnifiedRows(rawDiffLines, visLines, scroll, contentMaxLines, contentWidth, gutterWidth, lineNumbers, searchQuery, cursor, uStyles, cursorStyleU)...)
+		rendered = append(rendered, buildWrappedUnifiedRows(rawDiffLines, visLines, scroll, contentMaxLines, contentWidth, gutterWidth, lineNumbers, searchQuery, cursor, currentMatchLine, uStyles, cursorStyleU)...)
 	} else {
 		// Non-wrap: one row per line, so clamp to keep the last page full.
 		maxScroll = max(totalContent-contentMaxLines, 0)
