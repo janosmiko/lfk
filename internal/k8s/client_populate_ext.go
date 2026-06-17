@@ -54,14 +54,19 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 		populateEndpointSlice(ti, obj)
 
 	case "PriorityClass":
-		if val, ok := spec["globalDefault"].(bool); ok && val {
+		// PriorityClass has no spec: value, globalDefault, and preemptionPolicy
+		// are top-level fields on the object.
+		if val, ok := obj["globalDefault"].(bool); ok && val {
 			ti.Name += " (default)"
 			ti.Status = "default"
 		}
-		if v, ok := spec["value"].(float64); ok {
+		switch v := obj["value"].(type) {
+		case int64:
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Value", Value: fmt.Sprintf("%d", v)})
+		case float64:
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Value", Value: fmt.Sprintf("%d", int64(v))})
 		}
-		if pp, ok := spec["preemptionPolicy"].(string); ok && pp != "" {
+		if pp, ok := obj["preemptionPolicy"].(string); ok && pp != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Preemption Policy", Value: pp})
 		}
 

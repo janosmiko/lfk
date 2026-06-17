@@ -122,27 +122,22 @@ func TestPopulateExt_ServiceAccountCoverage(t *testing.T) {
 
 func TestPopulateExt_PriorityClassCoverage(t *testing.T) {
 	t.Run("default priority class", func(t *testing.T) {
+		// PriorityClass fields are top-level on the object, not under spec.
 		obj := map[string]any{
-			"spec": map[string]any{
-				"globalDefault": true,
-			},
+			"globalDefault": true,
 		}
 		ti := &model.Item{Name: "high-priority"}
-		spec := obj["spec"].(map[string]any)
-		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 		assert.Equal(t, "high-priority (default)", ti.Name)
 		assert.Equal(t, "default", ti.Status)
 	})
 
 	t.Run("non-default priority class", func(t *testing.T) {
 		obj := map[string]any{
-			"spec": map[string]any{
-				"globalDefault": false,
-			},
+			"globalDefault": false,
 		}
 		ti := &model.Item{Name: "low-priority"}
-		spec := obj["spec"].(map[string]any)
-		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 		assert.Equal(t, "low-priority", ti.Name)
 	})
 }
