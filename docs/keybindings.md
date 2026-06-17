@@ -151,14 +151,14 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `X` | Force delete (Pod/Job only) | `force_delete` |
 | `S` | Scale resource (Deployment / StatefulSet / ReplicaSet) | `scale` |
 | `W` | Save resource to file / toggle warnings-only filter (Events view) | `save_resource` |
-| `Ctrl+O` | Open ingress host or port-forward localhost URL in browser | `open_browser` |
+| `Ctrl+O` | Open in browser: ingress host, port-forward localhost URL, or (on a Service) start a port forward and open it | `open_browser` |
 | `i` | Edit labels/annotations | `label_editor` |
 | `a` | Create new resource from template (/ to search) | `create_template` |
 | `d` | Diff two selected resources | `diff` |
 
 Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping.
 
-Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. In the port-forward dialog, select an exposed port with `j`/`k`, or type a `local:remote` mapping (e.g. `8080:80`) to choose a specific local port — omit the local port (e.g. `:80`) for a random one. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group; press `D` there to remove the selected forward.
+Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. In the port-forward dialog, select an exposed port with `j`/`k`, or type a `local:remote` mapping (e.g. `8080:80`) to choose a specific local port — omit the local port (e.g. `:80`) for a random one. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group; press `D` there to remove the selected forward. On a Service, `Ctrl+O` (or the "Port Forward & Open" action) starts a port forward and opens the resolved `http://localhost:<port>` in the browser once it is ready.
 
 Resource-specific actions (exec, scale, restart, secret editor, etc.) are available through the action menu (`x`).
 
@@ -960,7 +960,7 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Service Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `O` Port Forward & Open (forward a port and open it in the browser), `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Secret Actions
 `e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events

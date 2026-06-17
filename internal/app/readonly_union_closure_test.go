@@ -41,6 +41,10 @@ func TestIsUnionAllowedActionForKind_ClosureOverMutatingActions(t *testing.T) {
 		// Allowed for the five kinds the action handler supports.
 		"Port Forward": {"Pod", "Service", "Deployment", "StatefulSet", "DaemonSet"},
 
+		// Port Forward & Open chains a port forward with a browser open;
+		// only Services expose it (Ctrl+O / action menu).
+		"Port Forward & Open": {"Service"},
+
 		// Everything below is hard-blocked at the union sentinel.
 		// These either need a single API target (Scale, Rollback,
 		// Edit) or are kind-specific operations (Cordon, Drain,

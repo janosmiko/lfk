@@ -476,6 +476,10 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Port Forward":
 		mdl, cmd := m.executeActionPortForward()
 		return mdl, cmd, true
+	case "Port Forward & Open":
+		m.pfOpenInBrowserAfterStart = true
+		mdl, cmd := m.executeActionPortForward()
+		return mdl, cmd, true
 	case "Debug":
 		mdl, cmd := m.executeActionDebug()
 		return mdl, cmd, true

@@ -40,6 +40,9 @@ func (m Model) updateContainerPortsLoaded(msg containerPortsLoadedMsg) Model {
 
 func (m Model) updatePortForwardStarted(msg portForwardStartedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		// Don't carry an "open in browser" intent into a future, unrelated
+		// port forward when this one failed to start.
+		m.pfOpenInBrowserAfterStart = false
 		m.setErrorFromErr("Port forward failed: ", msg.err)
 		return m, scheduleStatusClear()
 	}
@@ -55,7 +58,28 @@ func (m Model) updatePortForwardStarted(msg portForwardStartedMsg) (tea.Model, t
 	m.navigateToPortForwards()
 	m.saveCurrentPortForwards()
 	cmds := []tea.Cmd{m.waitForPortForwardUpdate()}
+	// If the user asked to open the forward in the browser and the local port
+	// is already known, open it now. A random ("0") port is opened later by
+	// updatePortForwardUpdate once it resolves.
+	if openCmd := m.consumePortForwardBrowserOpen(msg.localPort); openCmd != nil {
+		cmds = append(cmds, openCmd)
+	}
 	return m, tea.Batch(cmds...)
+}
+
+// consumePortForwardBrowserOpen returns a command that opens
+// http://localhost:<localPort> in the browser when a "Port Forward & Open"
+// intent is pending and the local port is resolved (non-empty, non-"0"). It
+// clears the intent and updates the status message as a side effect. Returns
+// nil (leaving the intent set) when there is nothing to open yet.
+func (m *Model) consumePortForwardBrowserOpen(localPort string) tea.Cmd {
+	if !m.pfOpenInBrowserAfterStart || localPort == "" || localPort == "0" {
+		return nil
+	}
+	m.pfOpenInBrowserAfterStart = false
+	url := "http://localhost:" + localPort
+	m.setStatusMessage("Opening "+url, false)
+	return openInBrowser(url)
 }
 
 func (m Model) updatePortForwardStopped(msg portForwardStoppedMsg) (tea.Model, tea.Cmd) {
@@ -107,6 +131,13 @@ func (m Model) updatePortForwardUpdate(msg portForwardUpdateMsg) (tea.Model, tea
 				m.addLogEntry("INF", fmt.Sprintf("Port forward %d resolved: localhost:%s -> %s", e.ID, e.LocalPort, e.RemotePort))
 				m.pfLastCreatedID = 0
 				m.saveCurrentPortForwards()
+				// Open the resolved localhost URL in the browser if a
+				// "Port Forward & Open" intent is still pending (the port was
+				// random and only became known now). Overrides the status
+				// message set just above.
+				if openCmd := m.consumePortForwardBrowserOpen(e.LocalPort); openCmd != nil {
+					cmds = append(cmds, openCmd)
+				}
 				cmds = append(cmds, scheduleStatusClear())
 				break
 			}

@@ -738,11 +738,11 @@ type Model struct {
 	captureOverlay captureOverlayState
 
 	// Port forward overlay state: discovered ports for the selected resource.
-	pfAvailablePorts []ui.PortInfo
-	pfPortCursor     int              // cursor in the available ports list (-1 = manual input)
-	pfLastCreatedID  int              // ID of the most recently created port forward (for showing resolved port)
-	pfLoggedErrors   map[int]struct{} // port forward IDs whose failures have been logged to errorLog
-
+	pfAvailablePorts          []ui.PortInfo
+	pfPortCursor              int              // cursor in the available ports list (-1 = manual input)
+	pfLastCreatedID           int              // ID of the most recently created port forward (for showing resolved port)
+	pfLoggedErrors            map[int]struct{} // port forward IDs whose failures have been logged to errorLog
+	pfOpenInBrowserAfterStart bool             // open localhost:<port> once the next forward resolves ("Port Forward & Open")
 	// Explain view state (API browser).
 	explainFields                []model.ExplainField
 	explainDesc                  string // resource/field-level description
