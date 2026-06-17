@@ -151,7 +151,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `X` | Force delete (Pod/Job only) | `force_delete` |
 | `S` | Scale resource (Deployment / StatefulSet / ReplicaSet) | `scale` |
 | `W` | Save resource to file / toggle warnings-only filter (Events view) | `save_resource` |
-| `Ctrl+O` | Open ingress host in browser | `open_browser` |
+| `Ctrl+O` | Open ingress host or port-forward localhost URL in browser | `open_browser` |
 | `i` | Edit labels/annotations | `label_editor` |
 | `a` | Create new resource from template (/ to search) | `create_template` |
 | `d` | Diff two selected resources | `diff` |

@@ -485,8 +485,8 @@ func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 
 func (m Model) handleExplorerActionKeyOpenBrowser() (tea.Model, tea.Cmd, bool) {
 	kind := m.selectedResourceKind()
-	if kind != "Ingress" {
-		m.setStatusMessage("Open in browser is only available for Ingress resources", true)
+	if kind != "Ingress" && kind != "__port_forwards__" && kind != "__port_forward_entry__" {
+		m.setStatusMessage("Open in browser is only available for Ingress resources and port forwards", true)
 		return m, scheduleStatusClear(), true
 	}
 	sel := m.selectedMiddleItem()
