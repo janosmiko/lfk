@@ -61,10 +61,10 @@ func TestSeverityAndFollowDefaults(t *testing.T) {
 	if kb.Filter != "f" {
 		t.Errorf("Filter = %q, want %q", kb.Filter, "f")
 	}
-	if kb.SeverityDown != "-" {
-		t.Errorf("SeverityDown = %q, want %q", kb.SeverityDown, "-")
+	if kb.SeverityDown != "i" {
+		t.Errorf("SeverityDown = %q, want %q", kb.SeverityDown, "i")
 	}
-	if kb.SeverityUp != "+" {
-		t.Errorf("SeverityUp = %q, want %q", kb.SeverityUp, "+")
+	if kb.SeverityUp != "o" {
+		t.Errorf("SeverityUp = %q, want %q", kb.SeverityUp, "o")
 	}
 }

@@ -160,7 +160,7 @@ func DefaultKeybindings() Keybindings {
 
 		// Views
 		Help: "?", Filter: "f", Search: "/",
-		SeverityUp: "+", SeverityDown: "-",
+		SeverityUp: "o", SeverityDown: "i",
 		NextMatch: "n", PrevMatch: "N",
 		TogglePreview: "P", ToggleWrap: ">", ResourceMap: "M", Fullscreen: "F",
 		ToggleLineNumbers: "#", ToggleFold: "z", ToggleFoldAll: "Z",
