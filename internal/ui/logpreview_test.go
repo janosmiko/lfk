@@ -1219,3 +1219,25 @@ func TestParseLogLine_Log4j_WithPodPrefix(t *testing.T) {
 		t.Errorf("level = %q, want Warning", got["level"])
 	}
 }
+
+func TestParseLogLine_Glog_AbseilFullDate(t *testing.T) {
+	// Dragonfly / Abseil glog: 8-digit YYYYMMDD date.
+	in := `W20260429 10:55:50.349922    12 common.cc:346] ReportError: Operation canceled`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewKlog {
+		t.Fatalf("kind = %v, want Klog (glog 8-digit date)", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	if got["level"] != "Warning" {
+		t.Errorf("level = %q, want Warning", got["level"])
+	}
+	if got["message"] != "ReportError: Operation canceled" {
+		t.Errorf("message = %q", got["message"])
+	}
+	if got["caller"] != "common.cc:346" {
+		t.Errorf("caller = %q, want common.cc:346", got["caller"])
+	}
+}

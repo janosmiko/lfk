@@ -154,12 +154,14 @@ func ParseLogLine(line string) ParsedLogPreview {
 //
 //	LMMDD HH:MM:SS.uuuuuu threadid file:line] msg
 //
-// L is one of I/W/E/F (Info/Warning/Error/Fatal). The thread id is
+// L is one of I/W/E/F (Info/Warning/Error/Fatal). The date is klog's
+// 4-digit MMDD or the 8-digit YYYYMMDD emitted by Abseil/glog (used by
+// Dragonfly and other C++ Abseil-logging apps). The thread id is
 // right-aligned with leading whitespace in real klog output, so \s+ is
 // used between the time and the thread id. The trailing `]` after the
 // file:line is the signature element that distinguishes klog from
 // free-form text that happens to start with a capital letter.
-var klogLine = regexp.MustCompile(`^([IWEF])(\d{4}) (\d{2}:\d{2}:\d{2}\.\d+)\s+(\d+)\s+([^:\s]+:\d+)\]\s*(.*)$`)
+var klogLine = regexp.MustCompile(`^([IWEF])(\d{8}|\d{4}) (\d{2}:\d{2}:\d{2}\.\d+)\s+(\d+)\s+([^:\s]+:\d+)\]\s*(.*)$`)
 
 var klogLevelName = map[byte]string{
 	'I': "Info",

@@ -28,6 +28,14 @@ func TestLineLogLevel_Structured(t *testing.T) {
 		// log4j2 / OpenSearch
 		{"log4j info", "[2026-06-17T01:50:33,660][INFO ][o.o.a.t.Cron] [node-0] hourly cron", LogInfo},
 		{"log4j warn", "[2026-06-17T01:50:33,660][WARN ][o.o.j.s.JobSweeper] [node-0] slow sweep", LogWarn},
+		// Abseil/glog (Dragonfly): 8-digit YYYYMMDD date. The level letter is
+		// authoritative even when the message text contains "error" — these
+		// would be mis-bucketed by a plain keyword scan.
+		{"glog warn msg has Error", `W20260429 10:55:50.349922    12 common.cc:346] ReportError: Operation canceled`, LogWarn},
+		{"glog info msg has error", `I20260429 10:55:50.350005    12 dflycmd.cc:747] Replication error: canceled`, LogInfo},
+		{"glog error", `E20260429 10:55:50.350005    12 x.cc:1] boom`, LogError},
+		// klog 4-digit MMDD still works
+		{"klog 4-digit info", "I0416 12:00:00.000000       1 main.go:10] starting", LogInfo},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
