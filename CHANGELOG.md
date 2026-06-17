@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.14.10](https://github.com/janosmiko/lfk/compare/v0.14.9...v0.14.10) (2026-06-17)
+
+
+### Features
+
+* allow Ctrl+O (open in browser) for port forwards ([#445](https://github.com/janosmiko/lfk/issues/445)) ([fc38e92](https://github.com/janosmiko/lfk/commit/fc38e9241d187f7d9eb54be6d26569a86e392775))
+* Port Forward & Open action for Services (Ctrl+O) ([#448](https://github.com/janosmiko/lfk/issues/448)) ([691b612](https://github.com/janosmiko/lfk/commit/691b612c24224c92094b48bcf6a6cab79819ca99))
+
+
+### Bug Fixes
+
+* **logs:** reconnect specific-container stream while it is waiting to start ([#450](https://github.com/janosmiko/lfk/issues/450)) ([7e61834](https://github.com/janosmiko/lfk/commit/7e61834364fc50c9522fa59b14e61e47a799acbf))
+* scope to default namespace when toggling all-namespaces off with none set ([#449](https://github.com/janosmiko/lfk/issues/449)) ([ea9d9b2](https://github.com/janosmiko/lfk/commit/ea9d9b26217eb23b18b5a44cf788739cf0febcb2))
+* show PriorityClass Value and Preemption Policy columns ([#446](https://github.com/janosmiko/lfk/issues/446)) ([c8ef02c](https://github.com/janosmiko/lfk/commit/c8ef02c001f0209afa0e00b619a3c1f315e7dfe2))
+
 ## [0.14.9](https://github.com/janosmiko/lfk/compare/v0.14.8...v0.14.9) (2026-06-17)
 
 
