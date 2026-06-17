@@ -66,9 +66,13 @@ func TestTemplatesCrossReferencesResolve(t *testing.T) {
 	svcLabelApp := dig(tpl["Service"], "metadata", "labels", "app")
 	require.Equal(t, sharedApp, svcLabelApp, "Service must carry the shared app label")
 
-	// Pod containerPort, Service port, and targetPort line up.
-	require.EqualValues(t, 80, dig(tpl["Service"], "spec", "ports").([]any)[0].(map[string]any)["port"])
-	require.EqualValues(t, 80, dig(tpl["Service"], "spec", "ports").([]any)[0].(map[string]any)["targetPort"])
+	// Pod containerPort, Service port, and targetPort line up, and the Service
+	// port is named so the ServiceMonitor endpoint can reference it.
+	svcPort := dig(tpl["Service"], "spec", "ports").([]any)[0].(map[string]any)
+	require.EqualValues(t, 80, svcPort["port"])
+	require.EqualValues(t, 80, svcPort["targetPort"])
+	svcPortName := svcPort["name"]
+	require.NotEmpty(t, svcPortName, "Service port must be named so a ServiceMonitor can reference it")
 
 	// Ingress backend must point at the Service by name and port.
 	svcName := dig(tpl["Service"], "metadata", "name")
@@ -81,9 +85,13 @@ func TestTemplatesCrossReferencesResolve(t *testing.T) {
 	npApp := dig(tpl["NetworkPolicy"], "spec", "podSelector", "matchLabels", "app")
 	require.Equal(t, podApp, npApp, "NetworkPolicy podSelector must match the Pod")
 
-	// ServiceMonitor must select the Service (by its label).
+	// ServiceMonitor must select the Service (by its label) and scrape a port
+	// that actually exists on that Service (by name).
 	smApp := dig(tpl["ServiceMonitor"], "spec", "selector", "matchLabels", "app")
 	require.Equal(t, svcLabelApp, smApp, "ServiceMonitor selector must match the Service label")
+	smPort := dig(tpl["ServiceMonitor"], "spec", "endpoints").([]any)[0].(map[string]any)["port"]
+	require.Equal(t, svcPortName, smPort,
+		"ServiceMonitor endpoint port must reference the Service's named port")
 
 	// HPA must target the Deployment by name.
 	deployName := dig(tpl["Deployment"], "metadata", "name")

@@ -248,7 +248,8 @@ spec:
   selector:
     app: my-app
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
       protocol: TCP
 `,
@@ -510,7 +511,7 @@ spec:
     matchLabels:
       app: my-app
   endpoints:
-    - port: metrics
+    - port: http
       interval: 30s
       path: /metrics
 `,
