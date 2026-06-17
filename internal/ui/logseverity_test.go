@@ -26,6 +26,10 @@ func TestLineSeverity(t *testing.T) {
 		// Postgres: uses "severity" key; LOG maps to SevInfo, DEBUG1 strips digit to "debug"
 		{"postgres log", "2024-01-15 10:30:00.123 UTC [1234] LOG:  database system is ready to accept connections", SevInfo},
 		{"postgres error", "2024-01-15 10:30:00.123 UTC [1234] ERROR:  relation \"foo\" does not exist", SevError},
+		// log4j2 / OpenSearch bracketed: [ts][LEVEL][logger] msg (level often space-padded)
+		{"log4j opensearch info", "[2026-06-17T01:50:33,660][INFO ][o.o.a.t.CronTransportAction] [node-0] Start running AD hourly cron.", SevInfo},
+		{"log4j opensearch warn", "[2026-06-17T01:50:33,660][WARN ][o.o.j.s.JobSweeper] [node-0] slow sweep", SevWarn},
+		{"log4j error no logger", "[2026-06-17T01:50:33,660][ERROR] boom", SevError},
 		// Plain text has no level field
 		{"plain text", "just a plain line with no level", SevUnknown},
 		// Java stack trace tail is plain text
