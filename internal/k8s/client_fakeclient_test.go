@@ -1386,6 +1386,8 @@ func newFakeDynClient(objects ...runtime.Object) *dynamicfake.FakeDynamicClient 
 			{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}: "KustomizationList",
 			{Group: "helm.toolkit.fluxcd.io", Version: "v2beta1", Resource: "helmreleases"}:   "HelmReleaseList",
 			{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}:               "CertificateList",
+			{Group: "longhorn.io", Version: "v1beta2", Resource: "nodes"}:                     "NodeList",
+			{Group: "longhorn.io", Version: "v1beta2", Resource: "replicas"}:                  "ReplicaList",
 		}, objects...)
 }
 

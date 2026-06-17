@@ -92,6 +92,8 @@ func TestIsUnionAllowedActionForKind_ClosureOverMutatingActions(t *testing.T) {
 		"Cordon Node":          nil,
 		"Uncordon Node":        nil,
 		"Drain Node":           nil,
+		"Evict Replicas":       nil,
+		"Cancel Eviction":      nil,
 		"Activate":             nil,
 		"Edit Values":          nil,
 		"Upgrade":              nil,

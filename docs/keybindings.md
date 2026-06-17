@@ -971,6 +971,11 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 ### Node Actions
 `c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
+### Longhorn Node Actions
+`e` Evict Replicas, `C` Cancel Eviction, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events, `P` Permissions
+
+The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas scheduled on each node. Force Delete disables scheduling, then deletes (the `validator.longhorn.io` webhook rejects deleting a still-schedulable node). Evict Replicas disables scheduling and sets `spec.evictionRequested`, so Longhorn rebuilds each replica on another node before removing it.
+
 ### Job Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 

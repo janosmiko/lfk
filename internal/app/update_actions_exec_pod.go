@@ -203,8 +203,35 @@ func (m Model) executeActionEdit() (tea.Model, tea.Cmd) {
 // executeActionDelete handles the "Delete" action.
 func (m Model) executeActionDelete() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
 	m.confirmAction = m.actionCtx.name
+	// Clear any override left by a previous non-delete confirm so the simple
+	// confirm overlay falls back to its "Delete X?" wording.
+	m.confirmTitle = ""
+	m.confirmQuestion = ""
 	m.overlay = overlayConfirm
 	m.pendingAction = "Delete"
+	return m, nil
+}
+
+// executeActionEvictReplicas handles the "Evict Replicas" action on a
+// longhorn.io node. Eviction is data-safe (Longhorn rebuilds each replica on
+// another node before removing it here), so a simple y/n confirm is enough.
+func (m Model) executeActionEvictReplicas() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name
+	m.confirmTitle = "Confirm Evict Replicas"
+	m.confirmQuestion = fmt.Sprintf("Evict all replicas from %s?", m.actionCtx.name)
+	m.overlay = overlayConfirm
+	m.pendingAction = "Evict Replicas"
+	return m, nil
+}
+
+// executeActionCancelEviction handles the "Cancel Eviction" action on a
+// longhorn.io node (clears spec.evictionRequested).
+func (m Model) executeActionCancelEviction() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name
+	m.confirmTitle = "Confirm Cancel Eviction"
+	m.confirmQuestion = fmt.Sprintf("Cancel replica eviction on %s?", m.actionCtx.name)
+	m.overlay = overlayConfirm
+	m.pendingAction = "Cancel Eviction"
 	return m, nil
 }
 

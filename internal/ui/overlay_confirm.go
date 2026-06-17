@@ -33,6 +33,50 @@ type OverlayConfirmConfig struct {
 	Centered    bool
 	InnerWidth  int
 	InnerHeight int
+
+	// WrapWidth, when > 0, word-wraps the Warning to this many columns
+	// before rendering. Without it, lipgloss wraps the styled line at the
+	// box edge and breaks on hyphens / mid-word, which shatters long
+	// resource names (e.g. dev-envs-autoscaled-cx43-...). Callers pass the
+	// box inner width.
+	WrapWidth int
+}
+
+// wrapConfirmText word-wraps text to width on whitespace boundaries so words
+// (and hyphenated resource names) stay intact. A single token longer than
+// width is hard-split into width-sized chunks so no line exceeds width and
+// lipgloss never re-wraps with its hyphen-breaking default. Confirm text is
+// ASCII, so byte length is a safe column proxy.
+func wrapConfirmText(text string, width int) []string {
+	if width <= 0 {
+		return []string{text}
+	}
+	var lines []string
+	cur := ""
+	flush := func() {
+		if cur != "" {
+			lines = append(lines, cur)
+			cur = ""
+		}
+	}
+	for word := range strings.FieldsSeq(text) {
+		for len(word) > width {
+			flush()
+			lines = append(lines, word[:width])
+			word = word[width:]
+		}
+		switch {
+		case cur == "":
+			cur = word
+		case len(cur)+1+len(word) <= width:
+			cur += " " + word
+		default:
+			flush()
+			cur = word
+		}
+	}
+	flush()
+	return lines
 }
 
 // RenderOverlayConfirm renders a confirm overlay per cfg.
@@ -50,7 +94,11 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 	b.WriteString(OverlayTitleStyle.Render(cfg.Title))
 	b.WriteString("\n\n")
 	if cfg.Warning != "" {
-		b.WriteString(OverlayWarningStyle.Render(cfg.Warning))
+		warning := cfg.Warning
+		if cfg.WrapWidth > 0 {
+			warning = strings.Join(wrapConfirmText(warning, cfg.WrapWidth), "\n")
+		}
+		b.WriteString(OverlayWarningStyle.Render(warning))
 		b.WriteString("\n\n")
 	}
 	for i, line := range cfg.Body {

@@ -1,0 +1,34 @@
+package ui
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestWrapConfirmText(t *testing.T) {
+	t.Run("keeps words and hyphenated names intact", func(t *testing.T) {
+		lines := wrapConfirmText("Evict all replicas from dev-envs-autoscaled-cx43-2496bed88dc5524c?", 46)
+		for _, ln := range lines {
+			assert.LessOrEqual(t, len(ln), 46, "line exceeds width: %q", ln)
+		}
+		// The long name fits within 46 cols, so it must stay on one line
+		// (no hyphen shattering).
+		assert.Contains(t, lines, "dev-envs-autoscaled-cx43-2496bed88dc5524c?")
+		// No word is split mid-character.
+		assert.NotContains(t, lines, "r")
+	})
+
+	t.Run("hard-splits a token longer than width", func(t *testing.T) {
+		long := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" // 30 chars
+		lines := wrapConfirmText(long, 10)
+		for _, ln := range lines {
+			assert.LessOrEqual(t, len(ln), 10)
+		}
+		assert.Equal(t, []string{"aaaaaaaaaa", "aaaaaaaaaa", "aaaaaaaaaa"}, lines)
+	})
+
+	t.Run("zero width returns text unchanged", func(t *testing.T) {
+		assert.Equal(t, []string{"hello world"}, wrapConfirmText("hello world", 0))
+	})
+}
