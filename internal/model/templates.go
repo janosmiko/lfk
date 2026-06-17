@@ -24,7 +24,7 @@ metadata:
   name: my-pod
   namespace: NAMESPACE
   labels:
-    app: my-pod
+    app: my-app
 spec:
   containers:
     - name: nginx
@@ -43,16 +43,16 @@ metadata:
   name: my-deployment
   namespace: NAMESPACE
   labels:
-    app: my-deployment
+    app: my-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: my-deployment
+      app: my-app
   template:
     metadata:
       labels:
-        app: my-deployment
+        app: my-app
     spec:
       containers:
         - name: nginx
@@ -71,16 +71,16 @@ metadata:
   name: my-replicaset
   namespace: NAMESPACE
   labels:
-    app: my-replicaset
+    app: my-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: my-replicaset
+      app: my-app
   template:
     metadata:
       labels:
-        app: my-replicaset
+        app: my-app
     spec:
       containers:
         - name: nginx
@@ -99,17 +99,17 @@ metadata:
   name: my-statefulset
   namespace: NAMESPACE
   labels:
-    app: my-statefulset
+    app: my-app
 spec:
   serviceName: my-statefulset
   replicas: 1
   selector:
     matchLabels:
-      app: my-statefulset
+      app: my-app
   template:
     metadata:
       labels:
-        app: my-statefulset
+        app: my-app
     spec:
       containers:
         - name: app
@@ -140,15 +140,15 @@ metadata:
   name: my-daemonset
   namespace: NAMESPACE
   labels:
-    app: my-daemonset
+    app: my-app
 spec:
   selector:
     matchLabels:
-      app: my-daemonset
+      app: my-app
   template:
     metadata:
       labels:
-        app: my-daemonset
+        app: my-app
     spec:
       containers:
         - name: log-collector
@@ -241,12 +241,15 @@ kind: Service
 metadata:
   name: my-service
   namespace: NAMESPACE
+  labels:
+    app: my-app
 spec:
   type: ClusterIP
   selector:
     app: my-app
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
       protocol: TCP
 `,
@@ -484,7 +487,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: my-service-account
-    namespace: default
+    namespace: NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -508,7 +511,7 @@ spec:
     matchLabels:
       app: my-app
   endpoints:
-    - port: metrics
+    - port: http
       interval: 30s
       path: /metrics
 `,
