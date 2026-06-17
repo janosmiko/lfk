@@ -550,6 +550,26 @@ func actionsForKnativeKind(kind string) ([]ActionMenuItem, bool) {
 	return nil, false
 }
 
+// ActionsForLonghornNode returns the action menu for longhorn.io Node CRDs.
+// Distinct from the core-node menu (Cordon / Drain / Taint / Shell are
+// kubectl node verbs that do not apply here): a longhorn.io node is managed
+// through its spec. Evict Replicas / Cancel Eviction toggle
+// spec.evictionRequested so Longhorn rebuilds replicas elsewhere before
+// removing them; Force Delete disables scheduling then deletes past the
+// validating webhook (which rejects deletion of a still-schedulable node).
+func ActionsForLonghornNode() []ActionMenuItem {
+	return []ActionMenuItem{
+		{Label: "Evict Replicas", Description: "Drain replicas off this node (rebuilds them elsewhere first)", Key: "e"},
+		{Label: "Cancel Eviction", Description: "Stop an in-progress replica eviction", Key: "C"},
+		{Label: "Describe", Description: "Describe resource", Key: "v"},
+		{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+		{Label: "Delete", Description: "Delete this Longhorn node", Key: "D"},
+		{Label: "Force Delete", Description: "Force delete this Longhorn node (disable scheduling, then delete)", Key: "X"},
+		{Label: "Events", Description: "Show related events", Key: "V"},
+		{Label: "Permissions", Description: "Check RBAC permissions", Key: "P"},
+	}
+}
+
 // actionsDefault returns the generic action menu for unrecognized resource kinds.
 func actionsDefault() []ActionMenuItem {
 	return []ActionMenuItem{

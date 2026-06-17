@@ -71,6 +71,11 @@ var mutatingActions = map[string]bool{
 	"Suspend":       true,
 	"Resume":        true,
 
+	// Longhorn node mutations. Force Delete (above) disables scheduling then
+	// deletes; Evict Replicas / Cancel Eviction toggle spec.evictionRequested.
+	"Evict Replicas":  true,
+	"Cancel Eviction": true,
+
 	// Karpenter NodeClaim mutations. Disrupt removes the underlying
 	// node; Cordon / Uncordon / Drain Node operate on the node bound
 	// to the NodeClaim.

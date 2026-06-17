@@ -107,3 +107,11 @@ func IsForceDeleteableKind(kind string) bool {
 		return false
 	}
 }
+
+// IsLonghornNode reports whether rt is the longhorn.io Node CRD. The CRD's
+// Kind is "Node", which collides with the core Kubernetes Node, so callers
+// must disambiguate by API group rather than Kind alone. Force delete and
+// replica eviction apply only to the longhorn.io variant.
+func IsLonghornNode(rt ResourceTypeEntry) bool {
+	return rt.APIGroup == "longhorn.io" && rt.Resource == "nodes"
+}

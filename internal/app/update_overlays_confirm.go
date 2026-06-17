@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -27,6 +29,11 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		action := m.pendingAction
 		m.pendingAction = ""
 		m.confirmAction = ""
+		// Clear any title/question override (set by non-delete confirms such as
+		// Longhorn replica eviction) so the next overlayConfirm opener that
+		// relies on the default "Delete X?" wording is not shown stale text.
+		m.confirmTitle = ""
+		m.confirmQuestion = ""
 
 		ns := m.actionCtx.namespace
 		name := m.actionCtx.name
@@ -67,6 +74,15 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.execKubectlDrain()
 		}
 
+		switch action {
+		case "Evict Replicas":
+			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s.longhorn.io %s --type merge -p '{\"spec\":{\"allowScheduling\":false,\"evictionRequested\":true}}'%s --context %s", rt.Resource, name, nsArg, ctx))
+			return m, m.setLonghornNodeEviction(true)
+		case "Cancel Eviction":
+			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s.longhorn.io %s --type merge -p '{\"spec\":{\"evictionRequested\":false}}'%s --context %s", rt.Resource, name, nsArg, ctx))
+			return m, m.setLonghornNodeEviction(false)
+		}
+
 		// Regular delete.
 		if rt.APIGroup == "_helm" {
 			m.addLogEntry("DBG", fmt.Sprintf("$ helm uninstall %s -n %s --kube-context %s", name, ns, ctx))
@@ -77,6 +93,8 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n", "N", "esc", "q":
 		m.overlay = overlayNone
 		m.confirmAction = ""
+		m.confirmTitle = ""
+		m.confirmQuestion = ""
 		m.pendingAction = ""
 		m.resetBulkAction()
 		return m, nil
@@ -147,6 +165,10 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s %s --type merge -p '{\"metadata\":{\"finalizers\":null}}'%s --context %s", rt.Resource, name, nsArg, ctx))
 				return m, m.removeFinalizers()
 			case "Force Delete":
+				if model.IsLonghornNode(rt) {
+					m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s.longhorn.io %s --type merge -p '{\"spec\":{\"allowScheduling\":false}}'%s; kubectl delete %s.longhorn.io %s%s --context %s", rt.Resource, name, nsArg, rt.Resource, name, nsArg, ctx))
+					return m, m.forceDeleteLonghornNode()
+				}
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
 				return m, m.forceDeleteResource()
 			case "Finalizer Remove":

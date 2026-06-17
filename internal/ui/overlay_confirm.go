@@ -33,6 +33,66 @@ type OverlayConfirmConfig struct {
 	Centered    bool
 	InnerWidth  int
 	InnerHeight int
+
+	// WrapWidth, when > 0, word-wraps the Warning to this many columns
+	// before rendering. Without it, lipgloss wraps the styled line at the
+	// box edge and breaks on hyphens / mid-word, which shatters long
+	// resource names (e.g. dev-envs-autoscaled-cx43-...). Callers pass the
+	// box inner width.
+	WrapWidth int
+}
+
+// wrapConfirmText word-wraps text to width display columns on whitespace
+// boundaries so words (and hyphenated resource names) stay intact. A single
+// token wider than width is hard-split on rune boundaries so no line exceeds
+// width and lipgloss never re-wraps with its hyphen-breaking default. Widths
+// use lipgloss.Width so multibyte/wide characters are measured correctly.
+func wrapConfirmText(text string, width int) []string {
+	if width <= 0 {
+		return []string{text}
+	}
+	var lines []string
+	cur := ""
+	flush := func() {
+		if cur != "" {
+			lines = append(lines, cur)
+			cur = ""
+		}
+	}
+	for word := range strings.FieldsSeq(text) {
+		for lipgloss.Width(word) > width {
+			flush()
+			head, rest := splitAtWidth(word, width)
+			lines = append(lines, head)
+			word = rest
+		}
+		switch {
+		case cur == "":
+			cur = word
+		case lipgloss.Width(cur)+1+lipgloss.Width(word) <= width:
+			cur += " " + word
+		default:
+			flush()
+			cur = word
+		}
+	}
+	flush()
+	return lines
+}
+
+// splitAtWidth returns the longest prefix of s whose display width is <= width
+// and the remainder, splitting on rune boundaries so multibyte characters are
+// never cut in half.
+func splitAtWidth(s string, width int) (string, string) {
+	w := 0
+	for i, r := range s {
+		rw := lipgloss.Width(string(r))
+		if w+rw > width {
+			return s[:i], s[i:]
+		}
+		w += rw
+	}
+	return s, ""
 }
 
 // RenderOverlayConfirm renders a confirm overlay per cfg.
@@ -50,7 +110,11 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 	b.WriteString(OverlayTitleStyle.Render(cfg.Title))
 	b.WriteString("\n\n")
 	if cfg.Warning != "" {
-		b.WriteString(OverlayWarningStyle.Render(cfg.Warning))
+		warning := cfg.Warning
+		if cfg.WrapWidth > 0 {
+			warning = strings.Join(wrapConfirmText(warning, cfg.WrapWidth), "\n")
+		}
+		b.WriteString(OverlayWarningStyle.Render(warning))
 		b.WriteString("\n\n")
 	}
 	for i, line := range cfg.Body {

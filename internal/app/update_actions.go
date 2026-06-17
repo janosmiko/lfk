@@ -53,6 +53,11 @@ func (m Model) openResourceActionMenu() Model {
 		actions = model.ActionsForCapture()
 	case m.nav.Level == model.LevelContainers:
 		actions = model.ActionsForContainer()
+	case model.IsLonghornNode(m.actionCtx.resourceType):
+		// longhorn.io nodes share Kind "Node" with core nodes; route to the
+		// dedicated menu (Evict Replicas / Force Delete) instead of the
+		// core-node kubectl verbs.
+		actions = model.ActionsForLonghornNode()
 	default:
 		actions = model.ActionsForKind(kind)
 	}
@@ -299,15 +304,18 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
-	if !model.IsForceDeleteableKind(kind) {
-		m.setStatusMessage("Force delete not available for "+kind, true)
-		return m, scheduleStatusClear()
-	}
 	sel := m.selectedMiddleItem()
 	if sel == nil {
 		return m, nil
 	}
 	m.actionCtx = m.buildActionCtx(sel, kind)
+	// longhorn.io nodes are not force-deleteable by kind ("Node" collides with
+	// core nodes) but support their own force-delete (disable scheduling, then
+	// delete past the validating webhook).
+	if !model.IsForceDeleteableKind(kind) && !model.IsLonghornNode(m.actionCtx.resourceType) {
+		m.setStatusMessage("Force delete not available for "+kind, true)
+		return m, scheduleStatusClear()
+	}
 	if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, "Force Delete") {
 		logger.Info("Blocked by union view", "action", "Force Delete", "kind", kind)
 		m.setStatusMessage("Force Delete is not available in union view", true)
@@ -496,6 +504,12 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 		return mdl, cmd, true
 	case "Force Finalize":
 		mdl, cmd := m.executeActionForceFinalize()
+		return mdl, cmd, true
+	case "Evict Replicas":
+		mdl, cmd := m.executeActionEvictReplicas()
+		return mdl, cmd, true
+	case "Cancel Eviction":
+		mdl, cmd := m.executeActionCancelEviction()
 		return mdl, cmd, true
 	case "Cordon":
 		mdl, cmd := m.executeActionCordon()

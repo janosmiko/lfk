@@ -78,7 +78,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		if cerr == nil {
 			items = sortResourceItems(items, rt.Kind)
 			infs.observeCachedListSize(contextName, gvr, len(items))
-			return items, nil
+			return c.withLonghornReplicaCounts(ctx, contextName, namespace, rt, items), nil
 		}
 	}
 
@@ -112,7 +112,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	if mode == InformerCacheAuto && infs != nil {
 		infs.observeDirectListSize(contextName, gvr, len(items))
 	}
-	return sortResourceItems(items, rt.Kind), nil
+	return c.withLonghornReplicaCounts(ctx, contextName, namespace, rt, sortResourceItems(items, rt.Kind)), nil
 }
 
 // cacheEnabled reports whether the informer cache is wired up at all. False
