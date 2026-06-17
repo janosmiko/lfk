@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.9](https://github.com/janosmiko/lfk/compare/v0.14.8...v0.14.9) (2026-06-17)
+
+
+### Features
+
+* force-delete and evict replicas for Longhorn nodes ([#443](https://github.com/janosmiko/lfk/issues/443)) ([fbb4763](https://github.com/janosmiko/lfk/commit/fbb47633ec56ba7dd6f8aab8ada9213582eb5c41))
+* **logs:** filtering, severity filter, and current-match highlight ([#442](https://github.com/janosmiko/lfk/issues/442)) ([9cc3c72](https://github.com/janosmiko/lfk/commit/9cc3c72dd2dc72f77ea242a778d655ea5c3c9d9d))
+
 ## [0.14.8](https://github.com/janosmiko/lfk/compare/v0.14.7...v0.14.8) (2026-06-15)
 
 
