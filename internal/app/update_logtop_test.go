@@ -44,6 +44,24 @@ func TestLogTopKey_EscReturnsToLogs(t *testing.T) {
 	}
 }
 
+// TestLogTopKey_EscRebuildsLogView verifies that returning from Log Top via esc
+// immediately populates the log viewer projection (logView.lines) from rawLines,
+// so the user does not see a blank screen on return.
+func TestLogTopKey_EscRebuildsLogView(t *testing.T) {
+	m := newLogTopModel(t)
+	if len(m.logView.rawLines) == 0 {
+		t.Fatal("precondition: rawLines must be non-empty for this test to be meaningful")
+	}
+	mdl, _ := m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEsc})
+	got := mdl.(Model)
+	if got.mode != modeLogs {
+		t.Fatalf("mode after esc = %v, want modeLogs", got.mode)
+	}
+	if len(got.logView.lines) == 0 {
+		t.Errorf("logView.lines is empty after esc from Log Top; viewer would appear blank")
+	}
+}
+
 func TestLogTopKey_GOpensGroupByOverlay(t *testing.T) {
 	m := newLogTopModel(t)
 	mdl, _ := m.handleLogTopKey(key("g"))

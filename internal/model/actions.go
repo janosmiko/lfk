@@ -326,7 +326,6 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Resubmit Workflow", Description: "Create new workflow from this spec", Key: "R"},
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View workflow pod logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "o"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this workflow", Key: "D"},

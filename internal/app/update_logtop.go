@@ -19,6 +19,7 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 			m.logTopRebuildRows()
 			return m, nil
 		}
+		(&m).rebuildLogView()
 		m.mode = modeLogs
 		return m, nil
 	case kb.Down, "j":
