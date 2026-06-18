@@ -211,6 +211,9 @@ func (m Model) handleModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case modeObjectExplorer:
 		mdl, cmd := m.handleObjectExplorerKey(msg)
 		return mdl, cmd, true
+	case modeLogTop:
+		mdl, cmd := m.handleLogTopKey(msg)
+		return mdl, cmd, true
 	case modeCredits:
 		// Any key exits the credits screen.
 		m.mode = modeExplorer
