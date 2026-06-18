@@ -125,3 +125,79 @@ func TestAggregation_DimsMaxDistinct(t *testing.T) {
 		t.Errorf("path dim = %q, want %q", rows[0].Dims[FieldPath], want)
 	}
 }
+
+// TestAggregation_Percentiles verifies that P95/P99 are computed from the
+// latency histogram, and that groups without any duration field report -1.
+func TestAggregation_Percentiles(t *testing.T) {
+	a := NewAggregation([]string{FieldMethod, FieldPath}, nil, IsHTTPError)
+
+	// Group A: 96 requests at <=13ms and 4 at 500ms (total 100).
+	// Bucket distribution: all 96 fast samples land in <=8ms or <=13ms buckets.
+	// p95 target = ceil(0.95*100) = 95 -> cumulative at <=13ms bucket = 96 >= 95,
+	// so p95 = 13 (the upper bound of that bucket).
+	// p99 target = 99 -> the 99th sample is the 3rd outlier (500ms, bucket <=610),
+	// so p99 = 610.
+	for range 96 {
+		a.Add(Fields{
+			FieldMethod:     "GET",
+			FieldPath:       "/fast",
+			FieldStatus:     "200",
+			FieldDurationMS: "10", // 10ms -> bucket index 5, bound=13
+		})
+	}
+	for range 4 {
+		a.Add(Fields{
+			FieldMethod:     "GET",
+			FieldPath:       "/fast",
+			FieldStatus:     "200",
+			FieldDurationMS: "500",
+		})
+	}
+
+	// Group B: no duration field at all.
+	a.Add(Fields{FieldMethod: "POST", FieldPath: "/nodur", FieldStatus: "200"})
+
+	rows := a.Rows(SortReq)
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2", len(rows))
+	}
+
+	rowsByPath := map[string]Row{}
+	for _, r := range rows {
+		rowsByPath[r.Values[1]] = r
+	}
+
+	fast := rowsByPath["/fast"]
+	if fast.P95 < 0 {
+		t.Errorf("/fast P95 = %v, want >= 0", fast.P95)
+	}
+	// p95: 95th of 100 samples, 96 at <=13ms -> cumulative crosses 95 in the <=13ms bucket
+	if fast.P95 > 13 {
+		t.Errorf("/fast P95 = %v, want <= 13 (96 samples at 10ms fill p95 bucket)", fast.P95)
+	}
+	if fast.P99 < 0 {
+		t.Errorf("/fast P99 = %v, want >= 0", fast.P99)
+	}
+	if fast.P99 > 610 {
+		t.Errorf("/fast P99 = %v, want <= 610", fast.P99)
+	}
+	if fast.P99 <= 13 {
+		t.Errorf("/fast P99 = %v, want > 13 (4 outliers push p99 into higher bucket)", fast.P99)
+	}
+
+	nodur := rowsByPath["/nodur"]
+	if nodur.P95 != -1 {
+		t.Errorf("/nodur P95 = %v, want -1 (no duration field)", nodur.P95)
+	}
+	if nodur.P99 != -1 {
+		t.Errorf("/nodur P99 = %v, want -1 (no duration field)", nodur.P99)
+	}
+}
+
+// TestPercentileFromHist_ZeroTotal verifies the no-data sentinel.
+func TestPercentileFromHist_ZeroTotal(t *testing.T) {
+	hist := make([]int, len(durBucketsMs)+1)
+	if got := percentileFromHist(hist, 0, 0.95); got != -1 {
+		t.Errorf("got %v, want -1 for zero total", got)
+	}
+}

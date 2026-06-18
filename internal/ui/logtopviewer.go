@@ -13,6 +13,8 @@ type LogTopRow struct {
 	Count    int
 	ErrCount int
 	Pct      float64
+	P95      float64 // approximate p95 latency in ms; -1 when no duration data
+	P99      float64 // approximate p99 latency in ms; -1 when no duration data
 }
 
 // dimWeight returns the column weight for a given dimension name.
@@ -61,22 +63,42 @@ func logTopColWidths(dims []string, dimsRegion int) []int {
 	return widths
 }
 
+// latencyCell formats a latency value for display in a column of width w.
+// Returns "n/a" right-aligned when v < 0, otherwise integer ms right-aligned.
+func latencyCell(v float64, w int) string {
+	var label string
+	if v < 0 {
+		label = "n/a"
+	} else {
+		label = fmt.Sprintf("%.0f", v)
+	}
+	pad := max(w-len(label), 0)
+	return strings.Repeat(" ", pad) + label
+}
+
 // RenderLogTopView renders the Log Top aggregation table full screen.
 // dims lists all dimension columns to show (in order).
 // reqPerSec is the global request rate; total is the total request count used
 // to compute per-row REQ/s as a proportional share of the global rate.
+// showLatency adds P95 and P99 latency columns when true.
 // Call sites must set ui.ActiveSortColumnName and ui.ActiveSortAscending before
 // calling so the active sort column is highlighted.
-func RenderLogTopView(title string, dims []string, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
+func RenderLogTopView(title string, dims []string, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int, showLatency bool) string {
 	titleBar := ViewTitle(width, title)
 
 	// Lines must fit inside the bordered box: FullscreenBorderStyle renders at
 	// width-2 with 1-col padding each side, leaving width-4 of text. Target
 	// width-5 (matching the event viewer) so a column never wraps.
-	// Layout: lead(2) + dimsRegion + metricsBlock(32)
+	// Layout: lead(2) + dimsRegion + metricsBlock
+	// metricsBlock = 32 base; +16 when showLatency (two " %7s" columns = 2*(1+7)=16)
 	innerWidth := max(width-5, 20)
 	const lead = 2
-	const metricsBlock = 32 // " %8d %8.1f %6.1f %6d" = 1+8+1+8+1+6+1+6 = 32
+	const metricsBlockBase = 32 // " %8d %8.1f %6.1f %6d" = 1+8+1+8+1+6+1+6 = 32
+	const latencyExtra = 16     // 2 * (1 space + 7 wide column)
+	metricsBlock := metricsBlockBase
+	if showLatency {
+		metricsBlock += latencyExtra
+	}
 	dimsRegion := max(innerWidth-lead-metricsBlock, len(dims)*5)
 	colWidths := logTopColWidths(dims, dimsRegion)
 
@@ -96,6 +118,10 @@ func RenderLogTopView(title string, dims []string, rows []LogTopRow, reqPerSec f
 	// metric columns: right-aligned within their widths, preceded by a space
 	metricNames := []string{"REQ", "REQ/s", "%", "ERR"}
 	metricWidths := []int{8, 8, 6, 6}
+	if showLatency {
+		metricNames = append(metricNames, "P95", "P99")
+		metricWidths = append(metricWidths, 7, 7)
+	}
 	for i, name := range metricNames {
 		w := metricWidths[i]
 		ind := sortIndicatorForColumn(name)
@@ -130,6 +156,9 @@ func RenderLogTopView(title string, dims []string, rows []LogTopRow, reqPerSec f
 		}
 		dimCols := strings.Join(dimParts, " ")
 		metrics := fmt.Sprintf(" %8d %8.1f %6.1f %6d", r.Count, rowRPS, r.Pct, r.ErrCount)
+		if showLatency {
+			metrics += " " + latencyCell(r.P95, 7) + " " + latencyCell(r.P99, 7)
+		}
 		line := strings.Repeat(" ", lead) + dimCols + metrics
 		if i == cursor {
 			line = SelectedStyle.Render(line)

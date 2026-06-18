@@ -40,6 +40,10 @@ type logTopState struct {
 	// parsed changes, and every parsed mutation funnels through logTopRebuildRows.
 	displayDims []string
 
+	// hasLatency is true when at least one parsed line has a duration_ms field.
+	// Cached in logTopRebuildRows; drives the P95/P99 column visibility.
+	hasLatency bool
+
 	// drillStack is the stack of drill frames. Each enter pushes a frame;
 	// each esc pops one and restores its groupBy; empty stack means no drill active.
 	drillStack []logTopDrillFrame

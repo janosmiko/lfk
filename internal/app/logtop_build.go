@@ -14,6 +14,8 @@ const (
 	logTopMetricRPS = "REQ/s"
 	logTopMetricPct = "%"
 	logTopMetricERR = "ERR"
+	logTopMetricP95 = "P95"
+	logTopMetricP99 = "P99"
 )
 
 // httpProfile reports whether kind is an HTTP-access-log profile.
@@ -136,6 +138,7 @@ func (m *Model) ingestLogTopLine(line string) {
 // or a parsed trim).
 func (m *Model) logTopRebuildRows() {
 	m.logTop.displayDims = m.computeDisplayDims()
+	m.logTop.hasLatency = m.computeHasLatency()
 	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTop.displayDims, m.logTopErrorPredicate())
 	for _, f := range m.logTop.parsed {
 		if !m.logTopMatchesDrill(f) {
@@ -189,9 +192,37 @@ func (m *Model) logTopRowText(r logagg.Row) string {
 }
 
 // logTopSortColumns returns the ordered list of sortable column names:
-// dimension columns first, then metric columns.
+// dimension columns first, then metric columns. P95/P99 are appended when
+// latency data is present.
 func (m *Model) logTopSortColumns() []string {
-	return append(append([]string(nil), m.logTop.displayDims...), logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR)
+	cols := append(append([]string(nil), m.logTop.displayDims...), logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR)
+	if m.logTop.hasLatency {
+		cols = append(cols, logTopMetricP95, logTopMetricP99)
+	}
+	return cols
+}
+
+// computeHasLatency reports whether any parsed line has a non-empty duration_ms field.
+func (m *Model) computeHasLatency() bool {
+	for _, f := range m.logTop.parsed {
+		if f[logagg.FieldDurationMS] != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// compareFloat compares two float64 values for sort order, returning -1, 0,
+// or 1. Values of -1 (the no-data sentinel) sort as smallest.
+func compareFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // logTopSortRows sorts m.logTop.rows by the active sortCol / sortAsc.
@@ -207,6 +238,10 @@ func (m *Model) logTopSortRows() {
 			// REQ/s and % are both proportional to Count (rate = share of the
 			// global rate; % = Count/total), so sorting by Count is equivalent.
 			c = rows[i].Count - rows[j].Count
+		case logTopMetricP95:
+			c = compareFloat(rows[i].P95, rows[j].P95)
+		case logTopMetricP99:
+			c = compareFloat(rows[i].P99, rows[j].P99)
 		default: // a dimension column: compare its display string
 			c = strings.Compare(rows[i].Dims[col], rows[j].Dims[col])
 		}

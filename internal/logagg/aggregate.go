@@ -1,10 +1,51 @@
 package logagg
 
 import (
+	"math"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+// durBucketsMs are ascending millisecond upper-bounds for the latency
+// histogram. A value falls in the first bucket whose bound is >= it; values
+// above the last bound fall in the overflow bucket (index len(durBucketsMs)).
+var durBucketsMs = []float64{
+	1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987,
+	1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025,
+}
+
+// durBucketIndex returns the histogram bucket for v ms.
+func durBucketIndex(v float64) int {
+	for i, b := range durBucketsMs {
+		if v <= b {
+			return i
+		}
+	}
+	return len(durBucketsMs) // overflow
+}
+
+// percentileFromHist returns the approximate p-quantile (0<p<1) in ms from a
+// histogram with `total` samples, or -1 when total == 0. The result is the
+// upper bound of the bucket where the cumulative count crosses p (overflow
+// bucket reports the largest bound).
+func percentileFromHist(hist []int, total int, p float64) float64 {
+	if total == 0 {
+		return -1
+	}
+	target := int(math.Ceil(p * float64(total)))
+	cum := 0
+	for i, c := range hist {
+		cum += c
+		if cum >= target {
+			if i >= len(durBucketsMs) {
+				return durBucketsMs[len(durBucketsMs)-1]
+			}
+			return durBucketsMs[i]
+		}
+	}
+	return durBucketsMs[len(durBucketsMs)-1]
+}
 
 // maxDimDistinct caps the number of distinct values tracked per dimension per
 // group to bound memory usage.
@@ -24,6 +65,8 @@ type Row struct {
 	Count    int
 	ErrCount int
 	Dims     map[string]string // per-dimension display string: uniform value, or "*N", or "*50+"
+	P95      float64           // approximate p95 latency in ms; -1 when no duration data
+	P99      float64           // approximate p99 latency in ms; -1 when no duration data
 	id       string            // cached "\x00"-joined Values, for a stable allocation-free sort tiebreak
 }
 
@@ -35,6 +78,8 @@ type groupRow struct {
 	errCount int
 	dimSets  map[string]map[string]struct{} // per-dim distinct values (capped at maxDimDistinct)
 	dimFirst map[string]string              // first value seen per dim (for the uniform case)
+	durHist  []int                          // latency histogram (lazily allocated, len = len(durBucketsMs)+1)
+	durTotal int                            // number of lines with a valid duration
 }
 
 // Aggregation accumulates grouped counts. Memory is bounded by the number of
@@ -79,6 +124,17 @@ func (a *Aggregation) Add(f Fields) {
 		r.errCount++
 	}
 	a.total++
+
+	// Accumulate latency histogram.
+	if ds := f[FieldDurationMS]; ds != "" {
+		if v, err := strconv.ParseFloat(ds, 64); err == nil {
+			if r.durHist == nil {
+				r.durHist = make([]int, len(durBucketsMs)+1)
+			}
+			r.durHist[durBucketIndex(v)]++
+			r.durTotal++
+		}
+	}
 
 	// Track distinct values per display dimension.
 	for _, d := range a.dims {
@@ -129,6 +185,8 @@ func (a *Aggregation) Rows(key SortKey) []Row {
 			Count:    gr.count,
 			ErrCount: gr.errCount,
 			Dims:     dims,
+			P95:      percentileFromHist(gr.durHist, gr.durTotal, 0.95),
+			P99:      percentileFromHist(gr.durHist, gr.durTotal, 0.99),
 			id:       gr.id,
 		})
 	}

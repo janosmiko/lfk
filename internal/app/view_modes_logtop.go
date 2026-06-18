@@ -11,6 +11,7 @@ func (m Model) viewLogTop() string {
 	total := len(m.logTop.parsed)
 	dims := m.logTopDisplayDims()
 
+	showLatency := m.logTop.hasLatency
 	rows := make([]ui.LogTopRow, len(m.logTop.rows))
 	for i, r := range m.logTop.rows {
 		pct := 0.0
@@ -22,6 +23,8 @@ func (m Model) viewLogTop() string {
 			Count:    r.Count,
 			ErrCount: r.ErrCount,
 			Pct:      pct,
+			P95:      r.P95,
+			P99:      r.P99,
 		}
 	}
 
@@ -63,7 +66,7 @@ func (m Model) viewLogTop() string {
 
 	hint := m.logTopHintBar()
 	return ui.RenderLogTopView(title, dims, rows, m.logTopReqPerSec(),
-		total, m.logTop.cursor, m.logTop.scroll, hint, m.width, m.height)
+		total, m.logTop.cursor, m.logTop.scroll, hint, m.width, m.height, showLatency)
 }
 
 func (m Model) logTopHintBar() string {
