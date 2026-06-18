@@ -571,7 +571,7 @@ type TabState struct {
 	logTopAutoProf    bool
 	logTopFilterQuery string
 	logTopColOrder    []string
-	logTopColHidden   []string
+	logTopColHidden   []string // serialized (sorted key) form of the runtime colHidden map[string]bool
 
 	// Security feature state — per-tab so two tabs pointing at different
 	// clusters keep their own source manager and availability map.

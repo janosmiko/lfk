@@ -65,6 +65,16 @@ func (m Model) renderLogTopProfileOverlay() (string, int, int) {
 	return ui.RenderOverlayList(items, cfg, w-4), w, cfg.Height + 2
 }
 
+// columnsOverlayRenderCursor maps the logical column cursor (over dims then
+// metrics, no divider) to the render-list index, which includes a Header
+// divider between the two non-empty groups.
+func columnsOverlayRenderCursor(cursor, nDims, nMets int) int {
+	if nDims > 0 && nMets > 0 && cursor >= nDims {
+		return cursor + 1 // skip the divider row
+	}
+	return cursor
+}
+
 func (m Model) renderLogTopColumnsOverlay() (string, int, int) {
 	dims := m.logTop.colOrder
 	mets := m.logTopAllMetrics()
@@ -82,7 +92,7 @@ func (m Model) renderLogTopColumnsOverlay() (string, int, int) {
 	w := min(m.width-10, 44)
 	cfg := ui.OverlayListConfig{
 		Title:       "Columns",
-		Cursor:      m.overlayCursor,
+		Cursor:      columnsOverlayRenderCursor(m.overlayCursor, len(dims), len(mets)),
 		MultiSelect: true,
 		FooterHint:  "space toggle · J/K reorder dims · enter apply · esc cancel",
 		Height:      min(len(items)+4, m.height-6),

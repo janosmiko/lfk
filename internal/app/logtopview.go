@@ -97,7 +97,9 @@ func (s logTopState) copy() logTopState {
 	if s.colHidden != nil {
 		c.colHidden = maps.Clone(s.colHidden)
 	}
-	c.agg = nil // live aggregation is rebuilt lazily; never share the pointer across snapshots
+	c.agg = nil           // live aggregation is rebuilt lazily; never share the pointer across snapshots
+	c.colSnapOrder = nil  // ephemeral: esc-cancel snapshot, valid only while the columns overlay is open
+	c.colSnapHidden = nil // ephemeral: esc-cancel snapshot, valid only while the columns overlay is open
 	return c
 }
 
