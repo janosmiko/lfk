@@ -31,6 +31,7 @@ const (
 	modeKubetris
 	modeCredits
 	modeObjectExplorer
+	modeLogTop
 )
 
 // overlayKind tracks which overlay is currently open.
