@@ -40,3 +40,22 @@ func (s logTopState) copy() logTopState {
 	c.agg = nil // live aggregation is rebuilt lazily; never share the pointer across snapshots
 	return c
 }
+
+func (m *Model) saveLogTopToTab(t *TabState) {
+	t.logTopProfile = string(m.logTop.profile)
+	t.logTopGroupBy = append([]string(nil), m.logTop.groupBy...)
+	t.logTopSortKey = int(m.logTop.sortKey)
+	t.logTopAutoProf = m.logTop.autoProf
+}
+
+func (m *Model) loadLogTopFromTab(t TabState) {
+	m.logTop = logTopState{
+		profile:  logagg.ProfileKind(t.logTopProfile),
+		groupBy:  append([]string(nil), t.logTopGroupBy...),
+		sortKey:  logagg.SortKey(t.logTopSortKey),
+		autoProf: t.logTopAutoProf,
+	}
+	if m.mode == modeLogTop && len(m.logView.rawLines) > 0 {
+		m.logTopReparseExisting()
+	}
+}

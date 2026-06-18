@@ -400,7 +400,6 @@ func (m *Model) saveCurrentTab() {
 	t.leftItems = append([]model.Item(nil), m.leftItems...)
 	t.middleItems = append([]model.Item(nil), m.middleItems...)
 	t.rightItems = append([]model.Item(nil), m.rightItems...)
-	// Deep copy leftItemsHistory.
 	t.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
 	for i, hist := range m.leftItemsHistory {
 		t.leftItemsHistory[i] = append([]model.Item(nil), hist...)
@@ -511,6 +510,7 @@ func (m *Model) saveCurrentTab() {
 	t.explainCursor = m.explainCursor
 	t.explainScroll = m.explainScroll
 	t.explainSearchQuery = m.explainSearchQuery
+	m.saveLogTopToTab(t)
 	m.saveSecurityStateToTab(t)
 	// Cache the current preview buffer then cancel the stream so it does not
 	// outlive the tab. The fullLogPreview flag is persisted above, so the next
@@ -649,7 +649,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.explainScroll = t.explainScroll
 	m.explainSearchQuery = t.explainSearchQuery
 	m.loadSecurityStateFromTab(&t)
-
+	m.loadLogTopFromTab(t)
 	// Close overlays and reset transient state.
 	m.overlay = overlayNone
 	m.filterActive = false
@@ -781,8 +781,8 @@ func (m *Model) cloneCurrentTab() TabState {
 	// start on the same cluster; navigateChildCluster will rebuild
 	// them via refreshSecuritySources when the user picks a different
 	// context.
+	m.saveLogTopToTab(&newTab)
 	m.saveSecurityStateToTab(&newTab)
-	// Deep copy leftItemsHistory.
 	newTab.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
 	for i, hist := range m.leftItemsHistory {
 		newTab.leftItemsHistory[i] = append([]model.Item(nil), hist...)
