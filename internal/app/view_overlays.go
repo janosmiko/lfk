@@ -309,6 +309,9 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 	case overlayLogTopProfile:
 		c, w, h := m.renderLogTopProfileOverlay()
 		return c, w, h, true
+	case overlayLogTopColumns:
+		c, w, h := m.renderLogTopColumnsOverlay()
+		return c, w, h, true
 	}
 	return "", 0, 0, false
 }

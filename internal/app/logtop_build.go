@@ -132,6 +132,60 @@ func (m *Model) ingestLogTopLine(line string) {
 	m.logTopAddLine(line)
 }
 
+// logTopReconcileColOrder syncs colOrder with the current displayDims: keep the
+// existing order for dims still present, append any new dims, drop absent ones.
+func (m *Model) logTopReconcileColOrder() {
+	present := map[string]bool{}
+	for _, d := range m.logTop.displayDims {
+		present[d] = true
+	}
+	var next []string
+	seen := map[string]bool{}
+	for _, d := range m.logTop.colOrder {
+		if present[d] && !seen[d] {
+			next = append(next, d)
+			seen[d] = true
+		}
+	}
+	for _, d := range m.logTop.displayDims {
+		if !seen[d] {
+			next = append(next, d)
+		}
+	}
+	m.logTop.colOrder = next
+}
+
+// logTopVisibleDims returns the ordered, non-hidden dimension columns.
+func (m *Model) logTopVisibleDims() []string {
+	out := make([]string, 0, len(m.logTop.colOrder))
+	for _, d := range m.logTop.colOrder {
+		if !m.logTop.colHidden[d] {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// logTopAllMetrics returns the metric column ids available given latency data.
+func (m *Model) logTopAllMetrics() []string {
+	mets := []string{logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR}
+	if m.logTop.hasLatency {
+		mets = append(mets, logTopMetricP95, logTopMetricP99)
+	}
+	return mets
+}
+
+// logTopVisibleMetrics returns the non-hidden metric columns in fixed order.
+func (m *Model) logTopVisibleMetrics() []string {
+	out := make([]string, 0, 6)
+	for _, name := range m.logTopAllMetrics() {
+		if !m.logTop.colHidden[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // logTopRebuildRows rebuilds the live aggregation from parsed (applying drill
 // constraints) and refreshes the displayed rows. Used on reset and on any
 // change that invalidates incremental accumulation (group-by, drill, profile,
@@ -139,6 +193,7 @@ func (m *Model) ingestLogTopLine(line string) {
 func (m *Model) logTopRebuildRows() {
 	m.logTop.displayDims = m.computeDisplayDims()
 	m.logTop.hasLatency = m.computeHasLatency()
+	m.logTopReconcileColOrder()
 	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTop.displayDims, m.logTopErrorPredicate())
 	for _, f := range m.logTop.parsed {
 		if !m.logTopMatchesDrill(f) {
@@ -159,8 +214,19 @@ func (m *Model) logTopRefreshRows() {
 		return
 	}
 	m.logTop.rows = m.logTop.agg.Rows(logagg.SortReq)
+	// If the active sort column is hidden, reset to first visible (prefer REQ).
+	if m.logTop.sortCol != "" && m.logTop.colHidden[m.logTop.sortCol] {
+		m.logTop.sortCol = ""
+	}
 	if m.logTop.sortCol == "" {
-		m.logTop.sortCol = logTopMetricREQ
+		if !m.logTop.colHidden[logTopMetricREQ] {
+			m.logTop.sortCol = logTopMetricREQ
+		} else {
+			cols := m.logTopSortColumns()
+			if len(cols) > 0 {
+				m.logTop.sortCol = cols[0]
+			}
+		}
 	}
 	m.logTopSortRows()
 	if m.logTop.filterQuery != "" {
@@ -178,12 +244,13 @@ func (m *Model) logTopRefreshRows() {
 	m.logTopSyncScroll()
 }
 
-// logTopRowText builds the searchable text for a row: its dimension display
+// logTopRowText builds the searchable text for a row: its visible dimension
 // values joined by spaces (so the filter matches against method/path/status/
 // host/router/service as shown).
 func (m *Model) logTopRowText(r logagg.Row) string {
-	parts := make([]string, 0, len(m.logTop.displayDims))
-	for _, d := range m.logTop.displayDims {
+	vdims := m.logTopVisibleDims()
+	parts := make([]string, 0, len(vdims))
+	for _, d := range vdims {
 		if v := r.Dims[d]; v != "" {
 			parts = append(parts, v)
 		}
@@ -192,14 +259,10 @@ func (m *Model) logTopRowText(r logagg.Row) string {
 }
 
 // logTopSortColumns returns the ordered list of sortable column names:
-// dimension columns first, then metric columns. P95/P99 are appended when
-// latency data is present.
+// visible dimension columns first, then visible metric columns.
 func (m *Model) logTopSortColumns() []string {
-	cols := append(append([]string(nil), m.logTop.displayDims...), logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR)
-	if m.logTop.hasLatency {
-		cols = append(cols, logTopMetricP95, logTopMetricP99)
-	}
-	return cols
+	cols := append([]string(nil), m.logTopVisibleDims()...)
+	return append(cols, m.logTopVisibleMetrics()...)
 }
 
 // computeHasLatency reports whether any parsed line has a non-empty duration_ms field.
@@ -342,13 +405,6 @@ var httpDimOrder = []string{
 	logagg.FieldHost,
 	logagg.FieldRouter,
 	logagg.FieldService,
-}
-
-// logTopDisplayDims returns the cached dimension columns for the current render.
-// The cache is populated by logTopRebuildRows; dims only change when parsed
-// changes, and every parsed mutation funnels through logTopRebuildRows.
-func (m *Model) logTopDisplayDims() []string {
-	return m.logTop.displayDims
 }
 
 // computeDisplayDims computes the dimension columns to show in the table by

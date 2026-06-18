@@ -1,6 +1,11 @@
 package app
 
-import "github.com/janosmiko/lfk/internal/logagg"
+import (
+	"maps"
+	"sort"
+
+	"github.com/janosmiko/lfk/internal/logagg"
+)
 
 // logTopDrillFilter is a single field=value constraint applied during drill-down.
 type logTopDrillFilter struct {
@@ -48,6 +53,16 @@ type logTopState struct {
 	// each esc pops one and restores its groupBy; empty stack means no drill active.
 	drillStack []logTopDrillFrame
 
+	// colOrder is the user-ordered dimension column ids. Synced with
+	// displayDims by logTopReconcileColOrder after each rebuild.
+	colOrder []string
+	// colHidden is the set of hidden column ids (dimension OR metric).
+	colHidden map[string]bool
+	// colSnapOrder/colSnapHidden snapshot colOrder/colHidden when the
+	// column overlay opens so esc can cancel without persisting changes.
+	colSnapOrder  []string
+	colSnapHidden map[string]bool
+
 	// pendingGroup holds the transient multi-select state for the group-by overlay.
 	// It is not copied in copy() because it is ephemeral overlay state.
 	pendingGroup map[string]bool
@@ -78,6 +93,10 @@ func (s logTopState) copy() logTopState {
 		}
 	}
 	c.displayDims = append([]string(nil), s.displayDims...)
+	c.colOrder = append([]string(nil), s.colOrder...)
+	if s.colHidden != nil {
+		c.colHidden = maps.Clone(s.colHidden)
+	}
 	c.agg = nil // live aggregation is rebuilt lazily; never share the pointer across snapshots
 	return c
 }
@@ -89,6 +108,13 @@ func (m *Model) saveLogTopToTab(t *TabState) {
 	t.logTopSortAsc = m.logTop.sortAsc
 	t.logTopAutoProf = m.logTop.autoProf
 	t.logTopFilterQuery = m.logTop.filterQuery
+	t.logTopColOrder = append([]string(nil), m.logTop.colOrder...)
+	hidden := make([]string, 0, len(m.logTop.colHidden))
+	for k := range m.logTop.colHidden {
+		hidden = append(hidden, k)
+	}
+	sort.Strings(hidden)
+	t.logTopColHidden = hidden
 }
 
 func (m *Model) loadLogTopFromTab(t TabState) {
@@ -99,6 +125,13 @@ func (m *Model) loadLogTopFromTab(t TabState) {
 		sortAsc:     t.logTopSortAsc,
 		autoProf:    t.logTopAutoProf,
 		filterQuery: t.logTopFilterQuery,
+		colOrder:    append([]string(nil), t.logTopColOrder...),
+	}
+	if len(t.logTopColHidden) > 0 {
+		m.logTop.colHidden = make(map[string]bool, len(t.logTopColHidden))
+		for _, k := range t.logTopColHidden {
+			m.logTop.colHidden[k] = true
+		}
 	}
 	if m.mode == modeLogTop && len(m.logView.rawLines) > 0 {
 		m.logTopReparseExisting()

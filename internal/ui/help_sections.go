@@ -429,6 +429,7 @@ func helpSections() []helpSection {
 				{"G", "Jump to bottom"},
 				{"g", "Group-by field picker (multi-select)"},
 				{"p", "Profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto)"},
+				{",", "Column picker: show/hide and reorder dimension columns, show/hide metric columns"},
 				{"sort key", "Toggle sort column (REQ <-> ERR)"},
 				{"Enter", "Drill into selected group (e.g. by status for HTTP)"},
 				{"Esc/q", "Pop drill level or return to log viewer"},

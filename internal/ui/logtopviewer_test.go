@@ -23,7 +23,8 @@ func TestRenderLogTopView_ShowsRowsAndRate(t *testing.T) {
 		},
 	}
 	dims := []string{"method", "path", "status"}
-	out := RenderLogTopView("Log Top: deploy/web", dims, rows, 4.7, 5000, 0, 0, "hint", 100, 30, false)
+	metrics := []string{"REQ", "REQ/s", "%", "ERR"}
+	out := RenderLogTopView("Log Top: deploy/web", dims, metrics, rows, 4.7, 5000, 0, 0, "hint", 100, 30)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "GET") {
 		t.Error("expected method GET rendered")
@@ -42,7 +43,7 @@ func TestRenderLogTopView_ShowsRowsAndRate(t *testing.T) {
 	}
 }
 
-// TestRenderLogTopView_LatencyColumns verifies that showLatency=true renders
+// TestRenderLogTopView_LatencyColumns verifies that passing P95/P99 in metrics renders
 // P95/P99 headers and that rows with P95/P99 < 0 show "n/a".
 func TestRenderLogTopView_LatencyColumns(t *testing.T) {
 	dims := []string{"method", "path"}
@@ -50,13 +51,14 @@ func TestRenderLogTopView_LatencyColumns(t *testing.T) {
 		{Dims: map[string]string{"method": "GET", "path": "/api"}, Count: 10, ErrCount: 0, Pct: 100, P95: 13, P99: 610},
 		{Dims: map[string]string{"method": "POST", "path": "/nodur"}, Count: 5, ErrCount: 0, Pct: 50, P95: -1, P99: -1},
 	}
-	out := RenderLogTopView("title", dims, rows, 1.0, 10, 0, 0, "hint", 120, 30, true)
+	metrics := []string{"REQ", "REQ/s", "%", "ERR", "P95", "P99"}
+	out := RenderLogTopView("title", dims, metrics, rows, 1.0, 10, 0, 0, "hint", 120, 30)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "P95") {
-		t.Error("expected P95 header when showLatency=true")
+		t.Error("expected P95 header when metrics includes P95")
 	}
 	if !strings.Contains(plain, "P99") {
-		t.Error("expected P99 header when showLatency=true")
+		t.Error("expected P99 header when metrics includes P99")
 	}
 	if !strings.Contains(plain, "n/a") {
 		t.Error("expected n/a for row with P95/P99 = -1")
@@ -86,15 +88,16 @@ func TestRenderLogTopView_NoLineOverflow(t *testing.T) {
 		},
 	}
 	dims := []string{"method", "path", "status"}
+	metrics := []string{"REQ", "REQ/s", "%", "ERR"}
 	for _, width := range []int{80, 100, 120, 200} {
-		out := RenderLogTopView("Log Top: deploy/web", dims, rows, 4.7, 5000, 0, 0, "hint", width, 30, false)
+		out := RenderLogTopView("Log Top: deploy/web", dims, metrics, rows, 4.7, 5000, 0, 0, "hint", width, 30)
 		for line := range strings.SplitSeq(stripANSI(out), "\n") {
 			if w := lipgloss.Width(line); w > width {
 				t.Errorf("width=%d: line exceeds terminal width (%d): %q", width, w, line)
 			}
 		}
 	}
-	// Also verify showLatency=true does not overflow.
+	// Also verify latency columns do not overflow.
 	latRows := []LogTopRow{
 		{
 			Dims:     map[string]string{"method": "GET", "path": "/api/users/with/a/fairly/long/path/segment", "status": "200"},
@@ -105,11 +108,12 @@ func TestRenderLogTopView_NoLineOverflow(t *testing.T) {
 			P99:      610,
 		},
 	}
+	latMetrics := []string{"REQ", "REQ/s", "%", "ERR", "P95", "P99"}
 	for _, width := range []int{80, 100, 120, 200} {
-		out := RenderLogTopView("Log Top: deploy/web", dims, latRows, 4.7, 5000, 0, 0, "hint", width, 30, true)
+		out := RenderLogTopView("Log Top: deploy/web", dims, latMetrics, latRows, 4.7, 5000, 0, 0, "hint", width, 30)
 		for line := range strings.SplitSeq(stripANSI(out), "\n") {
 			if w := lipgloss.Width(line); w > width {
-				t.Errorf("showLatency width=%d: line exceeds terminal width (%d): %q", width, w, line)
+				t.Errorf("latency width=%d: line exceeds terminal width (%d): %q", width, w, line)
 			}
 		}
 	}

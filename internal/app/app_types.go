@@ -88,6 +88,7 @@ const (
 	overlayObjectExplorerFind // recursive key search over the object (r key)
 	overlayLogTopGroupBy      // multi-select group-by field picker for Log Top
 	overlayLogTopProfile      // single-select log format profile picker for Log Top
+	overlayLogTopColumns      // show/hide and reorder column picker for Log Top
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
@@ -569,6 +570,8 @@ type TabState struct {
 	logTopSortAsc     bool
 	logTopAutoProf    bool
 	logTopFilterQuery string
+	logTopColOrder    []string
+	logTopColHidden   []string
 
 	// Security feature state — per-tab so two tabs pointing at different
 	// clusters keep their own source manager and availability map.

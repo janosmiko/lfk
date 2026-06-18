@@ -9,9 +9,8 @@ import (
 
 func (m Model) viewLogTop() string {
 	total := len(m.logTop.parsed)
-	dims := m.logTopDisplayDims()
-
-	showLatency := m.logTop.hasLatency
+	dims := m.logTopVisibleDims()
+	metrics := m.logTopVisibleMetrics()
 	rows := make([]ui.LogTopRow, len(m.logTop.rows))
 	for i, r := range m.logTop.rows {
 		pct := 0.0
@@ -65,8 +64,8 @@ func (m Model) viewLogTop() string {
 		m.logTop.title, prof, total, m.logTop.unmatched, span, drill, filterSuffix, searchSuffix)
 
 	hint := m.logTopHintBar()
-	return ui.RenderLogTopView(title, dims, rows, m.logTopReqPerSec(),
-		total, m.logTop.cursor, m.logTop.scroll, hint, m.width, m.height, showLatency)
+	return ui.RenderLogTopView(title, dims, metrics, rows, m.logTopReqPerSec(),
+		total, m.logTop.cursor, m.logTop.scroll, hint, m.width, m.height)
 }
 
 func (m Model) logTopHintBar() string {
@@ -78,6 +77,7 @@ func (m Model) logTopHintBar() string {
 		{Key: kb.SortReset, Desc: "reset sort"},
 		{Key: "g", Desc: "group by"},
 		{Key: "p", Desc: "profile"},
+		{Key: kb.ColumnToggle, Desc: "columns"},
 		{Key: kb.Filter, Desc: "filter"},
 		{Key: kb.Search, Desc: "search"},
 		{Key: kb.NextMatch + "/" + kb.PrevMatch, Desc: "next/prev"},

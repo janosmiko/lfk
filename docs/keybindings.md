@@ -392,6 +392,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `-` | Reset sort to REQ descending |
 | `g` | Open group-by field picker (multi-select) |
 | `p` | Open profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto) |
+| `,` | Open column picker: show/hide and reorder dimension columns, show/hide metric columns |
 | `f` | Filter rows (matches dimension values) |
 | `/` | Search and jump to matching row |
 | `n` / `N` | Next / previous search match |

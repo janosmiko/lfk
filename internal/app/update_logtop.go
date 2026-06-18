@@ -71,6 +71,8 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		return m.openLogTopGroupBy(), nil
 	case "p":
 		return m.openLogTopProfile(), nil
+	case kb.ColumnToggle:
+		return m.openLogTopColumns(), nil
 	case kb.SortNext:
 		m.logTopCycleSort(+1)
 		return m, nil

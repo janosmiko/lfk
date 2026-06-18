@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -133,4 +134,123 @@ func (m *Model) logTopReparseExisting() {
 		m.logTop.groupBy = defaultGroupBy(m.logTop.profile, m.logTop.parsed)
 	}
 	m.logTopRebuildRows()
+}
+
+// openLogTopColumns opens the column show/hide+reorder overlay, snapshotting
+// current state for esc-cancel.
+func (m Model) openLogTopColumns() Model {
+	m.overlay = overlayLogTopColumns
+	m.overlayCursor = 0
+	m.logTop.colSnapOrder = append([]string(nil), m.logTop.colOrder...)
+	if m.logTop.colHidden != nil {
+		m.logTop.colSnapHidden = maps.Clone(m.logTop.colHidden)
+	} else {
+		m.logTop.colSnapHidden = nil
+	}
+	return m
+}
+
+// handleLogTopColumnsKey handles key presses inside the column overlay.
+func (m Model) handleLogTopColumnsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention
+	return m.handleLogTopColumnsKeyInner(msg)
+}
+
+func (m Model) handleLogTopColumnsKeyInner(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam
+	dims := m.logTop.colOrder
+	mets := m.logTopAllMetrics()
+	total := len(dims) + len(mets)
+	switch msg.String() {
+	case "esc":
+		m.logTop.colOrder = m.logTop.colSnapOrder
+		m.logTop.colHidden = m.logTop.colSnapHidden
+		m.overlay = overlayNone
+		m.logTopRebuildRows()
+		return m, nil
+	case "enter":
+		m.overlay = overlayNone
+		m.logTopRebuildRows()
+		return m, nil
+	case "j", "down":
+		if m.overlayCursor < total-1 {
+			m.overlayCursor++
+		}
+		return m, nil
+	case "k", "up":
+		if m.overlayCursor > 0 {
+			m.overlayCursor--
+		}
+		return m, nil
+	case " ":
+		return m.logTopColumnsToggleHide(dims, mets), nil
+	case "J", "shift+down":
+		return m.logTopColumnsMoveDown(dims), nil
+	case "K", "shift+up":
+		return m.logTopColumnsMoveUp(dims), nil
+	}
+	return m, nil
+}
+
+func (m Model) logTopColumnsToggleHide(dims []string, mets []string) Model {
+	var colID string
+	if m.overlayCursor < len(dims) {
+		colID = dims[m.overlayCursor]
+	} else {
+		idx := m.overlayCursor - len(dims)
+		if idx < len(mets) {
+			colID = mets[idx]
+		}
+	}
+	if colID == "" {
+		return m
+	}
+	if m.logTop.colHidden == nil {
+		m.logTop.colHidden = map[string]bool{}
+	}
+	currentlyHidden := m.logTop.colHidden[colID]
+	if !currentlyHidden {
+		// Count currently visible columns across dims and metrics.
+		visible := 0
+		for _, d := range dims {
+			if !m.logTop.colHidden[d] {
+				visible++
+			}
+		}
+		for _, met := range mets {
+			if !m.logTop.colHidden[met] {
+				visible++
+			}
+		}
+		if visible <= 1 {
+			return m // no-op: would hide the last visible column
+		}
+	}
+	m.logTop.colHidden[colID] = !currentlyHidden
+	if !m.logTop.colHidden[colID] {
+		delete(m.logTop.colHidden, colID)
+	}
+	return m
+}
+
+func (m Model) logTopColumnsMoveDown(dims []string) Model {
+	cur := m.overlayCursor
+	if cur >= len(dims)-1 {
+		return m // on metrics or last dim; ignore
+	}
+	order := append([]string(nil), m.logTop.colOrder...)
+	order[cur], order[cur+1] = order[cur+1], order[cur]
+	m.logTop.colOrder = order
+	m.overlayCursor = cur + 1
+	return m
+}
+
+func (m Model) logTopColumnsMoveUp(dims []string) Model {
+	cur := m.overlayCursor
+	if cur == 0 || cur >= len(dims) {
+		return m // at top of dims or on metrics; ignore
+	}
+	order := append([]string(nil), m.logTop.colOrder...)
+	order[cur], order[cur-1] = order[cur-1], order[cur]
+	m.logTop.colOrder = order
+	m.overlayCursor = cur - 1
+	return m
 }
