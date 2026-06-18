@@ -182,6 +182,14 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ShowRareTypes != nil {
 		ConfigShowRareTypes = *cfg.ShowRareTypes
 	}
+	if cfg.LogTopDefaultProfile != nil {
+		switch *cfg.LogTopDefaultProfile {
+		case "auto", "traefik-json", "nginx-combined", "json", "logfmt":
+			ConfigLogTopDefaultProfile = *cfg.LogTopDefaultProfile
+		default:
+			ConfigLogTopDefaultProfile = "auto"
+		}
+	}
 	applySecurityConfig(cfg)
 	applyRightsizingDefaults(cfg.RightsizingDefaults)
 	if cfg.Scheduler != nil {

@@ -171,6 +171,9 @@ log_path: /tmp/lfk.log
 #   - /team-a/configs
 #   - /team-b/configs
 
+# Default Log Top parser profile (auto-detect when "auto").
+# log_top_default_profile: auto
+
 # ─── Log Viewer ──────────────────────────────────────────────────────────────
 # Settings for the log viewer (L key). The show_* defaults let you skip pressing
 # the toggle keys on every open. Runtime toggles (configurable keybindings):

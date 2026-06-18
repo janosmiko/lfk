@@ -49,6 +49,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `log_tail_lines` | int | `100` | **Deprecated** — use `log_viewer.tail_lines`. Number of log lines to load initially via `--tail`. |
 | `log_tail_lines_short` | int | `10` | **Deprecated** — use `log_viewer.tail_lines_short`. Number of log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
 | `log_render_ansi` | bool | `true` | **Deprecated** — use `log_viewer.render_ansi`. Render ANSI SGR sequences from log producers. |
+| `log_top_default_profile` | string | `auto` | Default Log Top parser: `auto`, `traefik-json`, `nginx-combined`, `json`, `logfmt`. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `dim_overlay` | bool | `true` | **Deprecated** — use `appearance.dim_overlay`. Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |

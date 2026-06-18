@@ -97,6 +97,10 @@ type configFile struct {
 	// Controls whether ANSI SGR sequences (colour, bold, underline) emitted by
 	// log producers are rendered. Defaults to true; false strips all ANSI.
 	LogRenderAnsi *bool `json:"log_render_ansi" yaml:"log_render_ansi"`
+	// LogTopDefaultProfile is the default Log Top parser profile. Valid values:
+	// "auto" (detect from loaded logs), "traefik-json", "nginx-combined",
+	// "json", "logfmt". Unknown values fall back to "auto". Defaults to "auto".
+	LogTopDefaultProfile *string `json:"log_top_default_profile" yaml:"log_top_default_profile"`
 	// YAMLViewer holds startup-default toggles for the YAML viewer.
 	YAMLViewer *YAMLViewerConfig `json:"yaml_viewer" yaml:"yaml_viewer"`
 	// DiffViewer holds startup-default toggles for the diff viewer.
