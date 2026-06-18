@@ -102,6 +102,17 @@ func (m *Model) logTopParseInto(line string) {
 	}
 }
 
+// ingestLogTopLine appends a streamed raw line to rawLines and updates the
+// aggregation. On the first line it detects the profile and seeds groupBy.
+func (m *Model) ingestLogTopLine(line string) {
+	m.logView.rawLines = append(m.logView.rawLines, line)
+	if m.logTop.profile == "" {
+		m.logTopResetAndParse() // first line: detect + seed groupBy + build
+		return
+	}
+	m.logTopAddLine(line)
+}
+
 // logTopAddLine parses one raw line incrementally and rebuilds rows.
 func (m *Model) logTopAddLine(line string) {
 	m.logTopParseInto(line)
