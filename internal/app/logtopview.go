@@ -23,7 +23,8 @@ type logTopState struct {
 	profile   logagg.ProfileKind // detected or configured parser profile
 	autoProf  bool               // true when profile was auto-detected
 	groupBy   []string           // selected group-by field names
-	sortKey   logagg.SortKey     // active sort column
+	sortCol   string             // active sort column name (e.g. "REQ", "ERR", or a dim name)
+	sortAsc   bool               // true = ascending; false = descending (default)
 	cursor    int                // selected row index
 	scroll    int                //nolint:unused // wired in later Log Top tasks
 	parsed    []logagg.Fields    // cache of parsed (matched) lines, for re-aggregation
@@ -70,7 +71,8 @@ func (s logTopState) copy() logTopState {
 func (m *Model) saveLogTopToTab(t *TabState) {
 	t.logTopProfile = string(m.logTop.profile)
 	t.logTopGroupBy = append([]string(nil), m.logTop.groupBy...)
-	t.logTopSortKey = int(m.logTop.sortKey)
+	t.logTopSortCol = m.logTop.sortCol
+	t.logTopSortAsc = m.logTop.sortAsc
 	t.logTopAutoProf = m.logTop.autoProf
 }
 
@@ -78,7 +80,8 @@ func (m *Model) loadLogTopFromTab(t TabState) {
 	m.logTop = logTopState{
 		profile:  logagg.ProfileKind(t.logTopProfile),
 		groupBy:  append([]string(nil), t.logTopGroupBy...),
-		sortKey:  logagg.SortKey(t.logTopSortKey),
+		sortCol:  t.logTopSortCol,
+		sortAsc:  t.logTopSortAsc,
 		autoProf: t.logTopAutoProf,
 	}
 	if m.mode == modeLogTop && len(m.logView.rawLines) > 0 {

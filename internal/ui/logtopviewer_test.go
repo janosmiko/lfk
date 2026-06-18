@@ -23,8 +23,7 @@ func TestRenderLogTopView_ShowsRowsAndRate(t *testing.T) {
 		},
 	}
 	dims := []string{"method", "path", "status"}
-	grouped := map[string]bool{"method": true, "path": true}
-	out := RenderLogTopView("Log Top: deploy/web", dims, grouped, rows, 4.7, 5000, 0, 0, "hint", 100, 30)
+	out := RenderLogTopView("Log Top: deploy/web", dims, rows, 4.7, 5000, 0, 0, "hint", 100, 30)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "GET") {
 		t.Error("expected method GET rendered")
@@ -60,9 +59,8 @@ func TestRenderLogTopView_NoLineOverflow(t *testing.T) {
 		},
 	}
 	dims := []string{"method", "path", "status"}
-	grouped := map[string]bool{"method": true, "path": true}
 	for _, width := range []int{80, 100, 120, 200} {
-		out := RenderLogTopView("Log Top: deploy/web", dims, grouped, rows, 4.7, 5000, 0, 0, "hint", width, 30)
+		out := RenderLogTopView("Log Top: deploy/web", dims, rows, 4.7, 5000, 0, 0, "hint", width, 30)
 		for line := range strings.SplitSeq(stripANSI(out), "\n") {
 			if w := lipgloss.Width(line); w > width {
 				t.Errorf("width=%d: line exceeds terminal width (%d): %q", width, w, line)

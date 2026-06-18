@@ -63,10 +63,11 @@ func logTopColWidths(dims []string, dimsRegion int) []int {
 
 // RenderLogTopView renders the Log Top aggregation table full screen.
 // dims lists all dimension columns to show (in order).
-// grouped maps dimension names that are part of the current group-by key.
 // reqPerSec is the global request rate; total is the total request count used
 // to compute per-row REQ/s as a proportional share of the global rate.
-func RenderLogTopView(title string, dims []string, grouped map[string]bool, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
+// Call sites must set ui.ActiveSortColumnName and ui.ActiveSortAscending before
+// calling so the active sort column is highlighted.
+func RenderLogTopView(title string, dims []string, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
 	titleBar := ViewTitle(width, title)
 
 	// Lines must fit inside the bordered box: FullscreenBorderStyle renders at
@@ -79,23 +80,33 @@ func RenderLogTopView(title string, dims []string, grouped map[string]bool, rows
 	dimsRegion := max(innerWidth-lead-metricsBlock, len(dims)*5)
 	colWidths := logTopColWidths(dims, dimsRegion)
 
-	// Build header.
-	headParts := make([]string, 0, len(dims))
+	// Build header using renderStyledHeader so the active sort column is highlighted.
+	var segments []headerSegment
+	// leading spaces - no column name
+	segments = append(segments, headerSegment{text: strings.Repeat(" ", lead)})
 	for i, d := range dims {
-		label := strings.ToUpper(d)
-		if grouped[d] {
-			label = DimStyle.Bold(true).Render(label)
-		} else {
-			label = DimStyle.Render(label)
-		}
-		// Left-justify in column, accounting for ANSI.
+		label := strings.ToUpper(d) + sortIndicatorForColumn(d)
 		raw := Truncate(label, colWidths[i])
 		padded := raw + strings.Repeat(" ", max(colWidths[i]-lipgloss.Width(raw), 0))
-		headParts = append(headParts, padded)
+		if i > 0 {
+			segments = append(segments, headerSegment{text: " "})
+		}
+		segments = append(segments, headerSegment{text: padded, colName: d})
 	}
-	dimHeader := strings.Join(headParts, " ")
-	metricHeader := fmt.Sprintf(" %8s %8s %6s %6s", "REQ", "REQ/s", "%", "ERR")
-	head := strings.Repeat(" ", lead) + dimHeader + metricHeader
+	// metric columns: right-aligned within their widths, preceded by a space
+	metricNames := []string{"REQ", "REQ/s", "%", "ERR"}
+	metricWidths := []int{8, 8, 6, 6}
+	for i, name := range metricNames {
+		w := metricWidths[i]
+		ind := sortIndicatorForColumn(name)
+		label := name + ind
+		rawW := lipgloss.Width(label)
+		pad := max(w-rawW, 0)
+		// " " + spaces + label totals 1+w chars
+		cell := " " + strings.Repeat(" ", pad) + label
+		segments = append(segments, headerSegment{text: cell, colName: name})
+	}
+	head := renderStyledHeader(segments, lead+dimsRegion+metricsBlock)
 
 	maxRows := max(height-5, 3)
 	var b strings.Builder

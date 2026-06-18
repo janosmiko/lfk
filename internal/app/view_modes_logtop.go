@@ -25,10 +25,8 @@ func (m Model) viewLogTop() string {
 		}
 	}
 
-	grouped := map[string]bool{}
-	for _, g := range m.logTop.groupBy {
-		grouped[g] = true
-	}
+	ui.ActiveSortColumnName = m.logTop.sortCol
+	ui.ActiveSortAscending = m.logTop.sortAsc
 
 	prof := string(m.logTop.profile)
 	if m.logTop.autoProf {
@@ -46,13 +44,13 @@ func (m Model) viewLogTop() string {
 	}
 	drill := ""
 	if len(drillParts) > 0 {
-		drill = "  " + strings.Join(drillParts, "  ")
+		drill = "  filter: " + strings.Join(drillParts, " ")
 	}
 	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s",
 		m.logTop.title, prof, total, m.logTop.unmatched, span, drill)
 
 	hint := m.logTopHintBar()
-	return ui.RenderLogTopView(title, dims, grouped, rows, m.logTopReqPerSec(),
+	return ui.RenderLogTopView(title, dims, rows, m.logTopReqPerSec(),
 		total, m.logTop.cursor, m.logTop.scroll, hint, m.width, m.height)
 }
 
@@ -60,7 +58,9 @@ func (m Model) logTopHintBar() string {
 	kb := ui.ActiveKeybindings
 	hints := []ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
-		{Key: kb.SortNext, Desc: "sort"},
+		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort col"},
+		{Key: kb.SortFlip, Desc: "flip sort"},
+		{Key: kb.SortReset, Desc: "reset sort"},
 		{Key: "g", Desc: "group by"},
 		{Key: "p", Desc: "profile"},
 		{Key: "enter", Desc: "drill"},

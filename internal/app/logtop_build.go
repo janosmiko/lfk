@@ -1,8 +1,19 @@
 package app
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/janosmiko/lfk/internal/logagg"
 	"github.com/janosmiko/lfk/internal/ui"
+)
+
+// Metric column names used as sort keys.
+const (
+	logTopMetricREQ = "REQ"
+	logTopMetricRPS = "REQ/s"
+	logTopMetricPct = "%"
+	logTopMetricERR = "ERR"
 )
 
 // httpProfile reports whether kind is an HTTP-access-log profile.
@@ -136,17 +147,72 @@ func (m *Model) logTopRebuildRows() {
 	m.logTopRefreshRows()
 }
 
-// logTopRefreshRows re-snapshots rows from the live aggregation and clamps the
-// cursor. Cheap: O(groups log groups), no re-parse.
+// logTopRefreshRows re-snapshots rows from the live aggregation, applies the
+// user-selected sort, and clamps the cursor. Cheap: O(groups log groups), no
+// re-parse.
 func (m *Model) logTopRefreshRows() {
 	if m.logTop.agg == nil {
 		m.logTopRebuildRows()
 		return
 	}
-	m.logTop.rows = m.logTop.agg.Rows(m.logTop.sortKey)
+	m.logTop.rows = m.logTop.agg.Rows(logagg.SortReq)
+	if m.logTop.sortCol == "" {
+		m.logTop.sortCol = logTopMetricREQ
+	}
+	m.logTopSortRows()
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
 	}
+}
+
+// logTopSortColumns returns the ordered list of sortable column names:
+// dimension columns first, then metric columns.
+func (m *Model) logTopSortColumns() []string {
+	return append(append([]string(nil), m.logTop.displayDims...), logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR)
+}
+
+// logTopSortRows sorts m.logTop.rows by the active sortCol / sortAsc.
+func (m *Model) logTopSortRows() {
+	col := m.logTop.sortCol
+	rows := m.logTop.rows
+	sort.SliceStable(rows, func(i, j int) bool {
+		var c int
+		switch col {
+		case logTopMetricERR:
+			c = rows[i].ErrCount - rows[j].ErrCount
+		case logTopMetricREQ, logTopMetricRPS, logTopMetricPct:
+			c = rows[i].Count - rows[j].Count
+		default: // a dimension column: compare its display string
+			c = strings.Compare(rows[i].Dims[col], rows[j].Dims[col])
+		}
+		if c == 0 {
+			// stable tiebreak by joined group values
+			c = strings.Compare(strings.Join(rows[i].Values, "\x00"), strings.Join(rows[j].Values, "\x00"))
+		}
+		if m.logTop.sortAsc {
+			return c < 0
+		}
+		return c > 0
+	})
+}
+
+// logTopCycleSort advances the active sort column by dir (+1 or -1), wrapping
+// around the full column list, then refreshes rows.
+func (m *Model) logTopCycleSort(dir int) {
+	cols := m.logTopSortColumns()
+	if len(cols) == 0 {
+		return
+	}
+	idx := 0
+	for i, c := range cols {
+		if c == m.logTop.sortCol {
+			idx = i
+			break
+		}
+	}
+	idx = (idx + dir + len(cols)) % len(cols)
+	m.logTop.sortCol = cols[idx]
+	m.logTopRefreshRows()
 }
 
 // logTopAddLine parses one raw line and folds it into the live aggregation in

@@ -565,7 +565,8 @@ type TabState struct {
 	// Log Top aggregation state (per-tab).
 	logTopProfile  string
 	logTopGroupBy  []string
-	logTopSortKey  int
+	logTopSortCol  string
+	logTopSortAsc  bool
 	logTopAutoProf bool
 
 	// Security feature state — per-tab so two tabs pointing at different

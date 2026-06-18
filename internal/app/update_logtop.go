@@ -3,7 +3,6 @@ package app
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/logagg"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -40,13 +39,20 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		return m.openLogTopGroupBy(), nil
 	case "p":
 		return m.openLogTopProfile(), nil
-	case kb.SortNext, kb.SortFlip:
-		if m.logTop.sortKey == logagg.SortReq {
-			m.logTop.sortKey = logagg.SortErr
-		} else {
-			m.logTop.sortKey = logagg.SortReq
-		}
-		m.logTopRebuildRows()
+	case kb.SortNext:
+		m.logTopCycleSort(+1)
+		return m, nil
+	case kb.SortPrev:
+		m.logTopCycleSort(-1)
+		return m, nil
+	case kb.SortFlip:
+		m.logTop.sortAsc = !m.logTop.sortAsc
+		m.logTopRefreshRows()
+		return m, nil
+	case kb.SortReset:
+		m.logTop.sortCol = logTopMetricREQ
+		m.logTop.sortAsc = false
+		m.logTopRefreshRows()
 		return m, nil
 	case "enter":
 		return m.logTopDrillIn(), nil
@@ -55,10 +61,15 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 }
 
 // logTopDrillIn pins the selected row's group values as a new frame and groups
-// by the next dimension (status for HTTP, level otherwise).
+// by the next unused display dimension. If every dimension is already pinned,
+// the drill is a no-op.
 func (m Model) logTopDrillIn() Model {
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		return m
+	}
+	next := m.logTopNextDrillDim()
+	if next == "" {
+		return m // nothing left to break down
 	}
 	row := m.logTop.rows[m.logTop.cursor]
 	frame := logTopDrillFrame{groupBy: append([]string(nil), m.logTop.groupBy...)}
@@ -66,12 +77,29 @@ func (m Model) logTopDrillIn() Model {
 		frame.filters = append(frame.filters, logTopDrillFilter{field: field, value: row.Values[i]})
 	}
 	m.logTop.drillStack = append(m.logTop.drillStack, frame)
-	next := logagg.FieldStatus
-	if !httpProfile(m.logTop.profile) {
-		next = logagg.FieldLevel
-	}
 	m.logTop.groupBy = []string{next}
 	m.logTop.cursor = 0
 	m.logTopRebuildRows()
 	return m
+}
+
+// logTopNextDrillDim returns the first display dimension that is not already
+// part of the current groupBy or pinned by an active drill filter, or "" if
+// every dimension is already used.
+func (m *Model) logTopNextDrillDim() string {
+	pinned := map[string]bool{}
+	for _, g := range m.logTop.groupBy {
+		pinned[g] = true
+	}
+	for _, fr := range m.logTop.drillStack {
+		for _, flt := range fr.filters {
+			pinned[flt.field] = true
+		}
+	}
+	for _, d := range m.logTop.displayDims {
+		if !pinned[d] {
+			return d
+		}
+	}
+	return ""
 }
