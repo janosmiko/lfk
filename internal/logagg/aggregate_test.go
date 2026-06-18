@@ -89,6 +89,25 @@ func TestAggregation_DimsUniformAndVaried(t *testing.T) {
 	}
 }
 
+// TestAggregation_DimsSentinelFirstValue verifies that a dimension whose first
+// observed value is the empty-field sentinel "-" is recorded as uniform "-",
+// not silently skipped. This guards the explicit presence-check in Add.
+func TestAggregation_DimsSentinelFirstValue(t *testing.T) {
+	a := NewAggregation([]string{FieldMethod}, []string{FieldStatus}, nil)
+	// First line: status field is absent -> normalised to "-".
+	a.Add(Fields{FieldMethod: "GET"})
+	// Second line: same group, same absent status.
+	a.Add(Fields{FieldMethod: "GET"})
+
+	rows := a.Rows(SortReq)
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want 1", len(rows))
+	}
+	if rows[0].Dims[FieldStatus] != "-" {
+		t.Errorf("status dim = %q, want \"-\"", rows[0].Dims[FieldStatus])
+	}
+}
+
 // TestAggregation_DimsMaxDistinct verifies that tracking is capped at
 // maxDimDistinct and the display string uses the "*50+" sentinel.
 func TestAggregation_DimsMaxDistinct(t *testing.T) {

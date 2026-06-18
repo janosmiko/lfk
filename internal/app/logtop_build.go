@@ -123,7 +123,8 @@ func (m *Model) ingestLogTopLine(line string) {
 // change that invalidates incremental accumulation (group-by, drill, profile,
 // or a parsed trim).
 func (m *Model) logTopRebuildRows() {
-	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTopDisplayDims(), m.logTopErrorPredicate())
+	m.logTop.displayDims = m.computeDisplayDims()
+	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTop.displayDims, m.logTopErrorPredicate())
 	for _, f := range m.logTop.parsed {
 		if !m.logTopMatchesDrill(f) {
 			continue
@@ -215,11 +216,19 @@ var httpDimOrder = []string{
 	logagg.FieldRouter,
 }
 
-// logTopDisplayDims returns the dimension columns to show in the table.
-// It returns the subset of httpDimOrder that appears in at least one parsed
-// line. If no HTTP dimensions are present (generic logs), it falls back to the
-// current groupBy fields so the table always has something to display.
+// logTopDisplayDims returns the cached dimension columns for the current render.
+// The cache is populated by logTopRebuildRows; dims only change when parsed
+// changes, and every parsed mutation funnels through logTopRebuildRows.
 func (m *Model) logTopDisplayDims() []string {
+	return m.logTop.displayDims
+}
+
+// computeDisplayDims computes the dimension columns to show in the table by
+// scanning parsed once. It returns the subset of httpDimOrder that appears in
+// at least one parsed line. If no HTTP dimensions are present (generic logs),
+// it falls back to the current groupBy fields so the table always has something
+// to display.
+func (m *Model) computeDisplayDims() []string {
 	seen := map[string]bool{}
 	for _, f := range m.logTop.parsed {
 		for _, d := range httpDimOrder {

@@ -37,7 +37,14 @@ func logTopColWidths(dims []string, dimsRegion int) []int {
 		return nil
 	}
 	// The separating spaces between columns take (D-1) chars from the budget.
-	budget := max(dimsRegion-(d-1), d*5)
+	// Use the available region minus separators when positive; otherwise floor at
+	// d*4 so Truncate can handle the narrow case without widths exceeding dimsRegion.
+	var budget int
+	if rem := dimsRegion - (d - 1); rem > 0 {
+		budget = rem
+	} else {
+		budget = d * 4
+	}
 	totalWeight := 0
 	for _, dim := range dims {
 		totalWeight += dimWeight(dim)
@@ -45,12 +52,12 @@ func logTopColWidths(dims []string, dimsRegion int) []int {
 	widths := make([]int, d)
 	used := 0
 	for i, dim := range dims {
-		w := max(dimWeight(dim)*budget/totalWeight, 5)
+		w := max(dimWeight(dim)*budget/totalWeight, 4)
 		widths[i] = w
 		used += w
 	}
-	// Adjust last column to absorb rounding differences.
-	widths[d-1] = max(widths[d-1]+budget-used, 5)
+	// Adjust last column to absorb rounding differences; floor at 4.
+	widths[d-1] = max(widths[d-1]+budget-used, 4)
 	return widths
 }
 

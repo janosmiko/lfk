@@ -90,7 +90,7 @@ func (a *Aggregation) Add(f Fields) {
 			r.dimFirst = map[string]string{}
 			r.dimSets = map[string]map[string]struct{}{}
 		}
-		if r.dimFirst[d] == "" && len(r.dimSets[d]) == 0 {
+		if _, ok := r.dimFirst[d]; !ok {
 			r.dimFirst[d] = v
 		}
 		set := r.dimSets[d]

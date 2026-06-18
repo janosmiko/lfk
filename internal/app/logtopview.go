@@ -34,6 +34,11 @@ type logTopState struct {
 
 	agg *logagg.Aggregation // live aggregation; folded incrementally, rebuilt on group/drill/profile change or parsed trim
 
+	// displayDims is the cached result of computeDisplayDims(). It is set by
+	// logTopRebuildRows before building the aggregation; dims only change when
+	// parsed changes, and every parsed mutation funnels through logTopRebuildRows.
+	displayDims []string
+
 	// drillStack is the stack of drill frames. Each enter pushes a frame;
 	// each esc pops one and restores its groupBy; empty stack means no drill active.
 	drillStack []logTopDrillFrame
@@ -57,6 +62,7 @@ func (s logTopState) copy() logTopState {
 			}
 		}
 	}
+	c.displayDims = append([]string(nil), s.displayDims...)
 	c.agg = nil // live aggregation is rebuilt lazily; never share the pointer across snapshots
 	return c
 }
