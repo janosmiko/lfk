@@ -14,6 +14,9 @@ func (m Model) logTopGroupByCandidates() []string {
 	seen := map[string]bool{}
 	for _, f := range m.logTop.parsed {
 		for k := range f {
+			if k == logagg.FieldDurationMS {
+				continue
+			}
 			seen[k] = true
 		}
 	}

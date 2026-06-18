@@ -17,6 +17,12 @@ var nginxRe = regexp.MustCompile(`^\S+ \S+ \S+ \[[^\]]*\] "([A-Z]+) (\S+)[^"]*" 
 // format appends after the standard CLF fields.
 var nginxDurRe = regexp.MustCompile(`(\d+)ms\s*$`)
 
+// nginxRouterRe captures a Traefik router name from a quoted token containing
+// "@" (e.g. "websecure-gitlab@kubernetes"). Traefik router names always end
+// with @<provider> (kubernetes/docker/file). Referer and user-agent fields are
+// "-" and service URLs start with "http://", so they never match.
+var nginxRouterRe = regexp.MustCompile(`"([^"]*@[^"]*)"`)
+
 type nginxParser struct{}
 
 // NewNginxParser parses NCSA Common/Combined Log Format access logs (nginx,
@@ -43,6 +49,9 @@ func (nginxParser) Parse(line string) (Fields, bool) {
 	}
 	if d := nginxDurRe.FindStringSubmatch(line); d != nil {
 		f[FieldDurationMS] = d[1]
+	}
+	if r := nginxRouterRe.FindStringSubmatch(line); r != nil {
+		f[FieldRouter] = r[1]
 	}
 	return f, true
 }

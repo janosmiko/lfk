@@ -424,7 +424,7 @@ func helpSections() []helpSection {
 		{
 			title: "Log Top", context: "Log Top",
 			bindings: []helpEntry{
-				{"", "Launched from the action menu (\"Log Top\", quick-key T). Aggregates logs by parsed attributes."},
+				{"", "Launched from the action menu (\"Log Top\", quick-key T) or by pressing " + kb.LogTop + " in the open log viewer. Aggregates logs by parsed attributes."},
 				{"j/k", "Navigate rows"},
 				{"G", "Jump to bottom"},
 				{"g", "Group-by field picker (multi-select)"},

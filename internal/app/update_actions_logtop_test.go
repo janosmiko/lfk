@@ -1,6 +1,8 @@
 package app
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestExecuteActionLogTop_SetsMode(t *testing.T) {
 	m := basePush80Model()
@@ -47,5 +49,46 @@ func TestExecuteActionLogTop_ContainerSelected(t *testing.T) {
 	got := mdl.(Model)
 	if len(got.logView.selectedContainers) != 1 || got.logView.selectedContainers[0] != "traefik" {
 		t.Fatalf("selectedContainers = %#v, want [traefik]", got.logView.selectedContainers)
+	}
+}
+
+// TestOpenLogTopFromViewer_SwitchesMode verifies that pressing the LogTop key
+// in the log viewer switches mode to modeLogTop and populates logTop.rows.
+func TestOpenLogTopFromViewer_SwitchesMode(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	m.logView.title = "Logs: my-pod"
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"RequestMethod":"GET","RequestPath":"/a","DownstreamStatus":200}`,
+		`2026-06-18T10:00:01Z {"RequestMethod":"POST","RequestPath":"/b","DownstreamStatus":500}`,
+	}
+	mdl, cmd, handled := m.handleLogActionKey(key("T"))
+	got := mdl.(Model)
+	if !handled {
+		t.Error("handleLogActionKey(T) returned handled=false")
+	}
+	if cmd != nil {
+		t.Error("openLogTopFromViewer should return nil cmd (reuses existing stream)")
+	}
+	if got.mode != modeLogTop {
+		t.Errorf("mode = %v, want modeLogTop", got.mode)
+	}
+	if len(got.logTop.rows) == 0 {
+		t.Error("expected logTop.rows to be non-empty after opening from viewer")
+	}
+}
+
+// TestOpenLogTopFromViewer_TitleStripped verifies the "Logs: " prefix is stripped.
+func TestOpenLogTopFromViewer_TitleStripped(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	m.logView.title = "Logs: traefik/web"
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"RequestMethod":"GET","RequestPath":"/","DownstreamStatus":200}`,
+	}
+	mdl, _, _ := m.handleLogActionKey(key("T"))
+	got := mdl.(Model)
+	if got.logTop.title != "Log Top: traefik/web" {
+		t.Errorf("logTop.title = %q, want %q", got.logTop.title, "Log Top: traefik/web")
 	}
 }

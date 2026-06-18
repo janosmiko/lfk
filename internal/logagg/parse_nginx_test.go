@@ -13,13 +13,13 @@ func TestNginxParser_Parse(t *testing.T) {
 			name:   "traefik common log format",
 			line:   `10.42.2.19 - - [18/Jun/2026:15:18:46 +0000] "POST /api/v4/jobs/request HTTP/1.1" 204 0 "-" "-" 8086 "websecure-gitlab@kubernetes" "http://10.42.13.162:8181" 2ms`,
 			wantOK: true,
-			want:   map[string]string{"method": "POST", "path": "/api/v4/jobs/request", "status": "204", "duration_ms": "2"},
+			want:   map[string]string{"method": "POST", "path": "/api/v4/jobs/request", "status": "204", "duration_ms": "2", "router": "websecure-gitlab@kubernetes"},
 		},
 		{
 			name:   "query string stripped from path",
 			line:   `10.255.0.12 - - [18/Jun/2026:15:18:46 +0000] "GET /rest/executions?filter=%7B%22a%22%3A1%7D&limit=10 HTTP/2.0" 304 0 "-" "-" 8087 "websecure-n8n@kubernetes" "http://10.42.2.57:5678" 20ms`,
 			wantOK: true,
-			want:   map[string]string{"method": "GET", "path": "/rest/executions", "status": "304", "duration_ms": "20"},
+			want:   map[string]string{"method": "GET", "path": "/rest/executions", "status": "304", "duration_ms": "20", "router": "websecure-n8n@kubernetes"},
 		},
 		{
 			name:   "combined log without trailing duration",
@@ -58,6 +58,36 @@ func TestNginxParser_Parse(t *testing.T) {
 					t.Errorf("expected no duration_ms, got %q", got[FieldDurationMS])
 				}
 			}
+			if tt.want["router"] == "" {
+				if _, has := got[FieldRouter]; has {
+					t.Errorf("expected no router, got %q", got[FieldRouter])
+				}
+			}
 		})
+	}
+}
+
+// TestNginxParser_RouterExtraction tests Traefik router name extraction.
+func TestNginxParser_RouterExtraction(t *testing.T) {
+	p := NewNginxParser()
+
+	// Traefik CLF line with router name.
+	traefikLine := `10.42.2.19 - - [18/Jun/2026:15:18:46 +0000] "GET /api/health HTTP/1.1" 200 0 "-" "-" 100 "websecure-gitlab@kubernetes" "http://10.42.1.1:8080" 3ms`
+	got, ok := p.Parse(traefikLine)
+	if !ok {
+		t.Fatal("expected parse ok for traefik CLF line")
+	}
+	if got[FieldRouter] != "websecure-gitlab@kubernetes" {
+		t.Errorf("router = %q, want %q", got[FieldRouter], "websecure-gitlab@kubernetes")
+	}
+
+	// Plain combined log line (no "@" quoted token) must not set router.
+	plainLine := `192.0.2.1 - - [10/Oct/2000:13:55:36 -0700] "GET /index.html HTTP/1.0" 200 2326 "-" "Mozilla/5.0"`
+	got2, ok2 := p.Parse(plainLine)
+	if !ok2 {
+		t.Fatal("expected parse ok for plain combined log line")
+	}
+	if _, has := got2[FieldRouter]; has {
+		t.Errorf("plain combined log must not set router field, got %q", got2[FieldRouter])
 	}
 }

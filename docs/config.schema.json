@@ -410,7 +410,8 @@
         "local_cluster_manager": { "type": "string" },
         "security_ignore_toggle": { "type": "string" },
         "security_badge_toggle": { "type": "string" },
-        "toggle_preview_logs": { "type": "string" }
+        "toggle_preview_logs": { "type": "string" },
+        "log_top": { "type": "string" }
       }
     },
     "view": {

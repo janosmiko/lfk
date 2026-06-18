@@ -19,7 +19,7 @@ func (m Model) renderLogTopGroupByOverlay() (string, int, int) {
 		FooterHint:  "space toggle · enter apply · esc cancel",
 		Height:      min(len(items)+4, m.height-6),
 	}
-	return ui.RenderOverlayList(items, cfg, w), w + 2, cfg.Height + 2
+	return ui.RenderOverlayList(items, cfg, w-4), w, cfg.Height + 2
 }
 
 func (m Model) renderLogTopProfileOverlay() (string, int, int) {
@@ -36,5 +36,5 @@ func (m Model) renderLogTopProfileOverlay() (string, int, int) {
 		FooterHint:       "enter select · esc cancel",
 		Height:           min(len(items)+4, m.height-6),
 	}
-	return ui.RenderOverlayList(items, cfg, w), w + 2, cfg.Height + 2
+	return ui.RenderOverlayList(items, cfg, w-4), w, cfg.Height + 2
 }

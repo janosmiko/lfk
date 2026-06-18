@@ -11,6 +11,7 @@ const (
 	FieldStatus     = "status"
 	FieldDurationMS = "duration_ms"
 	FieldLevel      = "level"
+	FieldRouter     = "router"
 )
 
 // ProfileKind identifies a built-in log format parser.

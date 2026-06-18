@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -56,4 +58,18 @@ func (m Model) executeActionLogTop() (tea.Model, tea.Cmd) {
 	m.logTop.title = "Log Top: " + label
 
 	return m, m.startLogStream()
+}
+
+// openLogTopFromViewer switches the open log viewer into the Log Top
+// aggregation mode over the lines already buffered, without restarting the
+// stream. New lines continue to flow in via the existing reader (updateLogLine
+// routes to ingestLogTopLine while mode is modeLogTop).
+func (m Model) openLogTopFromViewer() (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+	m.mode = modeLogTop
+	m.logTop = logTopState{}
+	title := strings.TrimPrefix(m.logView.title, "Logs: ")
+	title = strings.TrimPrefix(title, "Logs (tail): ")
+	m.logTop.title = "Log Top: " + title
+	m.logTopResetAndParse()
+	return m, nil
 }
