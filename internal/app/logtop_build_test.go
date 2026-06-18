@@ -7,6 +7,49 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// TestLogTopResetAndParse_PrefixedCLF covers the real-world case: a Deployment
+// streamed with kubectl --all-containers --prefix --timestamps, where Traefik
+// logs in Common Log Format. Each rawLine is
+// "[pod/<pod>/<container>] <RFC3339> <CLF>". The pod prefix and timestamp must
+// be stripped before the nginx/CLF parser sees the body.
+func TestLogTopResetAndParse_PrefixedCLF(t *testing.T) {
+	orig := ui.ConfigLogTopDefaultProfile
+	ui.ConfigLogTopDefaultProfile = "auto"
+	defer func() { ui.ConfigLogTopDefaultProfile = orig }()
+
+	m := &Model{}
+	m.logView.rawLines = []string{
+		`[pod/traefik-99f4b987c-6rnkn/traefik] 2026-06-18T15:18:46.679395292Z 10.42.2.19 - - [18/Jun/2026:15:18:46 +0000] "POST /api/v4/jobs/request HTTP/1.1" 204 0 "-" "-" 8086 "websecure-gitlab@kubernetes" "http://10.42.13.162:8181" 2ms`,
+		`[pod/traefik-99f4b987c-6rnkn/traefik] 2026-06-18T15:18:48.031270306Z 10.42.2.2 - - [18/Jun/2026:15:18:48 +0000] "POST /api/v4/jobs/request HTTP/1.1" 204 0 "-" "-" 8088 "websecure-gitlab@kubernetes" "http://10.42.15.65:8181" 1ms`,
+		`[pod/traefik-99f4b987c-6rnkn/traefik] 2026-06-18T15:18:49.068676261Z 10.42.8.184 - - [18/Jun/2026:15:18:49 +0000] "HEAD /v2/m2community/magento/manifests/feature-ai-modules HTTP/1.1" 401 0 "-" "-" 8090 "websecure-harbor@kubernetes" "http://10.42.20.197:8080" 5ms`,
+	}
+	m.logTopResetAndParse()
+
+	if m.logTop.profile != logagg.ProfileNginx {
+		t.Errorf("profile = %q, want nginx-combined", m.logTop.profile)
+	}
+	if len(m.logTop.parsed) != 3 || m.logTop.unmatched != 0 {
+		t.Fatalf("parsed=%d unmatched=%d, want 3/0", len(m.logTop.parsed), m.logTop.unmatched)
+	}
+	// Default HTTP group-by is method+path: two POST /api/v4/jobs/request, one HEAD.
+	var post *logagg.Row
+	for i := range m.logTop.rows {
+		if m.logTop.rows[i].Values[0] == "POST" && m.logTop.rows[i].Values[1] == "/api/v4/jobs/request" {
+			post = &m.logTop.rows[i]
+		}
+	}
+	if post == nil || post.Count != 2 {
+		t.Fatalf("POST /api/v4/jobs/request row = %v, want Count 2", post)
+	}
+	if post.ErrCount != 0 {
+		t.Errorf("POST row ErrCount = %d, want 0 (204s)", post.ErrCount)
+	}
+	// REQ/s must be derivable: timestamps were parsed (firstTS<lastTS).
+	if m.logTopReqPerSec() <= 0 {
+		t.Errorf("req/s = %v, want > 0 (timestamps should parse after prefix strip)", m.logTopReqPerSec())
+	}
+}
+
 func TestLogTopResetAndParse_Traefik(t *testing.T) {
 	m := &Model{}
 	m.logView.rawLines = []string{

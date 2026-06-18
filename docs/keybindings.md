@@ -379,14 +379,14 @@ Auto-reconnect across init containers: when viewing logs for a single Pod in all
 
 ## Log Top
 
-Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns: REQ (count), REQ/s, % (share), ERR (error count). Launch from the resource action menu ("Log Top", quick-key `T`). Config: `log_top_default_profile` (`auto` | `traefik-json` | `json` | `logfmt`).
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns: REQ (count), REQ/s, % (share), ERR (error count). Launch from the resource action menu ("Log Top", quick-key `T`). Auto-detects Traefik JSON, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `nginx-combined` | `json` | `logfmt`).
 
 | Key | Action |
 |---|---|
 | `j` / `k` | Navigate rows |
 | `G` | Jump to bottom |
 | `g` | Open group-by field picker (multi-select) |
-| `p` | Open profile picker (traefik-json / json / logfmt / auto) |
+| `p` | Open profile picker (traefik-json / nginx-combined / json / logfmt / auto) |
 | sort key | Toggle sort column (REQ <-> ERR) |
 | `Enter` | Drill into selected group (e.g. by status for HTTP) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |

@@ -66,12 +66,13 @@ func (m *Model) logTopResetAndParse() {
 	m.logTopRebuildRows()
 }
 
-// logTopSample strips the kubectl timestamp from up to 200 head lines for
-// profile detection.
+// logTopSample strips the kubectl pod prefix and timestamp from up to 200 head
+// lines for profile detection.
 func (m *Model) logTopSample() []string {
 	n := min(len(m.logView.rawLines), 200)
 	out := make([]string, 0, n)
 	for _, line := range m.logView.rawLines[:n] {
+		line = ui.StripPodPrefix(line)
 		if _, rest, ok := logagg.SplitTimestamp(line); ok {
 			out = append(out, rest)
 		} else {
@@ -84,6 +85,10 @@ func (m *Model) logTopSample() []string {
 // logTopParseInto parses one raw line into parsed/unmatched and updates TS
 // bounds. It does not rebuild rows.
 func (m *Model) logTopParseInto(line string) {
+	// Strip the "[pod/name/container]" prefix that kubectl --prefix prepends to
+	// every line (all-containers/group-resource streams) so the timestamp and
+	// the log body can be parsed.
+	line = ui.StripPodPrefix(line)
 	body := line
 	if ts, rest, ok := logagg.SplitTimestamp(line); ok {
 		body = rest

@@ -58,6 +58,9 @@ func RenderLogTopView(title string, header []string, rows []LogTopRow, reqPerSec
 		b.WriteByte('\n')
 	}
 
-	body := FullscreenBorderStyle(width, maxRows).Render(strings.TrimRight(b.String(), "\n"))
+	// Content is the header row plus maxRows data rows; size the border to that
+	// full height so the view fills the screen exactly (no blank line below the
+	// hint bar) and the box doesn't grow past its budget.
+	body := FullscreenBorderStyle(width, maxRows+1).Render(strings.TrimRight(b.String(), "\n"))
 	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, hintBar)
 }
