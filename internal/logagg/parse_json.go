@@ -28,7 +28,7 @@ func durationToMS(v string) string {
 	case "ns":
 		f /= 1_000_000
 	}
-	return strconv.FormatFloat(f, 'g', -1, 64)
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }
 
 // jsonKeyAliases maps common source keys to normalized field names.
@@ -60,8 +60,8 @@ func (jsonParser) Parse(line string) (Fields, bool) {
 	}
 	f := make(Fields, len(raw))
 	for k, v := range raw {
-		s := scalarString(v)
-		if s == "" {
+		s, ok := scalarString(v)
+		if !ok {
 			continue
 		}
 		if norm, ok := jsonKeyAliases[k]; ok {
@@ -79,15 +79,15 @@ func (jsonParser) Parse(line string) (Fields, bool) {
 	return f, len(f) > 0
 }
 
-func scalarString(v any) string {
+func scalarString(v any) (string, bool) {
 	switch t := v.(type) {
 	case string:
-		return t
+		return t, true
 	case float64:
-		return strconv.FormatFloat(t, 'f', -1, 64)
+		return strconv.FormatFloat(t, 'f', -1, 64), true
 	case bool:
-		return strconv.FormatBool(t)
+		return strconv.FormatBool(t), true
 	default:
-		return ""
+		return "", false
 	}
 }
