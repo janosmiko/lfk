@@ -203,6 +203,8 @@ func (m *Model) logTopSortRows() {
 		case logTopMetricERR:
 			c = rows[i].ErrCount - rows[j].ErrCount
 		case logTopMetricREQ, logTopMetricRPS, logTopMetricPct:
+			// REQ/s and % are both proportional to Count (rate = share of the
+			// global rate; % = Count/total), so sorting by Count is equivalent.
 			c = rows[i].Count - rows[j].Count
 		default: // a dimension column: compare its display string
 			c = strings.Compare(rows[i].Dims[col], rows[j].Dims[col])
