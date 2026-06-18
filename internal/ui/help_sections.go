@@ -89,7 +89,7 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{kb.NamespaceSelector, "Select namespace (space: include, tab: exclude, A: all-namespaces, R: refresh)"},
 				{kb.AllNamespaces, "Toggle all-namespaces mode"},
-				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, crash investigator, traffic capture, RBAC permissions"},
+				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, T=Log Top aggregation, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, crash investigator, traffic capture, RBAC permissions"},
 				{kb.TogglePreviewLogs, "Toggle live-log preview pane for selected pod or container (right pane, streaming tail)"},
 				{kb.Logs, "Open fullscreen log viewer for selected resource"},
 				{kb.Describe, "Describe selected resource"},
@@ -419,6 +419,20 @@ func helpSections() []helpSection {
 				{"\\", "Switch pod / filter containers"},
 				{"", "Full logs load last 100 lines initially (log_viewer.tail_lines); tail logs load last 10 (log_viewer.tail_lines_short). Scroll up for older history."},
 				{"q/Esc", "Close log viewer"},
+			},
+		},
+		{
+			title: "Log Top", context: "Log Top",
+			bindings: []helpEntry{
+				{"", "Launched from the action menu (\"Log Top\", quick-key T). Aggregates logs by parsed attributes."},
+				{"j/k", "Navigate rows"},
+				{"G", "Jump to bottom"},
+				{"g", "Group-by field picker (multi-select)"},
+				{"p", "Profile picker (traefik-json / json / logfmt / auto)"},
+				{"sort key", "Toggle sort column (REQ <-> ERR)"},
+				{"Enter", "Drill into selected group (e.g. by status for HTTP)"},
+				{"Esc/q", "Pop drill level or return to log viewer"},
+				{"", "Config: log_top_default_profile (auto|traefik-json|json|logfmt)"},
 			},
 		},
 		{

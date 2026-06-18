@@ -377,6 +377,20 @@ Tail-first loading: Full Logs (`Ctrl+L` key or action menu `L`) load the last 10
 
 Auto-reconnect across init containers: when viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — e.g. as init containers transition. The reconnect is silent. After several consecutive empty reconnects the viewer stops retrying.
 
+## Log Top
+
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns: REQ (count), REQ/s, % (share), ERR (error count). Launch from the resource action menu ("Log Top", quick-key `T`). Config: `log_top_default_profile` (`auto` | `traefik-json` | `json` | `logfmt`).
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate rows |
+| `G` | Jump to bottom |
+| `g` | Open group-by field picker (multi-select) |
+| `p` | Open profile picker (traefik-json / json / logfmt / auto) |
+| sort key | Toggle sort column (REQ <-> ERR) |
+| `Enter` | Drill into selected group (e.g. by status for HTTP) |
+| `Esc` / `q` | Pop drill level, or return to log viewer |
+
 ## Exec Mode (embedded terminal)
 
 `Ctrl+]` is a prefix key (like tmux's `Ctrl+b`). Press it once to activate, then press a follow-up key:
