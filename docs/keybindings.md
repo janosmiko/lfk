@@ -396,7 +396,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `f` | Filter rows (matches dimension values) |
 | `/` | Search and jump to matching row |
 | `n` / `N` | Next / previous search match |
-| `Enter` | Drill into selected group (descends to the next unused dimension) |
+| `Enter` | Drill into selected group (descends to the next unused dimension, marked `▸` in its column header) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |
 
 ## Exec Mode (embedded terminal)

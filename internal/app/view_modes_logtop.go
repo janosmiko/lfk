@@ -29,6 +29,7 @@ func (m Model) viewLogTop() string {
 
 	ui.ActiveSortColumnName = m.logTop.sortCol
 	ui.ActiveSortAscending = m.logTop.sortAsc
+	ui.ActiveLogTopNextDrill = m.logTopNextDrillDim()
 
 	prof := string(m.logTop.profile)
 	if m.logTop.autoProf {

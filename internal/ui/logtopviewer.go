@@ -7,6 +7,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// logTopDrillMarker prefixes the header of the dimension column that the next
+// drill-down (Enter) will expand into.
+const logTopDrillMarker = "▸" // ▸
+
+// ActiveLogTopNextDrill names the dimension column the next Log Top drill-down
+// will expand into. Set by the caller before RenderLogTopView; "" hides the
+// marker. Follows the same "set ui.Active* before render" pattern as
+// ActiveSortColumnName.
+var ActiveLogTopNextDrill string
+
 // LogTopRow is one display row for the Log Top aggregation table.
 type LogTopRow struct {
 	Dims     map[string]string
@@ -140,6 +150,10 @@ func RenderLogTopView(title string, dims []string, metrics []string, rows []LogT
 	segments = append(segments, headerSegment{text: strings.Repeat(" ", lead)})
 	for i, d := range dims {
 		label := strings.ToUpper(d) + sortIndicatorForColumn(d)
+		// Mark the dimension that the next Enter (drill-down) will expand into.
+		if d != "" && d == ActiveLogTopNextDrill {
+			label = logTopDrillMarker + label
+		}
 		raw := Truncate(label, colWidths[i])
 		padded := raw + strings.Repeat(" ", max(colWidths[i]-lipgloss.Width(raw), 0))
 		if i > 0 {

@@ -7,6 +7,29 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func TestRenderLogTopView_NextDrillMarker(t *testing.T) {
+	prev := ActiveLogTopNextDrill
+	t.Cleanup(func() { ActiveLogTopNextDrill = prev })
+
+	rows := []LogTopRow{{Dims: map[string]string{"method": "GET", "path": "/a", "status": "200"}, Count: 10}}
+	dims := []string{"method", "path", "status"}
+	metrics := []string{"REQ", "REQ/s", "%", "ERR"}
+
+	// With a next-drill target set, that column's header carries the marker.
+	ActiveLogTopNextDrill = "status"
+	out := stripANSI(RenderLogTopView("t", dims, metrics, rows, 1.0, 10, 0, 0, "hint", 120, 30))
+	if !strings.Contains(out, logTopDrillMarker+"STATUS") {
+		t.Errorf("expected next-drill marker on STATUS header; got header line not containing %q", logTopDrillMarker+"STATUS")
+	}
+
+	// With no target, no marker is rendered.
+	ActiveLogTopNextDrill = ""
+	out = stripANSI(RenderLogTopView("t", dims, metrics, rows, 1.0, 10, 0, 0, "hint", 120, 30))
+	if strings.Contains(out, logTopDrillMarker) {
+		t.Errorf("expected no drill marker when ActiveLogTopNextDrill is empty")
+	}
+}
+
 func TestRenderLogTopView_ShowsRowsAndRate(t *testing.T) {
 	rows := []LogTopRow{
 		{
