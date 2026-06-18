@@ -22,6 +22,10 @@ type logTopState struct {
 	// Drill-down stack: each entry pins a (field,value) constraint.
 	drillField []string
 	drillValue []string
+
+	// pendingGroup holds the transient multi-select state for the group-by overlay.
+	// It is not copied in copy() because it is ephemeral overlay state.
+	pendingGroup map[string]bool
 }
 
 func (s logTopState) copy() logTopState {

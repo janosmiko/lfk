@@ -31,12 +31,16 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 			m.logTop.cursor--
 		}
 		return m, nil
-	case kb.JumpTop, "g":
+	case kb.JumpTop:
 		m.logTop.cursor = 0
 		return m, nil
 	case kb.JumpBottom, "G":
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
 		return m, nil
+	case "g":
+		return m.openLogTopGroupBy(), nil
+	case "p":
+		return m.openLogTopProfile(), nil
 	case kb.SortNext, kb.SortFlip:
 		if m.logTop.sortKey == logagg.SortReq {
 			m.logTop.sortKey = logagg.SortErr

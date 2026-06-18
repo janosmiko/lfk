@@ -86,6 +86,8 @@ const (
 	overlayCopyFormat         // Y-key copy-as picker (YAML / JSON / Table)
 	overlayShuttingDown       // non-interactive "graceful shutdown in progress" notice
 	overlayObjectExplorerFind // recursive key search over the object (r key)
+	overlayLogTopGroupBy      // multi-select group-by field picker for Log Top
+	overlayLogTopProfile      // single-select log format profile picker for Log Top
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

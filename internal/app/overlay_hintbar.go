@@ -200,6 +200,19 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "/", Desc: "filter"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayLogTopGroupBy:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "space", Desc: "toggle"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "cancel"},
+		})
+	case overlayLogTopProfile:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "enter", Desc: "select"},
+			{Key: "esc", Desc: "cancel"},
+		})
 	case overlayClusterColor:
 		if m.clusterColorFilterMode {
 			return m.renderHints([]ui.HintEntry{

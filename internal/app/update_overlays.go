@@ -224,6 +224,12 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayLogContainerSelect:
 		mdl, cmd := m.handleLogContainerSelectOverlayKey(msg)
 		return mdl, cmd, true
+	case overlayLogTopGroupBy:
+		mdl, cmd := m.handleLogTopGroupByKey(msg)
+		return mdl, cmd, true
+	case overlayLogTopProfile:
+		mdl, cmd := m.handleLogTopProfileKey(msg)
+		return mdl, cmd, true
 	case overlayFinalizerSearch:
 		mdl, cmd := m.handleFinalizerSearchKey(msg)
 		return mdl, cmd, true
