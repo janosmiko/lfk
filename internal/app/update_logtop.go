@@ -12,14 +12,15 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 	switch msg.String() {
 	case "esc", "q":
 		// Pop a drill level, or return to the log viewer.
-		if n := len(m.logTop.drillField); n > 0 {
-			m.logTop.drillField = m.logTop.drillField[:n-1]
-			m.logTop.drillValue = m.logTop.drillValue[:n-1]
+		if n := len(m.logTop.drillStack); n > 0 {
+			top := m.logTop.drillStack[n-1]
+			m.logTop.groupBy = top.groupBy
+			m.logTop.drillStack = m.logTop.drillStack[:n-1]
 			m.logTop.cursor = 0
 			m.logTopRebuildRows()
 			return m, nil
 		}
-		(&m).rebuildLogView()
+		(&m).rebuildLogView() // populate logView.lines before returning to the viewer
 		m.mode = modeLogs
 		return m, nil
 	case kb.Down, "j":
@@ -53,17 +54,18 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 	return m, nil
 }
 
-// logTopDrillIn pins the selected row's group values as constraints and groups
+// logTopDrillIn pins the selected row's group values as a new frame and groups
 // by the next dimension (status for HTTP, level otherwise).
 func (m Model) logTopDrillIn() Model {
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		return m
 	}
 	row := m.logTop.rows[m.logTop.cursor]
+	frame := logTopDrillFrame{groupBy: append([]string(nil), m.logTop.groupBy...)}
 	for i, field := range m.logTop.groupBy {
-		m.logTop.drillField = append(m.logTop.drillField, field)
-		m.logTop.drillValue = append(m.logTop.drillValue, row.Values[i])
+		frame.filters = append(frame.filters, logTopDrillFilter{field: field, value: row.Values[i]})
 	}
+	m.logTop.drillStack = append(m.logTop.drillStack, frame)
 	next := logagg.FieldStatus
 	if !httpProfile(m.logTop.profile) {
 		next = logagg.FieldLevel

@@ -73,8 +73,7 @@ func (m Model) handleLogTopGroupByKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //n
 		if len(sel) > 0 {
 			m.logTop.groupBy = sel
 		}
-		m.logTop.drillField = nil
-		m.logTop.drillValue = nil
+		m.logTop.drillStack = nil
 		m.logTop.cursor = 0
 		m.overlay = overlayNone
 		m.logTopRebuildRows()

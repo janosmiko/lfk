@@ -9,6 +9,8 @@ import (
 
 func (m Model) viewLogTop() string {
 	total := len(m.logTop.parsed)
+	dims := m.logTopDisplayDims()
+
 	rows := make([]ui.LogTopRow, len(m.logTop.rows))
 	for i, r := range m.logTop.rows {
 		pct := 0.0
@@ -16,11 +18,16 @@ func (m Model) viewLogTop() string {
 			pct = 100 * float64(r.Count) / float64(total)
 		}
 		rows[i] = ui.LogTopRow{
-			Key:      strings.Join(r.Values, " "),
+			Dims:     r.Dims,
 			Count:    r.Count,
 			ErrCount: r.ErrCount,
 			Pct:      pct,
 		}
+	}
+
+	grouped := map[string]bool{}
+	for _, g := range m.logTop.groupBy {
+		grouped[g] = true
 	}
 
 	prof := string(m.logTop.profile)
@@ -31,11 +38,21 @@ func (m Model) viewLogTop() string {
 	if m.logTop.lastTS > m.logTop.firstTS {
 		span = fmt.Sprintf("  span %.0fs", float64(m.logTop.lastTS-m.logTop.firstTS)/1e9)
 	}
-	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s",
-		m.logTop.title, prof, total, m.logTop.unmatched, span)
+	var drillParts []string
+	for _, fr := range m.logTop.drillStack {
+		for _, flt := range fr.filters {
+			drillParts = append(drillParts, flt.field+"="+flt.value)
+		}
+	}
+	drill := ""
+	if len(drillParts) > 0 {
+		drill = "  " + strings.Join(drillParts, "  ")
+	}
+	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s",
+		m.logTop.title, prof, total, m.logTop.unmatched, span, drill)
 
 	hint := m.logTopHintBar()
-	return ui.RenderLogTopView(title, m.logTop.groupBy, rows, m.logTopReqPerSec(),
+	return ui.RenderLogTopView(title, dims, grouped, rows, m.logTopReqPerSec(),
 		total, m.logTop.cursor, m.logTop.scroll, hint, m.width, m.height)
 }
 

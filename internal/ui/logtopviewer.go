@@ -9,30 +9,86 @@ import (
 
 // LogTopRow is one display row for the Log Top aggregation table.
 type LogTopRow struct {
-	Key      string
+	Dims     map[string]string
 	Count    int
 	ErrCount int
 	Pct      float64
 }
 
+// dimWeight returns the column weight for a given dimension name.
+// path and router/host get extra weight to avoid truncation of long values.
+func dimWeight(d string) int {
+	switch d {
+	case "path":
+		return 3
+	case "router", "host":
+		return 2
+	default:
+		return 1
+	}
+}
+
+// logTopColWidths computes column widths for the dim columns.
+// dimsRegion is the total character budget; D is the number of dims.
+// Returns a slice of widths summing to at most dimsRegion.
+func logTopColWidths(dims []string, dimsRegion int) []int {
+	d := len(dims)
+	if d == 0 {
+		return nil
+	}
+	// The separating spaces between columns take (D-1) chars from the budget.
+	budget := max(dimsRegion-(d-1), d*5)
+	totalWeight := 0
+	for _, dim := range dims {
+		totalWeight += dimWeight(dim)
+	}
+	widths := make([]int, d)
+	used := 0
+	for i, dim := range dims {
+		w := max(dimWeight(dim)*budget/totalWeight, 5)
+		widths[i] = w
+		used += w
+	}
+	// Adjust last column to absorb rounding differences.
+	widths[d-1] = max(widths[d-1]+budget-used, 5)
+	return widths
+}
+
 // RenderLogTopView renders the Log Top aggregation table full screen.
+// dims lists all dimension columns to show (in order).
+// grouped maps dimension names that are part of the current group-by key.
 // reqPerSec is the global request rate; total is the total request count used
 // to compute per-row REQ/s as a proportional share of the global rate.
-func RenderLogTopView(title string, header []string, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
+func RenderLogTopView(title string, dims []string, grouped map[string]bool, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
 	titleBar := ViewTitle(width, title)
 
-	groupLabel := strings.ToUpper(strings.Join(header, "+"))
 	// Lines must fit inside the bordered box: FullscreenBorderStyle renders at
 	// width-2 with 1-col padding each side, leaving width-4 of text. Target
-	// width-5 (matching the event viewer) so a column never wraps. Each row is
-	// "  <key> <8 REQ> <8 REQ/s> <6 %> <6 ERR>" = 2 + keyWidth + 32 chars, so
-	// keyWidth = innerWidth - 34.
+	// width-5 (matching the event viewer) so a column never wraps.
+	// Layout: lead(2) + dimsRegion + metricsBlock(32)
 	innerWidth := max(width-5, 20)
-	keyWidth := max(innerWidth-34, 10)
-	groupLabel = Truncate(groupLabel, keyWidth)
+	const lead = 2
+	const metricsBlock = 32 // " %8d %8.1f %6.1f %6d" = 1+8+1+8+1+6+1+6 = 32
+	dimsRegion := max(innerWidth-lead-metricsBlock, len(dims)*5)
+	colWidths := logTopColWidths(dims, dimsRegion)
 
-	head := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s %8s %8s %6s %6s",
-		keyWidth, groupLabel, "REQ", "REQ/s", "%", "ERR"))
+	// Build header.
+	headParts := make([]string, 0, len(dims))
+	for i, d := range dims {
+		label := strings.ToUpper(d)
+		if grouped[d] {
+			label = DimStyle.Bold(true).Render(label)
+		} else {
+			label = DimStyle.Render(label)
+		}
+		// Left-justify in column, accounting for ANSI.
+		raw := Truncate(label, colWidths[i])
+		padded := raw + strings.Repeat(" ", max(colWidths[i]-lipgloss.Width(raw), 0))
+		headParts = append(headParts, padded)
+	}
+	dimHeader := strings.Join(headParts, " ")
+	metricHeader := fmt.Sprintf(" %8s %8s %6s %6s", "REQ", "REQ/s", "%", "ERR")
+	head := strings.Repeat(" ", lead) + dimHeader + metricHeader
 
 	maxRows := max(height-5, 3)
 	var b strings.Builder
@@ -46,8 +102,17 @@ func RenderLogTopView(title string, header []string, rows []LogTopRow, reqPerSec
 		if total > 0 {
 			rowRPS = reqPerSec * float64(r.Count) / float64(total)
 		}
-		line := fmt.Sprintf("  %-*s %8d %8.1f %6.1f %6d",
-			keyWidth, Truncate(r.Key, keyWidth), r.Count, rowRPS, r.Pct, r.ErrCount)
+
+		dimParts := make([]string, 0, len(dims))
+		for j, d := range dims {
+			val := r.Dims[d]
+			raw := Truncate(val, colWidths[j])
+			padded := raw + strings.Repeat(" ", max(colWidths[j]-lipgloss.Width(raw), 0))
+			dimParts = append(dimParts, padded)
+		}
+		dimCols := strings.Join(dimParts, " ")
+		metrics := fmt.Sprintf(" %8d %8.1f %6.1f %6d", r.Count, rowRPS, r.Pct, r.ErrCount)
+		line := strings.Repeat(" ", lead) + dimCols + metrics
 		if i == cursor {
 			line = SelectedStyle.Render(line)
 		}

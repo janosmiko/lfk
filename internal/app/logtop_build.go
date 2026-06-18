@@ -123,7 +123,7 @@ func (m *Model) ingestLogTopLine(line string) {
 // change that invalidates incremental accumulation (group-by, drill, profile,
 // or a parsed trim).
 func (m *Model) logTopRebuildRows() {
-	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTopErrorPredicate())
+	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTopDisplayDims(), m.logTopErrorPredicate())
 	for _, f := range m.logTop.parsed {
 		if !m.logTopMatchesDrill(f) {
 			continue
@@ -190,19 +190,54 @@ func (m *Model) logTopCapParsed() bool {
 }
 
 // logTopMatchesDrill reports whether a parsed line matches all active drill
-// constraints.
+// constraints (every frame's filters must all pass).
 func (m *Model) logTopMatchesDrill(f logagg.Fields) bool {
-	for i, field := range m.logTop.drillField {
-		want := m.logTop.drillValue[i]
-		got := f[field]
-		if got == "" {
-			got = "-"
-		}
-		if got != want {
-			return false
+	for _, fr := range m.logTop.drillStack {
+		for _, flt := range fr.filters {
+			got := f[flt.field]
+			if got == "" {
+				got = "-"
+			}
+			if got != flt.value {
+				return false
+			}
 		}
 	}
 	return true
+}
+
+// httpDimOrder is the fixed display order for HTTP dimension columns.
+var httpDimOrder = []string{
+	logagg.FieldMethod,
+	logagg.FieldPath,
+	logagg.FieldStatus,
+	logagg.FieldHost,
+	logagg.FieldRouter,
+}
+
+// logTopDisplayDims returns the dimension columns to show in the table.
+// It returns the subset of httpDimOrder that appears in at least one parsed
+// line. If no HTTP dimensions are present (generic logs), it falls back to the
+// current groupBy fields so the table always has something to display.
+func (m *Model) logTopDisplayDims() []string {
+	seen := map[string]bool{}
+	for _, f := range m.logTop.parsed {
+		for _, d := range httpDimOrder {
+			if f[d] != "" {
+				seen[d] = true
+			}
+		}
+	}
+	var out []string
+	for _, d := range httpDimOrder {
+		if seen[d] {
+			out = append(out, d)
+		}
+	}
+	if len(out) == 0 {
+		return append([]string(nil), m.logTop.groupBy...)
+	}
+	return out
 }
 
 // logTopReqPerSec returns the throughput in requests per second over the

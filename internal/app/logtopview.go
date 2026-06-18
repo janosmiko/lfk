@@ -2,6 +2,19 @@ package app
 
 import "github.com/janosmiko/lfk/internal/logagg"
 
+// logTopDrillFilter is a single field=value constraint applied during drill-down.
+type logTopDrillFilter struct {
+	field string
+	value string
+}
+
+// logTopDrillFrame captures the groupBy active before a drill and the filters
+// the drill added. Popping a frame restores groupBy and drops its filters.
+type logTopDrillFrame struct {
+	groupBy []string            // groupBy active before this drill (restored on pop)
+	filters []logTopDrillFilter // constraints this drill added
+}
+
 // logTopState holds the Log Top aggregation viewer state. It reads from the
 // same log stream as the log viewer; each new line is parsed once into parsed
 // and folded into the live aggregation.
@@ -21,9 +34,9 @@ type logTopState struct {
 
 	agg *logagg.Aggregation // live aggregation; folded incrementally, rebuilt on group/drill/profile change or parsed trim
 
-	// Drill-down stack: each entry pins a (field,value) constraint.
-	drillField []string
-	drillValue []string
+	// drillStack is the stack of drill frames. Each enter pushes a frame;
+	// each esc pops one and restores its groupBy; empty stack means no drill active.
+	drillStack []logTopDrillFrame
 
 	// pendingGroup holds the transient multi-select state for the group-by overlay.
 	// It is not copied in copy() because it is ephemeral overlay state.
@@ -35,8 +48,15 @@ func (s logTopState) copy() logTopState {
 	c.groupBy = append([]string(nil), s.groupBy...)
 	c.parsed = append([]logagg.Fields(nil), s.parsed...)
 	c.rows = append([]logagg.Row(nil), s.rows...)
-	c.drillField = append([]string(nil), s.drillField...)
-	c.drillValue = append([]string(nil), s.drillValue...)
+	if s.drillStack != nil {
+		c.drillStack = make([]logTopDrillFrame, len(s.drillStack))
+		for i, fr := range s.drillStack {
+			c.drillStack[i] = logTopDrillFrame{
+				groupBy: append([]string(nil), fr.groupBy...),
+				filters: append([]logTopDrillFilter(nil), fr.filters...),
+			}
+		}
+	}
 	c.agg = nil // live aggregation is rebuilt lazily; never share the pointer across snapshots
 	return c
 }
