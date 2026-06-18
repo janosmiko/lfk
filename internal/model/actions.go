@@ -5,6 +5,7 @@ func ActionsForContainer() []ActionMenuItem {
 	return []ActionMenuItem{
 		{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 		{Label: "Logs", Description: "View container logs", Key: "L"},
+		{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 		{Label: "Exec", Description: "Execute command in container", Key: "s"},
 		{Label: "Attach", Description: "Attach to running container", Key: "A"},
 		{Label: "Vuln Scan", Description: "Scan container image for vulnerabilities", Key: "V"},
@@ -81,6 +82,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View pod logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Debug", Description: "Debug pod with ephemeral container", Key: "B"},
@@ -116,6 +118,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Exec into pod behind service", Key: "s"},
 			{Label: "Attach", Description: "Attach to pod behind service", Key: "A"},
 			{Label: "Port Forward", Description: "Forward local port to service", Key: "p"},
@@ -192,6 +195,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Scale", Description: "Scale replica count", Key: "S"},
@@ -228,6 +232,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Scale", Description: "Scale replica count", Key: "S"},
@@ -245,6 +250,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Restart", Description: "Rolling restart", Key: "r"},
@@ -261,6 +267,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View job logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
@@ -276,6 +283,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View cronjob logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Trigger", Description: "Create a Job from this CronJob", Key: "t"},
@@ -318,6 +326,7 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Resubmit Workflow", Description: "Create new workflow from this spec", Key: "R"},
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View workflow pod logs", Key: "L"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "o"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this workflow", Key: "D"},
