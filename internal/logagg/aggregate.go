@@ -19,6 +19,7 @@ type Row struct {
 	Values   []string // group-key values, in groupBy order
 	Count    int
 	ErrCount int
+	id       string // cached "\x00"-joined Values, for a stable allocation-free sort tiebreak
 }
 
 // Aggregation accumulates grouped counts. Memory is bounded by the number of
@@ -52,7 +53,7 @@ func (a *Aggregation) Add(f Fields) {
 	id := strings.Join(vals, "\x00")
 	r := a.rows[id]
 	if r == nil {
-		r = &Row{Values: vals}
+		r = &Row{Values: vals, id: id}
 		a.rows[id] = r
 	}
 	r.Count++
@@ -77,7 +78,7 @@ func (a *Aggregation) Rows(key SortKey) []Row {
 		if vi != vj {
 			return vi > vj
 		}
-		return strings.Join(out[i].Values, "\x00") < strings.Join(out[j].Values, "\x00")
+		return out[i].id < out[j].id
 	})
 	return out
 }

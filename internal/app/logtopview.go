@@ -19,6 +19,8 @@ type logTopState struct {
 	firstTS   int64              // nanosecond timestamp of first parsed line
 	lastTS    int64              // nanosecond timestamp of last parsed line
 
+	agg *logagg.Aggregation // live aggregation; folded incrementally, rebuilt on group/drill/profile change or parsed trim
+
 	// Drill-down stack: each entry pins a (field,value) constraint.
 	drillField []string
 	drillValue []string
@@ -35,5 +37,6 @@ func (s logTopState) copy() logTopState {
 	c.rows = append([]logagg.Row(nil), s.rows...)
 	c.drillField = append([]string(nil), s.drillField...)
 	c.drillValue = append([]string(nil), s.drillValue...)
+	c.agg = nil // live aggregation is rebuilt lazily; never share the pointer across snapshots
 	return c
 }

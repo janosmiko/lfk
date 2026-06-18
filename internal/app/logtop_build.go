@@ -113,14 +113,10 @@ func (m *Model) ingestLogTopLine(line string) {
 	m.logTopAddLine(line)
 }
 
-// logTopAddLine parses one raw line incrementally and rebuilds rows.
-func (m *Model) logTopAddLine(line string) {
-	m.logTopParseInto(line)
-	m.logTopRebuildRows()
-}
-
-// logTopRebuildRows re-aggregates parsed through the current groupBy and drill
-// constraints into rows.
+// logTopRebuildRows rebuilds the live aggregation from parsed (applying drill
+// constraints) and refreshes the displayed rows. Used on reset and on any
+// change that invalidates incremental accumulation (group-by, drill, profile,
+// or a parsed trim).
 func (m *Model) logTopRebuildRows() {
 	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTopErrorPredicate())
 	for _, f := range m.logTop.parsed {
@@ -129,10 +125,63 @@ func (m *Model) logTopRebuildRows() {
 		}
 		agg.Add(f)
 	}
-	m.logTop.rows = agg.Rows(m.logTop.sortKey)
+	m.logTop.agg = agg
+	m.logTopRefreshRows()
+}
+
+// logTopRefreshRows re-snapshots rows from the live aggregation and clamps the
+// cursor. Cheap: O(groups log groups), no re-parse.
+func (m *Model) logTopRefreshRows() {
+	if m.logTop.agg == nil {
+		m.logTopRebuildRows()
+		return
+	}
+	m.logTop.rows = m.logTop.agg.Rows(m.logTop.sortKey)
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
 	}
+}
+
+// logTopAddLine parses one raw line and folds it into the live aggregation in
+// O(1) amortized time, then bounds the parsed cache.
+func (m *Model) logTopAddLine(line string) {
+	before := len(m.logTop.parsed)
+	m.logTopParseInto(line)
+	if m.logTop.agg == nil {
+		m.logTopRebuildRows()
+		return
+	}
+	if len(m.logTop.parsed) > before { // a matched line was appended
+		f := m.logTop.parsed[len(m.logTop.parsed)-1]
+		if m.logTopMatchesDrill(f) {
+			m.logTop.agg.Add(f)
+		}
+	}
+	if m.logTopCapParsed() {
+		// Oldest lines were dropped; the live aggregation is now stale.
+		m.logTopRebuildRows()
+		return
+	}
+	m.logTopRefreshRows()
+}
+
+// logTopCapParsed bounds m.logTop.parsed the same way capLogLines bounds the
+// raw buffer: it trims to ui.ConfigLogMaxLines once length exceeds
+// ConfigLogMaxLines+logBufferTrimSlack, so trimming (and the rebuild it forces)
+// is amortized across logBufferTrimSlack lines. Returns true when it trimmed.
+// Note: firstTS is not adjusted when old lines are dropped (parsed Fields do
+// not retain timestamps), so REQ/s can slightly under-report after the buffer
+// wraps. This is an accepted MVP limitation.
+func (m *Model) logTopCapParsed() bool {
+	maxLines := ui.ConfigLogMaxLines
+	if maxLines <= 0 || len(m.logTop.parsed) <= maxLines+logBufferTrimSlack {
+		return false
+	}
+	drop := len(m.logTop.parsed) - maxLines
+	trimmed := make([]logagg.Fields, maxLines)
+	copy(trimmed, m.logTop.parsed[drop:])
+	m.logTop.parsed = trimmed
+	return true
 }
 
 // logTopMatchesDrill reports whether a parsed line matches all active drill
