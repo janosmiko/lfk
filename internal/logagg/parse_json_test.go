@@ -26,6 +26,19 @@ func TestJSONParser_Parse(t *testing.T) {
 			line:   `192.0.2.1 GET /x 200`,
 			wantOK: false,
 		},
+		{
+			name:   "envoy-style json with http2 pseudo-headers",
+			line:   `{":method":"GET",":path":"/x",":authority":"a.example.com","response_code":200,"duration":12,"upstream_host":"10.0.0.1:80"}`,
+			wantOK: true,
+			want: map[string]string{
+				"method":      "GET",
+				"path":        "/x",
+				"host":        "a.example.com",
+				"status":      "200",
+				"duration_ms": "12",
+				"service":     "10.0.0.1:80",
+			},
+		},
 	}
 	p := NewJSONParser()
 	for _, tt := range tests {

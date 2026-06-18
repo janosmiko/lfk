@@ -428,11 +428,11 @@ func helpSections() []helpSection {
 				{"j/k", "Navigate rows"},
 				{"G", "Jump to bottom"},
 				{"g", "Group-by field picker (multi-select)"},
-				{"p", "Profile picker (traefik-json / nginx-combined / json / logfmt / auto)"},
+				{"p", "Profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto)"},
 				{"sort key", "Toggle sort column (REQ <-> ERR)"},
 				{"Enter", "Drill into selected group (e.g. by status for HTTP)"},
 				{"Esc/q", "Pop drill level or return to log viewer"},
-				{"", "Config: log_top_default_profile (auto|traefik-json|nginx-combined|json|logfmt)"},
+				{"", "Config: log_top_default_profile (auto|traefik-json|ingress-nginx|nginx-combined|envoy|json|logfmt)"},
 			},
 		},
 		{

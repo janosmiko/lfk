@@ -7,7 +7,8 @@ import (
 
 // httpProfile reports whether kind is an HTTP-access-log profile.
 func httpProfile(kind logagg.ProfileKind) bool {
-	return kind == logagg.ProfileTraefikJSON || kind == logagg.ProfileNginx
+	return kind == logagg.ProfileTraefikJSON || kind == logagg.ProfileNginx ||
+		kind == logagg.ProfileIngressNginx || kind == logagg.ProfileEnvoy
 }
 
 // defaultGroupBy returns sensible group-by fields for the detected profile.
@@ -214,6 +215,7 @@ var httpDimOrder = []string{
 	logagg.FieldStatus,
 	logagg.FieldHost,
 	logagg.FieldRouter,
+	logagg.FieldService,
 }
 
 // logTopDisplayDims returns the cached dimension columns for the current render.

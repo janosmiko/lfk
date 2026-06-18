@@ -132,7 +132,7 @@
     },
     "log_top_default_profile": {
       "type": "string",
-      "enum": ["auto", "traefik-json", "nginx-combined", "json", "logfmt"],
+      "enum": ["auto", "traefik-json", "ingress-nginx", "nginx-combined", "envoy", "json", "logfmt"],
       "default": "auto",
       "description": "Default Log Top parser profile. 'auto' detects the format from the loaded logs."
     },

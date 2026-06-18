@@ -184,7 +184,7 @@ func applyConfigOptions(cfg configFile) {
 	}
 	if cfg.LogTopDefaultProfile != nil {
 		switch *cfg.LogTopDefaultProfile {
-		case "auto", "traefik-json", "nginx-combined", "json", "logfmt":
+		case "auto", "traefik-json", "ingress-nginx", "nginx-combined", "envoy", "json", "logfmt":
 			ConfigLogTopDefaultProfile = *cfg.LogTopDefaultProfile
 		default:
 			ConfigLogTopDefaultProfile = "auto"

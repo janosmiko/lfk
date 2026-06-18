@@ -12,16 +12,19 @@ const (
 	FieldDurationMS = "duration_ms"
 	FieldLevel      = "level"
 	FieldRouter     = "router"
+	FieldService    = "service"
 )
 
 // ProfileKind identifies a built-in log format parser.
 type ProfileKind string
 
 const (
-	ProfileTraefikJSON ProfileKind = "traefik-json"
-	ProfileNginx       ProfileKind = "nginx-combined"
-	ProfileJSON        ProfileKind = "json"
-	ProfileLogfmt      ProfileKind = "logfmt"
+	ProfileTraefikJSON  ProfileKind = "traefik-json"
+	ProfileNginx        ProfileKind = "nginx-combined"
+	ProfileIngressNginx ProfileKind = "ingress-nginx"
+	ProfileEnvoy        ProfileKind = "envoy"
+	ProfileJSON         ProfileKind = "json"
+	ProfileLogfmt       ProfileKind = "logfmt"
 )
 
 // Parser turns a single log line into normalized Fields.

@@ -172,6 +172,7 @@ log_path: /tmp/lfk.log
 #   - /team-b/configs
 
 # Default Log Top parser profile (auto-detect when "auto").
+# Valid: auto, traefik-json, ingress-nginx, nginx-combined, envoy, json, logfmt.
 # log_top_default_profile: auto
 
 # ─── Log Viewer ──────────────────────────────────────────────────────────────

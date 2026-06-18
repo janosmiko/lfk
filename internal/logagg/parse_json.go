@@ -34,11 +34,16 @@ func durationToMS(v string) string {
 // jsonKeyAliases maps common source keys to normalized field names.
 var jsonKeyAliases = map[string]string{
 	"method": FieldMethod, "RequestMethod": FieldMethod, "http_method": FieldMethod,
+	":method": FieldMethod, "request_method": FieldMethod,
 	"path": FieldPath, "RequestPath": FieldPath, "route": FieldPath, "url": FieldPath, "uri": FieldPath,
+	":path": FieldPath, "request_uri": FieldPath,
 	"host": FieldHost, "RequestHost": FieldHost, "vhost": FieldHost,
+	"authority": FieldHost, ":authority": FieldHost,
 	"status": FieldStatus, "DownstreamStatus": FieldStatus, "status_code": FieldStatus, "response_status": FieldStatus,
-	"duration": FieldDurationMS, "Duration": FieldDurationMS, "response_time": FieldDurationMS, "latency": FieldDurationMS,
+	"response_code": FieldStatus,
+	"duration":      FieldDurationMS, "Duration": FieldDurationMS, "response_time": FieldDurationMS, "latency": FieldDurationMS,
 	"level": FieldLevel, "lvl": FieldLevel, "severity": FieldLevel,
+	"upstream_host": FieldService, "upstream": FieldService, "proxy_upstream_name": FieldService,
 }
 
 type jsonParser struct{}
