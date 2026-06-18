@@ -65,10 +65,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleExplorerKey(msg)
 }
 
+// inputActive reports whether any text input or search overlay is open that
+// should suppress global tab-switching keys.
+func (m *Model) inputActive() bool {
+	return m.mode == modeExplorer || m.mode == modeExec ||
+		m.yamlView.searchMode || m.logView.searchActive || m.logView.filterActive ||
+		m.logTop.filterActive || m.logTop.searchActive ||
+		m.helpSearchActive || m.explainSearchActive ||
+		m.diffView.searchMode || m.describeView.searchActive
+}
+
 // handleTabSwitchKey handles tab switching keys (next/prev/new tab).
 func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
-	if m.mode == modeExplorer || m.mode == modeExec || m.yamlView.searchMode || m.logView.searchActive || m.logView.filterActive || m.logTop.filterActive || m.helpSearchActive || m.explainSearchActive || m.diffView.searchMode || m.describeView.searchActive {
+	if m.inputActive() {
 		return m, nil, false
 	}
 	switch msg.String() {

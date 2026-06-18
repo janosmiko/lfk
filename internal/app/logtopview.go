@@ -26,7 +26,7 @@ type logTopState struct {
 	sortCol   string             // active sort column name (e.g. "REQ", "ERR", or a dim name)
 	sortAsc   bool               // true = ascending; false = descending (default)
 	cursor    int                // selected row index
-	scroll    int                //nolint:unused // wired in later Log Top tasks
+	scroll    int                // scroll offset: first visible row index
 	parsed    []logagg.Fields    // cache of parsed (matched) lines, for re-aggregation
 	unmatched int                // count of lines that did not parse
 	rows      []logagg.Row       // last computed rows (rebuilt on change)
@@ -52,6 +52,11 @@ type logTopState struct {
 	filterActive bool
 	filterInput  TextInput
 	filterQuery  string
+
+	// searchActive/searchInput/searchQuery drive the / row-jumping search (no filter).
+	searchActive bool
+	searchInput  TextInput
+	searchQuery  string
 }
 
 func (s logTopState) copy() logTopState {

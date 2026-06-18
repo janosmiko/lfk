@@ -52,8 +52,14 @@ func (m Model) viewLogTop() string {
 	} else if m.logTop.filterQuery != "" {
 		filterSuffix = "  filter: " + m.logTop.filterQuery
 	}
-	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s%s",
-		m.logTop.title, prof, total, m.logTop.unmatched, span, drill, filterSuffix)
+	searchSuffix := ""
+	if m.logTop.searchActive {
+		searchSuffix = "  /" + m.logTop.searchInput.Value + "█"
+	} else if m.logTop.searchQuery != "" {
+		searchSuffix = "  search: " + m.logTop.searchQuery
+	}
+	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s%s%s",
+		m.logTop.title, prof, total, m.logTop.unmatched, span, drill, filterSuffix, searchSuffix)
 
 	hint := m.logTopHintBar()
 	return ui.RenderLogTopView(title, dims, rows, m.logTopReqPerSec(),
@@ -70,6 +76,8 @@ func (m Model) logTopHintBar() string {
 		{Key: "g", Desc: "group by"},
 		{Key: "p", Desc: "profile"},
 		{Key: kb.Filter, Desc: "filter"},
+		{Key: kb.Search, Desc: "search"},
+		{Key: kb.NextMatch + "/" + kb.PrevMatch, Desc: "next/prev"},
 		{Key: "enter", Desc: "drill"},
 		{Key: "esc", Desc: "back"},
 	}

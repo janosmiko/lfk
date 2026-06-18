@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -429,5 +430,109 @@ func TestLogTopKey_FOpensFilter(t *testing.T) {
 	got := mdl.(Model)
 	if !got.logTop.filterActive {
 		t.Error("pressing filter key should set filterActive=true")
+	}
+}
+
+// TestLogTopNav_PageKeysAndScroll verifies page navigation and scroll-following.
+func TestLogTopNav_PageKeysAndScroll(t *testing.T) {
+	// Build a model with 60 distinct paths so the list is longer than the viewport.
+	m := basePush80Model()
+	m.mode = modeLogTop
+	m.height = 15 // visibleRows = max(15-5,3) = 10; half = 5
+	lines := make([]string, 0, 60)
+	for i := range 60 {
+		lines = append(lines, fmt.Sprintf(
+			`2026-06-18T10:00:%02dZ {"RequestMethod":"GET","RequestPath":"/path/%d","DownstreamStatus":200}`,
+			i%60, i,
+		))
+	}
+	m.logView.rawLines = lines
+	m.logTopResetAndParse()
+
+	if len(m.logTop.rows) < 20 {
+		t.Fatalf("precondition: expected >=20 rows, got %d", len(m.logTop.rows))
+	}
+
+	kb := ui.ActiveKeybindings
+
+	// Press ctrl+d (PageDown = half-page): cursor advances by ~half.
+	startCursor := m.logTop.cursor
+	mdl, _ := m.handleLogTopKey(key(kb.PageDown))
+	m = mdl.(Model)
+	half := max(m.logTopVisibleRows()/2, 1)
+	if m.logTop.cursor != min(startCursor+half, len(m.logTop.rows)-1) {
+		t.Errorf("after PageDown: cursor = %d, want %d", m.logTop.cursor, min(startCursor+half, len(m.logTop.rows)-1))
+	}
+	if m.logTop.scroll < 0 {
+		t.Errorf("scroll should not be negative, got %d", m.logTop.scroll)
+	}
+
+	// Press JumpBottom (G/end): cursor at last row, scroll follows.
+	mdl, _ = m.handleLogTopKey(key(kb.JumpBottom))
+	m = mdl.(Model)
+	if m.logTop.cursor != len(m.logTop.rows)-1 {
+		t.Errorf("after JumpBottom: cursor = %d, want %d", m.logTop.cursor, len(m.logTop.rows)-1)
+	}
+	// Scroll should be non-zero for a list much larger than the viewport.
+	if m.logTop.scroll == 0 && len(m.logTop.rows) > m.logTopVisibleRows() {
+		t.Errorf("scroll = 0 after JumpBottom on long list; expected scroll > 0")
+	}
+
+	// Press home: cursor at 0, scroll at 0.
+	mdl, _ = m.handleLogTopKey(key("home"))
+	m = mdl.(Model)
+	if m.logTop.cursor != 0 {
+		t.Errorf("after home: cursor = %d, want 0", m.logTop.cursor)
+	}
+	if m.logTop.scroll != 0 {
+		t.Errorf("after home: scroll = %d, want 0", m.logTop.scroll)
+	}
+}
+
+// TestLogTopSearch_JumpsToMatch verifies that logTopFindMatch jumps to a matching row.
+func TestLogTopSearch_JumpsToMatch(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogTop
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"RequestMethod":"GET","RequestPath":"/a","DownstreamStatus":200}`,
+		`2026-06-18T10:00:01Z {"RequestMethod":"GET","RequestPath":"/b","DownstreamStatus":200}`,
+		`2026-06-18T10:00:02Z {"RequestMethod":"GET","RequestPath":"/c","DownstreamStatus":200}`,
+	}
+	m.logTopResetAndParse()
+
+	if len(m.logTop.rows) < 3 {
+		t.Fatalf("precondition: expected >=3 rows, got %d", len(m.logTop.rows))
+	}
+
+	// Find which row index holds /c.
+	cIdx := -1
+	for i, r := range m.logTop.rows {
+		if r.Dims[logagg.FieldPath] == "/c" {
+			cIdx = i
+			break
+		}
+	}
+	if cIdx < 0 {
+		t.Fatal("/c row not found")
+	}
+
+	// Set search query to /c and find forward.
+	m.logTop.searchQuery = "/c"
+	m.logTop.cursor = 0
+	m.logTopFindMatch(true)
+
+	if m.logTop.cursor != cIdx {
+		t.Errorf("cursor after findMatch('/c') = %d, want %d (index of /c)", m.logTop.cursor, cIdx)
+	}
+}
+
+// TestLogTopKey_SlashOpensSearch verifies that pressing / sets searchActive=true.
+func TestLogTopKey_SlashOpensSearch(t *testing.T) {
+	m := newLogTopModel(t)
+	kb := ui.ActiveKeybindings
+	mdl, _ := m.handleLogTopKey(key(kb.Search))
+	got := mdl.(Model)
+	if !got.logTop.searchActive {
+		t.Error("pressing Search key should set searchActive=true")
 	}
 }

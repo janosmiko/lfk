@@ -172,6 +172,7 @@ func (m *Model) logTopRefreshRows() {
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
 	}
+	m.logTopSyncScroll()
 }
 
 // logTopRowText builds the searchable text for a row: its dimension display
@@ -349,4 +350,18 @@ func (m *Model) logTopReqPerSec() float64 {
 		return 0
 	}
 	return float64(len(m.logTop.parsed)) / (float64(spanNS) / 1e9)
+}
+
+// logTopSyncScroll keeps the selected row visible by recomputing the scroll
+// offset with the shared vim scroll-off helper (1 display line per row).
+func (m *Model) logTopSyncScroll() {
+	visible := m.logTopVisibleRows()
+	identity := func(from, to int) int { return to - from }
+	m.logTop.scroll = ui.VimScrollOff(m.logTop.scroll, m.logTop.cursor, len(m.logTop.rows), visible, ui.ConfigScrollOff, identity)
+}
+
+// logTopVisibleRows is the number of data rows visible in the table body,
+// matching the renderer's maxRows.
+func (m *Model) logTopVisibleRows() int {
+	return max(m.height-5, 3)
 }

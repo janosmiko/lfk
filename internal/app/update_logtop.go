@@ -7,10 +7,16 @@ import (
 )
 
 func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+	if m.logTop.searchActive {
+		return m.handleLogTopSearchKey(msg)
+	}
 	if m.logTop.filterActive {
 		return m.handleLogTopFilterKey(msg)
 	}
 	kb := ui.ActiveKeybindings
+	visible := m.logTopVisibleRows()
+	half := max(visible/2, 1)
+	full := max(visible-1, 1)
 	switch msg.String() {
 	case "esc", "q":
 		// Pop a drill level, or return to the log viewer.
@@ -25,18 +31,41 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		(&m).rebuildLogView() // populate logView.lines before returning to the viewer
 		m.mode = modeLogs
 		return m, nil
-	case kb.Down, "j":
+	case kb.Down, "j", "down":
 		if m.logTop.cursor < len(m.logTop.rows)-1 {
 			m.logTop.cursor++
 		}
+		m.logTopSyncScroll()
 		return m, nil
-	case kb.Up, "k":
+	case kb.Up, "k", "up":
 		if m.logTop.cursor > 0 {
 			m.logTop.cursor--
 		}
+		m.logTopSyncScroll()
 		return m, nil
-	case kb.JumpBottom, "G":
+	case kb.PageDown, "shift+down": // half-page down
+		m.logTop.cursor = min(m.logTop.cursor+half, max(len(m.logTop.rows)-1, 0))
+		m.logTopSyncScroll()
+		return m, nil
+	case kb.PageUp, "shift+up": // half-page up
+		m.logTop.cursor = max(m.logTop.cursor-half, 0)
+		m.logTopSyncScroll()
+		return m, nil
+	case kb.PageForward, "pgdown": // full-page down
+		m.logTop.cursor = min(m.logTop.cursor+full, max(len(m.logTop.rows)-1, 0))
+		m.logTopSyncScroll()
+		return m, nil
+	case kb.PageBack, "pgup": // full-page up
+		m.logTop.cursor = max(m.logTop.cursor-full, 0)
+		m.logTopSyncScroll()
+		return m, nil
+	case kb.JumpBottom, "G", "end":
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
+		m.logTopSyncScroll()
+		return m, nil
+	case "home":
+		m.logTop.cursor = 0
+		m.logTopSyncScroll()
 		return m, nil
 	case "g":
 		return m.openLogTopGroupBy(), nil
@@ -62,6 +91,16 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 	case kb.Filter:
 		m.logTop.filterActive = true
 		m.logTop.filterInput.Set(m.logTop.filterQuery)
+		return m, nil
+	case kb.Search:
+		m.logTop.searchActive = true
+		m.logTop.searchInput.Set(m.logTop.searchQuery)
+		return m, nil
+	case kb.NextMatch:
+		m.logTopFindMatch(true)
+		return m, nil
+	case kb.PrevMatch:
+		m.logTopFindMatch(false)
 		return m, nil
 	}
 	return m, nil
@@ -112,6 +151,72 @@ func (m Model) handleLogTopFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //no
 	m.logTop.filterQuery = m.logTop.filterInput.Value
 	m.logTopRefreshRows()
 	return m, nil
+}
+
+// handleLogTopSearchKey processes a key while the Log Top search input is open.
+// Search jumps the cursor to matching rows (it does not hide rows — that is
+// what the f filter does).
+func (m Model) handleLogTopSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the handler convention
+	switch msg.String() {
+	case "enter":
+		m.logTop.searchActive = false
+		m.logTop.searchQuery = m.logTop.searchInput.Value
+		m.logTopFindMatch(true)
+	case "esc":
+		m.logTop.searchActive = false
+		m.logTop.searchInput.Clear()
+		m.logTop.searchQuery = ""
+	case "ctrl+c":
+		return m.closeTabOrQuit()
+	case "backspace":
+		m.logTop.searchInput.Backspace()
+	case "ctrl+w":
+		m.logTop.searchInput.DeleteWord()
+	case "ctrl+u":
+		m.logTop.searchInput.DeleteLine()
+	case "ctrl+a":
+		m.logTop.searchInput.Home()
+		return m, nil
+	case "ctrl+e":
+		m.logTop.searchInput.End()
+		return m, nil
+	case "left":
+		m.logTop.searchInput.Left()
+		return m, nil
+	case "right":
+		m.logTop.searchInput.Right()
+		return m, nil
+	default:
+		k := msg.String()
+		if len(k) == 1 && k[0] >= 32 && k[0] < 127 {
+			m.logTop.searchInput.Insert(k)
+		} else {
+			return m, nil
+		}
+	}
+	m.logTop.searchQuery = m.logTop.searchInput.Value
+	return m, nil
+}
+
+// logTopFindMatch moves the cursor to the next (forward) or previous row whose
+// dimension text matches searchQuery, wrapping around. No-op if query is empty.
+func (m *Model) logTopFindMatch(forward bool) {
+	if m.logTop.searchQuery == "" || len(m.logTop.rows) == 0 {
+		return
+	}
+	n := len(m.logTop.rows)
+	step := 1
+	if !forward {
+		step = -1
+	}
+	for off := 1; off <= n; off++ {
+		idx := ((m.logTop.cursor+step*off)%n + n) % n
+		if ui.MatchLine(m.logTopRowText(m.logTop.rows[idx]), m.logTop.searchQuery) {
+			m.logTop.cursor = idx
+			m.logTopSyncScroll()
+			return
+		}
+	}
 }
 
 // logTopDrillIn pins the selected row's group values as a new frame and groups
