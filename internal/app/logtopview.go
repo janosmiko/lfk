@@ -63,6 +63,12 @@ type logTopState struct {
 	colSnapOrder  []string
 	colSnapHidden map[string]bool
 
+	// colFilter/colFilterActive drive the live column-name filter in the column overlay.
+	// drillTarget is the user-selected next-drill dimension (cycled via Tab); "" means use first candidate.
+	colFilter       string
+	colFilterActive bool
+	drillTarget     string
+
 	// pendingGroup holds the transient multi-select state for the group-by overlay.
 	// It is not copied in copy() because it is ephemeral overlay state.
 	pendingGroup map[string]bool
@@ -80,6 +86,10 @@ type logTopState struct {
 
 func (s logTopState) copy() logTopState {
 	c := s
+	// Zero transient overlay state that must not persist across tab snapshots.
+	c.colFilter = ""
+	c.colFilterActive = false
+	c.drillTarget = ""
 	c.groupBy = append([]string(nil), s.groupBy...)
 	c.parsed = append([]logagg.Fields(nil), s.parsed...)
 	c.rows = append([]logagg.Row(nil), s.rows...)

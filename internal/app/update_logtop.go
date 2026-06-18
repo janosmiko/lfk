@@ -1,6 +1,8 @@
 package app
 
 import (
+	"slices"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -87,6 +89,9 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		m.logTop.sortCol = logTopMetricREQ
 		m.logTop.sortAsc = false
 		m.logTopRefreshRows()
+		return m, nil
+	case "tab":
+		m.logTopCycleDrillTarget()
 		return m, nil
 	case "enter":
 		return m.logTopDrillIn(), nil
@@ -239,15 +244,14 @@ func (m Model) logTopDrillIn() Model {
 	}
 	m.logTop.drillStack = append(m.logTop.drillStack, frame)
 	m.logTop.groupBy = []string{next}
+	m.logTop.drillTarget = ""
 	m.logTop.cursor = 0
 	m.logTopRebuildRows()
 	return m
 }
 
-// logTopNextDrillDim returns the first display dimension that is not already
-// part of the current groupBy or pinned by an active drill filter, or "" if
-// every dimension is already used.
-func (m *Model) logTopNextDrillDim() string {
+// logTopDrillCandidates returns the un-pinned display dims in order.
+func (m *Model) logTopDrillCandidates() []string {
 	pinned := map[string]bool{}
 	for _, g := range m.logTop.groupBy {
 		pinned[g] = true
@@ -257,10 +261,42 @@ func (m *Model) logTopNextDrillDim() string {
 			pinned[flt.field] = true
 		}
 	}
+	var out []string
 	for _, d := range m.logTop.displayDims {
 		if !pinned[d] {
-			return d
+			out = append(out, d)
 		}
 	}
-	return ""
+	return out
+}
+
+// logTopNextDrillDim returns the dimension the next Enter will drill into.
+// If a drillTarget is set and still a valid candidate it is returned; otherwise
+// the first candidate is returned. Returns "" when every dimension is already used.
+func (m *Model) logTopNextDrillDim() string {
+	cands := m.logTopDrillCandidates()
+	if len(cands) == 0 {
+		return ""
+	}
+	if m.logTop.drillTarget != "" && slices.Contains(cands, m.logTop.drillTarget) {
+		return m.logTop.drillTarget
+	}
+	return cands[0]
+}
+
+// logTopCycleDrillTarget advances drillTarget to the next candidate, wrapping around.
+func (m *Model) logTopCycleDrillTarget() {
+	cands := m.logTopDrillCandidates()
+	if len(cands) == 0 {
+		return
+	}
+	current := m.logTopNextDrillDim()
+	idx := 0
+	for i, c := range cands {
+		if c == current {
+			idx = i
+			break
+		}
+	}
+	m.logTop.drillTarget = cands[(idx+1)%len(cands)]
 }

@@ -536,3 +536,52 @@ func TestLogTopKey_SlashOpensSearch(t *testing.T) {
 		t.Error("pressing Search key should set searchActive=true")
 	}
 }
+
+// TestLogTopDrillTarget_TabCycles verifies Tab cycles drillTarget through candidates.
+func TestLogTopDrillTarget_TabCycles(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogTop
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"RequestMethod":"GET","RequestPath":"/api","DownstreamStatus":200,"RequestHost":"a.example.com"}`,
+		`2026-06-18T10:00:01Z {"RequestMethod":"GET","RequestPath":"/api","DownstreamStatus":500,"RequestHost":"b.example.com"}`,
+	}
+	m.logTopResetAndParse()
+
+	// Ensure we have multiple candidates.
+	cands := m.logTopDrillCandidates()
+	if len(cands) < 2 {
+		t.Skipf("need at least 2 drill candidates, got %v", cands)
+	}
+
+	// Initial next dim is cands[0].
+	first := m.logTopNextDrillDim()
+	if first != cands[0] {
+		t.Fatalf("initial nextDrillDim = %q, want %q", first, cands[0])
+	}
+
+	// Press tab: next dim should advance to cands[1].
+	mdl, _ := m.handleLogTopKey(key("tab"))
+	m = mdl.(Model)
+	second := m.logTopNextDrillDim()
+	if second != cands[1] {
+		t.Errorf("after tab: nextDrillDim = %q, want %q", second, cands[1])
+	}
+
+	// Press tab enough times to wrap around: should return to cands[0].
+	for range len(cands) - 1 {
+		mdl, _ = m.handleLogTopKey(key("tab"))
+		m = mdl.(Model)
+	}
+	wrapped := m.logTopNextDrillDim()
+	if wrapped != cands[0] {
+		t.Errorf("after full cycle: nextDrillDim = %q, want %q (wrapped)", wrapped, cands[0])
+	}
+
+	// drillTarget resets after drill-in.
+	m.logTop.cursor = 0
+	mdl, _ = m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEnter})
+	m = mdl.(Model)
+	if m.logTop.drillTarget != "" {
+		t.Errorf("drillTarget should be reset after drill-in, got %q", m.logTop.drillTarget)
+	}
+}

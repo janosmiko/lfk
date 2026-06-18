@@ -168,6 +168,13 @@ func TestAggregation_Percentiles(t *testing.T) {
 	}
 
 	fast := rowsByPath["/fast"]
+	// p50 target = ceil(0.50*100) = 50 -> 50th sample is in the <=13ms bucket (96 samples fill it).
+	if fast.P50 < 0 {
+		t.Errorf("/fast P50 = %v, want >= 0", fast.P50)
+	}
+	if fast.P50 > 13 {
+		t.Errorf("/fast P50 = %v, want <= 13 (50th sample is within the 96 fast requests)", fast.P50)
+	}
 	if fast.P95 < 0 {
 		t.Errorf("/fast P95 = %v, want >= 0", fast.P95)
 	}
@@ -186,6 +193,9 @@ func TestAggregation_Percentiles(t *testing.T) {
 	}
 
 	nodur := rowsByPath["/nodur"]
+	if nodur.P50 != -1 {
+		t.Errorf("/nodur P50 = %v, want -1 (no duration field)", nodur.P50)
+	}
 	if nodur.P95 != -1 {
 		t.Errorf("/nodur P95 = %v, want -1 (no duration field)", nodur.P95)
 	}

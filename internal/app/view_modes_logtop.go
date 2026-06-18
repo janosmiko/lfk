@@ -22,6 +22,7 @@ func (m Model) viewLogTop() string {
 			Count:    r.Count,
 			ErrCount: r.ErrCount,
 			Pct:      pct,
+			P50:      r.P50,
 			P95:      r.P95,
 			P99:      r.P99,
 		}
@@ -71,6 +72,10 @@ func (m Model) viewLogTop() string {
 
 func (m Model) logTopHintBar() string {
 	kb := ui.ActiveKeybindings
+	enterDesc := "drill"
+	if next := m.logTopNextDrillDim(); next != "" {
+		enterDesc = "group by " + next
+	}
 	hints := []ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
 		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort col"},
@@ -82,7 +87,8 @@ func (m Model) logTopHintBar() string {
 		{Key: kb.Filter, Desc: "filter"},
 		{Key: kb.Search, Desc: "search"},
 		{Key: kb.NextMatch + "/" + kb.PrevMatch, Desc: "next/prev"},
-		{Key: "enter", Desc: "drill"},
+		{Key: "tab", Desc: "next dim"},
+		{Key: "enter", Desc: enterDesc},
 		{Key: "esc", Desc: "back"},
 	}
 	return ui.RenderHintBar(hints, m.width)

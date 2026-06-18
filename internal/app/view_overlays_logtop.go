@@ -25,6 +25,7 @@ func (m Model) overlayHintBarLogTop() string {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "space", Desc: "toggle"},
 			{Key: "J/K", Desc: "reorder"},
+			{Key: "/", Desc: "filter"},
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})
@@ -65,37 +66,30 @@ func (m Model) renderLogTopProfileOverlay() (string, int, int) {
 	return ui.RenderOverlayList(items, cfg, w-4), w, cfg.Height + 2
 }
 
-// columnsOverlayRenderCursor maps the logical column cursor (over dims then
-// metrics, no divider) to the render-list index, which includes a Header
-// divider between the two non-empty groups.
-func columnsOverlayRenderCursor(cursor, nDims, nMets int) int {
-	if nDims > 0 && nMets > 0 && cursor >= nDims {
-		return cursor + 1 // skip the divider row
-	}
-	return cursor
-}
+// overlayLogTopColScrollPos is the scroll state for the Log Top column-visibility overlay.
+var overlayLogTopColScrollPos int
 
 func (m Model) renderLogTopColumnsOverlay() (string, int, int) {
-	dims := m.logTop.colOrder
-	mets := m.logTopAllMetrics()
-	items := make([]ui.OverlayListItem, 0, len(dims)+1+len(mets))
-	for _, d := range dims {
-		items = append(items, ui.OverlayListItem{Name: d, Selected: !m.logTop.colHidden[d]})
+	cols := m.logTopFilteredColumns()
+	items := make([]ui.OverlayListItem, len(cols))
+	for i, c := range cols {
+		items[i] = ui.OverlayListItem{Name: c, Active: !m.logTop.colHidden[c]}
 	}
-	// Divider between dims and metrics sections.
-	if len(dims) > 0 && len(mets) > 0 {
-		items = append(items, ui.OverlayListItem{Name: "--- metrics ---", Header: true})
-	}
-	for _, met := range mets {
-		items = append(items, ui.OverlayListItem{Name: met, Selected: !m.logTop.colHidden[met]})
-	}
-	w := min(m.width-10, 44)
+	w := min(m.width-10, 60)
+	maxH := max(min(len(items)+4+overlayListChromeFilterable(), m.height-6), 3)
+	contentH := max(maxH, 1)
+	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
 	cfg := ui.OverlayListConfig{
-		Title:       "Columns",
-		Cursor:      columnsOverlayRenderCursor(m.overlayCursor, len(dims), len(mets)),
-		MultiSelect: true,
-		FooterHint:  "space toggle · J/K reorder dims · enter apply · esc cancel",
-		Height:      min(len(items)+4, m.height-6),
+		Title:            "Column Visibility",
+		Cursor:           m.overlayCursor,
+		Filterable:       true,
+		Filter:           m.logTop.colFilter,
+		FilterActive:     m.logTop.colFilterActive,
+		ShowActiveMarker: true,
+		Scroll:           overlayListScroll(&overlayLogTopColScrollPos, m.overlayCursor, len(items), maxVisible),
+		MaxVisible:       maxVisible,
+		EmptyMessage:     "No matching columns",
+		Height:           contentH,
 	}
-	return ui.RenderOverlayList(items, cfg, w-4), w, cfg.Height + 2
+	return ui.RenderOverlayList(items, cfg, w-6), w, contentH + 2
 }

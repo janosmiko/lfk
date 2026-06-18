@@ -14,6 +14,7 @@ const (
 	logTopMetricRPS = "REQ/s"
 	logTopMetricPct = "%"
 	logTopMetricERR = "ERR"
+	logTopMetricP50 = "P50"
 	logTopMetricP95 = "P95"
 	logTopMetricP99 = "P99"
 )
@@ -170,7 +171,7 @@ func (m *Model) logTopVisibleDims() []string {
 func (m *Model) logTopAllMetrics() []string {
 	mets := []string{logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR}
 	if m.logTop.hasLatency {
-		mets = append(mets, logTopMetricP95, logTopMetricP99)
+		mets = append(mets, logTopMetricP50, logTopMetricP95, logTopMetricP99)
 	}
 	return mets
 }
@@ -301,6 +302,8 @@ func (m *Model) logTopSortRows() {
 			// REQ/s and % are both proportional to Count (rate = share of the
 			// global rate; % = Count/total), so sorting by Count is equivalent.
 			c = rows[i].Count - rows[j].Count
+		case logTopMetricP50:
+			c = compareFloat(rows[i].P50, rows[j].P50)
 		case logTopMetricP95:
 			c = compareFloat(rows[i].P95, rows[j].P95)
 		case logTopMetricP99:

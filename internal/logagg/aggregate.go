@@ -65,6 +65,7 @@ type Row struct {
 	Count    int
 	ErrCount int
 	Dims     map[string]string // per-dimension display string: uniform value, or "*N", or "*50+"
+	P50      float64           // approximate p50 latency in ms; -1 when no duration data
 	P95      float64           // approximate p95 latency in ms; -1 when no duration data
 	P99      float64           // approximate p99 latency in ms; -1 when no duration data
 	id       string            // cached "\x00"-joined Values, for a stable allocation-free sort tiebreak
@@ -185,6 +186,7 @@ func (a *Aggregation) Rows(key SortKey) []Row {
 			Count:    gr.count,
 			ErrCount: gr.errCount,
 			Dims:     dims,
+			P50:      percentileFromHist(gr.durHist, gr.durTotal, 0.50),
 			P95:      percentileFromHist(gr.durHist, gr.durTotal, 0.95),
 			P99:      percentileFromHist(gr.durHist, gr.durTotal, 0.99),
 			id:       gr.id,

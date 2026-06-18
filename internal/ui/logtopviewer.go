@@ -23,6 +23,7 @@ type LogTopRow struct {
 	Count    int
 	ErrCount int
 	Pct      float64
+	P50      float64 // approximate p50 latency in ms; -1 when no duration data
 	P95      float64 // approximate p95 latency in ms; -1 when no duration data
 	P99      float64 // approximate p99 latency in ms; -1 when no duration data
 }
@@ -91,7 +92,7 @@ func metricWidth(id string) int {
 	switch id {
 	case "%", "ERR":
 		return 6
-	case "P95", "P99":
+	case "P50", "P95", "P99":
 		return 7
 	default: // REQ, REQ/s
 		return 8
@@ -110,6 +111,8 @@ func metricCell(id string, r LogTopRow, rowRPS float64) string {
 		label = fmt.Sprintf("%.1f", r.Pct)
 	case "ERR":
 		label = fmt.Sprintf("%d", r.ErrCount)
+	case "P50":
+		return latencyCell(r.P50, metricWidth(id))
 	case "P95":
 		return latencyCell(r.P95, metricWidth(id))
 	case "P99":
