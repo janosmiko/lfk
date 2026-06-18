@@ -383,12 +383,19 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Navigate rows |
-| `G` | Jump to bottom |
+| `j` / `k` / `↓` / `↑` | Move cursor down / up |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page down / up |
+| `home` / `G` / `end` | Jump to top / bottom |
+| `>` / `<` | Cycle sort column (dimensions + REQ / REQ/s / % / ERR / P95 / P99) |
+| `=` | Toggle sort direction (the active column shows ↑/↓) |
+| `-` | Reset sort to REQ descending |
 | `g` | Open group-by field picker (multi-select) |
 | `p` | Open profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto) |
-| sort key | Toggle sort column (REQ <-> ERR) |
-| `Enter` | Drill into selected group (e.g. by status for HTTP) |
+| `f` | Filter rows (matches dimension values) |
+| `/` | Search and jump to matching row |
+| `n` / `N` | Next / previous search match |
+| `Enter` | Drill into selected group (descends to the next unused dimension) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |
 
 ## Exec Mode (embedded terminal)
