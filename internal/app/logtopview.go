@@ -7,17 +7,17 @@ import "github.com/janosmiko/lfk/internal/logagg"
 // and folded into the live aggregation.
 type logTopState struct {
 	title     string             //nolint:unused // wired in later Log Top tasks
-	profile   logagg.ProfileKind //nolint:unused // wired in later Log Top tasks
-	autoProf  bool               //nolint:unused // wired in later Log Top tasks
+	profile   logagg.ProfileKind // detected or configured parser profile
+	autoProf  bool               // true when profile was auto-detected
 	groupBy   []string           // selected group-by field names
-	sortKey   logagg.SortKey     //nolint:unused // wired in later Log Top tasks
-	cursor    int                //nolint:unused // wired in later Log Top tasks
+	sortKey   logagg.SortKey     // active sort column
+	cursor    int                // selected row index
 	scroll    int                //nolint:unused // wired in later Log Top tasks
 	parsed    []logagg.Fields    // cache of parsed (matched) lines, for re-aggregation
-	unmatched int                //nolint:unused // wired in later Log Top tasks
+	unmatched int                // count of lines that did not parse
 	rows      []logagg.Row       // last computed rows (rebuilt on change)
-	firstTS   int64              //nolint:unused // wired in later Log Top tasks
-	lastTS    int64              //nolint:unused // wired in later Log Top tasks
+	firstTS   int64              // nanosecond timestamp of first parsed line
+	lastTS    int64              // nanosecond timestamp of last parsed line
 
 	// Drill-down stack: each entry pins a (field,value) constraint.
 	drillField []string
