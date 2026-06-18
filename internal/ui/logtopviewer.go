@@ -21,12 +21,18 @@ type LogTopRow struct {
 func RenderLogTopView(title string, header []string, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
 	titleBar := ViewTitle(width, title)
 
-	groupLabel := strings.Join(header, "+")
-	contentWidth := max(width-4, 20)
-	keyWidth := max(contentWidth-32, 10) // leave room for REQ, REQ/s, %, ERR columns
+	groupLabel := strings.ToUpper(strings.Join(header, "+"))
+	// Lines must fit inside the bordered box: FullscreenBorderStyle renders at
+	// width-2 with 1-col padding each side, leaving width-4 of text. Target
+	// width-5 (matching the event viewer) so a column never wraps. Each row is
+	// "  <key> <8 REQ> <8 REQ/s> <6 %> <6 ERR>" = 2 + keyWidth + 32 chars, so
+	// keyWidth = innerWidth - 34.
+	innerWidth := max(width-5, 20)
+	keyWidth := max(innerWidth-34, 10)
+	groupLabel = Truncate(groupLabel, keyWidth)
 
 	head := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s %8s %8s %6s %6s",
-		keyWidth, strings.ToUpper(groupLabel), "REQ", "REQ/s", "%", "ERR"))
+		keyWidth, groupLabel, "REQ", "REQ/s", "%", "ERR"))
 
 	maxRows := max(height-5, 3)
 	var b strings.Builder

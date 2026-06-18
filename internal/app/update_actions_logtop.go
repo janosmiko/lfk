@@ -11,6 +11,10 @@ import (
 // as the standard log viewer but switches to modeLogTop so the log lines are
 // parsed and aggregated rather than displayed verbatim.
 func (m Model) executeActionLogTop() (tea.Model, tea.Cmd) {
+	kind := m.actionCtx.kind
+	isGroupResource := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
+		kind == "Job" || kind == "CronJob" || kind == "Service"
+
 	m.mode = modeLogTop
 	m.resetLogBuffer()
 	m.logView.scroll = 0
@@ -22,7 +26,23 @@ func (m Model) executeActionLogTop() (tea.Model, tea.Cmd) {
 	m.logView.isMulti = false
 	m.logView.multiItems = nil
 	m.logView.containers = nil
-	m.logView.selectedContainers = []string{m.actionCtx.containerName}
+	// An empty selectedContainers means "show all"; a [""] slice would filter
+	// out every streamed line because no container is named "". Only pin a
+	// container when one was explicitly selected.
+	if m.actionCtx.containerName != "" {
+		m.logView.selectedContainers = []string{m.actionCtx.containerName}
+	} else {
+		m.logView.selectedContainers = nil
+	}
+	// Group resources stream all pods via label selector; keep the parent
+	// context so the log viewer (entered on Esc) can re-select pods/containers.
+	if isGroupResource && m.actionCtx.containerName == "" {
+		m.logView.parentKind = m.actionCtx.kind
+		m.logView.parentName = m.actionCtx.name
+	} else {
+		m.logView.parentKind = ""
+		m.logView.parentName = ""
+	}
 	m.logView.tailLines = ui.ConfigLogTailLines
 	m.logView.hasMoreHistory = true
 	m.logView.loadingHistory = false
