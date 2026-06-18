@@ -148,8 +148,8 @@ func (m *Model) logTopRebuildRows() {
 }
 
 // logTopRefreshRows re-snapshots rows from the live aggregation, applies the
-// user-selected sort, and clamps the cursor. Cheap: O(groups log groups), no
-// re-parse.
+// user-selected sort, applies any active text filter, and clamps the cursor.
+// Cheap: O(groups log groups), no re-parse.
 func (m *Model) logTopRefreshRows() {
 	if m.logTop.agg == nil {
 		m.logTopRebuildRows()
@@ -160,9 +160,31 @@ func (m *Model) logTopRefreshRows() {
 		m.logTop.sortCol = logTopMetricREQ
 	}
 	m.logTopSortRows()
+	if m.logTop.filterQuery != "" {
+		kept := make([]logagg.Row, 0, len(m.logTop.rows))
+		for _, r := range m.logTop.rows {
+			if ui.MatchLine(m.logTopRowText(r), m.logTop.filterQuery) {
+				kept = append(kept, r)
+			}
+		}
+		m.logTop.rows = kept
+	}
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
 	}
+}
+
+// logTopRowText builds the searchable text for a row: its dimension display
+// values joined by spaces (so the filter matches against method/path/status/
+// host/router/service as shown).
+func (m *Model) logTopRowText(r logagg.Row) string {
+	parts := make([]string, 0, len(m.logTop.displayDims))
+	for _, d := range m.logTop.displayDims {
+		if v := r.Dims[d]; v != "" {
+			parts = append(parts, v)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 // logTopSortColumns returns the ordered list of sortable column names:

@@ -345,3 +345,89 @@ func TestLogTopSort_CyclesAllColumns(t *testing.T) {
 		t.Error("SortReset: sortAsc should be false after reset")
 	}
 }
+
+// TestLogTopFilter_NarrowsRows verifies that typing a query narrows the displayed
+// rows to those whose dimension text contains the query.
+func TestLogTopFilter_NarrowsRows(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogTop
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"RequestMethod":"GET","RequestPath":"/api/users","DownstreamStatus":200}`,
+		`2026-06-18T10:00:01Z {"RequestMethod":"GET","RequestPath":"/health","DownstreamStatus":200}`,
+	}
+	m.logTopResetAndParse()
+
+	if len(m.logTop.rows) < 2 {
+		t.Fatalf("precondition: expected >=2 rows, got %d", len(m.logTop.rows))
+	}
+
+	// Open filter and type "api".
+	m.logTop.filterActive = true
+	for _, ch := range "api" {
+		mdl, _ := m.handleLogTopFilterKey(key(string(ch)))
+		m = mdl.(Model)
+	}
+
+	if len(m.logTop.rows) != 1 {
+		t.Fatalf("after filter 'api': rows = %d, want 1", len(m.logTop.rows))
+	}
+	// The remaining row must contain "api" in its dims.
+	found := false
+	for _, v := range m.logTop.rows[0].Dims {
+		if strings.Contains(v, "api") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("remaining row dims %v do not contain 'api'", m.logTop.rows[0].Dims)
+	}
+}
+
+// TestLogTopFilter_EscClears verifies that pressing esc clears the filter and
+// restores all rows.
+func TestLogTopFilter_EscClears(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogTop
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"RequestMethod":"GET","RequestPath":"/api/users","DownstreamStatus":200}`,
+		`2026-06-18T10:00:01Z {"RequestMethod":"GET","RequestPath":"/health","DownstreamStatus":200}`,
+	}
+	m.logTopResetAndParse()
+	totalRows := len(m.logTop.rows)
+
+	// Type a query that narrows to one row.
+	m.logTop.filterActive = true
+	for _, ch := range "api" {
+		mdl, _ := m.handleLogTopFilterKey(key(string(ch)))
+		m = mdl.(Model)
+	}
+	if len(m.logTop.rows) >= totalRows {
+		t.Fatal("filter should have narrowed rows before esc test")
+	}
+
+	// Press esc.
+	mdl, _ := m.handleLogTopFilterKey(tea.KeyMsg{Type: tea.KeyEsc})
+	m = mdl.(Model)
+
+	if m.logTop.filterActive {
+		t.Error("filterActive should be false after esc")
+	}
+	if m.logTop.filterQuery != "" {
+		t.Errorf("filterQuery should be empty after esc, got %q", m.logTop.filterQuery)
+	}
+	if len(m.logTop.rows) != totalRows {
+		t.Errorf("rows after esc = %d, want %d (all rows restored)", len(m.logTop.rows), totalRows)
+	}
+}
+
+// TestLogTopKey_FOpensFilter verifies that pressing the filter key opens the
+// filter input.
+func TestLogTopKey_FOpensFilter(t *testing.T) {
+	m := newLogTopModel(t)
+	kb := ui.ActiveKeybindings
+	mdl, _ := m.handleLogTopKey(key(kb.Filter))
+	got := mdl.(Model)
+	if !got.logTop.filterActive {
+		t.Error("pressing filter key should set filterActive=true")
+	}
+}

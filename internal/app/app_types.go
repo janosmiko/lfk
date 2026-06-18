@@ -563,11 +563,12 @@ type TabState struct {
 	explainSearchQuery string // persisted search query for n/N navigation
 
 	// Log Top aggregation state (per-tab).
-	logTopProfile  string
-	logTopGroupBy  []string
-	logTopSortCol  string
-	logTopSortAsc  bool
-	logTopAutoProf bool
+	logTopProfile     string
+	logTopGroupBy     []string
+	logTopSortCol     string
+	logTopSortAsc     bool
+	logTopAutoProf    bool
+	logTopFilterQuery string
 
 	// Security feature state — per-tab so two tabs pointing at different
 	// clusters keep their own source manager and availability map.

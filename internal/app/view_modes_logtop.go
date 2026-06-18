@@ -46,8 +46,14 @@ func (m Model) viewLogTop() string {
 	if len(drillParts) > 0 {
 		drill = "  filter: " + strings.Join(drillParts, " ")
 	}
-	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s",
-		m.logTop.title, prof, total, m.logTop.unmatched, span, drill)
+	filterSuffix := ""
+	if m.logTop.filterActive {
+		filterSuffix = "  /" + m.logTop.filterInput.Value + "█"
+	} else if m.logTop.filterQuery != "" {
+		filterSuffix = "  filter: " + m.logTop.filterQuery
+	}
+	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s%s",
+		m.logTop.title, prof, total, m.logTop.unmatched, span, drill, filterSuffix)
 
 	hint := m.logTopHintBar()
 	return ui.RenderLogTopView(title, dims, rows, m.logTopReqPerSec(),
@@ -63,6 +69,7 @@ func (m Model) logTopHintBar() string {
 		{Key: kb.SortReset, Desc: "reset sort"},
 		{Key: "g", Desc: "group by"},
 		{Key: "p", Desc: "profile"},
+		{Key: kb.Filter, Desc: "filter"},
 		{Key: "enter", Desc: "drill"},
 		{Key: "esc", Desc: "back"},
 	}

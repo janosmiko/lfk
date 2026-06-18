@@ -7,6 +7,9 @@ import (
 )
 
 func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+	if m.logTop.filterActive {
+		return m.handleLogTopFilterKey(msg)
+	}
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case "esc", "q":
@@ -56,7 +59,58 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		return m, nil
 	case "enter":
 		return m.logTopDrillIn(), nil
+	case kb.Filter:
+		m.logTop.filterActive = true
+		m.logTop.filterInput.Set(m.logTop.filterQuery)
+		return m, nil
 	}
+	return m, nil
+}
+
+// handleLogTopFilterKey processes a key while the Log Top filter input is open.
+// The filter applies live: every edit calls logTopRefreshRows which re-applies
+// the query to the current aggregation rows.
+func (m Model) handleLogTopFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the handler convention
+	switch msg.String() {
+	case "enter":
+		m.logTop.filterActive = false
+		return m, nil
+	case "esc":
+		m.logTop.filterActive = false
+		m.logTop.filterInput.Clear()
+		m.logTop.filterQuery = ""
+		m.logTopRefreshRows()
+		return m, nil
+	case "ctrl+c":
+		return m.closeTabOrQuit()
+	case "backspace":
+		m.logTop.filterInput.Backspace()
+	case "ctrl+w":
+		m.logTop.filterInput.DeleteWord()
+	case "ctrl+u":
+		m.logTop.filterInput.DeleteLine()
+	case "ctrl+a":
+		m.logTop.filterInput.Home()
+		return m, nil
+	case "ctrl+e":
+		m.logTop.filterInput.End()
+		return m, nil
+	case "left":
+		m.logTop.filterInput.Left()
+		return m, nil
+	case "right":
+		m.logTop.filterInput.Right()
+		return m, nil
+	default:
+		k := msg.String()
+		if len(k) == 1 && k[0] >= 32 && k[0] < 127 {
+			m.logTop.filterInput.Insert(k)
+		} else {
+			return m, nil
+		}
+	}
+	m.logTop.filterQuery = m.logTop.filterInput.Value
+	m.logTopRefreshRows()
 	return m, nil
 }
 

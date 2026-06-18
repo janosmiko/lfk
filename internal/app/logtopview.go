@@ -47,6 +47,11 @@ type logTopState struct {
 	// pendingGroup holds the transient multi-select state for the group-by overlay.
 	// It is not copied in copy() because it is ephemeral overlay state.
 	pendingGroup map[string]bool
+
+	// filterActive/filterInput/filterQuery drive the live row-text filter (f key).
+	filterActive bool
+	filterInput  TextInput
+	filterQuery  string
 }
 
 func (s logTopState) copy() logTopState {
@@ -74,15 +79,17 @@ func (m *Model) saveLogTopToTab(t *TabState) {
 	t.logTopSortCol = m.logTop.sortCol
 	t.logTopSortAsc = m.logTop.sortAsc
 	t.logTopAutoProf = m.logTop.autoProf
+	t.logTopFilterQuery = m.logTop.filterQuery
 }
 
 func (m *Model) loadLogTopFromTab(t TabState) {
 	m.logTop = logTopState{
-		profile:  logagg.ProfileKind(t.logTopProfile),
-		groupBy:  append([]string(nil), t.logTopGroupBy...),
-		sortCol:  t.logTopSortCol,
-		sortAsc:  t.logTopSortAsc,
-		autoProf: t.logTopAutoProf,
+		profile:     logagg.ProfileKind(t.logTopProfile),
+		groupBy:     append([]string(nil), t.logTopGroupBy...),
+		sortCol:     t.logTopSortCol,
+		sortAsc:     t.logTopSortAsc,
+		autoProf:    t.logTopAutoProf,
+		filterQuery: t.logTopFilterQuery,
 	}
 	if m.mode == modeLogTop && len(m.logView.rawLines) > 0 {
 		m.logTopReparseExisting()
