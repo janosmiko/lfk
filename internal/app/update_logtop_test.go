@@ -43,3 +43,21 @@ func TestLogTopKey_EscReturnsToLogs(t *testing.T) {
 		t.Errorf("mode after esc = %v, want modeLogs", m.mode)
 	}
 }
+
+func TestLogTopKey_GOpensGroupByOverlay(t *testing.T) {
+	m := newLogTopModel(t)
+	mdl, _ := m.handleLogTopKey(key("g"))
+	got := mdl.(Model)
+	if got.overlay != overlayLogTopGroupBy {
+		t.Fatalf("pressing g: overlay = %v, want overlayLogTopGroupBy", got.overlay)
+	}
+}
+
+func TestLogTopKey_POpensProfileOverlay(t *testing.T) {
+	m := newLogTopModel(t)
+	mdl, _ := m.handleLogTopKey(key("p"))
+	got := mdl.(Model)
+	if got.overlay != overlayLogTopProfile {
+		t.Fatalf("pressing p: overlay = %v, want overlayLogTopProfile", got.overlay)
+	}
+}
