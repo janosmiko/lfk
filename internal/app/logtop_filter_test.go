@@ -6,6 +6,31 @@ import (
 	"github.com/janosmiko/lfk/internal/logagg"
 )
 
+func TestSplitFilterToken(t *testing.T) {
+	cases := []struct {
+		tok              string
+		field, op, value string
+	}{
+		{"status=204", "status", "=", "204"},
+		{"status>=500", "status", ">=", "500"},
+		{"status!=200", "status", "!=", "200"},
+		{"host~example", "host", "~", "example"},
+		{"duration_ms<=100", "duration_ms", "<=", "100"},
+		{"path=/api/v1:8080", "path", "=", "/api/v1:8080"},
+		// Malformed / bare tokens -> free-text (field/op empty, value=whole token).
+		{">=500", "", "", ">=500"},
+		{"!=200", "", "", "!=200"},
+		{"=foo", "", "", "=foo"},
+		{"api", "", "", "api"},
+	}
+	for _, c := range cases {
+		field, op, value := splitFilterToken(c.tok)
+		if field != c.field || op != c.op || value != c.value {
+			t.Errorf("splitFilterToken(%q) = (%q,%q,%q), want (%q,%q,%q)", c.tok, field, op, value, c.field, c.op, c.value)
+		}
+	}
+}
+
 func TestLogTopFilterMatch_EmptyTerms(t *testing.T) {
 	f := logagg.Fields{"status": "200", "path": "/api"}
 	if !logTopFilterMatch(f, nil) {

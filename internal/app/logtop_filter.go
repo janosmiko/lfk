@@ -24,22 +24,34 @@ func parseLogTopFilter(q string) []logTopFilterTerm {
 }
 
 // splitFilterToken finds the first operator in tok and returns (field, op, value).
-// 2-char ops are checked before 1-char to avoid mis-splitting ">=" as ">".
-// If no operator is found or the field part is empty, returns ("", "", tok) for free-text.
+// 2-char ops are checked before 1-char so ">=" is not mis-split as ">". The part
+// before the operator must be a valid field name (letters/digits/_.:-); otherwise
+// the token is free-text. This keeps a bare ">=500" (no field) as free-text rather
+// than a phantom field term that matches nothing.
 func splitFilterToken(tok string) (field, op, value string) {
-	twoCharOps := []string{">=", "<=", "!="}
-	for _, o := range twoCharOps {
-		if i := strings.Index(tok, o); i > 0 {
-			return tok[:i], o, tok[i+len(o):]
-		}
-	}
-	oneCharOps := []string{"=", ">", "<", "~"}
-	for _, o := range oneCharOps {
-		if i := strings.Index(tok, o); i > 0 {
+	for _, o := range []string{">=", "<=", "!=", "=", ">", "<", "~"} {
+		if i := strings.Index(tok, o); i > 0 && isFilterFieldName(tok[:i]) {
 			return tok[:i], o, tok[i+len(o):]
 		}
 	}
 	return "", "", tok
+}
+
+// isFilterFieldName reports whether s is a plausible field name: non-empty and
+// composed only of letters, digits, and _ . : - (no operator characters).
+func isFilterFieldName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '_' || r == '.' || r == ':' || r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // logTopFilterMatch reports whether a parsed line satisfies all terms.
