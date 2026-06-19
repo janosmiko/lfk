@@ -8,7 +8,10 @@ import (
 )
 
 func (m Model) viewLogTop() string {
-	total := len(m.logTop.parsed)
+	total := 0
+	if m.logTop.agg != nil {
+		total = m.logTop.agg.Total()
+	}
 	dims := m.logTopVisibleDims()
 	metrics := m.logTopVisibleMetrics()
 	rows := make([]ui.LogTopRow, len(m.logTop.rows))
@@ -67,7 +70,7 @@ func (m Model) viewLogTop() string {
 		searchSuffix = "  search: " + m.logTop.searchQuery
 	}
 	title := fmt.Sprintf("%s    %s   %d matched / %d unmatched%s%s%s%s",
-		m.logTop.title, prof, total, m.logTop.unmatched, span, drill, filterSuffix, searchSuffix)
+		m.logTop.title, prof, len(m.logTop.parsed), m.logTop.unmatched, span, drill, filterSuffix, searchSuffix)
 
 	hint := m.logTopHintBar()
 	return ui.RenderLogTopView(title, dims, metrics, rows, m.logTopReqPerSec(),

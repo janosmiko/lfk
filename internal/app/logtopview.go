@@ -73,10 +73,11 @@ type logTopState struct {
 	// It is not copied in copy() because it is ephemeral overlay state.
 	pendingGroup map[string]bool
 
-	// filterActive/filterInput/filterQuery drive the live row-text filter (f key).
+	// filterActive/filterInput/filterQuery/filterTerms drive the pre-aggregation field filter (f key).
 	filterActive bool
 	filterInput  TextInput
 	filterQuery  string
+	filterTerms  []logTopFilterTerm
 
 	// searchActive/searchInput/searchQuery drive the / row-jumping search (no filter).
 	searchActive bool
@@ -150,6 +151,7 @@ func (m *Model) loadLogTopFromTab(t TabState) {
 			m.logTop.colHidden[k] = true
 		}
 	}
+	m.logTop.filterTerms = parseLogTopFilter(m.logTop.filterQuery)
 	if m.mode == modeLogTop && len(m.logView.rawLines) > 0 {
 		m.logTopReparseExisting()
 	}

@@ -39,6 +39,7 @@ var jsonKeyAliases = map[string]string{
 	":path": FieldPath, "request_uri": FieldPath,
 	"host": FieldHost, "RequestHost": FieldHost, "vhost": FieldHost,
 	"authority": FieldHost, ":authority": FieldHost,
+	"RequestScheme": FieldScheme, "scheme": FieldScheme, "request_scheme": FieldScheme,
 	"status": FieldStatus, "DownstreamStatus": FieldStatus, "status_code": FieldStatus, "response_status": FieldStatus,
 	"response_code": FieldStatus,
 	"duration":      FieldDurationMS, "Duration": FieldDurationMS, "response_time": FieldDurationMS, "latency": FieldDurationMS,

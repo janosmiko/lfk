@@ -234,7 +234,7 @@ func (m *Model) logTopRebuildRows() {
 	m.logTopReconcileColOrder()
 	agg := logagg.NewAggregation(m.logTop.groupBy, m.logTop.displayDims, m.logTopErrorPredicate())
 	for _, f := range m.logTop.parsed {
-		if !m.logTopMatchesDrill(f) {
+		if !m.logTopMatchesDrill(f) || !logTopFilterMatch(f, m.logTop.filterTerms) {
 			continue
 		}
 		agg.Add(f)
@@ -267,15 +267,6 @@ func (m *Model) logTopRefreshRows() {
 		}
 	}
 	m.logTopSortRows()
-	if m.logTop.filterQuery != "" {
-		kept := make([]logagg.Row, 0, len(m.logTop.rows))
-		for _, r := range m.logTop.rows {
-			if ui.MatchLine(m.logTopRowText(r), m.logTop.filterQuery) {
-				kept = append(kept, r)
-			}
-		}
-		m.logTop.rows = kept
-	}
 	if m.logTop.cursor >= len(m.logTop.rows) {
 		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
 	}
@@ -429,7 +420,7 @@ func (m *Model) logTopAddLine(line string) {
 	}
 	if len(m.logTop.parsed) > before { // a matched line was appended
 		f := m.logTop.parsed[len(m.logTop.parsed)-1]
-		if m.logTopMatchesDrill(f) {
+		if m.logTopMatchesDrill(f) && logTopFilterMatch(f, m.logTop.filterTerms) {
 			m.logTop.agg.Add(f)
 		}
 	}
@@ -483,6 +474,7 @@ var httpDimOrder = []string{
 	logagg.FieldPath,
 	logagg.FieldStatus,
 	logagg.FieldHost,
+	logagg.FieldScheme,
 	logagg.FieldRouter,
 	logagg.FieldService,
 }
@@ -520,7 +512,11 @@ func (m *Model) logTopReqPerSec() float64 {
 	if spanNS <= 0 {
 		return 0
 	}
-	return float64(len(m.logTop.parsed)) / (float64(spanNS) / 1e9)
+	n := 0
+	if m.logTop.agg != nil {
+		n = m.logTop.agg.Total()
+	}
+	return float64(n) / (float64(spanNS) / 1e9)
 }
 
 // logTopSyncScroll keeps the selected row visible by recomputing the scroll

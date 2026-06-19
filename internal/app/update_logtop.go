@@ -162,7 +162,8 @@ func (m Model) handleLogTopFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //no
 		m.logTop.filterActive = false
 		m.logTop.filterInput.Clear()
 		m.logTop.filterQuery = ""
-		m.logTopRefreshRows()
+		m.logTop.filterTerms = nil
+		m.logTopRebuildRows()
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -193,7 +194,8 @@ func (m Model) handleLogTopFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //no
 		}
 	}
 	m.logTop.filterQuery = m.logTop.filterInput.Value
-	m.logTopRefreshRows()
+	m.logTop.filterTerms = parseLogTopFilter(m.logTop.filterQuery)
+	m.logTopRebuildRows()
 	return m, nil
 }
 

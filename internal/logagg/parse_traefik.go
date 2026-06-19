@@ -29,7 +29,7 @@ func (traefikParser) Parse(line string) (Fields, bool) {
 			return nil, false
 		}
 	}
-	f := make(Fields, 6)
+	f := make(Fields, 7)
 	if v, ok := scalarString(raw["RequestMethod"]); ok {
 		f[FieldMethod] = v
 	}
@@ -44,6 +44,9 @@ func (traefikParser) Parse(line string) (Fields, bool) {
 	}
 	if ns, ok := raw["Duration"].(float64); ok {
 		f[FieldDurationMS] = strconv.FormatFloat(ns/1_000_000, 'f', -1, 64)
+	}
+	if v, ok := scalarString(raw["RequestScheme"]); ok {
+		f[FieldScheme] = v
 	}
 	return f, len(f) > 0
 }

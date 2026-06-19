@@ -13,6 +13,7 @@ const (
 	FieldLevel      = "level"
 	FieldRouter     = "router"
 	FieldService    = "service"
+	FieldScheme     = "scheme"
 )
 
 // ProfileKind identifies a built-in log format parser.
