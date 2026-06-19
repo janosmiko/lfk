@@ -86,6 +86,11 @@ type logTopState struct {
 	searchActive bool
 	searchInput  TextInput
 	searchQuery  string
+
+	// lineInput is the transient digit-prefix buffer for count-prefixed motions
+	// (e.g. 5j, 10G). Cleared by consumeCountPrefix after each motion, and also
+	// cleared on any non-digit non-motion key.
+	lineInput string
 }
 
 func (s logTopState) copy() logTopState {

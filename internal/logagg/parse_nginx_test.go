@@ -91,3 +91,29 @@ func TestNginxParser_RouterExtraction(t *testing.T) {
 		t.Errorf("plain combined log must not set router field, got %q", got2[FieldRouter])
 	}
 }
+
+// TestNginxParser_AtInUserAgent verifies that an "@"-sign in the user-agent field
+// of a plain combined log line does NOT trigger router extraction.
+func TestNginxParser_AtInUserAgent(t *testing.T) {
+	p := NewNginxParser()
+
+	// Plain combined log line whose UA contains "@" — must NOT set router.
+	uaLine := `192.0.2.1 - - [10/Oct/2000:13:55:36 -0700] "GET /index.html HTTP/1.0" 200 2326 "-" "bot@example.com"`
+	got, ok := p.Parse(uaLine)
+	if !ok {
+		t.Fatal("expected parse ok for combined log line with @ in UA")
+	}
+	if _, has := got[FieldRouter]; has {
+		t.Errorf("combined log line with @ in UA must not set router field, got %q", got[FieldRouter])
+	}
+
+	// Real Traefik CLF line still sets router.
+	traefikLine := `10.42.2.19 - - [18/Jun/2026:15:18:46 +0000] "GET /api/health HTTP/1.1" 200 0 "-" "-" 100 "websecure-gitlab@kubernetes" "http://10.42.1.1:8080" 3ms`
+	got2, ok2 := p.Parse(traefikLine)
+	if !ok2 {
+		t.Fatal("expected parse ok for traefik CLF line")
+	}
+	if got2[FieldRouter] != "websecure-gitlab@kubernetes" {
+		t.Errorf("router = %q, want %q", got2[FieldRouter], "websecure-gitlab@kubernetes")
+	}
+}

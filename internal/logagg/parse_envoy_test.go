@@ -75,3 +75,38 @@ func TestEnvoyParser_Kind(t *testing.T) {
 		t.Error("Kind() != ProfileEnvoy")
 	}
 }
+
+// TestEnvoyParser_TruncatedLine verifies that a truncated Envoy log line (fewer
+// than 5 quoted tokens) does not set host/service even when it parses successfully.
+func TestEnvoyParser_TruncatedLine(t *testing.T) {
+	p := NewEnvoyParser()
+
+	// Truncated line: only request-line quoted token (1 quoted token) — method/path/status still extracted.
+	truncLine := `[2023-10-10T13:55:36.000Z] "GET /api/health HTTP/1.1" 200 - 0 5 3 2`
+	got, ok := p.Parse(truncLine)
+	if !ok {
+		t.Fatal("expected parse ok for truncated envoy line")
+	}
+	if got[FieldMethod] != "GET" {
+		t.Errorf("method = %q, want GET", got[FieldMethod])
+	}
+	if _, has := got[FieldHost]; has {
+		t.Errorf("truncated line must not set host field, got %q", got[FieldHost])
+	}
+	if _, has := got[FieldService]; has {
+		t.Errorf("truncated line must not set service field, got %q", got[FieldService])
+	}
+
+	// Full line still sets host/service.
+	fullLine := `[2023-10-10T13:55:36.000Z] "GET /api/users HTTP/1.1" 200 - 0 1234 45 44 "10.0.0.1" "curl/7.68" "abc-123" "myapp.example.com" "10.0.0.5:8080"`
+	got2, ok2 := p.Parse(fullLine)
+	if !ok2 {
+		t.Fatal("expected parse ok for full envoy line")
+	}
+	if got2[FieldHost] != "myapp.example.com" {
+		t.Errorf("full line host = %q, want %q", got2[FieldHost], "myapp.example.com")
+	}
+	if got2[FieldService] != "10.0.0.5:8080" {
+		t.Errorf("full line service = %q, want %q", got2[FieldService], "10.0.0.5:8080")
+	}
+}

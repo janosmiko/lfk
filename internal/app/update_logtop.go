@@ -20,7 +20,19 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 	half := max(visible/2, 1)
 	full := max(visible-1, 1)
 	switch msg.String() {
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		m.logTop.lineInput += msg.String()
+		return m, nil
+	case "0":
+		if m.logTop.lineInput != "" {
+			m.logTop.lineInput += "0"
+			return m, nil
+		}
+		// bare 0 with no prefix: not a count, fall through to clear and no-op
+		m.logTop.lineInput = ""
+		return m, nil
 	case "esc", "q":
+		m.logTop.lineInput = ""
 		// Pop a drill level, or return to the log viewer.
 		if n := len(m.logTop.drillStack); n > 0 {
 			top := m.logTop.drillStack[n-1]
@@ -34,82 +46,107 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		m.mode = modeLogs
 		return m, nil
 	case kb.Down, "j", "down":
-		if m.logTop.cursor < len(m.logTop.rows)-1 {
-			m.logTop.cursor++
-		}
+		n := consumeCountPrefix(&m.logTop.lineInput)
+		last := max(len(m.logTop.rows)-1, 0)
+		m.logTop.cursor = min(m.logTop.cursor+n, last)
 		m.logTopSyncScroll()
 		return m, nil
 	case kb.Up, "k", "up":
-		if m.logTop.cursor > 0 {
-			m.logTop.cursor--
-		}
+		n := consumeCountPrefix(&m.logTop.lineInput)
+		m.logTop.cursor = max(m.logTop.cursor-n, 0)
 		m.logTopSyncScroll()
 		return m, nil
 	case kb.PageDown, "shift+down": // half-page down
-		m.logTop.cursor = min(m.logTop.cursor+half, max(len(m.logTop.rows)-1, 0))
+		n := consumeCountPrefix(&m.logTop.lineInput)
+		m.logTop.cursor = min(m.logTop.cursor+half*n, max(len(m.logTop.rows)-1, 0))
 		m.logTopSyncScroll()
 		return m, nil
 	case kb.PageUp, "shift+up": // half-page up
-		m.logTop.cursor = max(m.logTop.cursor-half, 0)
+		n := consumeCountPrefix(&m.logTop.lineInput)
+		m.logTop.cursor = max(m.logTop.cursor-half*n, 0)
 		m.logTopSyncScroll()
 		return m, nil
 	case kb.PageForward, "pgdown": // full-page down
-		m.logTop.cursor = min(m.logTop.cursor+full, max(len(m.logTop.rows)-1, 0))
+		n := consumeCountPrefix(&m.logTop.lineInput)
+		m.logTop.cursor = min(m.logTop.cursor+full*n, max(len(m.logTop.rows)-1, 0))
 		m.logTopSyncScroll()
 		return m, nil
 	case kb.PageBack, "pgup": // full-page up
-		m.logTop.cursor = max(m.logTop.cursor-full, 0)
+		n := consumeCountPrefix(&m.logTop.lineInput)
+		m.logTop.cursor = max(m.logTop.cursor-full*n, 0)
 		m.logTopSyncScroll()
 		return m, nil
 	case kb.JumpBottom, "G", "end":
-		m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
+		if m.logTop.lineInput != "" {
+			// count-G: go to row n-1 (1-indexed like vim)
+			n := consumeCountPrefix(&m.logTop.lineInput)
+			last := max(len(m.logTop.rows)-1, 0)
+			m.logTop.cursor = min(n-1, last)
+		} else {
+			m.logTop.cursor = max(len(m.logTop.rows)-1, 0)
+		}
 		m.logTopSyncScroll()
 		return m, nil
 	case "home":
+		m.logTop.lineInput = ""
 		m.logTop.cursor = 0
 		m.logTopSyncScroll()
 		return m, nil
 	case "g":
+		m.logTop.lineInput = ""
 		return m.openLogTopGroupBy(), nil
 	case "p":
+		m.logTop.lineInput = ""
 		return m.openLogTopProfile(), nil
 	case kb.ColumnToggle:
+		m.logTop.lineInput = ""
 		return m.openLogTopColumns(), nil
 	case kb.SortNext:
+		m.logTop.lineInput = ""
 		m.logTopCycleSort(+1)
 		return m, nil
 	case kb.SortPrev:
+		m.logTop.lineInput = ""
 		m.logTopCycleSort(-1)
 		return m, nil
 	case kb.SortFlip:
+		m.logTop.lineInput = ""
 		m.logTop.sortAsc = !m.logTop.sortAsc
 		m.logTopRefreshRows()
 		return m, nil
 	case kb.SortReset:
+		m.logTop.lineInput = ""
 		m.logTop.sortCol = logTopMetricREQ
 		m.logTop.sortAsc = false
 		m.logTopRefreshRows()
 		return m, nil
 	case "tab":
+		m.logTop.lineInput = ""
 		m.logTopCycleDrillTarget()
 		return m, nil
 	case "enter":
+		m.logTop.lineInput = ""
 		return m.logTopDrillIn(), nil
 	case kb.Filter:
+		m.logTop.lineInput = ""
 		m.logTop.filterActive = true
 		m.logTop.filterInput.Set(m.logTop.filterQuery)
 		return m, nil
 	case kb.Search:
+		m.logTop.lineInput = ""
 		m.logTop.searchActive = true
 		m.logTop.searchInput.Set(m.logTop.searchQuery)
 		return m, nil
 	case kb.NextMatch:
+		m.logTop.lineInput = ""
 		m.logTopFindMatch(true)
 		return m, nil
 	case kb.PrevMatch:
+		m.logTop.lineInput = ""
 		m.logTopFindMatch(false)
 		return m, nil
 	}
+	m.logTop.lineInput = ""
 	return m, nil
 }
 

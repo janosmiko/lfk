@@ -39,12 +39,13 @@ func TestLogTopHintBar_DrillHint(t *testing.T) {
 
 	// With method+path as groupBy and status/host available, next drill dim exists.
 	next := m.logTopNextDrillDim()
-	if next != "" {
-		hint := stripANSI(m.logTopHintBar())
-		// The enter hint should read "group by <dimname>".
-		if !strings.Contains(hint, "group by "+next) {
-			t.Errorf("hint bar should contain 'group by %s' when next drill dim is %q; got: %s", next, next, hint)
-		}
+	if next == "" {
+		t.Fatal("expected a next drill dim to exist after parsing traefik logs with multiple fields")
+	}
+	hint := stripANSI(m.logTopHintBar())
+	// The enter hint should read "group by <dimname>".
+	if !strings.Contains(hint, "group by "+next) {
+		t.Errorf("hint bar should contain 'group by %s' when next drill dim is %q; got: %s", next, next, hint)
 	}
 
 	// When all displayDims are pinned, next drill dim should be "" and enter shows "drill".

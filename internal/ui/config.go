@@ -561,8 +561,8 @@ var ConfigDimOverlay = true
 // thousands of lines at once.
 var ConfigLogTailLines = 100
 
-// ConfigLogTopDefaultProfile is the default Log Top parser: "auto" (detect),
-// "traefik-json", "json", or "logfmt".
+// ConfigLogTopDefaultProfile is the default Log Top parser:
+// auto | traefik-json | nginx-combined | ingress-nginx | envoy | json | logfmt.
 var ConfigLogTopDefaultProfile = "auto"
 
 // ConfigLogTailLinesShort is the tail line count used by the "Tail Logs" action

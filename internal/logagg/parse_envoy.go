@@ -39,7 +39,7 @@ func (envoyParser) Parse(line string) (Fields, bool) {
 	// Extract authority (host) and upstream (service) from quoted tokens.
 	// Default format quoted tokens: [request-line, XFF, UA, req-id, authority, upstream-host].
 	q := envoyQuotedRe.FindAllStringSubmatch(line, -1)
-	if len(q) >= 2 {
+	if len(q) >= 5 {
 		authority := q[len(q)-2][1]
 		upstream := q[len(q)-1][1]
 		if authority != "" && authority != "-" {

@@ -17,11 +17,13 @@ var nginxRe = regexp.MustCompile(`^\S+ \S+ \S+ \[[^\]]*\] "([A-Z]+) (\S+)[^"]*" 
 // format appends after the standard CLF fields.
 var nginxDurRe = regexp.MustCompile(`(\d+)ms\s*$`)
 
-// nginxRouterRe captures a Traefik router name from a quoted token containing
-// "@" (e.g. "websecure-gitlab@kubernetes"). Traefik router names always end
-// with @<provider> (kubernetes/docker/file). Referer and user-agent fields are
-// "-" and service URLs start with "http://", so they never match.
-var nginxRouterRe = regexp.MustCompile(`"([^"]*@[^"]*)"`)
+// nginxRouterRe captures a Traefik router name from the Traefik CLF extension.
+// It matches a quoted "@"-containing token (e.g. "websecure-gitlab@kubernetes")
+// that is followed by another quoted token and an optional "Nms" duration at the
+// end of the line. This tighter anchor prevents false positives from "@"-signs in
+// user-agent strings, which appear at a different position and are not followed
+// by the expected downstream-url and duration fields.
+var nginxRouterRe = regexp.MustCompile(`\d+ "([^"]*@[^"]*)" "[^"]*"(?:\s+\d+ms)?\s*$`)
 
 type nginxParser struct{}
 
