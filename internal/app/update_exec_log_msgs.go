@@ -132,7 +132,11 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 	} else {
 		m.logView.pendingContainerStart = false
 	}
-	m.appendRawLogLine(msg.line)
+	if m.mode == modeLogTop {
+		m.ingestLogTopLine(msg.line)
+	} else {
+		m.appendRawLogLine(msg.line)
+	}
 	// Bound the live buffer so a long-running follow doesn't grow memory
 	// without limit (issue #387). Trim the raw stream; offsets index the
 	// displayed projection, so without a filter we shift them by the dropped

@@ -433,6 +433,9 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Logs":
 		mdl, cmd := m.executeActionLogs()
 		return mdl, cmd, true
+	case "Log Top":
+		mdl, cmd := m.executeActionLogTop()
+		return mdl, cmd, true
 	case "Tail Logs":
 		mdl, cmd := m.executeActionTailLogs()
 		return mdl, cmd, true

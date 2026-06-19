@@ -377,6 +377,29 @@ Tail-first loading: Full Logs (`Ctrl+L` key or action menu `L`) load the last 10
 
 Auto-reconnect across init containers: when viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — e.g. as init containers transition. The reconnect is silent. After several consecutive empty reconnects the viewer stops retrying.
 
+## Log Top
+
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `T`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
+
+| Key | Action |
+|---|---|
+| `j` / `k` / `↓` / `↑` | Move cursor down / up |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page down / up |
+| `g` / `home` / `G` / `end` | Jump to top / bottom |
+| `5j` / `10G` | Count-prefixed motion (repeat / go to row N) |
+| `>` / `<` | Cycle sort column (dimensions + REQ / REQ/s / ERR% / 4XX / 5XX / AVG / p50 / p95 / p99 / MAX) |
+| `=` | Toggle sort direction (the active column shows ↑/↓) |
+| `-` | Reset sort to REQ descending |
+| `.` | Open group-by field picker (multi-select) |
+| `p` | Open profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto) |
+| `,` | Open column picker: show/hide and reorder dimension columns, show/hide metric columns |
+| `f` | Filter rows (matches dimension values) |
+| `/` | Search and jump to matching row |
+| `n` / `N` | Next / previous search match |
+| `Enter` | Drill into selected group (descends to the next unused dimension, marked `▸` in its column header) |
+| `Esc` / `q` | Pop drill level, or return to log viewer |
+
 ## Exec Mode (embedded terminal)
 
 `Ctrl+]` is a prefix key (like tmux's `Ctrl+b`). Press it once to activate, then press a follow-up key:

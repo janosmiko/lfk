@@ -291,7 +291,7 @@ type Model struct {
 	// Extracted from the formerly flat log* fields into one cohesive value;
 	// see logview.go.
 	logView logViewState
-
+	logTop  logTopState //nolint:unused // wired in later Log Top tasks
 	// logReaderInFlight records, per log channel, whether a one-shot reader
 	// goroutine is currently blocked on it. Switching into a logs tab used to
 	// arm a fresh reader unconditionally, accumulating duplicate readers (and

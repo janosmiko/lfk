@@ -15,7 +15,7 @@ import (
 // (with its own title/tab/hint bars) rather than the three-pane explorer.
 func isFullscreenRenderMode(mode viewMode) bool {
 	switch mode {
-	case modeYAML, modeLogs, modeDescribe, modeDiff, modeExec, modeExplain, modeEventViewer, modeObjectExplorer:
+	case modeYAML, modeLogs, modeDescribe, modeDiff, modeExec, modeExplain, modeEventViewer, modeObjectExplorer, modeLogTop:
 		return true
 	default:
 		return false
@@ -78,6 +78,8 @@ func (m Model) View() string {
 			content = m.viewEventViewer()
 		case modeObjectExplorer:
 			content = m.viewObjectExplorer()
+		case modeLogTop:
+			content = m.viewLogTop()
 		}
 
 		var parts []string

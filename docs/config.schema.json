@@ -130,6 +130,12 @@
       "description": "Deprecated alias for log_viewer.render_ansi. Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set false to strip them. Toggle at runtime with :set ansi / :set noansi.",
       "default": true
     },
+    "log_top_default_profile": {
+      "type": "string",
+      "enum": ["auto", "traefik-json", "ingress-nginx", "nginx-combined", "envoy", "json", "logfmt"],
+      "default": "auto",
+      "description": "Default Log Top parser profile. 'auto' detects the format from the loaded logs."
+    },
     "yaml_viewer": {
       "type": ["object", "null"],
       "description": "YAML viewer startup-toggle defaults.",
@@ -404,7 +410,8 @@
         "local_cluster_manager": { "type": "string" },
         "security_ignore_toggle": { "type": "string" },
         "security_badge_toggle": { "type": "string" },
-        "toggle_preview_logs": { "type": "string" }
+        "toggle_preview_logs": { "type": "string" },
+        "log_top": { "type": "string" }
       }
     },
     "view": {

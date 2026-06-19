@@ -189,6 +189,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "ctrl+c":
 		ret, cmd := m.handleLogKeyCtrlC()
 		return ret, cmd, true
+	case kb.LogTop:
+		ret, cmd := m.openLogTopFromViewer()
+		return ret, cmd, true
 	}
 	return m, nil, false
 }

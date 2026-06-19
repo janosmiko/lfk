@@ -44,6 +44,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 | API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
 | YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
 | Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
+| Log Top | <img src="./docs/imgs/log-top.png" alt="Log Top" width="600"> |
 | Helm integration | <img src="./docs/imgs/helm-integration.png" alt="Helm integration" width="600"> |
 | ArgoCD integration | <img src="./docs/imgs/argocd-integration.png" alt="ArgoCD integration" width="600"> |
 | ArgoCD AutoSync config | <img src="./docs/imgs/argocd-autosync.png" alt="ArgoCD auto-sync config" width="300"> |
@@ -114,6 +115,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Resource details** summary in split preview (toggle with `Shift+P`)
 - **List status summary** band pinned at the bottom of the children pane (like the resource-usage footer) when hovering a resource type in the resource-type list — always shows the resource count, plus a colored status rollup for kinds with a health signal (ArgoCD Application health/sync, Pod phase, workload ready ratios, Node readiness, Namespace/PV/PVC phase, Flux & cert-manager Ready) — plus a generic `.status.phase` or `.status.conditions` rollup for any other kind that surfaces one — so you can confirm a whole list is healthy without drilling in
 - **Inline log viewer** with streaming, search, live text filter (`f`: plain/`~`fuzzy/regex/`\`literal), severity filter (`i`/`o`: step the minimum level shown — INFO+/WARN+/ERROR+), line numbers, word wrap, follow mode (`F`), timestamps toggle, previous container logs, container filter, tail-first loading, line jump, structured preview pane (`P`: parses the selected line as JSON or logfmt, falls back to plain text), and automatic reconnect across init-container transitions (stays attached as each init container finishes and the next one starts)
+- **Log Top** — aggregate a resource's logs by parsed attributes (method, host, path, status, service, or JSON/logfmt keys) showing request counts, REQ/s, ERR%, 4xx/5xx counts, avg/max latency, and p50/p95/p99 percentiles (when duration data is present). Columns auto-fit the terminal width (wider = more columns, up to all of REQ, REQ/s, ERR%, P50/P95/P99, ERR, 4XX, 5XX, AVG, MAX, %); `,` toggles/reorders columns. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined access logs (nginx, Apache, Traefik default), JSON, and logfmt. Launch from the resource action menu ("Log Top") or press `T` in the open log viewer. In view: `g` group by, `p` profile, `,` columns (show/hide and reorder), `enter` drill down, sort key to re-sort, `esc` back.
 - **Inline describe view** with scrollable output
 - **Secret viewing/editing** with decode toggle (`Ctrl+S`) and dedicated editor (`e`)
 - **Embedded terminal** (PTY mode) for exec and shell with tab switching — PTY keeps running in background when switching tabs

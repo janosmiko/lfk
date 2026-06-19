@@ -200,6 +200,8 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "/", Desc: "filter"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayLogTopGroupBy, overlayLogTopProfile, overlayLogTopColumns:
+		return m.overlayHintBarLogTop()
 	case overlayClusterColor:
 		if m.clusterColorFilterMode {
 			return m.renderHints([]ui.HintEntry{

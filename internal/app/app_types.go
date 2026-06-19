@@ -31,6 +31,7 @@ const (
 	modeKubetris
 	modeCredits
 	modeObjectExplorer
+	modeLogTop
 )
 
 // overlayKind tracks which overlay is currently open.
@@ -85,6 +86,9 @@ const (
 	overlayCopyFormat         // Y-key copy-as picker (YAML / JSON / Table)
 	overlayShuttingDown       // non-interactive "graceful shutdown in progress" notice
 	overlayObjectExplorerFind // recursive key search over the object (r key)
+	overlayLogTopGroupBy      // multi-select group-by field picker for Log Top
+	overlayLogTopProfile      // single-select log format profile picker for Log Top
+	overlayLogTopColumns      // show/hide and reorder column picker for Log Top
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
@@ -558,6 +562,16 @@ type TabState struct {
 	explainCursor      int
 	explainScroll      int
 	explainSearchQuery string // persisted search query for n/N navigation
+
+	// Log Top aggregation state (per-tab).
+	logTopProfile     string
+	logTopGroupBy     []string
+	logTopSortCol     string
+	logTopSortAsc     bool
+	logTopAutoProf    bool
+	logTopFilterQuery string
+	logTopColOrder    []string
+	logTopColHidden   []string // serialized (sorted key) form of the runtime colHidden map[string]bool
 
 	// Security feature state — per-tab so two tabs pointing at different
 	// clusters keep their own source manager and availability map.

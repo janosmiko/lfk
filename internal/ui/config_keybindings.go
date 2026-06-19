@@ -144,6 +144,11 @@ type Keybindings struct {
 	// and the dispatcher gates accordingly. The fullscreen log viewer
 	// (kb.Logs) uses "ctrl+l" so the plain "L" is free for this toggle.
 	TogglePreviewLogs string `json:"toggle_preview_logs" yaml:"toggle_preview_logs"`
+
+	// LogTop opens the Log Top aggregation viewer directly from the open log
+	// viewer over the lines already buffered. "T" is free in modeLogs
+	// (ThemeSelector's "T" only dispatches in explorer/error-log modes).
+	LogTop string `json:"log_top" yaml:"log_top"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -232,6 +237,9 @@ func DefaultKeybindings() Keybindings {
 		// (gated in handleExplorerNavKey). The fullscreen log viewer
 		// (kb.Logs) is "ctrl+l".
 		TogglePreviewLogs: "L",
+
+		// Log Top from log viewer. "T" is free in modeLogs.
+		LogTop: "T",
 	}
 }
 
