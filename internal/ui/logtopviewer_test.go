@@ -170,3 +170,81 @@ func TestRenderLogTopView_NoLineOverflow(t *testing.T) {
 		}
 	}
 }
+
+// TestLogTopColumns_WidthAutoFit verifies the renderer's overflow-drop loop:
+// a narrow terminal keeps only high-priority columns (REQ, REQ/s, ERR%, P50)
+// and drops low-priority ones (%, MAX); an ultrawide terminal shows all columns.
+func TestLogTopColumns_WidthAutoFit(t *testing.T) {
+	dims := []string{"method", "path"}
+	// All 12 metrics in priority order (matching logTopAllMetrics with latency + http profile).
+	allMetrics := []string{
+		"REQ", "REQ/s", "ERR%",
+		"P50", "P95", "P99",
+		"ERR", "4XX", "5XX",
+		"AVG", "MAX",
+		"%",
+	}
+	rows := []LogTopRow{
+		{
+			Dims:      map[string]string{"method": "GET", "path": "/api/users"},
+			Count:     1000,
+			ErrCount:  10,
+			Pct:       50.0,
+			P50:       5,
+			P95:       13,
+			P99:       42,
+			Avg:       7.5,
+			Max:       100.0,
+			Status4xx: 3,
+			Status5xx: 7,
+		},
+	}
+
+	// --- Narrow terminal (80 cols) ---
+	narrowOut := stripANSI(RenderLogTopView("title", dims, allMetrics, rows, 2.0, 1000, 0, 0, "hint", 80, 30))
+
+	// Low-priority columns must be absent (dropped by overflow-drop).
+	// "%" is the bare percent column; it must not appear as a standalone header word.
+	// Note: "ERR%" is a different column and will be present — we check for " % " with
+	// surrounding whitespace or at line boundaries to avoid matching "ERR%".
+	headerLine := ""
+	for line := range strings.SplitSeq(narrowOut, "\n") {
+		if strings.Contains(line, "REQ") {
+			headerLine = line
+			break
+		}
+	}
+	// "MAX" is straightforward — it won't appear inside any other column name.
+	if strings.Contains(headerLine, "MAX") {
+		t.Errorf("narrow (80): expected %q to be dropped from header, but found it: %q", "MAX", headerLine)
+	}
+	// "%" column: check it does NOT appear as a standalone word (surrounded by spaces or borders).
+	// We check that " %  " or "  % " (padded standalone) is absent, not just "%".
+	if strings.Contains(headerLine, " %  ") || strings.Contains(headerLine, "  % ") || strings.HasSuffix(strings.TrimRight(headerLine, " │"), " %") {
+		t.Errorf("narrow (80): expected bare %% column to be dropped from header, but found it: %q", headerLine)
+	}
+
+	// High-priority columns must be present.
+	for _, present := range []string{"REQ", "REQ/s", "ERR%"} {
+		if !strings.Contains(narrowOut, present) {
+			t.Errorf("narrow (80): expected high-priority column %q to be present", present)
+		}
+	}
+
+	// No line exceeds the width.
+	for line := range strings.SplitSeq(narrowOut, "\n") {
+		if w := lipgloss.Width(line); w > 80 {
+			t.Errorf("narrow (80): line exceeds terminal width (%d): %q", w, line)
+		}
+	}
+
+	// --- Ultrawide terminal (260 cols) ---
+	wideOut := stripANSI(RenderLogTopView("title", dims, allMetrics, rows, 2.0, 1000, 0, 0, "hint", 260, 30))
+
+	// All metric headers must be present.
+	for _, col := range allMetrics {
+		if !strings.Contains(wideOut, col) {
+			t.Errorf("ultrawide (260): expected column %q to be present, but not found", col)
+		}
+	}
+}

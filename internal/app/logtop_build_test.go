@@ -183,8 +183,10 @@ func BenchmarkLogTopIngest(b *testing.B) {
 	}
 }
 
-// TestLogTopDefaultHiddenMetrics verifies the curated default-hidden seeding.
-func TestLogTopDefaultHiddenMetrics(t *testing.T) {
+// TestLogTopAllMetrics_PriorityOrder verifies that logTopAllMetrics returns
+// columns in priority order (highest priority first, % last) so the
+// renderer's overflow-drop removes the least-useful columns first.
+func TestLogTopAllMetrics_PriorityOrder(t *testing.T) {
 	orig := ui.ConfigLogTopDefaultProfile
 	ui.ConfigLogTopDefaultProfile = "auto"
 	defer func() { ui.ConfigLogTopDefaultProfile = orig }()
@@ -197,28 +199,34 @@ func TestLogTopDefaultHiddenMetrics(t *testing.T) {
 	}
 	m.logTopResetAndParse()
 
-	// colInit must be set after first build.
-	if !m.logTop.colInit {
-		t.Error("colInit should be true after first logTopRebuildRows")
-	}
-	// Default hidden: %, ERR, 4XX, 5XX, AVG, MAX.
-	hidden := m.logTop.colHidden
-	for _, id := range []string{logTopMetricPct, logTopMetricERR, logTopMetric4xx, logTopMetric5xx, logTopMetricAvg, logTopMetricMax} {
-		if !hidden[id] {
-			t.Errorf("metric %q should be hidden by default", id)
+	// colHidden must be empty (or nil) — all columns are candidates.
+	for _, id := range m.logTopAllMetrics() {
+		if m.logTop.colHidden[id] {
+			t.Errorf("metric %q should NOT be hidden by default (fresh model shows all)", id)
 		}
 	}
-	// Default visible: REQ, REQ/s, ERR%.
-	for _, id := range []string{logTopMetricREQ, logTopMetricRPS, logTopMetricErrRate} {
-		if hidden[id] {
-			t.Errorf("metric %q should be visible by default", id)
+
+	// logTopVisibleMetrics must equal logTopAllMetrics (nothing hidden).
+	all := m.logTopAllMetrics()
+	visible := m.logTopVisibleMetrics()
+	if len(visible) != len(all) {
+		t.Fatalf("visible=%v, want all=%v", visible, all)
+	}
+	for i, id := range all {
+		if visible[i] != id {
+			t.Errorf("visible[%d]=%q, want %q", i, visible[i], id)
 		}
 	}
-	// Second rebuild must NOT re-seed (colInit guard).
-	m.logTop.colHidden[logTopMetricREQ] = true // simulate user hiding REQ
-	m.logTopRebuildRows()
-	if !m.logTop.colHidden[logTopMetricREQ] {
-		t.Error("colInit guard failed: second rebuild must not re-seed colHidden")
+
+	// Priority order: REQ must be first, % must be last.
+	if len(all) == 0 {
+		t.Fatal("logTopAllMetrics returned empty slice")
+	}
+	if all[0] != logTopMetricREQ {
+		t.Errorf("first metric = %q, want REQ (highest priority)", all[0])
+	}
+	if all[len(all)-1] != logTopMetricPct {
+		t.Errorf("last metric = %q, want %% (lowest priority, dropped first)", all[len(all)-1])
 	}
 }
 
@@ -236,7 +244,6 @@ func TestCmpLatency_NALast(t *testing.T) {
 		`2026-06-18T10:00:02Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/c","Duration":100000000}`,
 	}
 	m.logTopResetAndParse()
-	m.logTop.colInit = true // skip re-seeding to avoid affecting sort
 
 	// Sort ascending by P95 - no-latency row must be last.
 	m.logTop.sortCol = logTopMetricP95
@@ -303,7 +310,6 @@ func TestLogTopMetricErrrateSort(t *testing.T) {
 		)
 	}
 	m.logTopResetAndParse()
-	m.logTop.colInit = true
 
 	m.logTop.sortCol = logTopMetricErrRate
 	m.logTop.sortAsc = false // descending: highest error rate first

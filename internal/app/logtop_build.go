@@ -24,11 +24,6 @@ const (
 	logTopMetricMax     = "MAX"
 )
 
-// logTopDefaultHiddenMetrics are hidden on fresh state; the user un-hides via ','.
-var logTopDefaultHiddenMetrics = []string{
-	logTopMetricPct, logTopMetricERR, logTopMetric4xx, logTopMetric5xx, logTopMetricAvg, logTopMetricMax,
-}
-
 // httpProfile reports whether kind is an HTTP-access-log profile.
 func httpProfile(kind logagg.ProfileKind) bool {
 	return kind == logagg.ProfileTraefikJSON || kind == logagg.ProfileNginx ||
@@ -199,15 +194,22 @@ func (m *Model) logTopVisibleDims() []string {
 	return out
 }
 
-// logTopAllMetrics returns the metric column ids available given latency data.
+// logTopAllMetrics returns the metric column ids in priority order (highest
+// priority first). The renderer's overflow-drop loop removes from the end, so
+// the last entries are dropped first on narrow terminals.
 func (m *Model) logTopAllMetrics() []string {
-	mets := []string{logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR, logTopMetricErrRate}
+	mets := []string{logTopMetricREQ, logTopMetricRPS, logTopMetricErrRate}
+	if m.logTop.hasLatency {
+		mets = append(mets, logTopMetricP50, logTopMetricP95, logTopMetricP99)
+	}
+	mets = append(mets, logTopMetricERR)
 	if httpProfile(m.logTop.profile) {
 		mets = append(mets, logTopMetric4xx, logTopMetric5xx)
 	}
 	if m.logTop.hasLatency {
-		mets = append(mets, logTopMetricAvg, logTopMetricP50, logTopMetricP95, logTopMetricP99, logTopMetricMax)
+		mets = append(mets, logTopMetricAvg, logTopMetricMax)
 	}
+	mets = append(mets, logTopMetricPct)
 	return mets
 }
 
@@ -227,17 +229,6 @@ func (m *Model) logTopVisibleMetrics() []string {
 // change that invalidates incremental accumulation (group-by, drill, profile,
 // or a parsed trim).
 func (m *Model) logTopRebuildRows() {
-	// Seed default-hidden metrics once per fresh state. The colInit guard
-	// prevents re-seeding over user choices when rows are rebuilt later.
-	if !m.logTop.colInit {
-		if m.logTop.colHidden == nil {
-			m.logTop.colHidden = make(map[string]bool)
-		}
-		for _, id := range logTopDefaultHiddenMetrics {
-			m.logTop.colHidden[id] = true
-		}
-		m.logTop.colInit = true
-	}
 	m.logTop.displayDims = m.computeDisplayDims()
 	m.logTop.hasLatency = m.computeHasLatency()
 	m.logTopReconcileColOrder()
