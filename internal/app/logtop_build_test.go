@@ -50,6 +50,38 @@ func TestLogTopResetAndParse_PrefixedCLF(t *testing.T) {
 	}
 }
 
+// TestLogTop_RedetectsWhenAccessLogsArriveLater guards the real-world case: a
+// Traefik deployment emits operational/console lines (which look like logfmt)
+// before/among its JSON access logs. Detection must re-evaluate as lines stream
+// in so it does not lock the wrong profile based on an early non-access line.
+func TestLogTop_RedetectsWhenAccessLogsArriveLater(t *testing.T) {
+	orig := ui.ConfigLogTopDefaultProfile
+	ui.ConfigLogTopDefaultProfile = "auto"
+	defer func() { ui.ConfigLogTopDefaultProfile = orig }()
+
+	m := &Model{}
+	m.mode = modeLogTop
+	// First line is an operational/error line that the logfmt matcher catches.
+	m.ingestLogTopLine(`2026-06-19T03:41:30Z level=error msg="tcp" error="conn reset"`)
+	if m.logTop.profile != logagg.ProfileLogfmt {
+		t.Fatalf("first line: profile = %q, want logfmt", m.logTop.profile)
+	}
+	// Then JSON access logs stream in.
+	for range 5 {
+		m.ingestLogTopLine(`2026-06-19T03:41:31Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/api/x"}`)
+	}
+	if m.logTop.profile != logagg.ProfileTraefikJSON {
+		t.Fatalf("after access logs streamed: profile = %q, want traefik-json (must re-detect)", m.logTop.profile)
+	}
+	// Grouping re-seeded to method+path for the new format, and rows appear.
+	if len(m.logTop.groupBy) != 2 || m.logTop.groupBy[0] != logagg.FieldMethod || m.logTop.groupBy[1] != logagg.FieldPath {
+		t.Errorf("groupBy = %v, want [method path]", m.logTop.groupBy)
+	}
+	if len(m.logTop.rows) == 0 {
+		t.Fatal("expected request rows after re-detecting traefik-json")
+	}
+}
+
 func TestLogTopResetAndParse_Traefik(t *testing.T) {
 	m := &Model{}
 	m.logView.rawLines = []string{

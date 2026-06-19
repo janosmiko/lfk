@@ -67,6 +67,15 @@ func (m *Model) logTopResetAndParse() {
 	} else {
 		m.logTop.autoProf = false
 	}
+	// When auto-detection settles on a different format than before (e.g. the
+	// first lines were operational/console logs and access logs have since
+	// arrived), drop the now-stale grouping and drill so they re-seed for the
+	// new format.
+	if kind != m.logTop.profile {
+		m.logTop.groupBy = nil
+		m.logTop.drillStack = nil
+		m.logTop.cursor = 0
+	}
 	m.logTop.profile = kind
 	m.logTop.parsed = m.logTop.parsed[:0]
 	m.logTop.unmatched = 0
@@ -122,12 +131,25 @@ func (m *Model) logTopParseInto(line string) {
 	}
 }
 
+// logTopDetectWindow is how many leading lines are sampled for auto-detection.
+// While auto-detecting, the profile is re-evaluated on every new line until the
+// buffer reaches this size, so an early non-access line (Traefik logs
+// operational/error lines that resemble logfmt) cannot lock the wrong profile
+// before the JSON access logs arrive. Matches logTopSample's head window.
+const logTopDetectWindow = 200
+
 // ingestLogTopLine appends a streamed raw line to rawLines and updates the
-// aggregation. On the first line it detects the profile and seeds groupBy.
+// aggregation. While auto-detecting it re-detects over the growing buffer; once
+// the format is settled it folds each new line in incrementally.
 func (m *Model) ingestLogTopLine(line string) {
 	m.logView.rawLines = append(m.logView.rawLines, line)
-	if m.logTop.profile == "" {
-		m.logTopResetAndParse() // first line: detect + seed groupBy + build
+	// Re-detect while auto-detecting AND still on a generic profile (logfmt/json):
+	// keep looking for a structured HTTP format until one is found or the sample
+	// window fills. Once a structured profile (traefik/nginx/envoy) is detected we
+	// are confident and stop re-detecting, so there is no per-line re-parse churn.
+	if m.logTop.profile == "" ||
+		(m.logTop.autoProf && !httpProfile(m.logTop.profile) && len(m.logView.rawLines) <= logTopDetectWindow) {
+		m.logTopResetAndParse() // detect/re-detect, seed groupBy, rebuild
 		return
 	}
 	m.logTopAddLine(line)
