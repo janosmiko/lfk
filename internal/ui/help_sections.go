@@ -426,8 +426,8 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{"", "Launched from the action menu (\"Log Top\", quick-key T) or by pressing " + kb.LogTop + " in the open log viewer. Aggregates logs by parsed attributes. Columns: REQ, REQ/s, %, ERR; P95/P99 latency (ms) shown when duration data is present."},
 				{"j/k", "Navigate rows"},
-				{"G", "Jump to bottom"},
-				{"g", "Group-by field picker (multi-select)"},
+				{"g/G", "Jump to top / bottom"},
+				{"b", "Group-by field picker (multi-select)"},
 				{"p", "Profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto)"},
 				{",", "Column picker: show/hide and reorder dimension columns, show/hide metric columns"},
 				{">/< =  -", "Cycle sort column / flip direction / reset"},

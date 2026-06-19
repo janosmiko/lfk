@@ -386,11 +386,12 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `j` / `k` / `↓` / `↑` | Move cursor down / up |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page down / up |
-| `home` / `G` / `end` | Jump to top / bottom |
+| `g` / `home` / `G` / `end` | Jump to top / bottom |
+| `5j` / `10G` | Count-prefixed motion (repeat / go to row N) |
 | `>` / `<` | Cycle sort column (dimensions + REQ / REQ/s / ERR% / 4XX / 5XX / AVG / p50 / p95 / p99 / MAX) |
 | `=` | Toggle sort direction (the active column shows ↑/↓) |
 | `-` | Reset sort to REQ descending |
-| `g` | Open group-by field picker (multi-select) |
+| `b` | Open group-by field picker (multi-select) |
 | `p` | Open profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto) |
 | `,` | Open column picker: show/hide and reorder dimension columns, show/hide metric columns |
 | `f` | Filter rows (matches dimension values) |

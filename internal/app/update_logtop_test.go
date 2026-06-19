@@ -68,12 +68,27 @@ func TestLogTopKey_EscRebuildsLogView(t *testing.T) {
 	}
 }
 
-func TestLogTopKey_GOpensGroupByOverlay(t *testing.T) {
+func TestLogTopKey_BOpensGroupByOverlay(t *testing.T) {
 	m := newLogTopModel(t)
-	mdl, _ := m.handleLogTopKey(key("g"))
+	mdl, _ := m.handleLogTopKey(key("b"))
 	got := mdl.(Model)
 	if got.overlay != overlayLogTopGroupBy {
-		t.Fatalf("pressing g: overlay = %v, want overlayLogTopGroupBy", got.overlay)
+		t.Fatalf("pressing b: overlay = %v, want overlayLogTopGroupBy", got.overlay)
+	}
+}
+
+// TestLogTopKey_GJumpsToTop verifies vim g = jump-to-top (was repurposed for
+// group-by before; group-by moved to b).
+func TestLogTopKey_GJumpsToTop(t *testing.T) {
+	m := newLogTopModel(t)
+	m.logTop.cursor = len(m.logTop.rows) - 1
+	mdl, _ := m.handleLogTopKey(key("g"))
+	got := mdl.(Model)
+	if got.overlay != overlayNone {
+		t.Fatalf("pressing g should not open an overlay, got %v", got.overlay)
+	}
+	if got.logTop.cursor != 0 {
+		t.Fatalf("pressing g: cursor = %d, want 0 (jump to top)", got.logTop.cursor)
 	}
 }
 

@@ -81,11 +81,11 @@ func (m Model) logTopHintBar() string {
 		enterDesc = "group by " + next
 	}
 	hints := []ui.HintEntry{
-		{Key: "j/k", Desc: "navigate"},
+		{Key: "j/k g/G", Desc: "navigate"},
 		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort col"},
 		{Key: kb.SortFlip, Desc: "flip sort"},
 		{Key: kb.SortReset, Desc: "reset sort"},
-		{Key: "g", Desc: "group by"},
+		{Key: "b", Desc: "group by"},
 		{Key: "p", Desc: "profile"},
 		{Key: kb.ColumnToggle, Desc: "columns"},
 		{Key: kb.Filter, Desc: "filter"},
