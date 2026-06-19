@@ -182,3 +182,138 @@ func BenchmarkLogTopIngest(b *testing.B) {
 		m.logTopAddLine(line)
 	}
 }
+
+// TestLogTopDefaultHiddenMetrics verifies the curated default-hidden seeding.
+func TestLogTopDefaultHiddenMetrics(t *testing.T) {
+	orig := ui.ConfigLogTopDefaultProfile
+	ui.ConfigLogTopDefaultProfile = "auto"
+	defer func() { ui.ConfigLogTopDefaultProfile = orig }()
+
+	m := &Model{}
+	// Traefik JSON lines with latency so hasLatency=true and httpProfile=true.
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/a","Duration":10000000}`,
+		`2026-06-18T10:00:01Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/a","Duration":20000000}`,
+	}
+	m.logTopResetAndParse()
+
+	// colInit must be set after first build.
+	if !m.logTop.colInit {
+		t.Error("colInit should be true after first logTopRebuildRows")
+	}
+	// Default hidden: %, ERR, 4XX, 5XX, AVG, MAX.
+	hidden := m.logTop.colHidden
+	for _, id := range []string{logTopMetricPct, logTopMetricERR, logTopMetric4xx, logTopMetric5xx, logTopMetricAvg, logTopMetricMax} {
+		if !hidden[id] {
+			t.Errorf("metric %q should be hidden by default", id)
+		}
+	}
+	// Default visible: REQ, REQ/s, ERR%.
+	for _, id := range []string{logTopMetricREQ, logTopMetricRPS, logTopMetricErrRate} {
+		if hidden[id] {
+			t.Errorf("metric %q should be visible by default", id)
+		}
+	}
+	// Second rebuild must NOT re-seed (colInit guard).
+	m.logTop.colHidden[logTopMetricREQ] = true // simulate user hiding REQ
+	m.logTopRebuildRows()
+	if !m.logTop.colHidden[logTopMetricREQ] {
+		t.Error("colInit guard failed: second rebuild must not re-seed colHidden")
+	}
+}
+
+// TestCmpLatency_NALast verifies that n/a rows sort last in both directions.
+func TestCmpLatency_NALast(t *testing.T) {
+	orig := ui.ConfigLogTopDefaultProfile
+	ui.ConfigLogTopDefaultProfile = "auto"
+	defer func() { ui.ConfigLogTopDefaultProfile = orig }()
+
+	m := &Model{}
+	// /a has 13ms duration, /b has no duration, /c has 100ms.
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/a","Duration":13000000}`,
+		`2026-06-18T10:00:01Z {"DownstreamStatus":200,"RequestMethod":"POST","RequestPath":"/b"}`,
+		`2026-06-18T10:00:02Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/c","Duration":100000000}`,
+	}
+	m.logTopResetAndParse()
+	m.logTop.colInit = true // skip re-seeding to avoid affecting sort
+
+	// Sort ascending by P95 - no-latency row must be last.
+	m.logTop.sortCol = logTopMetricP95
+	m.logTop.sortAsc = true
+	m.logTopRefreshRows()
+
+	lastIdx := len(m.logTop.rows) - 1
+	foundNA := false
+	for i := range m.logTop.rows {
+		if m.logTop.rows[i].P95 < 0 {
+			foundNA = true
+			if i != lastIdx {
+				t.Errorf("ascending P95: no-latency row is at index %d, want last (%d)", i, lastIdx)
+			}
+		}
+	}
+	if !foundNA {
+		t.Error("no row with P95=-1 found")
+	}
+
+	// Sort descending by P95 - no-latency row must still be last.
+	m.logTop.sortAsc = false
+	m.logTopRefreshRows()
+
+	lastIdx = len(m.logTop.rows) - 1
+	for i := range m.logTop.rows {
+		if m.logTop.rows[i].P95 < 0 {
+			if i != lastIdx {
+				t.Errorf("descending P95: no-latency row is at index %d, want last (%d)", i, lastIdx)
+			}
+		}
+	}
+}
+
+// TestLogTopMetricErrrateSort verifies ERR% sort uses rate not raw count.
+func TestLogTopMetricErrrateSort(t *testing.T) {
+	orig := ui.ConfigLogTopDefaultProfile
+	ui.ConfigLogTopDefaultProfile = "auto"
+	defer func() { ui.ConfigLogTopDefaultProfile = orig }()
+
+	m := &Model{}
+	// /a: 10 requests, 9 errors -> 90% err rate
+	m.logView.rawLines = []string{
+		`2026-06-18T10:00:00Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:01Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:02Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:03Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:04Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:05Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:06Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:07Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:08Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+		`2026-06-18T10:00:09Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/a"}`,
+	}
+	// /b: 100 requests, 50 errors -> 50% err rate
+	for range 50 {
+		m.logView.rawLines = append(m.logView.rawLines,
+			`2026-06-18T10:00:10Z {"DownstreamStatus":500,"RequestMethod":"GET","RequestPath":"/b"}`,
+		)
+	}
+	for range 50 {
+		m.logView.rawLines = append(m.logView.rawLines,
+			`2026-06-18T10:00:10Z {"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/b"}`,
+		)
+	}
+	m.logTopResetAndParse()
+	m.logTop.colInit = true
+
+	m.logTop.sortCol = logTopMetricErrRate
+	m.logTop.sortAsc = false // descending: highest error rate first
+	m.logTopRefreshRows()
+
+	if len(m.logTop.rows) < 2 {
+		t.Fatalf("expected at least 2 rows, got %d", len(m.logTop.rows))
+	}
+	// /a (90%) should be first (higher rate), /b (50%) second.
+	if m.logTop.rows[0].Values[1] != "/a" {
+		t.Errorf("first row path = %v, want /a (90%% err rate)", m.logTop.rows[0].Values)
+	}
+}

@@ -58,6 +58,10 @@ type logTopState struct {
 	colOrder []string
 	// colHidden is the set of hidden column ids (dimension OR metric).
 	colHidden map[string]bool
+	// colInit is true once the default-hidden metrics have been seeded into
+	// colHidden. Persisted per tab so a restored tab does not re-seed over
+	// the user's choices.
+	colInit bool
 	// colSnapOrder/colSnapHidden snapshot colOrder/colHidden when the
 	// column overlay opens so esc can cancel without persisting changes.
 	colSnapOrder  []string
@@ -121,6 +125,7 @@ func (m *Model) saveLogTopToTab(t *TabState) {
 	t.logTopAutoProf = m.logTop.autoProf
 	t.logTopFilterQuery = m.logTop.filterQuery
 	t.logTopColOrder = append([]string(nil), m.logTop.colOrder...)
+	t.logTopColInit = m.logTop.colInit
 	hidden := make([]string, 0, len(m.logTop.colHidden))
 	for k := range m.logTop.colHidden {
 		hidden = append(hidden, k)
@@ -138,6 +143,7 @@ func (m *Model) loadLogTopFromTab(t TabState) {
 		autoProf:    t.logTopAutoProf,
 		filterQuery: t.logTopFilterQuery,
 		colOrder:    append([]string(nil), t.logTopColOrder...),
+		colInit:     t.logTopColInit,
 	}
 	if len(t.logTopColHidden) > 0 {
 		m.logTop.colHidden = make(map[string]bool, len(t.logTopColHidden))

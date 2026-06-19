@@ -144,4 +144,29 @@ func TestRenderLogTopView_NoLineOverflow(t *testing.T) {
 			}
 		}
 	}
+	// Full 12-metric set: verify overflow-drop keeps lines within bounds.
+	allMetrics := []string{"REQ", "REQ/s", "%", "ERR", "ERR%", "4XX", "5XX", "AVG", "P50", "P95", "P99", "MAX"}
+	fullRows := []LogTopRow{
+		{
+			Dims:      map[string]string{"method": "GET", "path": "/api/users/with/a/fairly/long/path/segment", "status": "200"},
+			Count:     1180,
+			ErrCount:  12,
+			Pct:       23.6,
+			P50:       5,
+			P95:       13,
+			P99:       610,
+			Avg:       42.5,
+			Max:       500.0,
+			Status4xx: 3,
+			Status5xx: 9,
+		},
+	}
+	for _, width := range []int{80, 100, 120, 200} {
+		out := RenderLogTopView("Log Top: deploy/web", dims, allMetrics, fullRows, 4.7, 5000, 0, 0, "hint", width, 30)
+		for line := range strings.SplitSeq(stripANSI(out), "\n") {
+			if w := lipgloss.Width(line); w > width {
+				t.Errorf("full-metrics width=%d: line exceeds terminal width (%d): %q", width, w, line)
+			}
+		}
+	}
 }

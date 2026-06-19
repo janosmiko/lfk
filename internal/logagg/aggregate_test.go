@@ -211,3 +211,49 @@ func TestPercentileFromHist_ZeroTotal(t *testing.T) {
 		t.Errorf("got %v, want -1 for zero total", got)
 	}
 }
+
+// TestAggregation_AvgMaxStatus tests Avg, Max, Status4xx, Status5xx fields.
+func TestAggregation_AvgMaxStatus(t *testing.T) {
+	a := NewAggregation([]string{FieldMethod, FieldPath}, nil, IsHTTPError)
+
+	// Group A: durations {10, 10, 20, 500} -> avg=135, max=500
+	for _, d := range []string{"10", "10", "20", "500"} {
+		a.Add(Fields{FieldMethod: "GET", FieldPath: "/a", FieldStatus: "200", FieldDurationMS: d})
+	}
+	// Group B: statuses {200, 404, 404, 503} -> 4xx=2, 5xx=1
+	for _, s := range []string{"200", "404", "404", "503"} {
+		a.Add(Fields{FieldMethod: "POST", FieldPath: "/b", FieldStatus: s})
+	}
+
+	rows := a.Rows(SortReq)
+	rowsByPath := map[string]Row{}
+	for _, r := range rows {
+		rowsByPath[r.Values[1]] = r
+	}
+
+	ga := rowsByPath["/a"]
+	wantAvg := (10.0 + 10.0 + 20.0 + 500.0) / 4
+	if ga.Avg < wantAvg-0.1 || ga.Avg > wantAvg+0.1 {
+		t.Errorf("/a Avg = %v, want ~%.1f", ga.Avg, wantAvg)
+	}
+	if ga.Max != 500 {
+		t.Errorf("/a Max = %v, want 500", ga.Max)
+	}
+	if ga.Status4xx != 0 {
+		t.Errorf("/a Status4xx = %d, want 0", ga.Status4xx)
+	}
+
+	gb := rowsByPath["/b"]
+	if gb.Status4xx != 2 {
+		t.Errorf("/b Status4xx = %d, want 2 (two 404s)", gb.Status4xx)
+	}
+	if gb.Status5xx != 1 {
+		t.Errorf("/b Status5xx = %d, want 1 (one 503)", gb.Status5xx)
+	}
+	if gb.Avg != -1 {
+		t.Errorf("/b Avg = %v, want -1 (no duration data)", gb.Avg)
+	}
+	if gb.Max != -1 {
+		t.Errorf("/b Max = %v, want -1 (no duration data)", gb.Max)
+	}
+}

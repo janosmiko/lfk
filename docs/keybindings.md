@@ -379,7 +379,7 @@ Auto-reconnect across init containers: when viewing logs for a single Pod in all
 
 ## Log Top
 
-Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns: REQ (count), REQ/s, % (share), ERR (error count), P95/P99 latency in ms (shown when duration data is present). Launch from the resource action menu ("Log Top", quick-key `T`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns: REQ, REQ/s, ERR%, p50/p95/p99, and optionally %, ERR, 4xx, 5xx, AVG, MAX (default view: REQ, REQ/s, ERR%, p50/p95/p99; `,` toggles the rest). Launch from the resource action menu ("Log Top", quick-key `T`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
 
 | Key | Action |
 |---|---|
@@ -387,7 +387,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page down / up |
 | `home` / `G` / `end` | Jump to top / bottom |
-| `>` / `<` | Cycle sort column (dimensions + REQ / REQ/s / % / ERR / P95 / P99) |
+| `>` / `<` | Cycle sort column (dimensions + REQ / REQ/s / ERR% / 4XX / 5XX / AVG / p50 / p95 / p99 / MAX) |
 | `=` | Toggle sort direction (the active column shows ↑/↓) |
 | `-` | Reset sort to REQ descending |
 | `g` | Open group-by field picker (multi-select) |

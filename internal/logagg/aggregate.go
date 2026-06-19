@@ -61,26 +61,34 @@ const (
 
 // Row is one aggregated group.
 type Row struct {
-	Values   []string // group-key values, in groupBy order
-	Count    int
-	ErrCount int
-	Dims     map[string]string // per-dimension display string: uniform value, or "*N", or "*50+"
-	P50      float64           // approximate p50 latency in ms; -1 when no duration data
-	P95      float64           // approximate p95 latency in ms; -1 when no duration data
-	P99      float64           // approximate p99 latency in ms; -1 when no duration data
-	id       string            // cached "\x00"-joined Values, for a stable allocation-free sort tiebreak
+	Values    []string // group-key values, in groupBy order
+	Count     int
+	ErrCount  int
+	Dims      map[string]string // per-dimension display string: uniform value, or "*N", or "*50+"
+	P50       float64           // approximate p50 latency in ms; -1 when no duration data
+	P95       float64           // approximate p95 latency in ms; -1 when no duration data
+	P99       float64           // approximate p99 latency in ms; -1 when no duration data
+	Avg       float64           // mean latency in ms; -1 when no duration data
+	Max       float64           // max latency in ms; -1 when no duration data
+	Status4xx int               // count of HTTP 4xx responses
+	Status5xx int               // count of HTTP 5xx responses
+	id        string            // cached "\x00"-joined Values, for a stable allocation-free sort tiebreak
 }
 
 // groupRow is the internal per-group accumulator including dim tracking.
 type groupRow struct {
-	values   []string
-	id       string
-	count    int
-	errCount int
-	dimSets  map[string]map[string]struct{} // per-dim distinct values (capped at maxDimDistinct)
-	dimFirst map[string]string              // first value seen per dim (for the uniform case)
-	durHist  []int                          // latency histogram (lazily allocated, len = len(durBucketsMs)+1)
-	durTotal int                            // number of lines with a valid duration
+	values    []string
+	id        string
+	count     int
+	errCount  int
+	dimSets   map[string]map[string]struct{} // per-dim distinct values (capped at maxDimDistinct)
+	dimFirst  map[string]string              // first value seen per dim (for the uniform case)
+	durHist   []int                          // latency histogram (lazily allocated, len = len(durBucketsMs)+1)
+	durTotal  int                            // number of lines with a valid duration
+	durSum    float64                        // sum of duration values in ms (for mean)
+	durMax    float64                        // max duration value in ms
+	status4xx int                            // count of HTTP 4xx responses
+	status5xx int                            // count of HTTP 5xx responses
 }
 
 // Aggregation accumulates grouped counts. Memory is bounded by the number of
@@ -126,7 +134,7 @@ func (a *Aggregation) Add(f Fields) {
 	}
 	a.total++
 
-	// Accumulate latency histogram.
+	// Accumulate latency histogram and sum/max for mean/max metrics.
 	if ds := f[FieldDurationMS]; ds != "" {
 		if v, err := strconv.ParseFloat(ds, 64); err == nil {
 			if r.durHist == nil {
@@ -134,6 +142,19 @@ func (a *Aggregation) Add(f Fields) {
 			}
 			r.durHist[durBucketIndex(v)]++
 			r.durTotal++
+			r.durSum += v
+			if v > r.durMax {
+				r.durMax = v
+			}
+		}
+	}
+
+	// Track HTTP status class counts.
+	if code, err := strconv.Atoi(f[FieldStatus]); err == nil {
+		if code >= 400 && code < 500 {
+			r.status4xx++
+		} else if code >= 500 && code < 600 {
+			r.status5xx++
 		}
 	}
 
@@ -181,15 +202,27 @@ func (a *Aggregation) Rows(key SortKey) []Row {
 				dims[d] = "*" + strconv.Itoa(n)
 			}
 		}
+		avg := -1.0
+		if gr.durTotal > 0 {
+			avg = gr.durSum / float64(gr.durTotal)
+		}
+		maxDur := -1.0
+		if gr.durTotal > 0 {
+			maxDur = gr.durMax
+		}
 		out = append(out, Row{
-			Values:   gr.values,
-			Count:    gr.count,
-			ErrCount: gr.errCount,
-			Dims:     dims,
-			P50:      percentileFromHist(gr.durHist, gr.durTotal, 0.50),
-			P95:      percentileFromHist(gr.durHist, gr.durTotal, 0.95),
-			P99:      percentileFromHist(gr.durHist, gr.durTotal, 0.99),
-			id:       gr.id,
+			Values:    gr.values,
+			Count:     gr.count,
+			ErrCount:  gr.errCount,
+			Dims:      dims,
+			P50:       percentileFromHist(gr.durHist, gr.durTotal, 0.50),
+			P95:       percentileFromHist(gr.durHist, gr.durTotal, 0.95),
+			P99:       percentileFromHist(gr.durHist, gr.durTotal, 0.99),
+			Avg:       avg,
+			Max:       maxDur,
+			Status4xx: gr.status4xx,
+			Status5xx: gr.status5xx,
+			id:        gr.id,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

@@ -19,13 +19,17 @@ var ActiveLogTopNextDrill string
 
 // LogTopRow is one display row for the Log Top aggregation table.
 type LogTopRow struct {
-	Dims     map[string]string
-	Count    int
-	ErrCount int
-	Pct      float64
-	P50      float64 // approximate p50 latency in ms; -1 when no duration data
-	P95      float64 // approximate p95 latency in ms; -1 when no duration data
-	P99      float64 // approximate p99 latency in ms; -1 when no duration data
+	Dims      map[string]string
+	Count     int
+	ErrCount  int
+	Pct       float64
+	P50       float64 // approximate p50 latency in ms; -1 when no duration data
+	P95       float64 // approximate p95 latency in ms; -1 when no duration data
+	P99       float64 // approximate p99 latency in ms; -1 when no duration data
+	Avg       float64 // mean latency in ms; -1 when no duration data
+	Max       float64 // max latency in ms; -1 when no duration data
+	Status4xx int     // count of HTTP 4xx responses
+	Status5xx int     // count of HTTP 5xx responses
 }
 
 // dimWeight returns the column weight for a given dimension name.
@@ -83,16 +87,16 @@ func latencyCell(v float64, w int) string {
 	} else {
 		label = fmt.Sprintf("%.0f", v)
 	}
-	pad := max(w-len(label), 0)
+	pad := max(w-lipgloss.Width(label), 0)
 	return strings.Repeat(" ", pad) + label
 }
 
 // metricWidth returns the column character width for a given metric id.
 func metricWidth(id string) int {
 	switch id {
-	case "%", "ERR":
+	case "%", "ERR", "ERR%", "4XX", "5XX":
 		return 6
-	case "P50", "P95", "P99":
+	case "P50", "P95", "P99", "AVG", "MAX":
 		return 7
 	default: // REQ, REQ/s
 		return 8
@@ -111,6 +115,20 @@ func metricCell(id string, r LogTopRow, rowRPS float64) string {
 		label = fmt.Sprintf("%.1f", r.Pct)
 	case "ERR":
 		label = fmt.Sprintf("%d", r.ErrCount)
+	case "ERR%":
+		rate := 0.0
+		if r.Count > 0 {
+			rate = 100 * float64(r.ErrCount) / float64(r.Count)
+		}
+		label = fmt.Sprintf("%.1f", rate)
+	case "4XX":
+		label = fmt.Sprintf("%d", r.Status4xx)
+	case "5XX":
+		label = fmt.Sprintf("%d", r.Status5xx)
+	case "AVG":
+		return latencyCell(r.Avg, metricWidth(id))
+	case "MAX":
+		return latencyCell(r.Max, metricWidth(id))
 	case "P50":
 		return latencyCell(r.P50, metricWidth(id))
 	case "P95":
@@ -119,7 +137,7 @@ func metricCell(id string, r LogTopRow, rowRPS float64) string {
 		return latencyCell(r.P99, metricWidth(id))
 	}
 	w := metricWidth(id)
-	pad := max(w-len(label), 0)
+	pad := max(w-lipgloss.Width(label), 0)
 	return strings.Repeat(" ", pad) + label
 }
 
@@ -131,6 +149,9 @@ func metricCell(id string, r LogTopRow, rowRPS float64) string {
 // Call sites must set ui.ActiveSortColumnName and ui.ActiveSortAscending before
 // calling so the active sort column is highlighted.
 func RenderLogTopView(title string, dims []string, metrics []string, rows []LogTopRow, reqPerSec float64, total, cursor, scroll int, hintBar string, width, height int) string {
+	// Work on a local copy so the overflow-drop loop does not mutate the caller's slice.
+	metrics = append([]string(nil), metrics...)
+
 	titleBar := ViewTitle(width, title)
 
 	// Lines must fit inside the bordered box: FullscreenBorderStyle renders at
@@ -144,6 +165,17 @@ func RenderLogTopView(title string, dims []string, metrics []string, rows []LogT
 	for _, id := range metrics {
 		metricsBlock += 1 + metricWidth(id)
 	}
+
+	// Overflow-drop: if metrics block leaves dims region too narrow, drop
+	// right-most metrics until dims have enough room (at least 4 chars per dim).
+	for len(metrics) > 1 && innerWidth-lead-metricsBlock < len(dims)*4 {
+		metrics = metrics[:len(metrics)-1]
+		metricsBlock = 0
+		for _, id := range metrics {
+			metricsBlock += 1 + metricWidth(id)
+		}
+	}
+
 	dimsRegion := max(innerWidth-lead-metricsBlock, len(dims)*5)
 	colWidths := logTopColWidths(dims, dimsRegion)
 

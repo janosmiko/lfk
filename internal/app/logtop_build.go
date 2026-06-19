@@ -10,14 +10,24 @@ import (
 
 // Metric column names used as sort keys.
 const (
-	logTopMetricREQ = "REQ"
-	logTopMetricRPS = "REQ/s"
-	logTopMetricPct = "%"
-	logTopMetricERR = "ERR"
-	logTopMetricP50 = "P50"
-	logTopMetricP95 = "P95"
-	logTopMetricP99 = "P99"
+	logTopMetricREQ     = "REQ"
+	logTopMetricRPS     = "REQ/s"
+	logTopMetricPct     = "%"
+	logTopMetricERR     = "ERR"
+	logTopMetricP50     = "P50"
+	logTopMetricP95     = "P95"
+	logTopMetricP99     = "P99"
+	logTopMetricErrRate = "ERR%"
+	logTopMetric4xx     = "4XX"
+	logTopMetric5xx     = "5XX"
+	logTopMetricAvg     = "AVG"
+	logTopMetricMax     = "MAX"
 )
+
+// logTopDefaultHiddenMetrics are hidden on fresh state; the user un-hides via ','.
+var logTopDefaultHiddenMetrics = []string{
+	logTopMetricPct, logTopMetricERR, logTopMetric4xx, logTopMetric5xx, logTopMetricAvg, logTopMetricMax,
+}
 
 // httpProfile reports whether kind is an HTTP-access-log profile.
 func httpProfile(kind logagg.ProfileKind) bool {
@@ -191,16 +201,19 @@ func (m *Model) logTopVisibleDims() []string {
 
 // logTopAllMetrics returns the metric column ids available given latency data.
 func (m *Model) logTopAllMetrics() []string {
-	mets := []string{logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR}
+	mets := []string{logTopMetricREQ, logTopMetricRPS, logTopMetricPct, logTopMetricERR, logTopMetricErrRate}
+	if httpProfile(m.logTop.profile) {
+		mets = append(mets, logTopMetric4xx, logTopMetric5xx)
+	}
 	if m.logTop.hasLatency {
-		mets = append(mets, logTopMetricP50, logTopMetricP95, logTopMetricP99)
+		mets = append(mets, logTopMetricAvg, logTopMetricP50, logTopMetricP95, logTopMetricP99, logTopMetricMax)
 	}
 	return mets
 }
 
 // logTopVisibleMetrics returns the non-hidden metric columns in fixed order.
 func (m *Model) logTopVisibleMetrics() []string {
-	out := make([]string, 0, 6)
+	out := make([]string, 0, 12)
 	for _, name := range m.logTopAllMetrics() {
 		if !m.logTop.colHidden[name] {
 			out = append(out, name)
@@ -214,6 +227,17 @@ func (m *Model) logTopVisibleMetrics() []string {
 // change that invalidates incremental accumulation (group-by, drill, profile,
 // or a parsed trim).
 func (m *Model) logTopRebuildRows() {
+	// Seed default-hidden metrics once per fresh state. The colInit guard
+	// prevents re-seeding over user choices when rows are rebuilt later.
+	if !m.logTop.colInit {
+		if m.logTop.colHidden == nil {
+			m.logTop.colHidden = make(map[string]bool)
+		}
+		for _, id := range logTopDefaultHiddenMetrics {
+			m.logTop.colHidden[id] = true
+		}
+		m.logTop.colInit = true
+	}
 	m.logTop.displayDims = m.computeDisplayDims()
 	m.logTop.hasLatency = m.computeHasLatency()
 	m.logTopReconcileColOrder()
@@ -311,6 +335,28 @@ func compareFloat(a, b float64) int {
 	}
 }
 
+// cmpLatency orders real latencies numerically but always keeps n/a (-1) rows
+// last, regardless of sort direction.
+func (m *Model) cmpLatency(a, b float64) int {
+	aNA, bNA := a < 0, b < 0
+	switch {
+	case aNA && bNA:
+		return 0
+	case aNA:
+		if m.logTop.sortAsc {
+			return 1
+		}
+		return -1
+	case bNA:
+		if m.logTop.sortAsc {
+			return -1
+		}
+		return 1
+	default:
+		return compareFloat(a, b)
+	}
+}
+
 // logTopSortRows sorts m.logTop.rows by the active sortCol / sortAsc.
 func (m *Model) logTopSortRows() {
 	col := m.logTop.sortCol
@@ -324,12 +370,30 @@ func (m *Model) logTopSortRows() {
 			// REQ/s and % are both proportional to Count (rate = share of the
 			// global rate; % = Count/total), so sorting by Count is equivalent.
 			c = rows[i].Count - rows[j].Count
+		case logTopMetricErrRate:
+			rateI := 0.0
+			if rows[i].Count > 0 {
+				rateI = 100 * float64(rows[i].ErrCount) / float64(rows[i].Count)
+			}
+			rateJ := 0.0
+			if rows[j].Count > 0 {
+				rateJ = 100 * float64(rows[j].ErrCount) / float64(rows[j].Count)
+			}
+			c = compareFloat(rateI, rateJ)
+		case logTopMetric4xx:
+			c = rows[i].Status4xx - rows[j].Status4xx
+		case logTopMetric5xx:
+			c = rows[i].Status5xx - rows[j].Status5xx
+		case logTopMetricAvg:
+			c = m.cmpLatency(rows[i].Avg, rows[j].Avg)
+		case logTopMetricMax:
+			c = m.cmpLatency(rows[i].Max, rows[j].Max)
 		case logTopMetricP50:
-			c = compareFloat(rows[i].P50, rows[j].P50)
+			c = m.cmpLatency(rows[i].P50, rows[j].P50)
 		case logTopMetricP95:
-			c = compareFloat(rows[i].P95, rows[j].P95)
+			c = m.cmpLatency(rows[i].P95, rows[j].P95)
 		case logTopMetricP99:
-			c = compareFloat(rows[i].P99, rows[j].P99)
+			c = m.cmpLatency(rows[i].P99, rows[j].P99)
 		default: // a dimension column: compare its display string
 			c = strings.Compare(rows[i].Dims[col], rows[j].Dims[col])
 		}

@@ -18,13 +18,17 @@ func (m Model) viewLogTop() string {
 			pct = 100 * float64(r.Count) / float64(total)
 		}
 		rows[i] = ui.LogTopRow{
-			Dims:     r.Dims,
-			Count:    r.Count,
-			ErrCount: r.ErrCount,
-			Pct:      pct,
-			P50:      r.P50,
-			P95:      r.P95,
-			P99:      r.P99,
+			Dims:      r.Dims,
+			Count:     r.Count,
+			ErrCount:  r.ErrCount,
+			Pct:       pct,
+			P50:       r.P50,
+			P95:       r.P95,
+			P99:       r.P99,
+			Avg:       r.Avg,
+			Max:       r.Max,
+			Status4xx: r.Status4xx,
+			Status5xx: r.Status5xx,
 		}
 	}
 
