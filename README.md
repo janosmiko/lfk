@@ -44,6 +44,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 | API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
 | YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
 | Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
+| Log Top | <img src="./docs/imgs/log-top.png" alt="Log Top" width="600"> |
 | Helm integration | <img src="./docs/imgs/helm-integration.png" alt="Helm integration" width="600"> |
 | ArgoCD integration | <img src="./docs/imgs/argocd-integration.png" alt="ArgoCD integration" width="600"> |
 | ArgoCD AutoSync config | <img src="./docs/imgs/argocd-autosync.png" alt="ArgoCD auto-sync config" width="300"> |
