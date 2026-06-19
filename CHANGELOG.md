@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.12](https://github.com/janosmiko/lfk/compare/v0.14.11...v0.14.12) (2026-06-19)
+
+
+### Features
+
+* Log Top — live log aggregation view (top-style request analytics) ([#453](https://github.com/janosmiko/lfk/issues/453)) ([fd79482](https://github.com/janosmiko/lfk/commit/fd794829a97197f0e2333545c9aa4c9263e78286))
+
 ## [0.14.11](https://github.com/janosmiko/lfk/compare/v0.14.10...v0.14.11) (2026-06-17)
 
 
