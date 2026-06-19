@@ -92,7 +92,7 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 		m.logTop.cursor = 0
 		m.logTopSyncScroll()
 		return m, nil
-	case "b":
+	case ".":
 		m.logTop.lineInput = ""
 		return m.openLogTopGroupBy(), nil
 	case "p":

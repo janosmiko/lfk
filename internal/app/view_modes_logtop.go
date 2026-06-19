@@ -85,7 +85,7 @@ func (m Model) logTopHintBar() string {
 		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort col"},
 		{Key: kb.SortFlip, Desc: "flip sort"},
 		{Key: kb.SortReset, Desc: "reset sort"},
-		{Key: "b", Desc: "group by"},
+		{Key: ".", Desc: "group by"},
 		{Key: "p", Desc: "profile"},
 		{Key: kb.ColumnToggle, Desc: "columns"},
 		{Key: kb.Filter, Desc: "filter"},

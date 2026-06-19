@@ -391,7 +391,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `>` / `<` | Cycle sort column (dimensions + REQ / REQ/s / ERR% / 4XX / 5XX / AVG / p50 / p95 / p99 / MAX) |
 | `=` | Toggle sort direction (the active column shows ↑/↓) |
 | `-` | Reset sort to REQ descending |
-| `b` | Open group-by field picker (multi-select) |
+| `.` | Open group-by field picker (multi-select) |
 | `p` | Open profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto) |
 | `,` | Open column picker: show/hide and reorder dimension columns, show/hide metric columns |
 | `f` | Filter rows (matches dimension values) |

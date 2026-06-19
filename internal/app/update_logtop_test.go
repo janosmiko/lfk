@@ -68,12 +68,12 @@ func TestLogTopKey_EscRebuildsLogView(t *testing.T) {
 	}
 }
 
-func TestLogTopKey_BOpensGroupByOverlay(t *testing.T) {
+func TestLogTopKey_DotOpensGroupByOverlay(t *testing.T) {
 	m := newLogTopModel(t)
-	mdl, _ := m.handleLogTopKey(key("b"))
+	mdl, _ := m.handleLogTopKey(key("."))
 	got := mdl.(Model)
 	if got.overlay != overlayLogTopGroupBy {
-		t.Fatalf("pressing b: overlay = %v, want overlayLogTopGroupBy", got.overlay)
+		t.Fatalf("pressing .: overlay = %v, want overlayLogTopGroupBy", got.overlay)
 	}
 }
 
