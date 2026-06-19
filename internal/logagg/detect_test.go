@@ -17,6 +17,37 @@ func TestDetectKind(t *testing.T) {
 	}
 }
 
+// TestDetectKind_PrefersStructuredOverGeneric covers mixed logs: a deployment
+// (e.g. Traefik) that emits JSON access logs AND console/error lines that the
+// generic logfmt matcher catches. The structured access-log profile must win
+// even when the error lines outnumber the access lines.
+func TestDetectKind_PrefersStructuredOverGeneric(t *testing.T) {
+	sample := make([]string, 0, 65)
+	// 5 traefik-json access lines.
+	for range 5 {
+		sample = append(sample, `{"DownstreamStatus":200,"RequestMethod":"POST","RequestPath":"/rest/events","Duration":100000000}`)
+	}
+	// 60 console/error lines that match logfmt via the "error=" token.
+	for range 60 {
+		sample = append(sample, `level=error msg="tcp" error="readfrom tcp 10.0.0.1->10.0.0.2: connection reset by peer"`)
+	}
+	if got := DetectKind(sample); got != ProfileTraefikJSON {
+		t.Errorf("mixed access+error logs: DetectKind = %q, want %q (structured must win over logfmt)", got, ProfileTraefikJSON)
+	}
+
+	// A genuinely logfmt log with only a couple of stray structured lines stays logfmt.
+	mostlyLogfmt := make([]string, 0, 82)
+	for range 2 {
+		mostlyLogfmt = append(mostlyLogfmt, `{"DownstreamStatus":200,"RequestMethod":"GET","RequestPath":"/x"}`)
+	}
+	for range 80 {
+		mostlyLogfmt = append(mostlyLogfmt, `level=info msg="work" worker=3 duration=12ms`)
+	}
+	if got := DetectKind(mostlyLogfmt); got != ProfileLogfmt {
+		t.Errorf("mostly-logfmt with 2 stray JSON: DetectKind = %q, want %q", got, ProfileLogfmt)
+	}
+}
+
 func TestParserFor(t *testing.T) {
 	if ParserFor(ProfileTraefikJSON).Kind() != ProfileTraefikJSON {
 		t.Error("ParserFor(traefik) returned wrong kind")
