@@ -1,6 +1,7 @@
 package logagg
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
@@ -255,5 +256,25 @@ func TestAggregation_AvgMaxStatus(t *testing.T) {
 	}
 	if gb.Max != -1 {
 		t.Errorf("/b Max = %v, want -1 (no duration data)", gb.Max)
+	}
+}
+
+// TestAggregation_RejectsNaNInfDuration ensures "NaN"/"Inf" duration strings
+// (which strconv.ParseFloat accepts) do not poison Avg/Max metrics.
+func TestAggregation_RejectsNaNInfDuration(t *testing.T) {
+	a := NewAggregation([]string{FieldPath}, nil, IsHTTPError)
+	for _, d := range []string{"10", "NaN", "Inf", "-Inf", "30"} {
+		a.Add(Fields{FieldPath: "/a", FieldStatus: "200", FieldDurationMS: d})
+	}
+	r := a.Rows(SortReq)[0]
+	// Only 10 and 30 should count: avg=20, max=30.
+	if math.IsNaN(r.Avg) || math.IsInf(r.Avg, 0) {
+		t.Fatalf("Avg poisoned by NaN/Inf: %v", r.Avg)
+	}
+	if r.Avg < 19.9 || r.Avg > 20.1 {
+		t.Errorf("Avg = %v, want ~20 (NaN/Inf ignored)", r.Avg)
+	}
+	if r.Max != 30 {
+		t.Errorf("Max = %v, want 30 (NaN/Inf ignored)", r.Max)
 	}
 }

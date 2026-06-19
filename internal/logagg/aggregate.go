@@ -136,7 +136,7 @@ func (a *Aggregation) Add(f Fields) {
 
 	// Accumulate latency histogram and sum/max for mean/max metrics.
 	if ds := f[FieldDurationMS]; ds != "" {
-		if v, err := strconv.ParseFloat(ds, 64); err == nil {
+		if v, err := strconv.ParseFloat(ds, 64); err == nil && !math.IsNaN(v) && !math.IsInf(v, 0) {
 			if r.durHist == nil {
 				r.durHist = make([]int, len(durBucketsMs)+1)
 			}
