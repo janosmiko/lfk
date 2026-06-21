@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+reviews:
+  auto_review:
+    # release-please bot PRs only bump the version and CHANGELOG. Skip CodeRabbit
+    # review and pre-merge checks on them (the auto-generated description never
+    # matches the PR template, which otherwise trips the Description check).
+    ignore_title_keywords:
+      - "chore(main): release"
