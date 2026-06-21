@@ -121,7 +121,7 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "space", Desc: "select"},
 			{Key: "tab", Desc: "exclude"},
 			{Key: "A", Desc: "all"},
-			{Key: ".", Desc: "filter to selection"},
+			{Key: ".", Desc: "filter to item's ns"},
 			{Key: "enter", Desc: "apply"},
 			{Key: "/", Desc: "filter"},
 			{Key: "R", Desc: "refresh"},
