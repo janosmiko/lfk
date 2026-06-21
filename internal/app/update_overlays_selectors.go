@@ -43,6 +43,35 @@ func (m Model) rejectPendingUnionSetNamespaceMultiSelect() (tea.Model, tea.Cmd) 
 	return m, scheduleStatusClear()
 }
 
+// quickFilterToSelectedNamespace narrows the namespace scope to the namespace
+// of the resource highlighted in the explorer behind the namespace overlay,
+// then closes the overlay and refreshes the current level. Mirrors the single-
+// namespace branch of the Enter handler so the resulting scope is identical to
+// picking that namespace from the list by hand.
+func (m Model) quickFilterToSelectedNamespace() (tea.Model, tea.Cmd) {
+	sel := m.selectedMiddleItem()
+	if sel == nil || sel.Namespace == "" {
+		m.setStatusMessage("No namespaced resource selected to filter to", true)
+		return m, scheduleStatusClear()
+	}
+	ns := sel.Namespace
+	oldNs := m.namespace
+	m.selectedNamespaces = map[string]bool{ns: true}
+	m.namespace = ns
+	m.allNamespaces = false
+	m.nsSelectionNegated = false
+	m.nsSelectionModified = false
+	m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
+	m.overlayFilter.Clear()
+	m.nsFilterMode = false
+	m.overlay = overlayNone
+	m.saveCurrentSession()
+	m.cancelAndReset()
+	m.requestGen++
+	m.setStatusMessage("Filtered to namespace: "+ns, false)
+	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
+}
+
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	items := m.filteredOverlayItems()
@@ -182,6 +211,17 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.nsSelectionNegated = !m.nsSelectionNegated
 		m.nsSelectionModified = true
 		return m, nil
+
+	case ".":
+		// Quick filter to the namespace of the resource highlighted in the
+		// explorer behind the overlay (chord: "\\" to open, then "."). Inert
+		// in union mode / the union-set picker (single-namespace rules of
+		// their own) and when the overlay was opened from a parent overlay
+		// (the explorer selection is not the relevant subject there).
+		if m.pendingUnionSetName != "" || m.unionMode || m.previousOverlay != overlayNone {
+			return m, nil
+		}
+		return m.quickFilterToSelectedNamespace()
 
 	case ui.ActiveKeybindings.AllNamespaces:
 		if m.pendingUnionSetName != "" {

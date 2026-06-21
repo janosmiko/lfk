@@ -181,6 +181,70 @@ func TestHandleKeyNamespaceSelector_StaleCacheSchedulesBackgroundRefresh(t *test
 	assert.NotNil(t, cmd, "stale cache must schedule a silent refresh command")
 }
 
+// TestHandleNamespaceOverlay_QuickFilterToSelectedNamespace verifies the "."
+// quick filter (pressed while the namespace overlay is open) snaps the
+// namespace scope to the namespace of the resource highlighted in the
+// explorer behind the overlay, then closes.
+func TestHandleNamespaceOverlay_QuickFilterToSelectedNamespace(t *testing.T) {
+	m := nsSelectorModel()
+	m.allNamespaces = true
+	m.namespace = ""
+	m.middleItems = []model.Item{
+		{Name: "pod-a", Kind: "Pod", Namespace: "team-alpha"},
+		{Name: "pod-b", Kind: "Pod", Namespace: "team-beta"},
+	}
+	m.setCursor(1) // highlight pod-b in team-beta
+	m.overlay = overlayNamespace
+
+	ret, _ := m.handleNamespaceOverlayKey(runeKey('.'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNone, result.overlay, "quick filter must close the overlay")
+	assert.Equal(t, "team-beta", result.namespace)
+	assert.False(t, result.allNamespaces, "quick filter must leave all-namespaces mode")
+	assert.True(t, result.selectedNamespaces["team-beta"])
+	assert.Len(t, result.selectedNamespaces, 1)
+}
+
+// TestHandleNamespaceOverlay_QuickFilterNoNamespaceIsNoOp verifies the quick
+// filter is a safe no-op (overlay stays open, scope unchanged) when the
+// highlighted resource is cluster-scoped (empty Namespace).
+func TestHandleNamespaceOverlay_QuickFilterNoNamespaceIsNoOp(t *testing.T) {
+	m := nsSelectorModel()
+	m.allNamespaces = true
+	m.middleItems = []model.Item{
+		{Name: "node-1", Kind: "Node", Namespace: ""},
+	}
+	m.setCursor(0)
+	m.overlay = overlayNamespace
+
+	ret, _ := m.handleNamespaceOverlayKey(runeKey('.'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNamespace, result.overlay, "no-op quick filter keeps the overlay open")
+	assert.True(t, result.allNamespaces, "scope must be unchanged")
+	assert.NotEmpty(t, result.statusMessage)
+	assert.True(t, result.statusMessageErr)
+}
+
+// TestHandleNamespaceOverlay_QuickFilterInertInUnionMode verifies the quick
+// filter does nothing in union mode, which enforces its own single-namespace
+// rules.
+func TestHandleNamespaceOverlay_QuickFilterInertInUnionMode(t *testing.T) {
+	m := nsSelectorModel()
+	m.unionMode = true
+	m.allNamespaces = true
+	m.middleItems = []model.Item{{Name: "pod-a", Kind: "Pod", Namespace: "team-alpha"}}
+	m.setCursor(0)
+	m.overlay = overlayNamespace
+
+	ret, _ := m.handleNamespaceOverlayKey(runeKey('.'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNamespace, result.overlay, "union mode must leave the overlay open")
+	assert.True(t, result.allNamespaces, "union mode quick filter must not change scope")
+}
+
 // TestHandleNamespaceOverlay_RefreshReloads verifies the in-overlay refresh
 // (R / kb.Refresh) re-fetches namespaces and keeps the overlay open.
 func TestHandleNamespaceOverlay_RefreshReloads(t *testing.T) {
