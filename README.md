@@ -218,7 +218,7 @@ Clusters (kubeconfig contexts)
                     +-- Containers (for Pods)
 ```
 
-Namespaces are **not** a navigation level. The current namespace is shown in the top-right corner and can be changed by pressing `\`. All-namespaces mode is enabled by default (toggle with `A`). Inside the namespace selector, press `Space` to include namespaces, `Tab` to exclude them (negative selection — shows all except the marked namespaces, each prefixed with `!`), `A` to reset to all-namespaces mode, or `R` to refresh the list from the cluster.
+Namespaces are **not** a navigation level. The current namespace is shown in the top-right corner and can be changed by pressing `\`. All-namespaces mode is enabled by default (toggle with `A`). Inside the namespace selector, press `Space` to include namespaces, `Tab` to exclude them (negative selection — shows all except the marked namespaces, each prefixed with `!`), `A` to reset to all-namespaces mode, or `R` to refresh the list from the cluster. Press `.` to quick-filter straight to the namespace of the resource highlighted behind the overlay.
 
 ### Owner Resolution
 

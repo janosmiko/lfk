@@ -139,7 +139,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | Key | Action | Config key |
 |---|---|---|
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
-| `\` | Open namespace selector | `namespace_selector` |
+| `\` | Open namespace selector (then `.` to filter to current item's namespace) | `namespace_selector` |
 | `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
 | `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
 | `Ctrl+L` | Open fullscreen log viewer for selected resource | `logs` |
