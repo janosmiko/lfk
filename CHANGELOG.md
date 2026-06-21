@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.14](https://github.com/janosmiko/lfk/compare/v0.14.13...v0.14.14) (2026-06-21)
+
+
+### Bug Fixes
+
+* **release:** make Chocolatey publish best-effort ([#460](https://github.com/janosmiko/lfk/issues/460)) ([82f6137](https://github.com/janosmiko/lfk/commit/82f61378b1920b995bbcb0754057a89e47540d7d))
+
 ## [0.14.13](https://github.com/janosmiko/lfk/compare/v0.14.12...v0.14.13) (2026-06-21)
 
 
