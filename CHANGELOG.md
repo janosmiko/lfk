@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.13](https://github.com/janosmiko/lfk/compare/v0.14.12...v0.14.13) (2026-06-21)
+
+
+### Features
+
+* quick-filter to current item's namespace from selector ([#455](https://github.com/janosmiko/lfk/issues/455)) ([#456](https://github.com/janosmiko/lfk/issues/456)) ([35ac6c3](https://github.com/janosmiko/lfk/commit/35ac6c37914fd3391ef36a1df8fa4fc4a9c60eca))
+
 ## [0.14.12](https://github.com/janosmiko/lfk/compare/v0.14.11...v0.14.12) (2026-06-19)
 
 
