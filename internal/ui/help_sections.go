@@ -6,6 +6,12 @@ package ui
 // pushing help.go past the repo's 800-line file cap.
 func helpSections() []helpSection {
 	kb := ActiveKeybindings
+	gotoChordList := kb.GotoPods + "/" + kb.GotoDeployments + "/" + kb.GotoServices + "/" +
+		kb.GotoNodes + "/" + kb.GotoNamespaces + "/" + kb.GotoIngresses + "/" +
+		kb.GotoJobs + "/" + kb.GotoCronJobs + "/" + kb.GotoReplicaSets + "/" +
+		kb.GotoDaemonSets + "/" + kb.GotoStatefulSets + "/" + kb.GotoConfigMaps + "/" +
+		kb.GotoSecrets + "/" + kb.GotoHPAs + "/" + kb.GotoPVCs + "/" +
+		kb.GotoPVs + "/" + kb.GotoPDBs
 	return []helpSection{
 		{
 			title: "Navigation",
@@ -16,7 +22,7 @@ func helpSections() []helpSection {
 				{kb.Up + " / Up", "Move up"},
 				{kb.JumpTop + kb.JumpTop + " / Home", "Jump to top"},
 				{kb.JumpBottom + " / End", "Jump to bottom"},
-				{kb.JumpTop + "+chord (gp/gd/gs/gn/gN/gi/gj/gc/gr/gD/gt/gC/gS/gh/gv/gV/gb)", "Goto resource type (press " + kb.JumpTop + " for which-key popup; add custom chords/CRDs via goto_targets)"},
+				{kb.JumpTop + "+chord (" + gotoChordList + ")", "Goto resource type (press " + kb.JumpTop + " for which-key popup; add custom chords/CRDs via goto_targets)"},
 				{helpKeyDisplay(kb.PageDown) + " / " + helpKeyDisplay(kb.PageUp) + " / Shift+↓ / Shift+↑", "Half-page scroll down / up"},
 				{helpKeyDisplay(kb.PageForward) + " / " + helpKeyDisplay(kb.PageBack) + " / PgDn / PgUp", "Full-page scroll down / up"},
 				{kb.Enter, "Open YAML view / navigate into"},

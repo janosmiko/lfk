@@ -8,6 +8,22 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// restoreWhichKeyGlobals snapshots the package-global UI config the which-key
+// tests mutate and restores it after the test, so test order can't leak state.
+func restoreWhichKeyGlobals(t *testing.T) {
+	t.Helper()
+	kb := ui.ActiveKeybindings
+	enabled := ui.ConfigWhichKeyEnabled
+	delay := ui.ConfigWhichKeyDelayMs
+	dim := ui.ConfigDimOverlay
+	t.Cleanup(func() {
+		ui.ActiveKeybindings = kb
+		ui.ConfigWhichKeyEnabled = enabled
+		ui.ConfigWhichKeyDelayMs = delay
+		ui.ConfigDimOverlay = dim
+	})
+}
+
 // gotoTestModel returns an explorer model at LevelResourceTypes with a
 // discovered resource set containing Pods and Deployments for the active context.
 func gotoTestModel() Model {
@@ -83,6 +99,7 @@ func TestHandleGotoChord_GPassesThroughToJumpTop(t *testing.T) {
 // nothing happens — which-key semantics, no fall-through to the key's normal
 // explorer action.
 func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
+	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	m.pendingG = true
@@ -111,6 +128,7 @@ func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
 // esc (and any non-g key) is swallowed while the prefix is armed: it closes
 // the popup as a noop instead of falling through to its normal explorer action.
 func TestHandleGotoChord_EscClosesPopup(t *testing.T) {
+	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	m.pendingG = true
@@ -190,6 +208,7 @@ func TestLayoutWhichKey(t *testing.T) {
 }
 
 func TestGotoTargets_IncludesBuiltins(t *testing.T) {
+	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	byChord := map[string]string{}
@@ -230,7 +249,7 @@ func TestGotoResourceType_LeftPaneIsResourceTypes(t *testing.T) {
 			kinds[item.Kind] = true
 		}
 	}
-	if !kinds["Pod"] && !kinds["Deployment"] {
+	if !kinds["Pod"] || !kinds["Deployment"] {
 		t.Fatalf("left pane does not hold resource-type items after goto; kinds=%v", kinds)
 	}
 }

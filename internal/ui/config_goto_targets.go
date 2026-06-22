@@ -22,6 +22,9 @@ var ConfigGotoTargets map[string]GotoTargetEntry
 // kind; invalid entries are silently skipped.
 func applyGotoTargets(cfg configFile, jumpTopPrefix string) {
 	if len(cfg.GotoTargets) == 0 {
+		// Reset so a previous non-empty value does not survive a reload that
+		// removed goto_targets.
+		ConfigGotoTargets = nil
 		return
 	}
 	valid := make(map[string]GotoTargetEntry, len(cfg.GotoTargets))

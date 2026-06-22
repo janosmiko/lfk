@@ -8,6 +8,7 @@ import (
 )
 
 func TestRenderWhichKey_ListsTargets(t *testing.T) {
+	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyDelayMs = 0
@@ -25,6 +26,7 @@ func TestRenderWhichKey_ListsTargets(t *testing.T) {
 // The modern preset anchors the panel to the bottom of the screen, so the
 // content must land in the lower rows, not centered or at the top.
 func TestRenderWhichKey_AnchoredToBottom(t *testing.T) {
+	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyDelayMs = 0
@@ -48,6 +50,7 @@ func TestRenderWhichKey_AnchoredToBottom(t *testing.T) {
 }
 
 func TestRenderWhichKey_HiddenWhenDisabled(t *testing.T) {
+	restoreWhichKeyGlobals(t)
 	ui.ConfigWhichKeyEnabled = false
 	m := gotoTestModel()
 	m.pendingG = true
