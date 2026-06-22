@@ -333,23 +333,24 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 // a pre-styled " ON" / "OFF" / "  -" indicator in the Badge column.
 // Self-Heal and Prune are gated on AutoSync being on; when AutoSync is
 // off they render with Disabled=true (dim) and show the "  -" badge
-// instead of OFF. The space/enter/esc hint sits in FooterHint so users
-// see how to interact without looking at the bottom hint bar.
+// instead of OFF. The cursor highlight is capped to the label column
+// (CursorHighlightWidth) so it never sits behind the ON/OFF switches; the
+// space/enter/esc keys live in the app-wide hint bar at the bottom.
 func renderAutoSyncOverlay(m Model) string {
 	const (
 		boxWMax    = 46
-		labelW     = 14
-		badgeW     = 3 // " ON" / "OFF" / "  -"
-		chromeRows = 2 // title + title bottom padding
+		labelW     = 22 // wide label column so the cursor highlight reads as a bar
+		badgeW     = 3  // " ON" / "OFF" / "  -"
+		chromeRows = 2  // title + title bottom padding
 	)
 	boxW := min(boxWMax, m.width-4)
-	contentH := chromeRows + 3 + 2 // title chrome + 3 rows + blank + footer
+	contentH := chromeRows + 3 // title chrome + 3 rows
 	innerW := max(boxW-4, 1)
 
 	// Badges carry the surface background — fg-only styles would punch
 	// through to the terminal background inside the themed overlay box.
 	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.SurfaceBg)
-	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError)).Background(ui.SurfaceBg)
+	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError)).Bold(true).Background(ui.SurfaceBg)
 	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed)).Background(ui.SurfaceBg)
 
 	badge := func(on, disabled bool) string {
@@ -377,11 +378,11 @@ func renderAutoSyncOverlay(m Model) string {
 		},
 	}
 	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
-		Title:      "Configure AutoSync",
-		Cursor:     m.autoSyncCursor,
-		BadgeWidth: badgeW,
-		FooterHint: "space: toggle | enter: save | esc: cancel",
-		Height:     contentH,
+		Title:                "Configure AutoSync",
+		Cursor:               m.autoSyncCursor,
+		BadgeWidth:           badgeW,
+		CursorHighlightWidth: labelW,
+		Height:               contentH,
 	}, innerW)
 	return ui.OverlayStyle.Width(boxW).Render(content)
 }
