@@ -126,7 +126,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
 - **Network policy visualizer**: Visualize a NetworkPolicy's ingress/egress rules (`x` → `N` on a NetworkPolicy), or list every policy affecting a Pod or Service (`x` → "Network Policies" on the resource) — including which backing pods a policy covers. Supports CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy (entities, FQDNs, deny rules, L7 indicators) when the Cilium CRDs are installed. The dialog scrolls with the mouse wheel and is searchable (`/`, `n`/`N`)
 - **Clipboard support**: Copy resource name (`y`), open copy-as picker (`Y`: YAML / JSON / Table), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
-- **Bookmarks**: Save favorite resource paths for quick navigation
+- **Bookmarks**: Save favorite resource paths (including the active list filter) for quick navigation
 - **Orphan detection**: Press `Shift+Z` (or run bare `:orphans`) to open the cluster-wide orphan overview across 11 kinds — Pods, Secrets, ConfigMaps, Services, PVCs, HPAs, PDBs, NetworkPolicies, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings. Per-list filters are still available via the filter-preset overlay (`.`) on each kind, or jump straight to a filtered view with `:orphans <kind>` (e.g., `:orphans secrets`). A strict / lenient toggle (`s`) flips between "truly unused" and "currently idle but referenced by workload templates" (e.g. CronJob between firings). Auto-excludes Helm release Secrets, ServiceAccount tokens, owner-managed resources, and `kube-root-ca.crt`.
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 
@@ -367,7 +367,7 @@ All search and filter inputs support three modes, auto-detected from the query s
 - Press `o` on a resource to jump to its owner (e.g. Pod -> Deployment), then `Backspace` to jump back
 - Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
 - Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete/scale/restart via `x`
-- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Press tab to jump to the namespace
+- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Press tab to jump to the namespace. An active list filter is saved with the bookmark and reapplied on jump (shown as `> /<filter>` in the slot name)
 - Press `.` for quick filter presets (e.g. only failing Pods); extend them per resource type in config
 - Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
 - Copy the resource name with `y`; press `Y` to copy as YAML, JSON, or Table

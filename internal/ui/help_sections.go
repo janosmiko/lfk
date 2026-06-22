@@ -156,8 +156,8 @@ func helpSections() []helpSection {
 		{
 			title: "Bookmarks",
 			bindings: []helpEntry{
-				{kb.SetMark + "<a-z/0-9>", "Set context-aware mark (switches cluster on jump)"},
-				{kb.SetMark + "<A-Z>", "Set context-free mark (stays in current cluster on jump)"},
+				{kb.SetMark + "<a-z/0-9>", "Set context-aware mark (switches cluster on jump, saves active filter)"},
+				{kb.SetMark + "<A-Z>", "Set context-free mark (stays in current cluster on jump, saves active filter)"},
 				{kb.OpenMarks, "Open bookmarks list"},
 				{"a-z/A-Z/0-9", "Jump to named mark (in overlay)"},
 				{"j/k", "Navigate bookmarks (in overlay)"},
