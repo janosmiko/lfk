@@ -15,16 +15,17 @@ type GotoTargetEntry struct {
 var ConfigGotoTargets map[string]GotoTargetEntry
 
 // applyGotoTargets validates and loads goto_targets from cfg into ConfigGotoTargets.
-// A chord must be exactly 2 runes, start with the jump_top keybinding, and have
-// a non-empty kind; invalid entries are silently skipped.
-func applyGotoTargets(cfg configFile) {
+// jumpTopPrefix is the already-merged jump_top keybinding (pass kb.JumpTop from
+// LoadConfig so custom jump_top values are validated against the correct prefix).
+// A chord must be exactly 2 runes, start with jumpTopPrefix, and have a non-empty
+// kind; invalid entries are silently skipped.
+func applyGotoTargets(cfg configFile, jumpTopPrefix string) {
 	if len(cfg.GotoTargets) == 0 {
 		return
 	}
 	valid := make(map[string]GotoTargetEntry, len(cfg.GotoTargets))
-	prefix := ActiveKeybindings.JumpTop
 	for chord, t := range cfg.GotoTargets {
-		if len([]rune(chord)) != 2 || !strings.HasPrefix(chord, prefix) || t.Kind == "" {
+		if len([]rune(chord)) != 2 || !strings.HasPrefix(chord, jumpTopPrefix) || t.Kind == "" {
 			continue
 		}
 		valid[chord] = t

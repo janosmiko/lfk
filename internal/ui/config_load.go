@@ -634,6 +634,7 @@ func LoadConfig(configOverride string) {
 	applyColorscheme(&theme, cfg)
 	mergeThemeOverrides(&theme, cfg.Theme)
 	MergeKeybindings(&kb, &cfg.Keybindings)
+	applyGotoTargets(cfg, kb.JumpTop)
 	applyConfigOptions(cfg)
 	applyConfigMaps(cfg, abbr)
 
