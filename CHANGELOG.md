@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.14](https://github.com/janosmiko/lfk/compare/v0.14.13...v0.14.14) (2026-06-22)
+
+
+### Features
+
+* goto navigation (g-prefix chords) + which-key overlay ([#469](https://github.com/janosmiko/lfk/issues/469)) ([f47054e](https://github.com/janosmiko/lfk/commit/f47054e49886bd26eecfb8b450eba1bf9d19e477))
+* manual scaling for HorizontalPodAutoscalers ([#464](https://github.com/janosmiko/lfk/issues/464)) ([d2dbf9c](https://github.com/janosmiko/lfk/commit/d2dbf9cd020cd1f253aad4be7bf6ee13c644ced9))
+
+
+### Bug Fixes
+
+* **release:** make Chocolatey publish best-effort ([#460](https://github.com/janosmiko/lfk/issues/460)) ([82f6137](https://github.com/janosmiko/lfk/commit/82f61378b1920b995bbcb0754057a89e47540d7d))
+* **ui:** AutoSync overlay polish — no highlight behind switches, drop in-overlay hint ([#468](https://github.com/janosmiko/lfk/issues/468)) ([c3cb486](https://github.com/janosmiko/lfk/commit/c3cb4861b6c514d91f576638cdf22ef3cb1f27a7))
+
 ## [0.14.13](https://github.com/janosmiko/lfk/compare/v0.14.12...v0.14.13) (2026-06-21)
 
 
