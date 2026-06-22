@@ -184,18 +184,20 @@ func TestParseHPAScaleInputs(t *testing.T) {
 		name        string
 		min, max    string
 		target      string
+		scaleMinMax bool
 		scaleTarget bool
 		wantErr     bool
 		wantMin     int32
 		wantMax     int32
 		wantTarget  int32
 	}{
-		{name: "valid min/max only", min: "2", max: "5", wantMin: 2, wantMax: 5},
-		{name: "valid with target", min: "1", max: "8", target: "4", scaleTarget: true, wantMin: 1, wantMax: 8, wantTarget: 4},
-		{name: "min zero rejected", min: "0", max: "5", wantErr: true},
-		{name: "max below min rejected", min: "5", max: "2", wantErr: true},
-		{name: "non-numeric rejected", min: "x", max: "5", wantErr: true},
-		{name: "negative target rejected", min: "1", max: "5", target: "-1", scaleTarget: true, wantErr: true},
+		{name: "valid min/max only", min: "2", max: "5", scaleMinMax: true, wantMin: 2, wantMax: 5},
+		{name: "valid with target", min: "1", max: "8", target: "4", scaleMinMax: true, scaleTarget: true, wantMin: 1, wantMax: 8, wantTarget: 4},
+		{name: "target only ignores unset min/max", min: "", max: "", target: "3", scaleTarget: true, wantTarget: 3},
+		{name: "min zero rejected", min: "0", max: "5", scaleMinMax: true, wantErr: true},
+		{name: "max below min rejected", min: "5", max: "2", scaleMinMax: true, wantErr: true},
+		{name: "non-numeric rejected", min: "x", max: "5", scaleMinMax: true, wantErr: true},
+		{name: "negative target rejected", min: "1", max: "5", target: "-1", scaleMinMax: true, scaleTarget: true, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -203,7 +205,7 @@ func TestParseHPAScaleInputs(t *testing.T) {
 			st.min.Set(tt.min)
 			st.max.Set(tt.max)
 			st.target.Set(tt.target)
-			minR, maxR, targetR, err := parseHPAScaleInputs(st, tt.scaleTarget)
+			minR, maxR, targetR, err := parseHPAScaleInputs(st, tt.scaleMinMax, tt.scaleTarget)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

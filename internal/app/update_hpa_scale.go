@@ -110,6 +110,9 @@ func (m Model) openHPAScaleOverlay() Model {
 	return m
 }
 
+// handleHPAScaleOverlayKey routes a keypress in the HPA scale overlay: j/k move
+// between fields, h/- and l/+ step the active value, arrows move the cursor,
+// digits type, enter applies, esc cancels.
 func (m Model) handleHPAScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
@@ -181,7 +184,7 @@ func (m Model) applyHPAScaleOverlay() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	minR, maxR, targetR, err := parseHPAScaleInputs(st, scaleTarget)
+	minR, maxR, targetR, err := parseHPAScaleInputs(st, scaleMinMax, scaleTarget)
 	if err != nil {
 		m.overlay = overlayNone
 		m.hpaScale = hpaScaleState{}
@@ -215,16 +218,22 @@ func (m Model) applyHPAScaleOverlay() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// parseHPAScaleInputs validates and parses the overlay inputs. minReplicas must
-// be >= 1, maxReplicas >= minReplicas, and (when changed) target replicas >= 0.
-func parseHPAScaleInputs(st hpaScaleState, scaleTarget bool) (minR, maxR, targetR int32, err error) {
-	minV, errMin := strconv.ParseInt(strings.TrimSpace(st.min.Value), 10, 32)
-	maxV, errMax := strconv.ParseInt(strings.TrimSpace(st.max.Value), 10, 32)
-	if errMin != nil || errMax != nil || minV < 1 || maxV < 1 {
-		return 0, 0, 0, fmt.Errorf("invalid min/max replicas")
-	}
-	if maxV < minV {
-		return 0, 0, 0, fmt.Errorf("max replicas must be >= min replicas")
+// parseHPAScaleInputs validates and parses only the inputs that are actually
+// being applied. When scaleMinMax is set, minReplicas must be >= 1 and
+// maxReplicas >= minReplicas; when scaleTarget is set, target replicas >= 0.
+// Min/max are not validated for a target-only change (they may be unset when
+// prefill from the HPA spec was unavailable).
+func parseHPAScaleInputs(st hpaScaleState, scaleMinMax, scaleTarget bool) (minR, maxR, targetR int32, err error) {
+	if scaleMinMax {
+		minV, errMin := strconv.ParseInt(strings.TrimSpace(st.min.Value), 10, 32)
+		maxV, errMax := strconv.ParseInt(strings.TrimSpace(st.max.Value), 10, 32)
+		if errMin != nil || errMax != nil || minV < 1 || maxV < 1 {
+			return 0, 0, 0, fmt.Errorf("invalid min/max replicas")
+		}
+		if maxV < minV {
+			return 0, 0, 0, fmt.Errorf("max replicas must be >= min replicas")
+		}
+		minR, maxR = int32(minV), int32(maxV)
 	}
 	if scaleTarget {
 		tv, errT := strconv.ParseInt(strings.TrimSpace(st.target.Value), 10, 32)
@@ -233,9 +242,10 @@ func parseHPAScaleInputs(st hpaScaleState, scaleTarget bool) (minR, maxR, target
 		}
 		targetR = int32(tv)
 	}
-	return int32(minV), int32(maxV), targetR, nil
+	return minR, maxR, targetR, nil
 }
 
+// patchHPAScale returns a command that patches the selected HPA's min/max bounds.
 func (m Model) patchHPAScale(minR, maxR int32) tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
@@ -250,6 +260,8 @@ func (m Model) patchHPAScale(minR, maxR int32) tea.Cmd {
 	})
 }
 
+// scaleHPATarget returns a command that scales the HPA's target workload to the
+// given replica count (reusing the generic ScaleResource path).
 func (m Model) scaleHPATarget(kind, name string, replicas int32) tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
