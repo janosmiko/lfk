@@ -540,6 +540,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	if len(m.jumpBackStack) > 0 {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.JumpBack, Desc: "jump back"})
 	}
+	hintEntries = append(hintEntries, ui.HintEntry{Key: ui.ActiveKeybindings.JumpTop, Desc: "goto"})
 	hintEntries = append(hintEntries,
 		ui.HintEntry{Key: kb.Help, Desc: "help"},
 		ui.HintEntry{Key: "q", Desc: "quit"},
