@@ -204,6 +204,28 @@ func derivedParentHighlightBg(t Theme) string {
 	return formatHexColor(r, g, b)
 }
 
+// Darken returns hex with its HSL lightness scaled toward 0 by amount,
+// preserving hue and saturation. amount is clamped to [0, 1]: 0 returns the
+// color unchanged, 1 returns black. Use it to derive a readable shade of a
+// theme accent against a light background (e.g. status badges on the
+// selection highlight) instead of hardcoding a separate color. Returns the
+// input unchanged if it can't be parsed (named/malformed color).
+func Darken(hex string, amount float64) string {
+	r, g, b, ok := parseHexColor(hex)
+	if !ok {
+		return hex
+	}
+	switch {
+	case amount <= 0:
+		return hex
+	case amount > 1:
+		amount = 1
+	}
+	h, s, l := rgbToHSL(r, g, b)
+	nr, ng, nb := hslToRGB(h, s, l*(1-amount))
+	return formatHexColor(nr, ng, nb)
+}
+
 // EnforceMinContrast nudges the fg hex color's HSL lightness so it meets a
 // minimum WCAG contrast ratio against the bg hex color. The value parameter is
 // the user-facing normalized knob in [0, 1]:

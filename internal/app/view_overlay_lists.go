@@ -343,6 +343,10 @@ func renderAutoSyncOverlay(m Model) string {
 		labelW     = 14
 		badgeW     = 3 // " ON" / "OFF" / "  -"
 		chromeRows = 2 // title + title bottom padding
+		// The default green / red wash out on the light-blue selection
+		// background, so the selected row darkens the theme accents (hue
+		// preserved) for readability rather than hardcoding new colors.
+		selectedBadgeDarken = 0.5
 	)
 	boxW := min(boxWMax, m.width-4)
 	contentH := chromeRows + 3 // title chrome + 3 rows
@@ -355,16 +359,22 @@ func renderAutoSyncOverlay(m Model) string {
 	// surface background.
 	badge := func(on, disabled, selected bool) string {
 		bg := ui.SurfaceBg
+		fgOn := lipgloss.Color(ui.ColorSecondary)
+		fgOff := lipgloss.Color(ui.ColorError)
+		fgDim := lipgloss.Color(ui.ColorDimmed)
 		if selected {
 			bg = lipgloss.Color(ui.ColorSelectedBg)
+			fgOn = lipgloss.Color(ui.Darken(ui.ColorSecondary, selectedBadgeDarken))
+			fgOff = lipgloss.Color(ui.Darken(ui.ColorError, selectedBadgeDarken))
+			fgDim = lipgloss.Color(ui.ColorSelectedFg)
 		}
 		switch {
 		case disabled:
-			return lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed)).Background(bg).Render("  -")
+			return lipgloss.NewStyle().Foreground(fgDim).Background(bg).Render("  -")
 		case on:
-			return lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(bg).Render(" ON")
+			return lipgloss.NewStyle().Foreground(fgOn).Bold(true).Background(bg).Render(" ON")
 		default:
-			return lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError)).Background(bg).Render("OFF")
+			return lipgloss.NewStyle().Foreground(fgOff).Bold(true).Background(bg).Render("OFF")
 		}
 	}
 
