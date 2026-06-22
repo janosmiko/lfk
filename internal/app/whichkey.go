@@ -40,7 +40,10 @@ func (m Model) gotoTargets() []gotoTarget {
 		{kb.GotoStatefulSets, "StatefulSet", "apps", "StatefulSets"},
 		{kb.GotoConfigMaps, "ConfigMap", "", "ConfigMaps"},
 		{kb.GotoSecrets, "Secret", "", "Secrets"},
-		{kb.GotoArgoApplications, "Application", "argoproj.io", "ArgoCD Applications"},
+		{kb.GotoHPAs, "HorizontalPodAutoscaler", "autoscaling", "HPAs"},
+		{kb.GotoPVCs, "PersistentVolumeClaim", "", "PVCs"},
+		{kb.GotoPVs, "PersistentVolume", "", "PVs"},
+		{kb.GotoPDBs, "PodDisruptionBudget", "policy", "PDBs"},
 	}
 	out := make([]gotoTarget, 0, len(base)+len(ui.ConfigGotoTargets))
 	idx := map[string]int{}

@@ -16,7 +16,7 @@ func helpSections() []helpSection {
 				{kb.Up + " / Up", "Move up"},
 				{kb.JumpTop + kb.JumpTop + " / Home", "Jump to top"},
 				{kb.JumpBottom + " / End", "Jump to bottom"},
-				{kb.JumpTop + "+chord (gp/gd/gs/gn/gN/gi/gj/gc/gr/gD/gt/gC/gS/ga)", "Goto resource type (press " + kb.JumpTop + " for which-key popup; add custom chords via goto_targets)"},
+				{kb.JumpTop + "+chord (gp/gd/gs/gn/gN/gi/gj/gc/gr/gD/gt/gC/gS/gh/gv/gV/gb)", "Goto resource type (press " + kb.JumpTop + " for which-key popup; add custom chords/CRDs via goto_targets)"},
 				{helpKeyDisplay(kb.PageDown) + " / " + helpKeyDisplay(kb.PageUp) + " / Shift+↓ / Shift+↑", "Half-page scroll down / up"},
 				{helpKeyDisplay(kb.PageForward) + " / " + helpKeyDisplay(kb.PageBack) + " / PgDn / PgUp", "Full-page scroll down / up"},
 				{kb.Enter, "Open YAML view / navigate into"},

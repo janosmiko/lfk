@@ -257,7 +257,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
 | `Backspace` | Jump back through teleport history (owner / port-forward / orphan / finding / mark jumps) |
-| `g`+`p/d/s/n/N/i/j/c/r/D/t/C/S/a` | Goto resource type: Pods / Deployments / Services / Nodes / Namespaces / Ingresses / Jobs / CronJobs / ReplicaSets / DaemonSets / StatefulSets / ConfigMaps / Secrets / ArgoCD Applications (press `g` for which-key popup) |
+| `g`+`p/d/s/n/N/i/j/c/r/D/t/C/S/h/v/V/b` | Goto resource type: Pods / Deployments / Services / Nodes / Namespaces / Ingresses / Jobs / CronJobs / ReplicaSets / DaemonSets / StatefulSets / ConfigMaps / Secrets / HPAs / PVCs / PVs / PDBs (press `g` for which-key popup; add CRDs like ArgoCD via `goto_targets`) |
 
 ### Views and Modes
 

@@ -451,7 +451,10 @@
         "goto_statefulsets": { "type": "string" },
         "goto_configmaps": { "type": "string" },
         "goto_secrets": { "type": "string" },
-        "goto_argo_applications": { "type": "string" }
+        "goto_hpas": { "type": "string" },
+        "goto_pvcs": { "type": "string" },
+        "goto_pvs": { "type": "string" },
+        "goto_pdbs": { "type": "string" }
       }
     },
     "view": {

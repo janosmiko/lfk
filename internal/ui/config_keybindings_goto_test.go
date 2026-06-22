@@ -9,7 +9,8 @@ func TestDefaultKeybindings_GotoChords(t *testing.T) {
 		"GotoNodes": "gn", "GotoNamespaces": "gN", "GotoIngresses": "gi",
 		"GotoJobs": "gj", "GotoCronJobs": "gc", "GotoReplicaSets": "gr",
 		"GotoDaemonSets": "gD", "GotoStatefulSets": "gt", "GotoConfigMaps": "gC",
-		"GotoSecrets": "gS", "GotoArgoApplications": "ga",
+		"GotoSecrets": "gS", "GotoHPAs": "gh", "GotoPVCs": "gv", "GotoPVs": "gV",
+		"GotoPDBs": "gb",
 	}
 	got := map[string]string{
 		"GotoPods": kb.GotoPods, "GotoDeployments": kb.GotoDeployments,
@@ -18,7 +19,8 @@ func TestDefaultKeybindings_GotoChords(t *testing.T) {
 		"GotoJobs": kb.GotoJobs, "GotoCronJobs": kb.GotoCronJobs,
 		"GotoReplicaSets": kb.GotoReplicaSets, "GotoDaemonSets": kb.GotoDaemonSets,
 		"GotoStatefulSets": kb.GotoStatefulSets, "GotoConfigMaps": kb.GotoConfigMaps,
-		"GotoSecrets": kb.GotoSecrets, "GotoArgoApplications": kb.GotoArgoApplications,
+		"GotoSecrets": kb.GotoSecrets, "GotoHPAs": kb.GotoHPAs,
+		"GotoPVCs": kb.GotoPVCs, "GotoPVs": kb.GotoPVs, "GotoPDBs": kb.GotoPDBs,
 	}
 	for field, want := range cases {
 		if got[field] != want {
