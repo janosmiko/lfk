@@ -218,6 +218,12 @@ func (m Model) renderWhichKey(background string) string {
 		return background
 	}
 
+	// Panel-local styles: foreground only, all on the theme base background so
+	// the panel matches the theme rather than carrying the status bar's grey
+	// surface. Keys use the help-key accent; descriptions use normal text.
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
+
 	// Column width is the widest "key desc" pair, floored at which-key's
 	// min column width of 5.
 	plain := make([]string, len(cells))
@@ -225,12 +231,14 @@ func (m Model) renderWhichKey(background string) string {
 	cellW := 5
 	for i, c := range cells {
 		plain[i] = c.key + " " + c.desc
-		styled[i] = ui.HelpKeyStyle.Render(c.key) + " " + ui.BarDimStyle.Render(c.desc)
+		styled[i] = keyStyle.Render(c.key) + " " + descStyle.Render(c.desc)
 		cellW = max(cellW, lipgloss.Width(plain[i]))
 	}
 
 	const gap = 1
-	inner := max(m.width-2, cellW) // 2 = double border sides
+	// Panel spans ~75% of the screen width, centered, with the double border
+	// inside that budget.
+	inner := max(m.width*3/4-2, cellW)
 	cols := max((inner+gap)/(cellW+gap), 1)
 	rows := (len(cells) + cols - 1) / cols
 
@@ -247,12 +255,15 @@ func (m Model) renderWhichKey(background string) string {
 		}
 		lines[r] = strings.Join(parts, strings.Repeat(" ", gap))
 	}
-	content := ui.FillLinesBg(strings.Join(lines, "\n"), inner, ui.SurfaceBg)
+	content := ui.FillLinesBg(strings.Join(lines, "\n"), inner, ui.BaseBg)
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
+		Background(ui.BaseBg).
 		Width(inner).
 		Render(content)
-	return ui.PlaceOverlayBottom(m.width, m.height, box, ui.PadToHeight(background, m.height))
+	// marginBottom of 1 lifts the panel off the very bottom row, keeping the
+	// hint bar visible beneath it.
+	return ui.PlaceOverlayBottom(m.width, m.height, 1, box, ui.PadToHeight(background, m.height))
 }

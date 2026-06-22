@@ -575,11 +575,11 @@ func padToWidth(s string, targetWidth int) string {
 	return s + strings.Repeat(" ", targetWidth-w)
 }
 
-// PlaceOverlayBottom anchors an overlay to the bottom edge of the background,
-// horizontally centered. Used for the which-key panel, which rises from the
-// bottom of the screen like neovim's which-key "modern" preset rather than
-// floating in the center.
-func PlaceOverlayBottom(width, height int, overlay, background string) string {
+// PlaceOverlayBottom anchors an overlay near the bottom edge of the background,
+// horizontally centered, leaving marginBottom rows below it. Used for the
+// which-key panel, which rises from the bottom of the screen like neovim's
+// which-key "modern" preset rather than floating in the center.
+func PlaceOverlayBottom(width, height, marginBottom int, overlay, background string) string {
 	bgLines := strings.Split(background, "\n")
 	for len(bgLines) < height {
 		bgLines = append(bgLines, "")
@@ -594,7 +594,7 @@ func PlaceOverlayBottom(width, height int, overlay, background string) string {
 		ovWidth = lipgloss.Width(ovLines[0])
 	}
 
-	startRow := max(height-len(ovLines), 0)
+	startRow := max(height-marginBottom-len(ovLines), 0)
 	startCol := max((width-ovWidth)/2, 0)
 
 	result := make([]string, len(bgLines))
