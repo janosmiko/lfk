@@ -47,6 +47,14 @@ func (m Model) overlayHintBarDialog() string {
 		})
 	case overlayScaleInput:
 		return m.renderHints([]ui.HintEntry{
+			{Key: "h/l -/+", Desc: "−/＋"},
+			{Key: "Enter", Desc: "apply"},
+			{Key: "esc", Desc: "cancel"},
+		})
+	case overlayHPAScale:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "field"},
+			{Key: "h/l -/+", Desc: "−/＋"},
 			{Key: "Enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})

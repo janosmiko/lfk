@@ -178,6 +178,27 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 	return nil
 }
 
+// PatchHPAScale patches a HorizontalPodAutoscaler's spec.minReplicas and
+// spec.maxReplicas. rt carries the cluster's served HPA group/version so the
+// patch targets the right endpoint (autoscaling/v2 on modern clusters).
+func (c *Client) PatchHPAScale(contextName, namespace string, rt model.ResourceTypeEntry, name string, minReplicas, maxReplicas int32) error {
+	logger.Info("Scaling HPA", "context", contextName, "namespace", namespace, "name", name, "min", minReplicas, "max", maxReplicas)
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: rt.APIGroup, Version: rt.APIVersion, Resource: rt.Resource}
+	patch := fmt.Appendf(nil, `{"spec":{"minReplicas":%d,"maxReplicas":%d}}`, minReplicas, maxReplicas)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("scaling HPA %s to min=%d max=%d: %w", name, minReplicas, maxReplicas, err)
+	}
+	return nil
+}
+
 // ResizePVC patches a PersistentVolumeClaim's spec.resources.requests.storage to the given size.
 func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
 	logger.Info("Resizing PVC", "context", contextName, "namespace", namespace, "name", name, "size", newSize)

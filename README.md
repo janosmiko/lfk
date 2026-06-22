@@ -135,6 +135,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **ArgoCD integration**: Browse Applications, sync, terminate sync, refresh, view managed resources
 - **Argo Workflows integration**: Suspend/resume, stop/terminate, resubmit Workflows; submit from WorkflowTemplates; suspend/resume CronWorkflows
 - **Helm integration**: Browse releases, view managed resources, uninstall
+- **HPA scaling**: Press `S` on a HorizontalPodAutoscaler to edit its min/max replica bounds and scale its target workload (Deployment / StatefulSet / ReplicaSet) in one overlay
 - **KEDA integration**: Pause/unpause ScaledObjects and ScaledJobs
 - **External Secrets integration**: Force refresh ExternalSecrets, ClusterExternalSecrets, and PushSecrets
 - **CRD discovery**: Automatically discovers installed CRDs and groups them by API group

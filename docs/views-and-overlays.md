@@ -103,6 +103,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | Overlay                  | Default trigger                | Purpose                                            |
 | ------------------------ | ------------------------------ | -------------------------------------------------- |
 | `overlayScaleInput`      | `S` on workload                | Replica count input.                                |
+| `overlayHPAScale`        | `S` on HPA                     | HPA min/max bounds + target replica scale.          |
 | `overlayPortForward`     | `p` on Service / Pod           | Port-forward destination input.                     |
 | `overlaySecretEditor`    | `e` on Secret                  | Inline edit of decoded secret values.               |
 | `overlayConfigMapEditor` | `e` on ConfigMap               | Inline edit of CM keys.                             |

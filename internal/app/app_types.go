@@ -44,6 +44,7 @@ const (
 	overlayConfirm     // y/n confirmation (regular delete, drain)
 	overlayConfirmType // requires typing "DELETE" to confirm (force delete, force finalize)
 	overlayScaleInput
+	overlayHPAScale // HPA min/max bounds + target replicas (action menu key S)
 	overlayPortForward
 	overlayContainerSelect
 	overlayPodSelect
@@ -403,6 +404,24 @@ type actionContext struct {
 	image         string // container image (for vuln scan at container level)
 	resourceType  model.ResourceTypeEntry
 	columns       []model.KeyValue // additional item columns (e.g., Node, IP) for custom action templates
+	raw           map[string]any   // full source object; used to prefill scale overlays from spec/status
+}
+
+// hpaScaleState backs the HPA scale overlay. The overlay edits the HPA's
+// own min/max bounds (patched on the HPA) and, separately, the replica count
+// of its scale target (a Deployment/StatefulSet/ReplicaSet — scaled directly,
+// which the HPA may revert on its next reconcile). orig* snapshots the
+// prefilled values so apply only issues a call for fields the user changed.
+type hpaScaleState struct {
+	min        TextInput
+	max        TextInput
+	target     TextInput
+	field      int // active row: 0=min, 1=max, 2=target
+	targetKind string
+	targetName string
+	origMin    string
+	origMax    string
+	origTarget string
 }
 
 // TabState holds per-tab navigation state so each tab is fully independent.

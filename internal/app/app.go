@@ -153,7 +153,7 @@ type Model struct {
 
 	// Scale input state.
 	scaleInput TextInput
-
+	hpaScale   hpaScaleState // HPA scale overlay: min/max bounds + target replicas
 	// PVC resize: current size displayed in the overlay.
 	pvcCurrentSize string
 

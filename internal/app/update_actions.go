@@ -183,6 +183,9 @@ func (m *Model) buildActionCtx(sel *model.Item, kind string) actionContext {
 
 	// Store item columns for custom action template variable substitution.
 	ctx.columns = sel.Columns
+	// Retain the raw object so scale overlays can prefill from spec/status
+	// without depending on column key names.
+	ctx.raw = sel.Raw
 
 	return ctx
 }
@@ -338,7 +341,7 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
-	if !model.IsScaleableKind(kind) {
+	if !model.IsScaleableKind(kind) && kind != "HorizontalPodAutoscaler" {
 		m.setStatusMessage("Scale not available for "+kind, true)
 		return m, scheduleStatusClear()
 	}

@@ -149,7 +149,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `v` | Describe selected resource | `describe` |
 | `D` | Delete resource (force delete Pod/Job if already deleting, force finalize others) | `delete` |
 | `X` | Force delete (Pod/Job only) | `force_delete` |
-| `S` | Scale resource (Deployment / StatefulSet / ReplicaSet) | `scale` |
+| `S` | Scale resource (Deployment / StatefulSet / ReplicaSet / HPA) | `scale` |
 | `W` | Save resource to file / toggle warnings-only filter (Events view) | `save_resource` |
 | `Ctrl+O` | Open in browser: ingress host, port-forward localhost URL, or (on a Service) start a port forward and open it | `open_browser` |
 | `i` | Edit labels/annotations | `label_editor` |
@@ -981,6 +981,11 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 
 ### DaemonSet Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+
+### HorizontalPodAutoscaler Actions
+`S` Scale (edit min/max bounds & target replicas), `E` Edit, `D` Delete, `v` Describe, `b` Debug Pod, `V` Events
+
+The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the HPA keeps autoscaling within the new range) and, optionally, scales the target workload directly. Fields prefill from the HPA's current values. `j`/`k` (or `↓`/`↑`) move between the three fields; `h`/`-` and `l`/`+` decrement/increment the active field; `←`/`→` move the cursor within the field; digits type a value directly. Target replica changes may be reverted by the HPA on its next reconcile. The same `h`/`-`/`l`/`+` steppers work in the workload Scale overlay.
 
 ### Service Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `O` Port Forward & Open (forward a port and open it in the browser), `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events

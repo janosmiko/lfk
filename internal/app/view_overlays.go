@@ -174,10 +174,23 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 			WrapWidth: w - 4,
 		}), w, min(10, m.height-6), true
 	case overlayScaleInput:
+		w := min(45, m.width-10)
 		return ui.RenderOverlayInput(ui.OverlayInputConfig{
 			Title: "Scale Deployment",
-			Rows:  []ui.OverlayInputRow{{Label: "Replicas: ", Input: m.scaleInput.Value}},
-		}), min(45, m.width-10), min(8, m.height-6), true
+			Width: w - 4,
+			Rows:  []ui.OverlayInputRow{{Label: "Replicas: ", Input: m.scaleInput.Value, ShowCursor: true, Cursor: m.scaleInput.Cursor}},
+		}), w, min(8, m.height-6), true
+	case overlayHPAScale:
+		w := min(56, m.width-10)
+		return ui.RenderOverlayInput(ui.OverlayInputConfig{
+			Title: "Scale HPA",
+			Width: w - 4,
+			Rows: []ui.OverlayInputRow{
+				{Label: "Min replicas:    ", Input: m.hpaScale.min.Value, ShowCursor: m.hpaScale.field == 0, Cursor: m.hpaScale.min.Cursor},
+				{Label: "Max replicas:    ", Input: m.hpaScale.max.Value, ShowCursor: m.hpaScale.field == 1, Cursor: m.hpaScale.max.Cursor},
+				{Label: "Target replicas: ", Input: m.hpaScale.target.Value, ShowCursor: m.hpaScale.field == 2, Cursor: m.hpaScale.target.Cursor},
+			},
+		}), w, min(11, m.height-6), true
 	case overlayPVCResize:
 		var hint string
 		if m.pvcCurrentSize != "" {
@@ -240,6 +253,7 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 					Label:      prompt + "\n  ",
 					Input:      m.batchLabelInput.Value,
 					ShowCursor: true,
+					Cursor:     m.batchLabelInput.Cursor,
 				},
 			},
 		})
