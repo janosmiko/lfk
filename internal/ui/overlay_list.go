@@ -88,6 +88,14 @@ type OverlayListConfig struct {
 	// row content and the badge).
 	BadgeWidth int
 
+	// CursorHighlightWidth, when > 0, caps the selection highlight on the
+	// cursor row to this many cells instead of spanning the full item
+	// area. The remaining cells up to the item width pad with the surface
+	// background so trailing columns (badge/scrollbar) stay aligned. Use
+	// it when a full-width bar would read as highlighting trailing fields
+	// (e.g. the AutoSync overlay's ON/OFF switches).
+	CursorHighlightWidth int
+
 	// Height, when > 0, locks the rendered output to exactly this many
 	// lines. Padding with blank lines when content is shorter,
 	// truncating when longer. Use this to keep the surrounding overlay
@@ -194,11 +202,19 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		it := items[i]
 		var row string
 		if i == cfg.Cursor {
-			// Cursor row: plain text padded to itemWidth so the selection
-			// background spans the entire item area. The scrollbar + badge
-			// sit outside the highlight so they stay readable against the
-			// box.
-			row = OverlaySelectedStyle.Width(itemWidth).Render(itemPlainLine(it, cfg, hasActive))
+			// Cursor row: plain text padded so the selection background spans
+			// the item area. The scrollbar + badge sit outside the highlight
+			// so they stay readable against the box. CursorHighlightWidth
+			// caps the highlight short of the item area; the remainder pads
+			// with the surface background so the badge column stays put.
+			hlW := itemWidth
+			if cfg.CursorHighlightWidth > 0 && cfg.CursorHighlightWidth < itemWidth {
+				hlW = cfg.CursorHighlightWidth
+			}
+			row = OverlaySelectedStyle.Width(hlW).Render(itemPlainLine(it, cfg, hasActive))
+			if pad := itemWidth - lipgloss.Width(row); pad > 0 {
+				row += OverlayDimStyle.Render(strings.Repeat(" ", pad))
+			}
 		} else {
 			line := OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive))
 			// Only pad non-cursor rows when there's a trailing column
