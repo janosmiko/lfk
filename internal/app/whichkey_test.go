@@ -147,28 +147,43 @@ func TestLayoutWhichKey(t *testing.T) {
 		return out
 	}
 
-	// Wide terminal, 15 entries -> 4 columns, ceil(15/4)=4 rows.
-	lay := layoutWhichKey(mk(15), 1000)
+	sumOf := func(xs []int) int {
+		s := 0
+		for _, x := range xs {
+			s += x
+		}
+		return s
+	}
+
+	// 15 entries -> 4 columns, ceil(15/4)=4 rows; stretched to the target width
+	// with the slack in the gaps and no trailing space past the last column
+	// (inner == sum(colW) + sum(gaps)).
+	lay := layoutWhichKey(mk(15), 100, 200)
 	if len(lay.colW) != 4 || lay.rows != 4 {
 		t.Fatalf("15 entries: want 4 cols / 4 rows, got %d cols / %d rows", len(lay.colW), lay.rows)
 	}
+	if lay.inner != 100 {
+		t.Fatalf("grid must stretch to target inner 100, got %d", lay.inner)
+	}
+	if sumOf(lay.colW)+sumOf(lay.gaps) != lay.inner {
+		t.Fatalf("no-trailing-gap invariant broken: cols=%v gaps=%v inner=%d", lay.colW, lay.gaps, lay.inner)
+	}
 
 	// Adding entries keeps 4 columns and grows rows (expand vertically).
-	lay2 := layoutWhichKey(mk(23), 1000)
+	lay2 := layoutWhichKey(mk(23), 100, 200)
 	if len(lay2.colW) != 4 || lay2.rows != 6 { // ceil(23/4)=6
 		t.Fatalf("23 entries: want 4 cols / 6 rows, got %d cols / %d rows", len(lay2.colW), lay2.rows)
 	}
 
-	// Each column is sized to its own widest entry (no global padding => no
-	// trailing right gap). 4 entries, 4 columns, 1 row each.
+	// Each column is sized to its own widest entry. 4 entries, 4 columns, 1 row.
 	wide := []string{"short", "a-very-long-entry", "short", "short"}
-	lay3 := layoutWhichKey(wide, 1000)
+	lay3 := layoutWhichKey(wide, 100, 200)
 	if lay3.colW[1] != len("a-very-long-entry") || lay3.colW[0] != len("short") {
 		t.Fatalf("per-column widths wrong: %v", lay3.colW)
 	}
 
 	// Narrow terminal reduces the column count to fit.
-	lay4 := layoutWhichKey(mk(15), 5)
+	lay4 := layoutWhichKey(mk(15), 5, 5)
 	if len(lay4.colW) >= 4 {
 		t.Fatalf("narrow width must reduce columns, got %d", len(lay4.colW))
 	}

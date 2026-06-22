@@ -210,39 +210,57 @@ func (m Model) whichKeyCells() []whichKeyCell {
 // terminal is too narrow to fit them.
 const (
 	whichKeyMaxCols = 4 // preferred column count
-	whichKeyColGap  = 3 // spaces between columns
+	whichKeyMinGap  = 3 // minimum spaces between columns
 )
 
-// whichKeyLayout describes a laid-out grid: the per-column widths, the row
-// count, and the total inner content width.
+// whichKeyLayout describes a laid-out grid: the per-column widths, the spacing
+// inserted between each pair of columns (length cols-1), the row count, and the
+// total inner content width.
 type whichKeyLayout struct {
 	colW  []int
+	gaps  []int
 	rows  int
 	inner int
 }
 
 // layoutWhichKey lays the cells into the largest column count (up to
 // whichKeyMaxCols) that fits maxInner, sizing each column to its own widest
-// entry (so the grid has no trailing right gap). Column-major fill: entries go
-// down each column.
-func layoutWhichKey(plain []string, maxInner int) whichKeyLayout {
+// entry. The columns are then spread to targetInner (bounded by maxInner) by
+// widening the inter-column gaps, so the grid fills the width without any
+// trailing gap past the last column. Column-major fill: entries go down each
+// column.
+func layoutWhichKey(plain []string, targetInner, maxInner int) whichKeyLayout {
 	cols := min(whichKeyMaxCols, len(plain))
 	for {
 		rows := (len(plain) + cols - 1) / cols
 		colW := make([]int, cols)
+		sumW := 0
 		for c := range cols {
 			for r := range rows {
 				if idx := c*rows + r; idx < len(plain) {
 					colW[c] = max(colW[c], lipgloss.Width(plain[idx]))
 				}
 			}
+			sumW += colW[c]
 		}
-		inner := whichKeyColGap * (cols - 1)
-		for _, w := range colW {
-			inner += w
+		if cols == 1 {
+			return whichKeyLayout{colW: colW, rows: rows, inner: sumW}
 		}
-		if cols == 1 || inner <= maxInner {
-			return whichKeyLayout{colW: colW, rows: rows, inner: inner}
+		minWidth := sumW + whichKeyMinGap*(cols-1)
+		if minWidth <= maxInner {
+			// Stretch toward targetInner (never below the minimal layout, never
+			// past the screen). The slack is shared across the gaps.
+			want := min(max(targetInner, minWidth), maxInner)
+			slack := want - sumW
+			base, rem := slack/(cols-1), slack%(cols-1)
+			gaps := make([]int, cols-1)
+			for i := range gaps {
+				gaps[i] = base
+				if i < rem {
+					gaps[i]++
+				}
+			}
+			return whichKeyLayout{colW: colW, gaps: gaps, rows: rows, inner: want}
 		}
 		cols--
 	}
@@ -275,28 +293,34 @@ func (m Model) renderWhichKey(background string) string {
 	}
 
 	const (
-		padV = 1 // rows of padding above and below
-		padH = 2 // columns of padding left and right
+		padV     = 1  // rows of padding above and below
+		padH     = 2  // columns of padding left and right
+		widthPct = 60 // panel spans this percent of the screen width
 	)
-	// Budget the natural grid against the screen, leaving room for padding and
-	// the border.
-	maxInner := max(m.width-2*padH-2, 1)
-	lay := layoutWhichKey(plain, maxInner)
+	// Target ~widthPct of the screen, but never wider than the screen leaves
+	// room for once padding and the border are accounted for.
+	chrome := 2*padH + 2
+	maxInner := max(m.width-chrome, 1)
+	targetInner := max(m.width*widthPct/100-chrome, 1)
+	lay := layoutWhichKey(plain, targetInner, maxInner)
 	cols := len(lay.colW)
 
 	body := make([]string, lay.rows)
 	for r := range lay.rows {
-		parts := make([]string, cols)
+		var sb strings.Builder
 		for c := range cols {
 			idx := c*lay.rows + r // column-major: fill down each column first
-			if idx >= len(cells) {
-				parts[c] = strings.Repeat(" ", lay.colW[c])
-				continue
+			if idx < len(cells) {
+				sb.WriteString(styled[idx])
+				sb.WriteString(strings.Repeat(" ", max(lay.colW[c]-lipgloss.Width(plain[idx]), 0)))
+			} else {
+				sb.WriteString(strings.Repeat(" ", lay.colW[c]))
 			}
-			pad := max(lay.colW[c]-lipgloss.Width(plain[idx]), 0)
-			parts[c] = styled[idx] + strings.Repeat(" ", pad)
+			if c < cols-1 {
+				sb.WriteString(strings.Repeat(" ", lay.gaps[c]))
+			}
 		}
-		body[r] = strings.Join(parts, strings.Repeat(" ", whichKeyColGap))
+		body[r] = sb.String()
 	}
 	content := ui.FillLinesBg(strings.Join(body, "\n"), lay.inner, ui.BaseBg)
 
