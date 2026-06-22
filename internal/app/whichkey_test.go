@@ -138,6 +138,42 @@ func TestExplorerJumpTop_GGClearsWhichKeyShown(t *testing.T) {
 	}
 }
 
+func TestLayoutWhichKey(t *testing.T) {
+	mk := func(n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = "x x" // width 3
+		}
+		return out
+	}
+
+	// Wide terminal, 15 entries -> 4 columns, ceil(15/4)=4 rows.
+	lay := layoutWhichKey(mk(15), 1000)
+	if len(lay.colW) != 4 || lay.rows != 4 {
+		t.Fatalf("15 entries: want 4 cols / 4 rows, got %d cols / %d rows", len(lay.colW), lay.rows)
+	}
+
+	// Adding entries keeps 4 columns and grows rows (expand vertically).
+	lay2 := layoutWhichKey(mk(23), 1000)
+	if len(lay2.colW) != 4 || lay2.rows != 6 { // ceil(23/4)=6
+		t.Fatalf("23 entries: want 4 cols / 6 rows, got %d cols / %d rows", len(lay2.colW), lay2.rows)
+	}
+
+	// Each column is sized to its own widest entry (no global padding => no
+	// trailing right gap). 4 entries, 4 columns, 1 row each.
+	wide := []string{"short", "a-very-long-entry", "short", "short"}
+	lay3 := layoutWhichKey(wide, 1000)
+	if lay3.colW[1] != len("a-very-long-entry") || lay3.colW[0] != len("short") {
+		t.Fatalf("per-column widths wrong: %v", lay3.colW)
+	}
+
+	// Narrow terminal reduces the column count to fit.
+	lay4 := layoutWhichKey(mk(15), 5)
+	if len(lay4.colW) >= 4 {
+		t.Fatalf("narrow width must reduce columns, got %d", len(lay4.colW))
+	}
+}
+
 func TestGotoTargets_IncludesBuiltins(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()

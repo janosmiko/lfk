@@ -205,10 +205,53 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	return cells
 }
 
-// renderWhichKey draws the goto cheatsheet anchored to the bottom of the screen
-// when the g prefix is armed and visible, styled after neovim's which-key
-// "modern" preset: a compact full-width double-bordered panel of key/desc
-// columns. Returns background unchanged when hidden/disabled.
+// which-key grid geometry. The grid grows vertically (more rows) as entries
+// are added, keeping a stable column count; the count drops only when the
+// terminal is too narrow to fit them.
+const (
+	whichKeyMaxCols = 4 // preferred column count
+	whichKeyColGap  = 3 // spaces between columns
+)
+
+// whichKeyLayout describes a laid-out grid: the per-column widths, the row
+// count, and the total inner content width.
+type whichKeyLayout struct {
+	colW  []int
+	rows  int
+	inner int
+}
+
+// layoutWhichKey lays the cells into the largest column count (up to
+// whichKeyMaxCols) that fits maxInner, sizing each column to its own widest
+// entry (so the grid has no trailing right gap). Column-major fill: entries go
+// down each column.
+func layoutWhichKey(plain []string, maxInner int) whichKeyLayout {
+	cols := min(whichKeyMaxCols, len(plain))
+	for {
+		rows := (len(plain) + cols - 1) / cols
+		colW := make([]int, cols)
+		for c := range cols {
+			for r := range rows {
+				if idx := c*rows + r; idx < len(plain) {
+					colW[c] = max(colW[c], lipgloss.Width(plain[idx]))
+				}
+			}
+		}
+		inner := whichKeyColGap * (cols - 1)
+		for _, w := range colW {
+			inner += w
+		}
+		if cols == 1 || inner <= maxInner {
+			return whichKeyLayout{colW: colW, rows: rows, inner: inner}
+		}
+		cols--
+	}
+}
+
+// renderWhichKey draws the goto cheatsheet near the bottom of the screen when
+// the g prefix is armed and visible, styled after neovim's which-key "modern"
+// preset: a rounded-border panel of key/desc columns with uniform padding over
+// a dimmed background. Returns background unchanged when hidden/disabled.
 func (m Model) renderWhichKey(background string) string {
 	if !m.pendingG || !m.whichKeyShown || !ui.ConfigWhichKeyEnabled {
 		return background
@@ -224,67 +267,51 @@ func (m Model) renderWhichKey(background string) string {
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
 
-	// Column width is the widest "key desc" pair, floored at which-key's
-	// min column width of 5.
 	plain := make([]string, len(cells))
 	styled := make([]string, len(cells))
-	cellW := 5
 	for i, c := range cells {
 		plain[i] = c.key + " " + c.desc
 		styled[i] = keyStyle.Render(c.key) + " " + descStyle.Render(c.desc)
-		cellW = max(cellW, lipgloss.Width(plain[i]))
 	}
 
-	const gap = 1
-	// Panel spans ~75% of the screen width, centered, with the rounded border
-	// inside that budget.
-	inner := max(m.width*3/4-2, cellW)
-	cols := max((inner+gap)/(cellW+gap), 1)
-	rows := (len(cells) + cols - 1) / cols
+	const (
+		padV = 1 // rows of padding above and below
+		padH = 2 // columns of padding left and right
+	)
+	// Budget the natural grid against the screen, leaving room for padding and
+	// the border.
+	maxInner := max(m.width-2*padH-2, 1)
+	lay := layoutWhichKey(plain, maxInner)
+	cols := len(lay.colW)
 
-	// Spread the columns across the full inner width instead of packing them
-	// left: each column is at least cellW wide, and the rounding remainder is
-	// absorbed by the leftmost columns.
-	avail := max(inner-gap*(cols-1), cols)
-	baseW, rem := avail/cols, avail%cols
-	colW := func(c int) int {
-		if c < rem {
-			return baseW + 1
-		}
-		return baseW
-	}
-
-	body := make([]string, rows)
-	for r := range rows {
+	body := make([]string, lay.rows)
+	for r := range lay.rows {
 		parts := make([]string, cols)
 		for c := range cols {
-			idx := c*rows + r // column-major: fill down each column first
+			idx := c*lay.rows + r // column-major: fill down each column first
 			if idx >= len(cells) {
-				parts[c] = strings.Repeat(" ", colW(c))
+				parts[c] = strings.Repeat(" ", lay.colW[c])
 				continue
 			}
-			pad := max(colW(c)-lipgloss.Width(plain[idx]), 0)
+			pad := max(lay.colW[c]-lipgloss.Width(plain[idx]), 0)
 			parts[c] = styled[idx] + strings.Repeat(" ", pad)
 		}
-		body[r] = strings.Join(parts, strings.Repeat(" ", gap))
+		body[r] = strings.Join(parts, strings.Repeat(" ", whichKeyColGap))
 	}
-	// A blank leading row gives the first entries breathing room below the
-	// top border.
-	lines := append([]string{""}, body...)
-	content := ui.FillLinesBg(strings.Join(lines, "\n"), inner, ui.BaseBg)
+	content := ui.FillLinesBg(strings.Join(body, "\n"), lay.inner, ui.BaseBg)
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Background(ui.BaseBg).
-		Width(inner).
+		Padding(padV, padH).
 		Render(content)
 
-	// Dim the screen behind the panel like the other overlays do, then lift
-	// the panel one row off the bottom so the hint bar stays visible.
+	// Dim the screen behind the panel like the other overlays do, then lift the
+	// panel a few rows off the bottom.
 	bg := ui.PadToHeight(background, m.height)
 	if ui.ConfigDimOverlay {
 		bg = ui.DimBackground(bg, 1)
 	}
-	return ui.PlaceOverlayBottom(m.width, m.height, 1, box, bg)
+	return ui.PlaceOverlayBottom(m.width, m.height, 5, box, bg)
 }
