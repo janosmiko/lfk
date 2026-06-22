@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
@@ -153,4 +155,46 @@ func (m Model) handleGotoChord(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	m.whichKeyShown = false
 	out, cmd := m.gotoResourceType(gt.Kind, gt.Group)
 	return out, cmd, true
+}
+
+// whichKeyTickMsg fires after which_key_delay_ms to reveal the popup.
+type whichKeyTickMsg struct{}
+
+// armWhichKey is called when the g prefix arms. With no delay it shows the
+// popup immediately; otherwise it schedules a reveal tick.
+func (m Model) armWhichKey() (Model, tea.Cmd) {
+	if !ui.ConfigWhichKeyEnabled {
+		m.whichKeyShown = false
+		return m, nil
+	}
+	if ui.ConfigWhichKeyDelayMs <= 0 {
+		m.whichKeyShown = true
+		return m, nil
+	}
+	m.whichKeyShown = false
+	d := time.Duration(ui.ConfigWhichKeyDelayMs) * time.Millisecond
+	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyTickMsg{} })
+}
+
+// renderWhichKey draws the goto cheatsheet over background when the g prefix
+// is armed and visible. Returns background unchanged when hidden/disabled.
+func (m Model) renderWhichKey(background string) string {
+	if !m.pendingG || !m.whichKeyShown || !ui.ConfigWhichKeyEnabled {
+		return background
+	}
+	targets := m.gotoTargets()
+	if len(targets) == 0 {
+		return background
+	}
+	var b strings.Builder
+	b.WriteString("Goto\n\n")
+	fmt.Fprintf(&b, "  %-4s %s\n", ui.ActiveKeybindings.JumpTop+ui.ActiveKeybindings.JumpTop, "list top")
+	for _, gt := range targets {
+		fmt.Fprintf(&b, "  %-4s %s\n", gt.Chord, gt.Label)
+	}
+	content := strings.TrimRight(b.String(), "\n")
+	w := min(40, m.width-4)
+	content = ui.FillLinesBg(content, w, ui.SurfaceBg)
+	box := ui.OverlayStyle.Width(w).Render(content)
+	return ui.PlaceOverlay(m.width, m.height, box, ui.PadToHeight(background, m.height))
 }

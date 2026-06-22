@@ -203,6 +203,11 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 // updateEasterEggMsg handles easter egg tick/clear messages.
 func (m Model) updateEasterEggMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg.(type) {
+	case whichKeyTickMsg:
+		if m.pendingG {
+			m.whichKeyShown = true
+		}
+		return m, nil, true
 	case konamiClearMsg:
 		m = m.clearKonami()
 		return m, nil, true

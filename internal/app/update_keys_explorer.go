@@ -276,7 +276,8 @@ func (m Model) handleExplorerJumpTop() (tea.Model, tea.Cmd) {
 		return m, m.loadPreview()
 	}
 	m.pendingG = true
-	return m, nil
+	mdl, cmd := m.armWhichKey()
+	return mdl, cmd
 }
 
 func (m Model) handleExplorerJumpBottom() (tea.Model, tea.Cmd) {
