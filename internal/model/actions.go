@@ -222,6 +222,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "HorizontalPodAutoscaler":
 		return []ActionMenuItem{
+			{Label: "Scale", Description: "Edit min/max bounds & target replicas", Key: "S"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this HPA", Key: "D"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},

@@ -243,6 +243,18 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale %s %s --replicas=%d -n %s --context %s", strings.ToLower(m.actionCtx.kind), m.actionCtx.name, replicas, m.actionCtx.namespace, m.actionCtx.context))
 		return m, m.scaleResource(int32(replicas))
+	case "l", "+":
+		stepInput(&m.scaleInput, 1, 0)
+		return m, nil
+	case "h", "-":
+		stepInput(&m.scaleInput, -1, 0)
+		return m, nil
+	case "left":
+		m.scaleInput.Left()
+		return m, nil
+	case "right":
+		m.scaleInput.Right()
+		return m, nil
 	case "backspace":
 		if len(m.scaleInput.Value) > 0 {
 			m.scaleInput.Backspace()
@@ -250,18 +262,6 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+w":
 		m.scaleInput.DeleteWord()
-		return m, nil
-	case "ctrl+a":
-		m.scaleInput.Home()
-		return m, nil
-	case "ctrl+e":
-		m.scaleInput.End()
-		return m, nil
-	case "left":
-		m.scaleInput.Left()
-		return m, nil
-	case "right":
-		m.scaleInput.Right()
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()

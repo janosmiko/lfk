@@ -118,6 +118,9 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 	case overlayScaleInput:
 		mdl, cmd := m.handleScaleOverlayKey(msg)
 		return mdl, cmd, true
+	case overlayHPAScale:
+		mdl, cmd := m.handleHPAScaleOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayPVCResize:
 		mdl, cmd := m.handlePVCResizeOverlayKey(msg)
 		return mdl, cmd, true

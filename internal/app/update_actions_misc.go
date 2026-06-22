@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -147,7 +148,16 @@ func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) executeActionScale() Model {
-	m.scaleInput.Clear()
+	if m.actionCtx.kind == "HorizontalPodAutoscaler" {
+		return m.openHPAScaleOverlay()
+	}
+	// Prefill with the workload's current desired replica count so the user
+	// can step from it rather than retype.
+	if v, ok := nestedInt(m.actionCtx.raw, "spec", "replicas"); ok {
+		m.scaleInput.Set(strconv.FormatInt(v, 10))
+	} else {
+		m.scaleInput.Clear()
+	}
 	m.overlay = overlayScaleInput
 	return m
 }

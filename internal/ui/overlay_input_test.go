@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,20 +70,41 @@ func TestRenderOverlayInput(t *testing.T) {
 		assert.Contains(t, out, "8080")
 	})
 
-	t.Run("ShowCursor appends a cursor block to the row", func(t *testing.T) {
+	t.Run("ShowCursor renders a reverse-video cursor cell at the cursor offset", func(t *testing.T) {
+		// With styling stripped in tests, a cursor at the end of the input
+		// surfaces as a trailing cursor cell (space) after the value.
 		out := RenderOverlayInput(OverlayInputConfig{
 			Title: "Add Labels",
-			Rows:  []OverlayInputRow{{Label: "key=value: ", Input: "app=foo", ShowCursor: true}},
+			Rows:  []OverlayInputRow{{Label: "key=value: ", Input: "app=foo", ShowCursor: true, Cursor: 7}},
 		})
-		assert.Contains(t, out, "█")
+		assert.Contains(t, out, "app=foo ")
 	})
 
-	t.Run("ShowCursor off omits cursor block", func(t *testing.T) {
+	t.Run("ShowCursor off renders no cursor cell", func(t *testing.T) {
 		out := RenderOverlayInput(OverlayInputConfig{
 			Title: "Scale",
 			Rows:  []OverlayInputRow{{Label: "Replicas: ", Input: "3", ShowCursor: false}},
 		})
 		assert.NotContains(t, out, "█")
+		assert.NotContains(t, out, "3 ")
+	})
+
+	t.Run("Width highlights the active row full-width", func(t *testing.T) {
+		out := RenderOverlayInput(OverlayInputConfig{
+			Title: "Scale",
+			Width: 30,
+			Rows:  []OverlayInputRow{{Label: "Replicas: ", Input: "3", ShowCursor: true}},
+		})
+		// The active row carries the label + value and is padded to Width
+		// (styles are stripped in tests, leaving the spacing).
+		var rowLine string
+		for line := range strings.SplitSeq(out, "\n") {
+			if strings.Contains(line, "Replicas: 3") {
+				rowLine = line
+			}
+		}
+		assert.NotEmpty(t, rowLine)
+		assert.GreaterOrEqual(t, lipgloss.Width(rowLine), 30)
 	})
 
 	t.Run("candidate list rendered with header and cursor", func(t *testing.T) {
