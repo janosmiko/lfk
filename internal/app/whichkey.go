@@ -2,10 +2,12 @@ package app
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -138,23 +140,23 @@ func (m *Model) normalizeGotoPanes() {
 	m.clearRight()
 }
 
-// handleGotoChord is called while the g prefix is armed (m.pendingG). It
-// consumes only registered goto chords; the second "g" and any unregistered
-// key are left to the existing dispatch (jump-top / passthrough), so no
-// current behavior regresses.
+// handleGotoChord is called while the g prefix is armed (m.pendingG). The
+// second "g" falls through to the gg jump-top handler. Every other key closes
+// the prefix and the popup (which-key semantics): a registered chord navigates,
+// and an unregistered key (e.g. gP) is swallowed as a silent noop rather than
+// falling through to the key's normal explorer action.
 func (m Model) handleGotoChord(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	key := msg.String()
 	if key == ui.ActiveKeybindings.JumpTop { // "g" -> belongs to gg jump-top
 		return m, nil, false
 	}
-	gt, ok := m.gotoTargetForChord("g" + key)
-	if !ok {
-		return m, nil, false
-	}
 	m.pendingG = false
 	m.whichKeyShown = false
-	out, cmd := m.gotoResourceType(gt.Kind, gt.Group)
-	return out, cmd, true
+	if gt, ok := m.gotoTargetForChord(ui.ActiveKeybindings.JumpTop + key); ok {
+		out, cmd := m.gotoResourceType(gt.Kind, gt.Group)
+		return out, cmd, true
+	}
+	return m, nil, true
 }
 
 // whichKeyTickMsg fires after which_key_delay_ms to reveal the popup.
@@ -176,25 +178,81 @@ func (m Model) armWhichKey() (Model, tea.Cmd) {
 	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyTickMsg{} })
 }
 
-// renderWhichKey draws the goto cheatsheet over background when the g prefix
-// is armed and visible. Returns background unchanged when hidden/disabled.
+// whichKeyCell is one continuation key and its label in the which-key panel.
+type whichKeyCell struct {
+	key  string // continuation after the prefix, e.g. "p" for "gp"
+	desc string
+}
+
+// whichKeyCells builds the sorted continuation entries for the g prefix: gg
+// (list top) plus every goto target, keyed by the part of the chord after the
+// prefix. Sorted alphanumerically like neovim's which-key.
+func (m Model) whichKeyCells() []whichKeyCell {
+	prefix := ui.ActiveKeybindings.JumpTop
+	targets := m.gotoTargets()
+	cells := make([]whichKeyCell, 0, len(targets)+1)
+	cells = append(cells, whichKeyCell{prefix, "list top"})
+	for _, gt := range targets {
+		cells = append(cells, whichKeyCell{strings.TrimPrefix(gt.Chord, prefix), gt.Label})
+	}
+	sort.SliceStable(cells, func(i, j int) bool {
+		li, lj := strings.ToLower(cells[i].key), strings.ToLower(cells[j].key)
+		if li != lj {
+			return li < lj
+		}
+		return cells[i].key < cells[j].key
+	})
+	return cells
+}
+
+// renderWhichKey draws the goto cheatsheet anchored to the bottom of the screen
+// when the g prefix is armed and visible, styled after neovim's which-key
+// "modern" preset: a compact full-width double-bordered panel of key/desc
+// columns. Returns background unchanged when hidden/disabled.
 func (m Model) renderWhichKey(background string) string {
 	if !m.pendingG || !m.whichKeyShown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	targets := m.gotoTargets()
-	if len(targets) == 0 {
+	cells := m.whichKeyCells()
+	if len(cells) == 0 {
 		return background
 	}
-	var b strings.Builder
-	b.WriteString("Goto\n\n")
-	fmt.Fprintf(&b, "  %-4s %s\n", ui.ActiveKeybindings.JumpTop+ui.ActiveKeybindings.JumpTop, "list top")
-	for _, gt := range targets {
-		fmt.Fprintf(&b, "  %-4s %s\n", gt.Chord, gt.Label)
+
+	// Column width is the widest "key desc" pair, floored at which-key's
+	// min column width of 5.
+	plain := make([]string, len(cells))
+	styled := make([]string, len(cells))
+	cellW := 5
+	for i, c := range cells {
+		plain[i] = c.key + " " + c.desc
+		styled[i] = ui.HelpKeyStyle.Render(c.key) + " " + ui.BarDimStyle.Render(c.desc)
+		cellW = max(cellW, lipgloss.Width(plain[i]))
 	}
-	content := strings.TrimRight(b.String(), "\n")
-	w := min(40, m.width-4)
-	content = ui.FillLinesBg(content, w, ui.SurfaceBg)
-	box := ui.OverlayStyle.Width(w).Render(content)
-	return ui.PlaceOverlay(m.width, m.height, box, ui.PadToHeight(background, m.height))
+
+	const gap = 1
+	inner := max(m.width-2, cellW) // 2 = double border sides
+	cols := max((inner+gap)/(cellW+gap), 1)
+	rows := (len(cells) + cols - 1) / cols
+
+	lines := make([]string, rows)
+	for r := range rows {
+		var parts []string
+		for c := range cols {
+			idx := c*rows + r // column-major: fill down each column first
+			if idx >= len(cells) {
+				continue
+			}
+			pad := max(cellW-lipgloss.Width(plain[idx]), 0)
+			parts = append(parts, styled[idx]+strings.Repeat(" ", pad))
+		}
+		lines[r] = strings.Join(parts, strings.Repeat(" ", gap))
+	}
+	content := ui.FillLinesBg(strings.Join(lines, "\n"), inner, ui.SurfaceBg)
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
+		Width(inner).
+		Render(content)
+	return ui.PlaceOverlayBottom(m.width, m.height, box, ui.PadToHeight(background, m.height))
 }

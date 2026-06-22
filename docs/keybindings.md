@@ -26,7 +26,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 
 ## Goto Navigation
 
-Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`).
+Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
 
 | Key | Resource |
 |---|---|

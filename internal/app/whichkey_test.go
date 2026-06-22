@@ -79,6 +79,65 @@ func TestHandleGotoChord_GPassesThroughToJumpTop(t *testing.T) {
 	}
 }
 
+// An unregistered second key (e.g. gP) is swallowed: the popup closes and
+// nothing happens — which-key semantics, no fall-through to the key's normal
+// explorer action.
+func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := gotoTestModel()
+	m.pendingG = true
+	m.whichKeyShown = true
+	out, cmd, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	if !handled {
+		t.Fatal("unregistered second key must be consumed (handled=true)")
+	}
+	if cmd != nil {
+		t.Fatal("unregistered second key must be a noop (no command)")
+	}
+	rm := out.(Model)
+	if rm.pendingG || rm.whichKeyShown {
+		t.Fatal("unregistered second key must close the prefix and the popup")
+	}
+	// A real goto sets Level to LevelResources; an unregistered key must leave
+	// the nav level untouched (here: LevelResourceTypes).
+	if rm.nav.Level != model.LevelResourceTypes {
+		t.Fatalf("unregistered second key must not navigate; nav.Level = %v", rm.nav.Level)
+	}
+	if rm.statusMessageErr {
+		t.Fatal("unregistered second key must be silent (no error status)")
+	}
+}
+
+// esc (and any non-g key) is swallowed while the prefix is armed: it closes
+// the popup as a noop instead of falling through to its normal explorer action.
+func TestHandleGotoChord_EscClosesPopup(t *testing.T) {
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := gotoTestModel()
+	m.pendingG = true
+	m.whichKeyShown = true
+	out, cmd, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyEsc})
+	if !handled || cmd != nil {
+		t.Fatal("esc must be consumed as a noop while the prefix is armed")
+	}
+	rm := out.(Model)
+	if rm.pendingG || rm.whichKeyShown {
+		t.Fatal("esc must close the prefix and the popup")
+	}
+}
+
+// Completing gg (jump to top) must clear whichKeyShown along with pendingG so
+// no stale visibility flag lingers.
+func TestExplorerJumpTop_GGClearsWhichKeyShown(t *testing.T) {
+	m := gotoTestModel()
+	m.pendingG = true
+	m.whichKeyShown = true
+	out, _ := m.handleExplorerJumpTop()
+	rm := out.(Model)
+	if rm.pendingG || rm.whichKeyShown {
+		t.Fatalf("gg must clear both pendingG and whichKeyShown; got pendingG=%v whichKeyShown=%v", rm.pendingG, rm.whichKeyShown)
+	}
+}
+
 func TestGotoTargets_IncludesBuiltins(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()

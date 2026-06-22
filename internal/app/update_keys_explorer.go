@@ -9,21 +9,17 @@ import (
 )
 
 func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	kb := ui.ActiveKeybindings
-
 	wasKonami := m.konamiActive
 	m = m.checkKonami(msg)
 	if m.konamiActive && !wasKonami {
 		return m, scheduleKonamiClear()
 	}
 
+	// While the g prefix is armed, handleGotoChord consumes every key except a
+	// second "g" (which falls through to the gg jump-top handler below).
 	if m.pendingG {
 		if out, cmd, handled := m.handleGotoChord(msg); handled {
 			return out, cmd
-		}
-		if msg.String() != kb.JumpTop {
-			m.pendingG = false
-			m.whichKeyShown = false
 		}
 	}
 
@@ -270,6 +266,7 @@ func (m Model) handleExplorerJumpTop() (tea.Model, tea.Cmd) {
 	}
 	if m.pendingG {
 		m.pendingG = false
+		m.whichKeyShown = false
 		m.setCursor(0)
 		m.clampCursor()
 		m.syncExpandedGroup()
