@@ -598,6 +598,12 @@ var ConfigMouse = true
 // mutating action is blocked unless overridden per-context.
 var ConfigReadOnly bool
 
+// ConfigWhichKeyEnabled toggles the which-key popup (chords work regardless).
+var ConfigWhichKeyEnabled = true
+
+// ConfigWhichKeyDelayMs delays the popup after a prefix is pressed (0..2000).
+var ConfigWhichKeyDelayMs = 0
+
 // ConfigShowRareTypes is the startup default for the "show rarely-used resource
 // types" toggle (the ToggleRare / H key). When true the sidebar surfaces the
 // rare and "Advanced" resource types from launch. The runtime H toggle

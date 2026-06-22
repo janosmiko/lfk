@@ -79,6 +79,32 @@
         "items": { "$ref": "#/definitions/filterPreset" }
       }
     },
+    "goto_targets": {
+      "type": ["object", "null"],
+      "description": "User-defined g-prefix goto chords. Key is the full chord (e.g. \"gA\") and must start with the jump_top key.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string" },
+          "group": { "type": "string" },
+          "name": { "type": "string" }
+        },
+        "required": ["kind"]
+      }
+    },
+    "which_key_enabled": {
+      "type": "boolean",
+      "description": "Show the which-key popup while a chord prefix (g) is pending. Chords still work when false.",
+      "default": true
+    },
+    "which_key_delay_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2000,
+      "description": "Delay before the which-key popup appears, in milliseconds (0 = immediate).",
+      "default": 0
+    },
     "terminal": {
       "type": "string",
       "description": "How exec/shell commands run: \"pty\" (embedded in the TUI), \"exec\" (takes over the terminal), or \"mux\" (open in a new tmux/zellij window or pane).",
@@ -411,7 +437,24 @@
         "security_ignore_toggle": { "type": "string" },
         "security_badge_toggle": { "type": "string" },
         "toggle_preview_logs": { "type": "string" },
-        "log_top": { "type": "string" }
+        "log_top": { "type": "string" },
+        "goto_pods": { "type": "string" },
+        "goto_deployments": { "type": "string" },
+        "goto_services": { "type": "string" },
+        "goto_nodes": { "type": "string" },
+        "goto_namespaces": { "type": "string" },
+        "goto_ingresses": { "type": "string" },
+        "goto_jobs": { "type": "string" },
+        "goto_cronjobs": { "type": "string" },
+        "goto_replicasets": { "type": "string" },
+        "goto_daemonsets": { "type": "string" },
+        "goto_statefulsets": { "type": "string" },
+        "goto_configmaps": { "type": "string" },
+        "goto_secrets": { "type": "string" },
+        "goto_hpas": { "type": "string" },
+        "goto_pvcs": { "type": "string" },
+        "goto_pvs": { "type": "string" },
+        "goto_pdbs": { "type": "string" }
       }
     },
     "view": {

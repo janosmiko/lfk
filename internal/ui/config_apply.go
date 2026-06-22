@@ -195,6 +195,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.Scheduler != nil {
 		applySchedulerConfig(cfg.Scheduler)
 	}
+	applyWhichKey(cfg)
 	if os.Getenv("NO_COLOR") != "" {
 		// Per https://no-color.org, the presence of NO_COLOR (regardless of
 		// value) disables color. Env takes precedence over the config file

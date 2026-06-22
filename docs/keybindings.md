@@ -24,6 +24,39 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the Object Explorer for it |
 | `Backspace` | Jump back through teleport history (owner, port-forward, orphan, finding, and mark jumps push history; hierarchical `h`/`l` navigation does not) |
 
+## Goto Navigation
+
+Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
+
+| Key | Resource |
+|---|---|
+| `gp` | Pods |
+| `gd` | Deployments |
+| `gs` | Services |
+| `gn` | Nodes |
+| `gN` | Namespaces |
+| `gi` | Ingresses |
+| `gj` | Jobs |
+| `gc` | CronJobs |
+| `gr` | ReplicaSets |
+| `gD` | DaemonSets |
+| `gt` | StatefulSets |
+| `gC` | ConfigMaps |
+| `gS` | Secrets |
+| `gh` | HorizontalPodAutoscalers |
+| `gv` | PersistentVolumeClaims |
+| `gV` | PersistentVolumes |
+| `gb` | PodDisruptionBudgets |
+
+Add custom chords (including CRDs) via `goto_targets` in `~/.config/lfk/config.yaml`. For example, to jump to ArgoCD Applications with `ga`:
+
+```yaml
+goto_targets:
+  ga: { kind: Application, group: argoproj.io, name: ArgoCD Applications }
+```
+
+All built-in chords are rebindable under `keybindings`.
+
 ## Views and Tools
 
 | Key | Action |

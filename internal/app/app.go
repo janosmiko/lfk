@@ -193,11 +193,11 @@ type Model struct {
 	statusMessageExp time.Time // when message expires
 	statusMessageTip bool      // true when the message is a startup tip (dismiss on keypress)
 
-	// Pending target: when set, after resources load, find and select this item by name.
-	pendingTarget string
+	pendingTarget string // when set, resources load selects this item by name
 
-	// Vim-style 'gg' command: when true, the next 'g' press jumps to top.
-	pendingG bool
+	// pendingG: vim 'gg' -> next 'g' jumps to top; whichKeyShown: popup visible while armed.
+	pendingG      bool
+	whichKeyShown bool
 
 	// Vim text-object operator pending in visual mode ('i'/'a'); 0 = none.
 	pendingTextObject byte

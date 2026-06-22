@@ -534,6 +534,18 @@ filter_presets:
 #     match:
 #       status: "OOMKilled"
 
+# ─── Extra Goto Chords ──────────────────────────────────────────────────────
+# Extra goto chords (g prefix), including CRDs. Key is the full chord; must
+# start with jump_top.
+# goto_targets:
+#   ga: { kind: Application, group: argoproj.io, name: ArgoCD Applications }
+#   gA: { kind: ApplicationSet, group: argoproj.io, name: AppSets }
+#   gx: { kind: Rollout, group: argoproj.io }
+
+# ─── Which-Key Popup ─────────────────────────────────────────────────────────
+# which_key_enabled: true
+# which_key_delay_ms: 0
+
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories
 # (Workloads, Networking, etc.) instead of being sorted alphabetically.

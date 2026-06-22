@@ -94,6 +94,11 @@ filter_presets:
       key: p
       match:
         status: Pending
+goto_targets:
+  gx:
+    kind: Deployment
+which_key_enabled: false
+which_key_delay_ms: 250
 monitoring:
   _global:
     node_metrics: prometheus
@@ -277,6 +282,9 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, "Ping", ConfigCustomActions["Pod"][0].Label)
 	require.Contains(t, ConfigFilterPresets, "pod", "filter_presets")
 	assert.Equal(t, "Pending", ConfigFilterPresets["pod"][0].Match.Status)
+	assert.Equal(t, "Deployment", ConfigGotoTargets["gx"].Kind, "goto_targets")
+	assert.False(t, ConfigWhichKeyEnabled, "which_key_enabled")
+	assert.Equal(t, 250, ConfigWhichKeyDelayMs, "which_key_delay_ms")
 
 	// Per-cluster overrides (clusters.<ctx>.*).
 	assert.True(t, ConfigClusterReadOnly["ctx1"], "clusters.read_only")
@@ -346,6 +354,9 @@ var wiringCoveredFields = map[string]string{
 	"scheduler":               "TestLoadConfig_AllSettingsWired",
 	"kubeconfig_dir":          "TestLoadConfig_AllSettingsWired",
 	"union_sets":              "TestLoadConfig_AllSettingsWired",
+	"goto_targets":            "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
+	"which_key_enabled":       "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"which_key_delay_ms":      "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
 }
 
 // TestConfigFile_EveryFieldHasWiringCoverage is a forcing function: it fails if
@@ -446,6 +457,9 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origClusterSecSources := ConfigClusterSecuritySources
 	origClusterQPS := ConfigClusterK8sClientQPS
 	origClusterBurst := ConfigClusterK8sClientBurst
+	origGotoTargets := ConfigGotoTargets
+	origWhichKeyEnabled := ConfigWhichKeyEnabled
+	origWhichKeyDelayMs := ConfigWhichKeyDelayMs
 
 	origMonitoring := model.ConfigMonitoring
 	origRSStrategy := model.ConfigDefaultRightsizingStrategy
@@ -529,6 +543,9 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigClusterSecuritySources = origClusterSecSources
 		ConfigClusterK8sClientQPS = origClusterQPS
 		ConfigClusterK8sClientBurst = origClusterBurst
+		ConfigGotoTargets = origGotoTargets
+		ConfigWhichKeyEnabled = origWhichKeyEnabled
+		ConfigWhichKeyDelayMs = origWhichKeyDelayMs
 
 		model.ConfigMonitoring = origMonitoring
 		model.ConfigDefaultRightsizingStrategy = origRSStrategy
