@@ -236,34 +236,55 @@ func (m Model) renderWhichKey(background string) string {
 	}
 
 	const gap = 1
-	// Panel spans ~75% of the screen width, centered, with the double border
+	// Panel spans ~75% of the screen width, centered, with the rounded border
 	// inside that budget.
 	inner := max(m.width*3/4-2, cellW)
 	cols := max((inner+gap)/(cellW+gap), 1)
 	rows := (len(cells) + cols - 1) / cols
 
-	lines := make([]string, rows)
+	// Spread the columns across the full inner width instead of packing them
+	// left: each column is at least cellW wide, and the rounding remainder is
+	// absorbed by the leftmost columns.
+	avail := max(inner-gap*(cols-1), cols)
+	baseW, rem := avail/cols, avail%cols
+	colW := func(c int) int {
+		if c < rem {
+			return baseW + 1
+		}
+		return baseW
+	}
+
+	body := make([]string, rows)
 	for r := range rows {
-		var parts []string
+		parts := make([]string, cols)
 		for c := range cols {
 			idx := c*rows + r // column-major: fill down each column first
 			if idx >= len(cells) {
+				parts[c] = strings.Repeat(" ", colW(c))
 				continue
 			}
-			pad := max(cellW-lipgloss.Width(plain[idx]), 0)
-			parts = append(parts, styled[idx]+strings.Repeat(" ", pad))
+			pad := max(colW(c)-lipgloss.Width(plain[idx]), 0)
+			parts[c] = styled[idx] + strings.Repeat(" ", pad)
 		}
-		lines[r] = strings.Join(parts, strings.Repeat(" ", gap))
+		body[r] = strings.Join(parts, strings.Repeat(" ", gap))
 	}
+	// A blank leading row gives the first entries breathing room below the
+	// top border.
+	lines := append([]string{""}, body...)
 	content := ui.FillLinesBg(strings.Join(lines, "\n"), inner, ui.BaseBg)
 
 	box := lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Background(ui.BaseBg).
 		Width(inner).
 		Render(content)
-	// marginBottom of 1 lifts the panel off the very bottom row, keeping the
-	// hint bar visible beneath it.
-	return ui.PlaceOverlayBottom(m.width, m.height, 1, box, ui.PadToHeight(background, m.height))
+
+	// Dim the screen behind the panel like the other overlays do, then lift
+	// the panel one row off the bottom so the hint bar stays visible.
+	bg := ui.PadToHeight(background, m.height)
+	if ui.ConfigDimOverlay {
+		bg = ui.DimBackground(bg, 1)
+	}
+	return ui.PlaceOverlayBottom(m.width, m.height, 1, box, bg)
 }
