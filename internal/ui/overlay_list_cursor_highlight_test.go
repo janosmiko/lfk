@@ -55,26 +55,30 @@ func selectedHighlightWidth(out string) int {
 	return total
 }
 
-// TestRenderOverlayList_CursorHighlightWidthCapsHighlight verifies the cursor
-// highlight is capped to CursorHighlightWidth instead of spanning the full item
-// area, so trailing fields (e.g. the AutoSync ON/OFF switches) are not
-// highlighted. Default (0) keeps the full-width behaviour.
-func TestRenderOverlayList_CursorHighlightWidthCapsHighlight(t *testing.T) {
+// TestRenderOverlayList_BadgeInHighlight verifies that BadgeInHighlight extends
+// the cursor-row selection highlight across the badge column (the whole line is
+// highlighted), while the default keeps the badge outside the highlight.
+func TestRenderOverlayList_BadgeInHighlight(t *testing.T) {
 	forceTrueColorTheme(t)
 
-	items := []OverlayListItem{{Name: "AB", Badge: "X"}}
+	// Badge painted on the selection background (as the AutoSync overlay does
+	// for its selected row) so it blends with the highlight.
+	selBadge := OverlaySelectedStyle.Render(" ON")
+	items := []OverlayListItem{{Name: "AB", Badge: selBadge}}
 
-	capped := RenderOverlayList(items, OverlayListConfig{
-		Cursor:               0,
-		BadgeWidth:           1,
-		CursorHighlightWidth: 6,
+	withFlag := RenderOverlayList(items, OverlayListConfig{
+		Cursor:           0,
+		BadgeWidth:       3,
+		BadgeInHighlight: true,
 	}, 42)
-	assert.Equal(t, 6, selectedHighlightWidth(capped), "highlight should be capped to CursorHighlightWidth")
+	// Highlight spans the full inner width: label area + separator + badge.
+	assert.Equal(t, 42, selectedHighlightWidth(withFlag), "highlight should span the whole row including the badge")
 
-	full := RenderOverlayList(items, OverlayListConfig{
+	without := RenderOverlayList(items, OverlayListConfig{
 		Cursor:     0,
-		BadgeWidth: 1,
+		BadgeWidth: 3,
 	}, 42)
-	// itemWidth = innerW(42) - badgeReserve(2) = 40 with no cap.
-	require.Equal(t, 40, selectedHighlightWidth(full), "default highlight spans the full item area")
+	// itemWidth = innerW(42) - badgeReserve(3+1) = 38; the surface-bg
+	// separator breaks the selection run before the badge.
+	require.Equal(t, 38, selectedHighlightWidth(without), "default keeps the badge outside the highlight")
 }
