@@ -9,8 +9,9 @@ type GotoTargetEntry struct {
 	Name  string `json:"name" yaml:"name"`
 }
 
-// ConfigGotoTargets is populated by applyGotoTargets (called from applyConfigMaps)
-// from the goto_targets config section. Keys are full chords (e.g. "gx").
+// ConfigGotoTargets is populated by applyGotoTargets (called from LoadConfig
+// after the keybindings merge) from the goto_targets config section. Keys are
+// full chords (e.g. "gx").
 // Invalid entries (wrong chord format or missing kind) are silently skipped.
 var ConfigGotoTargets map[string]GotoTargetEntry
 
