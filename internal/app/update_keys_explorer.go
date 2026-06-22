@@ -17,8 +17,14 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleKonamiClear()
 	}
 
-	if m.pendingG && msg.String() != kb.JumpTop {
-		m.pendingG = false
+	if m.pendingG {
+		if out, cmd, handled := m.handleGotoChord(msg); handled {
+			return out, cmd
+		}
+		if msg.String() != kb.JumpTop {
+			m.pendingG = false
+			m.whichKeyShown = false
+		}
 	}
 
 	if m.pendingMark {

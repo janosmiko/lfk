@@ -1,0 +1,156 @@
+package app
+
+import (
+	"fmt"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
+)
+
+// gotoTarget is one g-prefix goto entry: a full chord and the resource type it
+// jumps to.
+type gotoTarget struct {
+	Chord string // full chord, e.g. "gp"
+	Kind  string
+	Group string // APIGroup; "" for core
+	Label string
+}
+
+// gotoTargets returns the active goto targets: built-ins from the keybinding
+// config, then user-defined goto_targets (Task 3) which override built-ins on
+// chord collision. Order is stable for rendering.
+func (m Model) gotoTargets() []gotoTarget {
+	kb := ui.ActiveKeybindings
+	base := []gotoTarget{
+		{kb.GotoPods, "Pod", "", "Pods"},
+		{kb.GotoDeployments, "Deployment", "apps", "Deployments"},
+		{kb.GotoServices, "Service", "", "Services"},
+		{kb.GotoNodes, "Node", "", "Nodes"},
+		{kb.GotoNamespaces, "Namespace", "", "Namespaces"},
+		{kb.GotoIngresses, "Ingress", "networking.k8s.io", "Ingresses"},
+		{kb.GotoJobs, "Job", "batch", "Jobs"},
+		{kb.GotoCronJobs, "CronJob", "batch", "CronJobs"},
+		{kb.GotoReplicaSets, "ReplicaSet", "apps", "ReplicaSets"},
+		{kb.GotoDaemonSets, "DaemonSet", "apps", "DaemonSets"},
+		{kb.GotoStatefulSets, "StatefulSet", "apps", "StatefulSets"},
+		{kb.GotoConfigMaps, "ConfigMap", "", "ConfigMaps"},
+		{kb.GotoSecrets, "Secret", "", "Secrets"},
+		{kb.GotoArgoApplications, "Application", "argoproj.io", "ArgoCD Applications"},
+	}
+	out := make([]gotoTarget, 0, len(base)+len(ui.ConfigGotoTargets))
+	idx := map[string]int{}
+	for _, gt := range base {
+		if gt.Chord == "" {
+			continue
+		}
+		idx[gt.Chord] = len(out)
+		out = append(out, gt)
+	}
+	// Custom targets override built-ins on chord collision. This loop is a
+	// no-op until Task 3 populates ui.ConfigGotoTargets.
+	for chord, ct := range ui.ConfigGotoTargets {
+		label := ct.Name
+		if label == "" {
+			label = ct.Kind
+		}
+		gt := gotoTarget{Chord: chord, Kind: ct.Kind, Group: ct.Group, Label: label}
+		if i, ok := idx[chord]; ok {
+			out[i] = gt
+			continue
+		}
+		idx[chord] = len(out)
+		out = append(out, gt)
+	}
+	return out
+}
+
+// gotoTargetForChord looks up a goto target by its full chord (e.g. "gp").
+func (m Model) gotoTargetForChord(chord string) (gotoTarget, bool) {
+	for _, gt := range m.gotoTargets() {
+		if gt.Chord == chord {
+			return gt, true
+		}
+	}
+	return gotoTarget{}, false
+}
+
+// gotoResourceType switches the current tab to the given resource type in the
+// active context, preserving the namespace filter. It mirrors the descend path
+// of navigateChildResourceType. Requires an active cluster/context.
+func (m Model) gotoResourceType(kind, apiGroup string) (tea.Model, tea.Cmd) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Select a cluster first", true)
+		return m, scheduleStatusClear()
+	}
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	rt, ok := model.FindResourceTypeByKindAndGroup(kind, apiGroup, m.discoveredResources[discoveryCtx])
+	if !ok {
+		m.setStatusMessage(fmt.Sprintf("%s not available in this cluster", kind), true)
+		return m, scheduleStatusClear()
+	}
+	m.saveCursor()
+	m.nav.ResourceType = rt
+	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
+	m.nav.Level = model.LevelResources
+	m.normalizeGotoPanes()
+	m.saveCurrentSession()
+	if cached, hit := m.itemCache[m.navKey()]; hit {
+		m.setMiddleItems(cached)
+		m.restoreCursor()
+	} else {
+		m.setMiddleItems(nil)
+		m.setCursor(0)
+	}
+	m.loading = true
+	return m, m.loadResources(false)
+}
+
+// normalizeGotoPanes rebuilds the left pane for a clean LevelResources view
+// regardless of the level the goto fired from. After this call, leftItems holds
+// the resource-types sidebar so that pressing h/left returns the user to the
+// correct types list rather than a stale resources or owned pane.
+func (m *Model) normalizeGotoPanes() {
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	// Build a fresh resource-types sidebar for the left pane. This is the
+	// same item set that navigateChildResourceType's pushLeft() would promote.
+	typesItems := model.BuildSidebarItems(m.discoveredResources[discoveryCtx])
+
+	// Retain only the deepest cluster-level history entry so that navigating
+	// back past LevelResources -> LevelResourceTypes -> LevelClusters still
+	// works correctly. The history at index 0 (if any) holds the cluster
+	// picker items; everything above it was intermediate pane state that the
+	// goto jumps over.
+	var clusterHistory [][]model.Item
+	if len(m.leftItemsHistory) > 0 {
+		clusterHistory = [][]model.Item{m.leftItemsHistory[0]}
+	}
+	m.leftItemsHistory = clusterHistory
+	m.leftItems = typesItems
+	m.clearRight()
+}
+
+// handleGotoChord is called while the g prefix is armed (m.pendingG). It
+// consumes only registered goto chords; the second "g" and any unregistered
+// key are left to the existing dispatch (jump-top / passthrough), so no
+// current behavior regresses.
+func (m Model) handleGotoChord(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	key := msg.String()
+	if key == ui.ActiveKeybindings.JumpTop { // "g" -> belongs to gg jump-top
+		return m, nil, false
+	}
+	gt, ok := m.gotoTargetForChord("g" + key)
+	if !ok {
+		return m, nil, false
+	}
+	m.pendingG = false
+	m.whichKeyShown = false
+	out, cmd := m.gotoResourceType(gt.Kind, gt.Group)
+	return out, cmd, true
+}
