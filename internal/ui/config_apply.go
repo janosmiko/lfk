@@ -444,6 +444,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			ConfigFilterPresets[strings.ToLower(k)] = v
 		}
 	}
+	applyGotoTargets(cfg)
 	if len(cfg.Clusters) > 0 {
 		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
 		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))

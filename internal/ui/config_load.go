@@ -234,6 +234,11 @@ type configFile struct {
 	// CLI --namespace overrides the per-set namespace; --union-context and
 	// --context are mutually exclusive with --union-set.
 	UnionSets UnionSetsConfig `json:"union_sets" yaml:"union_sets"`
+	// GotoTargets maps full g-prefix chords (e.g. "gA") to user-defined
+	// goto targets. Chords must start with the jump_top key and be exactly
+	// 2 runes. Kind is required; Group and Name are optional.
+	// User entries override built-ins on chord collision.
+	GotoTargets map[string]GotoTargetEntry `json:"goto_targets" yaml:"goto_targets"`
 }
 
 // UnionSetsConfig accepts both supported top-level shapes:

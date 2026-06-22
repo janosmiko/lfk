@@ -534,6 +534,12 @@ filter_presets:
 #     match:
 #       status: "OOMKilled"
 
+# ─── Extra Goto Chords ──────────────────────────────────────────────────────
+# Extra goto chords (g prefix). Key is the full chord; must start with jump_top.
+# goto_targets:
+#   gA: { kind: ApplicationSet, group: argoproj.io, name: AppSets }
+#   gx: { kind: Rollout, group: argoproj.io }
+
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories
 # (Workloads, Networking, etc.) instead of being sorted alphabetically.

@@ -79,6 +79,20 @@
         "items": { "$ref": "#/definitions/filterPreset" }
       }
     },
+    "goto_targets": {
+      "type": ["object", "null"],
+      "description": "User-defined g-prefix goto chords. Key is the full chord (e.g. \"gA\") and must start with the jump_top key.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string" },
+          "group": { "type": "string" },
+          "name": { "type": "string" }
+        },
+        "required": ["kind"]
+      }
+    },
     "terminal": {
       "type": "string",
       "description": "How exec/shell commands run: \"pty\" (embedded in the TUI), \"exec\" (takes over the terminal), or \"mux\" (open in a new tmux/zellij window or pane).",
