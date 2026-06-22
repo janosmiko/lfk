@@ -411,7 +411,21 @@
         "security_ignore_toggle": { "type": "string" },
         "security_badge_toggle": { "type": "string" },
         "toggle_preview_logs": { "type": "string" },
-        "log_top": { "type": "string" }
+        "log_top": { "type": "string" },
+        "goto_pods": { "type": "string" },
+        "goto_deployments": { "type": "string" },
+        "goto_services": { "type": "string" },
+        "goto_nodes": { "type": "string" },
+        "goto_namespaces": { "type": "string" },
+        "goto_ingresses": { "type": "string" },
+        "goto_jobs": { "type": "string" },
+        "goto_cronjobs": { "type": "string" },
+        "goto_replicasets": { "type": "string" },
+        "goto_daemonsets": { "type": "string" },
+        "goto_statefulsets": { "type": "string" },
+        "goto_configmaps": { "type": "string" },
+        "goto_secrets": { "type": "string" },
+        "goto_argo_applications": { "type": "string" }
       }
     },
     "view": {

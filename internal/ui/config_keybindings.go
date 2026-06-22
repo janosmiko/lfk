@@ -149,6 +149,24 @@ type Keybindings struct {
 	// viewer over the lines already buffered. "T" is free in modeLogs
 	// (ThemeSelector's "T" only dispatches in explorer/error-log modes).
 	LogTop string `json:"log_top" yaml:"log_top"`
+
+	// Goto navigation: vim-style g-prefix chords that switch the active
+	// resource type in the current context. Each holds the full chord
+	// (e.g. "gp"). Reserved: "gg" jumps to list top, "G" to list bottom.
+	GotoPods             string `json:"goto_pods" yaml:"goto_pods"`
+	GotoDeployments      string `json:"goto_deployments" yaml:"goto_deployments"`
+	GotoServices         string `json:"goto_services" yaml:"goto_services"`
+	GotoNodes            string `json:"goto_nodes" yaml:"goto_nodes"`
+	GotoNamespaces       string `json:"goto_namespaces" yaml:"goto_namespaces"`
+	GotoIngresses        string `json:"goto_ingresses" yaml:"goto_ingresses"`
+	GotoJobs             string `json:"goto_jobs" yaml:"goto_jobs"`
+	GotoCronJobs         string `json:"goto_cronjobs" yaml:"goto_cronjobs"`
+	GotoReplicaSets      string `json:"goto_replicasets" yaml:"goto_replicasets"`
+	GotoDaemonSets       string `json:"goto_daemonsets" yaml:"goto_daemonsets"`
+	GotoStatefulSets     string `json:"goto_statefulsets" yaml:"goto_statefulsets"`
+	GotoConfigMaps       string `json:"goto_configmaps" yaml:"goto_configmaps"`
+	GotoSecrets          string `json:"goto_secrets" yaml:"goto_secrets"`
+	GotoArgoApplications string `json:"goto_argo_applications" yaml:"goto_argo_applications"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -240,6 +258,13 @@ func DefaultKeybindings() Keybindings {
 
 		// Log Top from log viewer. "T" is free in modeLogs.
 		LogTop: "T",
+
+		// Goto navigation chords (g prefix).
+		GotoPods: "gp", GotoDeployments: "gd", GotoServices: "gs",
+		GotoNodes: "gn", GotoNamespaces: "gN", GotoIngresses: "gi",
+		GotoJobs: "gj", GotoCronJobs: "gc", GotoReplicaSets: "gr",
+		GotoDaemonSets: "gD", GotoStatefulSets: "gt", GotoConfigMaps: "gC",
+		GotoSecrets: "gS", GotoArgoApplications: "ga",
 	}
 }
 
