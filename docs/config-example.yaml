@@ -540,6 +540,10 @@ filter_presets:
 #   gA: { kind: ApplicationSet, group: argoproj.io, name: AppSets }
 #   gx: { kind: Rollout, group: argoproj.io }
 
+# ─── Which-Key Popup ─────────────────────────────────────────────────────────
+# which_key_enabled: true
+# which_key_delay_ms: 0
+
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories
 # (Workloads, Networking, etc.) instead of being sorted alphabetically.

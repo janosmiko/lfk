@@ -239,6 +239,12 @@ type configFile struct {
 	// 2 runes. Kind is required; Group and Name are optional.
 	// User entries override built-ins on chord collision.
 	GotoTargets map[string]GotoTargetEntry `json:"goto_targets" yaml:"goto_targets"`
+	// WhichKeyEnabled controls whether the which-key popup appears while a
+	// chord prefix (g) is pending. Chords still work when false.
+	WhichKeyEnabled *bool `json:"which_key_enabled" yaml:"which_key_enabled"`
+	// WhichKeyDelayMs is the delay before the which-key popup appears after a
+	// prefix is pressed, in milliseconds. Clamped to [0, 2000].
+	WhichKeyDelayMs *int `json:"which_key_delay_ms" yaml:"which_key_delay_ms"`
 }
 
 // UnionSetsConfig accepts both supported top-level shapes:

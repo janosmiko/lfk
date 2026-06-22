@@ -93,6 +93,18 @@
         "required": ["kind"]
       }
     },
+    "which_key_enabled": {
+      "type": "boolean",
+      "description": "Show the which-key popup while a chord prefix (g) is pending. Chords still work when false.",
+      "default": true
+    },
+    "which_key_delay_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2000,
+      "description": "Delay before the which-key popup appears, in milliseconds (0 = immediate).",
+      "default": 0
+    },
     "terminal": {
       "type": "string",
       "description": "How exec/shell commands run: \"pty\" (embedded in the TUI), \"exec\" (takes over the terminal), or \"mux\" (open in a new tmux/zellij window or pane).",
