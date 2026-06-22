@@ -88,15 +88,13 @@ type OverlayListConfig struct {
 	// row content and the badge).
 	BadgeWidth int
 
-	// BadgeInHighlight, when true, extends the cursor-row selection
-	// highlight across the badge column (the separator carries the
-	// selection background) so the whole row reads as highlighted —
-	// including the badge. Callers that want the badge to keep its own
-	// background on the selected row (e.g. the ClusterColor swatch) leave
-	// this false, the default. The badge itself is styled by the caller;
-	// it should paint the selected row's badge on the selection
-	// background to blend with the highlight.
-	BadgeInHighlight bool
+	// CursorHighlightWidth, when > 0, caps the selection highlight on the
+	// cursor row to this many cells instead of spanning the full item
+	// area. The remaining cells up to the item width pad with the surface
+	// background so trailing columns (badge/scrollbar) stay aligned. Use
+	// it when a full-width bar would read as highlighting trailing fields
+	// (e.g. the AutoSync overlay's ON/OFF switches).
+	CursorHighlightWidth int
 
 	// Height, when > 0, locks the rendered output to exactly this many
 	// lines. Padding with blank lines when content is shorter,
@@ -204,11 +202,19 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		it := items[i]
 		var row string
 		if i == cfg.Cursor {
-			// Cursor row: plain text padded to itemWidth so the selection
-			// background spans the entire item area. The scrollbar + badge
-			// sit outside the highlight so they stay readable against the
-			// box (unless BadgeInHighlight extends it — see below).
-			row = OverlaySelectedStyle.Width(itemWidth).Render(itemPlainLine(it, cfg, hasActive))
+			// Cursor row: plain text padded so the selection background spans
+			// the item area. The scrollbar + badge sit outside the highlight
+			// so they stay readable against the box. CursorHighlightWidth
+			// caps the highlight short of the item area; the remainder pads
+			// with the surface background so the badge column stays put.
+			hlW := itemWidth
+			if cfg.CursorHighlightWidth > 0 && cfg.CursorHighlightWidth < itemWidth {
+				hlW = cfg.CursorHighlightWidth
+			}
+			row = OverlaySelectedStyle.Width(hlW).Render(itemPlainLine(it, cfg, hasActive))
+			if pad := itemWidth - lipgloss.Width(row); pad > 0 {
+				row += OverlayDimStyle.Render(strings.Repeat(" ", pad))
+			}
 		} else {
 			line := OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive))
 			// Only pad non-cursor rows when there's a trailing column
@@ -227,15 +233,7 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			row = line
 		}
 		if cfg.BadgeWidth > 0 {
-			// The separator between the row text and the badge normally
-			// carries the surface background. On the cursor row, when
-			// BadgeInHighlight is set, paint it with the selection
-			// background so the highlight runs unbroken across the badge.
-			sep := OverlayDimStyle.Render(" ")
-			if i == cfg.Cursor && cfg.BadgeInHighlight {
-				sep = OverlaySelectedStyle.Render(" ")
-			}
-			row += sep + it.Badge
+			row += OverlayDimStyle.Render(" ") + it.Badge
 		}
 		if hasOverflow {
 			row += renderScrollbar(i-start, visible, len(items), start)

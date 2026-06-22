@@ -333,71 +333,56 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 // a pre-styled " ON" / "OFF" / "  -" indicator in the Badge column.
 // Self-Heal and Prune are gated on AutoSync being on; when AutoSync is
 // off they render with Disabled=true (dim) and show the "  -" badge
-// instead of OFF. The cursor highlight spans the whole row, including the
-// ON/OFF badge (BadgeInHighlight); the selected row's badge is painted on
-// the selection background to blend in. The space/enter/esc keys live in
-// the app-wide hint bar at the bottom.
+// instead of OFF. The cursor highlight is capped to the label column
+// (CursorHighlightWidth) so it never sits behind the ON/OFF switches; the
+// space/enter/esc keys live in the app-wide hint bar at the bottom.
 func renderAutoSyncOverlay(m Model) string {
 	const (
 		boxWMax    = 46
-		labelW     = 14
-		badgeW     = 3 // " ON" / "OFF" / "  -"
-		chromeRows = 2 // title + title bottom padding
-		// The default green / red wash out on the light-blue selection
-		// background, so the selected row darkens the theme accents (hue
-		// preserved) for readability rather than hardcoding new colors.
-		selectedBadgeDarken = 0.5
+		labelW     = 22 // wide label column so the cursor highlight reads as a bar
+		badgeW     = 3  // " ON" / "OFF" / "  -"
+		chromeRows = 2  // title + title bottom padding
 	)
 	boxW := min(boxWMax, m.width-4)
 	contentH := chromeRows + 3 // title chrome + 3 rows
 	innerW := max(boxW-4, 1)
 
-	// Badges carry a background — fg-only styles would punch through to the
-	// terminal background inside the themed overlay box. The selected row's
-	// badge uses the selection background so the highlight runs unbroken
-	// across the whole line (BadgeInHighlight below); other rows use the
-	// surface background.
-	badge := func(on, disabled, selected bool) string {
-		bg := ui.SurfaceBg
-		fgOn := lipgloss.Color(ui.ColorSecondary)
-		fgOff := lipgloss.Color(ui.ColorError)
-		fgDim := lipgloss.Color(ui.ColorDimmed)
-		if selected {
-			bg = lipgloss.Color(ui.ColorSelectedBg)
-			fgOn = lipgloss.Color(ui.Darken(ui.ColorSecondary, selectedBadgeDarken))
-			fgOff = lipgloss.Color(ui.Darken(ui.ColorError, selectedBadgeDarken))
-			fgDim = lipgloss.Color(ui.ColorSelectedFg)
-		}
+	// Badges carry the surface background — fg-only styles would punch
+	// through to the terminal background inside the themed overlay box.
+	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.SurfaceBg)
+	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError)).Bold(true).Background(ui.SurfaceBg)
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed)).Background(ui.SurfaceBg)
+
+	badge := func(on, disabled bool) string {
 		switch {
 		case disabled:
-			return lipgloss.NewStyle().Foreground(fgDim).Background(bg).Render("  -")
+			return dimStyle.Render("  -")
 		case on:
-			return lipgloss.NewStyle().Foreground(fgOn).Bold(true).Background(bg).Render(" ON")
+			return onStyle.Render(" ON")
 		default:
-			return lipgloss.NewStyle().Foreground(fgOff).Bold(true).Background(bg).Render("OFF")
+			return offStyle.Render("OFF")
 		}
 	}
 
-	cur := m.autoSyncCursor
 	items := []ui.OverlayListItem{
-		{Name: padRight("AutoSync", labelW), Badge: badge(m.autoSyncEnabled, false, cur == 0)},
+		{Name: padRight("AutoSync", labelW), Badge: badge(m.autoSyncEnabled, false)},
 		{
 			Name:     padRight("Self-Heal", labelW),
-			Badge:    badge(m.autoSyncSelfHeal, !m.autoSyncEnabled, cur == 1),
+			Badge:    badge(m.autoSyncSelfHeal, !m.autoSyncEnabled),
 			Disabled: !m.autoSyncEnabled,
 		},
 		{
 			Name:     padRight("Prune", labelW),
-			Badge:    badge(m.autoSyncPrune, !m.autoSyncEnabled, cur == 2),
+			Badge:    badge(m.autoSyncPrune, !m.autoSyncEnabled),
 			Disabled: !m.autoSyncEnabled,
 		},
 	}
 	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
-		Title:            "Configure AutoSync",
-		Cursor:           m.autoSyncCursor,
-		BadgeWidth:       badgeW,
-		BadgeInHighlight: true,
-		Height:           contentH,
+		Title:                "Configure AutoSync",
+		Cursor:               m.autoSyncCursor,
+		BadgeWidth:           badgeW,
+		CursorHighlightWidth: labelW,
+		Height:               contentH,
 	}, innerW)
 	return ui.OverlayStyle.Width(boxW).Render(content)
 }
