@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.15](https://github.com/janosmiko/lfk/compare/v0.14.14...v0.14.15) (2026-06-23)
+
+
+### Features
+
+* save and restore list filter in bookmarks ([#470](https://github.com/janosmiko/lfk/issues/470)) ([4927d59](https://github.com/janosmiko/lfk/commit/4927d59ec44f7e65251adbd66c7cadfc1b729831))
+
 ## [0.14.14](https://github.com/janosmiko/lfk/compare/v0.14.13...v0.14.14) (2026-06-22)
 
 
