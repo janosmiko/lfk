@@ -1,23 +1,16 @@
 name: CodeQL
 
-# Advanced CodeQL setup. Replaces the GitHub-managed "default setup" so we can
-# also scan pull requests from forks: GitHub never runs default-setup code
-# scanning on fork PRs (their read-only token cannot upload results), which
-# leaves the ruleset's code_scanning rule unsatisfiable and the PR blocked.
-#
-# Trusted paths (push, schedule, same-repo PRs) run on the normal pull_request
-# event. Fork PRs are scanned only via pull_request_target AFTER a maintainer
-# applies the `safe-to-scan` label - the label is the human review gate, because
-# this path checks out and builds untrusted contributor code with a write token.
+# Advanced CodeQL setup (replaces GitHub-managed default setup). Scans push to
+# main, same-repo pull requests, and a weekly schedule. Fork PRs are not scanned
+# here - their read-only token cannot upload results; review them manually and
+# rely on the post-merge scan of main (a repo-admin ruleset bypass exists for
+# merging reviewed fork PRs).
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  pull_request_target:
-    branches: [main]
-    types: [labeled, synchronize]
   schedule:
     - cron: "27 4 * * 1"
 
@@ -28,19 +21,6 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    # Run on: push/schedule; same-repo PRs (trusted, fork == false); or a fork
-    # PR freshly labeled `safe-to-scan` (pull_request_target, runs in base repo
-    # context so the token can upload results). Fork PRs on the plain
-    # pull_request event are skipped here - their token is read-only.
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'schedule' ||
-      (github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target' &&
-        github.event.action == 'labeled' &&
-        github.event.label.name == 'safe-to-scan' &&
-        github.event.pull_request.head.repo.full_name != github.repository)
     permissions:
       contents: read
       security-events: write
@@ -55,15 +35,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          # pull_request_target checks out the base by default; explicitly take
-          # the PR head SHA so we analyze the contributor's actual code. Safe
-          # only because this path requires the maintainer-applied label.
-          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
-          # checkout v7 refuses fork-PR checkout under pull_request_target unless
-          # opted in. The safe-to-scan label gate + minimal token + revoke-on-push
-          # are the safeguards; only enable it on that path, never on trusted runs.
-          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
 
       - name: Set up Go
         if: matrix.language == 'go'
@@ -82,31 +53,3 @@ jobs:
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           category: "/language:${{ matrix.language }}"
-
-  # New commits to a labeled fork PR drop the label so the contributor cannot
-  # slip unreviewed code into a scan; a maintainer must re-apply it after review.
-  revoke-on-push:
-    name: Revoke safe-to-scan on new commits
-    if: >-
-      github.event_name == 'pull_request_target' &&
-      github.event.action == 'synchronize' &&
-      github.event.pull_request.head.repo.full_name != github.repository &&
-      contains(github.event.pull_request.labels.*.name, 'safe-to-scan')
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Remove safe-to-scan label
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            await github.rest.issues.removeLabel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              name: 'safe-to-scan',
-            }).catch(err => {
-              // Tolerate "label already gone" (404); surface anything else so a
-              // failed removal fails the job instead of silently leaving the gate open.
-              if (err.status !== 404) throw err;
-            })
