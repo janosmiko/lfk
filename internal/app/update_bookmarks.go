@@ -159,6 +159,25 @@ func (m Model) resolveBookmarkTarget(bm model.Bookmark, loadSavedNamespace bool)
 	return target, "", true
 }
 
+// bookmarkNamespaceScope returns the namespace scope to persist on a bookmark:
+// a single primary namespace plus, for multi-select scopes, the full sorted
+// list. An empty primary with a nil list means "all namespaces".
+func (m Model) bookmarkNamespaceScope() (string, []string) {
+	switch {
+	case m.allNamespaces:
+		return "", nil
+	case len(m.selectedNamespaces) > 1:
+		nsList := make([]string, 0, len(m.selectedNamespaces))
+		for n := range m.selectedNamespaces {
+			nsList = append(nsList, n)
+		}
+		sort.Strings(nsList)
+		return nsList[0], nsList // primary namespace for backward compat display
+	default:
+		return m.namespace, nil
+	}
+}
+
 // bookmarkToSlot saves the current location as a named mark in the given slot.
 // Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks that
 // remember the current kube context or named union set. Uppercase (A-Z)
@@ -247,27 +266,21 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	if m.nav.ResourceName != "" {
 		parts = append(parts, m.nav.ResourceName)
 	}
+	// Capture the live list filter so it's restored on jump. Only the
+	// resources level carries a meaningful list filter; record it in the
+	// display name so the slot is distinguishable from an unfiltered one.
+	bmFilter := m.filterText
+	bmFilterBroad := m.filterBroadMode
+	if bmFilter != "" {
+		parts = append(parts, "/"+bmFilter)
+	}
 	name := strings.Join(parts, " > ")
 
 	// Always capture the current namespace scope so it's available for
 	// an opt-in override at jump time (Tab in the bookmark overlay).
 	// Context-free slots still ignore it on a default jump — the slot
 	// case controls defaults, not persistence.
-	var ns string
-	var nsList []string
-	switch {
-	case m.allNamespaces:
-		ns = ""
-	case len(m.selectedNamespaces) > 1:
-		nsList = make([]string, 0, len(m.selectedNamespaces))
-		for n := range m.selectedNamespaces {
-			nsList = append(nsList, n)
-		}
-		sort.Strings(nsList)
-		ns = nsList[0] // primary namespace for backward compat display
-	default:
-		ns = m.namespace
-	}
+	ns, nsList := m.bookmarkNamespaceScope()
 
 	bmContext := ""
 	bmUnionSet := ""
@@ -288,6 +301,8 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		NsSelectionNegated: m.nsSelectionNegated,
 		ResourceType:       rt.ResourceRef(),
 		ResourceName:       m.nav.ResourceName,
+		Filter:             bmFilter,
+		FilterBroad:        bmFilterBroad,
 		Slot:               slot,
 	}
 
@@ -699,9 +714,15 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.cancelAndReset()
 	m.requestGen++
 	m.loading = true
-	m.filterText = ""
+	// Restore the bookmark's saved list filter (empty for unfiltered slots).
+	// The filter applies once the resources finish loading; persist it in
+	// filterMemory too so navigating away and back keeps it.
+	m.filterText = bm.Filter
+	m.filterInput.Set(bm.Filter)
+	m.filterBroadMode = bm.FilterBroad
 	m.filterActive = false
 	m.searchActive = false
+	m.saveLevelFilter()
 
 	m.setStatusMessage("Jumped to: "+bm.Name, false)
 	cmds := []tea.Cmd{m.loadResources(false), scheduleStatusClear()}

@@ -389,7 +389,9 @@ type Bookmark struct {
 	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
-	Slot               string   `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, A-Z, 0-9)
+	Filter             string   `json:"filter,omitempty" yaml:"filter,omitempty"`             // list filter text restored on jump
+	FilterBroad        bool     `json:"filter_broad,omitempty" yaml:"filter_broad,omitempty"` // whether the filter also matched column values (Tab broad mode)
+	Slot               string   `json:"slot,omitempty" yaml:"slot,omitempty"`                 // single char key for vim-style named marks (a-z, A-Z, 0-9)
 }
 
 // IsContextAware reports whether this bookmark is anchored to a specific

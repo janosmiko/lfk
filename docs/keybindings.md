@@ -220,7 +220,9 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 
 Vim-style named marks for quick navigation. A bookmark stores a resource
 path (context + namespace + resource type + optional resource name) under
-a single-character slot.
+a single-character slot. Any list filter active when the mark is set is
+saved with it and reapplied on jump; filtered slots show a `> /<filter>`
+suffix in their name.
 
 - **Context-aware** (`a-z` / `0-9`): remembers the kube context; jumping
   switches clusters.

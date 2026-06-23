@@ -203,6 +203,54 @@ func TestBookmarkToSlot_ContextAwareFlag(t *testing.T) {
 	}
 }
 
+// TestBookmarkToSlot_CapturesFilter verifies that the live list filter is
+// persisted on the bookmark (text + broad mode) and surfaced in the display
+// name so a filtered slot is distinguishable from an unfiltered one.
+func TestBookmarkToSlot_CapturesFilter(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	rt := podResourceType()
+
+	t.Run("filter captured with broad mode", func(t *testing.T) {
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelResources,
+				Context:      "test",
+				ResourceType: rt,
+			},
+			namespace:       "default",
+			filterText:      "nginx",
+			filterBroadMode: true,
+			tabs:            []TabState{{}},
+		}
+
+		result, _ := m.bookmarkToSlot("a")
+		bm := result.(Model).bookmarks[0]
+		assert.Equal(t, "nginx", bm.Filter)
+		assert.True(t, bm.FilterBroad)
+		assert.Equal(t, "test > Pods > /nginx", bm.Name)
+	})
+
+	t.Run("no filter leaves fields empty and name clean", func(t *testing.T) {
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelResources,
+				Context:      "test",
+				ResourceType: rt,
+			},
+			namespace: "default",
+			tabs:      []TabState{{}},
+		}
+
+		result, _ := m.bookmarkToSlot("a")
+		bm := result.(Model).bookmarks[0]
+		assert.Empty(t, bm.Filter)
+		assert.False(t, bm.FilterBroad)
+		assert.Equal(t, "test > Pods", bm.Name)
+	})
+}
+
 // --- bookmarkToSlot display name resolution ---
 
 // TestBookmarkToSlot_CRDNameIncludesResourceType covers the user-reported
