@@ -183,6 +183,9 @@ type Model struct {
 	// = renders the cluster dashboard full screen.
 	fullscreenMiddle    bool
 	fullscreenDashboard bool
+	// hideLeftPane hides only the left resource-type sidebar; middle and
+	// right preview stay visible. Toggled via kb.HideSidebar.
+	hideLeftPane bool
 
 	sortColumnName string              // which column to sort by (e.g. "Name", "Age")
 	sortAscending  bool                // true = ascending, false = descending

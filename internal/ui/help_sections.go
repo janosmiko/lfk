@@ -57,6 +57,7 @@ func helpSections() []helpSection {
 				{"", "Details pane shows labels, finalizers, annotations, and metadata"},
 				{"", "Details view shows deletion timestamp for resources being deleted"},
 				{kb.Fullscreen, "Toggle fullscreen (middle column or dashboard)"},
+				{kb.HideSidebar, "Hide / show left resource-type sidebar"},
 				{kb.ResourceMap, "Toggle resource relationship map"},
 				{kb.ColumnToggle, "Column visibility toggle (show/hide and reorder columns)"},
 				{helpKeyDisplay(kb.SecretToggle), "Toggle secret value visibility (details pane only)"},

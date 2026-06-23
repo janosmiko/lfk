@@ -73,7 +73,6 @@ func (m Model) recomposePreviewEvents() Model {
 // above it and the children table — see renderRightColumn and the matching
 // innerW in clampPreviewScroll.
 func (m Model) rightFooterInnerWidth() int {
-	usable := m.width - 6
-	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
+	_, _, rightW := m.explorerColumnWidths()
 	return max(rightW-2, 20)
 }

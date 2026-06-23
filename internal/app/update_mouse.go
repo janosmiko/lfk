@@ -284,12 +284,13 @@ func (m Model) columnBoundaries() (leftEnd, middleEnd int) {
 		// Fullscreen: only middle column exists.
 		return 0, m.width
 	}
-	usable := m.width - 6
-	leftW := max(10, usable*12/100)
-	middleW := max(10, usable*51/100)
-	// Each column adds 1 border char on each side = 2 extra cells per
-	// column on screen. Padding is already included in leftW / middleW.
+	// Single source of truth for widths; hideLeftPane returns leftW=0
+	// so the left band collapses and the middle band starts at x=0.
+	leftW, middleW, _ := m.explorerColumnWidths()
 	leftEnd = leftW + 2
+	if leftW == 0 {
+		leftEnd = 0
+	}
 	middleEnd = leftEnd + middleW + 2
 	return leftEnd, middleEnd
 }

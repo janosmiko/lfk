@@ -270,6 +270,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `P` | Toggle between details and YAML preview |
 | `M` | Toggle resource relationship map |
 | `F` | Toggle fullscreen (middle column or dashboard) |
+| `\|` | Hide / show the left resource-type sidebar |
 | `.` | Quick filter presets |
 | `!` | Error log (V/v select, y copy, f fullscreen) |
 | `Ctrl+S` | Toggle secret value visibility |

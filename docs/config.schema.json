@@ -377,6 +377,7 @@
         "toggle_unified": { "type": "string" },
         "resource_map": { "type": "string" },
         "fullscreen": { "type": "string" },
+        "hide_sidebar": { "type": "string" },
         "filter_presets": { "type": "string" },
         "error_log": { "type": "string" },
         "secret_toggle": { "type": "string" },

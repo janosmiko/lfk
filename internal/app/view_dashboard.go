@@ -96,6 +96,8 @@ func (m Model) viewExplorerColumns(middle string, leftW, leftInner, rightW, righ
 		return m.viewExplorerDashboard(contentHeight)
 	case m.fullscreenMiddle:
 		return middle
+	case m.hideLeftPane:
+		return m.viewExplorerTwoColMiddleRight(middle, rightW, rightInner, contentHeight)
 	default:
 		return m.viewExplorerThreeCol(middle, leftW, leftInner, rightW, rightInner, contentHeight)
 	}

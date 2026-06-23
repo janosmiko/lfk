@@ -430,6 +430,22 @@ func TestHandleKeyFTogglesFullscreenMiddle(t *testing.T) {
 	assert.False(t, result.fullscreenMiddle)
 }
 
+// --- handleKey: | toggles hide-left-sidebar ---
+
+func TestHandleKeyPipeTogglesHideLeftPane(t *testing.T) {
+	m := baseExplorerModel()
+	assert.False(t, m.hideLeftPane)
+
+	ret, _ := m.handleKey(runeKey('|'))
+	result := ret.(Model)
+	assert.True(t, result.hideLeftPane, "| should hide the left sidebar")
+	assert.False(t, result.fullscreenMiddle, "hide-sidebar must not touch fullscreen state")
+
+	ret, _ = result.handleKey(runeKey('|'))
+	result = ret.(Model)
+	assert.False(t, result.hideLeftPane, "| again should restore the left sidebar")
+}
+
 // --- handleKey: ctrl+a toggles select all ---
 
 func TestHandleKeyCtrlASelectsAll(t *testing.T) {

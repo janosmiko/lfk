@@ -57,8 +57,7 @@ func (m *Model) clampPreviewScroll() {
 		return
 	}
 	// Compute the right column width exactly as the View function does.
-	usable := m.width - 6
-	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
+	_, _, rightW := m.explorerColumnWidths()
 	innerW := rightW - 2
 
 	// Compute the column height exactly as the View function does.

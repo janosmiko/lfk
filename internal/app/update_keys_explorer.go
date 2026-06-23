@@ -368,6 +368,9 @@ func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.Fullscreen:
 		mdl, cmd := m.handleExplorerFullscreen()
 		return mdl, cmd, true
+	case kb.HideSidebar:
+		mdl, cmd := m.handleExplorerHideSidebar()
+		return mdl, cmd, true
 	case kb.SecretToggle:
 		mdl, cmd := m.handleKeySecretToggle()
 		return mdl, cmd, true
@@ -442,6 +445,16 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Fullscreen ON", false)
 	} else {
 		m.setStatusMessage("Fullscreen OFF", false)
+	}
+	return m, scheduleStatusClear()
+}
+
+func (m Model) handleExplorerHideSidebar() (tea.Model, tea.Cmd) {
+	m.hideLeftPane = !m.hideLeftPane
+	if m.hideLeftPane {
+		m.setStatusMessage("Sidebar hidden", false)
+	} else {
+		m.setStatusMessage("Sidebar shown", false)
 	}
 	return m, scheduleStatusClear()
 }

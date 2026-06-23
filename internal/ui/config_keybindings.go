@@ -44,6 +44,7 @@ type Keybindings struct {
 	ToggleUnified     string `json:"toggle_unified" yaml:"toggle_unified"`
 	ResourceMap       string `json:"resource_map" yaml:"resource_map"`
 	Fullscreen        string `json:"fullscreen" yaml:"fullscreen"`
+	HideSidebar       string `json:"hide_sidebar" yaml:"hide_sidebar"`
 	FilterPresets     string `json:"filter_presets" yaml:"filter_presets"`
 	ErrorLog          string `json:"error_log" yaml:"error_log"`
 	SecretToggle      string `json:"secret_toggle" yaml:"secret_toggle"`
@@ -189,6 +190,7 @@ func DefaultKeybindings() Keybindings {
 		SeverityUp: "o", SeverityDown: "i",
 		NextMatch: "n", PrevMatch: "N",
 		TogglePreview: "P", ToggleWrap: ">", ResourceMap: "M", Fullscreen: "F",
+		HideSidebar:       "|",
 		ToggleLineNumbers: "#", ToggleFold: "z", ToggleFoldAll: "Z",
 		ToggleFollow: "F", ToggleTimestamps: "s", TogglePrefixes: "p", ToggleUnified: "u",
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",

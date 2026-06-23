@@ -445,6 +445,7 @@ func (m *Model) saveCurrentTab() {
 	t.selectionAnchor = m.selectionAnchor
 	t.fullscreenMiddle = m.fullscreenMiddle
 	t.fullscreenDashboard = m.fullscreenDashboard
+	t.hideLeftPane = m.hideLeftPane
 	t.dashboardPreview = m.dashboardPreview
 	t.dashboardEventsPreview = m.dashboardEventsPreview
 	t.monitoringPreview = m.monitoringPreview
@@ -577,6 +578,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.selectionAnchor = t.selectionAnchor
 	m.fullscreenMiddle = t.fullscreenMiddle
 	m.fullscreenDashboard = t.fullscreenDashboard
+	m.hideLeftPane = t.hideLeftPane
 	m.dashboardPreview = t.dashboardPreview
 	m.dashboardEventsPreview = t.dashboardEventsPreview
 	m.monitoringPreview = t.monitoringPreview
