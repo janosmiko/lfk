@@ -60,6 +60,10 @@ jobs:
           # the PR head SHA so we analyze the contributor's actual code. Safe
           # only because this path requires the maintainer-applied label.
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          # checkout v7 refuses fork-PR checkout under pull_request_target unless
+          # opted in. The safe-to-scan label gate + minimal token + revoke-on-push
+          # are the safeguards; only enable it on that path, never on trusted runs.
+          allow-unsafe-pr-checkout: ${{ github.event_name == 'pull_request_target' }}
 
       - name: Set up Go
         if: matrix.language == 'go'
