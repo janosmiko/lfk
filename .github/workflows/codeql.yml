@@ -1,18 +1,12 @@
 name: CodeQL
 
-# Advanced CodeQL setup (replaces GitHub-managed default setup). Scans push to
-# main, same-repo pull requests, and a weekly schedule. Fork PRs are not scanned
-# here - their read-only token cannot upload results; review them manually and
-# rely on the post-merge scan of main (a repo-admin ruleset bypass exists for
-# merging reviewed fork PRs).
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
-    - cron: "27 4 * * 1"
+    - cron: '17 6 * * 1'
 
 permissions:
   contents: read
@@ -22,8 +16,11 @@ jobs:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       security-events: write
+      packages: read
+      actions: read
+      contents: read
+
     strategy:
       fail-fast: false
       matrix:
@@ -32,9 +29,10 @@ jobs:
             build-mode: autobuild
           - language: actions
             build-mode: none
+
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Go
         if: matrix.language == 'go'
@@ -43,13 +41,13 @@ jobs:
           go-version-file: go.mod
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-and-quality
 
-      - name: Analyze
-        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
         with:
           category: "/language:${{ matrix.language }}"
