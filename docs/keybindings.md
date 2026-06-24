@@ -65,8 +65,7 @@ All built-in chords are rebindable under `keybindings`.
 | `P` | Toggle between details summary and YAML preview |
 | | Details pane shows labels, finalizers, annotation count, and resource metadata |
 | | Details view shows deletion timestamp (with warning highlight) for resources being deleted |
-| `F` | Toggle fullscreen (middle column or dashboard) |
-| `\|` | Hide / show the left resource-type sidebar (keeps middle list + right preview) |
+| `F` | Cycle layout: hide sidebar -> fullscreen -> restore (dashboards toggle fullscreen) |
 | `M` | Toggle resource relationship map view |
 | `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
 | `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
@@ -1106,8 +1105,7 @@ keybindings:
   search: "/"            # Search and jump
   toggle_preview: "P"    # Toggle YAML preview
   resource_map: "M"      # Resource map
-  fullscreen: "F"        # Fullscreen toggle
-  hide_sidebar: "|"      # Hide / show the left sidebar
+  fullscreen: "F"        # Cycle layout: hide sidebar / fullscreen / restore
   watch_mode: "w"        # Watch mode
   command_bar: ":"        # Command bar
   theme_selector: "T"    # Theme selector

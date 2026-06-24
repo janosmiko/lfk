@@ -184,7 +184,7 @@ type Model struct {
 	fullscreenMiddle    bool
 	fullscreenDashboard bool
 	// hideLeftPane hides only the left resource-type sidebar; middle and
-	// right preview stay visible. Toggled via kb.HideSidebar.
+	// right preview stay visible. One phase of the kb.Fullscreen cycle.
 	hideLeftPane bool
 
 	sortColumnName string              // which column to sort by (e.g. "Name", "Age")
@@ -791,13 +791,7 @@ type Model struct {
 	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
 	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
 
-	// Easter egg state.
-	konamiProgress int  // current position in the Konami Code sequence
-	konamiActive   bool // true when cheat code was just activated (clears after 5s)
-	nyanMode       bool // toggleable nyan mode indicator
-	nyanTick       int  // animation tick for nyan mode
-	creditsScroll  int  // scroll position for credits screen
-	creditsStopped bool // true when credits reached center and waiting to close
-	kubetrisGame   *kubetrisGame
+	// Easter egg state (Konami, nyan, credits, kubetris).
+	easterEggState
 	securityModelState
 }

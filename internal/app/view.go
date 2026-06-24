@@ -624,7 +624,8 @@ func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rig
 }
 
 // viewExplorerTwoColMiddleRight renders the explorer with the left sidebar
-// hidden (kb.HideSidebar). Same right-column rendering as viewExplorerThreeCol
+// hidden (the hide-sidebar phase of the kb.Fullscreen cycle). Same
+// right-column rendering as viewExplorerThreeCol
 // minus the left column; ActiveLeftScroll/HighlightQuery are still saved and
 // cleared so the right pane doesn't inherit middle-pane highlight state.
 func (m Model) viewExplorerTwoColMiddleRight(middle string, rightW, rightInner, contentHeight int) string {

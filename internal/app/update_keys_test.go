@@ -415,35 +415,30 @@ func TestHandleKeyPTogglesFullYAMLPreview(t *testing.T) {
 	assert.False(t, result.fullYAMLPreview)
 }
 
-// --- handleKey: F toggles fullscreen middle ---
+// --- handleKey: F cycles explorer layout phases ---
 
-func TestHandleKeyFTogglesFullscreenMiddle(t *testing.T) {
-	m := baseExplorerModel()
-	assert.False(t, m.fullscreenMiddle)
-
-	ret, _ := m.handleKey(runeKey('F'))
-	result := ret.(Model)
-	assert.True(t, result.fullscreenMiddle)
-
-	ret, _ = result.handleKey(runeKey('F'))
-	result = ret.(Model)
-	assert.False(t, result.fullscreenMiddle)
-}
-
-// --- handleKey: | toggles hide-left-sidebar ---
-
-func TestHandleKeyPipeTogglesHideLeftPane(t *testing.T) {
+func TestHandleKeyFCyclesLayout(t *testing.T) {
 	m := baseExplorerModel()
 	assert.False(t, m.hideLeftPane)
+	assert.False(t, m.fullscreenMiddle)
 
-	ret, _ := m.handleKey(runeKey('|'))
+	// Phase 1: full layout -> hide sidebar.
+	ret, _ := m.handleKey(runeKey('F'))
 	result := ret.(Model)
-	assert.True(t, result.hideLeftPane, "| should hide the left sidebar")
-	assert.False(t, result.fullscreenMiddle, "hide-sidebar must not touch fullscreen state")
+	assert.True(t, result.hideLeftPane, "first F hides the left sidebar")
+	assert.False(t, result.fullscreenMiddle, "first F must not enter fullscreen")
 
-	ret, _ = result.handleKey(runeKey('|'))
+	// Phase 2: hide sidebar -> fullscreen.
+	ret, _ = result.handleKey(runeKey('F'))
 	result = ret.(Model)
-	assert.False(t, result.hideLeftPane, "| again should restore the left sidebar")
+	assert.True(t, result.fullscreenMiddle, "second F enters fullscreen")
+	assert.False(t, result.hideLeftPane, "fullscreen clears the hide-sidebar phase")
+
+	// Phase 3: fullscreen -> full layout.
+	ret, _ = result.handleKey(runeKey('F'))
+	result = ret.(Model)
+	assert.False(t, result.fullscreenMiddle, "third F restores the full layout")
+	assert.False(t, result.hideLeftPane, "third F restores the full layout")
 }
 
 // --- handleKey: ctrl+a toggles select all ---
@@ -631,7 +626,9 @@ func TestPush2HandleKeyExplorerModeF(t *testing.T) {
 	m.mode = modeExplorer
 	result, _ := m.handleKey(keyMsg("F"))
 	rm := result.(Model)
-	assert.True(t, rm.fullscreenMiddle)
+	// First F press enters the hide-sidebar phase of the layout cycle.
+	assert.True(t, rm.hideLeftPane)
+	assert.False(t, rm.fullscreenMiddle)
 }
 
 func TestPush2HandleKeyExplorerModeW(t *testing.T) {

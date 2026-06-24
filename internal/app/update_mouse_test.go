@@ -488,7 +488,7 @@ func TestColumnBoundariesMatchViewExplorerLayout(t *testing.T) {
 		"x=leftEnd hits the middle column, not the left (which would drill to ResourceTypes)")
 }
 
-// When the left sidebar is hidden (kb.HideSidebar / `|`), the column
+// When the left sidebar is hidden (the hide-sidebar phase of kb.Fullscreen), the column
 // math must collapse the left band to width=0 so clicks at low x land
 // in the middle column. Pre-fix, columnBoundaries returned the same
 // (15, 75) split as the three-col layout, so x=2 navigated to the

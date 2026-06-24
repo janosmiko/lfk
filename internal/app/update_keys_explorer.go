@@ -368,9 +368,6 @@ func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.Fullscreen:
 		mdl, cmd := m.handleExplorerFullscreen()
 		return mdl, cmd, true
-	case kb.HideSidebar:
-		mdl, cmd := m.handleExplorerHideSidebar()
-		return mdl, cmd, true
 	case kb.SecretToggle:
 		mdl, cmd := m.handleKeySecretToggle()
 		return mdl, cmd, true
@@ -440,21 +437,21 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 		}
 		return m, scheduleStatusClear()
 	}
-	m.fullscreenMiddle = !m.fullscreenMiddle
-	if m.fullscreenMiddle {
-		m.setStatusMessage("Fullscreen ON", false)
-	} else {
-		m.setStatusMessage("Fullscreen OFF", false)
-	}
-	return m, scheduleStatusClear()
-}
-
-func (m Model) handleExplorerHideSidebar() (tea.Model, tea.Cmd) {
-	m.hideLeftPane = !m.hideLeftPane
-	if m.hideLeftPane {
-		m.setStatusMessage("Sidebar hidden", false)
-	} else {
-		m.setStatusMessage("Sidebar shown", false)
+	// Three-pane explorer: F cycles through layout phases that progressively
+	// reveal more of the middle list, then wraps back to the full layout:
+	// normal -> hide sidebar -> fullscreen -> normal.
+	switch {
+	case !m.hideLeftPane && !m.fullscreenMiddle:
+		m.hideLeftPane = true
+		m.setStatusMessage("Layout: sidebar hidden", false)
+	case m.hideLeftPane && !m.fullscreenMiddle:
+		m.hideLeftPane = false
+		m.fullscreenMiddle = true
+		m.setStatusMessage("Layout: fullscreen", false)
+	default:
+		m.hideLeftPane = false
+		m.fullscreenMiddle = false
+		m.setStatusMessage("Layout: normal", false)
 	}
 	return m, scheduleStatusClear()
 }

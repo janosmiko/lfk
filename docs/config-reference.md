@@ -464,8 +464,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `tree_view` | `T` | Toggle the ASCII-art tree view (Object Explorer, API Explorer). Shares the `T` default with `theme_selector`, but they apply in separate contexts (explorers vs. resource list). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
 | `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod or container (explorer; deeper levels only). |
-| `fullscreen` | `F` | Maximize/minimize: explorer middle column & dashboard, event timeline, error log. |
-| `hide_sidebar` | `\|` | Hide / show the explorer's left resource-type sidebar; middle list and right preview stay visible. |
+| `fullscreen` | `F` | Explorer: cycle layout (hide sidebar -> fullscreen -> restore). Dashboard / event timeline / error log: fullscreen toggle. |
 | `sort_next` | `>` | Sort by next column |
 | `sort_prev` | `<` | Sort by previous column |
 | `sort_flip` | `=` | Toggle sort direction |
