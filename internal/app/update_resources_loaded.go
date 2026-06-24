@@ -239,9 +239,13 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
+			// Land on the saved resource (deferred ResourceName) by name, then
+			// layer on the saved list filter and any cursor target that rode
+			// through discovery on pendingSessionList.
 			if name != "" {
 				m.pendingTarget = name
 			}
+			m.applyPendingSessionList()
 			return m, m.loadResources(false)
 		}
 	}
@@ -355,6 +359,36 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 	return mdl, cmd
 }
 
+// restoreCursorAfterLoad places the cursor once a resource list has loaded.
+// A pending session/bookmark target wins (matched against the visible list so a
+// restored filter that hides rows doesn't throw off the index; an optional
+// namespace disambiguates same-named rows in all-namespaces views). Otherwise
+// the previously-highlighted row is restored, preferring an exact cluster match
+// in union mode where names recur across clusters.
+func (m *Model) restoreCursorAfterLoad(prevName, prevNs, prevExtra, prevKind, prevCluster string) {
+	if m.pendingTarget != "" {
+		target, targetNs := m.pendingTarget, m.pendingTargetNamespace
+		for i, item := range m.visibleMiddleItems() {
+			if item.Name == target && (targetNs == "" || item.Namespace == targetNs) {
+				m.setCursor(i)
+				break
+			}
+		}
+		m.pendingTarget = ""
+		m.pendingTargetNamespace = ""
+		return
+	}
+	if m.unionMode && prevCluster != "" {
+		for i, item := range m.visibleMiddleItems() {
+			if item.Name == prevName && item.Namespace == prevNs && item.ClusterName == prevCluster {
+				m.setCursor(i)
+				return
+			}
+		}
+	}
+	m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+}
+
 func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
 	msg.items = m.filterLoadedItemsBySelectedNamespaces(msg.items)
 	if len(msg.items) == 0 {
@@ -426,31 +460,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	m.applyWarningEventsFilter()
 	m.applyEventGrouping()
 	m.reapplyFilterPreset()
-	if m.pendingTarget != "" {
-		for i, item := range m.middleItems {
-			if item.Name == m.pendingTarget {
-				m.setCursor(i)
-				break
-			}
-		}
-		m.pendingTarget = ""
-	} else if m.unionMode && prevCluster != "" {
-		// In union mode, prefer the exact cluster match to avoid jumping to
-		// the first alphabetical cluster when names are shared across clusters.
-		restored := false
-		for i, item := range m.visibleMiddleItems() {
-			if item.Name == prevName && item.Namespace == prevNs && item.ClusterName == prevCluster {
-				m.setCursor(i)
-				restored = true
-				break
-			}
-		}
-		if !restored {
-			m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
-		}
-	} else {
-		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
-	}
+	m.restoreCursorAfterLoad(prevName, prevNs, prevExtra, prevKind, prevCluster)
 	// If this load originated from a watch-mode refresh, propagate the
 	// suppress flag to the downstream preview/metrics cmds so they too
 	// stay off the title-bar indicator. Capture the prior flag so the

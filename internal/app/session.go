@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/paths"
 )
 
@@ -20,6 +21,11 @@ type SessionTab struct {
 	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"`
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+	// List view state at quit time, restored once the resource list reloads.
+	Filter          string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	FilterBroad     bool   `json:"filter_broad,omitempty" yaml:"filter_broad,omitempty"`
+	CursorName      string `json:"cursor_name,omitempty" yaml:"cursor_name,omitempty"`
+	CursorNamespace string `json:"cursor_namespace,omitempty" yaml:"cursor_namespace,omitempty"`
 }
 
 // SessionState represents the persisted navigation state across restarts.
@@ -32,6 +38,13 @@ type SessionState struct {
 	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"` // group/version/resource ref string
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+
+	// List view state for the legacy single-tab shape; the multi-tab path
+	// carries these per SessionTab instead.
+	Filter          string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	FilterBroad     bool   `json:"filter_broad,omitempty" yaml:"filter_broad,omitempty"`
+	CursorName      string `json:"cursor_name,omitempty" yaml:"cursor_name,omitempty"`
+	CursorNamespace string `json:"cursor_namespace,omitempty" yaml:"cursor_namespace,omitempty"`
 
 	// Multi-tab fields.
 	Tabs      []SessionTab `json:"tabs,omitempty" yaml:"tabs,omitempty"`
@@ -124,7 +137,7 @@ func (m *Model) saveCurrentSession() {
 		ActiveTab: m.activeTab,
 	}
 
-	for _, t := range m.tabs {
+	for i, t := range m.tabs {
 		st := SessionTab{
 			Context:       t.nav.Context,
 			AllNamespaces: t.allNamespaces,
@@ -146,6 +159,22 @@ func (m *Model) saveCurrentSession() {
 		}
 		if t.nav.ResourceName != "" {
 			st.ResourceName = t.nav.ResourceName
+		}
+		// Persist the list filter only when the tab is sitting on a resource
+		// list; a filter typed at the resource-types level is not meaningful
+		// once the session reopens directly into the resource view.
+		if t.nav.Level == model.LevelResources {
+			st.Filter = t.filterText
+			st.FilterBroad = t.filterBroadMode
+			// The active tab's highlighted row lives in the live Model state
+			// (saveCurrentTab copied indices, not the item identity), so read
+			// it back from there to land the cursor on the same resource.
+			if i == m.activeTab {
+				if name, ns, _, _ := m.cursorItemKey(); name != "" {
+					st.CursorName = name
+					st.CursorNamespace = ns
+				}
+			}
 		}
 		s.Tabs = append(s.Tabs, st)
 	}

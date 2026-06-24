@@ -194,6 +194,8 @@ type Model struct {
 	statusMessageTip bool      // true when the message is a startup tip (dismiss on keypress)
 
 	pendingTarget string // when set, resources load selects this item by name
+	// pendingTargetNamespace narrows pendingTarget to one ns (empty = name-only).
+	pendingTargetNamespace string
 
 	// pendingG: vim 'gg' -> next 'g' jumps to top; whichKeyShown: popup visible while armed.
 	pendingG      bool
@@ -450,33 +452,31 @@ type Model struct {
 
 	// Contexts whose discoveredResources entries have been refreshed
 	// (i.e. live-fetched) during this session. NewModel prefills
-	// discoveredResources from the on-disk discovery cache for instant
-	// first paint, so the bare presence of an entry no longer implies
-	// "fresh" — this flag is the source of truth for stale-while-revalidate
-	// gating in the lazy discovery triggers.
+	// discoveredResources from the on-disk discovery cache for instant first
+	// paint, so an entry's mere presence no longer implies "fresh" — this flag
+	// is the source of truth for stale-while-revalidate gating in lazy discovery.
 	discoveryRefreshedContexts map[string]bool
 
 	// bookmarkAwaitingDiscovery holds a bookmark whose target resource type
 	// can't be resolved yet because API discovery for the effective context
 	// hasn't completed (typical at session restore — the seed list resolves
-	// Pods/Deployments synchronously but CRDs like ArgoCD Applications are
-	// only known after the discovery round-trip lands). Set by
-	// navigateToBookmark, consumed by updateAPIResourceDiscovery, which
-	// replays the navigation once the matching context's entries arrive.
-	// Distinct from pendingBookmark (which gates save-overwrite confirmation).
+	// Pods/Deployments synchronously but CRDs like ArgoCD Applications are only
+	// known after the discovery round-trip lands). Set by navigateToBookmark,
+	// consumed by updateAPIResourceDiscovery, which replays the navigation once
+	// the matching context's entries arrive. Distinct from pendingBookmark
+	// (which gates save-overwrite confirmation).
 	bookmarkAwaitingDiscovery *model.Bookmark
-
 	// sessionResourceTypeAwaitingDiscovery captures the resource type ref a
-	// just-restored session wants to land on when the type wasn't yet known
-	// to the seed list (CRD-backed views like ArgoCD Application). The
-	// matching apiResourceDiscoveryMsg consumes it and navigates to the
-	// resource type so the user lands back on the view they quit from
-	// instead of being dumped at the resource types level.
+	// just-restored session wants to land on when the type wasn't yet known to
+	// the seed list (CRD-backed views like ArgoCD Application). The matching
+	// apiResourceDiscoveryMsg consumes it and navigates to the resource type so
+	// the user lands back on the view they quit from rather than the type level.
 	sessionResourceTypeAwaitingDiscovery string
-	// sessionResourceNameAwaitingDiscovery is the resource name to land on
-	// once the type-await above resolves. Mirrors pendingTarget but is only
-	// armed when the type itself was deferred.
+	// sessionResourceNameAwaitingDiscovery is the resource name to land on once
+	// the type-await above resolves; mirrors pendingTarget but only when deferred.
 	sessionResourceNameAwaitingDiscovery string
+	// pendingSessionList carries the saved filter + cursor through a deferred restore.
+	pendingSessionList pendingSessionListState
 
 	// Preview scroll offset for the right column.
 	previewScroll int

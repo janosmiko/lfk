@@ -473,6 +473,7 @@ type TabState struct {
 	sortAscending           bool
 	sortMemory              map[string]sortPref
 	filterText              string
+	filterBroadMode         bool
 	watchMode               bool
 	objectExplorerLive      bool
 	objectExplorerTree      bool
