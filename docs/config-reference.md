@@ -1054,7 +1054,7 @@ To regenerate themes from the latest ghostty source, run `make generate-themes`.
 
 ## Session Persistence
 
-The application automatically saves and restores the last visited context, namespace, and resource type across restarts. The session state is stored at `~/.local/state/lfk/session.yaml`.
+The application automatically saves and restores the last visited context, namespace, and resource type across restarts (per tab, including the active tab). It also restores the active list filter (including the `Tab` broad-match mode) and the highlighted row, so you reopen lfk on the same resource you were looking at. The session state is stored at `~/.local/state/lfk/session.yaml`.
 
 This is transparent and requires no configuration. To start fresh, delete the session file.
 

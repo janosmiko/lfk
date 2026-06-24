@@ -473,9 +473,14 @@ type TabState struct {
 	sortAscending           bool
 	sortMemory              map[string]sortPref
 	filterText              string
-	watchMode               bool
-	objectExplorerLive      bool
-	objectExplorerTree      bool
+	filterBroadMode         bool
+	// Identity of the highlighted resource row, captured on save so session
+	// restore can reopen every tab (not just the active one) on the same item.
+	cursorName         string
+	cursorNamespace    string
+	watchMode          bool
+	objectExplorerLive bool
+	objectExplorerTree bool
 	// readOnly blocks all mutating actions for this tab. Re-evaluated on
 	// context switch from CLI flag, per-context config, and global config.
 	readOnly               bool

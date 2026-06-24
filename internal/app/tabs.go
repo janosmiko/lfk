@@ -434,6 +434,8 @@ func (m *Model) saveCurrentTab() {
 	t.sortColumnName = m.sortColumnName
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
+	t.filterBroadMode = m.filterBroadMode
+	t.cursorName, t.cursorNamespace, _, _ = m.cursorItemKey()
 	t.watchMode = m.watchMode
 	t.objectExplorerLive = m.objectExplorerLive
 	t.objectExplorerTree = m.objectExplorerTree
@@ -513,8 +515,8 @@ func (m *Model) saveCurrentTab() {
 	m.saveLogTopToTab(t)
 	m.saveSecurityStateToTab(t)
 	// Cache the current preview buffer then cancel the stream so it does not
-	// outlive the tab. The fullLogPreview flag is persisted above, so the next
-	// loadTab will know to restart (and can restore from cache) if needed.
+	// outlive the tab. fullLogPreview is persisted above, so the next loadTab
+	// knows to restart (and can restore from cache) if needed.
 	m.cachePreviewLog()
 	m.cancelPreviewLogStream()
 }
@@ -564,6 +566,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.sortColumnName = t.sortColumnName
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
+	m.filterBroadMode = t.filterBroadMode
+	m.filterInput.Set(t.filterText)
 	m.watchMode = t.watchMode
 	m.objectExplorerLive = t.objectExplorerLive
 	m.objectExplorerTree = t.objectExplorerTree
@@ -576,8 +580,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.dashboardPreview = t.dashboardPreview
 	m.dashboardEventsPreview = t.dashboardEventsPreview
 	m.monitoringPreview = t.monitoringPreview
-	// Restore the right-pane footers so the new tab paints with its own
-	// metrics / events instead of leaking the previous tab's values.
+	// Restore the right-pane footers so the new tab paints its own metrics/events.
 	m.metricsContent = t.metricsContent
 	m.previewEventsContent = t.previewEventsContent
 	m.metricsData = t.metricsData
@@ -615,8 +618,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logView.visualCol = t.logVisualCol
 	m.logView.visualCurCol = t.logVisualCurCol
 	m.logView.scrollOption = t.logScrollOption
-	// Rebuild the filtered view after all offset/follow fields are restored so
-	// clampLogOffsets operates on the correct follow flag and cursor position.
+	// Rebuild after offset/follow restore so clampLogOffsets sees correct state.
 	m.rebuildLogView()
 	m.logView.parentKind = t.logParentKind
 	m.logView.parentName = t.logParentName
@@ -658,23 +660,20 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.pendingTextObject = 0
 
 	// Re-annotate cluster picker rows with the current effective read-only
-	// state. The override map is per-Model (shared across tabs), but
-	// middleItems was captured per-tab — so a Ctrl+R toggle in another tab
-	// can leave this tab's [RO] markers stale until the next context
-	// reload. This brings them in sync immediately on tab switch.
+	// state. The override map is per-Model (shared across tabs), but middleItems
+	// was captured per-tab — so a Ctrl+R toggle in another tab can leave this
+	// tab's [RO] markers stale until the next context reload. Sync them now.
 	m.refreshContextReadOnlyMarkers()
 
-	// If this tab was restored from a session but never loaded, clear the
-	// flag, set up the navigation column structure, and return a command
-	// that fetches the tab's data.
+	// If this tab was restored from a session but never loaded, clear the flag,
+	// set up the navigation column structure, and return a fetch command.
 	if needsLoad {
 		m.tabs[idx].needsLoad = false
 		m.applyPinnedTypes()
 
-		// Rebuild security state for the restored context so the Security
-		// sidebar seeds from the on-disk cache. Live availability probing is
-		// lazy (maybeProbeSecurityOnFocus) — it runs when the user focuses
-		// the Security category, not eagerly on every tab/context restore.
+		// Rebuild security state for the restored context so the Security sidebar
+		// seeds from the on-disk cache. Live availability probing is lazy
+		// (maybeProbeSecurityOnFocus): on Security focus, not on every restore.
 		securitySeedCmd := m.refreshSecuritySources()
 
 		// Load contexts for the left column breadcrumb.
@@ -690,13 +689,14 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 
 		switch m.nav.Level {
 		case model.LevelResources:
-			// At resources level: left = resource types, history = [contexts].
+			// Resources level: left = resource types, history = [contexts].
 			m.leftItemsHistory = [][]model.Item{contexts}
 			m.leftItems = resourceTypes
 			m.setMiddleItems(nil)
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
+			m.pendingTarget, m.pendingTargetNamespace = t.cursorName, t.cursorNamespace // quit-time row
 			return tea.Batch(securitySeedCmd, m.loadResources(false))
 		case model.LevelResourceTypes:
 			// At resource types level: left = contexts, middle = resource types.

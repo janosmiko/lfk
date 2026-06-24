@@ -6,6 +6,51 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// pendingSessionListState carries a restored session's filter and cursor target
+// when the descent to the resource list is deferred behind CRD discovery.
+type pendingSessionListState struct {
+	armed       bool
+	filter      string
+	filterBroad bool
+	cursorName  string
+	cursorNs    string
+}
+
+// sessionCursor resolves the row a restored session lands on: the saved cursor
+// name/namespace, falling back to ResourceName for pre-cursor legacy sessions.
+func sessionCursor(sess *SessionState) (name, ns string) {
+	if sess.CursorName != "" {
+		return sess.CursorName, sess.CursorNamespace
+	}
+	return sess.ResourceName, ""
+}
+
+// applySessionFilterAndCursor seeds the filter and cursor target for the next
+// resource load, committing the filter to filterMemory so drill-out/back keeps it.
+func (m *Model) applySessionFilterAndCursor(filter string, broad bool, cursorName, cursorNs string) {
+	m.filterText = filter
+	m.filterInput.Set(filter)
+	m.filterBroadMode = broad
+	m.filterActive = false
+	m.searchActive = false
+	m.saveLevelFilter()
+	if cursorName != "" {
+		m.pendingTarget = cursorName
+		m.pendingTargetNamespace = cursorNs
+	}
+}
+
+// applyPendingSessionList applies a deferred (CRD-discovery) session list state
+// and clears it; no-op when nothing is armed.
+func (m *Model) applyPendingSessionList() {
+	p := m.pendingSessionList
+	m.pendingSessionList = pendingSessionListState{}
+	if !p.armed {
+		return
+	}
+	m.applySessionFilterAndCursor(p.filter, p.filterBroad, p.cursorName, p.cursorNs)
+}
+
 func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	sess := m.pendingSession
 	m.pendingSession = nil
@@ -112,6 +157,14 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 		if !ok && needsDiscovery {
 			m.sessionResourceTypeAwaitingDiscovery = sess.ResourceType
 			m.sessionResourceNameAwaitingDiscovery = sess.ResourceName
+			cursorName, cursorNs := sessionCursor(sess)
+			m.pendingSessionList = pendingSessionListState{
+				armed:       true,
+				filter:      sess.Filter,
+				filterBroad: sess.FilterBroad,
+				cursorName:  cursorName,
+				cursorNs:    cursorNs,
+			}
 		}
 		if ok {
 			rtRef := rt.ResourceRef()
@@ -132,9 +185,8 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 			m.setCursor(0)
 			m.loading = true
 
-			if sess.ResourceName != "" {
-				m.pendingTarget = sess.ResourceName
-			}
+			cursorName, cursorNs := sessionCursor(sess)
+			m.applySessionFilterAndCursor(sess.Filter, sess.FilterBroad, cursorName, cursorNs)
 
 			cmds = append(cmds, m.loadResources(false))
 			return m, tea.Batch(cmds...)
@@ -181,6 +233,10 @@ func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item)
 		NsSelectionNegated: activeSess.NsSelectionNegated,
 		ResourceType:       activeSess.ResourceType,
 		ResourceName:       activeSess.ResourceName,
+		Filter:             activeSess.Filter,
+		FilterBroad:        activeSess.FilterBroad,
+		CursorName:         activeSess.CursorName,
+		CursorNamespace:    activeSess.CursorNamespace,
 	}, contexts)
 }
 
@@ -230,6 +286,12 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 			if st.ResourceName != "" {
 				tab.nav.ResourceName = st.ResourceName
 			}
+			// Carry filter + cursor so this lazy tab reopens filtered and on its row.
+			tab.filterText = st.Filter
+			tab.filterBroadMode = st.FilterBroad
+			tab.cursorName, tab.cursorNamespace = sessionCursor(&SessionState{
+				ResourceName: st.ResourceName, CursorName: st.CursorName, CursorNamespace: st.CursorNamespace,
+			})
 		} else {
 			tab.nav.Level = model.LevelResourceTypes
 		}

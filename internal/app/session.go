@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/paths"
 )
 
@@ -20,6 +21,11 @@ type SessionTab struct {
 	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"`
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+	// List view state at quit time, restored once the resource list reloads.
+	Filter          string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	FilterBroad     bool   `json:"filter_broad,omitempty" yaml:"filter_broad,omitempty"`
+	CursorName      string `json:"cursor_name,omitempty" yaml:"cursor_name,omitempty"`
+	CursorNamespace string `json:"cursor_namespace,omitempty" yaml:"cursor_namespace,omitempty"`
 }
 
 // SessionState represents the persisted navigation state across restarts.
@@ -32,6 +38,13 @@ type SessionState struct {
 	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"` // group/version/resource ref string
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+
+	// List view state for the legacy single-tab shape; the multi-tab path
+	// carries these per SessionTab instead.
+	Filter          string `json:"filter,omitempty" yaml:"filter,omitempty"`
+	FilterBroad     bool   `json:"filter_broad,omitempty" yaml:"filter_broad,omitempty"`
+	CursorName      string `json:"cursor_name,omitempty" yaml:"cursor_name,omitempty"`
+	CursorNamespace string `json:"cursor_namespace,omitempty" yaml:"cursor_namespace,omitempty"`
 
 	// Multi-tab fields.
 	Tabs      []SessionTab `json:"tabs,omitempty" yaml:"tabs,omitempty"`
@@ -146,6 +159,16 @@ func (m *Model) saveCurrentSession() {
 		}
 		if t.nav.ResourceName != "" {
 			st.ResourceName = t.nav.ResourceName
+		}
+		// Persist filter + highlighted row only on a resource list; a filter from
+		// the resource-types level is meaningless once restore reopens into the
+		// list. saveCurrentTab already captured each tab's cursor, so every tab
+		// reopens on its own row.
+		if t.nav.Level == model.LevelResources {
+			st.Filter = t.filterText
+			st.FilterBroad = t.filterBroadMode
+			st.CursorName = t.cursorName
+			st.CursorNamespace = t.cursorNamespace
 		}
 		s.Tabs = append(s.Tabs, st)
 	}
