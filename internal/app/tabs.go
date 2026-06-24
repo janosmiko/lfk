@@ -583,8 +583,13 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 		// (maybeProbeSecurityOnFocus): on Security focus, not on every restore.
 		securitySeedCmd := m.refreshSecuritySources()
 
-		// Load contexts for the left column breadcrumb.
-		contexts, _ := m.client.GetContexts()
+		// Load contexts for the left column breadcrumb. A failure is
+		// non-fatal here (the breadcrumb just degrades to empty), but
+		// surface it so the read error is not swallowed silently.
+		contexts, err := m.client.GetContexts()
+		if err != nil {
+			m.setErrorFromErr("Failed to load contexts: ", err)
+		}
 		resourceTypes := model.BuildSidebarItems(model.SeedResources())
 		discoveryCtx := m.nav.Context
 		if m.unionMode && m.nav.Context == UnionContextSentinel && len(m.unionContexts) > 0 {
