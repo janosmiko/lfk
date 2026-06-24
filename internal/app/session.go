@@ -137,7 +137,7 @@ func (m *Model) saveCurrentSession() {
 		ActiveTab: m.activeTab,
 	}
 
-	for i, t := range m.tabs {
+	for _, t := range m.tabs {
 		st := SessionTab{
 			Context:       t.nav.Context,
 			AllNamespaces: t.allNamespaces,
@@ -160,21 +160,17 @@ func (m *Model) saveCurrentSession() {
 		if t.nav.ResourceName != "" {
 			st.ResourceName = t.nav.ResourceName
 		}
-		// Persist the list filter only when the tab is sitting on a resource
-		// list; a filter typed at the resource-types level is not meaningful
-		// once the session reopens directly into the resource view.
+		// Persist the list filter and highlighted row only when the tab sits on
+		// a resource list; a filter typed at the resource-types level is not
+		// meaningful once the session reopens directly into the resource view.
+		// saveCurrentTab captured the cursor identity for every tab (live for
+		// the active one, last-seen for the rest), so restore can reopen each
+		// tab on its own row.
 		if t.nav.Level == model.LevelResources {
 			st.Filter = t.filterText
 			st.FilterBroad = t.filterBroadMode
-			// The active tab's highlighted row lives in the live Model state
-			// (saveCurrentTab copied indices, not the item identity), so read
-			// it back from there to land the cursor on the same resource.
-			if i == m.activeTab {
-				if name, ns, _, _ := m.cursorItemKey(); name != "" {
-					st.CursorName = name
-					st.CursorNamespace = ns
-				}
-			}
+			st.CursorName = t.cursorName
+			st.CursorNamespace = t.cursorNamespace
 		}
 		s.Tabs = append(s.Tabs, st)
 	}

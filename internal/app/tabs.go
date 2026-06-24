@@ -435,6 +435,7 @@ func (m *Model) saveCurrentTab() {
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
 	t.filterBroadMode = m.filterBroadMode
+	t.cursorName, t.cursorNamespace, _, _ = m.cursorItemKey()
 	t.watchMode = m.watchMode
 	t.objectExplorerLive = m.objectExplorerLive
 	t.objectExplorerTree = m.objectExplorerTree
@@ -664,17 +665,15 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// tab's [RO] markers stale until the next context reload. Sync them now.
 	m.refreshContextReadOnlyMarkers()
 
-	// If this tab was restored from a session but never loaded, clear the
-	// flag, set up the navigation column structure, and return a command
-	// that fetches the tab's data.
+	// If this tab was restored from a session but never loaded, clear the flag,
+	// set up the navigation column structure, and return a fetch command.
 	if needsLoad {
 		m.tabs[idx].needsLoad = false
 		m.applyPinnedTypes()
 
-		// Rebuild security state for the restored context so the Security
-		// sidebar seeds from the on-disk cache. Live availability probing is
-		// lazy (maybeProbeSecurityOnFocus) — it runs when the user focuses
-		// the Security category, not eagerly on every tab/context restore.
+		// Rebuild security state for the restored context so the Security sidebar
+		// seeds from the on-disk cache. Live availability probing is lazy
+		// (maybeProbeSecurityOnFocus): on Security focus, not on every restore.
 		securitySeedCmd := m.refreshSecuritySources()
 
 		// Load contexts for the left column breadcrumb.
@@ -690,13 +689,14 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 
 		switch m.nav.Level {
 		case model.LevelResources:
-			// At resources level: left = resource types, history = [contexts].
+			// Resources level: left = resource types, history = [contexts].
 			m.leftItemsHistory = [][]model.Item{contexts}
 			m.leftItems = resourceTypes
 			m.setMiddleItems(nil)
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
+			m.pendingTarget, m.pendingTargetNamespace = t.cursorName, t.cursorNamespace // quit-time row
 			return tea.Batch(securitySeedCmd, m.loadResources(false))
 		case model.LevelResourceTypes:
 			// At resource types level: left = contexts, middle = resource types.

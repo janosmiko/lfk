@@ -368,14 +368,17 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 func (m *Model) restoreCursorAfterLoad(prevName, prevNs, prevExtra, prevKind, prevCluster string) {
 	if m.pendingTarget != "" {
 		target, targetNs := m.pendingTarget, m.pendingTargetNamespace
+		m.pendingTarget = ""
+		m.pendingTargetNamespace = ""
 		for i, item := range m.visibleMiddleItems() {
 			if item.Name == target && (targetNs == "" || item.Namespace == targetNs) {
 				m.setCursor(i)
-				break
+				return
 			}
 		}
-		m.pendingTarget = ""
-		m.pendingTargetNamespace = ""
+		// Target gone (deleted, or hidden by a restored filter): fall back to
+		// the prior row / clamp instead of leaving a stale pre-load index.
+		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
 		return
 	}
 	if m.unionMode && prevCluster != "" {

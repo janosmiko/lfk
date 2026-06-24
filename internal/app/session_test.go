@@ -176,21 +176,60 @@ func TestApplyPendingSessionList(t *testing.T) {
 	})
 }
 
-// sessionCursor folds a drilled-in ResourceName into the cursor target (name
-// only, since its namespace was never persisted) and otherwise uses the saved
-// cursor name/namespace.
+// sessionCursor prefers the saved cursor name/namespace (which disambiguates
+// same-named rows across namespaces) and only falls back to a drilled-in
+// ResourceName for legacy sessions saved before the cursor fields existed.
 func TestSessionCursor(t *testing.T) {
-	t.Run("ResourceName wins, name only", func(t *testing.T) {
-		name, ns := sessionCursor(&SessionState{ResourceName: "my-app", CursorName: "other", CursorNamespace: "x"})
-		assert.Equal(t, "my-app", name)
-		assert.Empty(t, ns)
-	})
-
-	t.Run("falls back to cursor name and namespace", func(t *testing.T) {
-		name, ns := sessionCursor(&SessionState{CursorName: "pod-2", CursorNamespace: "ns-2"})
+	t.Run("cursor name wins and keeps its namespace", func(t *testing.T) {
+		name, ns := sessionCursor(&SessionState{ResourceName: "other", CursorName: "pod-2", CursorNamespace: "ns-2"})
 		assert.Equal(t, "pod-2", name)
 		assert.Equal(t, "ns-2", ns)
 	})
+
+	t.Run("falls back to ResourceName for legacy sessions", func(t *testing.T) {
+		name, ns := sessionCursor(&SessionState{ResourceName: "my-app"})
+		assert.Equal(t, "my-app", name)
+		assert.Empty(t, ns)
+	})
+}
+
+// restoreCursorAfterLoad lands on the pending target, and when that target is
+// gone (deleted, or hidden by a restored filter) falls back to the prior row
+// rather than leaving a stale pre-load index.
+func TestRestoreCursorAfterLoad(t *testing.T) {
+	t.Run("lands on the namespace-qualified pending target", func(t *testing.T) {
+		m := basePush80Model() // pod-1/default, pod-2/ns-2, pod-3/default
+		m.pendingTarget, m.pendingTargetNamespace = "pod-2", "ns-2"
+
+		m.restoreCursorAfterLoad("", "", "", "", "")
+
+		assert.Equal(t, 1, m.cursor())
+		assert.Empty(t, m.pendingTarget)
+		assert.Empty(t, m.pendingTargetNamespace)
+	})
+
+	t.Run("falls back to the prior row when the target is gone", func(t *testing.T) {
+		m := basePush80Model()
+		m.setCursor(0)
+		m.pendingTarget, m.pendingTargetNamespace = "ghost", "default"
+
+		m.restoreCursorAfterLoad("pod-3", "default", "", "Pod", "")
+
+		assert.Equal(t, 2, m.cursor(), "missing target must restore the prior row")
+		assert.Empty(t, m.pendingTarget)
+	})
+}
+
+// saveCurrentTab captures the highlighted row for every tab so an inactive tab
+// can be reopened on its own resource, not just the active one.
+func TestSaveCurrentTab_CapturesCursorIdentity(t *testing.T) {
+	m := basePush80Model()
+	m.setCursor(1) // pod-2 / ns-2
+
+	m.saveCurrentTab()
+
+	assert.Equal(t, "pod-2", m.tabs[0].cursorName)
+	assert.Equal(t, "ns-2", m.tabs[0].cursorNamespace)
 }
 
 // saveCurrentSession captures the active tab's filter and highlighted row when

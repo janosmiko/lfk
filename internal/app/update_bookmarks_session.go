@@ -18,14 +18,15 @@ type pendingSessionListState struct {
 	cursorNs    string
 }
 
-// sessionCursor resolves the row a restored session should land on. A drilled-in
-// ResourceName takes precedence and matches on name alone (its namespace was
-// never persisted); otherwise the captured cursor name/namespace is used.
+// sessionCursor resolves the row a restored session should land on. The captured
+// cursor name/namespace is preferred (it disambiguates same-named rows across
+// namespaces); a drilled-in ResourceName is only a fallback for legacy sessions
+// saved before the cursor fields existed, and matches on name alone.
 func sessionCursor(sess *SessionState) (name, ns string) {
-	if sess.ResourceName != "" {
-		return sess.ResourceName, ""
+	if sess.CursorName != "" {
+		return sess.CursorName, sess.CursorNamespace
 	}
-	return sess.CursorName, sess.CursorNamespace
+	return sess.ResourceName, ""
 }
 
 // applySessionFilterAndCursor seeds the list filter and cursor target so they
@@ -290,10 +291,13 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 			if st.ResourceName != "" {
 				tab.nav.ResourceName = st.ResourceName
 			}
-			// Carry the saved list filter so switching to this lazily-loaded
-			// tab reopens it filtered, matching the active tab's restore.
+			// Carry the saved list filter and cursor so switching to this
+			// lazily-loaded tab reopens it filtered and on the same row.
 			tab.filterText = st.Filter
 			tab.filterBroadMode = st.FilterBroad
+			tab.cursorName, tab.cursorNamespace = sessionCursor(&SessionState{
+				ResourceName: st.ResourceName, CursorName: st.CursorName, CursorNamespace: st.CursorNamespace,
+			})
 		} else {
 			tab.nav.Level = model.LevelResourceTypes
 		}
