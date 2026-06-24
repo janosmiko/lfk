@@ -148,7 +148,12 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 			ui.ActiveLeftScroll = 0
 			m.clearRight()
 			m.clearSelection()
-			contexts, _ := m.client.GetContexts()
+			// Repopulate the cluster picker. On error keep the fallback flow
+			// (empty list) but surface the read failure rather than dropping it.
+			contexts, err := m.client.GetContexts()
+			if err != nil {
+				m.setErrorFromErr("Failed to load contexts: ", err)
+			}
 			m.leftItems = nil
 			m.setMiddleItems(contexts)
 			m.cursors = [5]int{}
