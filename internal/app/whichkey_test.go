@@ -253,3 +253,39 @@ func TestGotoResourceType_LeftPaneIsResourceTypes(t *testing.T) {
 		t.Fatalf("left pane does not hold resource-type items after goto; kinds=%v", kinds)
 	}
 }
+
+// TestGotoResourceType_BackNavLandsOnJumpedType verifies that after jumping to a
+// resource type via goto (gv) and pressing h/left to go back, the cursor lands on
+// the resource type that was jumped to rather than a stale or default highlight.
+func TestGotoResourceType_BackNavLandsOnJumpedType(t *testing.T) {
+	m := gotoTestModel() // LevelResourceTypes, ctx with Pod + Deployment
+	// Seed the types list as the middle column with the cursor on the first
+	// item (Pods), simulating a real session before the jump.
+	typesItems := model.BuildSidebarItems(m.discoveredResources["ctx"])
+	m.setMiddleItems(typesItems)
+	m.setCursor(0)
+
+	// Jump to Deployment (gv -> Deployment).
+	out, _ := m.gotoResourceType("Deployment", "apps")
+	m = out.(Model)
+	if m.nav.Level != model.LevelResources {
+		t.Fatalf("nav.Level = %v, want LevelResources", m.nav.Level)
+	}
+
+	// Press h/left to return to the resource-types list.
+	out, _ = m.navigateParent()
+	rm := out.(Model)
+	if rm.nav.Level != model.LevelResourceTypes {
+		t.Fatalf("nav.Level = %v, want LevelResourceTypes after back-nav", rm.nav.Level)
+	}
+
+	visible := rm.visibleMiddleItems()
+	c := rm.cursor()
+	if c < 0 || c >= len(visible) {
+		t.Fatalf("cursor %d out of range (visible=%d)", c, len(visible))
+	}
+	want := model.ResourceTypeEntry{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments"}
+	if got := visible[c]; got.Extra != want.ResourceRef() {
+		t.Fatalf("cursor landed on %q (%s), want Deployment (%s)", got.Name, got.Extra, want.ResourceRef())
+	}
+}

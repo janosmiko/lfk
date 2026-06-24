@@ -104,6 +104,7 @@ func (m Model) gotoResourceType(kind, apiGroup string) (tea.Model, tea.Cmd) {
 	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 	m.nav.Level = model.LevelResources
 	m.normalizeGotoPanes()
+	m.primeTypesReturnCursor(rt)
 	m.saveCurrentSession()
 	if cached, hit := m.itemCache[m.navKey()]; hit {
 		m.setMiddleItems(cached)
@@ -141,6 +142,40 @@ func (m *Model) normalizeGotoPanes() {
 	m.leftItemsHistory = clusterHistory
 	m.leftItems = typesItems
 	m.clearRight()
+}
+
+// primeTypesReturnCursor records the parent (LevelResourceTypes) cursor so that
+// pressing h/left from the jumped-to resource list lands on the resource type we
+// jumped to. A goto never moves the types-list cursor onto the target the way a
+// manual descent does, so restoreCursor would otherwise recall a stale highlight.
+// The index is computed through the real collapse logic (visibleMiddleItems) on a
+// throwaway copy positioned at LevelResourceTypes, and the target's group is
+// expanded so the recorded index and the restored view agree. Must run after
+// normalizeGotoPanes (which populates leftItems) and after saveCursor.
+func (m *Model) primeTypesReturnCursor(rt model.ResourceTypeEntry) {
+	ref := rt.ResourceRef()
+	if ref == "" || ref == "//" {
+		return
+	}
+	// Expand the target's group so it renders as a real (non-collapsed) row.
+	for _, it := range m.leftItems {
+		if it.Extra == ref {
+			if it.Category != "" {
+				m.expandedGroup = it.Category
+			}
+			break
+		}
+	}
+	probe := *m
+	probe.nav.Level = model.LevelResourceTypes
+	probe.nav.ResourceType = model.ResourceTypeEntry{}
+	probe.middleItems = m.leftItems
+	probe.filterText = ""
+	idx := indexByExtra(probe.visibleMiddleItems(), ref)
+	if idx < 0 {
+		return
+	}
+	m.cursorMemory[probe.navKey()] = idx
 }
 
 // handleGotoChord is called while the g prefix is armed (m.pendingG). The
