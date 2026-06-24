@@ -488,6 +488,33 @@ func TestColumnBoundariesMatchViewExplorerLayout(t *testing.T) {
 		"x=leftEnd hits the middle column, not the left (which would drill to ResourceTypes)")
 }
 
+// When the left sidebar is hidden (the hide-sidebar phase of kb.Fullscreen), the column
+// math must collapse the left band to width=0 so clicks at low x land
+// in the middle column. Pre-fix, columnBoundaries returned the same
+// (15, 75) split as the three-col layout, so x=2 navigated to the
+// parent level even though no left pane was drawn.
+func TestColumnBoundariesRespectsHideLeftPane(t *testing.T) {
+	m := baseExplorerModel() // width=120
+	m.hideLeftPane = true
+	leftEnd, middleEnd := m.columnBoundaries()
+	assert.Equal(t, 0, leftEnd, "hideLeftPane collapses the left band to 0")
+	// usable = 114, middleW = 114*58/100 = 66, plus 2 border chars = 68.
+	assert.Equal(t, 68, middleEnd, "middle column widens to ~58% when left is hidden")
+
+	withMiddleLineMap(t, []int{0, 1, 2})
+	m.setCursor(0)
+	startLevel := m.nav.Level
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      2,
+		Y:      4,
+	})
+	r := ret.(Model)
+	assert.Equal(t, startLevel, r.nav.Level,
+		"low-x click must hit the middle column, not navigate to a phantom parent")
+}
+
 func TestMouseRightClickRespectsFullscreenLayout(t *testing.T) {
 	m := baseExplorerModel()
 	m.fullscreenMiddle = true // only the middle column is rendered

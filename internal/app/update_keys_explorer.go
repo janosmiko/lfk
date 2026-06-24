@@ -437,11 +437,21 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 		}
 		return m, scheduleStatusClear()
 	}
-	m.fullscreenMiddle = !m.fullscreenMiddle
-	if m.fullscreenMiddle {
-		m.setStatusMessage("Fullscreen ON", false)
-	} else {
-		m.setStatusMessage("Fullscreen OFF", false)
+	// Three-pane explorer: F cycles through layout phases that progressively
+	// reveal more of the middle list, then wraps back to the full layout:
+	// normal -> hide sidebar -> fullscreen -> normal.
+	switch {
+	case !m.hideLeftPane && !m.fullscreenMiddle:
+		m.hideLeftPane = true
+		m.setStatusMessage("Layout: sidebar hidden", false)
+	case m.hideLeftPane && !m.fullscreenMiddle:
+		m.hideLeftPane = false
+		m.fullscreenMiddle = true
+		m.setStatusMessage("Layout: fullscreen", false)
+	default:
+		m.hideLeftPane = false
+		m.fullscreenMiddle = false
+		m.setStatusMessage("Layout: normal", false)
 	}
 	return m, scheduleStatusClear()
 }

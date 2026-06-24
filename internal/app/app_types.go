@@ -489,6 +489,7 @@ type TabState struct {
 	selectionAnchor        int // anchor index for region selection (-1 = unset)
 	fullscreenMiddle       bool
 	fullscreenDashboard    bool
+	hideLeftPane           bool
 	dashboardPreview       string
 	dashboardEventsPreview string // warning events for two-column dashboard
 	monitoringPreview      string

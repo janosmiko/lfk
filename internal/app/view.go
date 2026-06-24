@@ -11,6 +11,32 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// explorerColumnWidths is the single source of truth for the explorer's
+// left / middle / right column widths. Every helper that recomputes a
+// column width (mouse hit-tests, footer renderers, preview scroll
+// clamps, dashboard width) MUST call this so a layout-mode change
+// (fullscreen, hide-left-pane) reaches them all in lock-step.
+//
+//   - fullscreenMiddle / fullscreenDashboard → left=0, right=0, middle=full
+//   - hideLeftPane → left=0; middle widens from 51% to 58% of usable, right takes the rest
+//   - default → 12% / 51% / remainder (~37%) over (width - 6) usable cells (3 column borders)
+func (m Model) explorerColumnWidths() (leftW, middleW, rightW int) {
+	usable := m.width - 6 // 3 columns x 2 border chars
+	switch {
+	case m.fullscreenDashboard || m.fullscreenMiddle:
+		return 0, m.width - 2, 0
+	case m.hideLeftPane:
+		middleW = max(10, usable*58/100)
+		rightW = max(10, usable-middleW)
+		return 0, middleW, rightW
+	default:
+		leftW = max(10, usable*12/100)
+		middleW = max(10, usable*51/100)
+		rightW = max(10, usable-leftW-middleW)
+		return leftW, middleW, rightW
+	}
+}
+
 // isFullscreenRenderMode reports whether a mode renders as a fullscreen view
 // (with its own title/tab/hint bars) rather than the three-pane explorer.
 func isFullscreenRenderMode(mode viewMode) bool {
@@ -310,18 +336,7 @@ func (m Model) viewExplorer() string {
 	ui.ActiveSelectedItems = m.selectedItems
 	defer func() { ui.ActiveSelectedItems = nil }()
 
-	// Calculate column widths: left=12%, middle=51%, right=remainder (~37%).
-	usable := m.width - 6 // 3 columns x 2 border chars
-	var leftW, middleW, rightW int
-	if m.fullscreenDashboard || m.fullscreenMiddle {
-		leftW = 0
-		rightW = 0
-		middleW = m.width - 2 // single column with border
-	} else {
-		leftW = max(10, usable*12/100)
-		middleW = max(10, usable*51/100)
-		rightW = max(10, usable-leftW-middleW)
-	}
+	leftW, middleW, rightW := m.explorerColumnWidths()
 
 	contentHeight := max(
 		// room for title(1) + column borders(2) + status(1)
@@ -606,6 +621,28 @@ func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rig
 	left := ui.InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
 	right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
+}
+
+// viewExplorerTwoColMiddleRight renders the explorer with the left sidebar
+// hidden (the hide-sidebar phase of the kb.Fullscreen cycle). Same
+// right-column rendering as viewExplorerThreeCol
+// minus the left column; ActiveLeftScroll/HighlightQuery are still saved and
+// cleared so the right pane doesn't inherit middle-pane highlight state.
+func (m Model) viewExplorerTwoColMiddleRight(middle string, rightW, rightInner, contentHeight int) string {
+	savedHighlight := ui.ActiveHighlightQuery
+	ui.ActiveHighlightQuery = ""
+	savedMiddleScroll := ui.ActiveMiddleScroll
+	savedLeftScroll := ui.ActiveLeftScroll
+	ui.ActiveMiddleScroll = -1
+	ui.ActiveLeftScroll = -1
+	rightCol := m.renderRightColumn(rightInner, contentHeight)
+	ui.ActiveMiddleScroll = savedMiddleScroll
+	ui.ActiveLeftScroll = savedLeftScroll
+	ui.ActiveHighlightQuery = savedHighlight
+	rightCol = ui.PadToHeight(rightCol, contentHeight)
+	rightCol = ui.FillLinesBg(rightCol, rightInner, ui.BaseBg)
+	right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
+	return lipgloss.JoinHorizontal(lipgloss.Top, middle, right)
 }
 
 // buildNsLabelText returns the text portion of the namespace scope chip shown

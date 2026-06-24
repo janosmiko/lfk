@@ -73,7 +73,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them (dimmed) under their categories and an "Advanced" group (resets each launch; set `show_rare_types: true` in config to show them from startup)
 - **Hide individual resource types**: At the resource types level, open the action menu (`x`) on a type to hide or show it. Hidden types are saved per cluster context (or named union set) and stay hidden across restarts. Press `H` to reveal hidden types dimmed so you can un-hide them
 - **Expandable/collapsible resource groups** with `z`
-- **Fullscreen middle column** toggle with `Shift+F`
+- **Layout cycle** with `Shift+F` — hide sidebar, then fullscreen middle column, then restore
 - **Vim-style keybindings** throughout (fully customizable via config)
 - **Mouse support**: Click to navigate, scroll wheel scrolls the pane under the pointer, `Ctrl+Option+Y` toggles mouse capture, Shift+Drag for native terminal text selection
 
@@ -269,7 +269,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `n` / `N` | Next / previous search match |
 | `P` | Toggle between details and YAML preview |
 | `M` | Toggle resource relationship map |
-| `F` | Toggle fullscreen (middle column or dashboard) |
+| `F` | Cycle layout: hide sidebar -> fullscreen -> normal |
 | `.` | Quick filter presets |
 | `!` | Error log (V/v select, y copy, f fullscreen) |
 | `Ctrl+S` | Toggle secret value visibility |

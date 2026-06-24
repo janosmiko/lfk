@@ -322,11 +322,9 @@ func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []strin
 // rendered into for the current display mode, matching the view layout.
 func (m Model) dashboardContentWidth(twoCol bool) int {
 	if !m.fullscreenDashboard {
-		// Right preview pane inner width (mirrors viewExplorer's column math).
-		usable := m.width - 6
-		leftW := max(10, usable*12/100)
-		middleW := max(10, usable*51/100)
-		rightW := max(10, usable-leftW-middleW)
+		// Right preview pane inner width — explorerColumnWidths centralizes
+		// the layout math so hideLeftPane / fullscreen modes flow through.
+		_, _, rightW := m.explorerColumnWidths()
 		return max(rightW-2, 20)
 	}
 	innerW := m.width - 4 // ActiveColumnStyle border+padding
