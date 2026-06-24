@@ -6,10 +6,8 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// pendingSessionListState holds the list filter and cursor target a restored
-// session must reapply once its resource list reloads. It is only armed when
-// the descent to the resource list is deferred behind CRD discovery; the
-// immediate path applies the same values directly.
+// pendingSessionListState carries a restored session's filter and cursor target
+// when the descent to the resource list is deferred behind CRD discovery.
 type pendingSessionListState struct {
 	armed       bool
 	filter      string
@@ -18,10 +16,8 @@ type pendingSessionListState struct {
 	cursorNs    string
 }
 
-// sessionCursor resolves the row a restored session should land on. The captured
-// cursor name/namespace is preferred (it disambiguates same-named rows across
-// namespaces); a drilled-in ResourceName is only a fallback for legacy sessions
-// saved before the cursor fields existed, and matches on name alone.
+// sessionCursor resolves the row a restored session lands on: the saved cursor
+// name/namespace, falling back to ResourceName for pre-cursor legacy sessions.
 func sessionCursor(sess *SessionState) (name, ns string) {
 	if sess.CursorName != "" {
 		return sess.CursorName, sess.CursorNamespace
@@ -29,9 +25,8 @@ func sessionCursor(sess *SessionState) (name, ns string) {
 	return sess.ResourceName, ""
 }
 
-// applySessionFilterAndCursor seeds the list filter and cursor target so they
-// take effect when the resource list finishes loading. The filter is also
-// committed to filterMemory so navigating away and back keeps it.
+// applySessionFilterAndCursor seeds the filter and cursor target for the next
+// resource load, committing the filter to filterMemory so drill-out/back keeps it.
 func (m *Model) applySessionFilterAndCursor(filter string, broad bool, cursorName, cursorNs string) {
 	m.filterText = filter
 	m.filterInput.Set(filter)
@@ -45,8 +40,8 @@ func (m *Model) applySessionFilterAndCursor(filter string, broad bool, cursorNam
 	}
 }
 
-// applyPendingSessionList applies a deferred session list state (armed when a
-// CRD discovery roundtrip was needed) and clears it. No-op when nothing armed.
+// applyPendingSessionList applies a deferred (CRD-discovery) session list state
+// and clears it; no-op when nothing is armed.
 func (m *Model) applyPendingSessionList() {
 	p := m.pendingSessionList
 	m.pendingSessionList = pendingSessionListState{}
@@ -291,8 +286,7 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 			if st.ResourceName != "" {
 				tab.nav.ResourceName = st.ResourceName
 			}
-			// Carry the saved list filter and cursor so switching to this
-			// lazily-loaded tab reopens it filtered and on the same row.
+			// Carry filter + cursor so this lazy tab reopens filtered and on its row.
 			tab.filterText = st.Filter
 			tab.filterBroadMode = st.FilterBroad
 			tab.cursorName, tab.cursorNamespace = sessionCursor(&SessionState{

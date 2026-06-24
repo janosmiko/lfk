@@ -239,9 +239,8 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
-			// Land on the saved resource (deferred ResourceName) by name, then
-			// layer on the saved list filter and any cursor target that rode
-			// through discovery on pendingSessionList.
+			// Land on the deferred ResourceName, then apply the filter/cursor
+			// that rode through discovery on pendingSessionList.
 			if name != "" {
 				m.pendingTarget = name
 			}
@@ -359,12 +358,9 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 	return mdl, cmd
 }
 
-// restoreCursorAfterLoad places the cursor once a resource list has loaded.
-// A pending session/bookmark target wins (matched against the visible list so a
-// restored filter that hides rows doesn't throw off the index; an optional
-// namespace disambiguates same-named rows in all-namespaces views). Otherwise
-// the previously-highlighted row is restored, preferring an exact cluster match
-// in union mode where names recur across clusters.
+// restoreCursorAfterLoad places the cursor once a list has loaded: a pending
+// target (matched against the visible list, namespace-disambiguated) wins, else
+// the prior row, preferring the exact cluster in union mode.
 func (m *Model) restoreCursorAfterLoad(prevName, prevNs, prevExtra, prevKind, prevCluster string) {
 	if m.pendingTarget != "" {
 		target, targetNs := m.pendingTarget, m.pendingTargetNamespace
@@ -376,8 +372,8 @@ func (m *Model) restoreCursorAfterLoad(prevName, prevNs, prevExtra, prevKind, pr
 				return
 			}
 		}
-		// Target gone (deleted, or hidden by a restored filter): fall back to
-		// the prior row / clamp instead of leaving a stale pre-load index.
+		// Target gone (deleted or hidden by the restored filter): fall back to
+		// the prior row instead of a stale pre-load index.
 		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
 		return
 	}

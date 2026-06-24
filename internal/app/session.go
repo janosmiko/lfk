@@ -160,12 +160,10 @@ func (m *Model) saveCurrentSession() {
 		if t.nav.ResourceName != "" {
 			st.ResourceName = t.nav.ResourceName
 		}
-		// Persist the list filter and highlighted row only when the tab sits on
-		// a resource list; a filter typed at the resource-types level is not
-		// meaningful once the session reopens directly into the resource view.
-		// saveCurrentTab captured the cursor identity for every tab (live for
-		// the active one, last-seen for the rest), so restore can reopen each
-		// tab on its own row.
+		// Persist filter + highlighted row only on a resource list; a filter from
+		// the resource-types level is meaningless once restore reopens into the
+		// list. saveCurrentTab already captured each tab's cursor, so every tab
+		// reopens on its own row.
 		if t.nav.Level == model.LevelResources {
 			st.Filter = t.filterText
 			st.FilterBroad = t.filterBroadMode
