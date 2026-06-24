@@ -49,11 +49,18 @@ func (m *Model) portForwardItems() []model.Item {
 // navigateToPortForwards switches the view to the Port Forwards resource list.
 // If pfLastCreatedID is set, the cursor is placed on the matching entry.
 func (m *Model) navigateToPortForwards() {
+	// Build the correct left column state for LevelResources. Fetch the
+	// contexts before mutating any state so a failure aborts the teleport
+	// cleanly instead of leaving navigation half-updated.
+	contexts, err := m.client.GetContexts()
+	if err != nil {
+		m.setErrorFromErr("Failed to load contexts: ", err)
+		return
+	}
+
 	// Record the origin so jump_back can return here after this teleport.
 	m.pushJumpHistory()
 
-	// Build the correct left column state for LevelResources.
-	contexts, _ := m.client.GetContexts()
 	var resourceTypes []model.Item
 	discoveryCtx := m.nav.Context
 	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
