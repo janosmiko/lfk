@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.16](https://github.com/janosmiko/lfk/compare/v0.14.15...v0.14.16) (2026-06-24)
+
+
+### Features
+
+* hide-left-sidebar toggle (|) for the explorer ([#476](https://github.com/janosmiko/lfk/issues/476)) ([c1a895a](https://github.com/janosmiko/lfk/commit/c1a895a12f4300fa8d52643759a15a19b24aebca))
+* restore active list filter and cursor across restarts ([#477](https://github.com/janosmiko/lfk/issues/477)) ([273f230](https://github.com/janosmiko/lfk/commit/273f2307aa2aec354bdb58496c88a6f31c63e035))
+
+
+### Bug Fixes
+
+* handle discarded GetContexts errors in navigation ([#479](https://github.com/janosmiko/lfk/issues/479)) ([6f6145e](https://github.com/janosmiko/lfk/commit/6f6145e52be645a07ae9a291ad186d979fa82929))
+
 ## [0.14.15](https://github.com/janosmiko/lfk/compare/v0.14.14...v0.14.15) (2026-06-23)
 
 
