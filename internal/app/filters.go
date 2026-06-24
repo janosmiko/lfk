@@ -98,6 +98,8 @@ func kindFilterPresets(kind string) []FilterPreset {
 		return argoFilterPresets()
 	case "HelmRelease", "Kustomization":
 		return fluxFilterPresets()
+	case "PersistentVolume":
+		return pvFilterPresets()
 	case "PersistentVolumeClaim":
 		return pvcFilterPresets()
 	case "Event":
@@ -295,6 +297,29 @@ func fluxFilterPresets() []FilterPreset {
 			MatchFn: func(item model.Item) bool {
 				s := strings.ToLower(item.Status)
 				return s != "ready" && s != "applied" && !strings.Contains(s, "suspended")
+			},
+		},
+	}
+}
+
+func pvFilterPresets() []FilterPreset {
+	return []FilterPreset{
+		{
+			Name: "Available", Description: "Unbound, ready to be claimed", Key: "a",
+			MatchFn: func(item model.Item) bool { return strings.EqualFold(item.Status, "available") },
+		},
+		{
+			Name: "Released", Description: "Claim deleted, awaiting reclaim", Key: "r",
+			MatchFn: func(item model.Item) bool { return strings.EqualFold(item.Status, "released") },
+		},
+		{
+			Name: "Failed", Description: "Reclaim failed", Key: "f",
+			MatchFn: func(item model.Item) bool { return strings.EqualFold(item.Status, "failed") },
+		},
+		{
+			Name: "Not Bound", Description: "Phase != Bound", Key: notRunningKey,
+			MatchFn: func(item model.Item) bool {
+				return item.Status != "" && !strings.EqualFold(item.Status, "Bound")
 			},
 		},
 	}

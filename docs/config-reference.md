@@ -785,6 +785,7 @@ Press `.` on any resource list to see the presets available for that kind. The b
 | Pod | Failing (`f`), Pending (`p`), Not Ready (`n`), Restarting (`r`), High Restarts (`R`), **Not Running (`x`)** |
 | Deployment / StatefulSet / DaemonSet | Not Ready (`n`), Failing (`f`), **Not Running (`x`)** |
 | Job | Failed (`f`), **Not Running (`x`)** |
+| PersistentVolume | Available (`a`), Released (`r`), Failed (`f`), **Not Bound (`x`)** |
 | PersistentVolumeClaim | Pending (`p`), Lost (`l`), **Not Bound (`x`)** |
 | Node | Not Ready (`n`), Cordoned (`c`) |
 | Certificate / CertificateRequest | Not Ready (`n`), Expiring Soon (`e`) |
