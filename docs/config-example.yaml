@@ -507,7 +507,8 @@ custom_actions:
 #
 # Built-in presets vary by kind. Pod: Failing/Pending/Not Ready/Restarting/
 # High Restarts/Not Running. Deployment/StatefulSet/DaemonSet: Not Ready/
-# Failing/Not Running. Job: Failed/Not Running. PVC: Pending/Lost/Not Bound.
+# Failing/Not Running. Job: Failed/Not Running. PV: Available/Released/Failed/
+# Not Bound. PVC: Pending/Lost/Not Bound.
 # Universal presets (Old, Recent) are always shown. Your custom presets appear
 # after the built-ins.
 filter_presets:

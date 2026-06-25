@@ -87,6 +87,44 @@ func TestBuiltinFilterPresets_EventSpecific(t *testing.T) {
 	}
 }
 
+func TestBuiltinFilterPresets_PVSpecific(t *testing.T) {
+	presets := builtinFilterPresets("PersistentVolume")
+	names := presetNames(presets)
+
+	expected := []string{"Available", "Released", "Failed", "Not Bound"}
+	for _, name := range expected {
+		if !names[name] {
+			t.Errorf("PersistentVolume presets missing %q", name)
+		}
+	}
+}
+
+func TestCovFilterPresetsPVPhases(t *testing.T) {
+	presets := builtinFilterPresets("PersistentVolume")
+
+	available := findPreset(presets, "Available")
+	require.NotNil(t, available)
+	assert.True(t, available.MatchFn(model.Item{Status: "Available"}))
+	assert.False(t, available.MatchFn(model.Item{Status: "Bound"}))
+
+	released := findPreset(presets, "Released")
+	require.NotNil(t, released)
+	assert.True(t, released.MatchFn(model.Item{Status: "Released"}))
+	assert.False(t, released.MatchFn(model.Item{Status: "Bound"}))
+
+	failed := findPreset(presets, "Failed")
+	require.NotNil(t, failed)
+	assert.True(t, failed.MatchFn(model.Item{Status: "Failed"}))
+	assert.False(t, failed.MatchFn(model.Item{Status: "Available"}))
+
+	notBound := findPreset(presets, "Not Bound")
+	require.NotNil(t, notBound)
+	assert.True(t, notBound.MatchFn(model.Item{Status: "Available"}))
+	assert.True(t, notBound.MatchFn(model.Item{Status: "Released"}))
+	assert.False(t, notBound.MatchFn(model.Item{Status: "Bound"}))
+	assert.False(t, notBound.MatchFn(model.Item{Status: ""}))
+}
+
 func TestBuiltinFilterPresets_UnknownKind(t *testing.T) {
 	presets := builtinFilterPresets("SomeCustomCRD")
 	// Should only have universal presets.
@@ -99,7 +137,7 @@ func TestBuiltinFilterPresets_UniqueKeys(t *testing.T) {
 	kinds := []string{
 		"Pod", "Deployment", "Node", "Job", "CronJob", "Service",
 		"Certificate", "Application", "HelmRelease", "Kustomization",
-		"PersistentVolumeClaim", "Event", "StatefulSet", "DaemonSet",
+		"PersistentVolume", "PersistentVolumeClaim", "Event", "StatefulSet", "DaemonSet",
 	}
 
 	for _, kind := range kinds {
