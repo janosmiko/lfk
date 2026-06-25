@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.17](https://github.com/janosmiko/lfk/compare/v0.14.16...v0.14.17) (2026-06-25)
+
+
+### Features
+
+* add quick filter presets for PersistentVolumes ([#482](https://github.com/janosmiko/lfk/issues/482)) ([93835fb](https://github.com/janosmiko/lfk/commit/93835fb9586a28c6dc6c027370c63859938d2241))
+
+
+### Bug Fixes
+
+* land cursor on jumped-to resource type after goto back-nav ([#480](https://github.com/janosmiko/lfk/issues/480)) ([0c91696](https://github.com/janosmiko/lfk/commit/0c91696bf75c90d238ab637d82984e4b646836d8))
+
 ## [0.14.16](https://github.com/janosmiko/lfk/compare/v0.14.15...v0.14.16) (2026-06-24)
 
 
