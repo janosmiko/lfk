@@ -30,6 +30,21 @@ type columnToggleSnapshot struct {
 	hasOrder   bool
 }
 
+// columnToggleState holds the column-toggle overlay runtime fields, embedded
+// into Model to keep app.go under the file-length cap.
+type columnToggleState struct {
+	columnToggleItems        []columnToggleEntry
+	columnToggleCursor       int
+	columnToggleFilter       string
+	columnToggleFilterActive bool
+	// columnToggleSnapshot captures pre-overlay session/hidden/order maps
+	// so Esc can revert live edits (openColumnToggle -> handleColumnToggleKeyEsc).
+	columnToggleSnapshot columnToggleSnapshot
+	sessionColumns       map[string][]string // kind -> ordered visible extra column keys (session-only)
+	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
+	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
+}
+
 // captureColumnToggleSnapshot deep-copies the current per-kind column
 // config so a later restoreColumnToggleSnapshot can undo any live-apply
 // edits the user made while the overlay was open.

@@ -32,8 +32,10 @@ func TestCollectBuiltinToggleEntries_NameHiddenWhenSessionHidden(t *testing.T) {
 		{Name: "nginx", Namespace: "default", Status: "Running", Age: "5m"},
 	}
 	m := &Model{
-		hiddenBuiltinColumns: map[string][]string{
-			colKey("pod"): {"Name"},
+		columnToggleState: columnToggleState{
+			hiddenBuiltinColumns: map[string][]string{
+				colKey("pod"): {"Name"},
+			},
 		},
 	}
 	entries := m.collectBuiltinToggleEntries(items, "pod")

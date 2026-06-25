@@ -34,7 +34,7 @@ func (m Model) Init() tea.Cmd {
 		cmds = append(cmds, m.initialSecuritySeedCmd)
 	}
 	if m.watchMode {
-		cmds = append(cmds, scheduleWatchTick(m.watchInterval))
+		cmds = append(cmds, scheduleWatchTick(m.activeWatchInterval(), m.watchTickGen))
 	}
 	if ui.ConfigTipsEnabled {
 		cmds = append(cmds, scheduleStartupTip())

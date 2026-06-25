@@ -138,9 +138,10 @@ type Model struct {
 	// completing. Without this the right pane briefly renders
 	// "No resources found" between the two transitions.
 	previewLoading bool
-
 	// Spinner for loading animation.
 	spinner spinner.Model
+	// spinnerTicking guards the tick loop; armSpinner never stacks a second loop.
+	spinnerTicking bool
 
 	// initialSecuritySeedCmd holds the SEC-badge findings-cache seed command
 	// produced by refreshSecuritySources during NewModel. NewModel cannot
@@ -214,6 +215,19 @@ type Model struct {
 	// Watch mode: auto-refresh the current view on a timer.
 	watchMode     bool
 	watchInterval time.Duration
+	// focused tracks terminal focus (DECSET-1004); defaults true.
+	focused bool
+	// lastInputAt is the time of the most recent key press, for idle detection.
+	lastInputAt time.Time
+	// backgroundWatchInterval is the watch cadence while background or focused-idle.
+	backgroundWatchInterval time.Duration
+	// watchThrottle enables focus/idle throttling; false uses watchInterval always.
+	watchThrottle bool
+	// foregroundIdleTimeout is the no-input window before a focused window throttles; 0 disables.
+	foregroundIdleTimeout time.Duration
+	// watchTickGen guards the watch-tick chain (see watch_interval.go). A tick
+	// whose gen does not match is a retired chain and is ignored.
+	watchTickGen uint64
 
 	// objectExplorerLive controls whether the Object Explorer re-syncs its
 	// browsed object on list refreshes (issue #391). Defaults from
@@ -778,19 +792,8 @@ type Model struct {
 	finalizerSearchLoading      bool
 	finalizerSearchFilter       string
 	finalizerSearchFilterActive bool
-
-	// Column toggle overlay state.
-	columnToggleItems        []columnToggleEntry
-	columnToggleCursor       int
-	columnToggleFilter       string
-	columnToggleFilterActive bool
-	// columnToggleSnapshot captures pre-overlay session/hidden/order maps
-	// so Esc can revert live edits (openColumnToggle -> handleColumnToggleKeyEsc).
-	columnToggleSnapshot columnToggleSnapshot
-	sessionColumns       map[string][]string // kind -> ordered visible extra column keys (session-only)
-	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
-	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
-
+	// Column toggle overlay state; see columnToggleState in update_column_toggle.go.
+	columnToggleState
 	// Easter egg state (Konami, nyan, credits, kubetris).
 	easterEggState
 	securityModelState

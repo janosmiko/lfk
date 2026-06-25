@@ -30,8 +30,14 @@ func isContextCanceled(err error) bool {
 	return strings.Contains(msg, "context canceled") || strings.Contains(msg, "context deadline exceeded")
 }
 
-// Update handles messages.
+// Update handles messages and re-arms the spinner loop centrally.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	mdl, cmd := m.updateImpl(msg)
+	return armSpinner(mdl, cmd)
+}
+
+// updateImpl is the real message handler; Update wraps it to re-arm the spinner.
+func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Once graceful shutdown has begun, the drain goroutine owns the shared
 	// managers; freeze the model so no concurrent Update path mutates state
 	// underneath it. The only message that still matters is the drain's
@@ -50,6 +56,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+	case tea.FocusMsg:
+		return m.updateFocus(msg)
+	case tea.BlurMsg:
+		return m.updateBlur(msg)
 	case spinner.TickMsg:
 		return m.updateTick(msg)
 	case stderrCapturedMsg:
@@ -498,5 +508,9 @@ func (m Model) updateWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
+	if !m.spinnerNeeded() {
+		m.spinnerTicking = false
+		return m, nil
+	}
 	return m, cmd
 }

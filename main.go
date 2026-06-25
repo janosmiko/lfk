@@ -59,6 +59,8 @@ File locations:
 	rootCmd.Flags().BoolVar(&cliOpts.NoColor, "no-color", false, "Disable foreground/background colors; keep bold/reverse for visibility. Also honors the NO_COLOR env var.")
 	rootCmd.Flags().BoolVar(&cliOpts.ReadOnly, "read-only", false, "Disable all mutating actions (delete/edit/scale/restart/exec/port-forward/drain/cordon). Also configurable as read_only: true (global) or clusters.<ctx>.read_only (per-context) in config.")
 	rootCmd.Flags().DurationVar(&cliOpts.WatchInterval, "watch-interval", 0, "Watch mode polling interval (e.g. 500ms, 2s, 1m). Clamped to [500ms, 10m]. Overrides config.")
+	rootCmd.Flags().DurationVar(&cliOpts.BackgroundWatchInterval, "background-watch-interval", 0, "Watch interval while unfocused/idle (e.g. 10s). Clamped to [500ms, 10m]. Overrides config.")
+	rootCmd.Flags().DurationVar(&cliOpts.ForegroundIdleTimeout, "foreground-idle-timeout", -1, "Idle window before a focused window throttles (e.g. 120s). 0 disables. Overrides config.")
 
 	completion.RegisterShellCompletions(rootCmd)
 
@@ -209,7 +211,7 @@ func runTUI(opts app.StartupOptions) error {
 	m := app.NewModel(client, opts)
 	m.SetVersion(version.Short())
 	m.SetStderrChan(stderrCapture.MsgChan)
-	progOpts := []tea.ProgramOption{tea.WithAltScreen()}
+	progOpts := []tea.ProgramOption{tea.WithAltScreen(), tea.WithReportFocus()}
 	if !opts.NoMouse && ui.ConfigMouse {
 		progOpts = append(progOpts, tea.WithMouseCellMotion())
 	}

@@ -106,10 +106,11 @@ func scheduleStartupTip() tea.Cmd {
 	})
 }
 
-// scheduleWatchTick returns a command that sends a watchTickMsg after the interval.
-func scheduleWatchTick(interval time.Duration) tea.Cmd {
+// scheduleWatchTick returns a command that sends a watchTickMsg (stamped with
+// gen) after the interval.
+func scheduleWatchTick(interval time.Duration, gen uint64) tea.Cmd {
 	return tea.Tick(interval, func(_ time.Time) tea.Msg {
-		return watchTickMsg{}
+		return watchTickMsg{gen: gen}
 	})
 }
 

@@ -16,15 +16,17 @@ type StartupOptions struct {
 	// `color:` fields in config; empty for --union-context CLI usage
 	// (which has no place to specify colors). Drives the row-tile
 	// renderer in the merged view.
-	UnionContextColors map[string]string
-	Namespaces         []string
-	Kubeconfig         string
-	KubeconfigDirs     []string // --kubeconfig-dir: repeatable; each occurrence adds a directory to scan.
-	Config             string
-	NoMouse            bool
-	NoColor            bool          // --no-color: forces monochrome output regardless of env/config.
-	ReadOnly           bool          // --read-only: blocks all mutating actions; sticky for the process.
-	WatchInterval      time.Duration // 0 means not set — fall back to config/default.
+	UnionContextColors      map[string]string
+	Namespaces              []string
+	Kubeconfig              string
+	KubeconfigDirs          []string // --kubeconfig-dir: repeatable; each occurrence adds a directory to scan.
+	Config                  string
+	NoMouse                 bool
+	NoColor                 bool          // --no-color: forces monochrome output regardless of env/config.
+	ReadOnly                bool          // --read-only: blocks all mutating actions; sticky for the process.
+	WatchInterval           time.Duration // 0 means not set — fall back to config/default.
+	BackgroundWatchInterval time.Duration // 0 means not set — fall back to config/default.
+	ForegroundIdleTimeout   time.Duration // < 0 (default -1) means not set — fall back to config/default; 0 disables.
 }
 
 // HasCLIOverrides returns true when any CLI flag was provided.

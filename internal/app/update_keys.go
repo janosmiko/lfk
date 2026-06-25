@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
@@ -9,6 +10,7 @@ import (
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.lastInputAt = time.Now()
 	// Dismiss startup tip on any keypress.
 	if m.statusMessageTip {
 		m.statusMessage = ""
@@ -403,8 +405,11 @@ func (m Model) handleKeyWatchMode() (tea.Model, tea.Cmd) {
 	m.watchMode = !m.watchMode
 	if m.watchMode {
 		m.setStatusMessage(fmt.Sprintf("Watch mode ON (refresh every %s)", m.watchInterval), false)
-		return m, tea.Batch(scheduleWatchTick(m.watchInterval), scheduleStatusClear())
+		return m, tea.Batch(m.startWatchChain(), scheduleStatusClear())
 	}
+	// Bump the generation so any in-flight tick from the now-stopped chain is
+	// ignored on arrival.
+	m.watchTickGen++
 	m.setStatusMessage("Watch mode OFF", false)
 	return m, scheduleStatusClear()
 }

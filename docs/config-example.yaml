@@ -612,6 +612,26 @@ confirm_on_exit: true
 # Default: 2s
 # watch_interval: 2s
 
+# ─── Background / Idle Watch Interval ───────────────────────────────────────
+# Watch cadence while the lfk window is unfocused or a focused window has been
+# idle for foreground_idle_timeout. Slows background wakeups to save battery;
+# snaps back to watch_interval on focus or keypress. Same form and [500ms, 10m]
+# clamp as watch_interval. Set equal to watch_interval to disable background throttling.
+# Default: 10s
+# background_watch_interval: 10s
+
+# ─── Foreground Idle Timeout ──────────────────────────────────────────────────
+# After this much time with no keypress, a focused window throttles its watch
+# tick to background_watch_interval. Set to 0s to disable focused-idle throttling
+# (background throttling still applies). Default: 120s
+# foreground_idle_timeout: 120s
+
+# ─── Watch Throttle ───────────────────────────────────────────────────────────
+# Master switch for the focus/idle throttling above. Set to false to disable it
+# entirely: the watch tick always uses watch_interval regardless of focus or
+# idle state. Default: true
+# watch_throttle: true
+
 # ─── Kubeshark ────────────────────────────────────────────────────────────────
 # Namespace probed for Service kubeshark-hub by the Traffic Capture overlay.
 # Default: kubeshark (matches `helm install kubeshark/kubeshark -n kubeshark`).

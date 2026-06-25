@@ -47,6 +47,10 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `api_explorer` | object | *(see Viewer Defaults)* | API Explorer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `split_preview` | bool | `true` | Startup default for the split preview pane. Set to `false` to start with it hidden. |
 | `watch_mode` | bool | `true` | Startup default for live watch/polling. Set to `false` to start with manual refresh. |
+| `watch_interval` | string | `2s` | Polling interval in watch mode. Go duration string, clamped to [500ms, 10m]. Override with `--watch-interval`. |
+| `background_watch_interval` | string | `10s` | Watch cadence while the window is unfocused or focused-idle. Same form and [500ms, 10m] clamp as `watch_interval`. Set equal to `watch_interval` to disable background throttling. |
+| `foreground_idle_timeout` | string | `120s` | No-input window before a focused window throttles to `background_watch_interval`. Go duration; `0` disables focused-idle throttling (background throttling still applies). Clamped to [0, 10m]. |
+| `watch_throttle` | bool | `true` | Master switch for focus/idle watch throttling. Set `false` to disable it entirely; the watch tick then always uses `watch_interval`. |
 | `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
 | `events` | object | *(see Events section)* | Events view startup-toggle defaults. See [Events](#events). |
 | `log_tail_lines` | int | `100` | **Deprecated** — use `log_viewer.tail_lines`. Number of log lines to load initially via `--tail`. |

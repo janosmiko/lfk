@@ -55,6 +55,7 @@ api_explorer:
   tree: true
 split_preview: false
 watch_mode: false
+watch_throttle: false
 all_namespaces: false
 events:
   warnings_only: false
@@ -65,6 +66,8 @@ dim_overlay: false
 transparent_background: true
 mouse: false
 watch_interval: 3s
+background_watch_interval: 45s
+foreground_idle_timeout: 300s
 no_color: true
 secret_lazy_loading: true
 informer_cache: always
@@ -217,6 +220,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigAPIExplorerTree, "api_explorer.tree")
 	assert.False(t, ConfigSplitPreview, "split_preview")
 	assert.False(t, ConfigWatchMode, "watch_mode")
+	assert.False(t, ConfigWatchThrottle, "watch_throttle")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
 	assert.False(t, ConfigEventsWarningsOnly, "events.warnings_only")
 	assert.False(t, ConfigEventsGrouping, "events.grouping")
@@ -226,6 +230,8 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigTransparentBg, "transparent_background")
 	assert.False(t, ConfigMouse, "mouse")
 	assert.Equal(t, 3*time.Second, ConfigWatchInterval, "watch_interval")
+	assert.Equal(t, 45*time.Second, ConfigBackgroundWatchInterval, "background_watch_interval")
+	assert.Equal(t, 300*time.Second, ConfigForegroundIdleTimeout, "foreground_idle_timeout")
 	assert.True(t, ConfigNoColor, "no_color")
 	assert.True(t, ConfigSecretLazyLoading, "secret_lazy_loading")
 	assert.Equal(t, InformerCacheAlways, ConfigInformerCacheMode, "informer_cache")
@@ -303,60 +309,63 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 // fails if a field is added (or removed) without updating this map, forcing new
 // settings to ship with a wiring test.
 var wiringCoveredFields = map[string]string{
-	"appearance":              "config_appearance_test.go (TestAppearance_*)",
-	"colorscheme":             "TestLoadConfig_AllSettingsWired + TestApplyColorscheme_*",
-	"theme":                   "TestMergeThemeOverrides (mergeThemeOverrides is the LoadConfig wiring point)",
-	"keybindings":             "TestLoadConfig_AllSettingsWired + config_keybindings_test.go",
-	"log_path":                "TestLoadConfig_AllSettingsWired",
-	"abbreviations":           "TestLoadConfig_AllSettingsWired",
-	"icons":                   "TestLoadConfig_AllSettingsWired",
-	"resource_columns":        "TestLoadConfig_AllSettingsWired",
-	"views":                   "TestLoadConfig_AllSettingsWired",
-	"dashboard":               "TestLoadConfig_AllSettingsWired",
-	"custom_actions":          "TestLoadConfig_AllSettingsWired",
-	"filter_presets":          "TestLoadConfig_AllSettingsWired",
-	"terminal":                "TestLoadConfig_AllSettingsWired",
-	"scrollback_lines":        "TestLoadConfig_AllSettingsWired",
-	"pinned_groups":           "TestLoadConfig_AllSettingsWired",
-	"pinned_types":            "TestLoadConfig_AllSettingsWired",
-	"monitoring":              "TestLoadConfig_AllSettingsWired",
-	"tips":                    "TestLoadConfig_AllSettingsWired",
-	"log_tail_lines":          "TestLoadConfig_AllSettingsWired",
-	"log_tail_lines_short":    "TestLoadConfig_AllSettingsWired",
-	"log_render_ansi":         "TestLoadConfig_AllSettingsWired (deprecated flat alias)",
-	"log_top_default_profile": "TestLoadConfig_AllSettingsWired",
-	"log_viewer":              "TestLoadConfig_AllSettingsWired + config_log_viewer_test.go (TestLogViewer_*)",
-	"yaml_viewer":             "TestLoadConfig_AllSettingsWired",
-	"diff_viewer":             "TestLoadConfig_AllSettingsWired",
-	"describe_viewer":         "TestLoadConfig_AllSettingsWired",
-	"object_explorer":         "TestLoadConfig_AllSettingsWired",
-	"api_explorer":            "TestLoadConfig_AllSettingsWired",
-	"split_preview":           "TestLoadConfig_AllSettingsWired",
-	"watch_mode":              "TestLoadConfig_AllSettingsWired",
-	"all_namespaces":          "TestLoadConfig_AllSettingsWired",
-	"events":                  "TestLoadConfig_AllSettingsWired",
-	"scrolloff":               "TestLoadConfig_AllSettingsWired",
-	"confirm_on_exit":         "TestLoadConfig_AllSettingsWired",
-	"dim_overlay":             "TestLoadConfig_AllSettingsWired",
-	"transparent_background":  "TestLoadConfig_AllSettingsWired",
-	"mouse":                   "TestLoadConfig_AllSettingsWired",
-	"watch_interval":          "TestLoadConfig_AllSettingsWired",
-	"clusters":                "TestLoadConfig_AllSettingsWired",
-	"no_color":                "TestLoadConfig_AllSettingsWired",
-	"secret_lazy_loading":     "TestLoadConfig_AllSettingsWired",
-	"informer_cache":          "TestLoadConfig_AllSettingsWired",
-	"min_contrast_ratio":      "TestLoadConfig_AllSettingsWired",
-	"read_only":               "TestLoadConfig_AllSettingsWired",
-	"show_rare_types":         "TestLoadConfig_AllSettingsWired",
-	"security":                "TestLoadConfig_AllSettingsWired",
-	"rightsizing_defaults":    "TestLoadConfig_AllSettingsWired",
-	"kubeshark":               "TestLoadConfig_AllSettingsWired",
-	"scheduler":               "TestLoadConfig_AllSettingsWired",
-	"kubeconfig_dir":          "TestLoadConfig_AllSettingsWired",
-	"union_sets":              "TestLoadConfig_AllSettingsWired",
-	"goto_targets":            "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
-	"which_key_enabled":       "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
-	"which_key_delay_ms":      "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"appearance":                "config_appearance_test.go (TestAppearance_*)",
+	"colorscheme":               "TestLoadConfig_AllSettingsWired + TestApplyColorscheme_*",
+	"theme":                     "TestMergeThemeOverrides (mergeThemeOverrides is the LoadConfig wiring point)",
+	"keybindings":               "TestLoadConfig_AllSettingsWired + config_keybindings_test.go",
+	"log_path":                  "TestLoadConfig_AllSettingsWired",
+	"abbreviations":             "TestLoadConfig_AllSettingsWired",
+	"icons":                     "TestLoadConfig_AllSettingsWired",
+	"resource_columns":          "TestLoadConfig_AllSettingsWired",
+	"views":                     "TestLoadConfig_AllSettingsWired",
+	"dashboard":                 "TestLoadConfig_AllSettingsWired",
+	"custom_actions":            "TestLoadConfig_AllSettingsWired",
+	"filter_presets":            "TestLoadConfig_AllSettingsWired",
+	"terminal":                  "TestLoadConfig_AllSettingsWired",
+	"scrollback_lines":          "TestLoadConfig_AllSettingsWired",
+	"pinned_groups":             "TestLoadConfig_AllSettingsWired",
+	"pinned_types":              "TestLoadConfig_AllSettingsWired",
+	"monitoring":                "TestLoadConfig_AllSettingsWired",
+	"tips":                      "TestLoadConfig_AllSettingsWired",
+	"log_tail_lines":            "TestLoadConfig_AllSettingsWired",
+	"log_tail_lines_short":      "TestLoadConfig_AllSettingsWired",
+	"log_render_ansi":           "TestLoadConfig_AllSettingsWired (deprecated flat alias)",
+	"log_top_default_profile":   "TestLoadConfig_AllSettingsWired",
+	"log_viewer":                "TestLoadConfig_AllSettingsWired + config_log_viewer_test.go (TestLogViewer_*)",
+	"yaml_viewer":               "TestLoadConfig_AllSettingsWired",
+	"diff_viewer":               "TestLoadConfig_AllSettingsWired",
+	"describe_viewer":           "TestLoadConfig_AllSettingsWired",
+	"object_explorer":           "TestLoadConfig_AllSettingsWired",
+	"api_explorer":              "TestLoadConfig_AllSettingsWired",
+	"split_preview":             "TestLoadConfig_AllSettingsWired",
+	"watch_mode":                "TestLoadConfig_AllSettingsWired",
+	"watch_throttle":            "TestLoadConfig_AllSettingsWired",
+	"all_namespaces":            "TestLoadConfig_AllSettingsWired",
+	"events":                    "TestLoadConfig_AllSettingsWired",
+	"scrolloff":                 "TestLoadConfig_AllSettingsWired",
+	"confirm_on_exit":           "TestLoadConfig_AllSettingsWired",
+	"dim_overlay":               "TestLoadConfig_AllSettingsWired",
+	"transparent_background":    "TestLoadConfig_AllSettingsWired",
+	"mouse":                     "TestLoadConfig_AllSettingsWired",
+	"watch_interval":            "TestLoadConfig_AllSettingsWired",
+	"background_watch_interval": "TestLoadConfig_AllSettingsWired",
+	"foreground_idle_timeout":   "TestLoadConfig_AllSettingsWired",
+	"clusters":                  "TestLoadConfig_AllSettingsWired",
+	"no_color":                  "TestLoadConfig_AllSettingsWired",
+	"secret_lazy_loading":       "TestLoadConfig_AllSettingsWired",
+	"informer_cache":            "TestLoadConfig_AllSettingsWired",
+	"min_contrast_ratio":        "TestLoadConfig_AllSettingsWired",
+	"read_only":                 "TestLoadConfig_AllSettingsWired",
+	"show_rare_types":           "TestLoadConfig_AllSettingsWired",
+	"security":                  "TestLoadConfig_AllSettingsWired",
+	"rightsizing_defaults":      "TestLoadConfig_AllSettingsWired",
+	"kubeshark":                 "TestLoadConfig_AllSettingsWired",
+	"scheduler":                 "TestLoadConfig_AllSettingsWired",
+	"kubeconfig_dir":            "TestLoadConfig_AllSettingsWired",
+	"union_sets":                "TestLoadConfig_AllSettingsWired",
+	"goto_targets":              "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
+	"which_key_enabled":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"which_key_delay_ms":        "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
 }
 
 // TestConfigFile_EveryFieldHasWiringCoverage is a forcing function: it fails if
@@ -419,6 +428,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origAPIExplorerTree := ConfigAPIExplorerTree
 	origSplitPreview := ConfigSplitPreview
 	origWatchMode := ConfigWatchMode
+	origWatchThrottle := ConfigWatchThrottle
 	origAllNamespaces := ConfigAllNamespaces
 	origEventsWarn := ConfigEventsWarningsOnly
 	origEventsGroup := ConfigEventsGrouping
@@ -428,6 +438,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origTransparent := ConfigTransparentBg
 	origMouse := ConfigMouse
 	origWatch := ConfigWatchInterval
+	origBackgroundWatch := ConfigBackgroundWatchInterval
+	origForegroundIdle := ConfigForegroundIdleTimeout
 	origNoColor := ConfigNoColor
 	origKubeconfig := ConfigKubeconfigDirs
 	origSecretLazy := ConfigSecretLazyLoading
@@ -505,6 +517,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigAPIExplorerTree = origAPIExplorerTree
 		ConfigSplitPreview = origSplitPreview
 		ConfigWatchMode = origWatchMode
+		ConfigWatchThrottle = origWatchThrottle
 		ConfigAllNamespaces = origAllNamespaces
 		ConfigEventsWarningsOnly = origEventsWarn
 		ConfigEventsGrouping = origEventsGroup
@@ -514,6 +527,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigTransparentBg = origTransparent
 		ConfigMouse = origMouse
 		ConfigWatchInterval = origWatch
+		ConfigBackgroundWatchInterval = origBackgroundWatch
+		ConfigForegroundIdleTimeout = origForegroundIdle
 		ConfigNoColor = origNoColor
 		ConfigKubeconfigDirs = origKubeconfig
 		ConfigSecretLazyLoading = origSecretLazy

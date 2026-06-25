@@ -456,6 +456,7 @@ func basePush80Model() Model {
 		namespace:           "default",
 		reqCtx:              context.Background(),
 		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
+		watchThrottle:       true, // production default (ui.ConfigWatchThrottle)
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -493,6 +494,7 @@ func basePush80v2Model() Model {
 		namespace:           "default",
 		reqCtx:              context.Background(),
 		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
+		watchThrottle:       true, // production default (ui.ConfigWatchThrottle)
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -530,6 +532,7 @@ func basePush80v3Model() Model {
 		namespace:           "default",
 		reqCtx:              context.Background(),
 		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
+		watchThrottle:       true, // production default (ui.ConfigWatchThrottle)
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
