@@ -167,6 +167,8 @@ func applyConfigOptions(cfg configFile) {
 		ConfigMouse = *cfg.Mouse
 	}
 	applyWatchIntervalConfig(cfg.WatchInterval)
+	applyBackgroundWatchIntervalConfig(cfg.BackgroundWatchInterval)
+	applyForegroundIdleTimeoutConfig(cfg.ForegroundIdleTimeout)
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
@@ -375,6 +377,7 @@ func applyViewerDefaults(cfg configFile) {
 func applySessionDefaults(cfg configFile) {
 	applyBoolPtr(cfg.SplitPreview, &ConfigSplitPreview)
 	applyBoolPtr(cfg.WatchMode, &ConfigWatchMode)
+	applyBoolPtr(cfg.WatchThrottle, &ConfigWatchThrottle)
 	applyBoolPtr(cfg.AllNamespaces, &ConfigAllNamespaces)
 	if ev := cfg.Events; ev != nil {
 		applyBoolPtr(ev.WarningsOnly, &ConfigEventsWarningsOnly)

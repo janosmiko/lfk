@@ -237,6 +237,21 @@
       "description": "Polling interval used in watch mode, as a Go duration string (e.g. \"2s\", \"500ms\", \"1m\"). Clamped to [500ms, 10m].",
       "default": "2s"
     },
+    "background_watch_interval": {
+      "type": "string",
+      "description": "Watch cadence while the window is unfocused or focused-idle. Go duration, clamped to [500ms, 10m]. Default 10s.",
+      "default": "10s"
+    },
+    "foreground_idle_timeout": {
+      "type": "string",
+      "description": "No-input window before a focused window throttles to background_watch_interval. Go duration; 0 disables. Default 120s.",
+      "default": "120s"
+    },
+    "watch_throttle": {
+      "type": "boolean",
+      "description": "Master switch for focus/idle watch throttling. Set false to disable it entirely (watch_interval used unconditionally). Default true.",
+      "default": true
+    },
     "clusters": {
       "type": ["object", "null"],
       "description": "Per-cluster configuration overrides, keyed by context name.",

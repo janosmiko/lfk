@@ -100,6 +100,44 @@ const (
 // app.NewModel.
 var ConfigWatchInterval = DefaultWatchInterval
 
+// DefaultBackgroundWatchInterval is the watch-tick cadence used while the
+// terminal reports the lfk window as unfocused, or while a focused window has
+// seen no input for the foreground-idle timeout. Trades freshness for battery.
+const DefaultBackgroundWatchInterval = 10 * time.Second
+
+// ConfigBackgroundWatchInterval is the resolved background/idle polling interval.
+// Set from config file; CLI flag override is applied in app.NewModel. Clamped
+// to [MinWatchInterval, MaxWatchInterval] like the foreground interval.
+var ConfigBackgroundWatchInterval = DefaultBackgroundWatchInterval
+
+// DefaultForegroundIdleTimeout is the no-input window after which a focused lfk
+// window throttles its watch tick to the background interval. 0 disables
+// focused-idle throttling (background throttling still applies).
+const DefaultForegroundIdleTimeout = 120 * time.Second
+
+// ConfigForegroundIdleTimeout is the resolved focused-idle timeout.
+var ConfigForegroundIdleTimeout = DefaultForegroundIdleTimeout
+
+// DefaultWatchThrottle is the startup default for the focus/idle watch
+// throttling feature. When false, the watch tick always uses watch_interval
+// regardless of focus or idle state.
+const DefaultWatchThrottle = true
+
+// ConfigWatchThrottle enables the background/idle watch throttling. Set false
+// to fully disable it (watch_interval is then used unconditionally).
+var ConfigWatchThrottle = DefaultWatchThrottle
+
+// ClampForegroundIdleTimeout restricts d to [0, MaxWatchInterval]; 0 disables.
+func ClampForegroundIdleTimeout(d time.Duration) time.Duration {
+	if d < 0 {
+		return 0
+	}
+	if d > MaxWatchInterval {
+		return MaxWatchInterval
+	}
+	return d
+}
+
 // clamp01 restricts v to [0.0, 1.0].
 func clamp01(v float64) float64 {
 	if v < 0 {

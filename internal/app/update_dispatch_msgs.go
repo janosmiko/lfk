@@ -121,6 +121,10 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	if !m.watchMode {
 		return m, nil
 	}
+	// Retire ticks from a superseded chain (interval changed on focus/idle).
+	if msg.gen != m.watchTickGen {
+		return m, nil
+	}
 	// No explicit backpressure gate here: the scheduler's in-flight coalescing
 	// (Registry.Submit dedups against an identical RUNNING task, not just the
 	// queue) already gives this loop fixed-DELAY semantics under load — a tick
@@ -145,7 +149,7 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	// flag or its loaders would also call StartUntracked and the
 	// indicator would never appear for user actions.
 	m.suppressBgtasks = true
-	cmd := tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
+	cmd := tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.activeWatchInterval(), m.watchTickGen))
 	m.suppressBgtasks = false
 	return m, cmd
 }

@@ -146,6 +146,17 @@ type configFile struct {
 	// a Go duration string (e.g. "2s", "500ms", "1m"). Clamped to [500ms, 10m].
 	// Defaults to 2s when unset or invalid.
 	WatchInterval string `json:"watch_interval" yaml:"watch_interval"`
+	// BackgroundWatchInterval is the polling interval used while the lfk window is
+	// unfocused or the focused window has gone idle. Same duration-string form
+	// and [500ms, 10m] clamp as watch_interval. Defaults to 10s when unset or
+	// invalid. Set equal to watch_interval to disable background throttling.
+	BackgroundWatchInterval string `json:"background_watch_interval" yaml:"background_watch_interval"`
+	// ForegroundIdleTimeout is the no-input window before a focused window
+	// throttles to background_watch_interval. Go duration; 0 disables. Default 120s.
+	ForegroundIdleTimeout string `json:"foreground_idle_timeout" yaml:"foreground_idle_timeout"`
+	// WatchThrottle enables focus/idle watch throttling. Set false to fully
+	// disable it: the watch tick then always uses watch_interval. Default true.
+	WatchThrottle *bool `json:"watch_throttle" yaml:"watch_throttle"`
 	// Clusters maps context names to per-cluster configuration overrides.
 	Clusters map[string]clusterConfig `json:"clusters" yaml:"clusters"`
 	// NoColor, when true, strips foreground/background colors from all styles

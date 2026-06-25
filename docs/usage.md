@@ -308,6 +308,18 @@ load. Tune it with:
 Values outside `[500ms, 10m]` are clamped to the bounds; invalid values fall
 back to 2s.
 
+### Battery / idle throttling
+
+In watch mode, lfk slows its refresh to `background_watch_interval` (default 10s)
+when the terminal window is unfocused, or when a focused window has had no
+keypress for `foreground_idle_timeout` (default 120s; set 0 to disable). It
+snaps back to `watch_interval` and refreshes immediately on focus or keypress.
+The loading spinner only animates while a load is actually in flight.
+
+Set `watch_throttle: false` to disable this throttling entirely.
+
+Flags: `--background-watch-interval`, `--foreground-idle-timeout`.
+
 ## Discovery Cache
 
 API discovery (the list of resource types and CRDs the server exposes) is

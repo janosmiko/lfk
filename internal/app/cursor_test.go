@@ -1325,6 +1325,9 @@ func TestMoveCursorDebounceCoalescesRapidBursts(t *testing.T) {
 	}
 
 	assert.Equal(t, startGen+5, m.previewDebounceGen)
+	// Reflect production state: loading=true means the spinner would already
+	// be ticking (armed by the Update path that drove the cursor moves).
+	m.spinnerTicking = true
 
 	for staleGen := startGen + 1; staleGen < m.previewDebounceGen; staleGen++ {
 		_, cmd := m.Update(previewDebounceTickMsg{gen: staleGen})
