@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.18](https://github.com/janosmiko/lfk/compare/v0.14.17...v0.14.18) (2026-06-25)
+
+
+### Features
+
+* **app:** throttle watch refresh when idle/unfocused + gate spinner ([#483](https://github.com/janosmiko/lfk/issues/483)) ([1b575b7](https://github.com/janosmiko/lfk/commit/1b575b7601c9d8c38276d0636fc6385d62368457))
+
 ## [0.14.17](https://github.com/janosmiko/lfk/compare/v0.14.16...v0.14.17) (2026-06-25)
 
 
