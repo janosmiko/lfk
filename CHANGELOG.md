@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.19](https://github.com/janosmiko/lfk/compare/v0.14.18...v0.14.19) (2026-07-02)
+
+
+### Features
+
+* **ui:** color printer-column values by status semantics ([#489](https://github.com/janosmiko/lfk/issues/489)) ([34d9de6](https://github.com/janosmiko/lfk/commit/34d9de675548f568d6cf7a101c04c7416100c167))
+
 ## [0.14.18](https://github.com/janosmiko/lfk/compare/v0.14.17...v0.14.18) (2026-06-25)
 
 
