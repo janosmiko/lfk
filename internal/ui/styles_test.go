@@ -151,6 +151,16 @@ func TestConditionStyle(t *testing.T) {
 	}
 }
 
+// --- statusSeverity: Established ---
+
+// "Established" is the healthy terminal state of a CRD (Established: True
+// condition), so it must classify as running-green in the built-in Status
+// column and rank as healthy in status rollups.
+func TestStatusSeverity_Established(t *testing.T) {
+	assert.Equal(t, sevRunning, statusSeverity("Established"))
+	assert.Equal(t, StatusSeverityRank("Running"), StatusSeverityRank("Established"))
+}
+
 // --- FillLinesBg ---
 
 // TestFillLinesBgReestablishesBgAfterShortReset guards issue #293's recurrence

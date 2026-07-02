@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -186,6 +187,62 @@ func TestResourceColumnStyle(t *testing.T) {
 			// Verify the style can render without panicking.
 			rendered := style.Render("test")
 			assert.NotEmpty(t, rendered)
+		})
+	}
+}
+
+// TestResourceColumnStyle_ValueBased covers issue #488: printer/extra columns
+// with low-cardinality values (State: Active/Inactive, Established: True/False)
+// are colored semantically instead of always rendering dim.
+func TestResourceColumnStyle_ValueBased(t *testing.T) {
+	origProfile := lipgloss.DefaultRenderer().ColorProfile()
+	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+
+	fgKey := func(s lipgloss.Style) string {
+		fg := s.GetForeground()
+		r, g, b, a := fg.RGBA()
+		return fmt.Sprintf("%d:%d:%d:%d", r, g, b, a)
+	}
+	red := fgKey(StatusFailed)
+	green := fgKey(StatusRunning)
+	blue := fgKey(StatusProgressing)
+	dim := fgKey(DimStyle)
+
+	tests := []struct {
+		key  string
+		val  string
+		want string
+		desc string
+	}{
+		// Boolean-ish values follow the column name's polarity, like conditions.
+		{"Established", "True", green, "ready-polarity column, True = healthy"},
+		{"Established", "False", red, "ready-polarity column, False = problem"},
+		{"established", "true", green, "case-insensitive boolean"},
+		{"ESTABLISHED", "FALSE", red, "case-insensitive boolean"},
+		{"Failed", "True", red, "error-polarity column, True = problem"},
+		{"Failed", "False", green, "error-polarity column, False = healthy"},
+		{"Suspend", "True", blue, "info-polarity column, True = active"},
+		{"Suspend", "False", dim, "info-polarity column, False = neutral"},
+		{"Ready", "Unknown", dim, "unknown is neutral"},
+
+		// Word values reuse the status severity classification.
+		{"State", "Active", green, "known-good status word"},
+		{"State", "Established", green, "established = healthy"},
+		{"State", "Failed", red, "known-bad status word"},
+		{"State", "Pending", blue, "progressing status word"},
+		{"State", "Inactive", dim, "unclassified word stays dim"},
+
+		// Arbitrary values stay dim.
+		{"Node", "node-1", dim, "arbitrary text stays dim"},
+		{"Class", "default", dim, "literal default is not a status"},
+		{"Replicas", "3", dim, "numbers stay dim"},
+		{"Host", "", dim, "empty stays dim"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key+"/"+tt.val, func(t *testing.T) {
+			got := fgKey(resourceColumnStyle(tt.key, tt.val))
+			assert.Equal(t, tt.want, got, "%s=%q: %s", tt.key, tt.val, tt.desc)
 		})
 	}
 }
