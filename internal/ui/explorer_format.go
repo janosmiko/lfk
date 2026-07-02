@@ -369,8 +369,44 @@ func resourceColumnStyle(key, val string) lipgloss.Style {
 			return StatusFailed // red: disabled
 		}
 	default:
+		return extraColumnValueStyle(key, val)
+	}
+}
+
+// extraColumnValueStyle colors low-cardinality printer/extra column values:
+// boolean values follow the column name's condition polarity (Established/False
+// is a problem, Failed/False is healthy), recognized status words reuse the
+// shared status severity colors. Everything else stays dim.
+func extraColumnValueStyle(key, val string) lipgloss.Style {
+	if canonical, ok := canonicalBoolStatus(val); ok {
+		// ALLCAPS headers would tokenize letter-by-letter in the polarity
+		// heuristic; lowercase them so "ESTABLISHED" matches like "Established".
+		if key == strings.ToUpper(key) {
+			key = strings.ToLower(key)
+		}
+		return ConditionStyle(key, canonical)
+	}
+	switch statusSeverity(val) {
+	case sevRunning, sevDone, sevProgressing, sevFailed:
+		return StatusStyle(val)
+	default:
 		return DimStyle
 	}
+}
+
+// canonicalBoolStatus normalizes boolean-ish column values to condition-status
+// casing. CRD printer columns of type boolean render lowercase ("true"), while
+// condition-backed JSONPath columns yield "True"/"False"/"Unknown".
+func canonicalBoolStatus(val string) (string, bool) {
+	switch {
+	case strings.EqualFold(val, "true"):
+		return "True", true
+	case strings.EqualFold(val, "false"):
+		return "False", true
+	case strings.EqualFold(val, "unknown"):
+		return "Unknown", true
+	}
+	return "", false
 }
 
 // severityColumnStyle returns the lipgloss.Style that paints the

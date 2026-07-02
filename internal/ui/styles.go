@@ -453,7 +453,8 @@ func statusSeverity(status string) statusSev {
 	case "Running", "Active", "Bound", "Available", "Ready",
 		"Healthy", "Healthy/Synced", "Synced",
 		"Deployed",
-		"SecretSynced", "Created", "Updated", "Valid":
+		"SecretSynced", "Created", "Updated", "Valid",
+		"Established":
 		return sevRunning
 	case "Succeeded", "Completed",
 		"Superseded":

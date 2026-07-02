@@ -153,7 +153,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Configurable table columns** (global, per-resource-type, and per-cluster)
 - **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
-- **Status-aware coloring**: Running=green, Pending=yellow, Failed=red
+- **Status-aware coloring**: Running=green, Pending=yellow, Failed=red — also applied to CRD printer-column values: recognized status words (Active, Failed, Pending, ...) get their severity color, and True/False values follow the column's polarity (Established=False red, Failed=False green)
 - **Resource usage metrics**: CPU/MEM with color-coded bars in dashboard
 
 ## Installation
