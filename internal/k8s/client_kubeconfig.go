@@ -230,22 +230,30 @@ func contextDisplayHint(path string) string {
 //
 // Resolution order:
 //  1. KUBECONFIG env var (colon-separated).
-//  2. ~/.kube/config (only when home lookup succeeds).
+//  2. ~/.kube/config (only when home lookup succeeds AND KUBECONFIG is unset).
 //  3. Files under each path in kubeconfigDirs, falling back to a single-element
 //     [~/.kube/config.d/] when the slice is empty. An absolute, non-tilde
 //     directory is honored even when home lookup fails — the only reason to
 //     require a home directory is for tilde expansion or the default fallback.
+//
+// KUBECONFIG is exclusive, matching kubectl/k9s: when it is set, lfk does NOT
+// add the default ~/.kube/config, nor auto-scan the default ~/.kube/config.d/.
+// Only directories the user explicitly requested (--kubeconfig-dir /
+// KUBECONFIG_DIR / kubeconfig_dir) are still merged on top, because those are
+// deliberate opt-ins rather than implicit defaults.
 func buildKubeconfigPaths(kubeconfigDirs []string) []string {
 	var paths []string
 
 	// KUBECONFIG env var (colon-separated on unix).
-	if env := os.Getenv("KUBECONFIG"); env != "" {
-		paths = append(paths, filepath.SplitList(env)...)
+	kubeconfigSet := os.Getenv("KUBECONFIG") != ""
+	if kubeconfigSet {
+		paths = append(paths, filepath.SplitList(os.Getenv("KUBECONFIG"))...)
 	}
 
 	home, homeErr := os.UserHomeDir()
-	if homeErr == nil {
-		// Default kubeconfig.
+	if homeErr == nil && !kubeconfigSet {
+		// Default kubeconfig — skipped entirely when KUBECONFIG is set so lfk
+		// mirrors kubectl's exclusive semantics.
 		defaultPath := filepath.Join(home, ".kube", "config")
 		if !containsPath(paths, defaultPath) {
 			paths = append(paths, defaultPath)

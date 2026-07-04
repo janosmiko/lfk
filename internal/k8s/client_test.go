@@ -862,6 +862,57 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.Equal(t, 1, count, "default path should appear exactly once")
 	})
 
+	t.Run("KUBECONFIG is exclusive: no default config or config.d", func(t *testing.T) {
+		// kubectl/k9s semantics: when KUBECONFIG is set, the default
+		// ~/.kube/config and the auto-scanned ~/.kube/config.d/ must NOT be
+		// merged in. Point HOME at a temp dir seeded with both so we can prove
+		// they are absent from the result.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		defaultPath := filepath.Join(tmpHome, ".kube", "config")
+		configD := filepath.Join(tmpHome, ".kube", "config.d")
+		assert.NoError(t, os.MkdirAll(configD, 0o755))
+		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
+		configDCfg := filepath.Join(configD, "seeded-cluster")
+		assert.NoError(t, os.WriteFile(configDCfg, []byte(""), 0o600))
+
+		tmpDir := t.TempDir()
+		env := filepath.Join(tmpDir, "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		paths := buildKubeconfigPaths(nil)
+
+		assert.Equal(t, []string{env}, paths,
+			"KUBECONFIG must fully determine the file list, excluding ~/.kube/config and config.d")
+	})
+
+	t.Run("KUBECONFIG still merges explicit kubeconfigDirs", func(t *testing.T) {
+		// Explicit --kubeconfig-dir / KUBECONFIG_DIR / config values are a
+		// deliberate opt-in, so they remain merged even under KUBECONFIG's
+		// otherwise-exclusive semantics. Only the implicit ~/.kube/config.d
+		// default is dropped.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+
+		tmpDir := t.TempDir()
+		env := filepath.Join(tmpDir, "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		explicitDir := t.TempDir()
+		dirCfg := filepath.Join(explicitDir, "team-cluster")
+		assert.NoError(t, os.WriteFile(dirCfg, []byte(""), 0o600))
+
+		paths := buildKubeconfigPaths([]string{explicitDir})
+
+		resolvedDirCfg, err := filepath.EvalSymlinks(dirCfg)
+		assert.NoError(t, err)
+		assert.Contains(t, paths, env, "KUBECONFIG file must be present")
+		assert.Contains(t, paths, resolvedDirCfg,
+			"explicitly requested directory must still be merged under KUBECONFIG")
+	})
+
 	t.Run("includes files from config.d directory", func(t *testing.T) {
 		// Create a temporary home structure.
 		tmpHome := t.TempDir()

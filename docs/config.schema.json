@@ -27,7 +27,7 @@
       "description": "Path to the application log file. Defaults to ~/.local/share/lfk/lfk.log."
     },
     "kubeconfig_dir": {
-      "description": "Directory (or list of directories) recursively scanned for kubeconfig files, in addition to ~/.kube/config and KUBECONFIG. Tilde paths expand against $HOME.",
+      "description": "Directory (or list of directories) recursively scanned for kubeconfig files, in addition to ~/.kube/config (unless KUBECONFIG is set, which is exclusive like kubectl). Tilde paths expand against $HOME.",
       "oneOf": [
         { "type": "string" },
         { "type": "array", "items": { "type": "string" } },

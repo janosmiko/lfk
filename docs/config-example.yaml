@@ -158,9 +158,11 @@ log_path: /tmp/lfk.log
 
 # ─── Kubeconfig Directory ──────────────────────────────────────────────────────
 # Directory (or list of directories) recursively scanned for kubeconfig files,
-# in addition to ~/.kube/config and the KUBECONFIG env var. Tilde (~/) is
-# expanded against $HOME. Override at runtime with --kubeconfig-dir (repeatable)
-# or KUBECONFIG_DIR (colon-separated). --kubeconfig bypasses directory discovery.
+# in addition to ~/.kube/config. When the KUBECONFIG env var is set it is
+# exclusive (like kubectl): the default ~/.kube/config and config.d scan are
+# skipped, but explicit dirs below still merge. Tilde (~/) is expanded against
+# $HOME. Override at runtime with --kubeconfig-dir (repeatable) or
+# KUBECONFIG_DIR (colon-separated). --kubeconfig bypasses directory discovery.
 # Default: ~/.kube/config.d
 #
 # Single value:

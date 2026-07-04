@@ -301,10 +301,11 @@ func (c *Client) Shutdown() {
 }
 
 // NewClient creates a new Kubernetes client, loading configs from:
-//  1. KUBECONFIG env var
-//  2. ~/.kube/config
+//  1. KUBECONFIG env var. When set, it is exclusive (kubectl/k9s semantics):
+//     steps 2 and the default of step 3 are skipped.
+//  2. ~/.kube/config (only when KUBECONFIG is unset).
 //  3. All files in each kubeconfigDirs entry (recursively; symlinks to directories are followed).
-//     Defaults to [~/.kube/config.d/] when the slice is empty.
+//     Defaults to [~/.kube/config.d/] when the slice is empty and KUBECONFIG is unset.
 func NewClient(kubeconfigOverride string, kubeconfigDirs []string) (*Client, error) {
 	var kubeconfigPaths []string
 	if kubeconfigOverride != "" {

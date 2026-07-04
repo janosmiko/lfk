@@ -75,6 +75,13 @@ KUBECONFIG_DIR=/path/to/configs/ lfk
 KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
 
+`KUBECONFIG` is exclusive, exactly like kubectl and k9s: when it is set, lfk
+loads only the files it lists and does **not** also add the default
+`~/.kube/config` or auto-scan `~/.kube/config.d/`. Directories you explicitly
+request through `--kubeconfig-dir`, `KUBECONFIG_DIR`, or the `kubeconfig_dir`
+config key are still merged on top, since those are deliberate opt-ins. The
+`--kubeconfig` flag remains the strongest override and bypasses all discovery.
+
 When `--context` or `--namespace` flags are provided, the saved session state is
 ignored and the app opens directly in the specified context/namespace. The user
 can still change the namespace during the session.
