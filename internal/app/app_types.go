@@ -85,6 +85,7 @@ const (
 	overlayLocalClusters      // local-cluster manager (Ctrl+N at LevelClusters)
 	overlayTrafficCapture     // per-pod live packet capture (action menu key c)
 	overlayCopyFormat         // Y-key copy-as picker (YAML / JSON / Table)
+	overlayCopyField          // ctrl+y single-field copy picker
 	overlayShuttingDown       // non-interactive "graceful shutdown in progress" notice
 	overlayObjectExplorerFind // recursive key search over the object (r key)
 	overlayLogTopGroupBy      // multi-select group-by field picker for Log Top
