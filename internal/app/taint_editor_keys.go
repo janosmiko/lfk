@@ -18,7 +18,7 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	p := &m.taintEditor
 	n := len(p.rows)
-	_, _, visible := m.taintEditorOverlayDims()
+	visible := m.taintEditorMaxVisible()
 	switch msg.String() {
 	case "esc", "q":
 		m.closeTaintEditor()
@@ -148,23 +148,13 @@ func (m Model) stageTaintAddition() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// taintEditorOverlayDims returns the editor box width, height, and
-// visible row count (same shape as the other overlay editors).
-func (m Model) taintEditorOverlayDims() (w, h, maxVisible int) {
-	w = min(m.width-6, max(m.width*70/100, 64))
-	h = min(m.height-4, max(m.height*60/100, 12))
-	maxVisible = max(h-9, 1) // title + subtitle + add-row(2) + footer + borders
-	return w, h, maxVisible
-}
-
 // clampTaintEditorScroll keeps the cursor within the visible window via
 // the shared vim-style scrolloff viewport.
 func (m *Model) clampTaintEditorScroll() {
 	p := &m.taintEditor
-	_, _, visible := m.taintEditorOverlayDims()
 	n := len(p.rows)
 	p.cursor = max(0, min(p.cursor, n-1))
-	overlayListScroll(&p.scroll, p.cursor, n, visible)
+	overlayListScroll(&p.scroll, p.cursor, n, m.taintEditorMaxVisible())
 }
 
 // taintEditorHints is the editor's bottom hint bar (kept here to

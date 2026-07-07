@@ -3,46 +3,68 @@ package app
 import (
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // renderOverlayTaintEditor paints the node taint editor: existing
-// taints with removal checkboxes, staged additions marked [new], and
-// the add-row inputs when focused. Returns empty content + zero dims
-// when the editor isn't active so the view-dispatch fallback fires.
+// taints with removal checkboxes, staged additions suffixed (new), and
+// the add-row inputs beneath the list. The box is sized to its content
+// (like the copy-as picker and action menu) — nodes carry a handful of
+// taints, so a screen-proportional box would be mostly dead space.
+// Returns empty content + zero dims when the editor isn't active so
+// the view-dispatch fallback fires.
 func (m Model) renderOverlayTaintEditor() (string, int, int) {
 	if !m.taintEditor.active {
 		return "", 0, 0
 	}
 	p := m.taintEditor
-	w, h, maxVisible := m.taintEditorOverlayDims()
-	innerW := max(w-4, 1)
+	maxVisible := m.taintEditorMaxVisible()
 
 	items := make([]ui.OverlayListItem, len(p.rows))
 	for i, r := range p.rows {
 		it := ui.OverlayListItem{
-			Name:     ui.Truncate(taintDisplayString(r.taint), innerW),
+			Name:     taintDisplayString(r.taint),
 			Selected: r.remove,
 		}
 		if r.staged {
-			it.Status = "new"
+			it.Description = "(new)"
 		}
 		items[i] = it
 	}
 	cfg := ui.OverlayListConfig{
-		Title:        "Taints",
-		Subtitle:     p.node,
-		Cursor:       p.cursor,
-		MultiSelect:  true,
-		ShowStatus:   true,
-		Scroll:       p.scroll,
-		MaxVisible:   maxVisible,
-		EmptyMessage: taintEditorEmptyMessage(p),
-		Height:       h - 4, // reserve two lines for the add-row block below
+		Title:           "Taints",
+		Subtitle:        p.node,
+		Cursor:          p.cursor,
+		MultiSelect:     true,
+		ShowDescription: true,
+		Scroll:          p.scroll,
+		MaxVisible:      maxVisible,
+		EmptyMessage:    taintEditorEmptyMessage(p),
 	}
-	content := ui.RenderOverlayList(items, cfg, innerW)
-	return content + "\n" + m.renderTaintEditorAddRow(innerW), w, h
+
+	// Fit the box to the widest row (70-col floor, screen-capped), then
+	// truncate names against the width that actually won.
+	overlayW := ui.OverlayListWidth(items, cfg, max(m.width-10, 1))
+	innerW := max(overlayW-4, 1)
+	for i := range items {
+		items[i].Name = ui.Truncate(items[i].Name, innerW)
+	}
+
+	content := ui.RenderOverlayList(items, cfg, innerW) +
+		"\n\n" + m.renderTaintEditorAddRow(innerW)
+	// OverlayStyle's Height covers content + its 1+1 vertical padding.
+	overlayH := min(lipgloss.Height(content)+2, max(m.height-4, 3))
+	return content, overlayW, overlayH
+}
+
+// taintEditorMaxVisible caps the taint list rows shown at once. Shared
+// by the renderer and the scroll clamp so the scrollbar and cursor
+// stay in sync.
+func (m Model) taintEditorMaxVisible() int {
+	return min(10, max(m.height-12, 3))
 }
 
 // taintEditorEmptyMessage explains an empty list: still loading, or a
