@@ -2,7 +2,21 @@ package app
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// copyFormatPickerHints is the copy-as picker's bottom hint bar
+// (kept here to co-locate the feature and keep overlay_hintbar.go
+// under the file-length cap).
+func copyFormatPickerHints() []ui.HintEntry {
+	return []ui.HintEntry{
+		{Key: "j/k", Desc: "navigate"},
+		{Key: "y/J/t", Desc: "shortcut"},
+		{Key: "enter", Desc: "apply"},
+		{Key: "esc", Desc: "cancel"},
+	}
+}
 
 // handleCopyFormatPickerKey routes key events to the active copy-as
 // picker. j/k/down/up cycle the cursor (j/k stays consistent with

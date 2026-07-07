@@ -88,6 +88,7 @@ type Keybindings struct {
 	OpenBrowser       string `json:"open_browser" yaml:"open_browser"`
 	CopyName          string `json:"copy_name" yaml:"copy_name"`
 	CopyYAML          string `json:"copy_yaml" yaml:"copy_yaml"`
+	CopyField         string `json:"copy_field" yaml:"copy_field"`
 	PasteApply        string `json:"paste_apply" yaml:"paste_apply"`
 	Diff              string `json:"diff" yaml:"diff"`
 
@@ -211,6 +212,7 @@ func DefaultKeybindings() Keybindings {
 		Exec: "s", Edit: "E", Describe: "v", Delete: "D",
 		ForceDelete: "X", Scale: "S",
 		OpenBrowser: "ctrl+o", CopyName: "y", CopyYAML: "Y",
+		CopyField:  "ctrl+y",
 		PasteApply: "ctrl+p", Diff: "d",
 
 		// Multi-selection

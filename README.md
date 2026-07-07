@@ -125,7 +125,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Resource templates**: Create resources from 25+ built-in templates (`a`, `/` to search); includes a Custom Resource template as a starting point
 - **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
 - **Network policy visualizer**: Visualize a NetworkPolicy's ingress/egress rules (`x` → `N` on a NetworkPolicy), or list every policy affecting a Pod or Service (`x` → "Network Policies" on the resource) — including which backing pods a policy covers. Supports CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy (entities, FQDNs, deny rules, L7 indicators) when the Cilium CRDs are installed. The dialog scrolls with the mouse wheel and is searchable (`/`, `n`/`N`)
-- **Clipboard support**: Copy resource name (`y`), open copy-as picker (`Y`: YAML / JSON / Table), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
+- **Clipboard support**: Copy resource name (`y`), open copy-as picker (`Y`: YAML / JSON / Table), copy a single field via a filterable picker (`Ctrl+Y`: visible columns by default, `Tab` for all manifest fields — e.g. a node's external IP), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
 - **Bookmarks**: Save favorite resource paths (including the active list filter) for quick navigation
 - **Orphan detection**: Press `Shift+Z` (or run bare `:orphans`) to open the cluster-wide orphan overview across 11 kinds — Pods, Secrets, ConfigMaps, Services, PVCs, HPAs, PDBs, NetworkPolicies, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings. Per-list filters are still available via the filter-preset overlay (`.`) on each kind, or jump straight to a filtered view with `:orphans <kind>` (e.g., `:orphans secrets`). A strict / lenient toggle (`s`) flips between "truly unused" and "currently idle but referenced by workload templates" (e.g. CronJob between firings). Auto-excludes Helm release Secrets, ServiceAccount tokens, owner-managed resources, and `kube-root-ca.crt`.
 - **Session persistence**: Remembers last context/namespace/resource, the active list filter, and the highlighted row across restarts
@@ -300,6 +300,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `v` | Describe resource |
 | `D` / `X` | Delete / force delete |
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
+| `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |

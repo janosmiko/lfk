@@ -201,9 +201,10 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 |---|---|
 | `y` | Copy resource name to clipboard (with multi-selection: newline-joined names of all selected items) |
 | `Y` | Open copy-as picker (YAML / JSON / Table). YAML/JSON support multi-selection (multi-doc YAML joined with `---`, JSON array). Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest. |
+| `Ctrl+Y` | Copy a single field. Opens instantly on the visible table columns (Name, Status, extras...) — `Enter` copies the cell value. `Tab` switches to the full manifest field list, where array elements are labeled semantically (`status.addresses[ExternalIP].address` for a node's external IP) so filtering `ExternalIP` finds the address row. With multi-selection the chosen column/field is extracted from every selected item, one value per line; labeled array elements resolve per manifest (not by index), and items missing the field are skipped. Remembers the last-copied entry per resource kind for the session and preselects it next time. |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
 
-When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y` and `Y` operate on the selection rather than the cursor row — mirroring the precedence used by `D` (delete) and other bulk actions. `Y` is capped at 50 manifests per copy (client-go's default rate limiter serializes the per-item fetches).
+When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and `Ctrl+Y` operate on the selection rather than the cursor row — mirroring the precedence used by `D` (delete) and other bulk actions. `Y` and `Ctrl+Y` are capped at 50 manifests per copy (client-go's default rate limiter serializes the per-item fetches).
 
 ## Multi-Selection
 
@@ -1144,6 +1145,7 @@ keybindings:
   create_template: "a"   # Create from template
   copy_name: "y"         # Copy name
   copy_yaml: "Y"         # Open copy-as picker (YAML / JSON / Table)
+  copy_field: "ctrl+y"   # Copy a single manifest field (filterable picker)
   paste_apply: "ctrl+p"  # Apply from clipboard
   open_browser: "ctrl+o" # Open in browser
   diff: "d"              # Diff resources

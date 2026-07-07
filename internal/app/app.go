@@ -112,21 +112,21 @@ type Model struct {
 	// Current view mode.
 	mode viewMode
 
-	overlay          overlayKind  // active overlay kind (see overlayKind enum)
-	overlayItems     []model.Item // full list (e.g., all namespaces)
-	overlayFilter    TextInput    // typed filter text
-	overlayCursor    int
-	copyFormatPicker copyFormatPickerState // Y-key copy-as picker — see openCopyFormatPicker
-	taintEditor      taintEditorState      // node taint editor — see openTaintEditor
+	overlay             overlayKind  // active overlay kind (see overlayKind enum)
+	overlayItems        []model.Item // full list (e.g., all namespaces)
+	overlayFilter       TextInput    // typed filter text
+	overlayCursor       int
+	copyFormatPicker    copyFormatPickerState      // Y-key copy-as picker — see openCopyFormatPicker
+	copyFieldPicker     copyFieldPickerState       // ctrl+y field picker — see updateCopyFieldManifests
+	lastCopyFieldByKind map[string]copyFieldMemory // last entry copied per kind (ctrl+y preselect; session-only, all tabs)
+	taintEditor         taintEditorState           // node taint editor — see openTaintEditor
 
 	namespace string // current namespace (not a navigation level; displayed in top-right)
 
 	// Terminal dimensions.
-	width  int
-	height int
+	width, height int
 
-	// Error to display.
-	err error
+	err error // error to display
 
 	// Loading indicator.
 	loading bool

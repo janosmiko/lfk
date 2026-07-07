@@ -434,6 +434,7 @@
         "open_browser": { "type": "string" },
         "copy_name": { "type": "string" },
         "copy_yaml": { "type": "string" },
+        "copy_field": { "type": "string" },
         "paste_apply": { "type": "string" },
         "diff": { "type": "string" },
         "toggle_select": { "type": "string" },

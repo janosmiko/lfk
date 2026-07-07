@@ -109,6 +109,7 @@ func helpSections() []helpSection {
 				{kb.SaveResource, "Save resource to file / toggle warnings-only (Events)"},
 				{kb.CopyName, "Copy resource name to clipboard"},
 				{helpKeyDisplay(kb.CopyYAML), "Open copy-as picker (YAML / JSON / Table)"},
+				{helpKeyDisplay(kb.CopyField), "Copy a single field: visible columns by default, Tab for all manifest fields (multi-selection: one value per line)"},
 				{helpKeyDisplay(kb.PasteApply), "Apply resource from clipboard (kubectl apply)"},
 				{"", "Port forwarding: use action menu (" + kb.ActionMenu + ") on Pod/Service/Deployment/StatefulSet/DaemonSet"},
 				{"", "Auto-navigates to Port Forwards list after creation; shows resolved local port"},

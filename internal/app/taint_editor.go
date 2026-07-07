@@ -173,10 +173,13 @@ func taintApplySummary(node string, removals, additions []model.Taint) string {
 	return q
 }
 
-// routeTaintMsg dispatches the taint editor's async results (kept out
-// of updateActionResultMsg's type switch for its gocyclo budget).
-func (m Model) routeTaintMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+// routeOverlayEditorMsg dispatches the async results of the copy-field
+// picker and the taint editor (grouped into one case to stay inside
+// updateActionResultMsg's gocyclo budget).
+func (m Model) routeOverlayEditorMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch t := msg.(type) {
+	case copyFieldManifestsMsg:
+		return m.updateCopyFieldManifests(t)
 	case taintsLoadedMsg:
 		return m.updateTaintsLoaded(t)
 	case taintsAppliedMsg:
