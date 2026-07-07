@@ -346,19 +346,12 @@ func (m Model) copyFieldOverlayDims() (w, h, maxVisible int) {
 	return w, h, maxVisible
 }
 
-// clampCopyFieldScroll keeps the cursor within the visible window.
+// clampCopyFieldScroll keeps the cursor within the visible window via
+// the shared vim-style scrolloff viewport.
 func (m *Model) clampCopyFieldScroll() {
 	p := &m.copyFieldPicker
 	_, _, visible := m.copyFieldOverlayDims()
 	n := len(m.visibleCopyFieldEntries())
 	p.cursor = max(0, min(p.cursor, n-1))
-	if p.cursor < p.scroll {
-		p.scroll = p.cursor
-	}
-	if p.cursor >= p.scroll+visible {
-		p.scroll = p.cursor - visible + 1
-	}
-	if p.scroll < 0 {
-		p.scroll = 0
-	}
+	overlayListScroll(&p.scroll, p.cursor, n, visible)
 }

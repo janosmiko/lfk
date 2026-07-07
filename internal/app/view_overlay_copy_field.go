@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -18,16 +20,21 @@ func (m Model) renderOverlayCopyField() (string, int, int) {
 	p := m.copyFieldPicker
 	w, h, maxVisible := m.copyFieldOverlayDims()
 
-	// RenderOverlayList pads short rows but never truncates long ones, so
-	// cap path and value to the inner width — a multi-KB ConfigMap value
-	// must not overflow the row and desync the scrollbar column.
+	// RenderOverlayList pads short rows but never truncates long ones,
+	// and it joins Name + "  " + Description on one line — so the two
+	// share a row budget. Long paths cap at 60% of the width; the value
+	// gets whatever the (possibly shorter) path leaves over. A multi-KB
+	// ConfigMap value must not overflow the row and desync the
+	// scrollbar column.
 	innerW := max(w-4, 1)
 	vis := m.visibleCopyFieldEntries()
 	items := make([]ui.OverlayListItem, len(vis))
 	for i, e := range vis {
+		name := ui.Truncate(e.display, max(innerW*3/5, 1))
+		descW := innerW - lipgloss.Width(name) - 2
 		items[i] = ui.OverlayListItem{
-			Name:        ui.Truncate(e.display, innerW),
-			Description: ui.Truncate(e.value, innerW),
+			Name:        name,
+			Description: ui.Truncate(e.value, max(descW, 0)),
 		}
 	}
 	cfg := ui.OverlayListConfig{

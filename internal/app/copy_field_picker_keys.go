@@ -60,10 +60,14 @@ func (m Model) handleCopyFieldPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.cursor = 0
 	case "G", "end":
 		p.cursor = max(n-1, 0)
-	case "ctrl+d", "pgdown", "shift+down":
+	case "ctrl+d":
 		p.cursor = min(p.cursor+visible/2, max(n-1, 0))
-	case "ctrl+u", "pgup", "shift+up":
+	case "ctrl+u":
 		p.cursor = max(p.cursor-visible/2, 0)
+	case "ctrl+f", "pgdown", "shift+down":
+		p.cursor = min(p.cursor+visible, max(n-1, 0))
+	case "ctrl+b", "pgup", "shift+up":
+		p.cursor = max(p.cursor-visible, 0)
 	}
 	m.clampCopyFieldScroll()
 	return m, nil
@@ -83,9 +87,7 @@ func (m Model) handleCopyFieldPickerFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 		// Keep the filter, leave typing mode so j/k navigate the results.
 		p.filterActive = false
 	case "backspace":
-		if p.filter != "" {
-			p.filter = p.filter[:len(p.filter)-1]
-		}
+		p.filter = trimLastRune(p.filter)
 		p.cursor = 0
 		p.scroll = 0
 		m.recomputeCopyFieldVisible()

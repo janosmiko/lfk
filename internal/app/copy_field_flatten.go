@@ -94,12 +94,14 @@ func flattenCopyFields(root any) []copyFieldEntry {
 
 // newCopyFieldEntry builds an entry for the leaf at path, copying the
 // shared path slice (walk reuses its backing array between siblings).
+// The whole display path is sanitized — map keys and selector labels
+// both come from the manifest and could carry control bytes.
 func newCopyFieldEntry(path []copyFieldSeg, v any) copyFieldEntry {
 	p := make([]copyFieldSeg, len(path))
 	copy(p, path)
 	return copyFieldEntry{
 		path:    p,
-		display: formatCopyFieldPath(p),
+		display: copyFieldDisplayValue(formatCopyFieldPath(p)),
 		value:   copyFieldDisplayValue(copyFieldValueString(v)),
 	}
 }
@@ -134,14 +136,13 @@ func uniqueElementSelectors(arr []any) map[int]elementSelector {
 // labeling selector-bearing array segments semantically:
 // status.addresses[ExternalIP].address. Follows the
 // model.FormatObjectPath joining convention (no dot before "[").
-// Labels are display-sanitized — a hostile discriminator value must
-// not inject control bytes into the rendered row.
+// Sanitization of the whole path happens in newCopyFieldEntry.
 func formatCopyFieldPath(path []copyFieldSeg) string {
 	var b strings.Builder
 	for _, s := range path {
 		seg := s.key
 		if s.selVal != "" {
-			seg = "[" + copyFieldDisplayValue(s.selVal) + "]"
+			seg = "[" + s.selVal + "]"
 		}
 		if strings.HasPrefix(seg, "[") {
 			b.WriteString(seg)

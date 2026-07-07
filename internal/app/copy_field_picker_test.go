@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -234,6 +235,44 @@ func TestCopyFieldPicker_TabResetsFilter(t *testing.T) {
 	m.recomputeCopyFieldVisible()
 	m = tabToFields(t, m)
 	assert.Equal(t, "", m.copyFieldPicker.filter, "filter does not carry across modes")
+}
+
+func TestCopyFieldPickerFilter_BackspaceIsRuneSafe(t *testing.T) {
+	m := copyFieldOpenPicker(t, copyFieldTestModel(t))
+	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = mdl.(Model)
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("naïve")})
+	m = mdl.(Model)
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = mdl.(Model)
+	assert.Equal(t, "naïv", m.copyFieldPicker.filter, "backspace removes one rune, not one byte")
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = mdl.(Model)
+	assert.Equal(t, "naï", m.copyFieldPicker.filter, "multibyte rune removed intact")
+}
+
+func TestRenderOverlayCopyField_LongRowsStayWithinWidth(t *testing.T) {
+	m := copyFieldTestModel(t)
+	doc := map[string]any{
+		"kind": "Node",
+		"metadata": map[string]any{
+			"annotations": map[string]any{
+				strings.Repeat("k", 200): strings.Repeat("v", 500),
+			},
+		},
+	}
+	mdl, _, _ := m.handleExplorerActionKeyCopyField()
+	res := mdl.(Model)
+	mdl, _ = res.updateCopyFieldManifests(copyFieldManifestsMsg{docs: []any{doc}, requested: 1, seq: res.copyFieldPicker.seq})
+	res = mdl.(Model)
+	res = tabToFields(t, res)
+
+	content, w, _ := res.renderOverlayCopyField()
+	innerW := w - 4
+	for line := range strings.SplitSeq(stripANSI(content), "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(line), innerW+2,
+			"no row may exceed the overlay content width")
+	}
 }
 
 func TestRenderOverlayCopyField_ColumnsAndFieldsSubtitles(t *testing.T) {

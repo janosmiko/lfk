@@ -131,6 +131,22 @@ func TestFlattenCopyFields_HostileLabelSanitizedInDisplay(t *testing.T) {
 	}
 }
 
+func TestFlattenCopyFields_HostileMapKeySanitizedInDisplay(t *testing.T) {
+	doc := map[string]any{
+		"metadata": map[string]any{
+			"annotations": map[string]any{
+				"evil\x1b[31mkey\ttab": "v",
+			},
+		},
+	}
+	entries := flattenCopyFields(doc)
+	require.NotEmpty(t, entries)
+	for _, e := range entries {
+		assert.NotContains(t, e.display, "\x1b", "map keys are sanitized before display")
+		assert.NotContains(t, e.display, "\t")
+	}
+}
+
 func TestBuildCopyFieldPayload_PreservesRawValue(t *testing.T) {
 	doc := map[string]any{"data": map[string]any{"crt": "line1\nline2"}}
 	entries := flattenCopyFields(doc)
