@@ -23,26 +23,31 @@ func (m Model) renderOverlayTaintEditor() (string, int, int) {
 	p := m.taintEditor
 	maxVisible := m.taintEditorMaxVisible()
 
+	// Marked-for-removal rows carry the app-wide ✓ selection mark (the
+	// explorer's selectionMarker); staged additions override it with a
+	// + (per-item marker overrides follow the namespace overlay's "!"
+	// precedent) plus a dim (new) suffix.
 	items := make([]ui.OverlayListItem, len(p.rows))
 	for i, r := range p.rows {
 		it := ui.OverlayListItem{
-			Name:     taintDisplayString(r.taint),
-			Selected: r.remove,
+			Name:   taintDisplayString(r.taint),
+			Active: r.remove,
 		}
 		if r.staged {
+			it.Active = true
+			it.ActiveMarker = "+"
 			it.Description = "(new)"
 		}
 		items[i] = it
 	}
 	cfg := ui.OverlayListConfig{
-		Title:           "Taints",
-		Subtitle:        p.node,
-		Cursor:          p.cursor,
-		MultiSelect:     true,
-		ShowDescription: true,
-		Scroll:          p.scroll,
-		MaxVisible:      maxVisible,
-		EmptyMessage:    taintEditorEmptyMessage(p),
+		Title:            "Taints — " + p.node,
+		Cursor:           p.cursor,
+		ShowActiveMarker: true,
+		ShowDescription:  true,
+		Scroll:           p.scroll,
+		MaxVisible:       maxVisible,
+		EmptyMessage:     taintEditorEmptyMessage(p),
 	}
 
 	// Fit the box to the widest row (70-col floor, screen-capped), then
@@ -53,8 +58,13 @@ func (m Model) renderOverlayTaintEditor() (string, int, int) {
 		items[i].Name = ui.Truncate(items[i].Name, innerW)
 	}
 
-	content := ui.RenderOverlayList(items, cfg, innerW) +
-		"\n\n" + m.renderTaintEditorAddRow(innerW)
+	content := ui.RenderOverlayList(items, cfg, innerW)
+	// The add-row appears only while its inputs are focused — hotkey
+	// hints (including "a to add") live on the bottom hint bar, never
+	// inside the overlay box.
+	if p.focus != taintFocusList {
+		content += "\n\n" + m.renderTaintEditorAddRow(innerW)
+	}
 	// OverlayStyle's Height covers content + its 1+1 vertical padding.
 	overlayH := min(lipgloss.Height(content)+2, max(m.height-4, 3))
 	return content, overlayW, overlayH
@@ -68,26 +78,24 @@ func (m Model) taintEditorMaxVisible() int {
 }
 
 // taintEditorEmptyMessage explains an empty list: still loading, or a
-// node with no taints.
+// node with no taints. The add hotkey is on the hint bar, not here.
 func taintEditorEmptyMessage(p taintEditorState) string {
 	if p.loading {
 		return "Loading taints..."
 	}
-	return "No taints on this node — press a to add"
+	return "No taints on this node"
 }
 
-// renderTaintEditorAddRow paints the staged-input line. Inactive: a dim
-// "a to add" hint. Active: the three fields with the focused one
-// highlighted and a cursor marker on the text inputs.
+// renderTaintEditorAddRow paints the staged-input line: the three
+// fields with the focused one highlighted and a cursor marker on the
+// text inputs. Rendered only while an input field is focused.
 func (m Model) renderTaintEditorAddRow(innerW int) string {
 	p := m.taintEditor
-	if p.focus == taintFocusList {
-		return ui.OverlayDimStyle.Render(ui.Truncate("a to add a taint", innerW))
-	}
 	field := func(label, val string, focused bool) string {
 		text := label + " [" + val
 		if focused {
-			text += "▏"
+			// Block cursor, matching the kv-editor / secret-editor inputs.
+			text += "█"
 		}
 		text += "]"
 		if focused {
