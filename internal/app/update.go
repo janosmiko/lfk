@@ -327,8 +327,8 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case yamlClipboardMsg:
 		mdl, cmd := m.updateYamlClipboard(msg)
 		return mdl, cmd, true
-	case copyFieldManifestsMsg:
-		mdl, cmd := m.updateCopyFieldManifests(msg)
+	case copyFieldManifestsMsg, taintsLoadedMsg, taintsAppliedMsg:
+		mdl, cmd := m.routeOverlayEditorMsg(msg)
 		return mdl, cmd, true
 	case rbacCheckMsg:
 		mdl, cmd := m.updateRbacCheck(msg)

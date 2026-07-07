@@ -20,7 +20,7 @@ func TestIsMutatingAction(t *testing.T) {
 		"Debug", "Debug Pod", "Debug Mount",
 		"Port Forward",
 		"Cordon", "Uncordon", "Drain",
-		"Taint", "Untaint",
+		"Taints", "Apply Taints",
 		"Trigger", "Stop", "Remove",
 		"Labels / Annotations",
 		"Permissions",

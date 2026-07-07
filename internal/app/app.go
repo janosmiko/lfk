@@ -119,14 +119,14 @@ type Model struct {
 	copyFormatPicker    copyFormatPickerState      // Y-key copy-as picker — see openCopyFormatPicker
 	copyFieldPicker     copyFieldPickerState       // ctrl+y field picker — see updateCopyFieldManifests
 	lastCopyFieldByKind map[string]copyFieldMemory // last entry copied per kind (ctrl+y preselect; session-only, all tabs)
+	taintEditor         taintEditorState           // node taint editor — see openTaintEditor
 
 	namespace string // current namespace (not a navigation level; displayed in top-right)
 
 	// Terminal dimensions.
 	width, height int
 
-	// Error to display.
-	err error
+	err error // error to display
 
 	// Loading indicator.
 	loading bool

@@ -1033,7 +1033,7 @@ The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the H
 `e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
 ### Node Actions
-`c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
+`c` Cordon, `u` Uncordon, `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 ### Longhorn Node Actions
 `e` Evict Replicas, `C` Cancel Eviction, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events, `P` Permissions

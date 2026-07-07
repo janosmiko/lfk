@@ -952,32 +952,14 @@ func TestCovExecuteActionDrain(t *testing.T) {
 	assert.Equal(t, overlayConfirm, rm.overlay)
 }
 
-func TestCovExecuteActionTaint(t *testing.T) {
+func TestCovExecuteActionTaints(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.name = "node-1"
-	result, cmd := m.executeAction("Taint")
+	result, cmd := m.executeAction("Taints")
 	rm := result.(Model)
-	assert.Nil(t, cmd)
-	assert.True(t, rm.commandBarActive)
-}
-
-func TestCovExecuteActionUntaint(t *testing.T) {
-	m := testModelExec()
-	m.actionCtx.name = "node-1"
-	m.actionCtx.columns = []model.KeyValue{{Key: "Taints", Value: "key1=val:NoSchedule, key2:NoExecute"}}
-	result, cmd := m.executeAction("Untaint")
-	rm := result.(Model)
-	assert.Nil(t, cmd)
-	assert.True(t, rm.commandBarActive)
-}
-
-func TestCovExecuteActionUntaintEmpty(t *testing.T) {
-	m := testModelExec()
-	m.actionCtx.name = "node-1"
-	result, cmd := m.executeAction("Untaint")
-	rm := result.(Model)
-	assert.Nil(t, cmd)
-	assert.True(t, rm.commandBarActive)
+	assert.NotNil(t, cmd, "taint fetch dispatched")
+	assert.Equal(t, overlayTaintEditor, rm.overlay)
+	assert.True(t, rm.taintEditor.active)
 }
 
 func TestCovExecuteActionTrigger(t *testing.T) {
@@ -1866,29 +1848,13 @@ func TestFinalExecuteActionDrain(t *testing.T) {
 	assert.Equal(t, "Drain", rm.pendingAction)
 }
 
-func TestFinalExecuteActionTaint(t *testing.T) {
+func TestFinalExecuteActionTaints(t *testing.T) {
 	m := baseFinalModel()
 	m.actionCtx.kind = "Node"
-	result, _ := m.executeAction("Taint")
+	result, _ := m.executeAction("Taints")
 	rm := result.(Model)
-	assert.True(t, rm.commandBarActive)
-}
-
-func TestFinalExecuteActionUntaint(t *testing.T) {
-	m := baseFinalModel()
-	m.actionCtx.kind = "Node"
-	m.actionCtx.columns = []model.KeyValue{{Key: "Taints", Value: "key1=value1:NoSchedule, key2:NoExecute"}}
-	result, _ := m.executeAction("Untaint")
-	rm := result.(Model)
-	assert.True(t, rm.commandBarActive)
-}
-
-func TestFinalExecuteActionUntaintNoTaints(t *testing.T) {
-	m := baseFinalModel()
-	m.actionCtx.kind = "Node"
-	result, _ := m.executeAction("Untaint")
-	rm := result.(Model)
-	assert.True(t, rm.commandBarActive)
+	assert.Equal(t, overlayTaintEditor, rm.overlay)
+	assert.True(t, rm.taintEditor.active)
 }
 
 func TestFinalExecuteActionTrigger(t *testing.T) {

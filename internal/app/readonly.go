@@ -38,8 +38,8 @@ var mutatingActions = map[string]bool{
 	"Cordon":               true,
 	"Uncordon":             true,
 	"Drain":                true,
-	"Taint":                true,
-	"Untaint":              true,
+	"Taints":               true,
+	"Apply Taints":         true, // confirm-overlay pendingAction for the taint editor
 	"Trigger":              true,
 	"Stop":                 true,
 	"Remove":               true,

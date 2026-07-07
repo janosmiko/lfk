@@ -91,6 +91,7 @@ const (
 	overlayLogTopGroupBy      // multi-select group-by field picker for Log Top
 	overlayLogTopProfile      // single-select log format profile picker for Log Top
 	overlayLogTopColumns      // show/hide and reorder column picker for Log Top
+	overlayTaintEditor        // node taint editor (action menu key t on a Node)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

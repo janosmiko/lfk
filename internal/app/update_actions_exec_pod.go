@@ -469,50 +469,6 @@ func (m Model) executeActionDrain() (tea.Model, tea.Cmd) { //nolint:unparam // c
 	return m, nil
 }
 
-// executeActionTaint handles the "Taint" action. The bare "taint" subcommand
-// does not classify as cmdKubectl, so the pre-fill must include the
-// "kubectl" prefix to reach executeKubectlCommand on submit.
-func (m Model) executeActionTaint() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
-	name := m.actionCtx.name
-	m.commandBarActive = true
-	m.commandBarInput.Clear()
-	m.commandBarInput.Insert("kubectl taint node " + name + " ")
-	m.commandBarSuggestions = nil
-	m.commandBarSelectedSuggestion = 0
-	return m, nil
-}
-
-// executeActionUntaint handles the "Untaint" action.
-func (m Model) executeActionUntaint() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
-	name := m.actionCtx.name
-	// Pre-fill with existing taint keys for convenient removal. The
-	// "kubectl" prefix is required so the command classifies as cmdKubectl.
-	var prefill strings.Builder
-	prefill.WriteString("kubectl taint node " + name + " ")
-	for _, col := range m.actionCtx.columns {
-		if col.Key == "Taints" && col.Value != "" {
-			// Parse taint strings and append removal syntax (key-).
-			parts := strings.Split(col.Value, ", ")
-			for i, p := range parts {
-				// Extract just the key from key=value:effect or key:effect.
-				taintKey := strings.SplitN(p, "=", 2)[0]
-				taintKey = strings.SplitN(taintKey, ":", 2)[0]
-				if i > 0 {
-					prefill.WriteString(" ")
-				}
-				prefill.WriteString(taintKey + "-")
-			}
-			break
-		}
-	}
-	m.commandBarActive = true
-	m.commandBarInput.Clear()
-	m.commandBarInput.Insert(prefill.String())
-	m.commandBarSuggestions = nil
-	m.commandBarSelectedSuggestion = 0
-	return m, nil
-}
-
 // executeActionTrigger handles the "Trigger" action.
 func (m Model) executeActionTrigger() (tea.Model, tea.Cmd) {
 	ns := m.actionCtx.namespace
