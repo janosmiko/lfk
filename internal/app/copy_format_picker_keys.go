@@ -1,21 +1,32 @@
 package app
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// copyFormatPickerHints is the copy-as picker's bottom hint bar
-// (kept here to co-locate the feature and keep overlay_hintbar.go
-// under the file-length cap).
-func copyFormatPickerHints() []ui.HintEntry {
-	return []ui.HintEntry{
-		{Key: "j/k", Desc: "navigate"},
-		{Key: "y/J/t", Desc: "shortcut"},
-		{Key: "enter", Desc: "apply"},
-		{Key: "esc", Desc: "cancel"},
+// copyFormatPickerHints is the copy-as picker's bottom hint bar (kept
+// here to co-locate the feature and keep overlay_hintbar.go under the
+// file-length cap). The shortcut chip is built from the open picker's
+// actual formats so it cannot drift from the ShortcutKey dispatch.
+func (m Model) copyFormatPickerHints() []ui.HintEntry {
+	keys := make([]string, 0, len(m.copyFormatPicker.formats))
+	for _, f := range m.copyFormatPicker.formats {
+		if k := f.ShortcutKey(); k != "" {
+			keys = append(keys, k)
+		}
 	}
+	hints := []ui.HintEntry{{Key: "j/k", Desc: "navigate"}}
+	if len(keys) > 0 {
+		hints = append(hints, ui.HintEntry{Key: strings.Join(keys, "/"), Desc: "shortcut"})
+	}
+	return append(hints,
+		ui.HintEntry{Key: "enter", Desc: "apply"},
+		ui.HintEntry{Key: "esc", Desc: "cancel"},
+	)
 }
 
 // handleCopyFormatPickerKey routes key events to the active copy-as
