@@ -62,7 +62,14 @@ func NewCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 func completeUnionContextFlag(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	kubeconfig, _ := cmd.Flags().GetString("kubeconfig")
 	kubeconfigDirs, _ := cmd.Flags().GetStringArray("kubeconfig-dir")
-	completions, err := completeKubeContexts(kubeconfig, kubeconfigDirs, selectedUnionContexts(cmd), toComplete)
+	// Completion runs without the config file; resolve exclusivity from
+	// the flag and env only, defaulting to exclusive like the app.
+	exclusiveFlag, _ := cmd.Flags().GetBool("kubeconfig-exclusive")
+	kubeconfigExclusive := k8s.ResolveKubeconfigExclusive(
+		cmd.Flags().Changed("kubeconfig-exclusive"), exclusiveFlag,
+		os.Getenv("LFK_KUBECONFIG_EXCLUSIVE"), true,
+	)
+	completions, err := completeKubeContexts(kubeconfig, kubeconfigDirs, kubeconfigExclusive, selectedUnionContexts(cmd), toComplete)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -92,8 +99,8 @@ func selectedUnionContexts(cmd *cobra.Command) map[string]struct{} {
 	return selected
 }
 
-func completeKubeContexts(kubeconfigOverride string, kubeconfigDirs []string, selected map[string]struct{}, prefix string) ([]string, error) {
-	client, err := k8s.NewClient(kubeconfigOverride, kubeconfigDirs)
+func completeKubeContexts(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExclusive bool, selected map[string]struct{}, prefix string) ([]string, error) {
+	client, err := k8s.NewClient(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive)
 	if err != nil {
 		return nil, err
 	}

@@ -41,6 +41,7 @@ File locations:
   Logs:   ~/.local/share/lfk/lfk.log  (or $XDG_DATA_HOME/lfk/lfk.log)
   Override dirs for portable installs: LFK_CONFIG_DIR, LFK_STATE_DIR, LFK_DATA_DIR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cliOpts.KubeconfigExclusiveSet = cmd.Flags().Changed("kubeconfig-exclusive")
 			return runTUI(cliOpts)
 		},
 		// Silence cobra's own usage/error printing so the TUI is not disrupted.
@@ -53,6 +54,7 @@ File locations:
 	rootCmd.Flags().StringVar(&cliOpts.UnionSet, "union-set", "", "Named union_sets entry from config to expand into a union view (mutex with --union-context and --context; --namespace overrides the set's namespace)")
 	rootCmd.Flags().StringSliceVarP(&cliOpts.Namespaces, "namespace", "n", nil, "Namespace(s) to filter (repeatable, disables all-namespaces mode)")
 	rootCmd.Flags().StringVar(&cliOpts.Kubeconfig, "kubeconfig", "", "Path to kubeconfig file (overrides default discovery)")
+	rootCmd.Flags().BoolVar(&cliOpts.KubeconfigExclusive, "kubeconfig-exclusive", true, "When KUBECONFIG is set, load only the files it lists (kubectl semantics) and skip ~/.kube/config and the default ~/.kube/config.d/ scan. Pass --kubeconfig-exclusive=false to merge everything like older releases. Also configurable as kubeconfig_exclusive in config or the LFK_KUBECONFIG_EXCLUSIVE env var.")
 	rootCmd.Flags().StringArrayVar(&cliOpts.KubeconfigDirs, "kubeconfig-dir", nil, "Directory to scan for kubeconfig files instead of ~/.kube/config.d/. Repeatable: pass multiple flags to merge several directories. Also accepts KUBECONFIG_DIR env var (colon-separated). ~/ is expanded against $HOME.")
 	rootCmd.Flags().StringVarP(&cliOpts.Config, "config", "c", "", "Path to config file (overrides default ~/.config/lfk/config.yaml)")
 	rootCmd.Flags().BoolVar(&cliOpts.NoMouse, "no-mouse", false, "Disable mouse capture (enables native terminal text selection)")
@@ -116,7 +118,12 @@ func runTUI(opts app.StartupOptions) error {
 		return err
 	}
 
-	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDirs)
+	kubeconfigExclusive := k8s.ResolveKubeconfigExclusive(
+		opts.KubeconfigExclusiveSet, opts.KubeconfigExclusive,
+		os.Getenv("LFK_KUBECONFIG_EXCLUSIVE"), ui.ConfigKubeconfigExclusive,
+	)
+
+	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDirs, kubeconfigExclusive)
 	if err != nil {
 		return fmt.Errorf("initializing Kubernetes client: %w", err)
 	}

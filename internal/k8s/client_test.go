@@ -780,31 +780,6 @@ func TestExtractGenericConditions(t *testing.T) {
 	})
 }
 
-// --- containsPath ---
-
-func TestContainsPath(t *testing.T) {
-	tests := []struct {
-		name   string
-		paths  []string
-		target string
-		want   bool
-	}{
-		{"found at beginning", []string{"/a", "/b", "/c"}, "/a", true},
-		{"found in middle", []string{"/a", "/b", "/c"}, "/b", true},
-		{"found at end", []string{"/a", "/b", "/c"}, "/c", true},
-		{"not found", []string{"/a", "/b", "/c"}, "/d", false},
-		{"empty list", []string{}, "/a", false},
-		{"nil list", nil, "/a", false},
-		{"exact match required", []string{"/home/user/.kube/config"}, "/home/user/.kube", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, containsPath(tt.paths, tt.target))
-		})
-	}
-}
-
 // --- buildKubeconfigPaths ---
 
 func TestBuildKubeconfigPaths(t *testing.T) {
@@ -816,7 +791,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 			t.Setenv("KUBECONFIG", origKubeconfig)
 		}()
 
-		paths := buildKubeconfigPaths(nil)
+		paths := buildKubeconfigPaths(nil, true)
 
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -836,13 +811,15 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", cfg1+string(os.PathListSeparator)+cfg2)
 
-		paths := buildKubeconfigPaths(nil)
+		paths := buildKubeconfigPaths(nil, true)
 
 		assert.Contains(t, paths, cfg1)
 		assert.Contains(t, paths, cfg2)
 	})
 
-	t.Run("does not duplicate default path when in KUBECONFIG", func(t *testing.T) {
+	t.Run("dedups default path against KUBECONFIG when exclusivity is disabled", func(t *testing.T) {
+		// Only meaningful in merge mode: with exclusivity on the default
+		// path is never appended in the first place.
 		home, err := os.UserHomeDir()
 		if err != nil {
 			t.Skip("cannot determine home directory")
@@ -851,7 +828,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", defaultPath)
 
-		paths := buildKubeconfigPaths(nil)
+		paths := buildKubeconfigPaths(nil, false)
 
 		count := 0
 		for _, p := range paths {
@@ -860,6 +837,117 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 			}
 		}
 		assert.Equal(t, 1, count, "default path should appear exactly once")
+	})
+
+	t.Run("excludes default config and config.d when KUBECONFIG is set", func(t *testing.T) {
+		// kubectl/k9s semantics: when KUBECONFIG is set, the default
+		// ~/.kube/config and the auto-scanned ~/.kube/config.d/ must NOT be
+		// merged in. Point HOME at a temp dir seeded with both so we can prove
+		// they are absent from the result.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		defaultPath := filepath.Join(tmpHome, ".kube", "config")
+		configD := filepath.Join(tmpHome, ".kube", "config.d")
+		assert.NoError(t, os.MkdirAll(configD, 0o755))
+		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
+		configDCfg := filepath.Join(configD, "seeded-cluster")
+		assert.NoError(t, os.WriteFile(configDCfg, []byte(""), 0o600))
+
+		tmpDir := t.TempDir()
+		env := filepath.Join(tmpDir, "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		paths := buildKubeconfigPaths(nil, true)
+
+		assert.Equal(t, []string{env}, paths,
+			"KUBECONFIG must fully determine the file list, excluding ~/.kube/config and config.d")
+	})
+
+	t.Run("merges explicit dirs under exclusive KUBECONFIG", func(t *testing.T) {
+		// Explicit --kubeconfig-dir / KUBECONFIG_DIR / config values are a
+		// deliberate opt-in, so they remain merged even under KUBECONFIG's
+		// otherwise-exclusive semantics. Only the implicit ~/.kube/config.d
+		// default is dropped.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+
+		tmpDir := t.TempDir()
+		env := filepath.Join(tmpDir, "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		explicitDir := t.TempDir()
+		dirCfg := filepath.Join(explicitDir, "team-cluster")
+		assert.NoError(t, os.WriteFile(dirCfg, []byte(""), 0o600))
+
+		paths := buildKubeconfigPaths([]string{explicitDir}, true)
+
+		resolvedDirCfg, err := filepath.EvalSymlinks(dirCfg)
+		assert.NoError(t, err)
+		assert.Contains(t, paths, env, "KUBECONFIG file must be present")
+		assert.Contains(t, paths, resolvedDirCfg,
+			"explicitly requested directory must still be merged under KUBECONFIG")
+	})
+
+	t.Run("merges default config and config.d when exclusivity is disabled", func(t *testing.T) {
+		// kubeconfig_exclusive=false restores the pre-exclusivity merge
+		// behavior: KUBECONFIG plus the default file plus config.d.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		defaultPath := filepath.Join(tmpHome, ".kube", "config")
+		configD := filepath.Join(tmpHome, ".kube", "config.d")
+		assert.NoError(t, os.MkdirAll(configD, 0o755))
+		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
+		seeded := filepath.Join(configD, "seeded-cluster")
+		assert.NoError(t, os.WriteFile(seeded, []byte(""), 0o600))
+
+		env := filepath.Join(t.TempDir(), "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		paths := buildKubeconfigPaths(nil, false)
+
+		resolvedSeeded, err := filepath.EvalSymlinks(seeded)
+		assert.NoError(t, err)
+		assert.Contains(t, paths, env)
+		assert.Contains(t, paths, defaultPath, "default config merged in non-exclusive mode")
+		assert.Contains(t, paths, resolvedSeeded, "config.d merged in non-exclusive mode")
+	})
+
+	t.Run("drops empty KUBECONFIG entries and falls back when none remain", func(t *testing.T) {
+		// A stray "KUBECONFIG=:" (or trailing colon) must not produce empty
+		// path entries — and an all-empty value counts as unset, so the
+		// default discovery still applies instead of loading zero clusters.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		defaultPath := filepath.Join(tmpHome, ".kube", "config")
+		assert.NoError(t, os.MkdirAll(filepath.Dir(defaultPath), 0o755))
+		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
+
+		t.Setenv("KUBECONFIG", ":")
+		paths := buildKubeconfigPaths(nil, true)
+		assert.NotContains(t, paths, "", "no empty path entries")
+		assert.Contains(t, paths, defaultPath, "all-empty KUBECONFIG behaves as unset")
+
+		env := filepath.Join(t.TempDir(), "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env+string(os.PathListSeparator))
+		paths = buildKubeconfigPaths(nil, true)
+		assert.Equal(t, []string{env}, paths, "trailing separator adds no empty entry")
+	})
+
+	t.Run("prefers the --kubeconfig override over everything", func(t *testing.T) {
+		env := filepath.Join(t.TempDir(), "env-config")
+		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		override := filepath.Join(t.TempDir(), "override-config")
+		assert.NoError(t, os.WriteFile(override, []byte(""), 0o600))
+
+		paths := resolveKubeconfigPaths(override, []string{t.TempDir()}, true)
+		assert.Equal(t, []string{override}, paths,
+			"--kubeconfig short-circuits KUBECONFIG, dirs, and defaults")
 	})
 
 	t.Run("includes files from config.d directory", func(t *testing.T) {
@@ -875,7 +963,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		// and returns at least the default path.
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths(nil)
+		paths := buildKubeconfigPaths(nil, true)
 
 		assert.NotEmpty(t, paths, "should return at least the default kubeconfig path")
 	})
@@ -888,7 +976,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		via := filepath.Join(tmpDir, ".", "config.yaml")
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+via)
 
-		paths := buildKubeconfigPaths(nil)
+		paths := buildKubeconfigPaths(nil, true)
 		count := 0
 		for _, p := range paths {
 			if p == cfg || p == via {
@@ -912,7 +1000,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.Symlink(cfg, viaSymlink))
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+viaSymlink)
 
-		paths := buildKubeconfigPaths(nil)
+		paths := buildKubeconfigPaths(nil, true)
 		// Both entries point at the same underlying file; only one should
 		// remain after dedup. Compare via EvalSymlinks on both sides so
 		// we don't trip over /tmp → /private/tmp on macOS.
@@ -941,7 +1029,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{customDir})
+		paths := buildKubeconfigPaths([]string{customDir}, true)
 		// collectConfigDirPaths resolves symlinks, so on macOS /tmp may
 		// become /private/tmp — compare via EvalSymlinks to avoid failing.
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
@@ -961,7 +1049,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{"~/custom-k8s"})
+		paths := buildKubeconfigPaths([]string{"~/custom-k8s"}, true)
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
@@ -979,7 +1067,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(cfgA, []byte(""), 0o600))
 		assert.NoError(t, os.WriteFile(cfgB, []byte(""), 0o600))
 
-		paths := buildKubeconfigPaths([]string{dirA, dirB})
+		paths := buildKubeconfigPaths([]string{dirA, dirB}, true)
 
 		resA, _ := filepath.EvalSymlinks(cfgA)
 		resB, _ := filepath.EvalSymlinks(cfgB)
@@ -998,7 +1086,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		extraCfg := filepath.Join(customDir, "extra-cluster")
 		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
 
-		paths := buildKubeconfigPaths([]string{customDir})
+		paths := buildKubeconfigPaths([]string{customDir}, true)
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
@@ -1013,7 +1101,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		t.Setenv("USERPROFILE", "")
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{"~/some/dir"})
+		paths := buildKubeconfigPaths([]string{"~/some/dir"}, true)
 		// Result is whatever KUBECONFIG provides (empty here); the tilde
 		// path is silently skipped because expansion isn't possible.
 		for _, p := range paths {
@@ -1185,7 +1273,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("", nil)
+	client, err := NewClient("", nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1280,7 +1368,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("", nil)
+	client, err := NewClient("", nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1379,7 +1467,7 @@ users:
 	t.Setenv("KUBECONFIG",
 		dev+string(os.PathListSeparator)+itg+string(os.PathListSeparator)+prod)
 
-	client, err := NewClient("", nil)
+	client, err := NewClient("", nil, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1655,7 +1743,7 @@ users:
 
 			t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
 
-			client, err := NewClient("", nil)
+			client, err := NewClient("", nil, true)
 			assert.NoError(t, err)
 			assert.NotNil(t, client)
 
@@ -1831,4 +1919,32 @@ func TestFormatRelativeTime(t *testing.T) {
 		result := formatRelativeTime(time.Now().Add(-24 * time.Hour))
 		assert.Contains(t, result, "d ago")
 	})
+}
+
+// --- ResolveKubeconfigExclusive ---
+
+func TestResolveKubeconfigExclusive(t *testing.T) {
+	tests := []struct {
+		name      string
+		cliSet    bool
+		cliValue  bool
+		envValue  string
+		configVal bool
+		want      bool
+	}{
+		{"defaults to config value", false, false, "", true, true},
+		{"config can disable", false, false, "", false, false},
+		{"env overrides config", false, false, "false", true, false},
+		{"env enables over config", false, false, "true", false, true},
+		{"env accepts 1/0", false, false, "0", true, false},
+		{"invalid env falls through", false, false, "yep", true, true},
+		{"cli beats env and config", true, true, "false", false, true},
+		{"cli can disable", true, false, "true", true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ResolveKubeconfigExclusive(tt.cliSet, tt.cliValue, tt.envValue, tt.configVal)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

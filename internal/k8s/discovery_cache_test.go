@@ -259,7 +259,7 @@ users:
 
 	t.Setenv("KUBECONFIG", kubeconfig)
 
-	c, err := NewClient("", nil)
+	c, err := NewClient("", nil, true)
 	require.NoError(t, err)
 	return c
 }

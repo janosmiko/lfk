@@ -81,7 +81,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), `KUBECONFIG` env var, and `KUBECONFIG_DIR` env var.
+- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG_DIR` env var. The `KUBECONFIG` env var is exclusive like kubectl — when set it replaces `~/.kube/config` and the default `config.d/` scan (explicit `--kubeconfig-dir`/`KUBECONFIG_DIR` still merge); opt out with `kubeconfig_exclusive: false`.
 - **Union view**: Merge resources from multiple clusters into a single table with a `Context` column identifying the source, via `--union-context` (repeatable) or a named `--union-set` from config. See [Union View](docs/union-context.md).
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
