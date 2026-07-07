@@ -388,3 +388,64 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.Contains(t, out, "Stale")
 	})
 }
+
+// --- row width invariant ---
+
+// Rows must never exceed innerW, no matter how long a caller-supplied
+// Name/Description is — an overlong row wraps inside the overlay box,
+// shifting every row below it and desyncing the per-row scrollbar
+// (observed with multi-KB annotation values in the copy-field picker).
+func TestRenderOverlayList_RowsNeverExceedInnerWidth(t *testing.T) {
+	long := strings.Repeat("x", 300)
+	mk := func(n int) []OverlayListItem {
+		items := make([]OverlayListItem, n)
+		for i := range items {
+			items[i] = OverlayListItem{Name: long, Description: long}
+		}
+		return items
+	}
+	const innerW = 80
+
+	t.Run("overflowing list with scrollbar", func(t *testing.T) {
+		cfg := OverlayListConfig{
+			Title:           "T",
+			Cursor:          2,
+			ShowDescription: true,
+			MaxVisible:      5,
+		}
+		out := RenderOverlayList(mk(20), cfg, innerW)
+		for i, line := range strings.Split(out, "\n") {
+			require.LessOrEqualf(t, lipgloss.Width(line), innerW,
+				"line %d wider than innerW", i)
+		}
+	})
+
+	t.Run("short list without scrollbar", func(t *testing.T) {
+		cfg := OverlayListConfig{Cursor: 0, ShowDescription: true}
+		out := RenderOverlayList(mk(3), cfg, innerW)
+		for i, line := range strings.Split(out, "\n") {
+			require.LessOrEqualf(t, lipgloss.Width(line), innerW,
+				"line %d wider than innerW", i)
+		}
+	})
+
+	t.Run("cursor row with badge and multiselect", func(t *testing.T) {
+		items := mk(12)
+		for i := range items {
+			items[i].Selected = i%2 == 0
+			items[i].Badge = "##"
+		}
+		cfg := OverlayListConfig{
+			Cursor:          4,
+			MultiSelect:     true,
+			ShowDescription: true,
+			MaxVisible:      6,
+			BadgeWidth:      2,
+		}
+		out := RenderOverlayList(items, cfg, innerW)
+		for i, line := range strings.Split(out, "\n") {
+			require.LessOrEqualf(t, lipgloss.Width(line), innerW,
+				"line %d wider than innerW", i)
+		}
+	})
+}
