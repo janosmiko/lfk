@@ -530,11 +530,8 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Drain":
 		mdl, cmd := m.executeActionDrain()
 		return mdl, cmd, true
-	case "Taint":
-		mdl, cmd := m.executeActionTaint()
-		return mdl, cmd, true
-	case "Untaint":
-		mdl, cmd := m.executeActionUntaint()
+	case "Taints":
+		mdl, cmd := m.openTaintEditor()
 		return mdl, cmd, true
 	case "Trigger":
 		mdl, cmd := m.executeActionTrigger()

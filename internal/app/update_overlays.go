@@ -257,6 +257,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayCopyFormat:
 		mdl, cmd := m.handleCopyFormatPickerKey(msg)
 		return mdl, cmd, true
+	case overlayTaintEditor:
+		mdl, cmd := m.handleTaintEditorKey(msg)
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }

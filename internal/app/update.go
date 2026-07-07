@@ -327,6 +327,9 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case yamlClipboardMsg:
 		mdl, cmd := m.updateYamlClipboard(msg)
 		return mdl, cmd, true
+	case taintsLoadedMsg, taintsAppliedMsg:
+		mdl, cmd := m.routeTaintMsg(msg)
+		return mdl, cmd, true
 	case rbacCheckMsg:
 		mdl, cmd := m.updateRbacCheck(msg)
 		return mdl, cmd, true

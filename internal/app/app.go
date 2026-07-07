@@ -117,9 +117,9 @@ type Model struct {
 	overlayFilter    TextInput    // typed filter text
 	overlayCursor    int
 	copyFormatPicker copyFormatPickerState // Y-key copy-as picker — see openCopyFormatPicker
+	taintEditor      taintEditorState      // node taint editor — see openTaintEditor
 
-	// Namespace (not a navigation level; displayed in top-right).
-	namespace string
+	namespace string // current namespace (not a navigation level; displayed in top-right)
 
 	// Terminal dimensions.
 	width  int

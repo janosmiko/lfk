@@ -35,6 +35,10 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.confirmTitle = ""
 		m.confirmQuestion = ""
 
+		if action == "Apply Taints" {
+			return m, m.applyTaintEditor()
+		}
+
 		ns := m.actionCtx.namespace
 		name := m.actionCtx.name
 		ctx := m.actionCtx.context
@@ -91,12 +95,18 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.deleteResource()
 	case "n", "N", "esc", "q":
+		// A cancelled taint-apply returns to the still-alive editor so
+		// the staged marks are not lost.
+		returnToTaints := m.pendingAction == "Apply Taints" && m.taintEditor.active
 		m.overlay = overlayNone
 		m.confirmAction = ""
 		m.confirmTitle = ""
 		m.confirmQuestion = ""
 		m.pendingAction = ""
 		m.resetBulkAction()
+		if returnToTaints {
+			m.overlay = overlayTaintEditor
+		}
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()

@@ -317,6 +317,9 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 	case overlayCopyFormat:
 		c, w, h := m.renderOverlayCopyFormat()
 		return c, w, h, true
+	case overlayTaintEditor:
+		c, w, h := m.renderOverlayTaintEditor()
+		return c, w, h, true
 	case overlayLogTopGroupBy:
 		c, w, h := m.renderLogTopGroupByOverlay()
 		return c, w, h, true
