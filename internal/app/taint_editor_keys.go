@@ -36,6 +36,9 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			p.rows = slices.Delete(slices.Clone(p.rows), p.cursor, p.cursor+1)
 		} else {
 			p.rows[p.cursor].remove = !p.rows[p.cursor].remove
+			// Advance to the next row after a toggle, mirroring the
+			// explorer's space behavior (clamped by the scroll clamp).
+			p.cursor++
 		}
 	case "j", "down":
 		if p.cursor < n-1 {

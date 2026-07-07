@@ -105,12 +105,20 @@ func TestUpdateTaintsLoaded_ErrorClosesWithStatus(t *testing.T) {
 	assert.True(t, res.statusMessageErr)
 }
 
-func TestTaintEditor_SpaceTogglesRemovalMark(t *testing.T) {
+func TestTaintEditor_SpaceTogglesRemovalMarkAndAdvancesCursor(t *testing.T) {
 	m := openTaintEditorLoaded(t, taintEditorTestModel())
+	require.Equal(t, 0, m.taintEditor.cursor)
 	m = taintKey(t, m, "space")
 	assert.True(t, m.taintEditor.rows[0].remove)
+	assert.Equal(t, 1, m.taintEditor.cursor, "cursor advances after toggle, like the explorer")
+
+	// On the last row the cursor stays clamped.
 	m = taintKey(t, m, "space")
-	assert.False(t, m.taintEditor.rows[0].remove)
+	assert.True(t, m.taintEditor.rows[1].remove)
+	assert.Equal(t, 1, m.taintEditor.cursor)
+
+	m = taintKey(t, m, "space")
+	assert.False(t, m.taintEditor.rows[1].remove, "space still toggles off")
 }
 
 func TestTaintEditor_AddFlowStagesTaint(t *testing.T) {
