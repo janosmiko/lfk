@@ -104,15 +104,6 @@ func (m Model) handleTaintEditorAddKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// trimLastRune drops the final rune (multibyte-safe backspace).
-func trimLastRune(s string) string {
-	if s == "" {
-		return s
-	}
-	r := []rune(s)
-	return string(r[:len(r)-1])
-}
-
 // stageTaintAddition validates the add-row inputs and appends a staged
 // [+] row. Invalid input keeps the row open for correction; a
 // duplicate key+effect (existing or staged) is rejected — the node
