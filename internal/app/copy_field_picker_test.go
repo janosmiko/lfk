@@ -161,6 +161,30 @@ func TestApplyCopyFieldPicker_ColumnValue(t *testing.T) {
 		res.lastCopyFieldByKind["Node"])
 }
 
+func TestApplyCopyFieldPicker_ColumnValuePartialMissIsCounted(t *testing.T) {
+	m := copyFieldTestModel(t)
+	m.middleItems = []model.Item{
+		{Name: "worker-1", Status: "Ready"},
+		{Name: "worker-2"}, // no Status — must be skipped and counted
+	}
+	m.selectedItems = map[string]bool{
+		selectionKey(m.middleItems[0]): true,
+		selectionKey(m.middleItems[1]): true,
+	}
+	mdl, _, _ := m.handleExplorerActionKeyCopyField()
+	res := mdl.(Model)
+
+	res.copyFieldPicker.filter = "status"
+	res.recomputeCopyFieldVisible()
+	res.copyFieldPicker.cursor = 0
+	mdl, cmd := res.applyCopyFieldPicker()
+	res = mdl.(Model)
+
+	assert.NotNil(t, cmd)
+	assert.Contains(t, res.statusMessage, "1 values")
+	assert.Contains(t, res.statusMessage, "1 missing")
+}
+
 func TestApplyCopyFieldPicker_FieldValueRemembersPerKind(t *testing.T) {
 	m := copyFieldOpenPicker(t, copyFieldTestModel(t))
 	m = tabToFields(t, m)

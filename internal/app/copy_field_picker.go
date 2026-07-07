@@ -293,7 +293,7 @@ func (m Model) applyCopyFieldPicker() (tea.Model, tea.Cmd) {
 
 	var payload string
 	var found, missing int
-	if entry.column != "" {
+	if mode == copyFieldModeColumns {
 		payload, found, missing = buildCopyFieldColumnPayload(m.copyFieldPicker.scope, entry.column)
 	} else {
 		payload, found, missing = buildCopyFieldPayload(m.copyFieldPicker.docs, entry.path)

@@ -87,16 +87,8 @@ func ObjectElementLabel(v any) (key, val string) {
 // elementName returns a friendly label for an array element that is a map,
 // using the first of objectNameKeys that resolves to a non-empty scalar.
 func elementName(v any) string {
-	m, ok := v.(map[string]any)
-	if !ok {
-		return ""
-	}
-	for _, k := range objectNameKeys {
-		if s := scalarString(m[k]); s != "" {
-			return s
-		}
-	}
-	return ""
+	_, val := ObjectElementLabel(v)
+	return val
 }
 
 // ObjectFieldHasChildren reports whether v is a non-empty map or array (i.e.
