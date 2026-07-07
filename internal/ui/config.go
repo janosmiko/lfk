@@ -173,6 +173,12 @@ var ConfigLogPath string
 // normalised into this slice. Empty (nil) means "no override; use the default".
 var ConfigKubeconfigDirs []string
 
+// ConfigKubeconfigExclusive holds kubeconfig_exclusive from the config file:
+// whether a set KUBECONFIG suppresses the default kubeconfig discovery
+// (kubectl semantics). Defaults to true; CLI flag and env override it at
+// client construction (see k8s.ResolveKubeconfigExclusive).
+var ConfigKubeconfigExclusive = true
+
 // kubeconfigDirsSetting holds the parsed kubeconfig_dir config value. It accepts
 // either a string (single directory) or a list of strings (multiple directories
 // to merge). Resolved during LoadConfig and stored in ConfigKubeconfigDirs.

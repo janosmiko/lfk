@@ -173,6 +173,12 @@ log_path: /tmp/lfk.log
 #   - /team-a/configs
 #   - /team-b/configs
 
+# When KUBECONFIG is set, lfk loads only the files it lists (kubectl
+# semantics) and skips ~/.kube/config plus the default ~/.kube/config.d
+# scan. Set to false to merge everything like releases before 0.15.
+# Overridden by --kubeconfig-exclusive and LFK_KUBECONFIG_EXCLUSIVE.
+# kubeconfig_exclusive: true
+
 # Default Log Top parser profile (auto-detect when "auto").
 # Valid: auto, traefik-json, ingress-nginx, nginx-combined, envoy, json, logfmt.
 # log_top_default_profile: auto

@@ -301,18 +301,17 @@ func (c *Client) Shutdown() {
 }
 
 // NewClient creates a new Kubernetes client, loading configs from:
-//  1. KUBECONFIG env var. When set, it is exclusive (kubectl/k9s semantics):
-//     steps 2 and the default of step 3 are skipped.
-//  2. ~/.kube/config (only when KUBECONFIG is unset).
+//  1. KUBECONFIG env var. When set and kubeconfigExclusive is true (the
+//     default), it is exclusive (kubectl/k9s semantics): step 2 and the
+//     default of step 3 are skipped.
+//  2. ~/.kube/config (skipped under an exclusive KUBECONFIG).
 //  3. All files in each kubeconfigDirs entry (recursively; symlinks to directories are followed).
-//     Defaults to [~/.kube/config.d/] when the slice is empty and KUBECONFIG is unset.
-func NewClient(kubeconfigOverride string, kubeconfigDirs []string) (*Client, error) {
-	var kubeconfigPaths []string
-	if kubeconfigOverride != "" {
-		kubeconfigPaths = []string{kubeconfigOverride}
-	} else {
-		kubeconfigPaths = buildKubeconfigPaths(kubeconfigDirs)
-	}
+//     Defaults to [~/.kube/config.d/] when the slice is empty and no exclusive KUBECONFIG applies.
+//
+// kubeconfigOverride (--kubeconfig) beats everything: when non-empty it is
+// the only file loaded.
+func NewClient(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExclusive bool) (*Client, error) {
+	kubeconfigPaths := resolveKubeconfigPaths(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive)
 
 	loadingRules := &clientcmd.ClientConfigLoadingRules{
 		Precedence: kubeconfigPaths,

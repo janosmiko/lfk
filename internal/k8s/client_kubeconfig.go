@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -236,28 +236,30 @@ func contextDisplayHint(path string) string {
 //     directory is honored even when home lookup fails — the only reason to
 //     require a home directory is for tilde expansion or the default fallback.
 //
-// KUBECONFIG is exclusive, matching kubectl/k9s: when it is set, lfk does NOT
-// add the default ~/.kube/config, nor auto-scan the default ~/.kube/config.d/.
-// Only directories the user explicitly requested (--kubeconfig-dir /
-// KUBECONFIG_DIR / kubeconfig_dir) are still merged on top, because those are
-// deliberate opt-ins rather than implicit defaults.
-func buildKubeconfigPaths(kubeconfigDirs []string) []string {
+// KUBECONFIG is exclusive by default, matching kubectl/k9s: when it is set
+// (and `exclusive` is true), lfk does NOT add the default ~/.kube/config,
+// nor auto-scan the default ~/.kube/config.d/. Only directories the user
+// explicitly requested (--kubeconfig-dir / KUBECONFIG_DIR / kubeconfig_dir)
+// are still merged on top, because those are deliberate opt-ins rather than
+// implicit defaults. Passing exclusive=false (kubeconfig_exclusive: false /
+// --kubeconfig-exclusive=false / LFK_KUBECONFIG_EXCLUSIVE=false) restores
+// the historical merge-everything behavior.
+func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool) []string {
 	var paths []string
 
-	// KUBECONFIG env var (colon-separated on unix).
-	kubeconfigSet := os.Getenv("KUBECONFIG") != ""
-	if kubeconfigSet {
-		paths = append(paths, filepath.SplitList(os.Getenv("KUBECONFIG"))...)
-	}
+	// KUBECONFIG env var (colon-separated on unix). Empty entries (a stray
+	// "KUBECONFIG=:" or a trailing colon) are dropped; when nothing
+	// non-empty remains the variable counts as unset, so the default
+	// discovery still applies instead of silently loading zero clusters.
+	envPaths := trimNonEmpty(filepath.SplitList(os.Getenv("KUBECONFIG")))
+	paths = append(paths, envPaths...)
+	kubeconfigExclusive := exclusive && len(envPaths) > 0
 
 	home, homeErr := os.UserHomeDir()
-	if homeErr == nil && !kubeconfigSet {
-		// Default kubeconfig — skipped entirely when KUBECONFIG is set so lfk
-		// mirrors kubectl's exclusive semantics.
-		defaultPath := filepath.Join(home, ".kube", "config")
-		if !containsPath(paths, defaultPath) {
-			paths = append(paths, defaultPath)
-		}
+	if homeErr == nil && !kubeconfigExclusive {
+		// Default kubeconfig. The dedup pass below collapses it when
+		// KUBECONFIG already lists the same file.
+		paths = append(paths, filepath.Join(home, ".kube", "config"))
 		// Fall back to the default discovery directory when no override.
 		if len(kubeconfigDirs) == 0 {
 			kubeconfigDirs = []string{filepath.Join(home, ".kube", "config.d")}
@@ -440,6 +442,27 @@ func ValidateKubeconfigDir(path string) error {
 	return nil
 }
 
-func containsPath(paths []string, target string) bool {
-	return slices.Contains(paths, target)
+// resolveKubeconfigPaths returns the kubeconfig file list for NewClient:
+// an explicit --kubeconfig override wins outright; otherwise discovery
+// runs via buildKubeconfigPaths.
+func resolveKubeconfigPaths(override string, kubeconfigDirs []string, exclusive bool) []string {
+	if override != "" {
+		return []string{override}
+	}
+	return buildKubeconfigPaths(kubeconfigDirs, exclusive)
+}
+
+// ResolveKubeconfigExclusive resolves whether a set KUBECONFIG suppresses
+// the default discovery: the CLI flag (when explicitly passed) wins, then
+// the LFK_KUBECONFIG_EXCLUSIVE env var, then the config file's
+// kubeconfig_exclusive value (which defaults to true). Unparsable env
+// values fall through.
+func ResolveKubeconfigExclusive(cliSet, cliValue bool, envValue string, configValue bool) bool {
+	if cliSet {
+		return cliValue
+	}
+	if v, err := strconv.ParseBool(strings.TrimSpace(envValue)); err == nil {
+		return v
+	}
+	return configValue
 }

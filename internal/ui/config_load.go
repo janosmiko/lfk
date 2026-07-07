@@ -238,6 +238,14 @@ type configFile struct {
 	// precedence (repeatable), then the KUBECONFIG_DIR env var (colon-separated),
 	// then this config value.
 	KubeconfigDir *kubeconfigDirsSetting `json:"kubeconfig_dir" yaml:"kubeconfig_dir"`
+
+	// KubeconfigExclusive controls whether a set KUBECONFIG env var
+	// suppresses the default discovery (~/.kube/config and the
+	// ~/.kube/config.d scan), matching kubectl. Defaults to true; set
+	// false to restore the historical merge-everything behavior. The
+	// --kubeconfig-exclusive CLI flag, then LFK_KUBECONFIG_EXCLUSIVE,
+	// take precedence over this value.
+	KubeconfigExclusive *bool `json:"kubeconfig_exclusive" yaml:"kubeconfig_exclusive"`
 	// UnionSets defines named multi-cluster groups for the --union-set CLI
 	// flag. Each set bundles a list of contexts and an optional default
 	// namespace so users don't have to retype long --union-context lists

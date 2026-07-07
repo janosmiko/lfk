@@ -34,6 +34,11 @@
         { "type": "null" }
       ]
     },
+    "kubeconfig_exclusive": {
+      "type": "boolean",
+      "default": true,
+      "description": "When KUBECONFIG is set, load only the files it lists (kubectl semantics) and skip ~/.kube/config and the default ~/.kube/config.d scan. Set false to merge everything like releases before 0.15. Overridden by --kubeconfig-exclusive and LFK_KUBECONFIG_EXCLUSIVE."
+    },
     "abbreviations": {
       "type": ["object", "null"],
       "description": "Custom search abbreviation overrides/extensions. Maps a short alias to a full resource type name (e.g. \"po\": \"pod\").",

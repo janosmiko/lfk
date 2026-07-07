@@ -75,6 +75,7 @@ min_contrast_ratio: 0.5
 read_only: true
 show_rare_types: true
 kubeconfig_dir: /tmp/lfk-kcfg
+kubeconfig_exclusive: false
 abbreviations:
   zz: pod
 keybindings:
@@ -239,6 +240,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigReadOnly, "read_only")
 	assert.True(t, ConfigShowRareTypes, "show_rare_types")
 	assert.Equal(t, []string{"/tmp/lfk-kcfg"}, ConfigKubeconfigDirs, "kubeconfig_dir")
+	assert.False(t, ConfigKubeconfigExclusive, "kubeconfig_exclusive")
 	assert.Equal(t, "traffic-ns", ConfigKubesharkNamespace, "kubeshark")
 
 	// security section.
@@ -362,6 +364,7 @@ var wiringCoveredFields = map[string]string{
 	"kubeshark":                 "TestLoadConfig_AllSettingsWired",
 	"scheduler":                 "TestLoadConfig_AllSettingsWired",
 	"kubeconfig_dir":            "TestLoadConfig_AllSettingsWired",
+	"kubeconfig_exclusive":      "TestLoadConfig_AllSettingsWired",
 	"union_sets":                "TestLoadConfig_AllSettingsWired",
 	"goto_targets":              "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
 	"which_key_enabled":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",

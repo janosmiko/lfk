@@ -20,6 +20,8 @@ type StartupOptions struct {
 	Namespaces              []string
 	Kubeconfig              string
 	KubeconfigDirs          []string // --kubeconfig-dir: repeatable; each occurrence adds a directory to scan.
+	KubeconfigExclusive     bool     // --kubeconfig-exclusive: a set KUBECONFIG suppresses default discovery.
+	KubeconfigExclusiveSet  bool     // true when the flag was passed explicitly (cobra Changed) — distinguishes default from user choice.
 	Config                  string
 	NoMouse                 bool
 	NoColor                 bool          // --no-color: forces monochrome output regardless of env/config.
