@@ -67,6 +67,23 @@ func objectFieldFor(key string, v any) ObjectField {
 	}
 }
 
+// ObjectElementLabel returns the discriminator key/value labeling an
+// array element that is a map — the first of objectNameKeys resolving
+// to a non-empty scalar (e.g. "type"/"ExternalIP" for a node address).
+// Both returns are empty when no discriminator applies.
+func ObjectElementLabel(v any) (key, val string) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	for _, k := range objectNameKeys {
+		if s := scalarString(m[k]); s != "" {
+			return k, s
+		}
+	}
+	return "", ""
+}
+
 // elementName returns a friendly label for an array element that is a map,
 // using the first of objectNameKeys that resolves to a non-empty scalar.
 func elementName(v any) string {

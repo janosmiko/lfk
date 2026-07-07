@@ -90,6 +90,8 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 		return m.handleExplorerActionKeyCopyName()
 	case kb.CopyYAML:
 		return m.handleExplorerActionKeyCopyYAML()
+	case kb.CopyField:
+		return m.handleExplorerActionKeyCopyField()
 	case kb.PasteApply:
 		if m.readOnly {
 			m.setStatusMessage(readOnlyBlockedMessage("Paste & Apply"), true)
