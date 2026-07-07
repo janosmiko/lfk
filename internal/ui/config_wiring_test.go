@@ -445,6 +445,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origForegroundIdle := ConfigForegroundIdleTimeout
 	origNoColor := ConfigNoColor
 	origKubeconfig := ConfigKubeconfigDirs
+	origKubeconfigExclusive := ConfigKubeconfigExclusive
 	origSecretLazy := ConfigSecretLazyLoading
 	origKubeshark := ConfigKubesharkNamespace
 	origInformer := ConfigInformerCacheMode
@@ -534,6 +535,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigForegroundIdleTimeout = origForegroundIdle
 		ConfigNoColor = origNoColor
 		ConfigKubeconfigDirs = origKubeconfig
+		ConfigKubeconfigExclusive = origKubeconfigExclusive
 		ConfigSecretLazyLoading = origSecretLazy
 		ConfigKubesharkNamespace = origKubeshark
 		ConfigInformerCacheMode = origInformer
