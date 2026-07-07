@@ -1,6 +1,8 @@
 package app
 
 import (
+	"slices"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -16,6 +18,7 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	p := &m.taintEditor
 	n := len(p.rows)
+	_, _, visible := m.taintEditorOverlayDims()
 	switch msg.String() {
 	case "esc", "q":
 		m.closeTaintEditor()
@@ -30,7 +33,7 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if p.rows[p.cursor].staged {
-			p.rows = append(p.rows[:p.cursor], p.rows[p.cursor+1:]...)
+			p.rows = slices.Delete(slices.Clone(p.rows), p.cursor, p.cursor+1)
 		} else {
 			p.rows[p.cursor].remove = !p.rows[p.cursor].remove
 		}
@@ -46,6 +49,14 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.cursor = 0
 	case "G", "end":
 		p.cursor = max(n-1, 0)
+	case "ctrl+d":
+		p.cursor = min(p.cursor+visible/2, max(n-1, 0))
+	case "ctrl+u":
+		p.cursor = max(p.cursor-visible/2, 0)
+	case "ctrl+f", "pgdown", "shift+down":
+		p.cursor = min(p.cursor+visible, max(n-1, 0))
+	case "ctrl+b", "pgup", "shift+up":
+		p.cursor = max(p.cursor-visible, 0)
 	}
 	m.clampTaintEditorScroll()
 	return m, nil
