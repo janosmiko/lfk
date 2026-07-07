@@ -207,16 +207,22 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			// so they stay readable against the box. CursorHighlightWidth
 			// caps the highlight short of the item area; the remainder pads
 			// with the surface background so the badge column stays put.
+			// Text is truncated to the highlight width — anything longer
+			// would wrap inside the Width(hlW) block, pushing every row
+			// below out of sync with the scrollbar column.
 			hlW := itemWidth
 			if cfg.CursorHighlightWidth > 0 && cfg.CursorHighlightWidth < itemWidth {
 				hlW = cfg.CursorHighlightWidth
 			}
-			row = OverlaySelectedStyle.Width(hlW).Render(itemPlainLine(it, cfg, hasActive))
+			row = OverlaySelectedStyle.Width(hlW).Render(Truncate(itemPlainLine(it, cfg, hasActive), hlW))
 			if pad := itemWidth - lipgloss.Width(row); pad > 0 {
 				row += OverlayDimStyle.Render(strings.Repeat(" ", pad))
 			}
 		} else {
-			line := OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive))
+			// Truncated to the item area for the same reason as the cursor
+			// row: the component owns the no-wider-than-innerW invariant;
+			// callers only best-effort their Name/Description budgets.
+			line := OverlayNormalStyle.Render(Truncate(itemStyledLine(it, cfg, hasActive), itemWidth))
 			// Only pad non-cursor rows when there's a trailing column
 			// (badge or scrollbar) that needs a stable left edge —
 			// padding rows without a reserve regresses the historical
