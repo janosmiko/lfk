@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.15.0](https://github.com/janosmiko/lfk/compare/v0.14.19...v0.15.0) (2026-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **kubeconfig:** when KUBECONFIG is set, lfk no longer merges ~/.kube/config and the default ~/.kube/config.d scan; set kubeconfig_exclusive: false to restore the old behavior.
+
+### Features
+
+* **kubeconfig:** make KUBECONFIG exclusive by default, with opt-out ([#491](https://github.com/janosmiko/lfk/issues/491)) ([744f497](https://github.com/janosmiko/lfk/commit/744f497dee56a86bc98e134bb581497acf48dcb1))
+* node taint editor overlay (replaces Taint/Untaint prefill) ([#501](https://github.com/janosmiko/lfk/issues/501)) ([e77eac6](https://github.com/janosmiko/lfk/commit/e77eac6156423c7b1c5acf312359c78a8f44c4e7))
+* single-field copy picker (ctrl+y) ([#500](https://github.com/janosmiko/lfk/issues/500)) ([36b4f98](https://github.com/janosmiko/lfk/commit/36b4f98cf0c9965283cb9c0ceda4e4e557b8deb1))
+
+
+### Bug Fixes
+
+* truncate overlay list rows to the item area ([#504](https://github.com/janosmiko/lfk/issues/504)) ([5b7acc4](https://github.com/janosmiko/lfk/commit/5b7acc43ebd2088d270486311a04634c05e927d9))
+
 ## [0.14.19](https://github.com/janosmiko/lfk/compare/v0.14.18...v0.14.19) (2026-07-02)
 
 
