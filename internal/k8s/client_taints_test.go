@@ -64,6 +64,24 @@ func TestUpdateNodeTaints_RemoveAndAdd(t *testing.T) {
 		node.Spec.Taints[1])
 }
 
+func TestUpdateNodeTaints_ValueEditViaRemoveAndReAdd(t *testing.T) {
+	// The editor's value-edit workflow: remove dedicated=gpu:NoSchedule,
+	// re-add dedicated=cpu:NoSchedule. The NEW value must win — reusing
+	// the original taint struct here would silently write "gpu" back.
+	cs := k8sfake.NewClientset(taintedNode())
+	c := newFakeClient(cs, nil)
+
+	err := c.UpdateNodeTaints(t.Context(), "", "worker-1",
+		[]model.Taint{{Key: "dedicated", Value: "gpu", Effect: "NoSchedule"}},
+		[]model.Taint{{Key: "dedicated", Value: "cpu", Effect: "NoSchedule"}})
+	require.NoError(t, err)
+
+	node, err := cs.CoreV1().Nodes().Get(t.Context(), "worker-1", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, node.Spec.Taints, 2)
+	assert.Equal(t, "cpu", node.Spec.Taints[1].Value, "re-added taint carries the new value")
+}
+
 func TestUpdateNodeTaints_RemoveAll(t *testing.T) {
 	cs := k8sfake.NewClientset(taintedNode())
 	c := newFakeClient(cs, nil)

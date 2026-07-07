@@ -56,7 +56,10 @@ func (c *Client) UpdateNodeTaints(ctx context.Context, contextName, name string,
 	final := model.ComputeFinalTaints(existing, removals, additions)
 	out := make([]corev1.Taint, 0, len(final))
 	for _, ft := range final {
-		if orig, ok := byID[taintID{ft.Key, ft.Effect}]; ok {
+		// Reuse the original struct (preserving server-set TimeAdded)
+		// only when the value matches too — a remove+re-add that edits
+		// the value must not resurrect the old struct.
+		if orig, ok := byID[taintID{ft.Key, ft.Effect}]; ok && orig.Value == ft.Value {
 			out = append(out, orig)
 			continue
 		}

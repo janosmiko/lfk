@@ -155,21 +155,14 @@ func (m Model) taintEditorOverlayDims() (w, h, maxVisible int) {
 	return w, h, maxVisible
 }
 
-// clampTaintEditorScroll keeps the cursor within the visible window.
+// clampTaintEditorScroll keeps the cursor within the visible window via
+// the shared vim-style scrolloff viewport.
 func (m *Model) clampTaintEditorScroll() {
 	p := &m.taintEditor
 	_, _, visible := m.taintEditorOverlayDims()
 	n := len(p.rows)
 	p.cursor = max(0, min(p.cursor, n-1))
-	if p.cursor < p.scroll {
-		p.scroll = p.cursor
-	}
-	if p.cursor >= p.scroll+visible {
-		p.scroll = p.cursor - visible + 1
-	}
-	if p.scroll < 0 {
-		p.scroll = 0
-	}
+	overlayListScroll(&p.scroll, p.cursor, n, visible)
 }
 
 // taintEditorHints is the editor's bottom hint bar (kept here to
