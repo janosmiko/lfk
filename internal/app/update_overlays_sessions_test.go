@@ -191,6 +191,20 @@ func TestSessionsOverlaySaveAsPromptSavesAndActivates(t *testing.T) {
 	assert.Equal(t, "ctx-a", ns.State.Context)
 }
 
+func TestSessionsOverlaySwitchLoadFailureAborts(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush80Model()
+	m.activeSession = "current"
+	// A named session that isn't on disk (e.g. deleted between list and switch)
+	// must not abandon the current session or clobber its file.
+	ret, cmd := m.switchToSession("ghost")
+	rm := ret.(Model)
+	assert.Equal(t, "current", rm.activeSession, "active session unchanged on load failure")
+	assert.Nil(t, rm.pendingSession, "no restore armed")
+	assert.True(t, rm.statusMessageErr)
+	assert.NotNil(t, cmd)
+}
+
 func TestSessionsOverlaySwitchRejectedInUnion(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	require.NoError(t, saveNamedSession(NamedSession{Name: "p", SavedAt: time.Now(), State: SessionState{Context: "c"}}))

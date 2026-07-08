@@ -92,6 +92,20 @@ func TestNewModel_CLIOverrideContextOnly(t *testing.T) {
 	assert.Equal(t, "test-ctx", m.pendingSession.Tabs[0].Context)
 }
 
+func TestNewModel_SessionClearedByCLIOverride(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	client := newTestClientForOptions(t)
+
+	// --session foo --context bar: the CLI override replaces the workspace, so
+	// activeSession must be cleared to avoid clobbering foo.yaml on quit.
+	m := NewModel(client, StartupOptions{Session: "foo", Context: "test-ctx"})
+	assert.Equal(t, "", m.activeSession, "CLI override clears the active session")
+
+	// --session foo alone: the named session stays active.
+	m = NewModel(client, StartupOptions{Session: "foo"})
+	assert.Equal(t, "foo", m.activeSession, "--session alone stays active")
+}
+
 func TestNewModel_CLIOverrideNamespacesOnly(t *testing.T) {
 	client := newTestClientForOptions(t)
 

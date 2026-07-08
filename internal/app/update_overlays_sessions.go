@@ -273,18 +273,27 @@ func (m Model) switchToSession(name string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, nil
 	}
+
+	// Load the target first: a failed load must abort the switch cleanly (keep
+	// the current session active and the overlay open) rather than abandoning
+	// the current workspace for an empty one that then overwrites name.yaml.
+	var state *SessionState
+	if name == "" {
+		state = loadSession() // nil is a legitimate fresh default workspace
+	} else {
+		ns, err := loadNamedSession(name)
+		if err != nil {
+			m.setStatusMessage("Failed to load session: "+name, true)
+			return m, scheduleStatusClear()
+		}
+		s := ns.State
+		state = &s
+	}
+
 	m.saveCurrentSession() // persist the session we're leaving
 	m.activeSession = name
 	if err := saveActiveSessionName(name); err != nil {
 		logger.Warn("Failed to persist active session", "session", name, "error", err)
-	}
-
-	var state *SessionState
-	if name == "" {
-		state = loadSession()
-	} else if ns, err := loadNamedSession(name); err == nil {
-		s := ns.State
-		state = &s
 	}
 	m.pendingSession = state
 	m.sessionRestored = false

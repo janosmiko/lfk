@@ -188,6 +188,11 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			Context: contextName,
 			Tabs:    []SessionTab{tab},
 		}
+		// CLI overrides (--context/--namespace/--union) replace the workspace
+		// with a synthetic one, so auto-save must target the default
+		// (session.yaml), not clobber a named session (e.g. --session foo
+		// --context bar) with mismatched state.
+		m.activeSession = ""
 	}
 
 	if opts.IsUnionMode() {
