@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"sigs.k8s.io/yaml"
 
@@ -187,8 +188,18 @@ func (m *Model) saveCurrentSession() {
 	}
 	// Session persistence is best-effort, but a write failure means the
 	// next start won't restore the active context — log it so users can
-	// diagnose disk-full / permissions issues from lfk.log.
-	if err := saveSession(m.buildSessionState()); err != nil {
-		logger.Error("Failed to persist session state", "error", err)
+	// diagnose disk-full / permissions issues from lfk.log. The active
+	// session decides the target: the default workspace goes to session.yaml,
+	// a named session to its own sessions/<name>.yaml so it never clobbers
+	// the default's tabs.
+	state := m.buildSessionState()
+	if m.activeSession == "" {
+		if err := saveSession(state); err != nil {
+			logger.Error("Failed to persist session state", "error", err)
+		}
+		return
+	}
+	if err := saveNamedSession(NamedSession{Name: m.activeSession, SavedAt: time.Now(), State: state}); err != nil {
+		logger.Error("Failed to persist named session state", "session", m.activeSession, "error", err)
 	}
 }

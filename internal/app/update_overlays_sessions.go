@@ -69,6 +69,9 @@ type sessionsOverlayState struct {
 	sessionsList       []NamedSession
 	sessionsFilter     TextInput // filter text (/ mode) for sessions overlay
 	sessionsFilterMode bool
+	// activeSession is the named session that auto-save writes to and that
+	// startup restored. "" means the built-in default workspace (session.yaml).
+	activeSession string
 }
 
 // openSessionsOverlay loads the saved sessions and opens the picker overlay.

@@ -60,6 +60,25 @@ func saveActiveSessionName(name string) error {
 	return os.WriteFile(path, []byte(name+"\n"), 0o600)
 }
 
+// loadStartupSession resolves the active session at startup and loads its
+// workspace. Returns the active name ("" = default workspace) and the
+// SessionState to restore. A named session that does not exist yet (or is
+// corrupt) yields a nil state: startup opens a fresh workspace and the name is
+// created on the first save (create-on-use, tmux-style).
+func loadStartupSession(cliSession string) (string, *SessionState) {
+	name := resolveStartupSession(cliSession)
+	if name == "" {
+		return "", loadSession()
+	}
+	ns, err := loadNamedSession(name)
+	if err != nil {
+		logger.Info("Starting fresh workspace for new session", "session", name)
+		return name, nil
+	}
+	state := ns.State
+	return name, &state
+}
+
 // resolveStartupSession picks the session name to open at startup. Precedence:
 // the --session flag / LFK_SESSION env value (cliSession), then the persisted
 // active session, then "" (default). A non-default result is persisted so it

@@ -21,6 +21,52 @@ func TestActiveSessionRoundTrip(t *testing.T) {
 	assert.Equal(t, "", loadActiveSessionName())
 }
 
+func TestSaveCurrentSessionTargetsActiveSession(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush80Model()
+	m.nav.Context = "ctx-a"
+	m.tabs[m.activeTab].nav.Context = "ctx-a"
+
+	// Default active session -> writes the legacy session.yaml.
+	m.activeSession = ""
+	m.saveCurrentSession()
+	require.NotNil(t, loadSession(), "default active session writes session.yaml")
+	if _, err := loadNamedSession("prod"); err == nil {
+		t.Fatal("no named file should exist yet")
+	}
+
+	// Named active session -> writes sessions/prod.yaml, does NOT touch session.yaml.
+	m.activeSession = "prod"
+	m.saveCurrentSession()
+	ns, err := loadNamedSession("prod")
+	require.NoError(t, err)
+	assert.Equal(t, "prod", ns.Name)
+	assert.NotEmpty(t, ns.State.Tabs)
+	assert.Equal(t, "ctx-a", ns.State.Context)
+}
+
+func TestLoadStartupSession(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	// Default: no cli, nothing persisted -> "" + whatever session.yaml holds (nil here).
+	name, state := loadStartupSession("")
+	assert.Equal(t, "", name)
+	assert.Nil(t, state)
+
+	// Existing named session loads its state.
+	require.NoError(t, saveNamedSession(NamedSession{Name: "prod", State: SessionState{Context: "c", Tabs: []SessionTab{{Context: "c"}}}}))
+	name, state = loadStartupSession("prod")
+	assert.Equal(t, "prod", name)
+	require.NotNil(t, state)
+	assert.Equal(t, "c", state.Context)
+
+	// Unknown session name -> create-on-use: active set, nil state (fresh workspace).
+	name, state = loadStartupSession("brand-new")
+	assert.Equal(t, "brand-new", name)
+	assert.Nil(t, state)
+	assert.Equal(t, "brand-new", loadActiveSessionName(), "cli session persisted as active")
+}
+
 func TestResolveStartupSession(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 
