@@ -1542,10 +1542,29 @@ func TestCovExecuteActionReconcile(t *testing.T) {
 func TestCovExecuteActionSuspendResumeFlux(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.kind = "Kustomization"
+	m.actionCtx.resourceType = model.ResourceTypeEntry{APIGroup: "kustomize.toolkit.fluxcd.io"}
 	result, cmd := m.executeAction("Suspend/Resume")
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
+}
+
+// TestExecuteActionSuspendResumeUnsupportedKind verifies the default-branch
+// guard: a kind that is neither CronJob/CronWorkflow nor a Flux reconcilable
+// gets a clear error instead of a stray Flux toggle.
+func TestExecuteActionSuspendResumeUnsupportedKind(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.kind = "Deployment"
+	m.actionCtx.resourceType = model.ResourceTypeEntry{APIGroup: "apps"}
+	result, cmd := m.executeAction("Suspend/Resume")
+	rm := result.(Model)
+	assert.False(t, rm.loading, "guard clears loading before returning")
+	require.NotNil(t, cmd)
+	msg := cmd()
+	amsg, ok := msg.(actionResultMsg)
+	require.True(t, ok)
+	require.Error(t, amsg.err)
+	assert.Contains(t, amsg.err.Error(), "Deployment")
 }
 
 func TestCovExecuteActionOpenInBrowserPF(t *testing.T) {
@@ -2130,6 +2149,7 @@ func TestFinalExecuteActionReconcile(t *testing.T) {
 func TestFinalExecuteActionSuspendResumeFlux(t *testing.T) {
 	m := baseFinalModel()
 	m.actionCtx.kind = "Kustomization"
+	m.actionCtx.resourceType = model.ResourceTypeEntry{APIGroup: "kustomize.toolkit.fluxcd.io"}
 	result, cmd := m.executeAction("Suspend/Resume")
 	require.NotNil(t, cmd)
 	rm := result.(Model)

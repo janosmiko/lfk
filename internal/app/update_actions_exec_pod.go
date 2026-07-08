@@ -479,6 +479,17 @@ func (m Model) executeActionSuspendResume() (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", fmt.Sprintf("Toggle suspend cronworkflow/%s", name))
 		return m, m.toggleCronWorkflowSuspend()
 	default:
+		// Only FluxCD reconcilable kinds (Kustomization, GitRepository, …)
+		// reach here. Guard on the API group so a kind that gains
+		// "Suspend/Resume" in its menu without a matching dispatch case
+		// surfaces a clear error instead of a confusing Flux patch failure.
+		if !strings.HasSuffix(m.actionCtx.resourceType.APIGroup, "fluxcd.io") {
+			m.loading = false
+			kind := m.actionCtx.kind
+			return m, func() tea.Msg {
+				return actionResultMsg{err: fmt.Errorf("Suspend/Resume is not supported for %s", kind)}
+			}
+		}
 		m.addLogEntry("DBG", fmt.Sprintf("Toggle suspend %s/%s", m.actionCtx.kind, name))
 		return m, m.toggleFluxSuspend()
 	}
