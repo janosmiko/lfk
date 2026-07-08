@@ -455,6 +455,9 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case execPTYStartMsg:
 		mdl, cmd := m.updateExecPTYStart(msg)
 		return mdl, cmd, true
+	case drainNodeResolvedMsg:
+		mdl, cmd := m.updateDrainNodeResolved(msg)
+		return mdl, cmd, true
 	case logLineMsg:
 		mdl, cmd := m.updateLogLine(msg)
 		return mdl, cmd, true

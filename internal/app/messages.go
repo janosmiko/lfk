@@ -134,6 +134,12 @@ type triggerCronJobMsg struct {
 	err     error
 }
 
+// drainNodeResolvedMsg carries the node name resolved from a Karpenter
+// NodeClaim so the drain can then stream through the shared drainNodeCmd path.
+type drainNodeResolvedMsg struct {
+	nodeName string
+}
+
 // statusMessageExpiredMsg clears the status message after a timeout.
 type statusMessageExpiredMsg struct{}
 
