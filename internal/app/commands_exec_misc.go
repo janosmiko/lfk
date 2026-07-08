@@ -11,6 +11,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) deleteResource() tea.Cmd {
@@ -209,27 +210,43 @@ func (m Model) toggleNodeSchedulable() tea.Cmd {
 }
 
 func (m Model) execKubectlDrain() tea.Cmd {
+	return m.drainNodeCmd(m.actionCtx.name)
+}
+
+// drainNodeCmd runs `kubectl drain <nodeName>` against the action context's
+// cluster. In PTY mode it streams the drain progress into lfk's embedded
+// terminal so the eviction log stays visible and scrollable in-app instead of
+// scrolling past during a host-terminal takeover; Exec mode keeps the legacy
+// hand-over. Shared by the Node "Drain" action and the Karpenter
+// "Drain Node" action (which resolves the bound node first).
+func (m Model) drainNodeCmd(nodeName string) tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
 		}
 	}
-	name := m.actionCtx.name
+	kctx := m.actionCtx.context
 	args := []string{
-		"drain", name, "--context", m.kubectlContext(m.actionCtx.context),
+		"drain", nodeName, "--context", m.kubectlContext(kctx),
 		"--ignore-daemonsets", "--delete-emptydir-data",
 	}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
 	logExecCmd("Running kubectl command", cmd)
+
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols, rows := m.embeddedPTYSize()
+		return startPTYExecCmd(cmd, fmtPTYTitle("kubectl drain "+nodeName), cols, rows)
+	}
+
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
-			logger.Error("kubectl drain failed", "node", name, "context", m.actionCtx.context, "error", err)
-			return actionResultMsg{err: fmt.Errorf("drain %s: %w", name, err)}
+			logger.Error("kubectl drain failed", "node", nodeName, "context", kctx, "error", err)
+			return actionResultMsg{err: fmt.Errorf("drain %s: %w", nodeName, err)}
 		}
-		return actionResultMsg{message: fmt.Sprintf("Drained %s", name)}
+		return actionResultMsg{message: fmt.Sprintf("Drained %s", nodeName)}
 	})
 }
 

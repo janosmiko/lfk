@@ -1035,6 +1035,8 @@ The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the H
 ### Node Actions
 `c` Cordon/Uncordon (toggle schedulability), `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
+Drain streams the eviction progress live: in PTY terminal mode (default on macOS/Linux) the `kubectl drain` output renders in lfk's embedded scrollable terminal; in Exec mode the host terminal is handed over. The same applies to Drain Node on a Karpenter NodeClaim.
+
 ### Longhorn Node Actions
 `e` Evict Replicas, `C` Cancel Eviction, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events, `P` Permissions
 

@@ -724,6 +724,40 @@ func TestCovExecKubectlDrainReturnsCmd(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+func TestDrainNodeCmdReturnsCmdInBothTerminalModes(t *testing.T) {
+	prev := ui.ConfigTerminalMode
+	t.Cleanup(func() { ui.ConfigTerminalMode = prev })
+	m := testModelExec()
+	m.actionCtx.context = "test-ctx"
+
+	ui.ConfigTerminalMode = ui.TerminalModePTY
+	assert.NotNil(t, m.drainNodeCmd("node-1"), "PTY mode streams into the embedded terminal")
+
+	ui.ConfigTerminalMode = ui.TerminalModeExec
+	assert.NotNil(t, m.drainNodeCmd("node-1"), "Exec mode hands over the host terminal")
+}
+
+// TestDrainNodeResolvedStartsDrain verifies the resolve->drain hop: once the
+// NodeClaim's node name is known, the drain starts and the loading spinner
+// clears.
+func TestDrainNodeResolvedStartsDrain(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.context = "test-ctx"
+	m.loading = true
+
+	mdl, cmd := m.updateDrainNodeResolved(drainNodeResolvedMsg{nodeName: "node-1"})
+	rm := mdl.(Model)
+	assert.False(t, rm.loading)
+	assert.NotNil(t, cmd)
+}
+
+func TestDrainNodeFromClaimReturnsScheduledCmd(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.name = "my-claim"
+	m.actionCtx.context = "test-ctx"
+	assert.NotNil(t, m.drainNodeFromClaim())
+}
+
 func TestCovExecKubectlNodeShellReturnsCmd(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.name = "node-1"

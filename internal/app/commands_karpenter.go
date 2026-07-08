@@ -3,9 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -86,30 +83,18 @@ func (m Model) toggleNodeScheduleFromClaim() tea.Cmd {
 	})
 }
 
-// drainNodeFromClaim resolves the NodeClaim's status.nodeName and runs
-// `kubectl drain <node> --ignore-daemonsets --delete-emptydir-data`,
-// matching the flags the standalone executeActionDrain path uses on a
-// plain Node row.
+// drainNodeFromClaim resolves the NodeClaim's status.nodeName and then drains
+// it through the shared drainNodeCmd path (so the drain streams into the
+// embedded terminal like the plain Node "Drain" action). The resolve runs off
+// the main thread and hands the node name back via drainNodeResolvedMsg; two
+// errors short-circuit before the drain: the resolve fails (NodeClaim missing /
+// RBAC), or the claim has no node bound yet (Karpenter still provisioning).
 func (m Model) drainNodeFromClaim() tea.Cmd {
-	return m.kubectlNodeCmdFromClaim("drain")
-}
-
-// kubectlNodeCmdFromClaim resolves the NodeClaim's status.nodeName and
-// runs kubectl <subcmd> against the resolved node. Tracked as a
-// mutation so the title-bar indicator surfaces the in-flight operation
-// and the :tasks overlay shows it in the history.
-//
-// subcmd must be either "cordon" or "drain"; drain adds the standard
-// eviction-safety flags. Anything else falls through to a plain
-// kubectl invocation with no extra args.
-func (m Model) kubectlNodeCmdFromClaim(subcmd string) tea.Cmd {
 	ctx := m.actionCtx.context
 	claimName := m.actionCtx.name
-	kctxArg := m.kubectlContext(ctx)
-	kubeconfigPath := m.client.KubeconfigPathForContext(ctx)
 	client := m.client
 
-	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("%s node (NodeClaim %s)", subcmd, claimName), ctx, func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resolve node for drain (NodeClaim "+claimName+")", ctx, func(_ context.Context) tea.Msg {
 		nodeName, err := client.GetNodeClaimNodeName(ctx, claimName)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -117,31 +102,6 @@ func (m Model) kubectlNodeCmdFromClaim(subcmd string) tea.Cmd {
 		if nodeName == "" {
 			return actionResultMsg{err: fmt.Errorf("NodeClaim %s has no node bound yet (status.nodeName empty)", claimName)}
 		}
-
-		kubectlPath, err := exec.LookPath("kubectl")
-		if err != nil {
-			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
-		}
-		args := []string{subcmd, nodeName, "--context", kctxArg}
-		if subcmd == "drain" {
-			args = append(args, "--ignore-daemonsets", "--delete-emptydir-data")
-		}
-		cmd := exec.Command(kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
-		logExecCmd("Running kubectl command (resolved from NodeClaim)", cmd)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			logger.Error("kubectl node command failed", "subcmd", subcmd, "claim", claimName, "node", nodeName, "context", ctx, "error", err)
-			// kubectl sometimes exits non-zero with no stderr (e.g. context
-			// cancelled, kubeconfig path missing on disk). Fall back to the
-			// exec error so the user always sees concrete failure details
-			// instead of a trailing blank.
-			detail := strings.TrimSpace(string(output))
-			if detail == "" {
-				detail = err.Error()
-			}
-			return actionResultMsg{err: fmt.Errorf("%s %s (from NodeClaim %s): %s", subcmd, nodeName, claimName, detail)}
-		}
-		return actionResultMsg{message: fmt.Sprintf("%s %s (from NodeClaim %s): %s", subcmd, nodeName, claimName, strings.TrimSpace(string(output)))}
+		return drainNodeResolvedMsg{nodeName: nodeName}
 	})
 }

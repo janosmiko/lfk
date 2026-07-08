@@ -44,6 +44,14 @@ func (m Model) updateCommandBarResult(msg commandBarResultMsg) (tea.Model, tea.C
 	return m, scheduleStatusClear()
 }
 
+// updateDrainNodeResolved starts the drain for the node resolved from a
+// Karpenter NodeClaim and clears the loading spinner. The drain itself then
+// streams into the embedded terminal (PTY mode) via drainNodeCmd.
+func (m Model) updateDrainNodeResolved(msg drainNodeResolvedMsg) (tea.Model, tea.Cmd) {
+	m.loading = false
+	return m, m.drainNodeCmd(msg.nodeName)
+}
+
 func (m Model) updateTriggerCronJob(msg triggerCronJobMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		m.setErrorFromErr("Trigger failed: ", msg.err)
