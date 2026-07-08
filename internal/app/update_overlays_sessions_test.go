@@ -8,7 +8,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
+
+func TestSessionManagerKeyOpensOverlay(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	prev := ui.ActiveKeybindings.SessionManager
+	ui.ActiveKeybindings.SessionManager = "C"
+	t.Cleanup(func() { ui.ActiveKeybindings.SessionManager = prev })
+
+	m := basePush80Model()
+	ret, _, handled := m.handleExplorerUIKey(runeKey('C'))
+	require.True(t, handled, "session-manager key handled")
+	assert.Equal(t, overlaySessions, ret.(Model).overlay)
+}
 
 func TestSessionCommandSaveWritesFile(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

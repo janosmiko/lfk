@@ -73,6 +73,7 @@ All built-in chords are rebindable under `keybindings`.
 | `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
 | `U` | RBAC permissions browser (can-i) |
 | `Shift+Z` | Open the cluster-wide Orphan overview |
+| `C` | Session manager (save/switch/delete named workspace sessions) |
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
 | `@` | Monitoring overview (active Prometheus alerts) |
@@ -992,6 +993,23 @@ Press `:` to open the command bar. It supports four types of input:
 - `:ns` without arguments navigates to Namespaces; with arguments filters to those namespaces
 - Kubectl commands inject `--context` and `-n` from current selection automatically
 - `Ctrl+U` scrolls suggestions when visible, deletes line before cursor when closed
+
+## Named Sessions
+
+A session is the whole multi-tab workspace (each tab's context, namespace scope, resource type, filter, and cursor). lfk always has one **active session** that it auto-saves to on quit and restores on start.
+
+- **Default session**: the built-in workspace stored in `session.yaml`. It shows as `default` in the picker and is what you get with no named session active.
+- **Named sessions** live in `sessions/<name>.yaml` and are separate — working in one never overwrites another (or the default).
+
+| Key / Command | Action |
+|---|---|
+| `C` (or `:sessions`) | Open the session manager |
+| `:session save <name>` | Save the current workspace as a named session |
+| `:session delete <name>` | Delete a named session |
+
+Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save current workspace under a new name (becomes active), `d` delete the highlighted session (not `default`), `/` filter, `esc` close. A checkmark marks the active session.
+
+**Startup:** `lfk --session <name>` (or the `LFK_SESSION` env var) opens that session, creating it on first save if new. The active session is remembered across restarts; `--session` is mutually exclusive with `--context`.
 
 ## General
 

@@ -25,7 +25,7 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:orphans [<kind>]` | Open cluster-wide orphan resource overview |
 | `:session save <name>` | Save the current workspace (all tabs) as a named session |
 | `:session delete <name>` &nbsp;·&nbsp; `:session rm <name>` | Delete a named session |
-| `:sessions` | Open the named-session picker (enter=switch, d=delete, /=filter) |
+| `:sessions` &nbsp;·&nbsp; `C` | Open the session manager (enter=switch, s=save current as…, d=delete, /=filter). The active session auto-saves on quit; start on one with `lfk --session <name>` / `LFK_SESSION`. |
 | `:quit` &nbsp;·&nbsp; `:q` &nbsp;·&nbsp; `:q!` | Exit |
 | `:nyan` | Toggle Nyan mode |
 | `:kubetris` | Play Kubetris |

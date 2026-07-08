@@ -91,6 +91,8 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.ClusterColorPicker
 	case overlayOrphans:
 		return key == kb.OrphanOverlay
+	case overlaySessions:
+		return key == kb.SessionManager
 	case overlayLocalClusters:
 		return key == kb.LocalClusterManager
 	case overlayCopyFormat:

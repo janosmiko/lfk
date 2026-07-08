@@ -456,6 +456,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `label_editor` | `i` | Edit labels/annotations |
 | `secret_editor` | `e` | Secret/ConfigMap editor |
 | `column_toggle` | `,` | Column visibility toggle |
+| `session_manager` | `C` | Open the session manager (save/switch/delete named workspace sessions). |
 | `toggle_wrap` | `>` | Toggle line wrapping in the YAML, diff, describe, log, and event viewers. Shares the `>` default with `sort_next`, but they apply in separate contexts (viewers vs. resource list). |
 | `toggle_line_numbers` | `#` | Toggle line numbers (diff, log viewers). |
 | `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers; also folds tree-view branches in the Object/API Explorers, alongside `Space`). |
