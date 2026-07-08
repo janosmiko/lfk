@@ -40,7 +40,7 @@ func (m Model) clearStatusOnNavigationKey(msg tea.KeyMsg) Model {
 		kb.LevelCluster, kb.LevelTypes, kb.LevelResources,
 		kb.JumpBack, kb.JumpOwner,
 		kb.NextMatch, kb.PrevMatch,
-		kb.NextTab, kb.PrevTab, kb.NewTab:
+		kb.NextTab, kb.PrevTab, kb.NewTab, kb.MoveTabLeft, kb.MoveTabRight:
 		m.clearTransientStatus()
 	}
 	return m

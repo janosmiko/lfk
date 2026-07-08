@@ -550,6 +550,8 @@ func helpSections() []helpSection {
 				{kb.NewTab, "New tab (clone current)"},
 				{kb.PrevTab, "Previous tab"},
 				{kb.NextTab, "Next tab"},
+				{kb.MoveTabLeft, "Move tab left"},
+				{kb.MoveTabRight, "Move tab right"},
 			},
 		},
 		{

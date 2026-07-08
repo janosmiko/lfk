@@ -628,6 +628,32 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	return nil
 }
 
+// moveActiveTab reorders the active tab one slot in the given direction
+// (-1 = left, +1 = right) and keeps it active at its new index. It is a
+// no-op (returns false) when there are fewer than two tabs or the tab is
+// already at the edge — the order does not wrap.
+//
+// This is a pure reorder that does NOT switch tabs: the active tab's live
+// state stays in the Model, only its slot and m.activeTab move. So it must
+// not call saveCurrentTab — that cancels the live preview-log stream (for a
+// real switch loadTab restarts it, but a move never reloads), which would
+// silently kill the tail. The active tab's snapshot in m.tabs is left stale
+// and is refreshed by the next real switch's saveCurrentTab before it is
+// ever loaded; the neighbor's snapshot is already current and just changes
+// index.
+func (m *Model) moveActiveTab(direction int) bool {
+	if len(m.tabs) <= 1 {
+		return false
+	}
+	target := m.activeTab + direction
+	if target < 0 || target >= len(m.tabs) {
+		return false
+	}
+	m.tabs[m.activeTab], m.tabs[target] = m.tabs[target], m.tabs[m.activeTab]
+	m.activeTab = target
+	return true
+}
+
 // cloneCurrentTab creates a deep copy of the current model state as a new TabState.
 func (m *Model) cloneCurrentTab() TabState {
 	newTab := TabState{
