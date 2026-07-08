@@ -95,9 +95,89 @@ func (m Model) filteredNamedSessions() []NamedSession {
 	return out
 }
 
-// handleSessionsOverlayKey is a temporary stub; Task 4 replaces it with the
-// real key handler (switch/delete/filter).
-func (m Model) handleSessionsOverlayKey(_ tea.KeyMsg) (tea.Model, tea.Cmd) { return m, nil }
+// handleSessionsOverlayKey handles keys for the sessions picker overlay:
+// enter=switch, d=delete, /=filter, esc/q=close.
+func (m Model) handleSessionsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.sessionsFilterMode {
+		return m.handleSessionsFilterMode(msg)
+	}
+	items := m.filteredNamedSessions()
+	switch msg.String() {
+	case "esc", "q":
+		if m.sessionsFilter.Value != "" {
+			m.sessionsFilter.Clear()
+			m.overlayCursor = 0
+			return m, nil
+		}
+		m.overlay = overlayNone
+		return m, nil
+	case "enter":
+		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
+			return m.switchToNamedSession(items[m.overlayCursor])
+		}
+		return m, nil
+	case "d":
+		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
+			name := items[m.overlayCursor].Name
+			if _, err := deleteNamedSession(name); err != nil {
+				m.setStatusMessage("Delete failed: "+err.Error(), true)
+				return m, scheduleStatusClear()
+			}
+			m.sessionsList = listNamedSessions()
+			m.overlayCursor = clampOverlayCursor(m.overlayCursor, 0, len(m.filteredNamedSessions())-1)
+			m.setStatusMessage("Deleted session: "+name, false)
+			return m, scheduleStatusClear()
+		}
+		return m, nil
+	case "/":
+		m.sessionsFilterMode = true
+		m.sessionsFilter.Clear()
+		return m, nil
+	case "j", "down", "ctrl+n":
+		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
+		return m, nil
+	case "k", "up", "ctrl+p":
+		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
+		return m, nil
+	}
+	return m, nil
+}
+
+// handleSessionsFilterMode mirrors handleNamespaceFilterMode: type to narrow,
+// Enter/Esc leave filter mode (they do NOT switch — switching is an explicit
+// Enter in normal mode).
+func (m Model) handleSessionsFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch handleFilterKey(&m.sessionsFilter, msg.String()) {
+	case filterEscape, filterAccept:
+		m.sessionsFilterMode = false
+		m.overlayCursor = 0
+		return m, nil
+	case filterClose:
+		m.overlay = overlayNone
+		return m, nil
+	case filterContinue:
+		m.overlayCursor = 0
+		return m, nil
+	}
+	return m, nil
+}
+
+// switchToNamedSession replaces the current workspace with ns by riding the
+// startup restore path: set pendingSession and reload contexts so
+// updateContextsLoaded fires restoreSession.
+func (m Model) switchToNamedSession(ns NamedSession) (tea.Model, tea.Cmd) {
+	if m.unionMode {
+		m.setStatusMessage("Exit union view before switching sessions", true)
+		return m, scheduleStatusClear()
+	}
+	m.saveCurrentSession() // preserve the current unnamed workspace
+	state := ns.State
+	m.pendingSession = &state
+	m.sessionRestored = false
+	m.overlay = overlayNone
+	m.setStatusMessage("Switched to session: "+ns.Name, false)
+	return m, tea.Batch(m.loadContexts(), scheduleStatusClear())
+}
 
 // overlayHintBarSessions returns the hint bar for the sessions picker overlay.
 func (m Model) overlayHintBarSessions() string {
