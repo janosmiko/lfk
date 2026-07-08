@@ -182,6 +182,7 @@ func (m Model) switchToNamedSession(ns NamedSession) (tea.Model, tea.Cmd) {
 // overlayHintBarSessions returns the hint bar for the sessions picker overlay.
 func (m Model) overlayHintBarSessions() string {
 	return m.renderHints([]ui.HintEntry{
+		{Key: "j/k", Desc: "navigate"},
 		{Key: "enter", Desc: "switch"},
 		{Key: "d", Desc: "delete"},
 		{Key: "/", Desc: "filter"},
