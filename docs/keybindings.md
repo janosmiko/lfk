@@ -1033,7 +1033,7 @@ The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the H
 `e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
 ### Node Actions
-`c` Cordon, `u` Uncordon, `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
+`c` Cordon/Uncordon (toggle schedulability), `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 ### Longhorn Node Actions
 `e` Evict Replicas, `C` Cancel Eviction, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events, `P` Permissions
@@ -1044,7 +1044,7 @@ The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas sch
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
 ### CronJob Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### ArgoCD Application Actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events

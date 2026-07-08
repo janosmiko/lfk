@@ -87,8 +87,7 @@ func TestActionsForKind(t *testing.T) {
 	t.Run("Node actions", func(t *testing.T) {
 		actions := ActionsForKind("Node")
 		labels := actionLabels(actions)
-		assert.Contains(t, labels, "Cordon")
-		assert.Contains(t, labels, "Uncordon")
+		assert.Contains(t, labels, "Cordon/Uncordon")
 		assert.Contains(t, labels, "Drain")
 		assert.NotContains(t, labels, "Delete")
 	})

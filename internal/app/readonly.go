@@ -35,12 +35,12 @@ var mutatingActions = map[string]bool{
 	"Debug Mount":          true,
 	"Port Forward":         true,
 	"Port Forward & Open":  true,
-	"Cordon":               true,
-	"Uncordon":             true,
+	"Cordon/Uncordon":      true,
 	"Drain":                true,
 	"Taints":               true,
 	"Apply Taints":         true, // confirm-overlay pendingAction for the taint editor
 	"Trigger":              true,
+	"Suspend/Resume":       true,
 	"Stop":                 true,
 	"Remove":               true,
 	"Labels / Annotations": true,
@@ -54,23 +54,18 @@ var mutatingActions = map[string]bool{
 	"Terminate Sync":     true,
 
 	// Argo Workflows lifecycle mutations.
-	"Suspend Workflow":     true,
-	"Resume Workflow":      true,
-	"Stop Workflow":        true,
-	"Terminate Workflow":   true,
-	"Resubmit Workflow":    true,
-	"Submit Workflow":      true,
-	"Suspend CronWorkflow": true,
-	"Resume CronWorkflow":  true,
+	"Suspend Workflow":   true,
+	"Resume Workflow":    true,
+	"Stop Workflow":      true,
+	"Terminate Workflow": true,
+	"Resubmit Workflow":  true,
+	"Submit Workflow":    true,
 
 	// cert-manager / ExternalSecrets / KEDA / Flux mutations.
 	"Force Renew":   true,
 	"Force Refresh": true,
-	"Pause":         true,
-	"Unpause":       true,
+	"Pause/Unpause": true,
 	"Reconcile":     true,
-	"Suspend":       true,
-	"Resume":        true,
 
 	// Longhorn node mutations. Force Delete (above) disables scheduling then
 	// deletes; Evict Replicas / Cancel Eviction toggle spec.evictionRequested.
@@ -80,10 +75,9 @@ var mutatingActions = map[string]bool{
 	// Karpenter NodeClaim mutations. Disrupt removes the underlying
 	// node; Cordon / Uncordon / Drain Node operate on the node bound
 	// to the NodeClaim.
-	"Disrupt":       true,
-	"Cordon Node":   true,
-	"Uncordon Node": true,
-	"Drain Node":    true,
+	"Disrupt":              true,
+	"Cordon/Uncordon Node": true,
+	"Drain Node":           true,
 
 	// Knative Serving mutations. Activate patches the parent Service's
 	// spec.traffic to send 100% to a Revision.

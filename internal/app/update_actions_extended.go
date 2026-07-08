@@ -15,13 +15,12 @@ func (m Model) executeActionExtended(actionLabel string) (tea.Model, tea.Cmd, bo
 		return mdl, cmd, true
 	}
 	switch actionLabel {
-	case "Disrupt", "Cordon Node", "Uncordon Node", "Drain Node":
+	case "Disrupt", "Cordon/Uncordon Node", "Drain Node":
 		return m.executeActionKarpenter(actionLabel)
 	case "Configure AutoSync", "Sync", "Sync (Apply Only)", "Refresh",
 		"Terminate Sync", "Watch Workflow", "Suspend Workflow",
 		"Resume Workflow", "Stop Workflow", "Terminate Workflow",
-		"Resubmit Workflow", "Submit Workflow",
-		"Suspend CronWorkflow", "Resume CronWorkflow":
+		"Resubmit Workflow", "Submit Workflow":
 		mdl, cmd := m.executeActionArgo(actionLabel)
 		return mdl, cmd, true
 	case "Force Renew":
@@ -30,20 +29,11 @@ func (m Model) executeActionExtended(actionLabel string) (tea.Model, tea.Cmd, bo
 	case "Force Refresh":
 		mdl, cmd := m.executeActionSimpleLoading("Force refreshing", m.forceRefreshExternalSecret)
 		return mdl, cmd, true
-	case "Pause":
-		mdl, cmd := m.executeActionSimpleLoading("Pausing", m.pauseKEDAResource)
-		return mdl, cmd, true
-	case "Unpause":
-		mdl, cmd := m.executeActionSimpleLoading("Unpausing", m.unpauseKEDAResource)
+	case "Pause/Unpause":
+		mdl, cmd := m.executeActionSimpleLoading("Toggling pause for", m.toggleKEDAPause)
 		return mdl, cmd, true
 	case "Reconcile":
 		mdl, cmd := m.executeActionSimpleLoading("Reconciling", m.reconcileFluxResource)
-		return mdl, cmd, true
-	case "Suspend":
-		mdl, cmd := m.executeActionSimpleLoading("Suspending", m.suspendFluxResource)
-		return mdl, cmd, true
-	case "Resume":
-		mdl, cmd := m.executeActionSimpleLoading("Resuming", m.resumeFluxResource)
 		return mdl, cmd, true
 	case "Values":
 		mdl, cmd := m.executeActionHelmValues(false)

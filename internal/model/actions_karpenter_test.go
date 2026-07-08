@@ -20,10 +20,8 @@ func TestKarpenterActions_NodeClaim(t *testing.T) {
 	}
 	assert.Contains(t, labels, "Disrupt",
 		"NodeClaim must offer Disrupt (type-to-confirm; deletes the NodeClaim so Karpenter terminates the node)")
-	assert.Contains(t, labels, "Cordon Node",
-		"NodeClaim must offer Cordon Node (resolves status.nodeName then runs kubectl cordon)")
-	assert.Contains(t, labels, "Uncordon Node",
-		"NodeClaim must offer Uncordon Node (resolves status.nodeName then runs kubectl uncordon)")
+	assert.Contains(t, labels, "Cordon/Uncordon Node",
+		"NodeClaim must offer Cordon/Uncordon Node (resolves status.nodeName then toggles spec.unschedulable)")
 	assert.Contains(t, labels, "Drain Node",
 		"NodeClaim must offer Drain Node (resolves status.nodeName then runs the drain flow)")
 	// Standard actions still present.
@@ -51,10 +49,8 @@ func TestKarpenterActions_NodePool(t *testing.T) {
 	assert.Contains(t, labels, "Events")
 	assert.NotContains(t, labels, "Disrupt",
 		"NodePool does not offer Disrupt — that verb only applies to a single NodeClaim")
-	assert.NotContains(t, labels, "Cordon Node",
+	assert.NotContains(t, labels, "Cordon/Uncordon Node",
 		"NodePool has no single underlying node to cordon")
-	assert.NotContains(t, labels, "Uncordon Node",
-		"NodePool has no single underlying node to uncordon")
 	assert.NotContains(t, labels, "Drain Node",
 		"NodePool has no single underlying node to drain")
 }
@@ -74,10 +70,8 @@ func TestKarpenterActions_EC2NodeClass(t *testing.T) {
 	assert.Contains(t, labels, "Events")
 	assert.NotContains(t, labels, "Disrupt",
 		"EC2NodeClass is a node-launch template, not a node — Disrupt does not apply")
-	assert.NotContains(t, labels, "Cordon Node",
-		"EC2NodeClass is a node-launch template, not a node — Cordon Node does not apply")
-	assert.NotContains(t, labels, "Uncordon Node",
-		"EC2NodeClass is a node-launch template, not a node — Uncordon Node does not apply")
+	assert.NotContains(t, labels, "Cordon/Uncordon Node",
+		"EC2NodeClass is a node-launch template, not a node — Cordon/Uncordon Node does not apply")
 	assert.NotContains(t, labels, "Drain Node",
 		"EC2NodeClass is a node-launch template, not a node — Drain Node does not apply")
 }

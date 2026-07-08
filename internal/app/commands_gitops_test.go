@@ -106,7 +106,7 @@ func TestCovReconcileFluxResource(t *testing.T) {
 	assert.Error(t, result.err)
 }
 
-func TestCovSuspendFluxResource(t *testing.T) {
+func TestCovToggleFluxSuspend(t *testing.T) {
 	m := baseModelWithFakeClient()
 	rt := model.ResourceTypeEntry{
 		APIGroup:   "kustomize.toolkit.fluxcd.io",
@@ -114,21 +114,7 @@ func TestCovSuspendFluxResource(t *testing.T) {
 		Resource:   "kustomizations",
 	}
 	m = withActionCtx(m, "my-ks", "flux-system", "Kustomization", rt)
-	cmd := m.suspendFluxResource()
-	msg := execScheduled(t, m, cmd)
-	result := msg.(actionResultMsg)
-	assert.Error(t, result.err)
-}
-
-func TestCovResumeFluxResource(t *testing.T) {
-	m := baseModelWithFakeClient()
-	rt := model.ResourceTypeEntry{
-		APIGroup:   "kustomize.toolkit.fluxcd.io",
-		APIVersion: "v1",
-		Resource:   "kustomizations",
-	}
-	m = withActionCtx(m, "my-ks", "flux-system", "Kustomization", rt)
-	cmd := m.resumeFluxResource()
+	cmd := m.toggleFluxSuspend()
 	msg := execScheduled(t, m, cmd)
 	result := msg.(actionResultMsg)
 	assert.Error(t, result.err)
@@ -216,19 +202,10 @@ func TestCovSubmitWorkflowFromTemplateClusterScope(t *testing.T) {
 	}
 }
 
-func TestCovSuspendCronWorkflow(t *testing.T) {
+func TestCovToggleCronWorkflowSuspend(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-cwf", "argo", "CronWorkflow", model.ResourceTypeEntry{})
-	cmd := m.suspendCronWorkflow()
-	msg := execScheduled(t, m, cmd)
-	result := msg.(actionResultMsg)
-	assert.Error(t, result.err)
-}
-
-func TestCovResumeCronWorkflow(t *testing.T) {
-	m := baseModelWithFakeClient()
-	m = withActionCtx(m, "my-cwf", "argo", "CronWorkflow", model.ResourceTypeEntry{})
-	cmd := m.resumeCronWorkflow()
+	cmd := m.toggleCronWorkflowSuspend()
 	msg := execScheduled(t, m, cmd)
 	result := msg.(actionResultMsg)
 	assert.Error(t, result.err)
@@ -275,7 +252,7 @@ func TestCovForceRefreshExternalSecretClusterScoped(t *testing.T) {
 	assert.Error(t, result.err)
 }
 
-func TestCovPauseKEDAResource(t *testing.T) {
+func TestCovToggleKEDAPause(t *testing.T) {
 	m := baseModelWithFakeClient()
 	rt := model.ResourceTypeEntry{
 		APIGroup:   "keda.sh",
@@ -283,21 +260,7 @@ func TestCovPauseKEDAResource(t *testing.T) {
 		Resource:   "scaledobjects",
 	}
 	m = withActionCtx(m, "my-so", "default", "ScaledObject", rt)
-	cmd := m.pauseKEDAResource()
-	msg := execScheduled(t, m, cmd)
-	result := msg.(actionResultMsg)
-	assert.Error(t, result.err)
-}
-
-func TestCovUnpauseKEDAResource(t *testing.T) {
-	m := baseModelWithFakeClient()
-	rt := model.ResourceTypeEntry{
-		APIGroup:   "keda.sh",
-		APIVersion: "v1alpha1",
-		Resource:   "scaledobjects",
-	}
-	m = withActionCtx(m, "my-so", "default", "ScaledObject", rt)
-	cmd := m.unpauseKEDAResource()
+	cmd := m.toggleKEDAPause()
 	msg := execScheduled(t, m, cmd)
 	result := msg.(actionResultMsg)
 	assert.Error(t, result.err)

@@ -90,8 +90,8 @@ func (m Model) reconcileFluxResource() tea.Cmd {
 	})
 }
 
-// suspendFluxResource suspends a Flux resource.
-func (m Model) suspendFluxResource() tea.Cmd {
+// toggleFluxSuspend suspends or resumes a Flux resource, flipping spec.suspend.
+func (m Model) toggleFluxSuspend() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
@@ -101,34 +101,17 @@ func (m Model) suspendFluxResource() tea.Cmd {
 		Version:  rt.APIVersion,
 		Resource: rt.Resource,
 	}
-	logGitOps("Flux suspend requested", ctx, ns, name, "kind", rt.Kind)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Suspend Flux: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		err := m.client.SuspendFluxResource(ctx, ns, name, gvr)
+	logGitOps("Flux suspend toggle requested", ctx, ns, name, "kind", rt.Kind)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Toggle Flux suspend: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
+		suspended, err := m.client.ToggleFluxSuspend(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
-		return actionResultMsg{message: fmt.Sprintf("Suspended %s", name)}
-	})
-}
-
-// resumeFluxResource resumes a Flux resource.
-func (m Model) resumeFluxResource() tea.Cmd {
-	ctx := m.actionCtx.context
-	ns := m.actionNamespace()
-	name := m.actionCtx.name
-	rt := m.actionCtx.resourceType
-	gvr := schema.GroupVersionResource{
-		Group:    rt.APIGroup,
-		Version:  rt.APIVersion,
-		Resource: rt.Resource,
-	}
-	logGitOps("Flux resume requested", ctx, ns, name, "kind", rt.Kind)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resume Flux: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		err := m.client.ResumeFluxResource(ctx, ns, name, gvr)
-		if err != nil {
-			return actionResultMsg{err: err}
+		verb := "Resumed"
+		if suspended {
+			verb = "Suspended"
 		}
-		return actionResultMsg{message: fmt.Sprintf("Resumed %s", name)}
+		return actionResultMsg{message: fmt.Sprintf("%s %s", verb, name)}
 	})
 }
 
@@ -229,29 +212,21 @@ func (m Model) submitWorkflowFromTemplate(clusterScope bool) tea.Cmd {
 	})
 }
 
-func (m Model) suspendCronWorkflow() tea.Cmd {
+func (m Model) toggleCronWorkflowSuspend() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
-	logGitOps("Argo CronWorkflow suspend requested", ctx, ns, name)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Suspend cron workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		if err := m.client.SuspendCronWorkflow(ctx, ns, name); err != nil {
+	logGitOps("Argo CronWorkflow suspend toggle requested", ctx, ns, name)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Toggle cron workflow suspend: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
+		suspended, err := m.client.ToggleCronWorkflowSuspend(ctx, ns, name)
+		if err != nil {
 			return actionResultMsg{err: err}
 		}
-		return actionResultMsg{message: fmt.Sprintf("Suspended cron workflow %s", name)}
-	})
-}
-
-func (m Model) resumeCronWorkflow() tea.Cmd {
-	ctx := m.actionCtx.context
-	ns := m.actionNamespace()
-	name := m.actionCtx.name
-	logGitOps("Argo CronWorkflow resume requested", ctx, ns, name)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resume cron workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		if err := m.client.ResumeCronWorkflow(ctx, ns, name); err != nil {
-			return actionResultMsg{err: err}
+		verb := "Resumed"
+		if suspended {
+			verb = "Suspended"
 		}
-		return actionResultMsg{message: fmt.Sprintf("Resumed cron workflow %s", name)}
+		return actionResultMsg{message: fmt.Sprintf("%s cron workflow %s", verb, name)}
 	})
 }
 
@@ -304,8 +279,9 @@ func (m Model) forceRefreshExternalSecret() tea.Cmd {
 	})
 }
 
-// pauseKEDAResource pauses a KEDA ScaledObject or ScaledJob.
-func (m Model) pauseKEDAResource() tea.Cmd {
+// toggleKEDAPause pauses or resumes autoscaling on a KEDA ScaledObject or
+// ScaledJob, flipping the paused-replicas annotation.
+func (m Model) toggleKEDAPause() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
@@ -315,34 +291,17 @@ func (m Model) pauseKEDAResource() tea.Cmd {
 		Version:  rt.APIVersion,
 		Resource: rt.Resource,
 	}
-	logGitOps("KEDA pause requested", ctx, ns, name, "kind", rt.Kind)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Pause KEDA: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		err := m.client.PauseKEDAResource(ctx, ns, name, gvr)
+	logGitOps("KEDA pause toggle requested", ctx, ns, name, "kind", rt.Kind)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Toggle KEDA pause: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
+		paused, err := m.client.ToggleKEDAPause(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
-		return actionResultMsg{message: fmt.Sprintf("Paused %s", name)}
-	})
-}
-
-// unpauseKEDAResource unpauses a KEDA ScaledObject or ScaledJob.
-func (m Model) unpauseKEDAResource() tea.Cmd {
-	ctx := m.actionCtx.context
-	ns := m.actionNamespace()
-	name := m.actionCtx.name
-	rt := m.actionCtx.resourceType
-	gvr := schema.GroupVersionResource{
-		Group:    rt.APIGroup,
-		Version:  rt.APIVersion,
-		Resource: rt.Resource,
-	}
-	logGitOps("KEDA unpause requested", ctx, ns, name, "kind", rt.Kind)
-	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Unpause KEDA: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		err := m.client.UnpauseKEDAResource(ctx, ns, name, gvr)
-		if err != nil {
-			return actionResultMsg{err: err}
+		verb := "Unpaused"
+		if paused {
+			verb = "Paused"
 		}
-		return actionResultMsg{message: fmt.Sprintf("Unpaused %s", name)}
+		return actionResultMsg{message: fmt.Sprintf("%s %s", verb, name)}
 	})
 }
 

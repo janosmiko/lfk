@@ -345,6 +345,29 @@ func TestResumeFluxResource(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestToggleFluxSuspend(t *testing.T) {
+	ks := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+			"kind":       "Kustomization",
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
+		},
+	}
+	dc := newFakeDynClient(ks)
+	c := newFakeClient(nil, dc)
+	gvr := schema.GroupVersionResource{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}
+
+	// Unset spec.suspend toggles to suspended.
+	suspended, err := c.ToggleFluxSuspend("", "flux-system", "my-ks", gvr)
+	require.NoError(t, err)
+	assert.True(t, suspended)
+
+	// A second toggle resumes it.
+	suspended, err = c.ToggleFluxSuspend("", "flux-system", "my-ks", gvr)
+	require.NoError(t, err)
+	assert.False(t, suspended)
+}
+
 func TestForceRenewCertificate(t *testing.T) {
 	cert := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -489,6 +512,26 @@ func TestResumeCronWorkflow(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestToggleCronWorkflowSuspend(t *testing.T) {
+	cw := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "argoproj.io/v1alpha1",
+			"kind":       "CronWorkflow",
+			"metadata":   map[string]any{"name": "my-cw", "namespace": "default"},
+		},
+	}
+	dc := newFakeDynClient(cw)
+	c := newFakeClient(nil, dc)
+
+	suspended, err := c.ToggleCronWorkflowSuspend("", "default", "my-cw")
+	require.NoError(t, err)
+	assert.True(t, suspended)
+
+	suspended, err = c.ToggleCronWorkflowSuspend("", "default", "my-cw")
+	require.NoError(t, err)
+	assert.False(t, suspended)
+}
+
 func TestPauseKEDAResource(t *testing.T) {
 	so := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -527,6 +570,31 @@ func TestUnpauseKEDAResource(t *testing.T) {
 	err := c.UnpauseKEDAResource("", "default", "my-so",
 		schema.GroupVersionResource{Group: "keda.sh", Version: "v1alpha1", Resource: "scaledobjects"})
 	require.NoError(t, err)
+}
+
+func TestToggleKEDAPause(t *testing.T) {
+	so := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "keda.sh/v1alpha1",
+			"kind":       "ScaledObject",
+			"metadata":   map[string]any{"name": "my-so", "namespace": "default"},
+		},
+	}
+	dc := newFakeDynClientWith(map[schema.GroupVersionResource]string{
+		{Group: "keda.sh", Version: "v1alpha1", Resource: "scaledobjects"}: "ScaledObjectList",
+	}, so)
+	c := newFakeClient(nil, dc)
+	gvr := schema.GroupVersionResource{Group: "keda.sh", Version: "v1alpha1", Resource: "scaledobjects"}
+
+	// No paused annotation -> toggle pauses it.
+	paused, err := c.ToggleKEDAPause("", "default", "my-so", gvr)
+	require.NoError(t, err)
+	assert.True(t, paused)
+
+	// A second toggle unpauses it.
+	paused, err = c.ToggleKEDAPause("", "default", "my-so", gvr)
+	require.NoError(t, err)
+	assert.False(t, paused)
 }
 
 func TestGetWorkflowStatus(t *testing.T) {

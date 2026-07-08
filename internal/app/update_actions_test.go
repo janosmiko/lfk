@@ -925,19 +925,11 @@ func TestCovExecuteActionForceFinalize(t *testing.T) {
 	assert.Equal(t, "Force Finalize", rm.pendingAction)
 }
 
-func TestCovExecuteActionCordon(t *testing.T) {
+func TestCovExecuteActionToggleCordon(t *testing.T) {
 	m := testModelExec()
+	m.actionCtx.kind = "Node"
 	m.actionCtx.name = "node-1"
-	result, cmd := m.executeAction("Cordon")
-	rm := result.(Model)
-	assert.NotNil(t, cmd)
-	assert.True(t, rm.loading)
-}
-
-func TestCovExecuteActionUncordon(t *testing.T) {
-	m := testModelExec()
-	m.actionCtx.name = "node-1"
-	result, cmd := m.executeAction("Uncordon")
+	result, cmd := m.executeAction("Cordon/Uncordon")
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
@@ -966,6 +958,15 @@ func TestCovExecuteActionTrigger(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.kind = "CronJob"
 	result, cmd := m.executeAction("Trigger")
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.True(t, rm.loading)
+}
+
+func TestCovExecuteActionToggleCronJobSuspend(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.kind = "CronJob"
+	result, cmd := m.executeAction("Suspend/Resume")
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
@@ -1497,17 +1498,10 @@ func TestCovExecuteActionSubmitClusterWorkflow(t *testing.T) {
 	assert.True(t, rm.loading)
 }
 
-func TestCovExecuteActionSuspendCronWorkflow(t *testing.T) {
+func TestCovExecuteActionSuspendResumeCronWorkflow(t *testing.T) {
 	m := testModelExec()
-	result, cmd := m.executeAction("Suspend CronWorkflow")
-	rm := result.(Model)
-	assert.NotNil(t, cmd)
-	assert.True(t, rm.loading)
-}
-
-func TestCovExecuteActionResumeCronWorkflow(t *testing.T) {
-	m := testModelExec()
-	result, cmd := m.executeAction("Resume CronWorkflow")
+	m.actionCtx.kind = "CronWorkflow"
+	result, cmd := m.executeAction("Suspend/Resume")
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
@@ -1529,17 +1523,9 @@ func TestCovExecuteActionForceRefresh(t *testing.T) {
 	assert.True(t, rm.loading)
 }
 
-func TestCovExecuteActionPause(t *testing.T) {
+func TestCovExecuteActionTogglePause(t *testing.T) {
 	m := testModelExec()
-	result, cmd := m.executeAction("Pause")
-	rm := result.(Model)
-	assert.NotNil(t, cmd)
-	assert.True(t, rm.loading)
-}
-
-func TestCovExecuteActionUnpause(t *testing.T) {
-	m := testModelExec()
-	result, cmd := m.executeAction("Unpause")
+	result, cmd := m.executeAction("Pause/Unpause")
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
@@ -1553,20 +1539,32 @@ func TestCovExecuteActionReconcile(t *testing.T) {
 	assert.True(t, rm.loading)
 }
 
-func TestCovExecuteActionSuspend(t *testing.T) {
+func TestCovExecuteActionSuspendResumeFlux(t *testing.T) {
 	m := testModelExec()
-	result, cmd := m.executeAction("Suspend")
+	m.actionCtx.kind = "Kustomization"
+	m.actionCtx.resourceType = model.ResourceTypeEntry{APIGroup: "kustomize.toolkit.fluxcd.io"}
+	result, cmd := m.executeAction("Suspend/Resume")
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
 }
 
-func TestCovExecuteActionResume(t *testing.T) {
+// TestExecuteActionSuspendResumeUnsupportedKind verifies the default-branch
+// guard: a kind that is neither CronJob/CronWorkflow nor a Flux reconcilable
+// gets a clear error instead of a stray Flux toggle.
+func TestExecuteActionSuspendResumeUnsupportedKind(t *testing.T) {
 	m := testModelExec()
-	result, cmd := m.executeAction("Resume")
+	m.actionCtx.kind = "Deployment"
+	m.actionCtx.resourceType = model.ResourceTypeEntry{APIGroup: "apps"}
+	result, cmd := m.executeAction("Suspend/Resume")
 	rm := result.(Model)
-	assert.NotNil(t, cmd)
-	assert.True(t, rm.loading)
+	assert.False(t, rm.loading, "guard clears loading before returning")
+	require.NotNil(t, cmd)
+	msg := cmd()
+	amsg, ok := msg.(actionResultMsg)
+	require.True(t, ok)
+	require.Error(t, amsg.err)
+	assert.Contains(t, amsg.err.Error(), "Deployment")
 }
 
 func TestCovExecuteActionOpenInBrowserPF(t *testing.T) {
@@ -1820,19 +1818,10 @@ func TestFinalExecuteActionForceFinalize(t *testing.T) {
 	assert.Equal(t, "Force Finalize", rm.pendingAction)
 }
 
-func TestFinalExecuteActionCordon(t *testing.T) {
+func TestFinalExecuteActionToggleCordon(t *testing.T) {
 	m := baseFinalModel()
 	m.actionCtx.kind = "Node"
-	result, cmd := m.executeAction("Cordon")
-	require.NotNil(t, cmd)
-	rm := result.(Model)
-	assert.True(t, rm.loading)
-}
-
-func TestFinalExecuteActionUncordon(t *testing.T) {
-	m := baseFinalModel()
-	m.actionCtx.kind = "Node"
-	result, cmd := m.executeAction("Uncordon")
+	result, cmd := m.executeAction("Cordon/Uncordon")
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.True(t, rm.loading)
@@ -2116,17 +2105,10 @@ func TestFinalExecuteActionSubmitWorkflowCluster(t *testing.T) {
 	assert.True(t, rm.loading)
 }
 
-func TestFinalExecuteActionSuspendCronWorkflow(t *testing.T) {
+func TestFinalExecuteActionSuspendResumeCronWorkflow(t *testing.T) {
 	m := baseFinalModel()
-	result, cmd := m.executeAction("Suspend CronWorkflow")
-	require.NotNil(t, cmd)
-	rm := result.(Model)
-	assert.True(t, rm.loading)
-}
-
-func TestFinalExecuteActionResumeCronWorkflow(t *testing.T) {
-	m := baseFinalModel()
-	result, cmd := m.executeAction("Resume CronWorkflow")
+	m.actionCtx.kind = "CronWorkflow"
+	result, cmd := m.executeAction("Suspend/Resume")
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.True(t, rm.loading)
@@ -2148,17 +2130,9 @@ func TestFinalExecuteActionForceRefresh(t *testing.T) {
 	assert.True(t, rm.loading)
 }
 
-func TestFinalExecuteActionPause(t *testing.T) {
+func TestFinalExecuteActionTogglePause(t *testing.T) {
 	m := baseFinalModel()
-	result, cmd := m.executeAction("Pause")
-	require.NotNil(t, cmd)
-	rm := result.(Model)
-	assert.True(t, rm.loading)
-}
-
-func TestFinalExecuteActionUnpause(t *testing.T) {
-	m := baseFinalModel()
-	result, cmd := m.executeAction("Unpause")
+	result, cmd := m.executeAction("Pause/Unpause")
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.True(t, rm.loading)
@@ -2172,17 +2146,11 @@ func TestFinalExecuteActionReconcile(t *testing.T) {
 	assert.True(t, rm.loading)
 }
 
-func TestFinalExecuteActionSuspend(t *testing.T) {
+func TestFinalExecuteActionSuspendResumeFlux(t *testing.T) {
 	m := baseFinalModel()
-	result, cmd := m.executeAction("Suspend")
-	require.NotNil(t, cmd)
-	rm := result.(Model)
-	assert.True(t, rm.loading)
-}
-
-func TestFinalExecuteActionResume(t *testing.T) {
-	m := baseFinalModel()
-	result, cmd := m.executeAction("Resume")
+	m.actionCtx.kind = "Kustomization"
+	m.actionCtx.resourceType = model.ResourceTypeEntry{APIGroup: "kustomize.toolkit.fluxcd.io"}
+	result, cmd := m.executeAction("Suspend/Resume")
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.True(t, rm.loading)

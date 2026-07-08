@@ -307,6 +307,28 @@ func (c *Client) SuspendCronWorkflow(contextName, namespace, name string) error 
 	return nil
 }
 
+// ToggleCronWorkflowSuspend flips an Argo CronWorkflow's spec.suspend and
+// returns the new value: true when scheduling is now suspended, false when
+// resumed. The live object is read first so the toggle stays authoritative.
+func (c *Client) ToggleCronWorkflowSuspend(contextName, namespace, name string) (bool, error) {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return false, err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "cronworkflows"}
+	obj, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("getting cron workflow %s: %w", name, err)
+	}
+
+	suspended, _, _ := unstructured.NestedBool(obj.Object, "spec", "suspend")
+	if suspended {
+		return false, c.ResumeCronWorkflow(contextName, namespace, name)
+	}
+	return true, c.SuspendCronWorkflow(contextName, namespace, name)
+}
+
 // ResumeCronWorkflow sets spec.suspend=false on an Argo CronWorkflow.
 func (c *Client) ResumeCronWorkflow(contextName, namespace, name string) error {
 	dynClient, err := c.dynamicForContext(contextName)
