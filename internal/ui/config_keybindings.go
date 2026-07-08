@@ -99,9 +99,11 @@ type Keybindings struct {
 	SelectAll    string `json:"select_all" yaml:"select_all"`
 
 	// Tabs
-	NewTab  string `json:"new_tab" yaml:"new_tab"`
-	NextTab string `json:"next_tab" yaml:"next_tab"`
-	PrevTab string `json:"prev_tab" yaml:"prev_tab"`
+	NewTab       string `json:"new_tab" yaml:"new_tab"`
+	NextTab      string `json:"next_tab" yaml:"next_tab"`
+	PrevTab      string `json:"prev_tab" yaml:"prev_tab"`
+	MoveTabLeft  string `json:"move_tab_left" yaml:"move_tab_left"`
+	MoveTabRight string `json:"move_tab_right" yaml:"move_tab_right"`
 
 	// Bookmarks
 	SetMark   string `json:"set_mark" yaml:"set_mark"`
@@ -220,8 +222,10 @@ func DefaultKeybindings() Keybindings {
 		// Multi-selection
 		ToggleSelect: " ", SelectRange: "ctrl+@", SelectAll: "ctrl+a",
 
-		// Tabs
+		// Tabs. Move keys mirror the switch keys: "}" (shift+]) moves the
+		// active tab one slot right, "{" (shift+[) one slot left.
 		NewTab: "t", NextTab: "]", PrevTab: "[",
+		MoveTabLeft: "{", MoveTabRight: "}",
 
 		// Bookmarks
 		SetMark: "m", OpenMarks: "'",

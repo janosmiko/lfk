@@ -449,6 +449,8 @@
         "new_tab": { "type": "string" },
         "next_tab": { "type": "string" },
         "prev_tab": { "type": "string" },
+        "move_tab_left": { "type": "string" },
+        "move_tab_right": { "type": "string" },
         "set_mark": { "type": "string" },
         "open_marks": { "type": "string" },
         "terminal_toggle": { "type": "string" },

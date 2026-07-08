@@ -863,6 +863,8 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `t` | New tab (clone current view) |
 | `]` | Next tab |
 | `[` | Previous tab |
+| `}` | Move current tab right (shift+]) |
+| `{` | Move current tab left (shift+[) |
 
 ## Read-Only Mode
 
@@ -1179,6 +1181,8 @@ keybindings:
   new_tab: "t"           # New tab
   next_tab: "]"          # Next tab
   prev_tab: "["          # Previous tab
+  move_tab_left: "{"     # Move current tab left
+  move_tab_right: "}"    # Move current tab right
 
   # Bookmarks
   set_mark: "m"          # Set mark

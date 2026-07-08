@@ -20,6 +20,11 @@ func TestDefaultKeybindings_CriticalDefaults(t *testing.T) {
 	assert.Equal(t, " ", kb.ToggleSelect)
 	assert.Equal(t, "t", kb.NewTab)
 	assert.Equal(t, "m", kb.SetMark)
+	// Move-tab keys mirror the switch keys (shift+] / shift+[).
+	assert.Equal(t, "]", kb.NextTab)
+	assert.Equal(t, "[", kb.PrevTab)
+	assert.Equal(t, "}", kb.MoveTabRight)
+	assert.Equal(t, "{", kb.MoveTabLeft)
 }
 
 func TestMergeKeybindings_OverridesNonEmpty(t *testing.T) {

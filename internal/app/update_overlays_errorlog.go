@@ -42,7 +42,7 @@ func (m Model) errorLogForwardGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 	}
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
-	case kb.NewTab, kb.NextTab, kb.PrevTab:
+	case kb.NewTab, kb.NextTab, kb.PrevTab, kb.MoveTabLeft, kb.MoveTabRight:
 		if mdl, cmd, ok := m.handleExplorerActionKey(msg); ok {
 			return mdl, cmd, true
 		}

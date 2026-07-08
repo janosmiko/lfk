@@ -111,6 +111,16 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			m, logCmd := m.maybeRestartOrCancelPreviewLog()
 			return m, tea.Batch(m.postTabSwitchCmd(), logCmd), true
 		}
+	case kb.MoveTabLeft:
+		if m.moveActiveTab(-1) {
+			m.setStatusMessage(fmt.Sprintf("Tab moved to position %d", m.activeTab+1), false)
+			return m, scheduleStatusClear(), true
+		}
+	case kb.MoveTabRight:
+		if m.moveActiveTab(+1) {
+			m.setStatusMessage(fmt.Sprintf("Tab moved to position %d", m.activeTab+1), false)
+			return m, scheduleStatusClear(), true
+		}
 	case kb.NewTab:
 		if m.mode == modeKubetris && m.kubetrisGame != nil && !m.kubetrisGame.paused {
 			m.kubetrisGame.paused = true

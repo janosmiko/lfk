@@ -410,6 +410,8 @@ keybindings:
   security_ignore_toggle: "i" # Show/hide ignored security findings (default: i; security view only — shadows the Label Editor there)
   session_manager: "C" # Open the session manager overlay: save/switch/delete named workspace sessions (default: C)
   security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
+  move_tab_left: "{" # Move the current tab one slot left (default: { = shift+[)
+  move_tab_right: "}" # Move the current tab one slot right (default: } = shift+])
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
 # Short names for resource types used in search/filter.
