@@ -42,6 +42,13 @@ File locations:
   Override dirs for portable installs: LFK_CONFIG_DIR, LFK_STATE_DIR, LFK_DATA_DIR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliOpts.KubeconfigExclusiveSet = cmd.Flags().Changed("kubeconfig-exclusive")
+			// LFK_SESSION is the env equivalent of --session; the explicit
+			// flag wins when both are set.
+			if !cmd.Flags().Changed("session") {
+				if s := os.Getenv("LFK_SESSION"); s != "" {
+					cliOpts.Session = s
+				}
+			}
 			return runTUI(cliOpts)
 		},
 		// Silence cobra's own usage/error printing so the TUI is not disrupted.
@@ -53,6 +60,7 @@ File locations:
 	rootCmd.Flags().StringArrayVar(&cliOpts.UnionContexts, "union-context", nil, "Cluster context to include in union view (repeatable; requires --namespace)")
 	rootCmd.Flags().StringVar(&cliOpts.UnionSet, "union-set", "", "Named union_sets entry from config to expand into a union view (mutex with --union-context and --context; --namespace overrides the set's namespace)")
 	rootCmd.Flags().StringSliceVarP(&cliOpts.Namespaces, "namespace", "n", nil, "Namespace(s) to filter (repeatable, disables all-namespaces mode)")
+	rootCmd.Flags().StringVar(&cliOpts.Session, "session", "", "Named session to open at startup; created on first save if it doesn't exist. Becomes the active session (auto-saved to on quit). Also accepts the LFK_SESSION env var. Mutually exclusive with --context.")
 	rootCmd.Flags().StringVar(&cliOpts.Kubeconfig, "kubeconfig", "", "Path to kubeconfig file (overrides default discovery)")
 	rootCmd.Flags().BoolVar(&cliOpts.KubeconfigExclusive, "kubeconfig-exclusive", true, "When KUBECONFIG is set, load only the files it lists (kubectl semantics) and skip ~/.kube/config and the default ~/.kube/config.d/ scan. Pass --kubeconfig-exclusive=false to merge everything like older releases. Also configurable as kubeconfig_exclusive in config or the LFK_KUBECONFIG_EXCLUSIVE env var.")
 	rootCmd.Flags().StringArrayVar(&cliOpts.KubeconfigDirs, "kubeconfig-dir", nil, "Directory to scan for kubeconfig files instead of ~/.kube/config.d/. Repeatable: pass multiple flags to merge several directories. Also accepts KUBECONFIG_DIR env var (colon-separated). ~/ is expanded against $HOME.")
