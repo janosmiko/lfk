@@ -98,6 +98,37 @@ func TestActionKeyBraceMoveTabAtEdgeStillHandled(t *testing.T) {
 	assert.True(t, handled)
 }
 
+// TestTabSwitchKeyBraceMovesTabInFullscreenViewer covers the second dispatch
+// path: in a fullscreen viewer (not explorer/exec) the brace keys route through
+// handleTabSwitchKey, which is gated off in explorer/exec by inputActive.
+func TestTabSwitchKeyBraceMovesTabInFullscreenViewer(t *testing.T) {
+	m := threeTabModel(0) // active = prod
+	m.mode = modeYAML     // fullscreen viewer
+
+	mdl, _, handled := m.handleTabSwitchKey(runeKey('}'))
+	require.True(t, handled)
+	right := mdl.(Model)
+	assert.Equal(t, 1, right.activeTab)
+	assert.Equal(t, []string{"staging", "prod", "dev"}, tabContexts(right))
+
+	mdl, _, handled = right.handleTabSwitchKey(runeKey('{'))
+	require.True(t, handled)
+	left := mdl.(Model)
+	assert.Equal(t, 0, left.activeTab)
+	assert.Equal(t, []string{"prod", "staging", "dev"}, tabContexts(left))
+}
+
+// TestTabSwitchKeyBraceMoveTabAtEdgeFallsThrough verifies the fullscreen path
+// does NOT claim the key on a no-op move (matching NextTab/PrevTab), so the
+// brace can still reach a viewer that might bind it.
+func TestTabSwitchKeyBraceMoveTabAtEdgeFallsThrough(t *testing.T) {
+	m := threeTabModel(2) // active = dev (rightmost)
+	m.mode = modeYAML
+
+	_, _, handled := m.handleTabSwitchKey(runeKey('}'))
+	assert.False(t, handled, "no-op move must fall through in the fullscreen path")
+}
+
 // TestMoveActiveTab_KeepsPreviewLogStream is a regression guard: a move is not a
 // tab switch, so it must not cancel the live preview-log stream (which is never
 // restarted afterward). moveActiveTab must avoid saveCurrentTab's
