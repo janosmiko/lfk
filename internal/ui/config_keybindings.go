@@ -68,6 +68,7 @@ type Keybindings struct {
 	ColumnToggle      string `json:"column_toggle" yaml:"column_toggle"`
 	ToggleRare        string `json:"toggle_rare" yaml:"toggle_rare"`
 	OrphanOverlay     string `json:"orphan_overlay" yaml:"orphan_overlay"`
+	SessionManager    string `json:"session_manager" yaml:"session_manager"`
 
 	// Actions
 	NamespaceSelector string `json:"namespace_selector" yaml:"namespace_selector"`
@@ -203,7 +204,8 @@ func DefaultKeybindings() Keybindings {
 		QuotaDashboard: "Q", TasksOverlay: "`",
 		ExpandCollapse: "z", PinGroup: "p",
 		ColumnToggle: ",", ToggleRare: "H",
-		OrphanOverlay: "Z",
+		OrphanOverlay:  "Z",
+		SessionManager: "C",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",

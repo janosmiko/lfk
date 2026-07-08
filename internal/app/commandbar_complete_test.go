@@ -244,6 +244,73 @@ func TestCompleteBuiltin_ContextArg(t *testing.T) {
 	assert.Empty(t, got, "nil client should yield no context suggestions")
 }
 
+func TestCompleteBuiltin_SessionSubcommand(t *testing.T) {
+	tokens := []token{
+		{text: "session", start: 0, end: 7},
+		{text: "d", start: 8, end: 9},
+	}
+	m := baseModelCov()
+	got := completeBuiltin(tokens, &m)
+	assert.True(t, hasSuggestionCategory(got, "delete", "subcommand"),
+		"should suggest 'delete' for prefix 'd'")
+	assert.False(t, hasSuggestion(got, "save"),
+		"'save' should not match prefix 'd'")
+}
+
+func TestCompleteBuiltin_SessionNameArg(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	assert.NoError(t, saveNamedSession(NamedSession{
+		Name: "prod-debug", SavedAt: time.Now(),
+		State: SessionState{Context: "c1"},
+	}))
+	assert.NoError(t, saveNamedSession(NamedSession{
+		Name: "staging", SavedAt: time.Now(),
+		State: SessionState{Context: "c2"},
+	}))
+
+	tokens := []token{
+		{text: "session", start: 0, end: 7},
+		{text: "delete", start: 8, end: 14},
+		{text: "prod", start: 15, end: 19},
+	}
+	m := baseModelCov()
+	got := completeBuiltin(tokens, &m)
+	assert.True(t, hasSuggestionCategory(got, "prod-debug", "session"),
+		"should suggest existing session 'prod-debug' matching prefix 'prod'")
+	assert.False(t, hasSuggestion(got, "staging"),
+		"'staging' should not match prefix 'prod'")
+}
+
+func TestCompleteBuiltin_SessionNameArg_SaveSubcommand(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	assert.NoError(t, saveNamedSession(NamedSession{
+		Name: "prod-debug", SavedAt: time.Now(),
+		State: SessionState{Context: "c1"},
+	}))
+
+	tokens := []token{
+		{text: "session", start: 0, end: 7},
+		{text: "save", start: 8, end: 12},
+		{text: "prod", start: 13, end: 17},
+	}
+	m := baseModelCov()
+	got := completeBuiltin(tokens, &m)
+	assert.True(t, hasSuggestionCategory(got, "prod-debug", "session"),
+		"save should also suggest existing session names (to support overwrite)")
+}
+
+func TestCompleteBuiltin_SessionArg_StopsAfterName(t *testing.T) {
+	tokens := []token{
+		{text: "session", start: 0, end: 7},
+		{text: "delete", start: 8, end: 14},
+		{text: "prod-debug", start: 15, end: 25},
+		{text: "extra", start: 26, end: 31},
+	}
+	m := baseModelCov()
+	got := completeBuiltin(tokens, &m)
+	assert.Empty(t, got, "no suggestions once the session name is filled in")
+}
+
 // --- completeKubectl ---
 
 // TestCompleteKubectlBareKShowsSubcommands verifies that typing just

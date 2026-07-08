@@ -91,6 +91,8 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.ClusterColorPicker
 	case overlayOrphans:
 		return key == kb.OrphanOverlay
+	case overlaySessions:
+		return key == kb.SessionManager
 	case overlayLocalClusters:
 		return key == kb.LocalClusterManager
 	case overlayCopyFormat:
@@ -137,6 +139,9 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		return mdl, cmd, true
 	case overlayBookmarks:
 		mdl, cmd := m.handleBookmarkOverlayKey(msg)
+		return mdl, cmd, true
+	case overlaySessions:
+		mdl, cmd := m.handleSessionsOverlayKey(msg)
 		return mdl, cmd, true
 	case overlayTemplates:
 		mdl, cmd := m.handleTemplateOverlayKey(msg)

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"sigs.k8s.io/yaml"
 
@@ -125,11 +126,10 @@ func saveSession(s SessionState) error {
 	return os.WriteFile(path, data, 0o600)
 }
 
-// saveCurrentSession persists the current navigation state to the session file.
-func (m *Model) saveCurrentSession() {
-	if m.unionMode {
-		return
-	}
+// buildSessionState snapshots the current workspace (all tabs) into a
+// SessionState. Callers that persist it (auto-save, named-session save) share
+// this so the payload never diverges.
+func (m *Model) buildSessionState() SessionState {
 	// Ensure the active tab's state is up to date before serialising.
 	m.saveCurrentTab()
 
@@ -178,10 +178,28 @@ func (m *Model) saveCurrentSession() {
 		s.Context = s.Tabs[s.ActiveTab].Context
 	}
 
+	return s
+}
+
+// saveCurrentSession persists the current navigation state to the session file.
+func (m *Model) saveCurrentSession() {
+	if m.unionMode {
+		return
+	}
 	// Session persistence is best-effort, but a write failure means the
 	// next start won't restore the active context — log it so users can
-	// diagnose disk-full / permissions issues from lfk.log.
-	if err := saveSession(s); err != nil {
-		logger.Error("Failed to persist session state", "error", err)
+	// diagnose disk-full / permissions issues from lfk.log. The active
+	// session decides the target: the default workspace goes to session.yaml,
+	// a named session to its own sessions/<name>.yaml so it never clobbers
+	// the default's tabs.
+	state := m.buildSessionState()
+	if m.activeSession == "" {
+		if err := saveSession(state); err != nil {
+			logger.Error("Failed to persist session state", "error", err)
+		}
+		return
+	}
+	if err := saveNamedSession(NamedSession{Name: m.activeSession, SavedAt: time.Now(), State: state}); err != nil {
+		logger.Error("Failed to persist named session state", "session", m.activeSession, "error", err)
 	}
 }

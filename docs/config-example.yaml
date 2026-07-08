@@ -408,6 +408,7 @@ keybindings:
   mouse_toggle: "alt+ctrl+y" # Suspend/resume mouse capture for native text selection (Ctrl+Option+Y; default: alt+ctrl+y)
   cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; shares "L" with toggle_preview_logs, gated by level — at the cluster picker "L" opens this, at deeper levels it toggles the live-log preview)
   security_ignore_toggle: "i" # Show/hide ignored security findings (default: i; security view only — shadows the Label Editor there)
+  session_manager: "C" # Open the session manager overlay: save/switch/delete named workspace sessions (default: C)
   security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────

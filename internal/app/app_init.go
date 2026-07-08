@@ -47,6 +47,9 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	hiddenSt := loadHiddenTypesState()
 	sortMem := loadSortMemory()
 	colPrefs := loadColumnPrefs()
+	// Resolve which session to open: --session / LFK_SESSION, else the
+	// persisted active session, else the default workspace (session.yaml).
+	activeSession, pendingSession := loadStartupSession(opts.Session)
 	m := Model{
 		client: client,
 		// Start in the loading state. Init() dispatches loadContexts()
@@ -57,7 +60,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		loading:             true,
 		nav:                 model.NavigationState{Level: model.LevelClusters},
 		bookmarks:           loadBookmarks(),
-		pendingSession:      loadSession(),
+		pendingSession:      pendingSession,
 		pendingPortForwards: loadPortForwardState(),
 		commandHistory:      loadCommandHistory(),
 		queryHistory:        loadInputHistory(historyFileQuery),
@@ -100,6 +103,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			hiddenBuiltinColumns: colPrefs.hiddenBuiltinColumns,
 			columnOrder:          colPrefs.columnOrder,
 		},
+		sessionsOverlayState:       sessionsOverlayState{activeSession: activeSession},
 		cursorMemory:               make(map[string]int),
 		filterMemory:               make(map[string]savedFilter),
 		itemCache:                  make(map[string][]model.Item),
@@ -184,6 +188,11 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			Context: contextName,
 			Tabs:    []SessionTab{tab},
 		}
+		// CLI overrides (--context/--namespace/--union) replace the workspace
+		// with a synthetic one, so auto-save must target the default
+		// (session.yaml), not clobber a named session (e.g. --session foo
+		// --context bar) with mismatched state.
+		m.activeSession = ""
 	}
 
 	if opts.IsUnionMode() {

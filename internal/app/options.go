@@ -18,6 +18,7 @@ type StartupOptions struct {
 	// renderer in the merged view.
 	UnionContextColors      map[string]string
 	Namespaces              []string
+	Session                 string // --session / LFK_SESSION: named session to open at startup ("" = default workspace).
 	Kubeconfig              string
 	KubeconfigDirs          []string // --kubeconfig-dir: repeatable; each occurrence adds a directory to scan.
 	KubeconfigExclusive     bool     // --kubeconfig-exclusive: a set KUBECONFIG suppresses default discovery.

@@ -47,6 +47,8 @@ var builtinCommands = map[string]string{
 	"orphans":   "orphans",
 	"reload":    "reload",
 	"refresh":   "reload",
+	"session":   "session",
+	"sessions":  "sessions",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.
