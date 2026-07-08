@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.15.1](https://github.com/janosmiko/lfk/compare/v0.15.0...v0.15.1) (2026-07-08)
+
+
+### Features
+
+* **actions:** add CronJob Suspend/Resume and unify toggle actions ([#505](https://github.com/janosmiko/lfk/issues/505)) ([0257a63](https://github.com/janosmiko/lfk/commit/0257a630412499699b6facc4abf6cbae3c18c498))
+* **node:** stream kubectl drain output into the embedded terminal ([#506](https://github.com/janosmiko/lfk/issues/506)) ([5ef7591](https://github.com/janosmiko/lfk/commit/5ef75910827de4006281284d5927a537024b9db4))
+* **sessions:** named sessions with an active-session model ([#509](https://github.com/janosmiko/lfk/issues/509)) ([d8da84b](https://github.com/janosmiko/lfk/commit/d8da84bf0078fa6d147f12cb5fd8b4bc179d431f))
+* **tabs:** move active tab left/right ([#512](https://github.com/janosmiko/lfk/issues/512)) ([aadfac5](https://github.com/janosmiko/lfk/commit/aadfac529234170b6dbf35f06bae0a9e31c3eac1))
+
+
+### Bug Fixes
+
+* **namespace:** keep selector open on first Enter over a sole filtered result ([#508](https://github.com/janosmiko/lfk/issues/508)) ([ffbcdfb](https://github.com/janosmiko/lfk/commit/ffbcdfb0813679d16695bef15cc8bd3ee0e4a033))
+* **node:** humanize node Mem Alloc (6895736Ki -&gt; 6.6Gi) ([#511](https://github.com/janosmiko/lfk/issues/511)) ([7c4ba0d](https://github.com/janosmiko/lfk/commit/7c4ba0d4401d8bff4c083b833cf96a11759b6b13))
+* **sessions:** show live tab count for the active session ([#513](https://github.com/janosmiko/lfk/issues/513)) ([08b0c04](https://github.com/janosmiko/lfk/commit/08b0c04d0d581a737255340e759b7bb0ef6cf87f))
+
 ## [0.15.0](https://github.com/janosmiko/lfk/compare/v0.14.19...v0.15.0) (2026-07-07)
 
 
