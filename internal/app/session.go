@@ -125,11 +125,10 @@ func saveSession(s SessionState) error {
 	return os.WriteFile(path, data, 0o600)
 }
 
-// saveCurrentSession persists the current navigation state to the session file.
-func (m *Model) saveCurrentSession() {
-	if m.unionMode {
-		return
-	}
+// buildSessionState snapshots the current workspace (all tabs) into a
+// SessionState. Callers that persist it (auto-save, named-session save) share
+// this so the payload never diverges.
+func (m *Model) buildSessionState() SessionState {
 	// Ensure the active tab's state is up to date before serialising.
 	m.saveCurrentTab()
 
@@ -178,10 +177,18 @@ func (m *Model) saveCurrentSession() {
 		s.Context = s.Tabs[s.ActiveTab].Context
 	}
 
+	return s
+}
+
+// saveCurrentSession persists the current navigation state to the session file.
+func (m *Model) saveCurrentSession() {
+	if m.unionMode {
+		return
+	}
 	// Session persistence is best-effort, but a write failure means the
 	// next start won't restore the active context — log it so users can
 	// diagnose disk-full / permissions issues from lfk.log.
-	if err := saveSession(s); err != nil {
+	if err := saveSession(m.buildSessionState()); err != nil {
 		logger.Error("Failed to persist session state", "error", err)
 	}
 }

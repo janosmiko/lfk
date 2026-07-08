@@ -314,6 +314,12 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Reloading...", false)
 		return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
 
+	case "session":
+		return m.executeSessionCommand(tokens[1:])
+
+	case "sessions":
+		return m.openSessionsOverlay()
+
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
 		return m, scheduleStatusClear()
