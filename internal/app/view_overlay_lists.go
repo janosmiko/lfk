@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -144,6 +145,27 @@ func renderBookmarkOverlay(m Model) string {
 		FilterActive: m.bookmarkSearchMode == bookmarkModeFilter,
 		ShowKey:      true,
 		EmptyMessage: "No bookmarks yet — press m<key> in the explorer to set a mark",
+	}, min(w, m.width-10)-4)
+}
+
+// renderSessionsOverlay maps the named-session picker onto OverlayList.
+func renderSessionsOverlay(m Model) string {
+	const w = 90
+	now := time.Now()
+	filtered := m.filteredNamedSessions()
+	items := make([]ui.OverlayListItem, 0, len(filtered))
+	for _, s := range filtered {
+		desc := fmt.Sprintf("%d tabs · saved %s", len(s.State.Tabs), formatSavedAgo(s.SavedAt, now))
+		items = append(items, ui.OverlayListItem{Name: s.Name, Description: desc})
+	}
+	return ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:           "Sessions",
+		Cursor:          m.overlayCursor,
+		Filterable:      true,
+		Filter:          m.sessionsFilter.Value,
+		FilterActive:    m.sessionsFilterMode,
+		ShowDescription: true,
+		EmptyMessage:    "No saved sessions — :session save <name>",
 	}, min(w, m.width-10)-4)
 }
 

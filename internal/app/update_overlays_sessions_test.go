@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,4 +50,30 @@ func TestSessionCommandSaveRejectedInUnionMode(t *testing.T) {
 	rm := ret.(Model)
 	assert.True(t, rm.statusMessageErr)
 	assert.Contains(t, rm.statusMessage, "union")
+}
+
+func TestSessionsOverlayRendersList(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	require.NoError(t, saveNamedSession(NamedSession{
+		Name: "prod-debug", SavedAt: time.Now().Add(-2 * time.Hour),
+		State: SessionState{Tabs: []SessionTab{{Context: "a"}, {Context: "b"}, {Context: "c"}}},
+	}))
+	m := basePush80Model()
+	ret, _ := m.openSessionsOverlay()
+	rm := ret.(Model)
+	assert.Equal(t, overlaySessions, rm.overlay)
+	require.Len(t, rm.sessionsList, 1)
+
+	out := stripANSI(renderSessionsOverlay(rm))
+	assert.Contains(t, out, "prod-debug")
+	assert.Contains(t, out, "3 tabs")
+}
+
+func TestSessionsOverlayEmptyState(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush80Model()
+	ret, _ := m.openSessionsOverlay()
+	rm := ret.(Model)
+	out := stripANSI(renderSessionsOverlay(rm))
+	assert.Contains(t, out, "No saved sessions")
 }

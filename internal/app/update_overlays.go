@@ -138,6 +138,9 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 	case overlayBookmarks:
 		mdl, cmd := m.handleBookmarkOverlayKey(msg)
 		return mdl, cmd, true
+	case overlaySessions:
+		mdl, cmd := m.handleSessionsOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayTemplates:
 		mdl, cmd := m.handleTemplateOverlayKey(msg)
 		return mdl, cmd, true

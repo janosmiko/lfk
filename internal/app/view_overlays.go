@@ -214,6 +214,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
 		return renderBookmarkOverlay(m), w, h, true
+	case overlaySessions:
+		w, h := min(90, m.width-10), min(25, m.height-6)
+		return renderSessionsOverlay(m), w, h, true
 	case overlayTemplates:
 		content, h := renderTemplateOverlay(m)
 		return content, min(60, m.width-10), h, true

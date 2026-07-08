@@ -415,7 +415,7 @@ type Model struct {
 	// Reset on overlay close and consumed after each jump so it never
 	// leaks between opens.
 	bookmarkLoadNamespace bool
-
+	sessionsOverlayState
 	// Template overlay state.
 	templateItems      []model.ResourceTemplate
 	templateCursor     int

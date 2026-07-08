@@ -171,6 +171,8 @@ func (m Model) overlayHintBarSelector() string {
 		return m.overlayHintBarOverlayLogContainerSelect()
 	case overlayBookmarks:
 		return m.overlayHintBarBookmarks()
+	case overlaySessions:
+		return m.overlayHintBarSessions()
 	case overlayColorscheme:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "navigate"},

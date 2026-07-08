@@ -49,6 +49,7 @@ const (
 	overlayContainerSelect
 	overlayPodSelect
 	overlayBookmarks
+	overlaySessions
 	overlayTemplates
 	overlaySecretEditor
 	overlayConfigMapEditor

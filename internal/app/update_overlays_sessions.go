@@ -5,6 +5,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // executeSessionCommand handles `:session save <name>` / `:session delete <name>`.
@@ -61,6 +63,48 @@ func (m Model) sessionDelete(name string) (tea.Model, tea.Cmd) {
 	return m, scheduleStatusClear()
 }
 
-// openSessionsOverlay is a temporary stub; Task 3 replaces it with the real
-// session-picker overlay.
-func (m Model) openSessionsOverlay() (tea.Model, tea.Cmd) { return m, nil }
+// sessionsOverlayState holds the sessions-picker overlay runtime fields,
+// embedded into Model to keep app.go under the file-length cap.
+type sessionsOverlayState struct {
+	sessionsList       []NamedSession
+	sessionsFilter     TextInput // filter text (/ mode) for sessions overlay
+	sessionsFilterMode bool
+}
+
+// openSessionsOverlay loads the saved sessions and opens the picker overlay.
+func (m Model) openSessionsOverlay() (tea.Model, tea.Cmd) {
+	m.sessionsList = listNamedSessions()
+	m.sessionsFilter.Clear()
+	m.sessionsFilterMode = false
+	m.overlayCursor = 0
+	m.overlay = overlaySessions
+	return m, nil
+}
+
+// filteredNamedSessions returns m.sessionsList filtered by sessionsFilter.
+func (m Model) filteredNamedSessions() []NamedSession {
+	if m.sessionsFilter.Value == "" {
+		return m.sessionsList
+	}
+	var out []NamedSession
+	for _, s := range m.sessionsList {
+		if ui.MatchLine(s.Name, m.sessionsFilter.Value) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// handleSessionsOverlayKey is a temporary stub; Task 4 replaces it with the
+// real key handler (switch/delete/filter).
+func (m Model) handleSessionsOverlayKey(_ tea.KeyMsg) (tea.Model, tea.Cmd) { return m, nil }
+
+// overlayHintBarSessions returns the hint bar for the sessions picker overlay.
+func (m Model) overlayHintBarSessions() string {
+	return m.renderHints([]ui.HintEntry{
+		{Key: "enter", Desc: "switch"},
+		{Key: "d", Desc: "delete"},
+		{Key: "/", Desc: "filter"},
+		{Key: "esc", Desc: "close"},
+	})
+}
