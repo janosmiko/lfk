@@ -66,11 +66,21 @@ func namedSessionPath(name string) string {
 	return filepath.Join(dir, stem+".yaml")
 }
 
-// saveNamedSession writes ns to <StateDir>/sessions/<sanitized>.yaml.
+// saveNamedSession writes ns to <StateDir>/sessions/<sanitized>.yaml. Two
+// different display names can sanitize to the same filename (e.g. "prod
+// debug" and "prod/debug" both become "prod-debug"); if that file already
+// holds a different name, refuse to overwrite instead of silently destroying
+// the other session. A same-name save (the intended update path) proceeds.
+// A corrupt existing file is treated as non-colliding so one bad file can't
+// permanently block saving under a colliding sanitized name.
 func saveNamedSession(ns NamedSession) error {
+	stem := sanitizeSessionName(ns.Name)
 	path := namedSessionPath(ns.Name)
 	if path == "" {
 		return fmt.Errorf("invalid session name: %q", ns.Name)
+	}
+	if existing, err := loadNamedSession(ns.Name); err == nil && existing.Name != ns.Name {
+		return fmt.Errorf("a different session already uses the name %q — choose another name", stem)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err

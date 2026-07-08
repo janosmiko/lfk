@@ -51,6 +51,38 @@ func TestNamedSessionRoundTripAndList(t *testing.T) {
 	assert.False(t, existed)
 }
 
+func TestSaveNamedSession_RejectsDifferentNameCollision(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	base := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
+
+	require.NoError(t, saveNamedSession(NamedSession{
+		Name: "prod debug", SavedAt: base,
+		State: SessionState{Context: "c1", Tabs: []SessionTab{{Context: "c1"}}},
+	}))
+
+	// "prod/debug" sanitizes to the same "prod-debug.yaml" file as "prod debug".
+	err := saveNamedSession(NamedSession{
+		Name: "prod/debug", SavedAt: base.Add(time.Hour),
+		State: SessionState{Context: "c2", Tabs: []SessionTab{{Context: "c2"}}},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prod-debug")
+
+	got, loadErr := loadNamedSession("prod debug")
+	require.NoError(t, loadErr)
+	assert.Equal(t, "prod debug", got.Name, "first session must not be overwritten")
+	assert.Equal(t, "c1", got.State.Context)
+
+	// Re-saving under the SAME name is an intended update and must still overwrite.
+	require.NoError(t, saveNamedSession(NamedSession{
+		Name: "prod debug", SavedAt: base.Add(2 * time.Hour),
+		State: SessionState{Context: "c3", Tabs: []SessionTab{{Context: "c3"}}},
+	}))
+	got, loadErr = loadNamedSession("prod debug")
+	require.NoError(t, loadErr)
+	assert.Equal(t, "c3", got.State.Context, "same-name save should overwrite")
+}
+
 func TestFormatSavedAgo(t *testing.T) {
 	now := time.Date(2026, 7, 8, 12, 0, 0, 0, time.UTC)
 	assert.Equal(t, "just now", formatSavedAgo(now.Add(-10*time.Second), now))
