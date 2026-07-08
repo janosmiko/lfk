@@ -135,6 +135,7 @@ func helpSections() []helpSection {
 				{"", "Resource jump: :pod, :dep, :svc (navigate to resource type)"},
 				{"", "  With namespace: :pod kube-system (jump + filter namespace)"},
 				{"", "Built-in: :ns (navigate to NS or filter), :ctx <name>, :set <opt>, :sort <col>, :export <fmt>"},
+				{"", "Sessions: :session save <name>, :session delete <name>, :sessions (picker: enter=switch, d=delete, /=filter)"},
 				{"", "Kubectl: :k get pod, :kubectl describe pod (requires k/kubectl prefix)"},
 				{"", "Shell: :! <command> (run arbitrary shell command)"},
 				{"", ""},

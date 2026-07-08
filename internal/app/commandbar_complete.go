@@ -171,6 +171,11 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 	if singleArg && len(tokens) > 2 {
 		return nil
 	}
+	// :session takes a subcommand plus a name (two args), unlike the
+	// single-arg commands above.
+	if canonical == "session" && len(tokens) > 3 {
+		return nil
+	}
 
 	lastToken := tokens[len(tokens)-1]
 	prefix := strings.ToLower(lastToken.text)
@@ -199,6 +204,8 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 		return filterSuggestionsFuzzy([]string{"yaml", "json"}, prefix, "format")
 	case "orphans":
 		return filterSuggestionsFuzzy(orphanKindCompletions(), prefix, "kind")
+	case "session":
+		return completeSessionArg(tokens, prefix)
 	default:
 		return nil
 	}
@@ -278,6 +285,31 @@ func builtinCommandNames() []string {
 // orphanKindCompletions returns the kind tokens accepted by :orphans.
 func orphanKindCompletions() []string {
 	return []string{"pods", "secrets", "configmaps", "services"}
+}
+
+// sessionSubcommands returns the subcommands accepted by :session.
+func sessionSubcommands() []string {
+	return []string{"save", "delete", "rm"}
+}
+
+// completeSessionArg completes the `:session <save|delete|rm> [name]` chain:
+// the second token picks the subcommand, the third completes an existing
+// session name from listNamedSessions() (useful for delete, and to
+// overwrite a save).
+func completeSessionArg(tokens []token, prefix string) []ui.Suggestion {
+	if len(tokens) == 2 {
+		return filterSuggestionsTyped(sessionSubcommands(), prefix, "subcommand")
+	}
+	sub := strings.ToLower(tokens[1].text)
+	if sub != "save" && sub != "delete" && sub != "rm" {
+		return nil
+	}
+	sessions := listNamedSessions()
+	names := make([]string, 0, len(sessions))
+	for _, ns := range sessions {
+		names = append(names, ns.Name)
+	}
+	return filterSuggestionsFuzzy(names, prefix, "session")
 }
 
 // setOptions returns the available options for the :set command.
