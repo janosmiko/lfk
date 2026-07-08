@@ -99,6 +99,63 @@ func TestSessionsOverlayShowsDefaultRow(t *testing.T) {
 	assert.Contains(t, stripANSI(renderSessionsOverlay(rm)), "default")
 }
 
+// TestSessionsOverlayDefaultRowShowsLiveTabCount guards the reported bug: on the
+// default session, opening new tabs (which do not persist session.yaml) must
+// still show the live tab count, not the stale on-disk count.
+func TestSessionsOverlayDefaultRowShowsLiveTabCount(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	// session.yaml on disk holds a single tab (the last persisted state).
+	require.NoError(t, saveSession(SessionState{Tabs: []SessionTab{{Context: "a"}}}))
+
+	m := basePush80Model() // activeSession == "" (default)
+	m.tabs = []TabState{{}, {}, {}}
+	m.activeTab = 0
+
+	ret, _ := m.openSessionsOverlay()
+	rm := ret.(Model)
+
+	rows := rm.sessionRows()
+	require.NotEmpty(t, rows)
+	assert.True(t, rows[0].isDefault)
+	assert.Equal(t, 3, rows[0].tabs, "default row shows live tab count, not the stale disk count")
+	assert.Contains(t, stripANSI(renderSessionsOverlay(rm)), "3 tabs")
+}
+
+// TestSessionsOverlayActiveNamedRowShowsLiveTabCount extends the fix to a named
+// session that is currently active: its row reflects the live tabs, while a
+// non-active named session keeps its persisted count.
+func TestSessionsOverlayActiveNamedRowShowsLiveTabCount(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	require.NoError(t, saveNamedSession(NamedSession{
+		Name: "work", SavedAt: time.Now(),
+		State: SessionState{Tabs: []SessionTab{{Context: "a"}, {Context: "b"}}},
+	}))
+	require.NoError(t, saveNamedSession(NamedSession{
+		Name: "other", SavedAt: time.Now(),
+		State: SessionState{Tabs: []SessionTab{{Context: "x"}}},
+	}))
+
+	m := basePush80Model()
+	m.activeSession = "work"
+	m.tabs = []TabState{{}, {}, {}, {}} // 4 live tabs
+	m.activeTab = 0
+
+	ret, _ := m.openSessionsOverlay()
+	rm := ret.(Model)
+
+	var work, other sessionRow
+	for _, r := range rm.sessionRows() {
+		switch r.name {
+		case "work":
+			work = r
+		case "other":
+			other = r
+		}
+	}
+	assert.Equal(t, 4, work.tabs, "active named session shows live tab count")
+	assert.Equal(t, 1, other.tabs, "inactive named session keeps its persisted count")
+}
+
 func TestSessionsOverlayEnterSwitches(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	require.NoError(t, saveNamedSession(NamedSession{

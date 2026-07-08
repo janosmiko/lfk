@@ -100,9 +100,18 @@ type sessionRow struct {
 // openSessionsOverlay loads the saved sessions and opens the picker overlay.
 func (m Model) openSessionsOverlay() (tea.Model, tea.Cmd) {
 	m.sessionsList = listNamedSessions()
-	m.defaultSessionTabs = 0
-	if s := loadSession(); s != nil {
-		m.defaultSessionTabs = len(s.Tabs)
+	// The default workspace's row shows the live tab count when it is the
+	// active session: new tabs are not persisted to session.yaml until a
+	// navigation/quit, so the on-disk count would be stale. When a named
+	// session is active instead, the default is dormant, so its last-saved
+	// session.yaml count is the best available.
+	if m.activeSession == "" {
+		m.defaultSessionTabs = len(m.tabs)
+	} else {
+		m.defaultSessionTabs = 0
+		if s := loadSession(); s != nil {
+			m.defaultSessionTabs = len(s.Tabs)
+		}
 	}
 	m.sessionsFilter.Clear()
 	m.sessionsFilterMode = false
@@ -119,7 +128,13 @@ func (m Model) sessionRows() []sessionRow {
 	rows := make([]sessionRow, 0, len(m.sessionsList)+1)
 	rows = append(rows, sessionRow{label: defaultSessionLabel, tabs: m.defaultSessionTabs, isDefault: true})
 	for _, s := range m.sessionsList {
-		rows = append(rows, sessionRow{name: s.Name, label: s.Name, tabs: len(s.State.Tabs), savedAt: s.SavedAt})
+		// The active named session's live tabs supersede its persisted count
+		// (same staleness as the default row), mirroring openSessionsOverlay.
+		tabs := len(s.State.Tabs)
+		if s.Name == m.activeSession {
+			tabs = len(m.tabs)
+		}
+		rows = append(rows, sessionRow{name: s.Name, label: s.Name, tabs: tabs, savedAt: s.SavedAt})
 	}
 	if m.sessionsFilter.Value == "" {
 		return rows
