@@ -2,8 +2,11 @@ package k8s
 
 import (
 	"encoding/base64"
+	"fmt"
 	"sort"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -84,7 +87,7 @@ func populateNodeStatus(ti *model.Item, status map[string]any) {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "CPU Alloc", Value: cpu})
 		}
 		if mem, ok := alloc["memory"].(string); ok {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Mem Alloc", Value: mem})
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Mem Alloc", Value: humanizeMemory(mem)})
 		}
 		if pods, ok := alloc["pods"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pods Alloc", Value: pods})
@@ -215,5 +218,31 @@ func populateSecretDetails(ti *model.Item, obj map[string]any) {
 	}
 	if sType, ok := obj["type"].(string); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Type", Value: sType})
+	}
+}
+
+// humanizeMemory converts a Kubernetes memory quantity to a compact Gi/Mi form
+// for display. The kubelet reports node allocatable/capacity memory in Ki
+// (e.g. "6895736Ki"), which is unreadable in a list — this renders it as
+// "6.6Gi". Falls back to the original string if it can't be parsed. Mirrors
+// ui.FormatMemory, which the k8s layer cannot import (layering).
+func humanizeMemory(s string) string {
+	q, err := resource.ParseQuantity(s)
+	if err != nil {
+		return s
+	}
+	b := q.Value()
+	switch {
+	case b >= 1024*1024*1024:
+		// Keep one decimal for fractional values (6.6Gi) but drop it for whole
+		// ones (8Gi, not 8.0Gi).
+		gi := strings.TrimSuffix(fmt.Sprintf("%.1f", float64(b)/(1024*1024*1024)), ".0")
+		return gi + "Gi"
+	case b >= 1024*1024:
+		return fmt.Sprintf("%.0fMi", float64(b)/(1024*1024))
+	case b >= 1024:
+		return fmt.Sprintf("%.0fKi", float64(b)/1024)
+	default:
+		return fmt.Sprintf("%dB", b)
 	}
 }
