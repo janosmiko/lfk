@@ -473,7 +473,7 @@ func TestNamespaceOverlayEnterCommitsExcludeSet(t *testing.T) {
 	assert.False(t, result.allNamespaces)
 }
 
-// --- filter-accept single-result apply clears a restored exclude scope ---
+// --- committing a single filtered namespace clears a restored exclude scope ---
 
 func TestNamespaceOverlayFilterAcceptSingleResultClearsNegation(t *testing.T) {
 	m := newNamespaceOverlayModel()
@@ -484,11 +484,15 @@ func TestNamespaceOverlayFilterAcceptSingleResultClearsNegation(t *testing.T) {
 	m.nsFilterMode = true
 	m.overlayFilter.Value = "kube-system"
 
+	// First Enter accepts the filter and keeps the overlay open; the second
+	// Enter (normal mode) commits the single cursored namespace.
 	ret, _ := m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter))
+	m = ret.(Model)
+	ret, _ = m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter))
 	result := ret.(Model)
 
 	assert.False(t, result.nsSelectionNegated,
-		"applying a single filtered namespace must clear the restored negation")
+		"committing a single filtered namespace must clear the restored negation")
 	assert.True(t, result.selectedNamespaces["kube-system"],
 		"the filtered namespace must be committed as an include selection")
 	assert.False(t, result.allNamespaces)

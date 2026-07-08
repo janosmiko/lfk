@@ -13,6 +13,59 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// The namespace filter's first Enter must NOT auto-apply a single filtered
+// result: it accepts the filter and keeps the overlay open so the user can add
+// more namespaces with Space (build a multi-namespace scope).
+func TestNamespaceOverlayFilterEnterKeepsOverlayOpen(t *testing.T) {
+	m := newNamespaceOverlayModel()
+	m.nsFilterMode = true
+	m.overlayFilter.Value = "kube-system" // narrows to a single result
+
+	ret, _ := m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNamespace, result.overlay, "overlay stays open on first Enter")
+	assert.False(t, result.nsFilterMode, "filter-typing mode is left")
+	assert.Nil(t, result.selectedNamespaces, "single result is not auto-applied")
+	assert.False(t, result.allNamespaces)
+}
+
+// After the first Enter keeps the overlay open, Space adds the filtered
+// namespace to the selection and a second Enter applies it.
+func TestNamespaceOverlayFilterEnterThenSpaceThenEnterApplies(t *testing.T) {
+	m := newNamespaceOverlayModel()
+	m.nsFilterMode = true
+	m.overlayFilter.Value = "kube-system"
+
+	ret, _ := m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter)) // accept filter, keep open
+	m = ret.(Model)
+	ret, _ = m.handleNamespaceOverlayKey(specialKey(tea.KeySpace)) // add to selection
+	m = ret.(Model)
+	assert.True(t, m.selectedNamespaces["kube-system"])
+
+	ret, _ = m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter)) // apply and close
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay, "second Enter applies and closes")
+	assert.True(t, result.selectedNamespaces["kube-system"])
+}
+
+// A plain second Enter (no Space) on the single filtered result applies it as
+// the sole namespace and closes.
+func TestNamespaceOverlayFilterEnterTwiceAppliesSingle(t *testing.T) {
+	m := newNamespaceOverlayModel()
+	m.nsFilterMode = true
+	m.overlayFilter.Value = "kube-system"
+
+	ret, _ := m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter)) // accept filter, keep open
+	m = ret.(Model)
+	ret, _ = m.handleNamespaceOverlayKey(specialKey(tea.KeyEnter)) // apply single
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.True(t, result.selectedNamespaces["kube-system"])
+	assert.False(t, result.allNamespaces)
+}
+
 // --- handleNamespaceOverlayKey: normal mode ---
 
 func TestNamespaceOverlayEscClosesWithNoFilter(t *testing.T) {
@@ -256,7 +309,7 @@ func TestNamespaceFilterModeEnterCommits(t *testing.T) {
 // Filter narrows the list to a single concrete namespace: Enter must apply
 // it and close the overlay so the user does not have to press Enter again
 // on a one-row list.
-func TestNamespaceFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
+func TestNamespaceFilterModeEnterOnSoleResultKeepsOpen(t *testing.T) {
 	items := []model.Item{
 		{Name: "All Namespaces", Status: "all"},
 		{Name: "default"},
@@ -274,12 +327,13 @@ func TestNamespaceFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
 	}
 	ret, cmd := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
 	result := ret.(Model)
+	// First Enter only leaves filter mode; the sole result is NOT applied so
+	// the user can still add more namespaces with Space.
 	assert.False(t, result.nsFilterMode)
-	assert.Equal(t, overlayNone, result.overlay)
-	assert.Equal(t, "kube-system", result.namespace)
-	assert.True(t, result.selectedNamespaces["kube-system"])
-	assert.False(t, result.allNamespaces)
-	assert.NotNil(t, cmd)
+	assert.Equal(t, overlayNamespace, result.overlay, "overlay stays open")
+	assert.Nil(t, result.selectedNamespaces, "sole result is not auto-applied")
+	assert.True(t, result.allNamespaces, "prior scope is untouched until a namespace is committed")
+	assert.Nil(t, cmd)
 }
 
 // Two filtered results: Enter must keep the legacy behavior — exit filter

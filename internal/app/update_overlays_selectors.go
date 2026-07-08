@@ -379,34 +379,12 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		// When the filter narrows to a single result and the user hasn't
-		// been multi-selecting with Space, Enter is unambiguous: apply
-		// that result and close. Without this, the user has to press
-		// Enter twice (once to leave filter mode, once to commit) on a
-		// list that has only one row — the second Enter is busy work.
-		if !m.nsSelectionModified {
-			items := m.filteredOverlayItems()
-			if len(items) == 1 {
-				oldNs := m.namespace
-				m.nsSelectionNegated = false
-				if items[0].Status == "all" {
-					m.selectedNamespaces = nil
-					m.allNamespaces = true
-				} else {
-					ns := items[0].Name
-					m.selectedNamespaces = map[string]bool{ns: true}
-					m.namespace = ns
-					m.allNamespaces = false
-				}
-				m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
-				m.overlay = overlayNone
-				m.overlayFilter.Clear()
-				m.saveCurrentSession()
-				m.cancelAndReset()
-				m.requestGen++
-				return m, m.refreshCurrentLevel()
-			}
-		}
+		// Enter here only leaves filter-typing mode and keeps the overlay
+		// open (cursor on the first — often only — filtered row). It never
+		// auto-applies a single result: that would prevent building a
+		// multi-namespace scope. The user commits from normal mode with a
+		// second Enter (apply the cursor's namespace) or adds more with
+		// Space first. The retained filter keeps the narrowed row visible.
 		return m, nil
 	case filterClose:
 		// Ctrl+C in filter mode closes the overlay, not the tab —
