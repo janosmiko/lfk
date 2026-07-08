@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -72,39 +73,76 @@ type sessionsOverlayState struct {
 	// activeSession is the named session that auto-save writes to and that
 	// startup restored. "" means the built-in default workspace (session.yaml).
 	activeSession string
+	// defaultSessionTabs is the tab count of the default workspace
+	// (session.yaml), snapshotted at overlay-open so the "default" row can show
+	// it without a per-frame disk read.
+	defaultSessionTabs int
+	// sessionsSaveMode is true while the overlay prompts for a name (the "s"
+	// save-as key); sessionsSaveInput holds the typed name.
+	sessionsSaveMode  bool
+	sessionsSaveInput TextInput
+}
+
+// defaultSessionLabel is the display name of the built-in default workspace in
+// the picker; it has no sessions/<name>.yaml file (it lives in session.yaml).
+const defaultSessionLabel = "default"
+
+// sessionRow is one row in the picker: the built-in default plus each saved
+// named session. An empty name identifies the default workspace.
+type sessionRow struct {
+	name      string // "" for the default workspace
+	label     string
+	tabs      int
+	savedAt   time.Time
+	isDefault bool
 }
 
 // openSessionsOverlay loads the saved sessions and opens the picker overlay.
 func (m Model) openSessionsOverlay() (tea.Model, tea.Cmd) {
 	m.sessionsList = listNamedSessions()
+	m.defaultSessionTabs = 0
+	if s := loadSession(); s != nil {
+		m.defaultSessionTabs = len(s.Tabs)
+	}
 	m.sessionsFilter.Clear()
 	m.sessionsFilterMode = false
+	m.sessionsSaveMode = false
+	m.sessionsSaveInput.Clear()
 	m.overlayCursor = 0
 	m.overlay = overlaySessions
 	return m, nil
 }
 
-// filteredNamedSessions returns m.sessionsList filtered by sessionsFilter.
-func (m Model) filteredNamedSessions() []NamedSession {
-	if m.sessionsFilter.Value == "" {
-		return m.sessionsList
-	}
-	var out []NamedSession
+// sessionRows returns the picker rows: the default workspace first, then the
+// saved named sessions, filtered by the current filter text (matched on label).
+func (m Model) sessionRows() []sessionRow {
+	rows := make([]sessionRow, 0, len(m.sessionsList)+1)
+	rows = append(rows, sessionRow{label: defaultSessionLabel, tabs: m.defaultSessionTabs, isDefault: true})
 	for _, s := range m.sessionsList {
-		if ui.MatchLine(s.Name, m.sessionsFilter.Value) {
-			out = append(out, s)
+		rows = append(rows, sessionRow{name: s.Name, label: s.Name, tabs: len(s.State.Tabs), savedAt: s.SavedAt})
+	}
+	if m.sessionsFilter.Value == "" {
+		return rows
+	}
+	out := rows[:0:0]
+	for _, r := range rows {
+		if ui.MatchLine(r.label, m.sessionsFilter.Value) {
+			out = append(out, r)
 		}
 	}
 	return out
 }
 
 // handleSessionsOverlayKey handles keys for the sessions picker overlay:
-// enter=switch, d=delete, /=filter, esc/q=close.
+// enter=switch, s=save-as, d=delete, /=filter, esc/q=close.
 func (m Model) handleSessionsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.sessionsSaveMode {
+		return m.handleSessionsSaveMode(msg)
+	}
 	if m.sessionsFilterMode {
 		return m.handleSessionsFilterMode(msg)
 	}
-	items := m.filteredNamedSessions()
+	rows := m.sessionRows()
 	switch msg.String() {
 	case "esc", "q":
 		if m.sessionsFilter.Value != "" {
@@ -115,35 +153,49 @@ func (m Model) handleSessionsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, nil
 	case "enter":
-		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
-			return m.switchToNamedSession(items[m.overlayCursor])
+		if m.overlayCursor >= 0 && m.overlayCursor < len(rows) {
+			return m.switchToSession(rows[m.overlayCursor].name)
 		}
+		return m, nil
+	case "s":
+		m.sessionsSaveMode = true
+		m.sessionsSaveInput.Clear()
 		return m, nil
 	case "d":
-		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
-			name := items[m.overlayCursor].Name
-			if _, err := deleteNamedSession(name); err != nil {
-				m.setStatusMessage("Delete failed: "+err.Error(), true)
-				return m, scheduleStatusClear()
-			}
-			m.sessionsList = listNamedSessions()
-			m.overlayCursor = clampOverlayCursor(m.overlayCursor, 0, len(m.filteredNamedSessions())-1)
-			m.setStatusMessage("Deleted session: "+name, false)
-			return m, scheduleStatusClear()
-		}
-		return m, nil
+		return m.deleteSessionRow(rows)
 	case "/":
 		m.sessionsFilterMode = true
 		m.sessionsFilter.Clear()
 		return m, nil
 	case "j", "down", "ctrl+n":
-		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
+		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(rows)-1)
 		return m, nil
 	case "k", "up", "ctrl+p":
-		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
+		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(rows)-1)
 		return m, nil
 	}
 	return m, nil
+}
+
+// deleteSessionRow deletes the highlighted named session. The default row has
+// no file and cannot be deleted.
+func (m Model) deleteSessionRow(rows []sessionRow) (tea.Model, tea.Cmd) {
+	if m.overlayCursor < 0 || m.overlayCursor >= len(rows) {
+		return m, nil
+	}
+	row := rows[m.overlayCursor]
+	if row.isDefault {
+		m.setStatusMessage("The default session cannot be deleted", true)
+		return m, scheduleStatusClear()
+	}
+	if _, err := deleteNamedSession(row.name); err != nil {
+		m.setStatusMessage("Delete failed: "+err.Error(), true)
+		return m, scheduleStatusClear()
+	}
+	m.sessionsList = listNamedSessions()
+	m.overlayCursor = clampOverlayCursor(m.overlayCursor, 0, len(m.sessionRows())-1)
+	m.setStatusMessage("Deleted session: "+row.name, false)
+	return m, scheduleStatusClear()
 }
 
 // handleSessionsFilterMode mirrors handleNamespaceFilterMode: type to narrow,
@@ -165,28 +217,99 @@ func (m Model) handleSessionsFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// switchToNamedSession replaces the current workspace with ns by riding the
-// startup restore path: set pendingSession and reload contexts so
+// handleSessionsSaveMode drives the save-as name prompt: Enter commits, Esc
+// cancels, other keys edit the name.
+func (m Model) handleSessionsSaveMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch handleFilterKey(&m.sessionsSaveInput, msg.String()) {
+	case filterAccept:
+		return m.commitSessionSaveAs()
+	case filterEscape, filterClose:
+		m.sessionsSaveMode = false
+		m.sessionsSaveInput.Clear()
+		return m, nil
+	case filterContinue:
+		return m, nil
+	}
+	return m, nil
+}
+
+// commitSessionSaveAs saves the current workspace under the typed name and
+// makes it the active session (the current tabs continue into the new session).
+func (m Model) commitSessionSaveAs() (tea.Model, tea.Cmd) {
+	name := strings.TrimSpace(m.sessionsSaveInput.Value)
+	m.sessionsSaveMode = false
+	m.sessionsSaveInput.Clear()
+	if m.unionMode {
+		m.setStatusMessage(":session save is disabled in union view", true)
+		return m, scheduleStatusClear()
+	}
+	if sanitizeSessionName(name) == "" {
+		m.setStatusMessage("Session name required", true)
+		return m, scheduleStatusClear()
+	}
+	if err := saveNamedSession(NamedSession{Name: name, SavedAt: time.Now(), State: m.buildSessionState()}); err != nil {
+		m.setStatusMessage("Save failed: "+err.Error(), true)
+		return m, scheduleStatusClear()
+	}
+	m.activeSession = name
+	if err := saveActiveSessionName(name); err != nil {
+		logger.Warn("Failed to persist active session", "session", name, "error", err)
+	}
+	m.sessionsList = listNamedSessions()
+	m.setStatusMessage("Saved session: "+name, false)
+	return m, scheduleStatusClear()
+}
+
+// switchToSession replaces the current workspace with the named session (or the
+// default when name is ""). It rides the startup restore path: save the current
+// active session, set pendingSession, and reload contexts so
 // updateContextsLoaded fires restoreSession.
-func (m Model) switchToNamedSession(ns NamedSession) (tea.Model, tea.Cmd) {
+func (m Model) switchToSession(name string) (tea.Model, tea.Cmd) {
 	if m.unionMode {
 		m.setStatusMessage("Exit union view before switching sessions", true)
 		return m, scheduleStatusClear()
 	}
-	m.saveCurrentSession() // preserve the current unnamed workspace
-	state := ns.State
-	m.pendingSession = &state
+	if name == m.activeSession {
+		m.overlay = overlayNone
+		return m, nil
+	}
+	m.saveCurrentSession() // persist the session we're leaving
+	m.activeSession = name
+	if err := saveActiveSessionName(name); err != nil {
+		logger.Warn("Failed to persist active session", "session", name, "error", err)
+	}
+
+	var state *SessionState
+	if name == "" {
+		state = loadSession()
+	} else if ns, err := loadNamedSession(name); err == nil {
+		s := ns.State
+		state = &s
+	}
+	m.pendingSession = state
 	m.sessionRestored = false
 	m.overlay = overlayNone
-	m.setStatusMessage("Switched to session: "+ns.Name, false)
+
+	label := name
+	if label == "" {
+		label = defaultSessionLabel
+	}
+	m.setStatusMessage("Switched to session: "+label, false)
 	return m, tea.Batch(m.loadContexts(), scheduleStatusClear())
 }
 
 // overlayHintBarSessions returns the hint bar for the sessions picker overlay.
 func (m Model) overlayHintBarSessions() string {
+	if m.sessionsSaveMode {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "enter", Desc: "save"},
+			{Key: "esc", Desc: "cancel"},
+		})
+	}
 	return m.renderHints([]ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "enter", Desc: "switch"},
+		{Key: "s", Desc: "save current"},
 		{Key: "d", Desc: "delete"},
 		{Key: "/", Desc: "filter"},
 		{Key: "esc", Desc: "close"},

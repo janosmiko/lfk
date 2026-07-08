@@ -152,21 +152,33 @@ func renderBookmarkOverlay(m Model) string {
 func renderSessionsOverlay(m Model) string {
 	const w = 90
 	now := time.Now()
-	filtered := m.filteredNamedSessions()
-	items := make([]ui.OverlayListItem, 0, len(filtered))
-	for _, s := range filtered {
-		desc := fmt.Sprintf("%d tabs · saved %s", len(s.State.Tabs), formatSavedAgo(s.SavedAt, now))
-		items = append(items, ui.OverlayListItem{Name: s.Name, Description: desc})
+	rows := m.sessionRows()
+	items := make([]ui.OverlayListItem, 0, len(rows))
+	for _, r := range rows {
+		desc := fmt.Sprintf("%d tabs", r.tabs)
+		if !r.isDefault {
+			desc += " · saved " + formatSavedAgo(r.savedAt, now)
+		}
+		items = append(items, ui.OverlayListItem{
+			Name:        r.label,
+			Description: desc,
+			Active:      r.name == m.activeSession,
+		})
 	}
-	return ui.RenderOverlayList(items, ui.OverlayListConfig{
-		Title:           "Sessions",
-		Cursor:          m.overlayCursor,
-		Filterable:      true,
-		Filter:          m.sessionsFilter.Value,
-		FilterActive:    m.sessionsFilterMode,
-		ShowDescription: true,
-		EmptyMessage:    "No saved sessions — :session save <name>",
-	}, min(w, m.width-10)-4)
+	cfg := ui.OverlayListConfig{
+		Title:            "Sessions",
+		Cursor:           m.overlayCursor,
+		Filterable:       true,
+		Filter:           m.sessionsFilter.Value,
+		FilterActive:     m.sessionsFilterMode,
+		ShowDescription:  true,
+		ShowActiveMarker: true,
+		EmptyMessage:     "No sessions",
+	}
+	if m.sessionsSaveMode {
+		cfg.Subtitle = "Save current workspace as: " + m.sessionsSaveInput.Value + "█"
+	}
+	return ui.RenderOverlayList(items, cfg, min(w, m.width-10)-4)
 }
 
 // renderTemplateOverlay maps the resource-template picker onto OverlayList.
