@@ -521,11 +521,8 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Cancel Eviction":
 		mdl, cmd := m.executeActionCancelEviction()
 		return mdl, cmd, true
-	case "Cordon":
-		mdl, cmd := m.executeActionCordon()
-		return mdl, cmd, true
-	case "Uncordon":
-		mdl, cmd := m.executeActionUncordon()
+	case "Cordon/Uncordon":
+		mdl, cmd := m.executeActionToggleCordon()
 		return mdl, cmd, true
 	case "Drain":
 		mdl, cmd := m.executeActionDrain()
@@ -535,6 +532,9 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 		return mdl, cmd, true
 	case "Trigger":
 		mdl, cmd := m.executeActionTrigger()
+		return mdl, cmd, true
+	case "Suspend/Resume":
+		mdl, cmd := m.executeActionSuspendResume()
 		return mdl, cmd, true
 	case "Shell":
 		mdl, cmd := m.executeActionShell()

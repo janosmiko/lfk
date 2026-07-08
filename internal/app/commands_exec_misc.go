@@ -189,12 +189,23 @@ func (m Model) rollbackDeployment(revision int64) tea.Cmd {
 	})
 }
 
-func (m Model) execKubectlCordon() tea.Cmd {
-	return m.execKubectlNodeCmd("cordon")
-}
-
-func (m Model) execKubectlUncordon() tea.Cmd {
-	return m.execKubectlNodeCmd("uncordon")
+// toggleNodeSchedulable cordons or uncordons the node by flipping
+// spec.unschedulable via the API (equivalent to kubectl cordon/uncordon).
+func (m Model) toggleNodeSchedulable() tea.Cmd {
+	kctx := m.actionCtx.context
+	name := m.actionCtx.name
+	client := m.client
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Toggle node scheduling: "+name, bgtaskTarget(kctx, ""), func(ctx context.Context) tea.Msg {
+		cordoned, err := client.ToggleNodeSchedulable(ctx, kctx, name)
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		verb := "Uncordoned"
+		if cordoned {
+			verb = "Cordoned"
+		}
+		return actionResultMsg{message: fmt.Sprintf("%s %s", verb, name)}
+	})
 }
 
 func (m Model) execKubectlDrain() tea.Cmd {
@@ -222,29 +233,6 @@ func (m Model) execKubectlDrain() tea.Cmd {
 	})
 }
 
-func (m Model) execKubectlNodeCmd(subcmd string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
-	if err != nil {
-		return func() tea.Msg {
-			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
-		}
-	}
-	name := m.actionCtx.name
-	args := []string{subcmd, name, "--context", m.kubectlContext(m.actionCtx.context)}
-
-	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("%s node: %s", subcmd, name), m.actionCtx.context, func() tea.Msg {
-		cmd := exec.Command(kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
-		logExecCmd("Running kubectl command", cmd)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			logger.Error("kubectl node command failed", "subcmd", subcmd, "name", name, "context", m.actionCtx.context, "error", err)
-			return actionResultMsg{err: fmt.Errorf("%s %s: %s", subcmd, name, strings.TrimSpace(string(output)))}
-		}
-		return actionResultMsg{message: strings.TrimSpace(string(output))}
-	})
-}
-
 func (m Model) triggerCronJob() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
@@ -254,6 +242,25 @@ func (m Model) triggerCronJob() tea.Cmd {
 	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Trigger CronJob: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
 		jobName, err := client.TriggerCronJob(ctx, kctx, ns, name)
 		return triggerCronJobMsg{jobName: jobName, err: err}
+	})
+}
+
+func (m Model) toggleCronJobSuspend() tea.Cmd {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	kctx := m.actionCtx.context
+	client := m.client
+
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Toggle CronJob suspend: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		suspended, err := client.ToggleCronJobSuspend(ctx, kctx, ns, name)
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		verb := "Resumed"
+		if suspended {
+			verb = "Suspended"
+		}
+		return actionResultMsg{message: fmt.Sprintf("%s CronJob %s", verb, name)}
 	})
 }
 

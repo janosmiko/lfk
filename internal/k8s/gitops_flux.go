@@ -8,6 +8,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -178,6 +179,27 @@ func (c *Client) ResumeFluxResource(contextName, namespace, name string, gvr sch
 	return nil
 }
 
+// ToggleFluxSuspend flips a FluxCD resource's spec.suspend and returns the new
+// value: true when reconciliation is now suspended, false when resumed. Reading
+// the live object keeps the toggle authoritative.
+func (c *Client) ToggleFluxSuspend(contextName, namespace, name string, gvr schema.GroupVersionResource) (bool, error) {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return false, err
+	}
+
+	obj, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("getting %s %s: %w", gvr.Resource, name, err)
+	}
+
+	suspended, _, _ := unstructured.NestedBool(obj.Object, "spec", "suspend")
+	if suspended {
+		return false, c.ResumeFluxResource(contextName, namespace, name, gvr)
+	}
+	return true, c.SuspendFluxResource(contextName, namespace, name, gvr)
+}
+
 // ForceRefreshExternalSecret triggers a force sync on an ExternalSecret,
 // ClusterExternalSecret, or PushSecret by setting the
 // force-sync.external-secrets.io/force-sync annotation to the current timestamp.
@@ -222,6 +244,28 @@ func (c *Client) PauseKEDAResource(contextName, namespace, name string, gvr sche
 		return fmt.Errorf("pausing %s %s: %w", gvr.Resource, name, err)
 	}
 	return nil
+}
+
+// ToggleKEDAPause flips the paused state of a KEDA ScaledObject or ScaledJob and
+// returns the new value: true when autoscaling is now paused, false when
+// resumed. The paused state is detected by the presence of the
+// autoscaling.keda.sh/paused-replicas annotation on the live object.
+func (c *Client) ToggleKEDAPause(contextName, namespace, name string, gvr schema.GroupVersionResource) (bool, error) {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return false, err
+	}
+
+	obj, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("getting %s %s: %w", gvr.Resource, name, err)
+	}
+
+	_, paused := obj.GetAnnotations()["autoscaling.keda.sh/paused-replicas"]
+	if paused {
+		return false, c.UnpauseKEDAResource(contextName, namespace, name, gvr)
+	}
+	return true, c.PauseKEDAResource(contextName, namespace, name, gvr)
 }
 
 // UnpauseKEDAResource unpauses a KEDA ScaledObject or ScaledJob by removing

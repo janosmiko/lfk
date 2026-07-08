@@ -130,6 +130,31 @@ func (c *Client) DeleteResource(contextName, namespace string, rt model.Resource
 	return nil
 }
 
+// ToggleNodeSchedulable flips a node's spec.unschedulable and returns the new
+// value: true when the node is now cordoned, false when it is uncordoned.
+// Equivalent to `kubectl cordon`/`uncordon` (which patch the same field); the
+// live object is read first so the toggle stays authoritative.
+func (c *Client) ToggleNodeSchedulable(ctx context.Context, contextName, nodeName string) (bool, error) {
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return false, err
+	}
+
+	node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("getting node: %w", err)
+	}
+
+	cordoned := !node.Spec.Unschedulable
+	logger.Info("Toggling node scheduling", "context", contextName, "node", nodeName, "unschedulable", cordoned)
+
+	patch := fmt.Appendf(nil, `{"spec":{"unschedulable":%t}}`, cordoned)
+	if _, err := cs.CoreV1().Nodes().Patch(ctx, nodeName, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		return false, fmt.Errorf("setting node %s unschedulable=%t: %w", nodeName, cordoned, err)
+	}
+	return cordoned, nil
+}
+
 // ScaleResource scales a Deployment, StatefulSet, or ReplicaSet to the specified replica count.
 func (c *Client) ScaleResource(contextName, namespace, name, kind string, replicas int32) error {
 	logger.Info("Scaling resource", "context", contextName, "namespace", namespace, "kind", kind, "name", name, "replicas", replicas)

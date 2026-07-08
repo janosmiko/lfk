@@ -19,9 +19,9 @@ func TestIsMutatingAction(t *testing.T) {
 		"Exec", "Attach", "Shell",
 		"Debug", "Debug Pod", "Debug Mount",
 		"Port Forward",
-		"Cordon", "Uncordon", "Drain",
+		"Cordon/Uncordon", "Drain",
 		"Taints", "Apply Taints",
-		"Trigger", "Stop", "Remove",
+		"Trigger", "Suspend/Resume", "Stop", "Remove",
 		"Labels / Annotations",
 		"Permissions",
 		// ArgoCD application / sync.
@@ -31,11 +31,10 @@ func TestIsMutatingAction(t *testing.T) {
 		"Suspend Workflow", "Resume Workflow",
 		"Stop Workflow", "Terminate Workflow",
 		"Resubmit Workflow", "Submit Workflow",
-		"Suspend CronWorkflow", "Resume CronWorkflow",
 		// cert-manager / ExternalSecrets / KEDA / Flux.
 		"Force Renew", "Force Refresh",
-		"Pause", "Unpause",
-		"Reconcile", "Suspend", "Resume",
+		"Pause/Unpause",
+		"Reconcile",
 		// Helm.
 		"Edit Values", "Upgrade",
 	}
@@ -73,10 +72,9 @@ func TestExecuteActionExtended_ReadOnly_BlocksMutating(t *testing.T) {
 		"Suspend Workflow", "Resume Workflow",
 		"Stop Workflow", "Terminate Workflow",
 		"Resubmit Workflow", "Submit Workflow",
-		"Suspend CronWorkflow", "Resume CronWorkflow",
 		"Force Renew", "Force Refresh",
-		"Pause", "Unpause",
-		"Reconcile", "Suspend", "Resume",
+		"Pause/Unpause",
+		"Reconcile",
 		"Edit Values", "Upgrade",
 	}
 	for _, label := range mutating {

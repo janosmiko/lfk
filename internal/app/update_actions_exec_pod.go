@@ -380,14 +380,6 @@ func (m Model) executeActionArgo(actionLabel string) (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", fmt.Sprintf("Submitting workflow from template %s in %s", name, ns))
 		m.loading = true
 		return m, m.submitWorkflowFromTemplate(clusterScope)
-	case "Suspend CronWorkflow":
-		m.addLogEntry("DBG", fmt.Sprintf("Suspending cron workflow %s in %s", name, ns))
-		m.loading = true
-		return m, m.suspendCronWorkflow()
-	case "Resume CronWorkflow":
-		m.addLogEntry("DBG", fmt.Sprintf("Resuming cron workflow %s in %s", name, ns))
-		m.loading = true
-		return m, m.resumeCronWorkflow()
 	}
 	return m, nil
 }
@@ -443,22 +435,14 @@ func (m Model) executeActionDisruptNodeClaim() (tea.Model, tea.Cmd) { //nolint:u
 	return m, nil
 }
 
-// executeActionCordon handles the "Cordon" action.
-func (m Model) executeActionCordon() (tea.Model, tea.Cmd) {
+// executeActionToggleCordon handles the "Cordon/Uncordon" action by flipping
+// the node's spec.unschedulable.
+func (m Model) executeActionToggleCordon() (tea.Model, tea.Cmd) {
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl cordon %s --context %s", name, ctx))
+	m.addLogEntry("DBG", fmt.Sprintf("Toggle cordon node/%s --context %s", name, ctx))
 	m.loading = true
-	return m, m.execKubectlCordon()
-}
-
-// executeActionUncordon handles the "Uncordon" action.
-func (m Model) executeActionUncordon() (tea.Model, tea.Cmd) {
-	name := m.actionCtx.name
-	ctx := m.actionCtx.context
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl uncordon %s --context %s", name, ctx))
-	m.loading = true
-	return m, m.execKubectlUncordon()
+	return m, m.toggleNodeSchedulable()
 }
 
 // executeActionDrain handles the "Drain" action.
@@ -477,4 +461,25 @@ func (m Model) executeActionTrigger() (tea.Model, tea.Cmd) {
 	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl create job --from=cronjob/%s manual-trigger -n %s --context %s", name, ns, ctx))
 	m.loading = true
 	return m, m.triggerCronJob()
+}
+
+// executeActionSuspendResume handles the shared "Suspend/Resume" action. The
+// three kinds that expose it all toggle a spec.suspend-style flag, but through
+// different clients, so route by kind. The default branch covers the FluxCD
+// reconcilable kinds (Kustomization, GitRepository, …), the only other kinds
+// whose menu offers this action.
+func (m Model) executeActionSuspendResume() (tea.Model, tea.Cmd) {
+	name := m.actionCtx.name
+	m.loading = true
+	switch m.actionCtx.kind {
+	case "CronJob":
+		m.addLogEntry("DBG", fmt.Sprintf("Toggle suspend cronjob/%s", name))
+		return m, m.toggleCronJobSuspend()
+	case "CronWorkflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Toggle suspend cronworkflow/%s", name))
+		return m, m.toggleCronWorkflowSuspend()
+	default:
+		m.addLogEntry("DBG", fmt.Sprintf("Toggle suspend %s/%s", m.actionCtx.kind, name))
+		return m, m.toggleFluxSuspend()
+	}
 }

@@ -714,7 +714,7 @@ func TestIsUnionAllowedAction(t *testing.T) {
 	for _, kind := range []string{"Pod", "Service", "Deployment", "StatefulSet", "DaemonSet"} {
 		assert.True(t, isUnionAllowedActionForKind(kind, "Port Forward"), "Port Forward must be allowed for %s at the union sentinel", kind)
 	}
-	blocked := []string{"Edit", "Scale", "Drain", "Cordon", "Exec", "Shell", "Secret Editor", "Sync", "Upgrade"}
+	blocked := []string{"Edit", "Scale", "Drain", "Cordon/Uncordon", "Exec", "Shell", "Secret Editor", "Sync", "Upgrade"}
 	for _, label := range blocked {
 		assert.False(t, isUnionAllowedActionForKind("Pod", label), "%q must NOT be allowed at the union sentinel", label)
 	}

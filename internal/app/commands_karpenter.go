@@ -24,11 +24,8 @@ func (m Model) executeActionKarpenter(actionLabel string) (tea.Model, tea.Cmd, b
 	case "Disrupt":
 		mdl, cmd := m.executeActionDisruptNodeClaim()
 		return mdl, cmd, true
-	case "Cordon Node":
-		mdl, cmd := m.executeActionSimpleLoading("Cordoning node from NodeClaim", m.cordonNodeFromClaim)
-		return mdl, cmd, true
-	case "Uncordon Node":
-		mdl, cmd := m.executeActionSimpleLoading("Uncordoning node from NodeClaim", m.uncordonNodeFromClaim)
+	case "Cordon/Uncordon Node":
+		mdl, cmd := m.executeActionSimpleLoading("Toggling node scheduling from NodeClaim", m.toggleNodeScheduleFromClaim)
 		return mdl, cmd, true
 	case "Drain Node":
 		mdl, cmd := m.executeActionSimpleLoading("Draining node from NodeClaim", m.drainNodeFromClaim)
@@ -58,25 +55,38 @@ func (m Model) disruptNodeClaim() tea.Cmd {
 	})
 }
 
-// cordonNodeFromClaim resolves the NodeClaim's status.nodeName and
-// shells out `kubectl cordon <node>` against the resolved name. The
-// NodeClaim row is the user's chosen surface; the underlying Node row
-// would also offer a plain Cordon. Two errors short-circuit before the
-// shell-out: the resolve fails (NodeClaim missing / RBAC), or the
-// claim has no node bound yet (Karpenter still provisioning).
-func (m Model) cordonNodeFromClaim() tea.Cmd {
-	return m.kubectlNodeCmdFromClaim("cordon")
+// toggleNodeScheduleFromClaim resolves the NodeClaim's status.nodeName and
+// flips the resolved node's spec.unschedulable via the API (cordon when
+// schedulable, uncordon when cordoned). The NodeClaim row is the user's
+// chosen surface; the underlying Node row offers the same toggle. Two errors
+// short-circuit before the patch: the resolve fails (NodeClaim missing /
+// RBAC), or the claim has no node bound yet (Karpenter still provisioning).
+func (m Model) toggleNodeScheduleFromClaim() tea.Cmd {
+	kctx := m.actionCtx.context
+	claimName := m.actionCtx.name
+	client := m.client
+
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Toggle node scheduling (NodeClaim "+claimName+")", kctx, func(ctx context.Context) tea.Msg {
+		nodeName, err := client.GetNodeClaimNodeName(kctx, claimName)
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		if nodeName == "" {
+			return actionResultMsg{err: fmt.Errorf("NodeClaim %s has no node bound yet (status.nodeName empty)", claimName)}
+		}
+		cordoned, err := client.ToggleNodeSchedulable(ctx, kctx, nodeName)
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		verb := "Uncordoned"
+		if cordoned {
+			verb = "Cordoned"
+		}
+		return actionResultMsg{message: fmt.Sprintf("%s %s (from NodeClaim %s)", verb, nodeName, claimName)}
+	})
 }
 
-// uncordonNodeFromClaim mirrors cordonNodeFromClaim but runs
-// `kubectl uncordon <node>` against the resolved name. Provided so
-// users can re-mark a node as schedulable directly from the NodeClaim
-// row without bouncing through the Node view.
-func (m Model) uncordonNodeFromClaim() tea.Cmd {
-	return m.kubectlNodeCmdFromClaim("uncordon")
-}
-
-// drainNodeFromClaim mirrors cordonNodeFromClaim but runs
+// drainNodeFromClaim resolves the NodeClaim's status.nodeName and runs
 // `kubectl drain <node> --ignore-daemonsets --delete-emptydir-data`,
 // matching the flags the standalone executeActionDrain path uses on a
 // plain Node row.

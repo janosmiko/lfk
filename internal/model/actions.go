@@ -103,8 +103,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "Node":
 		return []ActionMenuItem{
-			{Label: "Cordon", Description: "Mark node as unschedulable", Key: "c"},
-			{Label: "Uncordon", Description: "Mark node as schedulable", Key: "u"},
+			{Label: "Cordon/Uncordon", Description: "Toggle node schedulability", Key: "c"},
 			{Label: "Drain", Description: "Drain node (evict pods)", Key: "n"},
 			{Label: "Taints", Description: "Edit node taints (add / remove)", Key: "t"},
 			{Label: "Shell", Description: "Open shell on node via debug pod", Key: "s"},
@@ -287,6 +286,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Trigger", Description: "Create a Job from this CronJob", Key: "t"},
+			{Label: "Suspend/Resume", Description: "Suspend or resume the schedule (spec.suspend)", Key: "S"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Right-sizing", Description: "Per-container CPU/Mem recommendations", Key: "z"},
@@ -351,8 +351,7 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "CronWorkflow":
 		return []ActionMenuItem{
-			{Label: "Suspend CronWorkflow", Description: "Suspend scheduled execution", Key: "s"},
-			{Label: "Resume CronWorkflow", Description: "Resume scheduled execution", Key: "r"},
+			{Label: "Suspend/Resume", Description: "Toggle scheduled execution (spec.suspend)", Key: "s"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this cron workflow", Key: "D"},
@@ -396,8 +395,7 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 func actionsFluxReconcilable(_ string) []ActionMenuItem {
 	return []ActionMenuItem{
 		{Label: "Reconcile", Description: "Trigger reconciliation", Key: "r"},
-		{Label: "Suspend", Description: "Suspend reconciliation", Key: "s"},
-		{Label: "Resume", Description: "Resume reconciliation", Key: "R"},
+		{Label: "Suspend/Resume", Description: "Toggle reconciliation (spec.suspend)", Key: "s"},
 		{Label: "Describe", Description: "Describe resource", Key: "v"},
 		{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 		{Label: "Delete", Description: "Delete this resource", Key: "D"},
@@ -451,8 +449,7 @@ func actionsForOperatorKind(kind string) ([]ActionMenuItem, bool) {
 	switch kind {
 	case "ScaledObject", "ScaledJob":
 		return []ActionMenuItem{
-			{Label: "Pause", Description: "Pause autoscaling", Key: "p"},
-			{Label: "Unpause", Description: "Resume autoscaling", Key: "u"},
+			{Label: "Pause/Unpause", Description: "Toggle autoscaling pause", Key: "p"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
@@ -486,8 +483,7 @@ func actionsForKarpenterKind(kind string) ([]ActionMenuItem, bool) {
 	case "NodeClaim":
 		return []ActionMenuItem{
 			{Label: "Disrupt", Description: "Delete claim; Karpenter terminates the node", Key: "X"},
-			{Label: "Cordon Node", Description: "Cordon the bound node", Key: "c"},
-			{Label: "Uncordon Node", Description: "Uncordon the bound node", Key: "u"},
+			{Label: "Cordon/Uncordon Node", Description: "Toggle schedulability of the bound node", Key: "c"},
 			{Label: "Drain Node", Description: "Drain the bound node (evict pods)", Key: "n"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},

@@ -275,6 +275,77 @@ func TestTriggerCronJob_NotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "getting cronjob")
 }
 
+// --- ToggleCronJobSuspend ---
+
+func TestToggleCronJobSuspend(t *testing.T) {
+	cronJob := &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-cron", Namespace: "default"},
+		Spec:       batchv1.CronJobSpec{Schedule: "*/5 * * * *"},
+	}
+	cs := k8sfake.NewClientset(cronJob)
+	c := newFakeClient(cs, nil)
+
+	// Unset spec.suspend (nil) toggles to suspended.
+	newState, err := c.ToggleCronJobSuspend(t.Context(), "", "default", "my-cron")
+	require.NoError(t, err)
+	assert.True(t, newState)
+	got, err := cs.BatchV1().CronJobs("default").Get(t.Context(), "my-cron", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, got.Spec.Suspend)
+	assert.True(t, *got.Spec.Suspend)
+
+	// A second toggle resumes it.
+	newState, err = c.ToggleCronJobSuspend(t.Context(), "", "default", "my-cron")
+	require.NoError(t, err)
+	assert.False(t, newState)
+	got, err = cs.BatchV1().CronJobs("default").Get(t.Context(), "my-cron", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotNil(t, got.Spec.Suspend)
+	assert.False(t, *got.Spec.Suspend)
+}
+
+func TestToggleCronJobSuspend_NotFound(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	c := newFakeClient(cs, nil)
+
+	_, err := c.ToggleCronJobSuspend(t.Context(), "", "default", "missing")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "getting cronjob")
+}
+
+// --- ToggleNodeSchedulable ---
+
+func TestToggleNodeSchedulable(t *testing.T) {
+	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
+	cs := k8sfake.NewClientset(node)
+	c := newFakeClient(cs, nil)
+
+	// Schedulable node toggles to cordoned.
+	cordoned, err := c.ToggleNodeSchedulable(t.Context(), "", "node-1")
+	require.NoError(t, err)
+	assert.True(t, cordoned)
+	got, err := cs.CoreV1().Nodes().Get(t.Context(), "node-1", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.True(t, got.Spec.Unschedulable)
+
+	// A second toggle uncordons it.
+	cordoned, err = c.ToggleNodeSchedulable(t.Context(), "", "node-1")
+	require.NoError(t, err)
+	assert.False(t, cordoned)
+	got, err = cs.CoreV1().Nodes().Get(t.Context(), "node-1", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.False(t, got.Spec.Unschedulable)
+}
+
+func TestToggleNodeSchedulable_NotFound(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	c := newFakeClient(cs, nil)
+
+	_, err := c.ToggleNodeSchedulable(t.Context(), "", "missing")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "getting node")
+}
+
 // --- GetContainers ---
 
 func TestGetContainers(t *testing.T) {

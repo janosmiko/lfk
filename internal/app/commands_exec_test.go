@@ -42,17 +42,11 @@ func TestRandomSuffix(t *testing.T) {
 	})
 }
 
-func TestPush3ExecKubectlNodeCmdNoKubectl(t *testing.T) {
+func TestPush3ToggleNodeSchedulableReturnsCmd(t *testing.T) {
 	m := basePush80v3Model()
-	t.Setenv("PATH", "/nonexistent")
 	m.actionCtx = actionContext{name: "node-1", context: "test-ctx"}
-	cmd := m.execKubectlNodeCmd("cordon")
+	cmd := m.toggleNodeSchedulable()
 	require.NotNil(t, cmd)
-	msg := cmd()
-	amsg, ok := msg.(actionResultMsg)
-	require.True(t, ok)
-	assert.Error(t, amsg.err)
-	assert.Contains(t, amsg.err.Error(), "kubectl not found")
 }
 
 func TestPush3ExecKubectlExplainNoKubectl(t *testing.T) {
@@ -716,17 +710,10 @@ func TestCovRollbackHelmReleaseReturnsCmd(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
-func TestCovExecKubectlCordonReturnsCmd(t *testing.T) {
+func TestCovToggleNodeSchedulableReturnsCmd(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.name = "node-1"
-	cmd := m.execKubectlCordon()
-	assert.NotNil(t, cmd)
-}
-
-func TestCovExecKubectlUncordonReturnsCmd(t *testing.T) {
-	m := testModelExec()
-	m.actionCtx.name = "node-1"
-	cmd := m.execKubectlUncordon()
+	cmd := m.toggleNodeSchedulable()
 	assert.NotNil(t, cmd)
 }
 
@@ -734,13 +721,6 @@ func TestCovExecKubectlDrainReturnsCmd(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.name = "node-1"
 	cmd := m.execKubectlDrain()
-	assert.NotNil(t, cmd)
-}
-
-func TestCovExecKubectlNodeCmdReturnsCmd(t *testing.T) {
-	m := testModelExec()
-	m.actionCtx.name = "node-1"
-	cmd := m.execKubectlNodeCmd("cordon")
 	assert.NotNil(t, cmd)
 }
 
@@ -854,11 +834,11 @@ func TestFinal2RemoveFinalizersNonNamespaced(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
-func TestFinal2ExecKubectlNodeCmd(t *testing.T) {
+func TestFinal2ToggleNodeSchedulable(t *testing.T) {
 	m := baseFinalModel()
 	m.actionCtx.name = "node-1"
 	m.actionCtx.context = "test-ctx"
-	cmd := m.execKubectlNodeCmd("cordon")
+	cmd := m.toggleNodeSchedulable()
 	assert.NotNil(t, cmd)
 }
 

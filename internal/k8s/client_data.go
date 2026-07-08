@@ -354,6 +354,32 @@ func (c *Client) TriggerCronJob(ctx context.Context, contextName, namespace, cro
 	return created.Name, nil
 }
 
+// ToggleCronJobSuspend flips a CronJob's spec.suspend and returns the new
+// value: true when the schedule is now paused, false when it is resumed.
+// The live object is read first so the toggle stays authoritative even if the
+// list view holds stale state.
+func (c *Client) ToggleCronJobSuspend(ctx context.Context, contextName, namespace, name string) (bool, error) {
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return false, err
+	}
+
+	cronJob, err := cs.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return false, fmt.Errorf("getting cronjob: %w", err)
+	}
+
+	suspended := cronJob.Spec.Suspend != nil && *cronJob.Spec.Suspend
+	newState := !suspended
+	logger.Info("Toggling CronJob suspend", "context", contextName, "namespace", namespace, "cronjob", name, "suspend", newState)
+
+	patch := fmt.Appendf(nil, `{"spec":{"suspend":%t}}`, newState)
+	if _, err := cs.BatchV1().CronJobs(namespace).Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		return false, fmt.Errorf("setting cronjob %s suspend=%t: %w", name, newState, err)
+	}
+	return newState, nil
+}
+
 // reorderYAMLFields reorders top-level YAML fields so that common Kubernetes
 // fields appear in a logical order: apiVersion, kind, metadata, type, spec, data, status.
 func reorderYAMLFields(yamlStr string) string {
