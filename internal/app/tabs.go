@@ -341,6 +341,8 @@ func (m *Model) saveCurrentTab() {
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
 	t.filterBroadMode = m.filterBroadMode
+	t.activeFilterPreset = m.activeFilterPreset
+	t.unfilteredMiddleItems = append([]model.Item(nil), m.unfilteredMiddleItems...)
 	t.cursorName, t.cursorNamespace, _, _ = m.cursorItemKey()
 	t.watchMode = m.watchMode
 	t.objectExplorerLive = m.objectExplorerLive
@@ -476,6 +478,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.filterText = t.filterText
 	m.filterBroadMode = t.filterBroadMode
 	m.filterInput.Set(t.filterText)
+	m.activeFilterPreset = t.activeFilterPreset
+	m.unfilteredMiddleItems = append([]model.Item(nil), t.unfilteredMiddleItems...)
 	m.watchMode = t.watchMode
 	m.objectExplorerLive = t.objectExplorerLive
 	m.objectExplorerTree = t.objectExplorerTree
