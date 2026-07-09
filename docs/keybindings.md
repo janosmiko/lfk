@@ -242,13 +242,13 @@ suffix in their name.
 | `j` / `k` | Bookmark overlay | Navigate bookmarks |
 | `/` | Bookmark overlay | Filter bookmarks by name |
 | `Enter` | Bookmark overlay | Jump to selected bookmark |
-| `Tab` | Bookmark overlay | Toggle `[LOAD NAMESPACE]` — apply the bookmark's saved namespace scope on the next jump |
+| `Tab` | Bookmark overlay | Toggle `[KEEP CURRENT NS]` — opt out of loading the bookmark's saved namespace on the next jump |
 | `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
 | `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
 
-> Namespace on jump: by default the tab's current namespace is kept. Press
-> `Tab` in the overlay to arm `[LOAD NAMESPACE]`; the saved namespace is
-> then applied on the next jump and the flag is cleared on close.
+> Namespace on jump: each bookmark shows its saved namespace scope, and by
+> default the jump applies it. Press `Tab` to opt out (`[KEEP CURRENT NS]`)
+> and keep the tab's current scope instead; the flag resets on close.
 
 ## Help View
 

@@ -427,10 +427,9 @@ func (m Model) overlayHintBarBookmarks() string {
 			{Key: "Esc/n", Desc: "cancel"},
 		})
 	default:
-		// tab desc flips with state: "load ns" when the user can arm
-		// the flag, "don't load" when it's already armed. That keeps
-		// the hint readable as the verb for the action Tab will
-		// perform next, matching what they see in the title chip.
+		// tab desc names the action Tab will perform next: loading is the
+		// default, so it reads "don't load ns" until the user opts out, then
+		// "load ns". Matches the title chip the user sees.
 		tabDesc := "load ns"
 		if m.bookmarkLoadNamespace {
 			tabDesc = "don't load ns"

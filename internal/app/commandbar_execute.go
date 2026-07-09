@@ -301,7 +301,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayBookmarks
 		m.bookmarkSearchMode = bookmarkModeNormal
 		m.bookmarkFilter.Clear()
-		m.bookmarkLoadNamespace = false
+		m.bookmarkLoadNamespace = true
 		return m, nil
 
 	case "orphans":

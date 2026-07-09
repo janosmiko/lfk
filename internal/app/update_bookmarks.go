@@ -461,13 +461,13 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		m.overlay = overlayNone
 		m.bookmarkFilter.Clear()
 		m.bookmarkSearchMode = bookmarkModeNormal
-		// Discard any pending "load namespace" flag so the next open
-		// starts from the default (don't load).
-		m.bookmarkLoadNamespace = false
+		// Reset the flag; the next open re-seeds it to the default (load).
+		m.bookmarkLoadNamespace = true
 		return m, nil
 	case "tab":
-		// Arm the "load saved namespace" flag for the next jump. The
-		// title bar picks this up via the [LOAD NAMESPACE] chip so
+		// Toggle whether the jump replays the bookmark's saved namespace.
+		// Loading is the default; Tab opts out to keep the current scope.
+		// The title bar shows a [KEEP CURRENT NS] chip while opted out so
 		// the user sees what Enter / slot-key will do.
 		m.bookmarkLoadNamespace = !m.bookmarkLoadNamespace
 		return m, nil
