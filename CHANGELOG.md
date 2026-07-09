@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.2](https://github.com/janosmiko/lfk/compare/v0.15.1...v0.15.2) (2026-07-09)
+
+
+### Features
+
+* **bookmarks:** load saved namespace by default, show it in the overlay ([#517](https://github.com/janosmiko/lfk/issues/517)) ([d003cc0](https://github.com/janosmiko/lfk/commit/d003cc0fcca8e55c2cccb0b2ccc59f1a20a4f3d4))
+* **namespace:** jump to previous namespace (g\) ([#515](https://github.com/janosmiko/lfk/issues/515)) ([ef40744](https://github.com/janosmiko/lfk/commit/ef4074472c03428de2c6bf6bfc16d6b8d444c8d7))
+
+
+### Bug Fixes
+
+* **nix:** bump Go override to 1.26.5 to match go.mod ([#514](https://github.com/janosmiko/lfk/issues/514)) ([39b68bb](https://github.com/janosmiko/lfk/commit/39b68bb8450c7873efb747f4a527a0e9c5f1f1b1))
+
 ## [0.15.1](https://github.com/janosmiko/lfk/compare/v0.15.0...v0.15.1) (2026-07-08)
 
 
