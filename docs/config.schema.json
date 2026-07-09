@@ -478,7 +478,8 @@
         "goto_hpas": { "type": "string" },
         "goto_pvcs": { "type": "string" },
         "goto_pvs": { "type": "string" },
-        "goto_pdbs": { "type": "string" }
+        "goto_pdbs": { "type": "string" },
+        "previous_namespace": { "type": "string" }
       }
     },
     "view": {

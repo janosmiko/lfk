@@ -412,6 +412,7 @@ keybindings:
   security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
   move_tab_left: "{" # Move the current tab one slot left (default: { = shift+[)
   move_tab_right: "}" # Move the current tab one slot right (default: } = shift+])
+  previous_namespace: "g\\" # Jump to previous namespace, swapping the scope back and forth (default: g\)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
 # Short names for resource types used in search/filter.

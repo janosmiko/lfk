@@ -295,6 +295,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 |---|---|
 | `x` | Action menu (logs, exec, describe, edit, delete, scale, port-forward, etc.) |
 | `\` / `A` | Namespace selector / toggle all-namespaces |
+| `g\` | Jump to previous namespace (swap back and forth) |
 | `L` | Toggle live-log preview pane (right pane, streaming tail; pod and container rows) |
 | `Ctrl+L` | Open fullscreen log viewer |
 | `v` | Describe resource |

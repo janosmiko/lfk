@@ -56,11 +56,15 @@ func (m Model) quickFilterToSelectedNamespace() (tea.Model, tea.Cmd) {
 	}
 	ns := sel.Namespace
 	oldNs := m.namespace
+	// Fired from inside the overlay (chord "\" then "."), so use the
+	// pre-overlay snapshot rather than the possibly Space-edited live scope.
+	beforeScope := m.namespaceOverlayEntryScope()
 	m.selectedNamespaces = map[string]bool{ns: true}
 	m.namespace = ns
 	m.allNamespaces = false
 	m.nsSelectionNegated = false
 	m.nsSelectionModified = false
+	m.recordPreviousNamespace(beforeScope)
 	m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 	m.overlayFilter.Clear()
 	m.nsFilterMode = false
@@ -109,6 +113,9 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Apply selection and close.
 		oldNs := m.namespace
+		// The pre-overlay scope, snapshotted on open — Space/Tab already
+		// mutated the live selection, so a fresh capture here would miss it.
+		beforeScope := m.namespaceOverlayEntryScope()
 		switch {
 		case m.nsSelectionModified && len(m.selectedNamespaces) > 0:
 			// User explicitly toggled selections with Space in this session.
@@ -131,6 +138,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.allNamespaces = true
 			m.nsSelectionNegated = false
 		}
+		m.recordPreviousNamespace(beforeScope)
 		m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 		m.overlayFilter.Clear()
 		m.nsFilterMode = false

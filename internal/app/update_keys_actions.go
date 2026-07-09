@@ -242,6 +242,7 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 		m.setStatusMessage("Union mode supports exactly one namespace", true)
 		return m, scheduleStatusClear(), true
 	}
+	beforeScope := m.captureNamespaceScope()
 	m.allNamespaces = !m.allNamespaces
 	if m.allNamespaces {
 		// Stash the current selection so toggling back off restores it
@@ -269,6 +270,7 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 		// m.namespace alone could still show "(ns: )".
 		m.setStatusMessage("All namespaces mode OFF (ns: "+m.effectiveNamespace()+")", false)
 	}
+	m.recordPreviousNamespace(beforeScope)
 	m.cancelAndReset()
 	m.requestGen++
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true

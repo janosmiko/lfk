@@ -472,11 +472,13 @@ type TabState struct {
 	// resetting to the default namespace.
 	savedSelectedNamespaces map[string]bool
 	savedNsSelectionNegated bool
-	sortColumnName          string // column name to sort by (e.g. "Name", "Age", "CPU")
-	sortAscending           bool
-	sortMemory              map[string]sortPref
-	filterText              string
-	filterBroadMode         bool
+	// previousNsScope is this tab's jump-to-previous-namespace target.
+	previousNsScope *nsScope
+	sortColumnName  string // column name to sort by (e.g. "Name", "Age", "CPU")
+	sortAscending   bool
+	sortMemory      map[string]sortPref
+	filterText      string
+	filterBroadMode bool
 	// Identity of the highlighted resource row, captured on save so session
 	// restore can reopen every tab (not just the active one) on the same item.
 	cursorName         string
