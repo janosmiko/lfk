@@ -103,6 +103,31 @@ func TestHandleGotoChord_PreviousNamespace(t *testing.T) {
 	if rm.namespace != "default" {
 		t.Fatalf(`g\ did not jump to previous namespace, got %q`, rm.namespace)
 	}
+	if !rm.selectedNamespaces["default"] || rm.selectedNamespaces["kube-system"] {
+		t.Fatalf("selectedNamespaces not swapped to previous scope: %v", rm.selectedNamespaces)
+	}
+}
+
+// With PreviousNamespace unbound, g\ is not a previous-namespace jump and
+// falls through to the goto-chord lookup (no such target -> consumed as an
+// unmapped chord, namespace untouched).
+func TestHandleGotoChord_PreviousNamespaceUnbound(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	kb := ui.DefaultKeybindings()
+	kb.PreviousNamespace = ""
+	ui.ActiveKeybindings = kb
+	m := gotoTestModel()
+	m.nav.Level = model.LevelResources
+	m.namespace = "kube-system"
+	m.previousNsScope = &nsScope{namespace: "default"}
+	m.pendingG = true
+	out, _, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\\'}})
+	if !handled {
+		t.Fatal(`g\ should still be consumed as an unmapped chord`)
+	}
+	if rm := out.(Model); rm.namespace != "kube-system" {
+		t.Fatalf("unbound g\\ must not jump; namespace changed to %q", rm.namespace)
+	}
 }
 
 func TestHandleGotoChord_GPassesThroughToJumpTop(t *testing.T) {

@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -88,6 +89,44 @@ func TestJumpToPreviousNamespace_NoPrevious(t *testing.T) {
 	got := out.(Model)
 	assert.Equal(t, "default", got.namespace, "no-op when nothing recorded")
 	assert.True(t, got.statusMessageErr, "reports an error message")
+}
+
+// TestNamespaceOverlayEntryScope_FallsBackToCurrent verifies the helper
+// returns the live scope when no overlay snapshot has been taken.
+func TestNamespaceOverlayEntryScope_FallsBackToCurrent(t *testing.T) {
+	m := newTestModel()
+	m.namespace = "default"
+	m.nsOverlayEntryScope = nil
+	assert.Equal(t, "default", m.namespaceOverlayEntryScope().namespace)
+
+	m.nsOverlayEntryScope = &nsScope{namespace: "kube-system"}
+	assert.Equal(t, "kube-system", m.namespaceOverlayEntryScope().namespace)
+}
+
+// TestOverlayCommit_RecordsPreOverlayScopeAfterSpaceEdit is the regression
+// guard for the CodeRabbit finding: Space mutates the live selection during
+// the overlay session, so the "previous" scope must come from the snapshot
+// taken when the overlay opened — not a capture at Enter time (which would
+// see the already-edited state and record nothing).
+func TestOverlayCommit_RecordsPreOverlayScopeAfterSpaceEdit(t *testing.T) {
+	m := newTestModel()
+	m.overlay = overlayNamespace
+	m.namespace = "default"
+	m.selectedNamespaces = map[string]bool{"default": true}
+	// Snapshot taken on open (pre-edit).
+	m.nsOverlayEntryScope = &nsScope{namespace: "default", selectedNamespaces: map[string]bool{"default": true}}
+	// Simulate a Space toggle having already mutated the live selection.
+	m.nsSelectionModified = true
+	m.selectedNamespaces = map[string]bool{"kube-system": true}
+
+	out, _ := m.handleNamespaceOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := out.(Model)
+
+	if assert.NotNil(t, rm.previousNsScope, "commit after a Space edit must record the pre-overlay scope") {
+		assert.Equal(t, "default", rm.previousNsScope.namespace)
+		assert.Equal(t, map[string]bool{"default": true}, rm.previousNsScope.selectedNamespaces)
+	}
+	assert.Equal(t, "kube-system", rm.namespace, "commit still applies the edited selection")
 }
 
 func TestJumpToPreviousNamespace_BlockedAtClusters(t *testing.T) {

@@ -379,6 +379,12 @@ func (m Model) openNamespaceSelectorForContext(contextName string) (tea.Model, t
 	m.overlayFilter.Clear()
 	ui.ResetOverlayNsScroll()
 	m.nsSelectionModified = false
+	// Snapshot the scope now, before Space/Tab/A editing mutates the live
+	// selection during the session. Commit (Enter) and the in-overlay quick
+	// filter (.) record THIS as the jump-to-previous target, not the
+	// mid-edit state a fresh capture would see.
+	entryScope := m.captureNamespaceScope()
+	m.nsOverlayEntryScope = &entryScope
 	// Remember which context this overlay lists so the in-overlay refresh
 	// (R) re-fetches the right namespaces even when activeContext() would
 	// resolve differently (e.g. the union-set namespace picker, which opens

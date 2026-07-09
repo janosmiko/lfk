@@ -60,6 +60,17 @@ func (m *Model) applyNamespaceScope(s nsScope) {
 	m.nsSelectionNegated = s.nsSelectionNegated
 }
 
+// namespaceOverlayEntryScope returns the scope captured when the namespace
+// overlay opened. It falls back to the current scope if no snapshot exists
+// (e.g. a commit path that never went through openNamespaceSelectorForContext),
+// so recordPreviousNamespace still gets a sane baseline.
+func (m Model) namespaceOverlayEntryScope() nsScope {
+	if m.nsOverlayEntryScope != nil {
+		return *m.nsOverlayEntryScope
+	}
+	return m.captureNamespaceScope()
+}
+
 // recordPreviousNamespace stores before as the previous scope, but only when
 // the selection actually changed, so a later jump-to-previous returns to the
 // last distinct scope rather than a no-op re-selection.

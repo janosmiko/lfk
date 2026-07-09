@@ -176,9 +176,9 @@ type Model struct {
 	selectedNamespaces, savedSelectedNamespaces map[string]bool
 	nsSelectionNegated, savedNsSelectionNegated bool     // nsSelectionNegated: EXCLUDE set
 	nsFilterMode, nsSelectionModified           bool     // nsSelectionModified: Space pressed in current ns overlay session
-	nsFilterEntryItem                           string   // namespace name selected when filter mode was entered; restored on Esc
-	nsOverlayContext                            string   // context the open namespace overlay lists; used by the in-overlay refresh (R)
+	nsFilterEntryItem, nsOverlayContext         string   // filter-entry ns (restored on Esc); context the open overlay lists (in-overlay R refresh)
 	previousNsScope                             *nsScope // scope before the last change; g\ swaps back to it (per-tab)
+	nsOverlayEntryScope                         *nsScope // scope when the ns overlay opened; the pre-edit "previous" recorded on commit
 
 	// Fullscreen toggles: middle = hides left and right columns; dashboard
 	// = renders the cluster dashboard full screen.
