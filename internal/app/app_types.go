@@ -479,6 +479,12 @@ type TabState struct {
 	sortMemory      map[string]sortPref
 	filterText      string
 	filterBroadMode bool
+	// Quick filter preset applied to this tab, and the pre-filter middle list
+	// captured when it was applied. Per-tab so a preset set on one tab does not
+	// leak onto siblings (the next data load would otherwise re-apply it and
+	// hide non-matching rows).
+	activeFilterPreset    *FilterPreset
+	unfilteredMiddleItems []model.Item
 	// Identity of the highlighted resource row, captured on save so session
 	// restore can reopen every tab (not just the active one) on the same item.
 	cursorName         string
