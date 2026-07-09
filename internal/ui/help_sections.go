@@ -97,6 +97,7 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{kb.NamespaceSelector, "Select namespace (space: include, tab: exclude, A: all-namespaces, R: refresh, .: quick filter to current item's namespace)"},
 				{kb.AllNamespaces, "Toggle all-namespaces mode"},
+				{kb.PreviousNamespace, "Jump to previous namespace (swap back and forth)"},
 				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, T=Log Top aggregation, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, crash investigator, traffic capture, RBAC permissions"},
 				{kb.TogglePreviewLogs, "Toggle live-log preview pane for selected pod or container (right pane, streaming tail)"},
 				{kb.Logs, "Open fullscreen log viewer for selected resource"},

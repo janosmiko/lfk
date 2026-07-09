@@ -336,6 +336,7 @@ func (m *Model) saveCurrentTab() {
 	t.nsSelectionNegated = m.nsSelectionNegated
 	t.savedSelectedNamespaces = copyMapStringBool(m.savedSelectedNamespaces)
 	t.savedNsSelectionNegated = m.savedNsSelectionNegated
+	t.previousNsScope = m.previousNsScope.clone()
 	t.sortColumnName = m.sortColumnName
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
@@ -469,6 +470,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.nsSelectionNegated = t.nsSelectionNegated
 	m.savedSelectedNamespaces = copyMapStringBool(t.savedSelectedNamespaces)
 	m.savedNsSelectionNegated = t.savedNsSelectionNegated
+	m.previousNsScope = t.previousNsScope.clone()
 	m.sortColumnName = t.sortColumnName
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
@@ -681,6 +683,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		nsSelectionNegated:      m.nsSelectionNegated,
 		savedSelectedNamespaces: copyMapStringBool(m.savedSelectedNamespaces),
 		savedNsSelectionNegated: m.savedNsSelectionNegated,
+		previousNsScope:         m.previousNsScope.clone(),
 		sortColumnName:          m.sortColumnName,
 		sortAscending:           m.sortAscending,
 		filterText:              m.filterText,

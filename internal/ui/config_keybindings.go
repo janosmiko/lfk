@@ -174,6 +174,11 @@ type Keybindings struct {
 	GotoPVCs         string `json:"goto_pvcs" yaml:"goto_pvcs"`
 	GotoPVs          string `json:"goto_pvs" yaml:"goto_pvs"`
 	GotoPDBs         string `json:"goto_pdbs" yaml:"goto_pdbs"`
+
+	// PreviousNamespace is a g-prefix chord that swaps the namespace scope with
+	// the one in effect before the last change (toggle back and forth). Holds
+	// the full chord (e.g. "g\\").
+	PreviousNamespace string `json:"previous_namespace" yaml:"previous_namespace"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -277,6 +282,10 @@ func DefaultKeybindings() Keybindings {
 		GotoDaemonSets: "gD", GotoStatefulSets: "gt", GotoConfigMaps: "gC",
 		GotoSecrets: "gS", GotoHPAs: "gh", GotoPVCs: "gv", GotoPVs: "gV",
 		GotoPDBs: "gb",
+
+		// Jump to previous namespace (g-prefix chord, sits next to the "\\"
+		// namespace selector).
+		PreviousNamespace: "g\\",
 	}
 }
 

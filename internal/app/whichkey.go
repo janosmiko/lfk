@@ -190,7 +190,12 @@ func (m Model) handleGotoChord(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	}
 	m.pendingG = false
 	m.whichKeyShown = false
-	if gt, ok := m.gotoTargetForChord(ui.ActiveKeybindings.JumpTop + key); ok {
+	chord := ui.ActiveKeybindings.JumpTop + key
+	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" && chord == pn {
+		out, cmd := m.jumpToPreviousNamespace()
+		return out, cmd, true
+	}
+	if gt, ok := m.gotoTargetForChord(chord); ok {
 		out, cmd := m.gotoResourceType(gt.Kind, gt.Group)
 		return out, cmd, true
 	}
@@ -228,10 +233,13 @@ type whichKeyCell struct {
 func (m Model) whichKeyCells() []whichKeyCell {
 	prefix := ui.ActiveKeybindings.JumpTop
 	targets := m.gotoTargets()
-	cells := make([]whichKeyCell, 0, len(targets)+1)
+	cells := make([]whichKeyCell, 0, len(targets)+2)
 	cells = append(cells, whichKeyCell{prefix, "list top"})
 	for _, gt := range targets {
 		cells = append(cells, whichKeyCell{strings.TrimPrefix(gt.Chord, prefix), gt.Label})
+	}
+	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" {
+		cells = append(cells, whichKeyCell{strings.TrimPrefix(pn, prefix), "Previous namespace"})
 	}
 	sort.SliceStable(cells, func(i, j int) bool {
 		li, lj := strings.ToLower(cells[i].key), strings.ToLower(cells[j].key)

@@ -86,6 +86,25 @@ func TestHandleGotoChord_NavigatesOnMatch(t *testing.T) {
 	}
 }
 
+func TestHandleGotoChord_PreviousNamespace(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := gotoTestModel()
+	m.nav.Level = model.LevelResources
+	m.namespace = "kube-system"
+	m.selectedNamespaces = map[string]bool{"kube-system": true}
+	m.previousNsScope = &nsScope{namespace: "default", selectedNamespaces: map[string]bool{"default": true}}
+	m.pendingG = true
+	out, _, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\\'}})
+	if !handled {
+		t.Fatal(`g\ should be handled`)
+	}
+	rm := out.(Model)
+	if rm.namespace != "default" {
+		t.Fatalf(`g\ did not jump to previous namespace, got %q`, rm.namespace)
+	}
+}
+
 func TestHandleGotoChord_GPassesThroughToJumpTop(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true

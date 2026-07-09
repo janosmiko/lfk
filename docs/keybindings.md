@@ -55,6 +55,8 @@ goto_targets:
   ga: { kind: Application, group: argoproj.io, name: ArgoCD Applications }
 ```
 
+The `g` popup also lists `g\`, which jumps to the previous namespace (swaps the scope back and forth).
+
 All built-in chords are rebindable under `keybindings`.
 
 ## Views and Tools
@@ -175,6 +177,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
 | `\` | Open namespace selector (then `.` to filter to current item's namespace) | `namespace_selector` |
 | `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
+| `g\` | Jump to previous namespace (swaps the scope back and forth) | `previous_namespace` |
 | `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
 | `Ctrl+L` | Open fullscreen log viewer for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
