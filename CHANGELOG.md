@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.3](https://github.com/janosmiko/lfk/compare/v0.15.2...v0.15.3) (2026-07-09)
+
+
+### Bug Fixes
+
+* **tabs:** isolate quick filter presets per tab ([#518](https://github.com/janosmiko/lfk/issues/518)) ([8dc64a0](https://github.com/janosmiko/lfk/commit/8dc64a01f916289553b2dc92dd988344017bd6e3))
+
 ## [0.15.2](https://github.com/janosmiko/lfk/compare/v0.15.1...v0.15.2) (2026-07-09)
 
 
