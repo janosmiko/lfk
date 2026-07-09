@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -121,31 +122,65 @@ func renderCanISubjectOverlay(m Model, innerW int) string {
 	}, innerW)
 }
 
-// renderBookmarkOverlay maps the bookmark picker onto OverlayList. The
-// "[LOAD NAMESPACE]" chip embeds in the title as raw styled text; the
-// per-row "<key>: <name>" slot prefix collapses into Status="[k]" + Name.
+// renderBookmarkOverlay maps the bookmark picker onto OverlayList. Each row
+// shows the bookmark's saved namespace scope as a dim "ns: <scope>" suffix.
+// The jump replays that scope by default; Tab opts out, surfaced by the
+// "[KEEP CURRENT NS]" title chip.
 func renderBookmarkOverlay(m Model) string {
 	const w = 90
 	title := "Bookmarks"
-	if m.bookmarkLoadNamespace {
-		title += "   " + ui.HelpKeyStyle.Render("[LOAD NAMESPACE]")
+	if !m.bookmarkLoadNamespace {
+		title += "   " + ui.HelpKeyStyle.Render("[KEEP CURRENT NS]")
 	}
 	var bookmarks []ui.OverlayListItem
 	for _, bm := range m.bookmarks {
 		if m.bookmarkFilter.Value != "" && !ui.MatchLine(bm.Name, m.bookmarkFilter.Value) {
 			continue
 		}
-		bookmarks = append(bookmarks, ui.OverlayListItem{Key: bm.Slot, Name: bm.Name})
+		bookmarks = append(bookmarks, ui.OverlayListItem{
+			Key:         bm.Slot,
+			Name:        bm.Name,
+			Description: "ns: " + bookmarkNamespaceLabel(bm),
+		})
 	}
 	return ui.RenderOverlayList(bookmarks, ui.OverlayListConfig{
-		Title:        title,
-		Cursor:       m.overlayCursor,
-		Filterable:   true,
-		Filter:       m.bookmarkFilter.Value,
-		FilterActive: m.bookmarkSearchMode == bookmarkModeFilter,
-		ShowKey:      true,
-		EmptyMessage: "No bookmarks yet — press m<key> in the explorer to set a mark",
+		Title:           title,
+		Cursor:          m.overlayCursor,
+		Filterable:      true,
+		Filter:          m.bookmarkFilter.Value,
+		FilterActive:    m.bookmarkSearchMode == bookmarkModeFilter,
+		ShowKey:         true,
+		ShowDescription: true,
+		EmptyMessage:    "No bookmarks yet — press m<key> in the explorer to set a mark",
 	}, min(w, m.width-10)-4)
+}
+
+// bookmarkNamespaceLabel formats a bookmark's saved namespace scope for the
+// overlay: "all namespaces" when unscoped, a single name, or a comma list
+// (prefixed "!" when the set is an exclude filter, capped at 3 + "+N more").
+func bookmarkNamespaceLabel(bm model.Bookmark) string {
+	names := bm.Namespaces
+	if len(names) == 0 && bm.Namespace != "" {
+		names = []string{bm.Namespace}
+	}
+	if len(names) == 0 {
+		return "all namespaces"
+	}
+	sorted := append([]string(nil), names...)
+	sort.Strings(sorted)
+	if bm.NsSelectionNegated {
+		for i, ns := range sorted {
+			sorted[i] = "!" + ns
+		}
+	}
+	if len(sorted) > 3 {
+		more := "more"
+		if bm.NsSelectionNegated {
+			more = "more excl"
+		}
+		return fmt.Sprintf("%s +%d %s", strings.Join(sorted[:3], ","), len(sorted)-3, more)
+	}
+	return strings.Join(sorted, ",")
 }
 
 // renderSessionsOverlay maps the named-session picker onto OverlayList.

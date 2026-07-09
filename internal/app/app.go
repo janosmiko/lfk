@@ -406,14 +406,11 @@ type Model struct {
 	bookmarks          []model.Bookmark
 	bookmarkFilter     TextInput           // filter text (f mode) for bookmark overlay
 	bookmarkSearchMode bookmarkOverlayMode // current interaction mode for bookmark overlay
-	// bookmarkLoadNamespace, when true, instructs the next jump issued
-	// from the bookmark overlay to apply the bookmark's saved namespace
-	// scope. By default bookmark jumps ignore the saved namespace and
-	// keep the tab's current scope (slot case only controls context
-	// switching, not namespace handling). Toggled by Tab inside the
-	// overlay and shown as a `[LOAD NAMESPACE]` chip in the title.
-	// Reset on overlay close and consumed after each jump so it never
-	// leaks between opens.
+	// bookmarkLoadNamespace controls whether the next jump from the bookmark
+	// overlay replays the bookmark's saved namespace scope. Loading is the
+	// default (seeded on open); Tab opts out to keep the tab's current scope,
+	// surfaced by a `[KEEP CURRENT NS]` title chip. Reset to the default on
+	// overlay close and consumed after each jump so it never leaks between opens.
 	bookmarkLoadNamespace bool
 	sessionsOverlayState
 	// Template overlay state.

@@ -42,8 +42,9 @@ func (m *Model) applyBookmarkContextSwitch(target bookmarkTarget) {
 	}
 }
 
-// applyBookmarkNamespace replays the bookmark's saved namespace selection
-// only when the user explicitly requested it via Tab in the overlay.
+// applyBookmarkNamespace replays the bookmark's saved namespace selection.
+// This is the default; the user opts out per-jump with Tab in the overlay
+// (which clears m.bookmarkLoadNamespace to keep the current scope).
 // Consumes m.bookmarkLoadNamespace immediately so the flag can't leak
 // into the next overlay open. Skips namespace replay for union-set
 // targets — those carry their own namespace in the target record.

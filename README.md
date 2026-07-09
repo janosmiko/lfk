@@ -370,7 +370,7 @@ All search and filter inputs support three modes, auto-detected from the query s
 - Press `o` on a resource to jump to its owner (e.g. Pod -> Deployment), then `Backspace` to jump back
 - Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
 - Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete/scale/restart via `x`
-- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Press tab to jump to the namespace. An active list filter is saved with the bookmark and reapplied on jump (shown as `> /<filter>` in the slot name)
+- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Each bookmark shows its saved namespace in the overlay and the jump applies it by default; press Tab to opt out and keep the current scope. An active list filter is saved with the bookmark and reapplied on jump (shown as `> /<filter>` in the slot name)
 - Press `.` for quick filter presets (e.g. only failing Pods); extend them per resource type in config
 - Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
 - Copy the resource name with `y`; press `Y` to copy as YAML, JSON, or Table

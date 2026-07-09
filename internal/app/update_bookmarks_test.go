@@ -1198,35 +1198,37 @@ func TestNavigateToBookmark_ContextAwareWithLoadAppliesSavedNamespace(t *testing
 		"Tab-armed jumps must apply the saved namespace for context-aware bookmarks too")
 }
 
-// TestBookmarkOverlay_TabTogglesLoadNamespace verifies that Tab
-// pressed in the bookmark overlay flips the "load namespace" chip,
-// so the next jump (Enter or slot key) applies the saved namespace.
+// TestBookmarkOverlay_TabTogglesLoadNamespace verifies that Tab pressed
+// in the bookmark overlay flips the load-namespace flag. Loading is the
+// default (as set on open), so the first Tab opts out (keep current scope)
+// and the second re-enables loading.
 func TestBookmarkOverlay_TabTogglesLoadNamespace(t *testing.T) {
 	m := baseFinalModel()
 	m.overlay = overlayBookmarks
 	m.bookmarks = []model.Bookmark{{Slot: "a", Name: "x"}}
+	m.bookmarkLoadNamespace = true // matches the open default
 
 	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
 	rm := result.(Model)
-	assert.True(t, rm.bookmarkLoadNamespace, "first Tab must arm the load flag")
+	assert.False(t, rm.bookmarkLoadNamespace, "first Tab must opt out of loading")
 
 	result, _ = rm.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
 	rm = result.(Model)
-	assert.False(t, rm.bookmarkLoadNamespace, "second Tab must disarm the flag")
+	assert.True(t, rm.bookmarkLoadNamespace, "second Tab must re-enable loading")
 }
 
-// TestBookmarkOverlay_EscapeResetsLoadNamespace verifies that closing
-// the overlay without jumping discards any pending Tab arming, so
-// reopening the overlay presents a clean default state.
+// TestBookmarkOverlay_EscapeResetsLoadNamespace verifies that closing the
+// overlay resets the flag to the default (load) so an opt-out via Tab does
+// not leak into the next open.
 func TestBookmarkOverlay_EscapeResetsLoadNamespace(t *testing.T) {
 	m := baseFinalModel()
 	m.overlay = overlayBookmarks
-	m.bookmarkLoadNamespace = true
+	m.bookmarkLoadNamespace = false
 
 	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
 	rm := result.(Model)
-	assert.False(t, rm.bookmarkLoadNamespace,
-		"closing the overlay must reset the flag so it doesn't leak into the next open")
+	assert.True(t, rm.bookmarkLoadNamespace,
+		"closing the overlay must reset the flag to the load default")
 }
 
 func TestNavigateToBookmark_LocalResourceNotFound(t *testing.T) {
