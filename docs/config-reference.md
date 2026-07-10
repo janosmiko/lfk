@@ -254,6 +254,21 @@ Each monitoring entry accepts the following top-level fields:
 | `alertmanager` | object | *(auto-discovery)* | Alertmanager endpoint configuration. See endpoint fields below. |
 | `node_metrics` | string | *(auto-detect)* | Metrics source for node **and pod** usage: `"prometheus"` (use Prometheus queries), `"metrics-api"` (use metrics.k8s.io API). When empty, uses Prometheus if a prometheus endpoint is configured, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus. |
 
+### Node Uptime Column
+
+The nodes list shows an `Uptime` column (how long since each node last booted)
+when Prometheus is the configured monitoring source — that is, a `prometheus`
+endpoint is set, or `node_metrics: prometheus`.
+
+| Requirement | Detail |
+|---|---|
+| Source | node_exporter's `node_boot_time_seconds` metric, queried via Prometheus |
+| Needs | node_exporter, not just Prometheus (e.g. kube-prometheus-stack ships both) |
+| Kubernetes API | Does not expose node boot time, so there is no fallback source |
+
+Clusters without node_exporter never show the column. A node missing from the
+query result shows `n/a`, as does every node if Prometheus stops responding.
+
 ### Monitoring Endpoint Fields
 
 Each endpoint (`prometheus` and `alertmanager`) accepts:

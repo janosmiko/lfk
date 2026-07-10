@@ -3,6 +3,7 @@ package app
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -205,4 +206,69 @@ func TestCompareResourceValuesCmp_SortOrder(t *testing.T) {
 
 func itemWithCol(key, val string) model.Item {
 	return model.Item{Columns: []model.KeyValue{{Key: key, Value: val}}}
+}
+
+func TestParseAgeDuration(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want time.Duration
+		ok   bool
+	}{
+		{"seconds", "45s", 45 * time.Second, true},
+		{"minutes", "12m", 12 * time.Minute, true},
+		{"hours", "3h", 3 * time.Hour, true},
+		{"days", "5d", 5 * 24 * time.Hour, true},
+		{"years", "2y", 2 * 365 * 24 * time.Hour, true},
+		{"n/a rejected", "n/a", 0, false},
+		{"empty rejected", "", 0, false},
+		{"combined form rejected", "5d3h", 0, false},
+		{"unknown unit rejected", "5x", 0, false},
+		{"non-numeric rejected", "abc", 0, false},
+		{"negative rejected", "-3h", 0, false},
+		{"surrounding whitespace tolerated", " 7d ", 7 * 24 * time.Hour, true},
+		{"zero duration accepted", "0s", 0, true},
+		{"large but representable years accepted", "292y", 292 * 365 * 24 * time.Hour, true},
+		{"years overflow rejected", "999999999999y", 0, false},
+		{"days overflow rejected", "999999999999d", 0, false},
+		{"seconds overflow rejected", "9223372036854775807s", 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := parseAgeDuration(tt.in)
+			if ok != tt.ok {
+				t.Fatalf("parseAgeDuration(%q) ok = %v, want %v", tt.in, ok, tt.ok)
+			}
+			if ok && got != tt.want {
+				t.Fatalf("parseAgeDuration(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+			if got < 0 {
+				t.Fatalf("parseAgeDuration(%q) returned negative duration %v", tt.in, got)
+			}
+		})
+	}
+}
+
+func TestCompareUptimeCmp(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want int
+	}{
+		{"9h before 10d by real duration, not lexically", "9h", "10d", -1},
+		{"10d after 9h", "10d", "9h", 1},
+		{"45s before 12m", "45s", "12m", -1},
+		{"equal values", "5d", "5d", 0},
+		{"n/a sorts after real value", "n/a", "5d", 1},
+		{"real value before n/a", "5d", "n/a", -1},
+		{"n/a equals n/a", "n/a", "n/a", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareUptimeCmp(tt.a, tt.b)
+			if (got < 0) != (tt.want < 0) || (got > 0) != (tt.want > 0) {
+				t.Errorf("compareUptimeCmp(%q, %q) = %d, want sign of %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
 }

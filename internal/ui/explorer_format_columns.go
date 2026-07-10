@@ -97,6 +97,7 @@ type colInfo struct {
 var canonicalColumnPriority = map[string]int{
 	"CPU": 0, "CPU%": 1, "CPU/R": 2, "CPU/L": 3,
 	"MEM": 4, "MEM%": 5, "MEM/R": 6, "MEM/L": 7,
+	"Uptime": 8,
 }
 
 // sortDiscoveryOrder reorders detected column keys in place into a canonical,

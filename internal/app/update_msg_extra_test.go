@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -1857,6 +1858,379 @@ func TestUpdateNodeMetricsEnrichedStaleGen(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// --- lookupNodeUptime ---
+
+func TestLookupNodeUptime(t *testing.T) {
+	uptimes := k8s.NodeUptimes{
+		ByName: map[string]time.Duration{"node-a": 5 * time.Minute},
+		ByAddr: map[string]time.Duration{
+			"10.0.1.5":     10 * time.Minute,
+			"node-c.local": 15 * time.Minute,
+		},
+	}
+
+	t.Run("hit by name", func(t *testing.T) {
+		item := model.Item{Name: "node-a"}
+		d, ok := lookupNodeUptime(item, uptimes)
+		assert.True(t, ok)
+		assert.Equal(t, 5*time.Minute, d)
+	})
+
+	t.Run("miss on name but hit on InternalIP", func(t *testing.T) {
+		item := model.Item{
+			Name:    "node-b",
+			Columns: []model.KeyValue{{Key: "InternalIP", Value: "10.0.1.5"}},
+		}
+		d, ok := lookupNodeUptime(item, uptimes)
+		assert.True(t, ok)
+		assert.Equal(t, 10*time.Minute, d)
+	})
+
+	t.Run("miss on name and InternalIP but hit on Hostname", func(t *testing.T) {
+		item := model.Item{
+			Name: "node-c",
+			Columns: []model.KeyValue{
+				{Key: "InternalIP", Value: "10.0.9.9"},
+				{Key: "Hostname", Value: "node-c.local"},
+			},
+		}
+		d, ok := lookupNodeUptime(item, uptimes)
+		assert.True(t, ok)
+		assert.Equal(t, 15*time.Minute, d)
+	})
+
+	t.Run("total miss returns ok=false", func(t *testing.T) {
+		item := model.Item{
+			Name:    "node-z",
+			Columns: []model.KeyValue{{Key: "InternalIP", Value: "10.0.0.0"}},
+		}
+		_, ok := lookupNodeUptime(item, uptimes)
+		assert.False(t, ok)
+	})
+
+	t.Run("empty result returns ok=false", func(t *testing.T) {
+		item := model.Item{Name: "node-a"}
+		_, ok := lookupNodeUptime(item, k8s.NodeUptimes{})
+		assert.False(t, ok)
+	})
+}
+
+// TestLookupNodeUptimeNameAndAddrCollisionResolvesIndependently is the
+// regression guard for defect #4: a flat single-map keyspace let a node
+// literally named the same string as another node's InternalIP silently
+// collide, so one of the two would show the wrong uptime. Splitting into
+// ByName/ByAddr must resolve each node to its own value.
+func TestLookupNodeUptimeNameAndAddrCollisionResolvesIndependently(t *testing.T) {
+	uptimes := k8s.NodeUptimes{
+		ByName: map[string]time.Duration{"10.0.1.5": 100 * time.Minute}, // a node literally named "10.0.1.5"
+		ByAddr: map[string]time.Duration{"10.0.1.5": 5 * time.Minute},   // a different node whose InternalIP is 10.0.1.5
+	}
+
+	nodeNamedByIP := model.Item{Name: "10.0.1.5"}
+	d, ok := lookupNodeUptime(nodeNamedByIP, uptimes)
+	require.True(t, ok)
+	assert.Equal(t, 100*time.Minute, d, "must resolve via ByName, not the colliding ByAddr entry")
+
+	otherNode := model.Item{
+		Name:    "node-b",
+		Columns: []model.KeyValue{{Key: "InternalIP", Value: "10.0.1.5"}},
+	}
+	d, ok = lookupNodeUptime(otherNode, uptimes)
+	require.True(t, ok)
+	assert.Equal(t, 5*time.Minute, d, "must resolve via ByAddr for the node whose IP equals another node's name")
+}
+
+// --- nodeUptimeEnrichedMsg ---
+
+func TestUpdateNodeUptimeEnrichedStaleGen(t *testing.T) {
+	m := baseModel()
+	m.requestGen = 10
+	m.middleItems = []model.Item{{Name: "node-a"}}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": 5 * time.Minute}},
+		gen:     5,
+	})
+	rm := result.(Model)
+	for _, kv := range rm.middleItems[0].Columns {
+		assert.NotEqual(t, "Uptime", kv.Key, "stale gen must not mutate columns")
+	}
+}
+
+// TestUpdateNodeUptimeEnrichedEmptyMapAddsNoColumn is the key regression
+// guard: an empty uptimes map means Prometheus isn't configured (or
+// node_exporter isn't installed, or the query transiently failed) -- not
+// that every node genuinely has zero uptime data. Writing "n/a" placeholders
+// here would permanently pin an UPTIME column onto every nodes list on every
+// cluster that doesn't run node_exporter.
+func TestUpdateNodeUptimeEnrichedEmptyMapAddsNoColumn(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{Name: "node-a"}, {Name: "node-b"}}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{gen: 0})
+	rm := result.(Model)
+	for _, item := range rm.middleItems {
+		for _, kv := range item.Columns {
+			assert.NotEqual(t, "Uptime", kv.Key, "empty uptimes map must not add an Uptime column")
+		}
+	}
+}
+
+func TestUpdateNodeUptimeEnrichedMatchedAndUnmatched(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{Name: "node-a"}, {Name: "node-b"}}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": 90 * time.Minute}},
+		gen:     0,
+	})
+	rm := result.(Model)
+
+	got := func(item model.Item) (string, bool) {
+		for _, kv := range item.Columns {
+			if kv.Key == "Uptime" {
+				return kv.Value, true
+			}
+		}
+		return "", false
+	}
+
+	valA, okA := got(rm.middleItems[0])
+	require.True(t, okA)
+	assert.Equal(t, k8s.FormatAge(90*time.Minute), valA)
+
+	valB, okB := got(rm.middleItems[1])
+	require.True(t, okB)
+	assert.Equal(t, "n/a", valB)
+}
+
+func TestUpdateNodeUptimeEnrichedMatchedByInternalIP(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{
+		Name:    "node-a",
+		Columns: []model.KeyValue{{Key: "InternalIP", Value: "10.0.1.5"}},
+	}}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByAddr: map[string]time.Duration{"10.0.1.5": 45 * time.Minute}},
+		gen:     0,
+	})
+	rm := result.(Model)
+
+	var val string
+	for _, kv := range rm.middleItems[0].Columns {
+		if kv.Key == "Uptime" {
+			val = kv.Value
+		}
+	}
+	assert.Equal(t, k8s.FormatAge(45*time.Minute), val)
+}
+
+func TestUpdateNodeUptimeEnrichedTwiceDoesNotDuplicate(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{Name: "node-a"}}
+
+	msg := nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": 5 * time.Minute}},
+		gen:     0,
+	}
+	result, _ := m.Update(msg)
+	result, _ = result.(Model).Update(msg)
+	rm := result.(Model)
+
+	count := 0
+	for _, kv := range rm.middleItems[0].Columns {
+		if kv.Key == "Uptime" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count)
+}
+
+// TestUpdateNodeUptimeEnrichedPreservesExistingIndex is the regression guard
+// for defect #1 (row-flapping): an existing "Uptime" column must be updated
+// in place, never moved, or its position in the detail pane oscillates
+// between carryOverMetricsColumnsFrom's prepend and this handler's position.
+func TestUpdateNodeUptimeEnrichedPreservesExistingIndex(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{
+		Name: "node-a",
+		Columns: []model.KeyValue{
+			{Key: "Foo", Value: "x"},
+			{Key: "Uptime", Value: "1h0m0s"},
+			{Key: "Bar", Value: "y"},
+		},
+	}}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": 2 * time.Hour}},
+		gen:     0,
+	})
+	rm := result.(Model)
+
+	cols := rm.middleItems[0].Columns
+	require.Len(t, cols, 3)
+	assert.Equal(t, "Foo", cols[0].Key)
+	assert.Equal(t, "Uptime", cols[1].Key, "Uptime must keep its original index")
+	assert.Equal(t, k8s.FormatAge(2*time.Hour), cols[1].Value)
+	assert.Equal(t, "Bar", cols[2].Key)
+}
+
+// TestUpdateNodeUptimeEnrichedStableAcrossCarryOverTicks simulates two watch
+// ticks (carryOverMetricsColumnsFrom then the enrichment handler, twice) and
+// asserts the column key order never changes. The flap this defect fixes
+// alternated the UPTIME row between its carried-over (prepended) position
+// and a moved (appended) position on every tick.
+func TestUpdateNodeUptimeEnrichedStableAcrossCarryOverTicks(t *testing.T) {
+	m := baseModel()
+	// Seed a steady state where "Uptime" is already established (from a
+	// prior successful tick), matching the reported symptom: the flap was
+	// observed on an already-populated nodes list, not on the very first
+	// tick before an Uptime column ever existed.
+	m.middleItems = []model.Item{{
+		Name:    "node-a",
+		Columns: []model.KeyValue{{Key: "Uptime", Value: "1h0m0s"}, {Key: "Other", Value: "x"}},
+	}}
+
+	keysOf := func(cols []model.KeyValue) []string {
+		keys := make([]string, len(cols))
+		for i, kv := range cols {
+			keys[i] = kv.Key
+		}
+		return keys
+	}
+
+	var afterCarryOver, afterHandler [2][]string
+	for tick := range 2 {
+		fresh := []model.Item{{Name: "node-a", Columns: []model.KeyValue{{Key: "Other", Value: "x"}}}}
+		carryOverMetricsColumnsFrom(m.middleItems, fresh)
+		afterCarryOver[tick] = keysOf(fresh[0].Columns)
+
+		m.middleItems = fresh
+		result, _ := m.Update(nodeUptimeEnrichedMsg{
+			uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": time.Duration(tick+1) * time.Hour}},
+			gen:     0,
+		})
+		m = result.(Model)
+		afterHandler[tick] = keysOf(m.middleItems[0].Columns)
+	}
+
+	want := []string{"Uptime", "Other"}
+	assert.Equal(t, want, afterCarryOver[0], "carryOver must place Uptime at the same index every tick")
+	assert.Equal(t, want, afterHandler[0], "handler must not move the column carryOver just placed")
+	assert.Equal(t, want, afterCarryOver[1], "carryOver position must be stable across ticks")
+	assert.Equal(t, want, afterHandler[1], "handler position must be stable across ticks")
+}
+
+// TestUpdateNodeUptimeEnrichedOrderIndependentFromMetrics asserts running
+// updateNodeMetricsEnriched then updateNodeUptimeEnriched produces the same
+// column key order as running them in the reverse order -- the two async
+// messages can land in either order and must not disagree about where
+// "Uptime" sits relative to the CPU/MEM block.
+func TestUpdateNodeUptimeEnrichedOrderIndependentFromMetrics(t *testing.T) {
+	established := []model.KeyValue{
+		{Key: "CPU", Value: "100m"},
+		{Key: "CPU%", Value: "10%"},
+		{Key: "MEM", Value: "1Gi"},
+		{Key: "MEM%", Value: "20%"},
+		{Key: "Uptime", Value: "1h0m0s"},
+		{Key: "Other", Value: "x"},
+	}
+	newCols := func() []model.KeyValue {
+		cols := make([]model.KeyValue, len(established))
+		copy(cols, established)
+		return cols
+	}
+	keysOf := func(cols []model.KeyValue) []string {
+		keys := make([]string, len(cols))
+		for i, kv := range cols {
+			keys[i] = kv.Key
+		}
+		return keys
+	}
+
+	metricsMsg := nodeMetricsEnrichedMsg{
+		metrics: map[string]model.PodMetrics{"node-a": {CPU: 500, Memory: 2 * 1024 * 1024 * 1024}},
+		gen:     0,
+	}
+	uptimeMsg := nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": 3 * time.Hour}},
+		gen:     0,
+	}
+
+	mA := baseModel()
+	mA.middleItems = []model.Item{{Name: "node-a", Columns: newCols()}}
+	rA, _ := mA.Update(metricsMsg)
+	rA, _ = rA.(Model).Update(uptimeMsg)
+	orderA := keysOf(rA.(Model).middleItems[0].Columns)
+
+	mB := baseModel()
+	mB.middleItems = []model.Item{{Name: "node-a", Columns: newCols()}}
+	rB, _ := mB.Update(uptimeMsg)
+	rB, _ = rB.(Model).Update(metricsMsg)
+	orderB := keysOf(rB.(Model).middleItems[0].Columns)
+
+	wantOrder := keysOf(established)
+	assert.Equal(t, wantOrder, orderA, "metrics-then-uptime must not reorder columns")
+	assert.Equal(t, wantOrder, orderB, "uptime-then-metrics must not reorder columns")
+	assert.Equal(t, orderA, orderB, "arrival order must not affect final column order")
+}
+
+// TestUpdateNodeUptimeEnrichedEmptyMapDegradesExistingColumnToNA is the
+// regression guard for defect #2: once Prometheus stops answering (an empty
+// uptimes map), a node that already carries a live "Uptime" value must have
+// it degrade to "n/a" rather than freeze forever. A node that never had an
+// Uptime column must still not get one invented (see
+// TestUpdateNodeUptimeEnrichedEmptyMapAddsNoColumn).
+func TestUpdateNodeUptimeEnrichedEmptyMapDegradesExistingColumnToNA(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{
+		{Name: "node-a", Columns: []model.KeyValue{{Key: "Uptime", Value: "2h0m0s"}}},
+		{Name: "node-b", Columns: []model.KeyValue{{Key: "Foo", Value: "bar"}}},
+	}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{gen: 0})
+	rm := result.(Model)
+
+	require.Len(t, rm.middleItems[0].Columns, 1)
+	assert.Equal(t, "Uptime", rm.middleItems[0].Columns[0].Key, "position must not move")
+	assert.Equal(t, "n/a", rm.middleItems[0].Columns[0].Value, "stale value must degrade to n/a")
+
+	for _, kv := range rm.middleItems[1].Columns {
+		assert.NotEqual(t, "Uptime", kv.Key, "a node that never had Uptime must not get one invented")
+	}
+}
+
+// TestUpdateNodeUptimeEnrichedFreezePreventedAcrossTicks runs a realistic
+// tick sequence -- a successful fetch, a watch-tick carryOver, then a failed
+// (empty-map) fetch -- and asserts the column reads "n/a" afterward instead
+// of freezing on the last live value forever.
+func TestUpdateNodeUptimeEnrichedFreezePreventedAcrossTicks(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{Name: "node-a"}}
+
+	// Tick 1: Prometheus answers.
+	result, _ := m.Update(nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{"node-a": 2 * time.Hour}},
+		gen:     0,
+	})
+	m = result.(Model)
+	liveValue := m.middleItems[0].Columns[0].Value
+	require.Equal(t, k8s.FormatAge(2*time.Hour), liveValue)
+
+	// Tick 2: list refresh carries the live value onto the fresh items,
+	// then the fetch fails (empty map).
+	fresh := []model.Item{{Name: "node-a"}}
+	carryOverMetricsColumnsFrom(m.middleItems, fresh)
+	m.middleItems = fresh
+	require.Equal(t, liveValue, m.middleItems[0].Columns[0].Value, "carryOver should have preserved the live value going into the failed tick")
+
+	result, _ = m.Update(nodeUptimeEnrichedMsg{gen: 0})
+	rm := result.(Model)
+
+	assert.Equal(t, "n/a", rm.middleItems[0].Columns[0].Value, "must degrade to n/a, not freeze on the stale live value")
+}
+
 // --- podLogSelectMsg ---
 
 func TestUpdatePodLogSelectError(t *testing.T) {
@@ -2043,4 +2417,21 @@ func TestUpdateWindowSizeMsgWithMultipleTabs(t *testing.T) {
 	assert.Equal(t, 100, mdl.width)
 	assert.Equal(t, 30, mdl.height)
 	assert.Nil(t, cmd)
+}
+
+// setUptimeColumn must replace the Columns slice, not write through it:
+// cloneCurrentTab shallow-copies Item values, so a tab snapshot shares the
+// backing array and would otherwise see another tab's uptime writes.
+func TestSetUptimeColumnDoesNotMutateSharedBackingArray(t *testing.T) {
+	item := model.Item{Name: "node-1", Columns: []model.KeyValue{
+		{Key: "Uptime", Value: "5d"},
+		{Key: "InternalIP", Value: "10.0.1.5"},
+	}}
+	snapshot := item // shallow copy, shares the Columns backing array
+
+	setUptimeColumn(&item, "n/a")
+
+	assert.Equal(t, "n/a", item.Columns[0].Value, "target item updated")
+	assert.Equal(t, "5d", snapshot.Columns[0].Value, "snapshot must not be mutated")
+	assert.Equal(t, "Uptime", item.Columns[0].Key, "position preserved")
 }

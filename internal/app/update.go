@@ -184,6 +184,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case nodeMetricsEnrichedMsg:
 		mdl := m.updateNodeMetricsEnriched(msg)
 		return mdl, nil, true
+	case nodeUptimeEnrichedMsg:
+		mdl := m.updateNodeUptimeEnriched(msg)
+		return mdl, nil, true
 	case dashboardPartialMsg:
 		mdl, cmd := m.handleDashboardPartial(msg)
 		return mdl, cmd, true

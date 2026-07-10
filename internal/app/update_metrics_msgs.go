@@ -591,3 +591,117 @@ func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 	m.itemCache[m.navKey()] = m.middleItems
 	return m
 }
+
+// lookupNodeUptime resolves a node item's uptime from a Prometheus result
+// split into name-keyed and address-keyed results (see k8s.GetNodeUptimes).
+// The two keyspaces are checked separately -- a node named the same string
+// as another node's IP/hostname must resolve to its own uptime, not
+// whichever one happened to land in a shared map. node_exporter's
+// "instance" label is an IP:port, not a node name, so the name lookup alone
+// misses most clusters -- fall back to the item's InternalIP, then
+// Hostname, columns.
+func lookupNodeUptime(item model.Item, uptimes k8s.NodeUptimes) (time.Duration, bool) {
+	if d, ok := uptimes.ByName[item.Name]; ok {
+		return d, true
+	}
+	for _, key := range []string{"InternalIP", "Hostname"} {
+		for _, kv := range item.Columns {
+			if kv.Key != key {
+				continue
+			}
+			if d, ok := uptimes.ByAddr[kv.Value]; ok {
+				return d, true
+			}
+		}
+	}
+	return 0, false
+}
+
+// updateNodeUptimeEnriched injects an "Uptime" column into each node item
+// once a Prometheus fetch resolves. msg.uptimes follows a three-way rule:
+//
+//   - Non-empty: write the formatted value for every matched node, "n/a" for
+//     every unmatched one (node_exporter simply doesn't cover every node).
+//   - Empty, and no item carries an "Uptime" column yet: a no-op. This means
+//     Prometheus isn't the configured monitoring source, node_exporter isn't
+//     installed, or the query has never once succeeded -- writing "n/a"
+//     placeholders here would permanently pin an UPTIME column onto every
+//     nodes list on every cluster that doesn't run node_exporter.
+//   - Empty, but an item already carries an "Uptime" column (from an earlier
+//     successful tick, possibly carried over by carryOverMetricsColumnsFrom):
+//     degrade that column to "n/a" in place. Otherwise a transient Prometheus
+//     outage leaves the last-known value on screen forever with no
+//     indication it has gone stale.
+func (m Model) updateNodeUptimeEnriched(msg nodeUptimeEnrichedMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response
+	}
+	empty := msg.uptimes.Empty()
+	if empty && !anyItemHasUptimeColumn(m.middleItems) {
+		return m
+	}
+	m.middleItemsRev++
+	for i := range m.middleItems {
+		item := &m.middleItems[i]
+		if empty {
+			if uptimeColumnIndex(item.Columns) >= 0 {
+				setUptimeColumn(item, "n/a")
+			}
+			continue
+		}
+		var value string
+		if d, ok := lookupNodeUptime(*item, msg.uptimes); ok {
+			value = k8s.FormatAge(d)
+		} else {
+			value = "n/a"
+		}
+		setUptimeColumn(item, value)
+	}
+	m.itemCache[m.navKey()] = m.middleItems
+	return m
+}
+
+// anyItemHasUptimeColumn reports whether any item already carries an
+// "Uptime" column, distinguishing "Prometheus never had data" (true no-op)
+// from "Prometheus had data and just stopped answering" (degrade to n/a).
+func anyItemHasUptimeColumn(items []model.Item) bool {
+	for _, item := range items {
+		if uptimeColumnIndex(item.Columns) >= 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// uptimeColumnIndex returns the index of item's "Uptime" column, or -1.
+func uptimeColumnIndex(cols []model.KeyValue) int {
+	for i, kv := range cols {
+		if kv.Key == "Uptime" {
+			return i
+		}
+	}
+	return -1
+}
+
+// setUptimeColumn writes value into item's existing "Uptime" column, or
+// prepends a new one if absent. An existing column must never be moved:
+// carryOverMetricsColumnsFrom and updateNodeMetricsEnriched both prepend
+// their columns on every tick, and this handler moving Uptime to the end
+// instead made its row flap between two positions every refresh.
+// Insertion also prepends so a first-seen Uptime column lands in the same
+// spot regardless of which of the two enrichment messages arrives first.
+//
+// The Columns slice is replaced rather than written through: cloneCurrentTab
+// shallow-copies Item values, so a tab snapshot shares this backing array.
+func setUptimeColumn(item *model.Item, value string) {
+	if idx := uptimeColumnIndex(item.Columns); idx >= 0 {
+		newCols := append([]model.KeyValue(nil), item.Columns...)
+		newCols[idx].Value = value
+		item.Columns = newCols
+		return
+	}
+	newCols := make([]model.KeyValue, 0, len(item.Columns)+1)
+	newCols = append(newCols, model.KeyValue{Key: "Uptime", Value: value})
+	newCols = append(newCols, item.Columns...)
+	item.Columns = newCols
+}

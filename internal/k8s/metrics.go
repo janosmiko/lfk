@@ -479,6 +479,17 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 // queryPrometheusNodeMetric runs a PromQL instant query via Kubernetes service proxy
 // and returns a map of node name -> float64 value.
 func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
+	return queryPrometheusMetric(ctx, contextName, cs, namespaces, services, port, query, parsePrometheusNodeResponse)
+}
+
+// queryPrometheusMetric runs a PromQL instant query via Kubernetes service proxy
+// and parses the response with the caller-supplied parser. A free function
+// (rather than a method) so it can be generic over the parsed result type T --
+// callers needing a different shape (e.g. node uptime, which splits into
+// name-keyed and address-keyed maps) reuse the same service-discovery and
+// promSvcCache logic instead of duplicating it.
+func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string, parse func([]byte) (T, error)) (T, error) {
+	var zero T
 	params := map[string]string{"query": query}
 
 	// Check cache for a known working namespace+service. Keyed by contextName
@@ -490,9 +501,9 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName stri
 		result := cs.CoreV1().Services(entry.namespace).ProxyGet("http", entry.service, port, "/api/v1/query", params)
 		data, err := result.DoRaw(ctx)
 		if err == nil {
-			nodeMap, err := parsePrometheusNodeResponse(data)
+			parsed, err := parse(data)
 			if err == nil {
-				return nodeMap, nil
+				return parsed, nil
 			}
 		}
 		// Cache entry stale, remove and fall through to discovery.
@@ -509,20 +520,20 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName stri
 				continue
 			}
 
-			nodeMap, err := parsePrometheusNodeResponse(data)
+			parsed, err := parse(data)
 			if err != nil {
 				lastErr = err
 				continue
 			}
 			promSvcCache.Store(contextName, promSvcEntry{namespace: ns, service: svc})
-			return nodeMap, nil
+			return parsed, nil
 		}
 	}
 
 	if lastErr != nil {
-		return nil, lastErr
+		return zero, lastErr
 	}
-	return nil, fmt.Errorf("no prometheus service found")
+	return zero, fmt.Errorf("no prometheus service found")
 }
 
 // parsePrometheusVector parses a Prometheus /api/v1/query instant-vector

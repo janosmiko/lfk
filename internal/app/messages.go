@@ -325,6 +325,16 @@ type nodeMetricsEnrichedMsg struct {
 	gen     uint64
 }
 
+// nodeUptimeEnrichedMsg carries Prometheus node uptimes to enrich the middle
+// pane items. uptimes separates name-keyed from address-keyed (IP/hostname)
+// results (see k8s.GetNodeUptimes) since node_exporter series aren't
+// reliably keyed by node name, and a name/address collision must not
+// silently overwrite either node's uptime.
+type nodeUptimeEnrichedMsg struct {
+	uptimes k8s.NodeUptimes
+	gen     uint64
+}
+
 // secretDataLoadedMsg carries the fetched secret data.
 type secretDataLoadedMsg struct {
 	data *model.SecretData
