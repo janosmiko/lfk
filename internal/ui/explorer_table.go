@@ -302,7 +302,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 	}
 
-	if ActiveMiddleScroll >= 0 {
+	// The ActiveMiddleScroll >= 0 && cursor >= 0 gates below scope the
+	// middle-pane globals (scroll, click map, sort/column layout) to the real
+	// middle-column render. Cursor-less renders (right-pane children tables,
+	// measure passes) must leave them untouched: VimScrollOff with cursor=-1
+	// returns 0, so an unguarded write resets the neighbouring pane's viewport
+	// and rebuilds the click map from the wrong items (issues #398/#524).
+	if ActiveMiddleScroll >= 0 && cursor >= 0 {
 		ActiveExtraColumnKeys = ActiveExtraColumnKeys[:0]
 		for _, ec := range extraCols {
 			ActiveExtraColumnKeys = append(ActiveExtraColumnKeys, ec.key)
@@ -311,7 +317,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 	order := orderedColumnKeys(hasName, hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
 
-	if ActiveMiddleScroll >= 0 {
+	if ActiveMiddleScroll >= 0 && cursor >= 0 {
 		ActiveSortableColumns = ActiveSortableColumns[:0]
 		// order now carries "Name" at its configured position, so the sortable
 		// list mirrors the on-screen column order directly.
@@ -371,7 +377,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	b.WriteString(renderStyledHeader(hdrSegments, width))
 	height--
 
-	if ActiveMiddleScroll >= 0 {
+	if ActiveMiddleScroll >= 0 && cursor >= 0 {
 		ActiveMiddleColumnLayout = ActiveMiddleColumnLayout[:0]
 		x := 0
 		if wantMarker {
@@ -432,7 +438,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 	scrollOff := ConfigScrollOff
 	startIdx := 0
-	if ActiveMiddleScroll >= 0 {
+	if ActiveMiddleScroll >= 0 && cursor >= 0 {
 		startIdx = VimScrollOff(ActiveMiddleScroll, cursor, len(items), height, scrollOff, tableDisplayLines)
 		ActiveMiddleScroll = startIdx
 	} else {
@@ -492,7 +498,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		endIdx++
 	}
 
-	if ActiveMiddleScroll >= 0 {
+	if ActiveMiddleScroll >= 0 && cursor >= 0 {
 		ActiveMiddleLineMap = ActiveMiddleLineMap[:0]
 		for i := startIdx; i < endIdx; i++ {
 			if hasSepForItem[i] && i > startIdx {

@@ -225,10 +225,14 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 	startEntry := 0
 
 	// Use persistent scroll position if available (vim-style stable viewport).
-	if isActive && ActiveMiddleScroll >= 0 {
+	// Cursor-less renders (cursor < 0: preview/measure passes, or a left pane
+	// whose parent highlight has no match) must not persist a viewport —
+	// VimScrollOff with cursor=-1 returns 0, so writing it back would reset
+	// the pane's scroll and make it visibly jump (issues #398/#524).
+	if isActive && ActiveMiddleScroll >= 0 && cursor >= 0 {
 		startEntry = VimScrollOff(ActiveMiddleScroll, cursor, len(entries), height, scrollOff, displayLines)
 		ActiveMiddleScroll = startEntry
-	} else if !isActive && ActiveLeftScroll >= 0 {
+	} else if !isActive && ActiveLeftScroll >= 0 && cursor >= 0 {
 		startEntry = VimScrollOff(ActiveLeftScroll, cursor, len(entries), height, scrollOff, displayLines)
 		ActiveLeftScroll = startEntry
 	} else {
@@ -293,8 +297,9 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 		endEntry++
 	}
 
-	// Build display-line-to-item map for mouse click handling (active middle column only).
-	if isActive {
+	// Build display-line-to-item map for mouse click handling (active middle
+	// column only; a cursor-less render is never the real middle column).
+	if isActive && cursor >= 0 {
 		ActiveMiddleLineMap = ActiveMiddleLineMap[:0]
 		for ei := startEntry; ei < endEntry; ei++ {
 			e := entries[ei]
