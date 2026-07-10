@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.5](https://github.com/janosmiko/lfk/compare/v0.15.4...v0.15.5) (2026-07-10)
+
+
+### Bug Fixes
+
+* **nodes:** describe drain in the drain confirmation, not delete ([#522](https://github.com/janosmiko/lfk/issues/522)) ([fa12b02](https://github.com/janosmiko/lfk/commit/fa12b02be93ecd43b4de4fb9fada27d09ebc6abc))
+
 ## [0.15.4](https://github.com/janosmiko/lfk/compare/v0.15.3...v0.15.4) (2026-07-10)
 
 
