@@ -258,7 +258,10 @@ Each monitoring entry accepts the following top-level fields:
 
 The nodes list shows an `Uptime` column (how long since each node last booted)
 when Prometheus is the configured monitoring source — that is, a `prometheus`
-endpoint is set, or `node_metrics: prometheus`.
+endpoint is set, or `node_metrics: prometheus`. One of the two is required;
+the column stays hidden on clusters with no monitoring config. With
+`node_metrics: prometheus` and no `prometheus` block, the endpoint itself is
+auto-discovered from the well-known namespaces and services listed below.
 
 | Requirement | Detail |
 |---|---|
