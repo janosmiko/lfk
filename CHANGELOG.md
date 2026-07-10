@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.6](https://github.com/janosmiko/lfk/compare/v0.15.5...v0.15.6) (2026-07-10)
+
+
+### Bug Fixes
+
+* **explorer:** stop cursor-less renders from writing pane scroll state ([#524](https://github.com/janosmiko/lfk/issues/524)) ([#526](https://github.com/janosmiko/lfk/issues/526)) ([ca4a2e8](https://github.com/janosmiko/lfk/commit/ca4a2e8b5dac4b9a25b087a12a4c2bc7ffaa2d50))
+
 ## [0.15.5](https://github.com/janosmiko/lfk/compare/v0.15.4...v0.15.5) (2026-07-10)
 
 
