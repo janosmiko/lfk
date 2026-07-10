@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.4](https://github.com/janosmiko/lfk/compare/v0.15.3...v0.15.4) (2026-07-10)
+
+
+### Features
+
+* **nodes:** show node uptime from Prometheus in the nodes list ([#520](https://github.com/janosmiko/lfk/issues/520)) ([d6f8e81](https://github.com/janosmiko/lfk/commit/d6f8e8154518e99bd8da50a63a4e7bc1ed846b0c))
+
 ## [0.15.3](https://github.com/janosmiko/lfk/compare/v0.15.2...v0.15.3) (2026-07-09)
 
 
