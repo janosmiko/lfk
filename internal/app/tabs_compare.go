@@ -1,6 +1,7 @@
 package app
 
 import (
+	"math"
 	"net/netip"
 	"sort"
 	"strconv"
@@ -162,20 +163,23 @@ var columnValueCmp = map[string]valueCmpFunc{
 	"Cluster IP":   compareIPCmp,
 	"Pod IP":       compareIPCmp,
 	"External IPs": compareIPCmp,
+	"Uptime":       compareUptimeCmp,
 }
 
-// metricsMissingLastColumns are the metrics columns whose cells render as
-// "n/a" when metrics-server has no data for the row. Rows missing such a value
-// must sort to the bottom regardless of sort direction (see sortMiddleItems).
+// metricsMissingLastColumns are columns whose cells can render as an "n/a"
+// placeholder — metrics-server data missing (CPU/MEM family) or unknown
+// Uptime. Rows with such a value must sort to the bottom regardless of
+// sort direction (see sortMiddleItems).
 var metricsMissingLastColumns = map[string]bool{
 	"CPU": true, "MEM": true,
 	"CPU%": true, "MEM%": true,
 	"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
+	"Uptime": true,
 }
 
-// metricValueMissing reports whether item's value for colName is a metrics-less
-// "n/a" placeholder that should always sort last. Returns false for non-metrics
-// columns, so only the CPU/MEM family gets the always-last treatment.
+// metricValueMissing reports whether item's value for colName is an "n/a"
+// placeholder that should always sort last. Returns false for columns not
+// in metricsMissingLastColumns.
 func metricValueMissing(colName string, item model.Item) bool {
 	if !metricsMissingLastColumns[colName] {
 		return false
@@ -461,6 +465,66 @@ func compareDurationCmp(a, b string) int {
 		return cmpInt64(int64(da), int64(db))
 	}
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
+// ageDurationUnits maps formatAge's single-char suffixes to their
+// nanosecond multiplier. Days = 24h, years = 365d, matching formatAge's
+// own arithmetic.
+var ageDurationUnits = map[byte]time.Duration{
+	's': time.Second,
+	'm': time.Minute,
+	'h': time.Hour,
+	'd': 24 * time.Hour,
+	'y': 365 * 24 * time.Hour,
+}
+
+// parseAgeDuration parses the single-unit duration strings emitted by
+// k8s.formatAge (e.g. "45s", "5d", "2y") — never a combined form like
+// "5d3h". time.ParseDuration only understands ns/us/ms/s/m/h, so it can't
+// parse formatAge's "d"/"y" suffixes; this is a dedicated parser instead
+// of reusing compareDurationCmp.
+func parseAgeDuration(s string) (time.Duration, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+	mult, known := ageDurationUnits[s[len(s)-1]]
+	if !known {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(s[:len(s)-1], 10, 64)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	// This backs the "Uptime" column comparator for any resource whose
+	// columnValueCmp key matches, including CRD additionalPrinterColumns
+	// values from the cluster — so n*mult must be checked for int64
+	// nanosecond overflow rather than trusted, or the multiplication wraps
+	// into a negative duration and silently inverts sort order.
+	if n > int64(math.MaxInt64)/int64(mult) {
+		return 0, false
+	}
+	return time.Duration(n) * mult, true
+}
+
+// compareUptimeCmp compares two Uptime column values (formatAge output) by
+// real duration, so "10d" sorts after "9h" instead of before it lexically.
+// "n/a" (and any other unparseable value) sorts after real values so
+// unknown-uptime rows land at the bottom in ascending order, mirroring
+// comparePercentCmp.
+func compareUptimeCmp(a, b string) int {
+	da, okA := parseAgeDuration(a)
+	db, okB := parseAgeDuration(b)
+	switch {
+	case okA && okB:
+		return cmpInt64(int64(da), int64(db))
+	case okA:
+		return -1
+	case okB:
+		return 1
+	default:
+		return strings.Compare(strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b)))
+	}
 }
 
 // compareREVCmp compares REV column values numerically (decimal). Falls back

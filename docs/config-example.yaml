@@ -256,6 +256,8 @@ monitoring:
 #     services: ["alertmanager-main"]
 #     port: "9093"
 #   node_metrics: prometheus  # "prometheus" or "metrics-api" (default: auto-detect)
+#                             # "prometheus" also enables the nodes-list Uptime
+#                             # column, which needs node_exporter installed.
 # _global:
 #   prometheus:
 #     namespaces: ["monitoring", "observability"]

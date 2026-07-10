@@ -207,6 +207,53 @@ func TestSortMiddleItemsCPU_NaAlwaysLast(t *testing.T) {
 	})
 }
 
+func TestSortMiddleItemsUptime_NaAlwaysLast(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Uptime"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	mkItem := func(name, uptime string) model.Item {
+		return model.Item{Name: name, Columns: []model.KeyValue{{Key: "Uptime", Value: uptime}}}
+	}
+	seed := func() []model.Item {
+		return []model.Item{
+			mkItem("none1", "n/a"),
+			mkItem("short", "12m"),
+			mkItem("long", "10d"),
+			mkItem("none2", "n/a"),
+			mkItem("mid", "9h"),
+		}
+	}
+	names := func(items []model.Item) []string {
+		out := make([]string, len(items))
+		for i, it := range items {
+			out[i] = it.Name
+		}
+		return out
+	}
+
+	// "10d" must sort after "9h" by real duration, not lexically (lexical
+	// order would put "10d" before "9h" since '1' < '9').
+	t.Run("ascending sorts by real duration, n/a last", func(t *testing.T) {
+		m := Model{
+			nav:            model.NavigationState{Level: model.LevelResources},
+			sortColumnName: "Uptime", sortAscending: true,
+			middleItems: seed(),
+		}
+		m.sortMiddleItems()
+		assert.Equal(t, []string{"short", "mid", "long", "none1", "none2"}, names(m.middleItems))
+	})
+
+	t.Run("descending sorts by real duration, n/a still last", func(t *testing.T) {
+		m := Model{
+			nav:            model.NavigationState{Level: model.LevelResources},
+			sortColumnName: "Uptime", sortAscending: false,
+			middleItems: seed(),
+		}
+		m.sortMiddleItems()
+		assert.Equal(t, []string{"long", "mid", "short", "none1", "none2"}, names(m.middleItems))
+	})
+}
+
 func TestSortMiddleItemsByAge(t *testing.T) {
 	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
 	defer func() { ui.ActiveSortableColumns = nil }()

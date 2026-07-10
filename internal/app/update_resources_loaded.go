@@ -486,7 +486,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	case "Pod":
 		cmds = append(cmds, m.loadPodMetricsForList())
 	case "Node":
-		cmds = append(cmds, m.loadNodeMetricsForList())
+		cmds = append(cmds, m.loadNodeMetricsForList(), m.loadNodeUptimeForList())
 	}
 	m.suppressBgtasks = savedSuppress
 	m.syncObjectExplorerLive()

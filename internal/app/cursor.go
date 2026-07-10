@@ -142,7 +142,7 @@ func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
 	metricsKeys := map[string]bool{
 		"CPU": true, "CPU/R": true, "CPU/L": true,
 		"MEM": true, "MEM/R": true, "MEM/L": true,
-		"CPU%": true, "MEM%": true,
+		"CPU%": true, "MEM%": true, "Uptime": true,
 	}
 	// Build lookup from old items. Carry over whatever metrics columns the
 	// item already had so the column set stays visually stable across watch

@@ -714,6 +714,33 @@ func TestCarryOverMetricsColumns(t *testing.T) {
 		m.carryOverMetricsColumns(newItems)
 		assert.Len(t, newItems[0].Columns, 1)
 	})
+
+	t.Run("Uptime survives a watch-tick refresh", func(t *testing.T) {
+		m := Model{
+			middleItems: []model.Item{
+				{
+					Name: "node-a",
+					Columns: []model.KeyValue{
+						{Key: "Uptime", Value: "3h"},
+					},
+				},
+			},
+		}
+		newItems := []model.Item{
+			{
+				Name:    "node-a",
+				Columns: []model.KeyValue{{Key: "Role", Value: "worker"}},
+			},
+		}
+		m.carryOverMetricsColumns(newItems)
+		var got string
+		for _, kv := range newItems[0].Columns {
+			if kv.Key == "Uptime" {
+				got = kv.Value
+			}
+		}
+		assert.Equal(t, "3h", got, "Uptime column must carry over across watch ticks")
+	})
 }
 
 // --- filteredOverlayItems ---

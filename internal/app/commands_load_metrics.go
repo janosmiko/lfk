@@ -218,3 +218,31 @@ func (m Model) loadNodeMetricsForList() tea.Cmd {
 		},
 	)
 }
+
+// loadNodeUptimeForList fetches Prometheus node uptimes and returns them to
+// enrich the middle pane items with an Uptime column. A nil/empty result is
+// not an error: it means Prometheus isn't the configured monitoring source.
+func (m Model) loadNodeUptimeForList() tea.Cmd {
+	// See loadPodMetricsForList: skip at the union sentinel.
+	if m.isUnionSentinel() {
+		return nil
+	}
+	kctx := m.nav.Context
+	gen := m.requestGen
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
+		"Node uptime",
+		bgtaskTarget(kctx, ""),
+		func(ctx context.Context) tea.Msg {
+			uptimes, err := client.GetNodeUptimes(ctx, kctx)
+			if err != nil {
+				logger.WarnOnce("node-uptime-list-load", kctx,
+					"node uptime list load failed", "context", kctx, "error", logger.Redact(err.Error()))
+				return nodeUptimeEnrichedMsg{gen: gen}
+			}
+			return nodeUptimeEnrichedMsg{uptimes: uptimes, gen: gen}
+		},
+	)
+}
