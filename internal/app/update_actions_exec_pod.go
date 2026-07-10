@@ -447,7 +447,10 @@ func (m Model) executeActionToggleCordon() (tea.Model, tea.Cmd) {
 
 // executeActionDrain handles the "Drain" action.
 func (m Model) executeActionDrain() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
-	m.confirmAction = m.actionCtx.name + " (drain)"
+	m.confirmTitle = "Confirm Drain"
+	m.confirmQuestion = fmt.Sprintf(
+		"Drain node %s? Pods will be evicted and the node cordoned (DaemonSet pods stay, emptyDir data is deleted).",
+		m.actionCtx.name)
 	m.pendingAction = "Drain"
 	m.overlay = overlayConfirm
 	return m, nil

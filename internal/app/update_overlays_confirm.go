@@ -20,6 +20,8 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			label := m.pendingAction
 			m.pendingAction = ""
 			m.confirmAction = ""
+			m.confirmTitle = ""
+			m.confirmQuestion = ""
 			m.resetBulkAction()
 			m.setStatusMessage(readOnlyBlockedMessage(label), true)
 			return m, scheduleStatusClear()
