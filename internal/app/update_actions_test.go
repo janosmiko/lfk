@@ -1835,6 +1835,12 @@ func TestFinalExecuteActionDrain(t *testing.T) {
 	rm := result.(Model)
 	assert.Equal(t, overlayConfirm, rm.overlay)
 	assert.Equal(t, "Drain", rm.pendingAction)
+	// The confirm must describe a drain, not fall back to the overlay's
+	// default "Delete X?" wording (drain evicts pods, it does not delete
+	// the node).
+	assert.Equal(t, "Confirm Drain", rm.confirmTitle)
+	assert.Contains(t, rm.confirmQuestion, "Drain node test-resource?")
+	assert.Contains(t, rm.confirmQuestion, "evict")
 }
 
 func TestFinalExecuteActionTaints(t *testing.T) {
