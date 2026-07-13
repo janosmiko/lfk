@@ -131,6 +131,11 @@
       "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"apps/deployments\") to move into the top-level Pinned section.",
       "items": { "type": "string" }
     },
+    "pinned_summaries": {
+      "type": ["array", "null"],
+      "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"batch/jobs\") whose status summaries render on the cluster dashboard. Also manageable in-app from the resource-type action menu.",
+      "items": { "type": "string" }
+    },
     "monitoring": {
       "type": ["object", "null"],
       "description": "Per-cluster monitoring endpoint configuration. Keys are context names or the special key \"_global\".",

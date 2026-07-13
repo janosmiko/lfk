@@ -580,6 +580,11 @@ var ConfigPinnedGroups []string
 // ("group/resource") that should move into the top-level Pinned section.
 var ConfigPinnedTypes []string
 
+// ConfigPinnedSummaries lists resource-type pin keys ("group/resource") from
+// the config file whose status summaries render on the cluster dashboard.
+// Merged at load time with the per-context / per-union-set state file.
+var ConfigPinnedSummaries []string
+
 // ConfigUnionSets holds named multi-cluster groups defined in config.
 // Resolved by --union-set into a list of contexts + optional namespace.
 // Empty by default; populated by applyConfigOptions when union_sets is

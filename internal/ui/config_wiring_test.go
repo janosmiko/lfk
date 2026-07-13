@@ -29,6 +29,7 @@ terminal: mux
 scrollback_lines: 8000
 pinned_groups: [karpenter.sh]
 pinned_types: [argoproj.io/applications]
+pinned_summaries: [batch/jobs, argoproj.io/applications]
 tips: false
 log_tail_lines: 250
 log_tail_lines_short: 7
@@ -201,6 +202,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 8000, ConfigScrollbackLines, "scrollback_lines")
 	assert.Equal(t, []string{"karpenter.sh"}, ConfigPinnedGroups, "pinned_groups")
 	assert.Equal(t, []string{"argoproj.io/applications"}, ConfigPinnedTypes, "pinned_types")
+	assert.Equal(t, []string{"batch/jobs", "argoproj.io/applications"}, ConfigPinnedSummaries, "pinned_summaries")
 	assert.False(t, ConfigTipsEnabled, "tips")
 	assert.Equal(t, 250, ConfigLogTailLines, "log_tail_lines")
 	assert.Equal(t, 7, ConfigLogTailLinesShort, "log_tail_lines_short")
@@ -327,6 +329,7 @@ var wiringCoveredFields = map[string]string{
 	"scrollback_lines":          "TestLoadConfig_AllSettingsWired",
 	"pinned_groups":             "TestLoadConfig_AllSettingsWired",
 	"pinned_types":              "TestLoadConfig_AllSettingsWired",
+	"pinned_summaries":          "TestLoadConfig_AllSettingsWired",
 	"monitoring":                "TestLoadConfig_AllSettingsWired",
 	"tips":                      "TestLoadConfig_AllSettingsWired",
 	"log_tail_lines":            "TestLoadConfig_AllSettingsWired",

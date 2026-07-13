@@ -71,6 +71,10 @@ type configFile struct {
 	// ("group/resource", e.g. "apps/deployments" or "argoproj.io/applications")
 	// to move into the top-level Pinned section.
 	PinnedTypes []string `json:"pinned_types" yaml:"pinned_types"`
+	// PinnedSummaries lists version-agnostic resource-type pin keys
+	// ("group/resource") whose status summaries render on the cluster
+	// dashboard, merged with per-context state pinned in-app.
+	PinnedSummaries []string `json:"pinned_summaries" yaml:"pinned_summaries"`
 	// Monitoring maps cluster context names to custom monitoring endpoint config.
 	// The special key "_global" applies to clusters without explicit config.
 	Monitoring map[string]model.MonitoringConfig `json:"monitoring" yaml:"monitoring"`
