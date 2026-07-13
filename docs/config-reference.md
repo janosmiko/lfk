@@ -714,6 +714,8 @@ pinned_groups:
 
 Pinned groups can also be managed interactively: press `p` at the resource types level to pin/unpin the selected CRD group. In-app pins are stored per-context, and for named union sets per union set, in `~/.local/state/lfk/pinned.yaml`; they are merged with the config file pins at runtime. Anonymous `--union-context` sessions have no durable name, so interactive pinning remains disabled there.
 
+Pinning a type's dashboard summary is a separate action (the action menu's "Pin summary" entry, `x` at the resource types level) with its own state file — see the `pinned_summaries` field above.
+
 ## Union Sets
 
 Define named groups of clusters that the `--union-set <name>` CLI flag expands into a merged ("union") view. Avoids retyping long `--union-context` lists for the same recurring groups (blue/green/canary, region triplets, etc.). The flag is mutually exclusive with `--union-context` and `--context`.

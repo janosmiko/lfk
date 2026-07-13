@@ -65,6 +65,7 @@ var startupTips = []string{
 	"Press v to describe a resource (like kubectl describe)",
 	"Press p to pin/unpin CRD groups for quick access",
 	"At the resource types level, press x to hide/show a resource type (saved per cluster or union set)",
+	"At the resource types level, press x to pin a resource type's status summary to the cluster dashboard",
 	"Press Shift+H to surface rarely used and hidden resource types (CSI, webhooks, leases, advanced core)",
 	"In the secret/configmap/labels editor: Tab switches fields, Enter saves, Cmd+V pastes",
 	"Use abbreviated search: type 'po' for Pods, 'deploy' for Deployments",
