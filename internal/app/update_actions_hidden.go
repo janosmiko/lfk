@@ -68,7 +68,7 @@ func (m Model) openResourceTypeActionMenu() Model {
 	}
 
 	sumLabel, sumDesc := actionLabelPinSummary, "Show this type's status summary on the cluster dashboard"
-	if m.isSummaryPinned(key) {
+	if m.isSummaryActive(key) {
 		sumLabel, sumDesc = actionLabelUnpinSummary, "Remove this type's summary from the cluster dashboard"
 	}
 	items = append(items, model.Item{Name: sumLabel, Extra: sumDesc, Status: summaryMenuChip})

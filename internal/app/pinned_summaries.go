@@ -23,8 +23,10 @@ const maxPinnedSummaries = 10
 // defaultPinnedSummaries render when nothing is pinned anywhere (issue #525,
 // Task 10). CRD-backed entries are silently skipped when the cluster does not
 // have the type - defaults must never show a "(not installed)" placeholder,
-// unlike an explicit pin. Pinning any type (state or config) replaces this
-// whole set, since it only applies when effectivePinnedSummaries is empty.
+// unlike an explicit pin. The set applies only while effectivePinnedSummaries
+// is empty: config pins replace it outright, while the first interactive pin
+// seeds the visible defaults into state before toggling (see
+// seedDefaultPinnedSummaries) so the rows the user sees are kept.
 var defaultPinnedSummaries = []string{
 	"batch/jobs",
 	"apps/deployments",
@@ -102,6 +104,93 @@ func (m Model) isSummaryPinned(key string) bool {
 	return slices.Contains(m.pinnedSummariesState.Contexts[m.nav.Context], key)
 }
 
+// isSummaryActive reports whether key's summary is currently visible on the
+// dashboard: either explicitly pinned, or implied by the built-in defaults
+// being active for this scope. The action menu and the toggle's cap check
+// both need this (not isSummaryPinned) so a default the user already sees
+// is offered as "Unpin" and never blocked by the cap it hasn't actually hit
+// yet.
+func (m Model) isSummaryActive(key string) bool {
+	return m.isSummaryPinned(key) || (m.defaultsActiveForScope() && slices.Contains(defaultPinnedSummaries, key))
+}
+
+// currentScopeSlice returns the active scope's raw persisted pin slice
+// (context, or named union set), without merging config pins. nil when the
+// scope has no entry yet.
+func (m Model) currentScopeSlice() []string {
+	if m.pinnedSummariesState == nil {
+		return nil
+	}
+	if m.isUnionSentinel() && m.unionSetName != "" {
+		return m.pinnedSummariesState.UnionSets[m.unionSetName]
+	}
+	return m.pinnedSummariesState.Contexts[m.nav.Context]
+}
+
+// setScopePinnedSummaries overwrites the active scope's persisted pin slice.
+func (m Model) setScopePinnedSummaries(keys []string) {
+	if m.isUnionSentinel() && m.unionSetName != "" {
+		m.pinnedSummariesState.UnionSets[m.unionSetName] = keys
+		return
+	}
+	m.pinnedSummariesState.Contexts[m.nav.Context] = keys
+}
+
+// defaultsActiveForScope reports whether the built-in defaults are what the
+// dashboard currently renders for the active scope: nothing pinned there yet
+// (state empty, no config pins), and defaults not explicitly disabled.
+func (m Model) defaultsActiveForScope() bool {
+	if defaultPinsDisabled() || len(ui.ConfigPinnedSummaries) > 0 {
+		return false
+	}
+	return len(m.currentScopeSlice()) == 0
+}
+
+// defaultSeedDiscovery returns the discovery entries to resolve default pins
+// against for the active scope: the per-context discovery map entry, or -
+// for a named union set - every member context's discovery concatenated, so
+// a default resolves if ANY member cluster has it.
+func (m Model) defaultSeedDiscovery() []model.ResourceTypeEntry {
+	if m.isUnionSentinel() && m.unionSetName != "" {
+		var all []model.ResourceTypeEntry
+		for _, ctx := range m.unionContexts {
+			all = append(all, m.discoveredResources[ctx]...)
+		}
+		return all
+	}
+	return m.discoveredResources[m.nav.Context]
+}
+
+// seedDefaultPinnedSummaries returns the default keys to copy into the active
+// scope's state before the requested toggle, so the user's first pin ADDS to
+// what they already see instead of replacing it (issue #525 follow-up: a
+// bare toggle wrote only the new key, making the previously-visible defaults
+// vanish). Returns nil when defaults aren't currently active for this scope
+// - the caller then performs a plain toggle, matching prior behavior.
+//
+// Only defaults that resolve against discovery are seeded: an unresolved CRD
+// default must never become an explicit pin, since an explicit pin renders a
+// "(not installed)" placeholder the user never saw as a default (see
+// pinnedSummaryCmds' silentSkip). When there is no discovery data at all for
+// the scope, fall back to seeding all five - better to over-seed than to
+// silently drop rows the user is currently looking at.
+func (m Model) seedDefaultPinnedSummaries() []string {
+	if !m.defaultsActiveForScope() {
+		return nil
+	}
+	discovered := m.defaultSeedDiscovery()
+	if len(discovered) == 0 {
+		return append([]string(nil), defaultPinnedSummaries...)
+	}
+	var resolved []string
+	for _, k := range defaultPinnedSummaries {
+		if _, ok := resolvePinnedSummaryEntry(discovered, k); ok {
+			resolved = append(resolved, k)
+		}
+	}
+	return resolved
+}
+
 // togglePinnedSummary pins or unpins the selected resource type's summary on
 // the cluster dashboard, persists the change, and refreshes the dashboard.
 // Mirrors handleKeyPinGroup: per-context (or per named union set) scope, cap
@@ -130,28 +219,39 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 	if m.pinnedSummariesState == nil {
 		m.pinnedSummariesState = newPinnedState()
 	}
+
+	// A first pin while the defaults are showing must ADD to what the user
+	// already sees, not replace it: seed the resolved default subset into
+	// state before the requested toggle. preSeed snapshots the scope's slice
+	// beforehand so a save failure below can roll back both the seed and the
+	// toggle in one step.
+	preSeed := m.currentScopeSlice()
+	if seed := m.seedDefaultPinnedSummaries(); len(seed) > 0 {
+		m.setScopePinnedSummaries(seed)
+	}
+
 	// Check against the effective (config + state, capped) list, not the raw
 	// state count: the dashboard renders effectivePinnedSummaries, so a new
 	// state pin that passes a state-only check could still be truncated off
-	// silently when config pins already fill the cap.
-	if !m.isSummaryPinned(key) && len(m.effectivePinnedSummaries()) >= maxPinnedSummaries {
+	// silently when config pins already fill the cap. isSummaryActive (not
+	// isSummaryPinned) so unpinning an already-active default is never
+	// blocked by the cap its own seed just filled.
+	if !m.isSummaryActive(key) && len(m.effectivePinnedSummaries()) >= maxPinnedSummaries {
+		m.setScopePinnedSummaries(preSeed)
 		m.setStatusMessage(fmt.Sprintf("Pinned-summary limit reached (%d)", maxPinnedSummaries), true)
 		return m, scheduleStatusClear()
 	}
 
 	var pinned bool
-	var undo func()
 	scopeLabel := ""
 	if m.isUnionSentinel() {
 		pinned = togglePinnedUnionSetType(m.pinnedSummariesState, m.unionSetName, key)
-		undo = func() { _ = togglePinnedUnionSetType(m.pinnedSummariesState, m.unionSetName, key) }
 		scopeLabel = " for union set " + m.unionSetName
 	} else {
 		pinned = togglePinnedType(m.pinnedSummariesState, m.nav.Context, key)
-		undo = func() { _ = togglePinnedType(m.pinnedSummariesState, m.nav.Context, key) }
 	}
 	if err := savePinnedSummariesState(m.pinnedSummariesState); err != nil {
-		undo()
+		m.setScopePinnedSummaries(preSeed)
 		m.setStatusMessage(fmt.Sprintf("Failed to save pinned summaries: %v", err), true)
 		return m, scheduleStatusClear()
 	}

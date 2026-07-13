@@ -14,6 +14,38 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// allDefaultEntries returns discovery entries that resolve every key in
+// defaultPinnedSummaries.
+func allDefaultEntries() []model.ResourceTypeEntry {
+	return []model.ResourceTypeEntry{
+		{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs"},
+		{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments"},
+		{Kind: "Application", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "applications"},
+		{Kind: "Kustomization", APIGroup: "kustomize.toolkit.fluxcd.io", APIVersion: "v1", Resource: "kustomizations"},
+		{Kind: "Certificate", APIGroup: "cert-manager.io", APIVersion: "v1", Resource: "certificates"},
+	}
+}
+
+// seedSummaryTestModel builds a per-context resource-types model whose
+// discovery set is extraDiscovered plus a "CronJobs" entry (batch/cronjobs) —
+// the type the tests pin as the user's "first pin", never itself a default.
+func seedSummaryTestModel(t *testing.T, extraDiscovered []model.ResourceTypeEntry) Model {
+	t.Helper()
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelWithFakeClient()
+	m.nav.Context = "prod"
+	m.nav.Level = model.LevelResourceTypes
+	m.allGroupsExpanded = true
+	m.hiddenState = newHiddenTypesState()
+	m.pinnedSummariesState = newPinnedState()
+	discovered := append([]model.ResourceTypeEntry{
+		{Kind: "CronJob", APIGroup: "batch", APIVersion: "v1", Resource: "cronjobs"},
+	}, extraDiscovered...)
+	m.discoveredResources["prod"] = discovered
+	m.setMiddleItems(model.BuildSidebarItems(discovered))
+	return m
+}
+
 // The state file round-trips through the same PinnedState shape the sidebar
 // pins use, just at a different path.
 func TestPinnedSummariesState_RoundTrip(t *testing.T) {
@@ -280,4 +312,175 @@ func TestTogglePinnedSummary_EnforcesCap_MixedConfigAndState(t *testing.T) {
 	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], 7, "cap rejects the 11th pin (3 config + 7 state)")
 	assert.Contains(t, m.statusMessage, "limit reached", "rejection must be surfaced to the user")
 	assert.True(t, m.statusMessageErr)
+}
+
+// TestTogglePinnedSummary_SeedsResolvedDefaultsOnFirstPin verifies that
+// pinning a type while the built-in defaults are showing (issue: pin
+// replaced the defaults instead of adding to them) copies the resolved
+// default subset into state, in default order, before appending the new key.
+func TestTogglePinnedSummary_SeedsResolvedDefaultsOnFirstPin(t *testing.T) {
+	m := seedSummaryTestModel(t, allDefaultEntries())
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+	require.NotEqual(t, -1, cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	want := append(append([]string(nil), defaultPinnedSummaries...), "batch/cronjobs")
+	assert.Equal(t, want, m.pinnedSummariesState.Contexts["prod"], "seed keeps default order, new key appended last")
+	assert.Equal(t, want, m.effectivePinnedSummaries(), "dashboard's effective list must show defaults + the new pin")
+}
+
+// TestTogglePinnedSummary_SeedsOnlyResolvedDefaultsOnPartialDiscovery
+// verifies that only the defaults the cluster actually has get seeded: a CRD
+// default the cluster lacks must never become an explicit pin (an explicit
+// pin renders a "(not installed)" placeholder the user never saw as a
+// default).
+func TestTogglePinnedSummary_SeedsOnlyResolvedDefaultsOnPartialDiscovery(t *testing.T) {
+	partial := []model.ResourceTypeEntry{
+		{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs"},
+		{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments"},
+	}
+	m := seedSummaryTestModel(t, partial)
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	assert.Equal(t, []string{"batch/jobs", "apps/deployments", "batch/cronjobs"}, m.pinnedSummariesState.Contexts["prod"])
+}
+
+// TestTogglePinnedSummary_SeedsAllDefaultsWhenNoDiscoveryData verifies the
+// over-seed fallback: when the active scope's discovery map entry is empty
+// or absent, seed all five defaults rather than risk losing rows the user is
+// currently seeing (no discovery data means we cannot tell which resolve).
+func TestTogglePinnedSummary_SeedsAllDefaultsWhenNoDiscoveryData(t *testing.T) {
+	m := seedSummaryTestModel(t, nil)
+	// Wipe discovery entirely for this context, simulating "no discovery data
+	// yet" while still selecting a pinnable item (BuildSidebarItems ran
+	// against the CronJob-only set captured before the wipe).
+	m.discoveredResources["prod"] = nil
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	want := append(append([]string(nil), defaultPinnedSummaries...), "batch/cronjobs")
+	assert.Equal(t, want, m.pinnedSummariesState.Contexts["prod"])
+}
+
+// TestTogglePinnedSummary_UnpinActiveDefaultKeepsOthers verifies selecting
+// "Unpin summary" on an active default (Jobs) seeds the resolved defaults
+// then removes just that key — the other defaults stay visible.
+func TestTogglePinnedSummary_UnpinActiveDefaultKeepsOthers(t *testing.T) {
+	m := seedSummaryTestModel(t, allDefaultEntries())
+	m.setCursor(cursorIndexOfItem(&m, "Jobs"))
+	require.NotEqual(t, -1, cursorIndexOfItem(&m, "Jobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	assert.NotContains(t, m.pinnedSummariesState.Contexts["prod"], "batch/jobs")
+	for _, k := range defaultPinnedSummaries {
+		if k == "batch/jobs" {
+			continue
+		}
+		assert.Contains(t, m.pinnedSummariesState.Contexts["prod"], k, "other defaults must stay pinned")
+	}
+}
+
+// TestTogglePinnedSummary_DefaultsDisabledNoSeed verifies an explicit
+// pinned_summaries: [] disables the seed entirely: the first pin is a plain
+// single-key pin, matching defaultPinsDisabled's contract.
+func TestTogglePinnedSummary_DefaultsDisabledNoSeed(t *testing.T) {
+	origSet, origList := ui.ConfigPinnedSummariesSet, ui.ConfigPinnedSummaries
+	ui.ConfigPinnedSummariesSet = true
+	ui.ConfigPinnedSummaries = nil
+	t.Cleanup(func() {
+		ui.ConfigPinnedSummariesSet = origSet
+		ui.ConfigPinnedSummaries = origList
+	})
+
+	m := seedSummaryTestModel(t, allDefaultEntries())
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	assert.Equal(t, []string{"batch/cronjobs"}, m.pinnedSummariesState.Contexts["prod"], "defaults disabled: no seeding")
+}
+
+// TestTogglePinnedSummary_ConfigPinsPresentNoSeed verifies that when config
+// already supplies pins, defaults were never active, so the first state pin
+// does not seed anything.
+func TestTogglePinnedSummary_ConfigPinsPresentNoSeed(t *testing.T) {
+	origConfig := ui.ConfigPinnedSummaries
+	ui.ConfigPinnedSummaries = []string{"batch/jobs"}
+	t.Cleanup(func() { ui.ConfigPinnedSummaries = origConfig })
+
+	m := seedSummaryTestModel(t, allDefaultEntries())
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	assert.Equal(t, []string{"batch/cronjobs"}, m.pinnedSummariesState.Contexts["prod"], "config pins present: defaults weren't active, no seeding")
+}
+
+// TestTogglePinnedSummary_UnionSeedsAgainstMemberDiscoveries verifies seeding
+// in a named union set resolves defaults against the union of all member
+// contexts' discoveries: a default resolves if ANY member cluster has it.
+func TestTogglePinnedSummary_UnionSeedsAgainstMemberDiscoveries(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.unionContexts = []string{"prod", "staging"}
+	m.unionSetName = "team-a"
+	m.nav.Level = model.LevelResourceTypes
+	m.allGroupsExpanded = true
+	m.hiddenState = newHiddenTypesState()
+	m.pinnedSummariesState = newPinnedState()
+
+	// Split the resolvable defaults across the two member contexts so
+	// neither one alone would resolve all five; the union must.
+	m.discoveredResources["prod"] = []model.ResourceTypeEntry{
+		{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs"},
+		{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments"},
+		{Kind: "CronJob", APIGroup: "batch", APIVersion: "v1", Resource: "cronjobs"},
+	}
+	m.discoveredResources["staging"] = []model.ResourceTypeEntry{
+		{Kind: "Application", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "applications"},
+		{Kind: "Kustomization", APIGroup: "kustomize.toolkit.fluxcd.io", APIVersion: "v1", Resource: "kustomizations"},
+		{Kind: "Certificate", APIGroup: "cert-manager.io", APIVersion: "v1", Resource: "certificates"},
+	}
+	m.setMiddleItems(model.BuildSidebarItems(m.discoveredResources["prod"]))
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	want := append(append([]string(nil), defaultPinnedSummaries...), "batch/cronjobs")
+	assert.Equal(t, want, m.pinnedSummariesState.UnionSets["team-a"])
+}
+
+// TestTogglePinnedSummary_SaveFailureRollsBackSeedAndToggle verifies that when
+// the disk write fails after a seed + toggle, the in-memory state is rolled
+// back to its exact pre-seed value (empty), not left half-seeded or
+// half-toggled.
+func TestTogglePinnedSummary_SaveFailureRollsBackSeedAndToggle(t *testing.T) {
+	dir := t.TempDir()
+	blocked := filepath.Join(dir, "blocked-state")
+	require.NoError(t, os.WriteFile(blocked, []byte("x"), 0o600))
+	t.Setenv("LFK_STATE_DIR", blocked)
+
+	m := seedSummaryTestModel(t, allDefaultEntries())
+	m.setCursor(cursorIndexOfItem(&m, "CronJobs"))
+
+	mdl, cmd := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	assert.Empty(t, m.pinnedSummariesState.Contexts["prod"], "save failure rolls back both the seed and the toggle")
+	assert.Contains(t, m.statusMessage, "Failed to save")
+	assert.NotNil(t, cmd)
 }

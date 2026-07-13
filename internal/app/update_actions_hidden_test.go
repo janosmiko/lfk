@@ -135,6 +135,38 @@ func TestResourceTypeActionMenu_OffersPinSummary(t *testing.T) {
 	assert.Contains(t, itemNames(menu2.overlayItems), actionLabelUnpinSummary)
 }
 
+// TestOpenResourceTypeActionMenu_SummaryLabelReflectsActiveDefaults verifies
+// the label predicts what the dashboard actually shows, not just raw state:
+// with the built-in defaults active (nothing pinned yet), a default type
+// (Jobs) offers "Unpin summary" and a non-default type (Widgets) still
+// offers "Pin summary". isSummaryPinned alone would show "Pin summary" for
+// an already-visible default, which is misleading.
+func TestOpenResourceTypeActionMenu_SummaryLabelReflectsActiveDefaults(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelWithFakeClient()
+	m.nav.Context = "prod"
+	m.nav.Level = model.LevelResourceTypes
+	m.allGroupsExpanded = true
+	m.hiddenState = newHiddenTypesState()
+	m.pinnedSummariesState = newPinnedState()
+	discovered := []model.ResourceTypeEntry{
+		{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs"},
+		{Kind: "Widget", APIGroup: "example.com", APIVersion: "v1", Resource: "widgets"},
+	}
+	m.discoveredResources["prod"] = discovered
+	m.setMiddleItems(model.BuildSidebarItems(discovered))
+
+	m.setCursor(cursorIndexOfItem(&m, "Jobs"))
+	menu := m.openResourceTypeActionMenu()
+	assert.Contains(t, itemNames(menu.overlayItems), actionLabelUnpinSummary, "active default must offer Unpin summary")
+	assert.NotContains(t, itemNames(menu.overlayItems), actionLabelPinSummary)
+
+	m.setCursor(cursorIndexOfItem(&m, "Widgets"))
+	menu2 := m.openResourceTypeActionMenu()
+	assert.Contains(t, itemNames(menu2.overlayItems), actionLabelPinSummary, "non-default type must still offer Pin summary")
+	assert.NotContains(t, itemNames(menu2.overlayItems), actionLabelUnpinSummary)
+}
+
 // rareTestModel builds a model whose sidebar includes a rarely-used type
 // (CSIDrivers) surfaced via the reveal toggle.
 func rareTestModel(t *testing.T) Model {

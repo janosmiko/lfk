@@ -716,7 +716,7 @@ Pinned groups can also be managed interactively: press `p` at the resource types
 
 Pinning a type's dashboard summary is a separate action (the action menu's "Pin summary" entry, `x` at the resource types level) with its own state file; see the `pinned_summaries` field above. With a named union set active, each member cluster's dashboard preview also shows the union set's pinned summaries, not just its own.
 
-When nothing is pinned anywhere (config or state), the dashboard shows a built-in default set instead: `batch/jobs`, `apps/deployments`, `argoproj.io/applications`, `kustomize.toolkit.fluxcd.io/kustomizations`, `cert-manager.io/certificates`. CRD-backed defaults are silently skipped when the cluster doesn't have the type. Pinning any type (interactively or via config) replaces the whole default set. Set `pinned_summaries: []` in config to disable the defaults and show none.
+When nothing is pinned anywhere (config or state), the dashboard shows a built-in default set instead: `batch/jobs`, `apps/deployments`, `argoproj.io/applications`, `kustomize.toolkit.fluxcd.io/kustomizations`, `cert-manager.io/certificates`. CRD-backed defaults are silently skipped when the cluster doesn't have the type. Your first interactive pin copies the currently-active defaults into your pinned list, then adds (or removes) the selected type, so the defaults you already see are kept, not replaced. Setting `pinned_summaries` in config is still a full explicit list and replaces the defaults outright. Set `pinned_summaries: []` in config to disable the defaults and show none.
 
 ## Union Sets
 
