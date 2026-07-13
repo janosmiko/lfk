@@ -29,10 +29,10 @@ const (
 	dashboardSectionNodeMetrics
 )
 
-// pinnedSummaryResult is one pinned resource type's status rollup for the
-// dashboard's PINNED SUMMARIES section. index preserves pin order across the
-// unordered fan-out; notFound flags a pin key absent from the cluster's
-// discovery (e.g. a CRD not installed here).
+// pinnedSummaryResult is one pinned resource type's status rollup, rendered
+// as inline dashboard metric rows below Pods (dashboardPinnedRows). index
+// preserves pin order across the unordered fan-out; notFound flags a pin key
+// absent from the cluster's discovery (e.g. a CRD not installed here).
 type pinnedSummaryResult struct {
 	index       int
 	key         string
@@ -40,6 +40,78 @@ type pinnedSummaryResult struct {
 	summary     ui.ListSummary
 	notFound    bool
 	err         error
+}
+
+// dashboardWidths holds the bar/separator widths used when composing the
+// dashboard. They scale with the width the dashboard is rendered at so the
+// bars use the available space (wide in fullscreen, compact in the right
+// preview pane) without overflowing the column.
+type dashboardWidths struct {
+	bar     int // cluster bars: node health, pod status, CPU, Mem
+	node    int // per-node CPU/Mem bars (two side by side)
+	sep     int // horizontal separator rule
+	label   int // metric-row label column width (for inline label/bar/summary alignment)
+	content int // total content width; inline rows are truncated to it as a safety net
+}
+
+// dashboardMetricLines lays out one cluster metric over two lines: the label +
+// bar on the first, and the status summary on its own indented line. Keeping
+// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
+// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
+// column width so a long summary can't wrap and tear the layout.
+func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
+	// A label longer than the column (a long pinned CRD display name) is
+	// truncated here rather than just left-unpadded: leaving it full-length
+	// would push that row's bar to a different column than every other row.
+	label = ui.Truncate(label, w.label)
+	pad := max(w.label-lipgloss.Width(label), 0)
+	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
+	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
+	return []string{
+		ansi.Truncate(barLine, w.content, ""),
+		ansi.Truncate(sumLine, w.content, ""),
+	}
+}
+
+// dashboardContentWidth returns the column content width the dashboard will be
+// rendered into for the current display mode, matching the view layout.
+func (m Model) dashboardContentWidth(twoCol bool) int {
+	if !m.fullscreenDashboard {
+		// Right preview pane inner width — explorerColumnWidths centralizes
+		// the layout math so hideLeftPane / fullscreen modes flow through.
+		_, _, rightW := m.explorerColumnWidths()
+		return max(rightW-2, 20)
+	}
+	innerW := m.width - 4 // ActiveColumnStyle border+padding
+	if twoCol {
+		return max(innerW*60/100, 20) // left column cap (see dashboardColumnWidths)
+	}
+	return max(innerW, 20)
+}
+
+// dashboardWidths derives the metric-row widths from the target content width.
+// Bars are uniform and as wide as the column allows; the summary lives on its
+// own line, so it no longer constrains the bar. maxPinnedLabel is the longest
+// label any pinned row will render (see maxPinnedLabelWidth) - the label
+// column widens to fit it, capped at 14, so a long CRD display name never
+// pushes that row's bar out of alignment with Nodes/Pods/CPU/Mem. The
+// reservation (labelCol + 11) leaves room for the "  " indents, brackets, and
+// renderBar's " NNN%" suffix so the bar line still fits contentW.
+func (m Model) dashboardWidths(twoCol bool, maxPinnedLabel int) dashboardWidths {
+	contentW := m.dashboardContentWidth(twoCol)
+	labelCol := min(max(maxPinnedLabel, 5), 14) // "Nodes" / "Pods" / "CPU" / "Mem" at minimum
+	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
+	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
+	// gaps), so split the rest between them to reach the same right edge as the
+	// top bars instead of staying noticeably narrower.
+	const perNodeOverhead = 31
+	return dashboardWidths{
+		bar:     min(max(contentW-labelCol-11, 8), 100),
+		node:    min(max((contentW-perNodeOverhead)/2, 3), 60),
+		sep:     min(max(contentW-2, 16), 120),
+		label:   labelCol,
+		content: contentW,
+	}
 }
 
 func (s dashboardSection) String() string {
@@ -344,7 +416,9 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 		podBar := renderStackedBar(segments, denom, w.bar)
 		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
-	lines = append(lines, "")
+	// No trailing blank here: pinned rows (dashboardPinnedRows) render
+	// directly below Pods inside the same block; composeDashboard adds the
+	// separating blank after them.
 
 	return lines
 }

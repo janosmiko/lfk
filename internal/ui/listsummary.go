@@ -405,28 +405,3 @@ func allocateCells(counts []int, total, cells int) []int {
 	}
 	return out
 }
-
-// RenderKindSummary renders a summary as a stacked dashboard block: a header
-// line with the kind label and total, then one proportional bar per dimension.
-// Unlike RenderListSummary (the single-kind preview band), the header carries
-// the kind name because several kinds render stacked on the cluster dashboard,
-// and a zero total still yields the header so an empty pinned kind reads as
-// "Jobs 0" rather than disappearing.
-func RenderKindSummary(s ListSummary, kindLabel string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	labelW := 0
-	for _, bar := range s.Bars {
-		if len(bar.Label) > labelW {
-			labelW = len(bar.Label)
-		}
-	}
-	header := DimStyle.Bold(true).Render(kindLabel) + DimStyle.Render(fmt.Sprintf("  %d", s.Total))
-	lines := []string{ansi.Truncate(header, width, "")}
-	for _, bar := range s.Bars {
-		line := fmt.Sprintf("%-*s ", labelW, bar.Label) + renderSummaryBar(bar) + "  " + renderSummaryLegend(bar)
-		lines = append(lines, ansi.Truncate(line, width, ""))
-	}
-	return strings.Join(lines, "\n")
-}

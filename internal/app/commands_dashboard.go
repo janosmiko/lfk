@@ -9,8 +9,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -221,18 +219,6 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	}
 }
 
-// dashboardWidths holds the bar/separator widths used when composing the
-// dashboard. They scale with the width the dashboard is rendered at so the
-// bars use the available space (wide in fullscreen, compact in the right
-// preview pane) without overflowing the column.
-type dashboardWidths struct {
-	bar     int // cluster bars: node health, pod status, CPU, Mem
-	node    int // per-node CPU/Mem bars (two side by side)
-	sep     int // horizontal separator rule
-	label   int // metric-row label column width (for inline label/bar/summary alignment)
-	content int // total content width; inline rows are truncated to it as a safety net
-}
-
 // nodeSummaryStr is the inline status summary for the Nodes row, e.g.
 // "14 Ready" or "12 Ready · 2 NotReady".
 func nodeSummaryStr(d dashboardData) string {
@@ -310,59 +296,6 @@ func memSummaryStr(d dashboardData) string {
 // dashboardSummarySep separates status counts within an inline summary.
 const dashboardSummarySep = " · "
 
-// dashboardMetricLines lays out one cluster metric over two lines: the label +
-// bar on the first, and the status summary on its own indented line. Keeping
-// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
-// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
-// column width so a long summary can't wrap and tear the layout.
-func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
-	pad := max(w.label-lipgloss.Width(label), 0)
-	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
-	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
-	return []string{
-		ansi.Truncate(barLine, w.content, ""),
-		ansi.Truncate(sumLine, w.content, ""),
-	}
-}
-
-// dashboardContentWidth returns the column content width the dashboard will be
-// rendered into for the current display mode, matching the view layout.
-func (m Model) dashboardContentWidth(twoCol bool) int {
-	if !m.fullscreenDashboard {
-		// Right preview pane inner width — explorerColumnWidths centralizes
-		// the layout math so hideLeftPane / fullscreen modes flow through.
-		_, _, rightW := m.explorerColumnWidths()
-		return max(rightW-2, 20)
-	}
-	innerW := m.width - 4 // ActiveColumnStyle border+padding
-	if twoCol {
-		return max(innerW*60/100, 20) // left column cap (see dashboardColumnWidths)
-	}
-	return max(innerW, 20)
-}
-
-// dashboardWidths derives the metric-row widths from the target content width.
-// Bars are uniform and as wide as the column allows; the summary lives on its
-// own line, so it no longer constrains the bar. The reservation (labelCol + 11)
-// leaves room for the "  " indents, brackets, and renderBar's " NNN%" suffix so
-// the bar line still fits contentW.
-func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
-	contentW := m.dashboardContentWidth(twoCol)
-	const labelCol = 5 // "Nodes" / "Pods" / "CPU" / "Mem"
-	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
-	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
-	// gaps), so split the rest between them to reach the same right edge as the
-	// top bars instead of staying noticeably narrower.
-	const perNodeOverhead = 31
-	return dashboardWidths{
-		bar:     min(max(contentW-labelCol-11, 8), 100),
-		node:    min(max((contentW-perNodeOverhead)/2, 3), 60),
-		sep:     min(max(contentW-2, 16), 120),
-		label:   labelCol,
-		content: contentW,
-	}
-}
-
 // composeDashboard renders the dashboard content + events column for the given
 // data at the current display width. Pure w.r.t. the model except for reading
 // width / fullscreen state, so it can be re-run whenever those change.
@@ -372,12 +305,16 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// of the right column, above the events. In the non-fullscreen preview pane
 	// everything stacks in the single column.
 	twoCol := m.fullscreenDashboard
-	w := m.dashboardWidths(twoCol)
+	w := m.dashboardWidths(twoCol, maxPinnedLabelWidth(data))
 
 	var left []string
 	left = append(left, "")
 	left = dashboardHeaderSection(left, data, w)
-	left = dashboardPinnedSection(left, data, w)
+	// Pinned rows render directly below Pods, inside the same block - no
+	// separator, no header - so the trailing blank that used to close
+	// dashboardHeaderSection is added here instead, after the pinned rows.
+	left = dashboardPinnedRows(left, data, w)
+	left = append(left, "")
 	left = dashboardResourcesSection(left, data, w)
 	left = dashboardNodesSection(left, data, w)
 	if !twoCol {

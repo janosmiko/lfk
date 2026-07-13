@@ -12,6 +12,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,8 +40,8 @@ func TestDashboardBarsScaleWithWidth(t *testing.T) {
 	full := Model{width: 200, height: 50, fullscreenDashboard: true}
 	pane := Model{width: 200, height: 50, fullscreenDashboard: false}
 
-	wf := full.dashboardWidths(false)
-	wp := pane.dashboardWidths(false)
+	wf := full.dashboardWidths(false, 0)
+	wp := pane.dashboardWidths(false, 0)
 
 	assert.Greater(t, wf.bar, wp.bar, "fullscreen bars must be wider than the right-pane bars")
 	assert.Greater(t, wf.bar, 30, "fullscreen bars must use more space than the old fixed 30")
@@ -138,6 +139,67 @@ func TestComposeDashboard_WarningsPlacement(t *testing.T) {
 		content, _ := m.composeDashboard(data)
 		assert.Contains(t, stripANSI(content), "WARNINGS")
 	})
+}
+
+// TestComposeDashboard_PinnedRowsRenderInlineAfterPods verifies pinned
+// summaries render as regular metric rows directly below Pods, with no
+// separate "PINNED SUMMARIES" section or separator between the two blocks
+// (Task 10: inline rows replace the old standalone section).
+func TestComposeDashboard_PinnedRowsRenderInlineAfterPods(t *testing.T) {
+	jobs := ui.BuildListSummary("Job", []model.Item{{Kind: "Job", Status: "Complete"}})
+	data := dashboardData{
+		nodeCount: 2, readyNodes: 2, nodeItems: make([]model.Item, 2),
+		pods: podStats{total: 5, running: 5},
+		pinnedSummaries: []pinnedSummaryResult{
+			{index: 0, key: "batch/jobs", displayName: "Jobs", summary: jobs},
+		},
+	}
+	m := Model{width: 120, height: 40}
+	content, _ := m.composeDashboard(data)
+	plain := stripANSI(content)
+
+	assert.NotContains(t, plain, "PINNED SUMMARIES", "the standalone section header is gone")
+
+	podsIdx := strings.Index(plain, "Pods")
+	jobsIdx := strings.Index(plain, "Jobs")
+	require.Greater(t, podsIdx, -1, "Pods row must render")
+	require.Greater(t, jobsIdx, -1, "the pinned Jobs row must render")
+	assert.Greater(t, jobsIdx, podsIdx, "the pinned row must render after the Pods row")
+
+	between := plain[podsIdx:jobsIdx]
+	assert.NotContains(t, between, "───", "no separator between Pods and the pinned row")
+}
+
+// TestComposeDashboard_PinnedLabelWidensColumnConsistently guards the
+// alignment failure mode this task exists to fix: a pinned label longer than
+// the old fixed 5-char column must widen dashboardWidths.label for every row,
+// not just its own, so Pods and the pinned row's bars still start at the same
+// column.
+func TestComposeDashboard_PinnedLabelWidensColumnConsistently(t *testing.T) {
+	jobs := ui.BuildListSummary("Job", []model.Item{{Kind: "Job", Status: "Complete"}})
+	data := dashboardData{
+		nodeCount: 2, readyNodes: 2, nodeItems: make([]model.Item, 2),
+		pods: podStats{total: 5, running: 5},
+		pinnedSummaries: []pinnedSummaryResult{
+			{index: 0, key: "kustomize.toolkit.fluxcd.io/kustomizations", displayName: "Kustomizations", summary: jobs},
+		},
+	}
+	m := Model{width: 120, height: 40}
+	content, _ := m.composeDashboard(data)
+	plain := stripANSI(content)
+
+	podsBarCol, pinnedBarCol := -1, -1
+	for ln := range strings.SplitSeq(plain, "\n") {
+		if strings.Contains(ln, "Pods") {
+			podsBarCol = strings.Index(ln, "[")
+		}
+		if strings.Contains(ln, "Kustomizations") {
+			pinnedBarCol = strings.Index(ln, "[")
+		}
+	}
+	require.NotEqual(t, -1, podsBarCol, "Pods bar must be found")
+	require.NotEqual(t, -1, pinnedBarCol, "pinned bar must be found")
+	assert.Equal(t, podsBarCol, pinnedBarCol, "widened label column must keep all bars aligned")
 }
 
 func TestPodOther(t *testing.T) {

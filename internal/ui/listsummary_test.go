@@ -473,32 +473,3 @@ func TestBuildListSummary_NodeAndNamespace(t *testing.T) {
 	assert.Equal(t, "Terminating", ns.Bars[0].Buckets[0].Value)
 	assert.Equal(t, "Active", ns.Bars[0].Buckets[1].Value)
 }
-
-func TestRenderKindSummary(t *testing.T) {
-	items := []model.Item{
-		argoApp("Healthy", "Synced"),
-		argoApp("Degraded", "OutOfSync"),
-	}
-	s := BuildListSummary("Application", items)
-
-	out := ansi.Strip(RenderKindSummary(s, "Applications", 80))
-	lines := strings.Split(out, "\n")
-	require.Len(t, lines, 3, "header + Health bar + Sync bar")
-	assert.Contains(t, lines[0], "Applications")
-	assert.Contains(t, lines[0], "2")
-	assert.NotContains(t, lines[0], "SUMMARY", "dashboard header shows the kind, not the band title")
-	assert.Contains(t, lines[1], "Health")
-	assert.Contains(t, lines[1], "1 Degraded")
-	assert.Contains(t, lines[2], "Sync")
-}
-
-func TestRenderKindSummary_ZeroTotalStillRendersHeader(t *testing.T) {
-	s := BuildListSummary("Job", nil)
-	out := ansi.Strip(RenderKindSummary(s, "Jobs", 80))
-	assert.Equal(t, "Jobs  0", out)
-}
-
-func TestRenderKindSummary_ZeroWidth(t *testing.T) {
-	s := BuildListSummary("Job", []model.Item{{Kind: "Job", Status: "Complete"}})
-	assert.Empty(t, RenderKindSummary(s, "Jobs", 0))
-}
