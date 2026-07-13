@@ -168,13 +168,17 @@ type dashboardLoadedMsg struct {
 	context string
 }
 
-// dashboardPartialMsg delivers one section of the dashboard fan-out
-// to the renderer. The renderer accumulates sections per-(kctx, gen)
-// and re-renders progressively. Once all 6 sections have arrived, a
-// dashboardLoadedMsg is dispatched for downstream consumers.
+// dashboardPartialMsg delivers one section of the dashboard fan-out to the
+// renderer, which accumulates sections per-(kctx, gen). key identifies the
+// section ("nodes", "pods", ..., or "pinned:<group/resource>"); total is the
+// number of sections this load fanned out to (6 fixed + one per pinned
+// summary), so the accumulator knows when the set is complete. Once all
+// expected sections have arrived, a dashboardLoadedMsg is dispatched for
+// downstream consumers.
 type dashboardPartialMsg struct {
 	context string
-	section dashboardSection
+	key     string
+	total   int
 	gen     uint64
 	data    dashboardData
 }

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -25,6 +27,19 @@ const (
 	dashboardSectionPDB
 	dashboardSectionNodeMetrics
 )
+
+// pinnedSummaryResult is one pinned resource type's status rollup for the
+// dashboard's PINNED SUMMARIES section. index preserves pin order across the
+// unordered fan-out; notFound flags a pin key absent from the cluster's
+// discovery (e.g. a CRD not installed here).
+type pinnedSummaryResult struct {
+	index       int
+	key         string
+	displayName string
+	summary     ui.ListSummary
+	notFound    bool
+	err         error
+}
 
 func (s dashboardSection) String() string {
 	switch s {
@@ -136,6 +151,65 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 		acc.totalMemAlloc = partial.totalMemAlloc
 		acc.nodeMetricsErr = partial.nodeMetricsErr
 	}
+	if len(partial.pinnedSummaries) > 0 {
+		acc.pinnedSummaries = append(acc.pinnedSummaries, partial.pinnedSummaries...)
+	}
+}
+
+// pinnedSummaryCmds builds one scheduled cmd per pinned summary key. A key
+// unresolved against the cluster's discovery (CRD absent or discovery still
+// warming) gets a synchronous notFound placeholder instead of a scheduled
+// fetch, so the section count still balances against total.
+func (m Model) pinnedSummaryCmds(kctx string, gen uint64, client *k8s.Client, pins []string, discovered []model.ResourceTypeEntry, total int, sectionTarget func(string) string) []tea.Cmd {
+	cmds := make([]tea.Cmd, 0, len(pins))
+	for i, pk := range pins {
+		key := "pinned:" + pk
+		entry, ok := resolvePinnedSummaryEntry(discovered, pk)
+		if !ok {
+			res := pinnedSummaryResult{index: i, key: pk, displayName: pk, notFound: true}
+			cmds = append(cmds, func() tea.Msg {
+				return dashboardPartialMsg{
+					context: kctx, gen: gen, key: key, total: total,
+					data: dashboardData{pinnedSummaries: []pinnedSummaryResult{res}},
+				}
+			})
+			continue
+		}
+		index := i
+		cmds = append(cmds, m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
+			"Dashboard: "+entry.DisplayName+" summary", sectionTarget(key),
+			func(ctx context.Context) tea.Msg {
+				return dashboardPartialMsg{
+					context: kctx, gen: gen, key: key, total: total,
+					data: fetchPinnedSummary(ctx, kctx, client, index, pk, entry),
+				}
+			}))
+	}
+	return cmds
+}
+
+// resolvePinnedSummaryEntry finds the discovery entry for a version-agnostic
+// pin key ("group/resource").
+func resolvePinnedSummaryEntry(entries []model.ResourceTypeEntry, key string) (model.ResourceTypeEntry, bool) {
+	for _, e := range entries {
+		if e.APIGroup+"/"+e.Resource == key {
+			return e, true
+		}
+	}
+	return model.ResourceTypeEntry{}, false
+}
+
+// fetchPinnedSummary lists one pinned resource type cluster-wide and rolls it
+// up with the same summary builder the preview band uses.
+func fetchPinnedSummary(ctx context.Context, kctx string, client *k8s.Client, index int, key string, entry model.ResourceTypeEntry) dashboardData {
+	res := pinnedSummaryResult{index: index, key: key, displayName: entry.DisplayName}
+	items, err := client.GetResources(ctx, kctx, "", entry)
+	if err != nil {
+		res.err = err
+	} else {
+		res.summary = ui.BuildListSummary(entry.Kind, items)
+	}
+	return dashboardData{pinnedSummaries: []pinnedSummaryResult{res}}
 }
 
 // renderBar renders a horizontal bar graph like [████████░░░░░░░░] 52%.

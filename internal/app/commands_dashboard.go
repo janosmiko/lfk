@@ -45,21 +45,22 @@ type podStats struct {
 
 // dashboardData holds all fetched data for the cluster dashboard.
 type dashboardData struct {
-	nodeItems      []model.Item
-	nodeCount      int
-	readyNodes     int
-	podCapacity    int64 // sum of nodes' allocatable pods (max schedulable)
-	pods           podStats
-	nsCount        int
-	warningEvents  []model.Item
-	allWarnings    []model.Item
-	pdbWarnings    []pdbWarning
-	nodes          []nodeInfo
-	totalCPUUsed   int64
-	totalCPUAlloc  int64
-	totalMemUsed   int64
-	totalMemAlloc  int64
-	nodeMetricsErr error
+	nodeItems       []model.Item
+	nodeCount       int
+	readyNodes      int
+	podCapacity     int64 // sum of nodes' allocatable pods (max schedulable)
+	pods            podStats
+	nsCount         int
+	warningEvents   []model.Item
+	allWarnings     []model.Item
+	pdbWarnings     []pdbWarning
+	nodes           []nodeInfo
+	totalCPUUsed    int64
+	totalCPUAlloc   int64
+	totalMemUsed    int64
+	totalMemAlloc   int64
+	nodeMetricsErr  error
+	pinnedSummaries []pinnedSummaryResult
 }
 
 // monitoringData retains the raw alert payload behind monitoringPreview so the
@@ -70,10 +71,10 @@ type monitoringData struct {
 	errMsg string // non-empty when the monitoring backend was unreachable
 }
 
-// loadDashboard fans out the cluster dashboard fetch into 6 parallel
-// Low-priority scheduler tasks, one per section. Each emits a
-// dashboardPartialMsg as it completes; handleDashboardPartial
-// accumulates them and re-renders progressively.
+// loadDashboard fans out the cluster dashboard fetch into parallel
+// Low-priority scheduler tasks: 6 fixed sections plus one per pinned
+// summary. Each emits a dashboardPartialMsg as it completes;
+// handleDashboardPartial accumulates them and re-renders progressively.
 //
 // Side benefit beyond preemption: even on a healthy cluster, the
 // dashboard renders incrementally instead of staying blank for ~20s.
@@ -88,68 +89,60 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	base := bgtaskTarget(kctx, "")
 
 	// Each section gets a unique target so the coalesce-by-sig logic
-	// treats them as distinct tasks rather than collapsing all 6 into one.
-	sectionTarget := func(s dashboardSection) string {
-		return base + "#" + s.String()
+	// treats them as distinct tasks rather than collapsing them into one.
+	sectionTarget := func(key string) string { return base + "#" + key }
+
+	pins := m.effectivePinnedSummaries()
+	discovered := m.discoveredResources[kctx]
+	total := 6 + len(pins)
+
+	fixed := []struct {
+		section dashboardSection
+		fetch   func(ctx context.Context) dashboardData
+	}{
+		{dashboardSectionNodes, func(ctx context.Context) dashboardData { return fetchDashboardNodes(ctx, kctx, client) }},
+		{dashboardSectionPods, func(ctx context.Context) dashboardData { return fetchDashboardPods(ctx, kctx, client) }},
+		{dashboardSectionNamespaces, func(ctx context.Context) dashboardData { return fetchDashboardNamespaces(ctx, kctx, client) }},
+		{dashboardSectionEvents, func(ctx context.Context) dashboardData { return fetchDashboardEvents(ctx, kctx, client) }},
+		{dashboardSectionPDB, func(ctx context.Context) dashboardData { return fetchDashboardPDB(ctx, kctx, client) }},
+		{dashboardSectionNodeMetrics, func(ctx context.Context) dashboardData {
+			// Node metrics needs node items as input. Re-fetch them inside
+			// this section to keep it self-contained; a node-list failure
+			// surfaces as nodeMetricsErr so the dashboard renders an explicit
+			// "metrics unavailable" instead of zeros.
+			nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
+				Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
+			})
+			if err != nil {
+				return dashboardData{nodeMetricsErr: err}
+			}
+			return fetchDashboardNodeMetrics(ctx, kctx, client, nodeItems)
+		}},
 	}
 
-	return tea.Batch(
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: nodes", sectionTarget(dashboardSectionNodes),
+	cmds := make([]tea.Cmd, 0, total)
+	for _, s := range fixed {
+		key := s.section.String()
+		fetch := s.fetch
+		cmds = append(cmds, m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
+			"Dashboard: "+key, sectionTarget(key),
 			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionNodes, data: fetchDashboardNodes(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: pods", sectionTarget(dashboardSectionPods),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionPods, data: fetchDashboardPods(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: namespaces", sectionTarget(dashboardSectionNamespaces),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionNamespaces, data: fetchDashboardNamespaces(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: events", sectionTarget(dashboardSectionEvents),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionEvents, data: fetchDashboardEvents(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: pdbs", sectionTarget(dashboardSectionPDB),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionPDB, data: fetchDashboardPDB(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: metrics", sectionTarget(dashboardSectionNodeMetrics),
-			func(ctx context.Context) tea.Msg {
-				// Node metrics needs node items as input. Re-fetch them
-				// inside this section to keep it self-contained. If the
-				// node list itself fails, surface that as the partial's
-				// nodeMetricsErr so the dashboard renders an explicit
-				// "metrics unavailable" instead of zero allocs/usage as
-				// if everything succeeded.
-				nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
-					Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
-				})
-				if err != nil {
-					return dashboardPartialMsg{
-						context: kctx,
-						gen:     gen,
-						section: dashboardSectionNodeMetrics,
-						data:    dashboardData{nodeMetricsErr: err},
-					}
-				}
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionNodeMetrics, data: fetchDashboardNodeMetrics(ctx, kctx, client, nodeItems)}
-			}),
-	)
+				return dashboardPartialMsg{context: kctx, gen: gen, key: key, total: total, data: fetch(ctx)}
+			}))
+	}
+
+	cmds = append(cmds, m.pinnedSummaryCmds(kctx, gen, client, pins, discovered, total, sectionTarget)...)
+	return tea.Batch(cmds...)
 }
 
-// dashboardAccumulator collects partial section results until all 6
-// have arrived, then composes the final dashboardLoadedMsg.
+// dashboardAccumulator collects partial section results until all expected
+// sections (msg.total: 6 fixed + one per pinned summary) have arrived, then
+// composes the final dashboardLoadedMsg.
 type dashboardAccumulator struct {
 	gen      uint64
 	data     dashboardData
-	received [6]bool // indexed by dashboardSection
+	received map[string]bool // by dashboardPartialMsg.key
+	expected int
 	count    int
 }
 
@@ -158,10 +151,10 @@ func dashboardAccKey(kctx string, gen uint64) string {
 }
 
 // handleDashboardPartial accumulates a section result and emits a
-// single dashboardLoadedMsg only after all 6 sections have arrived.
+// single dashboardLoadedMsg only after all expected sections have arrived.
 // This avoids flickering the dashboard layout on every watch tick
-// (each tick fires 6 partial fetches; rendering on each one would
-// repeatedly clear sections that haven't arrived yet).
+// (each tick fires one partial fetch per section; rendering on each one
+// would repeatedly clear sections that haven't arrived yet).
 //
 // Stale messages (different context or different requestGen) are
 // dropped silently AND any half-built accumulator for that stale
@@ -187,15 +180,11 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	}
 	acc, ok := m.dashboardAcc[key]
 	if !ok {
-		acc = &dashboardAccumulator{gen: msg.gen}
+		acc = &dashboardAccumulator{gen: msg.gen, received: make(map[string]bool), expected: msg.total}
 		m.dashboardAcc[key] = acc
 	}
-	idx := int(msg.section)
-	if idx < 0 || idx >= len(acc.received) {
-		return m, nil
-	}
-	if !acc.received[idx] {
-		acc.received[idx] = true
+	if !acc.received[msg.key] {
+		acc.received[msg.key] = true
 		acc.count++
 		mergeDashboardSection(&acc.data, msg.data)
 	}
@@ -203,7 +192,7 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	// Defer the render until every section has arrived so the user sees
 	// either the prior (still-valid) dashboard frame or the new one in
 	// full — never a half-populated state.
-	if acc.count < 6 {
+	if acc.count < acc.expected {
 		return m, nil
 	}
 

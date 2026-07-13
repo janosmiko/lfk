@@ -758,19 +758,19 @@ func TestHandleDashboardPartial_AccumulatesSections(t *testing.T) {
 	// would flicker the dashboard layout on every watch tick).
 	// nodeItems must be non-nil to trigger the nodeCount merge in mergeDashboardSection.
 	m, cmd1 := m.handleDashboardPartial(dashboardPartialMsg{
-		context: "test-ctx", gen: 7, section: dashboardSectionNodes,
+		context: "test-ctx", gen: 7, key: "nodes", total: 6,
 		data: dashboardData{nodeItems: make([]model.Item, 3), nodeCount: 3, readyNodes: 2},
 	})
 	assert.Nil(t, cmd1, "partial accumulation must not emit a render cmd")
 
 	m, cmd2 := m.handleDashboardPartial(dashboardPartialMsg{
-		context: "test-ctx", gen: 7, section: dashboardSectionPods,
+		context: "test-ctx", gen: 7, key: "pods", total: 6,
 		data: dashboardData{pods: podStats{total: 10, running: 8}},
 	})
 	assert.Nil(t, cmd2)
 
 	m, cmd3 := m.handleDashboardPartial(dashboardPartialMsg{
-		context: "test-ctx", gen: 7, section: dashboardSectionNamespaces,
+		context: "test-ctx", gen: 7, key: "namespaces", total: 6,
 		data: dashboardData{nsCount: 5},
 	})
 	assert.Nil(t, cmd3)
@@ -794,7 +794,7 @@ func TestHandleDashboardPartial_EmitsCmdOnlyAfterAllSections(t *testing.T) {
 	for i := range 5 {
 		var cmd tea.Cmd
 		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
-			context: "test-ctx", gen: 1, section: dashboardSection(i),
+			context: "test-ctx", gen: 1, key: dashboardSection(i).String(), total: 6,
 			data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
 		})
 		assert.Nilf(t, cmd, "section %d (1-indexed: %d) must not emit a cmd until all 6 arrive", i, i+1)
@@ -802,7 +802,7 @@ func TestHandleDashboardPartial_EmitsCmdOnlyAfterAllSections(t *testing.T) {
 
 	// Section 6 emits the dashboardLoadedMsg in one shot.
 	m, cmd := m.handleDashboardPartial(dashboardPartialMsg{
-		context: "test-ctx", gen: 1, section: dashboardSection(5),
+		context: "test-ctx", gen: 1, key: dashboardSection(5).String(), total: 6,
 		data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
 	})
 	require.NotNil(t, cmd, "the final section must emit a render cmd")
@@ -817,7 +817,7 @@ func TestHandleDashboardPartial_DropsStaleGen(t *testing.T) {
 	m.requestGen = 5
 
 	m, _ = m.handleDashboardPartial(dashboardPartialMsg{
-		context: "test-ctx", gen: 4 /* stale */, section: dashboardSectionNodes,
+		context: "test-ctx", gen: 4 /* stale */, key: "nodes", total: 6,
 		data: dashboardData{nodeCount: 99},
 	})
 
@@ -832,7 +832,7 @@ func TestHandleDashboardPartial_DropsWrongContext(t *testing.T) {
 	m.requestGen = 1
 
 	m, _ = m.handleDashboardPartial(dashboardPartialMsg{
-		context: "other-ctx", gen: 1, section: dashboardSectionNodes,
+		context: "other-ctx", gen: 1, key: "nodes", total: 6,
 		data: dashboardData{nodeCount: 99},
 	})
 
@@ -848,7 +848,7 @@ func TestHandleDashboardPartial_DropsAccumulatorWhenAll6Arrive(t *testing.T) {
 
 	for i := range 6 {
 		m, _ = m.handleDashboardPartial(dashboardPartialMsg{
-			context: "test-ctx", gen: 1, section: dashboardSection(i),
+			context: "test-ctx", gen: 1, key: dashboardSection(i).String(), total: 6,
 			data: dashboardData{nodeCount: 1},
 		})
 	}
@@ -894,4 +894,52 @@ func TestLoadDashboard_FanOutToBatch(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityLow) >= 6
 	}, 2*time.Second, 10*time.Millisecond, "loadDashboard must fan out into 6 Low-priority Submits")
+}
+
+// A dashboard load with pinned summaries completes only after 6 fixed
+// sections + one per pinned kind have arrived, and merged results keep
+// their pin order via index.
+func TestHandleDashboardPartial_PinnedSectionsCountTowardTotal(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 1
+	total := 8 // 6 fixed + 2 pinned
+
+	fixed := []string{"nodes", "pods", "namespaces", "events", "pdbs", "metrics"}
+	for _, k := range fixed {
+		var cmd tea.Cmd
+		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
+			context: m.nav.Context, gen: m.requestGen, key: k, total: total,
+		})
+		assert.Nil(t, cmd, "must not complete before all sections arrive: %s", k)
+	}
+
+	var cmd tea.Cmd
+	m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
+		context: m.nav.Context, gen: m.requestGen, key: "pinned:argoproj.io/applications", total: total,
+		data: dashboardData{pinnedSummaries: []pinnedSummaryResult{{index: 1, key: "argoproj.io/applications", displayName: "Applications"}}},
+	})
+	assert.Nil(t, cmd)
+
+	m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
+		context: m.nav.Context, gen: m.requestGen, key: "pinned:batch/jobs", total: total,
+		data: dashboardData{pinnedSummaries: []pinnedSummaryResult{{index: 0, key: "batch/jobs", displayName: "Jobs"}}},
+	})
+	require.NotNil(t, cmd, "last section completes the load")
+	msg, ok := cmd().(dashboardLoadedMsg)
+	require.True(t, ok)
+	require.Len(t, msg.data.pinnedSummaries, 2)
+}
+
+// Duplicate delivery of the same section key must not double-count.
+func TestHandleDashboardPartial_DuplicateKeyIgnored(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 1
+	var cmd tea.Cmd
+	m, _ = m.handleDashboardPartial(dashboardPartialMsg{context: m.nav.Context, gen: m.requestGen, key: "nodes", total: 2})
+	m, cmd = m.handleDashboardPartial(dashboardPartialMsg{context: m.nav.Context, gen: m.requestGen, key: "nodes", total: 2})
+	assert.Nil(t, cmd, "duplicate must not complete the accumulator")
+	_, cmd = m.handleDashboardPartial(dashboardPartialMsg{context: m.nav.Context, gen: m.requestGen, key: "pods", total: 2})
+	assert.NotNil(t, cmd)
 }
