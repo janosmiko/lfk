@@ -860,6 +860,43 @@ func TestHandleDashboardPartial_DropsAccumulatorWhenAll6Arrive(t *testing.T) {
 	assert.False(t, ok, "accumulator must be dropped after all 6 sections arrive")
 }
 
+// TestHandleDashboardPartial_MixedTotalTakesMax guards against a coalesced
+// old fan-out (total=6) racing a fresh one (total=7, e.g. a pin was added
+// mid-flight) on the same (context, gen). If expected were seeded from
+// whichever total arrives first and never revised, the accumulator could
+// complete at 6 unique keys and drop the 7th fan-out's section entirely.
+func TestHandleDashboardPartial_MixedTotalTakesMax(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 1
+
+	// 5 sections arrive at the old fan-out's total (6).
+	for i := range 5 {
+		var cmd tea.Cmd
+		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
+			context: "test-ctx", gen: 1, key: dashboardSection(i).String(), total: 6,
+			data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
+		})
+		assert.Nil(t, cmd)
+	}
+
+	// 6th message announces the larger total (7) from the fresh fan-out.
+	// This is the 6th unique key received, but expected must rise to 7,
+	// so the accumulator must NOT complete here.
+	m, cmd6 := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 1, key: dashboardSection(5).String(), total: 7,
+		data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
+	})
+	assert.Nil(t, cmd6, "must not complete at 6 unique keys once total has grown to 7")
+
+	// 7th (final) section arrives and completes the frame.
+	m, cmd7 := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 1, key: "pinned:extra", total: 7,
+		data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
+	})
+	require.NotNil(t, cmd7, "must complete once all 7 sections arrive")
+}
+
 func TestLoadDashboard_FanOutToBatch(t *testing.T) {
 	m := newTestModelWithScheduler()
 	m.nav.Context = "test-ctx"

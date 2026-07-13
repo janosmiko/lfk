@@ -380,6 +380,17 @@ func TestBuildListSummary_SanitizesTerminalEscapes(t *testing.T) {
 	oscValue := oscSummary.Bars[0].Buckets[0].Value
 	assert.NotContains(t, oscValue, "\x1b")
 	assert.NotContains(t, oscValue, "\x07")
+
+	// C1 control bytes (U+0080-U+009F), UTF-8 encoded as two bytes each, are a
+	// second encoding of the same escape range - e.g. U+009B (CSI) opens a
+	// control sequence just like the two-byte ESC-'[' does. The ASCII-only
+	// filter (r < 0x20 || r == 0x7f) lets these through as printable runes.
+	c1Items := []model.Item{argoApp("Healthy\u009b2J", "Synced")}
+	c1Summary := BuildListSummary("Application", c1Items)
+	require.Len(t, c1Summary.Bars, 2)
+	c1Value := c1Summary.Bars[0].Buckets[0].Value
+	assert.NotContains(t, c1Value, "\u009b", "C1 control byte (U+009B, CSI) must be stripped")
+	assert.Equal(t, "Healthy2J", c1Value)
 }
 
 func TestRenderListSummary_ContainsCountsAndFitsWidth(t *testing.T) {

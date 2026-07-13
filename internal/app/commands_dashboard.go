@@ -194,6 +194,12 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	if !ok {
 		acc = &dashboardAccumulator{gen: msg.gen, received: make(map[string]bool), expected: msg.total}
 		m.dashboardAcc[key] = acc
+	} else {
+		// A coalesced old fan-out (smaller total) can race a fresh one (larger
+		// total, e.g. a pin added mid-flight) on the same (context, gen).
+		// Awaiting the larger fan-out guarantees a full frame; the smaller
+		// fan-out's keys are a subset delivered by surviving coalesced tasks.
+		acc.expected = max(acc.expected, msg.total)
 	}
 	if !acc.received[msg.key] {
 		acc.received[msg.key] = true

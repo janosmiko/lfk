@@ -255,16 +255,19 @@ func buildSummaryBar(dim summaryDimension, items []model.Item) SummaryBar {
 }
 
 // sanitizeSummaryValue strips ASCII control characters (including ESC and
-// DEL) from a status value before it is bucketed and rendered. Status values
+// DEL) and the C1 control range (U+0080-U+009F, e.g. U+009B "CSI") from a
+// status value before it is bucketed and rendered. Status values
 // (.status.phase, condition types) come from cluster-controlled resources -
 // a hostile CRD status could embed cursor-movement or OSC-52 clipboard-write
 // escapes, and this is the single choke point every summary value passes
-// through on its way to the always-visible dashboard band.
+// through on its way to the always-visible dashboard band. C1 controls are
+// UTF-8-encoded as two bytes but decode to a single rune >= 0x7f, so an
+// ASCII-only filter (r < 0x20 || r == 0x7f) lets them through as if printable.
 func sanitizeSummaryValue(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if r < 0x20 || r == 0x7f {
+		if r < 0x20 || (r >= 0x7f && r <= 0x9f) {
 			continue
 		}
 		b.WriteRune(r)

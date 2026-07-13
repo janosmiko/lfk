@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -209,6 +210,7 @@ func fetchPinnedSummary(ctx context.Context, kctx string, client *k8s.Client, in
 	items, err := client.GetResources(ctx, kctx, "", entry)
 	if err != nil {
 		res.err = err
+		logger.Warn("Pinned summary list failed", "key", key, "error", err)
 	} else {
 		res.summary = ui.BuildListSummary(entry.Kind, items)
 	}
