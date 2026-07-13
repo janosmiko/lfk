@@ -178,9 +178,16 @@ type dashboardLoadedMsg struct {
 type dashboardPartialMsg struct {
 	context string
 	key     string
-	total   int
-	gen     uint64
-	data    dashboardData
+	// total seeds dashboardAccumulator.expected on the first section to
+	// arrive for a (context, gen) key. Invariant: one accumulator per
+	// fan-out — a new fan-out for the same (context, gen) (e.g. a reload
+	// with a different pin count while the prior one is still in flight)
+	// must start from a clean accumulator, not merge into the old one's
+	// stale expected count. loadDashboardFor enforces this by evicting any
+	// pre-existing accumulator for its (context, gen) before returning.
+	total int
+	gen   uint64
+	data  dashboardData
 }
 
 // monitoringDashboardMsg carries the rendered monitoring dashboard content

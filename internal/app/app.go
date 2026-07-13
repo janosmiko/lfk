@@ -745,7 +745,7 @@ type Model struct {
 	// Overlay to restore when the current closes — set when a nested overlay flow opens (e.g., RBAC → namespace selector → back to RBAC).
 	previousOverlay overlayKind
 
-	pinnedState, pinnedSummariesState *PinnedState      // sidebar pins / dashboard summary pins, both per-context
+	pinnedState, pinnedSummariesState *PinnedState      // sidebar pins / dashboard summary pins, both per-context or per-union-set
 	hiddenState                       *HiddenTypesState // per-context hidden resource types state
 	portForwardMgr                    *k8s.PortForwardManager
 	captureMgr                        *k8s.CaptureManager // tracks active packet capture processes

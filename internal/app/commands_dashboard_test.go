@@ -8,6 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -896,6 +898,73 @@ func TestLoadDashboard_FanOutToBatch(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond, "loadDashboard must fan out into 6 Low-priority Submits")
 }
 
+// TestLoadDashboardFor_EvictsStaleAccumulatorForSameContextAndGen guards
+// against a reload with a different pin count merging into a half-built
+// accumulator left behind by a still-in-flight fan-out for the same
+// (context, gen): dashboardAccumulator.expected is seeded from the first
+// arriving section's total, so a stale accumulator's expected count no
+// longer matches a fresh fan-out's total (e.g. a pin was added/removed
+// between the two loads), causing a transient wrong render or premature
+// completion. loadDashboardFor must evict any pre-existing accumulator for
+// its (context, gen) before returning, so every fan-out starts clean.
+func TestLoadDashboardFor_EvictsStaleAccumulatorForSameContextAndGen(t *testing.T) {
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.dashboardAcc = make(map[string]*dashboardAccumulator)
+	m.scheduler.StopWorkers()
+	defer m.scheduler.Close()
+
+	gen := m.requestGen
+	key := dashboardAccKey("test-ctx", gen)
+	// Half-built accumulator from a prior (now stale) fan-out: 2 of 6
+	// sections already arrived, seeded with the OLD total.
+	m.dashboardAcc[key] = &dashboardAccumulator{
+		gen:      gen,
+		received: map[string]bool{"nodes": true, "pods": true},
+		expected: 6,
+		count:    2,
+	}
+
+	cmd := m.loadDashboardFor("test-ctx")
+	require.NotNil(t, cmd)
+
+	_, exists := m.dashboardAcc[key]
+	assert.False(t, exists, "stale accumulator for the same (context, gen) must be evicted before the fresh fan-out starts")
+
+	// Drain the batch's sub-cmds so they Submit and don't leak goroutines
+	// parked on the scheduler's futures (mirrors TestLoadDashboard_FanOutToBatch).
+	msg := cmd()
+	batchMsg, ok := msg.(tea.BatchMsg)
+	require.True(t, ok)
+	var wg sync.WaitGroup
+	for _, subCmd := range batchMsg {
+		wg.Add(1)
+		go func(c tea.Cmd) {
+			defer wg.Done()
+			_ = c()
+		}(subCmd)
+	}
+	t.Cleanup(wg.Wait)
+
+	// A fresh fan-out at the new total (6, no pins) completes cleanly: the
+	// evicted accumulator's already-received "nodes"/"pods" keys don't
+	// short-circuit it, and it doesn't complete early against the stale
+	// expected count.
+	total := 6
+	fixed := []string{"nodes", "pods", "namespaces", "events", "pdbs", "metrics"}
+	var pcmd tea.Cmd
+	for i, k := range fixed {
+		m, pcmd = m.handleDashboardPartial(dashboardPartialMsg{context: "test-ctx", gen: gen, key: k, total: total})
+		if i < len(fixed)-1 {
+			assert.Nil(t, pcmd, "must not complete before all fresh sections arrive: %s", k)
+		}
+	}
+	require.NotNil(t, pcmd, "the fresh fan-out completes once all its own sections arrive")
+	loaded, ok := pcmd().(dashboardLoadedMsg)
+	require.True(t, ok)
+	assert.Equal(t, "test-ctx", loaded.context)
+}
+
 // A dashboard load with pinned summaries completes only after 6 fixed
 // sections + one per pinned kind have arrived, and merged results keep
 // their pin order via index.
@@ -929,6 +998,30 @@ func TestHandleDashboardPartial_PinnedSectionsCountTowardTotal(t *testing.T) {
 	msg, ok := cmd().(dashboardLoadedMsg)
 	require.True(t, ok)
 	require.Len(t, msg.data.pinnedSummaries, 2)
+	gotIndexes := []int{msg.data.pinnedSummaries[0].index, msg.data.pinnedSummaries[1].index}
+	assert.ElementsMatch(t, []int{0, 1}, gotIndexes, "merged results carry the original pin indexes, in whichever arrival order")
+}
+
+// TestFetchPinnedSummary_UsesDisplayNameForDiscoveryEntry verifies a pinned
+// summary resolves its label through model.DisplayNameFor rather than reading
+// entry.DisplayName directly. Discovery-produced ResourceTypeEntry values
+// (the normal case for a pinned CRD) never populate DisplayName themselves,
+// so reading it raw yields "" and the dashboard falls back to the raw pin key
+// instead of a friendly name.
+func TestFetchPinnedSummary_UsesDisplayNameForDiscoveryEntry(t *testing.T) {
+	widgetGVR := schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "widgets"}
+	gvrToListKind := map[schema.GroupVersionResource]string{widgetGVR: "WidgetList"}
+	m := baseModelWithFakeDynamic(gvrToListKind)
+
+	entry := model.ResourceTypeEntry{
+		Kind: "Widget", APIGroup: "example.com", APIVersion: "v1", Resource: "widgets", Namespaced: true,
+	}
+	require.Empty(t, entry.DisplayName, "discovery entries do not populate DisplayName")
+
+	data := fetchPinnedSummary(m.reqCtx, m.nav.Context, m.client, 0, "example.com/widgets", entry)
+	require.Len(t, data.pinnedSummaries, 1)
+	assert.Equal(t, "Widget", data.pinnedSummaries[0].displayName,
+		"no BuiltInMetadata entry for this CRD, so DisplayNameFor falls back to Kind")
 }
 
 // Duplicate delivery of the same section key must not double-count.

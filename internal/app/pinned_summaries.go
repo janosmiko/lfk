@@ -109,7 +109,11 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 	if m.pinnedSummariesState == nil {
 		m.pinnedSummariesState = newPinnedState()
 	}
-	if !m.isSummaryPinned(key) && m.pinnedSummariesScopeLen() >= maxPinnedSummaries {
+	// Check against the effective (config + state, capped) list, not the raw
+	// state count: the dashboard renders effectivePinnedSummaries, so a new
+	// state pin that passes a state-only check could still be truncated off
+	// silently when config pins already fill the cap.
+	if !m.isSummaryPinned(key) && len(m.effectivePinnedSummaries()) >= maxPinnedSummaries {
 		m.setStatusMessage(fmt.Sprintf("Pinned-summary limit reached (%d)", maxPinnedSummaries), true)
 		return m, scheduleStatusClear()
 	}
@@ -159,16 +163,4 @@ func (m Model) summaryDashboardReloadCmd() tea.Cmd {
 		return nil
 	}
 	return m.loadDashboard()
-}
-
-// pinnedSummariesScopeLen is the raw pin count in the active scope's state,
-// used for cap enforcement at toggle time.
-func (m Model) pinnedSummariesScopeLen() int {
-	if m.pinnedSummariesState == nil {
-		return 0
-	}
-	if m.isUnionSentinel() && m.unionSetName != "" {
-		return len(m.pinnedSummariesState.UnionSets[m.unionSetName])
-	}
-	return len(m.pinnedSummariesState.Contexts[m.nav.Context])
 }

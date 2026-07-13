@@ -159,7 +159,10 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 // pinnedSummaryCmds builds one scheduled cmd per pinned summary key. A key
 // unresolved against the cluster's discovery (CRD absent or discovery still
 // warming) gets a synchronous notFound placeholder instead of a scheduled
-// fetch, so the section count still balances against total.
+// fetch, so the section count still balances against total. A pin resolved
+// before discovery finishes renders the "(not installed in this cluster)"
+// placeholder until the next dashboard refresh re-resolves it - a known
+// transient, not a permanent misclassification.
 func (m Model) pinnedSummaryCmds(kctx string, gen uint64, client *k8s.Client, pins []string, discovered []model.ResourceTypeEntry, total int, sectionTarget func(string) string) []tea.Cmd {
 	cmds := make([]tea.Cmd, 0, len(pins))
 	for i, pk := range pins {
@@ -177,7 +180,7 @@ func (m Model) pinnedSummaryCmds(kctx string, gen uint64, client *k8s.Client, pi
 		}
 		index := i
 		cmds = append(cmds, m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: "+entry.DisplayName+" summary", sectionTarget(key),
+			"Dashboard: "+model.DisplayNameFor(entry)+" summary", sectionTarget(key),
 			func(ctx context.Context) tea.Msg {
 				return dashboardPartialMsg{
 					context: kctx, gen: gen, key: key, total: total,
@@ -202,7 +205,7 @@ func resolvePinnedSummaryEntry(entries []model.ResourceTypeEntry, key string) (m
 // fetchPinnedSummary lists one pinned resource type cluster-wide and rolls it
 // up with the same summary builder the preview band uses.
 func fetchPinnedSummary(ctx context.Context, kctx string, client *k8s.Client, index int, key string, entry model.ResourceTypeEntry) dashboardData {
-	res := pinnedSummaryResult{index: index, key: key, displayName: entry.DisplayName}
+	res := pinnedSummaryResult{index: index, key: key, displayName: model.DisplayNameFor(entry)}
 	items, err := client.GetResources(ctx, kctx, "", entry)
 	if err != nil {
 		res.err = err

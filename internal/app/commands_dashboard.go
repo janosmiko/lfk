@@ -88,6 +88,18 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	client := m.client
 	base := bgtaskTarget(kctx, "")
 
+	// A prior fan-out for this same (context, gen) may still be mid-flight
+	// (e.g. this reload was triggered by a pin toggle before the previous
+	// dashboard load finished). Its accumulator's `expected` count was seeded
+	// from *that* fan-out's total; if this fresh fan-out has a different
+	// total (a different pin count), letting both feed the same accumulator
+	// would mix section data across fan-outs or complete against the wrong
+	// count. Evict it so this fan-out always starts from a clean slate. The
+	// nil check guards test fixtures that build a bare Model{}.
+	if m.dashboardAcc != nil {
+		delete(m.dashboardAcc, dashboardAccKey(kctx, gen))
+	}
+
 	// Each section gets a unique target so the coalesce-by-sig logic
 	// treats them as distinct tasks rather than collapsing them into one.
 	sectionTarget := func(key string) string { return base + "#" + key }

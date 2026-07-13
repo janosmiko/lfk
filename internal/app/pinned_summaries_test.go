@@ -206,3 +206,55 @@ func TestTogglePinnedSummary_EnforcesCap(t *testing.T) {
 	assert.Contains(t, m.statusMessage, "limit reached", "rejection must be surfaced to the user")
 	assert.True(t, m.statusMessageErr)
 }
+
+// TestTogglePinnedSummary_EnforcesCap_ConfigPinsCountTowardCap verifies the cap
+// check counts config-level pins too: effectivePinnedSummaries (what the
+// dashboard actually renders) merges config pins first, then state pins,
+// truncated to maxPinnedSummaries. A state-only count would let a new pin
+// through even though it can never render (issue: cap check ignored config
+// pins).
+func TestTogglePinnedSummary_EnforcesCap_ConfigPinsCountTowardCap(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+	origConfig := ui.ConfigPinnedSummaries
+	keys := make([]string, 0, maxPinnedSummaries)
+	for i := range maxPinnedSummaries {
+		keys = append(keys, fmt.Sprintf("config-group%d/things", i))
+	}
+	ui.ConfigPinnedSummaries = keys
+	t.Cleanup(func() { ui.ConfigPinnedSummaries = origConfig })
+
+	m := hiddenTestModel(t)
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+	m.pinnedSummariesState = newPinnedState()
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+	assert.Empty(t, m.pinnedSummariesState.Contexts[m.nav.Context], "state must stay empty: the 11th pin (10 config + 1 new) is rejected")
+	assert.Contains(t, m.statusMessage, "limit reached", "rejection must be surfaced to the user")
+	assert.True(t, m.statusMessageErr)
+}
+
+// TestTogglePinnedSummary_EnforcesCap_MixedConfigAndState verifies the cap
+// check sums config and state pins together (3 config + 7 state = 10),
+// rejecting an 11th interactive pin.
+func TestTogglePinnedSummary_EnforcesCap_MixedConfigAndState(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+	origConfig := ui.ConfigPinnedSummaries
+	ui.ConfigPinnedSummaries = []string{"config-a/things", "config-b/things", "config-c/things"}
+	t.Cleanup(func() { ui.ConfigPinnedSummaries = origConfig })
+
+	m := hiddenTestModel(t)
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+	m.pinnedSummariesState = newPinnedState()
+	stateKeys := make([]string, 0, 7)
+	for i := range 7 {
+		stateKeys = append(stateKeys, fmt.Sprintf("state-group%d/things", i))
+	}
+	m.pinnedSummariesState.Contexts[m.nav.Context] = stateKeys
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], 7, "cap rejects the 11th pin (3 config + 7 state)")
+	assert.Contains(t, m.statusMessage, "limit reached", "rejection must be surfaced to the user")
+	assert.True(t, m.statusMessageErr)
+}
