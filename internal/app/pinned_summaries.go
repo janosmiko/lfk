@@ -102,6 +102,10 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 		m.setStatusMessage("This item has no summary to pin", true)
 		return m, scheduleStatusClear()
 	}
+	if m.isUnionSentinel() && m.unionSetName == "" {
+		m.setStatusMessage("Pinning in union mode requires a named union set", true)
+		return m, scheduleStatusClear()
+	}
 	if m.pinnedSummariesState == nil {
 		m.pinnedSummariesState = newPinnedState()
 	}
@@ -113,15 +117,11 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 	var pinned bool
 	var undo func()
 	scopeLabel := ""
-	switch {
-	case m.isUnionSentinel() && m.unionSetName != "":
+	if m.isUnionSentinel() {
 		pinned = togglePinnedUnionSetType(m.pinnedSummariesState, m.unionSetName, key)
 		undo = func() { _ = togglePinnedUnionSetType(m.pinnedSummariesState, m.unionSetName, key) }
 		scopeLabel = " for union set " + m.unionSetName
-	case m.isUnionSentinel():
-		m.setStatusMessage("Pinning in union mode requires a named union set", true)
-		return m, scheduleStatusClear()
-	default:
+	} else {
 		pinned = togglePinnedType(m.pinnedSummariesState, m.nav.Context, key)
 		undo = func() { _ = togglePinnedType(m.pinnedSummariesState, m.nav.Context, key) }
 	}
@@ -131,8 +131,8 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// Drop the cached dashboard frame so the change shows on next render,
-	// then refresh eagerly.
+	// Drop the cached dashboard frame so any later dashboard view recomposes
+	// fresh instead of repainting the stale pin list from m.dashboardData.
 	delete(m.dashboardData, m.dashboardPreviewTargetContext())
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
@@ -141,7 +141,24 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 	} else {
 		m.setStatusMessage(fmt.Sprintf("Summary unpinned from dashboard%s: %s", scopeLabel, sel.Name), false)
 	}
-	return m, tea.Batch(m.loadDashboard(), scheduleStatusClear())
+	if reload := m.summaryDashboardReloadCmd(); reload != nil {
+		return m, tea.Batch(reload, scheduleStatusClear())
+	}
+	return m, scheduleStatusClear()
+}
+
+// summaryDashboardReloadCmd returns the eager dashboard refresh for a pin
+// toggle, or nil when the reload would be pointless: the dashboard is disabled
+// by config (the gate every dashboard loader respects), or the union sentinel
+// is active - there loadDashboard would fetch for unionContexts[0] while
+// handleDashboardPartial filters on the sentinel context, discarding every
+// section. The union dashboard reloads lazily via its own gated loader on the
+// next view instead.
+func (m Model) summaryDashboardReloadCmd() tea.Cmd {
+	if !ui.ConfigDashboard || m.isUnionSentinel() {
+		return nil
+	}
+	return m.loadDashboard()
 }
 
 // pinnedSummariesScopeLen is the raw pin count in the active scope's state,
