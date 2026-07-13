@@ -349,6 +349,50 @@ func TestBuildListSummary_PartialValuesIgnoresEmpties(t *testing.T) {
 	assert.Equal(t, "Healthy", s.Bars[0].Buckets[0].Value)
 }
 
+// TestBuildListSummary_SanitizesTerminalEscapes verifies a CRD-controlled
+// status value (.status.phase / condition type) that embeds terminal control
+// bytes - the ESC introducer of a cursor-movement/screen-clear sequence, or
+// the BEL terminator of an OSC-52 clipboard write - has those control bytes
+// stripped before bucketing/counting. ansi.Truncate only trims to width; it
+// does not strip non-SGR escapes, and this data reaches the always-visible
+// dashboard summary band without ever passing through a viewer's sanitizer.
+// Stripping the control bytes is sufficient: without the ESC introducer, the
+// remaining printable text ("[2J", "]52;...") is inert - the terminal has no
+// escape sequence left to interpret.
+func TestBuildListSummary_SanitizesTerminalEscapes(t *testing.T) {
+	items := []model.Item{
+		argoApp("Healthy\x1b[2J", "Synced"),
+		argoApp("Healthy\x1b[2J", "Synced"),
+	}
+	s := BuildListSummary("Application", items)
+	require.Len(t, s.Bars, 2)
+	health := s.Bars[0]
+	require.Len(t, health.Buckets, 1, "identical escape-laden values sanitize to the same bucket")
+	assert.Equal(t, "Healthy[2J", health.Buckets[0].Value, "ESC introducer removed, trailing printable text left inert")
+	assert.Equal(t, 2, health.Buckets[0].Count)
+	assert.NotContains(t, health.Buckets[0].Value, "\x1b")
+
+	// OSC-52 clipboard-write payload: the BEL (0x07) terminator must also be
+	// stripped, not just ESC.
+	oscItems := []model.Item{argoApp("Healthy\x1b]52;c;ZXZpbA==\x07", "Synced")}
+	oscSummary := BuildListSummary("Application", oscItems)
+	require.Len(t, oscSummary.Bars, 2)
+	oscValue := oscSummary.Bars[0].Buckets[0].Value
+	assert.NotContains(t, oscValue, "\x1b")
+	assert.NotContains(t, oscValue, "\x07")
+
+	// C1 control bytes (U+0080-U+009F), UTF-8 encoded as two bytes each, are a
+	// second encoding of the same escape range - e.g. U+009B (CSI) opens a
+	// control sequence just like the two-byte ESC-'[' does. The ASCII-only
+	// filter (r < 0x20 || r == 0x7f) lets these through as printable runes.
+	c1Items := []model.Item{argoApp("Healthy\u009b2J", "Synced")}
+	c1Summary := BuildListSummary("Application", c1Items)
+	require.Len(t, c1Summary.Bars, 2)
+	c1Value := c1Summary.Bars[0].Buckets[0].Value
+	assert.NotContains(t, c1Value, "\u009b", "C1 control byte (U+009B, CSI) must be stripped")
+	assert.Equal(t, "Healthy2J", c1Value)
+}
+
 func TestRenderListSummary_ContainsCountsAndFitsWidth(t *testing.T) {
 	items := []model.Item{
 		argoApp("Healthy", "Synced"),

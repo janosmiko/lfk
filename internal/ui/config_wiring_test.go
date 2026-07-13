@@ -29,6 +29,7 @@ terminal: mux
 scrollback_lines: 8000
 pinned_groups: [karpenter.sh]
 pinned_types: [argoproj.io/applications]
+pinned_summaries: [batch/jobs, argoproj.io/applications]
 tips: false
 log_tail_lines: 250
 log_tail_lines_short: 7
@@ -201,6 +202,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 8000, ConfigScrollbackLines, "scrollback_lines")
 	assert.Equal(t, []string{"karpenter.sh"}, ConfigPinnedGroups, "pinned_groups")
 	assert.Equal(t, []string{"argoproj.io/applications"}, ConfigPinnedTypes, "pinned_types")
+	assert.Equal(t, []string{"batch/jobs", "argoproj.io/applications"}, ConfigPinnedSummaries, "pinned_summaries")
 	assert.False(t, ConfigTipsEnabled, "tips")
 	assert.Equal(t, 250, ConfigLogTailLines, "log_tail_lines")
 	assert.Equal(t, 7, ConfigLogTailLinesShort, "log_tail_lines_short")
@@ -306,6 +308,43 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, map[string]bool{"falco": false}, ConfigClusterSecuritySources["ctx1"], "clusters.security.sources")
 }
 
+// TestLoadConfig_PinnedSummariesEmptyListSetsFlag verifies an explicit
+// `pinned_summaries: []` is distinguishable from the key being absent: it sets
+// ConfigPinnedSummariesSet so loadDashboardFor can tell "no summaries, not
+// even defaults" apart from "key absent, use the built-in defaults" - both
+// otherwise leave ConfigPinnedSummaries equally empty.
+func TestLoadConfig_PinnedSummariesEmptyListSetsFlag(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("pinned_summaries: []\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.True(t, ConfigPinnedSummariesSet, "an explicit [] must set the flag")
+	assert.Empty(t, ConfigPinnedSummaries, "an explicit [] must leave the list empty")
+}
+
+// TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset verifies the key
+// being absent from the config file (as opposed to an explicit `[]`) leaves
+// ConfigPinnedSummariesSet false, so loadDashboardFor's default-pins gate
+// applies.
+func TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("dashboard: true\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.False(t, ConfigPinnedSummariesSet, "an absent key must not set the flag")
+	assert.Empty(t, ConfigPinnedSummaries)
+}
+
 // wiringCoveredFields records, for every configFile json field, where its
 // YAML->runtime wiring is asserted. TestConfigFile_EveryFieldHasWiringCoverage
 // fails if a field is added (or removed) without updating this map, forcing new
@@ -327,6 +366,7 @@ var wiringCoveredFields = map[string]string{
 	"scrollback_lines":          "TestLoadConfig_AllSettingsWired",
 	"pinned_groups":             "TestLoadConfig_AllSettingsWired",
 	"pinned_types":              "TestLoadConfig_AllSettingsWired",
+	"pinned_summaries":          "TestLoadConfig_AllSettingsWired + TestLoadConfig_PinnedSummariesEmptyListSetsFlag + TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset",
 	"monitoring":                "TestLoadConfig_AllSettingsWired",
 	"tips":                      "TestLoadConfig_AllSettingsWired",
 	"log_tail_lines":            "TestLoadConfig_AllSettingsWired",
@@ -410,6 +450,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origScrollback := ConfigScrollbackLines
 	origPinnedGroups := ConfigPinnedGroups
 	origPinnedTypes := ConfigPinnedTypes
+	origPinnedSummaries := ConfigPinnedSummaries
+	origPinnedSummariesSet := ConfigPinnedSummariesSet
 	origUnionSets := ConfigUnionSets
 	origTips := ConfigTipsEnabled
 	origTail := ConfigLogTailLines
@@ -500,6 +542,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigScrollbackLines = origScrollback
 		ConfigPinnedGroups = origPinnedGroups
 		ConfigPinnedTypes = origPinnedTypes
+		ConfigPinnedSummaries = origPinnedSummaries
+		ConfigPinnedSummariesSet = origPinnedSummariesSet
 		ConfigUnionSets = origUnionSets
 		ConfigTipsEnabled = origTips
 		ConfigLogTailLines = origTail

@@ -576,6 +576,18 @@ filter_presets:
 #   - argoproj.io/applications
 #   - /pods
 #
+# Show selected resource types' status summaries (the same bars the preview
+# band shows) as inline rows on the cluster dashboard. Keys are
+# version-agnostic group/resource. Manage interactively from the action menu
+# ('x') at the resource types level (stored per-context or per named union
+# set in ~/.local/state/lfk/pinned_summaries.yaml). Max 10 per scope.
+# Unset shows built-in defaults (Jobs, Deployments, Argo Applications, Flux
+# Kustomizations, cert-manager Certificates); set to [] to disable them.
+# pinned_summaries:
+#   - batch/jobs
+#   - argoproj.io/applications
+#   - /pods
+#
 # Legacy: pin whole CRD API groups. Still honored and expanded into member
 # types on load, but pinning individual types above is preferred.
 # pinned_groups:

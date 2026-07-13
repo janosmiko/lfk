@@ -9,8 +9,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -45,21 +43,22 @@ type podStats struct {
 
 // dashboardData holds all fetched data for the cluster dashboard.
 type dashboardData struct {
-	nodeItems      []model.Item
-	nodeCount      int
-	readyNodes     int
-	podCapacity    int64 // sum of nodes' allocatable pods (max schedulable)
-	pods           podStats
-	nsCount        int
-	warningEvents  []model.Item
-	allWarnings    []model.Item
-	pdbWarnings    []pdbWarning
-	nodes          []nodeInfo
-	totalCPUUsed   int64
-	totalCPUAlloc  int64
-	totalMemUsed   int64
-	totalMemAlloc  int64
-	nodeMetricsErr error
+	nodeItems       []model.Item
+	nodeCount       int
+	readyNodes      int
+	podCapacity     int64 // sum of nodes' allocatable pods (max schedulable)
+	pods            podStats
+	nsCount         int
+	warningEvents   []model.Item
+	allWarnings     []model.Item
+	pdbWarnings     []pdbWarning
+	nodes           []nodeInfo
+	totalCPUUsed    int64
+	totalCPUAlloc   int64
+	totalMemUsed    int64
+	totalMemAlloc   int64
+	nodeMetricsErr  error
+	pinnedSummaries []pinnedSummaryResult
 }
 
 // monitoringData retains the raw alert payload behind monitoringPreview so the
@@ -70,10 +69,10 @@ type monitoringData struct {
 	errMsg string // non-empty when the monitoring backend was unreachable
 }
 
-// loadDashboard fans out the cluster dashboard fetch into 6 parallel
-// Low-priority scheduler tasks, one per section. Each emits a
-// dashboardPartialMsg as it completes; handleDashboardPartial
-// accumulates them and re-renders progressively.
+// loadDashboard fans out the cluster dashboard fetch into parallel
+// Low-priority scheduler tasks: 6 fixed sections plus one per pinned
+// summary. Each emits a dashboardPartialMsg as it completes;
+// handleDashboardPartial accumulates them and re-renders progressively.
 //
 // Side benefit beyond preemption: even on a healthy cluster, the
 // dashboard renders incrementally instead of staying blank for ~20s.
@@ -87,69 +86,88 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	client := m.client
 	base := bgtaskTarget(kctx, "")
 
-	// Each section gets a unique target so the coalesce-by-sig logic
-	// treats them as distinct tasks rather than collapsing all 6 into one.
-	sectionTarget := func(s dashboardSection) string {
-		return base + "#" + s.String()
+	// A prior fan-out for this same (context, gen) may still be mid-flight
+	// (e.g. this reload was triggered by a pin toggle before the previous
+	// dashboard load finished). Its accumulator's `expected` count was seeded
+	// from *that* fan-out's total; if this fresh fan-out has a different
+	// total (a different pin count), letting both feed the same accumulator
+	// would mix section data across fan-outs or complete against the wrong
+	// count. Evict it so this fan-out always starts from a clean slate. The
+	// nil check guards test fixtures that build a bare Model{}.
+	if m.dashboardAcc != nil {
+		delete(m.dashboardAcc, dashboardAccKey(kctx, gen))
 	}
 
-	return tea.Batch(
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: nodes", sectionTarget(dashboardSectionNodes),
+	// Each section gets a unique target so the coalesce-by-sig logic
+	// treats them as distinct tasks rather than collapsing them into one.
+	sectionTarget := func(key string) string { return base + "#" + key }
+
+	pins := m.effectivePinnedSummaries()
+	discovered := m.discoveredResources[kctx]
+	// Nothing pinned anywhere: fall back to the built-in defaults, unless the
+	// user explicitly emptied pinned_summaries in config ("[]" disables
+	// defaults too - see defaultPinsDisabled). Unresolved defaults (a CRD this
+	// cluster lacks) are silently dropped rather than rendering "(not
+	// installed)" noise, so total must count only the ones that will
+	// actually resolve.
+	silentSkip := false
+	if len(pins) == 0 && !defaultPinsDisabled() {
+		pins = defaultPinnedSummaries
+		silentSkip = true
+	}
+	scheduledPins := len(pins)
+	if silentSkip {
+		scheduledPins = countResolvedPins(pins, discovered)
+	}
+	total := 6 + scheduledPins
+
+	fixed := []struct {
+		section dashboardSection
+		fetch   func(ctx context.Context) dashboardData
+	}{
+		{dashboardSectionNodes, func(ctx context.Context) dashboardData { return fetchDashboardNodes(ctx, kctx, client) }},
+		{dashboardSectionPods, func(ctx context.Context) dashboardData { return fetchDashboardPods(ctx, kctx, client) }},
+		{dashboardSectionNamespaces, func(ctx context.Context) dashboardData { return fetchDashboardNamespaces(ctx, kctx, client) }},
+		{dashboardSectionEvents, func(ctx context.Context) dashboardData { return fetchDashboardEvents(ctx, kctx, client) }},
+		{dashboardSectionPDB, func(ctx context.Context) dashboardData { return fetchDashboardPDB(ctx, kctx, client) }},
+		{dashboardSectionNodeMetrics, func(ctx context.Context) dashboardData {
+			// Node metrics needs node items as input. Re-fetch them inside
+			// this section to keep it self-contained; a node-list failure
+			// surfaces as nodeMetricsErr so the dashboard renders an explicit
+			// "metrics unavailable" instead of zeros.
+			nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
+				Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
+			})
+			if err != nil {
+				return dashboardData{nodeMetricsErr: err}
+			}
+			return fetchDashboardNodeMetrics(ctx, kctx, client, nodeItems)
+		}},
+	}
+
+	cmds := make([]tea.Cmd, 0, total)
+	for _, s := range fixed {
+		key := s.section.String()
+		fetch := s.fetch
+		cmds = append(cmds, m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
+			"Dashboard: "+key, sectionTarget(key),
 			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionNodes, data: fetchDashboardNodes(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: pods", sectionTarget(dashboardSectionPods),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionPods, data: fetchDashboardPods(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: namespaces", sectionTarget(dashboardSectionNamespaces),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionNamespaces, data: fetchDashboardNamespaces(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: events", sectionTarget(dashboardSectionEvents),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionEvents, data: fetchDashboardEvents(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: pdbs", sectionTarget(dashboardSectionPDB),
-			func(ctx context.Context) tea.Msg {
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionPDB, data: fetchDashboardPDB(ctx, kctx, client)}
-			}),
-		m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
-			"Dashboard: metrics", sectionTarget(dashboardSectionNodeMetrics),
-			func(ctx context.Context) tea.Msg {
-				// Node metrics needs node items as input. Re-fetch them
-				// inside this section to keep it self-contained. If the
-				// node list itself fails, surface that as the partial's
-				// nodeMetricsErr so the dashboard renders an explicit
-				// "metrics unavailable" instead of zero allocs/usage as
-				// if everything succeeded.
-				nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
-					Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
-				})
-				if err != nil {
-					return dashboardPartialMsg{
-						context: kctx,
-						gen:     gen,
-						section: dashboardSectionNodeMetrics,
-						data:    dashboardData{nodeMetricsErr: err},
-					}
-				}
-				return dashboardPartialMsg{context: kctx, gen: gen, section: dashboardSectionNodeMetrics, data: fetchDashboardNodeMetrics(ctx, kctx, client, nodeItems)}
-			}),
-	)
+				return dashboardPartialMsg{context: kctx, gen: gen, key: key, total: total, data: fetch(ctx)}
+			}))
+	}
+
+	cmds = append(cmds, m.pinnedSummaryCmds(kctx, gen, client, pins, discovered, total, silentSkip, sectionTarget)...)
+	return tea.Batch(cmds...)
 }
 
-// dashboardAccumulator collects partial section results until all 6
-// have arrived, then composes the final dashboardLoadedMsg.
+// dashboardAccumulator collects partial section results until all expected
+// sections (msg.total: 6 fixed + one per pinned summary) have arrived, then
+// composes the final dashboardLoadedMsg.
 type dashboardAccumulator struct {
 	gen      uint64
 	data     dashboardData
-	received [6]bool // indexed by dashboardSection
+	received map[string]bool // by dashboardPartialMsg.key
+	expected int
 	count    int
 }
 
@@ -158,10 +176,10 @@ func dashboardAccKey(kctx string, gen uint64) string {
 }
 
 // handleDashboardPartial accumulates a section result and emits a
-// single dashboardLoadedMsg only after all 6 sections have arrived.
+// single dashboardLoadedMsg only after all expected sections have arrived.
 // This avoids flickering the dashboard layout on every watch tick
-// (each tick fires 6 partial fetches; rendering on each one would
-// repeatedly clear sections that haven't arrived yet).
+// (each tick fires one partial fetch per section; rendering on each one
+// would repeatedly clear sections that haven't arrived yet).
 //
 // Stale messages (different context or different requestGen) are
 // dropped silently AND any half-built accumulator for that stale
@@ -187,15 +205,17 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	}
 	acc, ok := m.dashboardAcc[key]
 	if !ok {
-		acc = &dashboardAccumulator{gen: msg.gen}
+		acc = &dashboardAccumulator{gen: msg.gen, received: make(map[string]bool), expected: msg.total}
 		m.dashboardAcc[key] = acc
+	} else {
+		// A coalesced old fan-out (smaller total) can race a fresh one (larger
+		// total, e.g. a pin added mid-flight) on the same (context, gen).
+		// Awaiting the larger fan-out guarantees a full frame; the smaller
+		// fan-out's keys are a subset delivered by surviving coalesced tasks.
+		acc.expected = max(acc.expected, msg.total)
 	}
-	idx := int(msg.section)
-	if idx < 0 || idx >= len(acc.received) {
-		return m, nil
-	}
-	if !acc.received[idx] {
-		acc.received[idx] = true
+	if !acc.received[msg.key] {
+		acc.received[msg.key] = true
 		acc.count++
 		mergeDashboardSection(&acc.data, msg.data)
 	}
@@ -203,7 +223,7 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	// Defer the render until every section has arrived so the user sees
 	// either the prior (still-valid) dashboard frame or the new one in
 	// full — never a half-populated state.
-	if acc.count < 6 {
+	if acc.count < acc.expected {
 		return m, nil
 	}
 
@@ -212,18 +232,6 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	return m, func() tea.Msg {
 		return dashboardLoadedMsg{data: data, context: msg.context}
 	}
-}
-
-// dashboardWidths holds the bar/separator widths used when composing the
-// dashboard. They scale with the width the dashboard is rendered at so the
-// bars use the available space (wide in fullscreen, compact in the right
-// preview pane) without overflowing the column.
-type dashboardWidths struct {
-	bar     int // cluster bars: node health, pod status, CPU, Mem
-	node    int // per-node CPU/Mem bars (two side by side)
-	sep     int // horizontal separator rule
-	label   int // metric-row label column width (for inline label/bar/summary alignment)
-	content int // total content width; inline rows are truncated to it as a safety net
 }
 
 // nodeSummaryStr is the inline status summary for the Nodes row, e.g.
@@ -303,59 +311,6 @@ func memSummaryStr(d dashboardData) string {
 // dashboardSummarySep separates status counts within an inline summary.
 const dashboardSummarySep = " · "
 
-// dashboardMetricLines lays out one cluster metric over two lines: the label +
-// bar on the first, and the status summary on its own indented line. Keeping
-// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
-// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
-// column width so a long summary can't wrap and tear the layout.
-func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
-	pad := max(w.label-lipgloss.Width(label), 0)
-	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
-	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
-	return []string{
-		ansi.Truncate(barLine, w.content, ""),
-		ansi.Truncate(sumLine, w.content, ""),
-	}
-}
-
-// dashboardContentWidth returns the column content width the dashboard will be
-// rendered into for the current display mode, matching the view layout.
-func (m Model) dashboardContentWidth(twoCol bool) int {
-	if !m.fullscreenDashboard {
-		// Right preview pane inner width — explorerColumnWidths centralizes
-		// the layout math so hideLeftPane / fullscreen modes flow through.
-		_, _, rightW := m.explorerColumnWidths()
-		return max(rightW-2, 20)
-	}
-	innerW := m.width - 4 // ActiveColumnStyle border+padding
-	if twoCol {
-		return max(innerW*60/100, 20) // left column cap (see dashboardColumnWidths)
-	}
-	return max(innerW, 20)
-}
-
-// dashboardWidths derives the metric-row widths from the target content width.
-// Bars are uniform and as wide as the column allows; the summary lives on its
-// own line, so it no longer constrains the bar. The reservation (labelCol + 11)
-// leaves room for the "  " indents, brackets, and renderBar's " NNN%" suffix so
-// the bar line still fits contentW.
-func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
-	contentW := m.dashboardContentWidth(twoCol)
-	const labelCol = 5 // "Nodes" / "Pods" / "CPU" / "Mem"
-	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
-	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
-	// gaps), so split the rest between them to reach the same right edge as the
-	// top bars instead of staying noticeably narrower.
-	const perNodeOverhead = 31
-	return dashboardWidths{
-		bar:     min(max(contentW-labelCol-11, 8), 100),
-		node:    min(max((contentW-perNodeOverhead)/2, 3), 60),
-		sep:     min(max(contentW-2, 16), 120),
-		label:   labelCol,
-		content: contentW,
-	}
-}
-
 // composeDashboard renders the dashboard content + events column for the given
 // data at the current display width. Pure w.r.t. the model except for reading
 // width / fullscreen state, so it can be re-run whenever those change.
@@ -365,11 +320,16 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// of the right column, above the events. In the non-fullscreen preview pane
 	// everything stacks in the single column.
 	twoCol := m.fullscreenDashboard
-	w := m.dashboardWidths(twoCol)
+	w := m.dashboardWidths(twoCol, maxPinnedLabelWidth(data))
 
 	var left []string
 	left = append(left, "")
 	left = dashboardHeaderSection(left, data, w)
+	// Pinned rows render directly below Pods, inside the same block - no
+	// separator, no header - so the trailing blank that used to close
+	// dashboardHeaderSection is added here instead, after the pinned rows.
+	left = dashboardPinnedRows(left, data, w)
+	left = append(left, "")
 	left = dashboardResourcesSection(left, data, w)
 	left = dashboardNodesSection(left, data, w)
 	if !twoCol {

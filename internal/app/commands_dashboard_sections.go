@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -25,6 +28,91 @@ const (
 	dashboardSectionPDB
 	dashboardSectionNodeMetrics
 )
+
+// pinnedSummaryResult is one pinned resource type's status rollup, rendered
+// as inline dashboard metric rows below Pods (dashboardPinnedRows). index
+// preserves pin order across the unordered fan-out; notFound flags a pin key
+// absent from the cluster's discovery (e.g. a CRD not installed here).
+type pinnedSummaryResult struct {
+	index       int
+	key         string
+	displayName string
+	summary     ui.ListSummary
+	notFound    bool
+	err         error
+}
+
+// dashboardWidths holds the bar/separator widths used when composing the
+// dashboard. They scale with the width the dashboard is rendered at so the
+// bars use the available space (wide in fullscreen, compact in the right
+// preview pane) without overflowing the column.
+type dashboardWidths struct {
+	bar     int // cluster bars: node health, pod status, CPU, Mem
+	node    int // per-node CPU/Mem bars (two side by side)
+	sep     int // horizontal separator rule
+	label   int // metric-row label column width (for inline label/bar/summary alignment)
+	content int // total content width; inline rows are truncated to it as a safety net
+}
+
+// dashboardMetricLines lays out one cluster metric over two lines: the label +
+// bar on the first, and the status summary on its own indented line. Keeping
+// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
+// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
+// column width so a long summary can't wrap and tear the layout.
+func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
+	// A label longer than the column (a long pinned CRD display name) is
+	// truncated here rather than just left-unpadded: leaving it full-length
+	// would push that row's bar to a different column than every other row.
+	label = ui.Truncate(label, w.label)
+	pad := max(w.label-lipgloss.Width(label), 0)
+	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
+	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
+	return []string{
+		ansi.Truncate(barLine, w.content, ""),
+		ansi.Truncate(sumLine, w.content, ""),
+	}
+}
+
+// dashboardContentWidth returns the column content width the dashboard will be
+// rendered into for the current display mode, matching the view layout.
+func (m Model) dashboardContentWidth(twoCol bool) int {
+	if !m.fullscreenDashboard {
+		// Right preview pane inner width — explorerColumnWidths centralizes
+		// the layout math so hideLeftPane / fullscreen modes flow through.
+		_, _, rightW := m.explorerColumnWidths()
+		return max(rightW-2, 20)
+	}
+	innerW := m.width - 4 // ActiveColumnStyle border+padding
+	if twoCol {
+		return max(innerW*60/100, 20) // left column cap (see dashboardColumnWidths)
+	}
+	return max(innerW, 20)
+}
+
+// dashboardWidths derives the metric-row widths from the target content width.
+// Bars are uniform and as wide as the column allows; the summary lives on its
+// own line, so it no longer constrains the bar. maxPinnedLabel is the longest
+// label any pinned row will render (see maxPinnedLabelWidth) - the label
+// column widens to fit it, capped at 14, so a long CRD display name never
+// pushes that row's bar out of alignment with Nodes/Pods/CPU/Mem. The
+// reservation (labelCol + 11) leaves room for the "  " indents, brackets, and
+// renderBar's " NNN%" suffix so the bar line still fits contentW.
+func (m Model) dashboardWidths(twoCol bool, maxPinnedLabel int) dashboardWidths {
+	contentW := m.dashboardContentWidth(twoCol)
+	labelCol := min(max(maxPinnedLabel, 5), 14) // "Nodes" / "Pods" / "CPU" / "Mem" at minimum
+	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
+	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
+	// gaps), so split the rest between them to reach the same right edge as the
+	// top bars instead of staying noticeably narrower.
+	const perNodeOverhead = 31
+	return dashboardWidths{
+		bar:     min(max(contentW-labelCol-11, 8), 100),
+		node:    min(max((contentW-perNodeOverhead)/2, 3), 60),
+		sep:     min(max(contentW-2, 16), 120),
+		label:   labelCol,
+		content: contentW,
+	}
+}
 
 func (s dashboardSection) String() string {
 	switch s {
@@ -136,6 +224,94 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 		acc.totalMemAlloc = partial.totalMemAlloc
 		acc.nodeMetricsErr = partial.nodeMetricsErr
 	}
+	if len(partial.pinnedSummaries) > 0 {
+		acc.pinnedSummaries = append(acc.pinnedSummaries, partial.pinnedSummaries...)
+	}
+}
+
+// pinnedSummaryCmds builds one scheduled cmd per pinned summary key. A key
+// unresolved against the cluster's discovery (CRD absent or discovery still
+// warming) normally gets a synchronous notFound placeholder instead of a
+// scheduled fetch, so the section count still balances against total. A pin
+// resolved before discovery finishes renders the "(not installed in this
+// cluster)" placeholder until the next dashboard refresh re-resolves it - a
+// known transient, not a permanent misclassification.
+//
+// silentSkip is set when pins is the built-in default set (nothing pinned):
+// an unresolved default is dropped entirely instead - no cmd, no placeholder
+// - since a default set should never surface "not installed" noise for CRDs
+// the user never asked to pin. The caller (loadDashboardFor) must size total
+// to match: countResolvedPins gives the same count this loop actually
+// schedules.
+func (m Model) pinnedSummaryCmds(kctx string, gen uint64, client *k8s.Client, pins []string, discovered []model.ResourceTypeEntry, total int, silentSkip bool, sectionTarget func(string) string) []tea.Cmd {
+	cmds := make([]tea.Cmd, 0, len(pins))
+	for i, pk := range pins {
+		key := "pinned:" + pk
+		entry, ok := resolvePinnedSummaryEntry(discovered, pk)
+		if !ok {
+			if silentSkip {
+				continue
+			}
+			res := pinnedSummaryResult{index: i, key: pk, displayName: pk, notFound: true}
+			cmds = append(cmds, func() tea.Msg {
+				return dashboardPartialMsg{
+					context: kctx, gen: gen, key: key, total: total,
+					data: dashboardData{pinnedSummaries: []pinnedSummaryResult{res}},
+				}
+			})
+			continue
+		}
+		index := i
+		cmds = append(cmds, m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard,
+			"Dashboard: "+model.DisplayNameFor(entry)+" summary", sectionTarget(key),
+			func(ctx context.Context) tea.Msg {
+				return dashboardPartialMsg{
+					context: kctx, gen: gen, key: key, total: total,
+					data: fetchPinnedSummary(ctx, kctx, client, index, pk, entry),
+				}
+			}))
+	}
+	return cmds
+}
+
+// resolvePinnedSummaryEntry finds the discovery entry for a version-agnostic
+// pin key ("group/resource").
+func resolvePinnedSummaryEntry(entries []model.ResourceTypeEntry, key string) (model.ResourceTypeEntry, bool) {
+	for _, e := range entries {
+		if e.APIGroup+"/"+e.Resource == key {
+			return e, true
+		}
+	}
+	return model.ResourceTypeEntry{}, false
+}
+
+// countResolvedPins counts how many pin keys resolve against discovered.
+// loadDashboardFor uses this to size the fan-out total when defaults are in
+// play: pinnedSummaryCmds schedules nothing for an unresolved default (see
+// silentSkip above), so an unresolved one must not count toward total either,
+// or the accumulator would wait forever for a section that never arrives.
+func countResolvedPins(pins []string, discovered []model.ResourceTypeEntry) int {
+	n := 0
+	for _, pk := range pins {
+		if _, ok := resolvePinnedSummaryEntry(discovered, pk); ok {
+			n++
+		}
+	}
+	return n
+}
+
+// fetchPinnedSummary lists one pinned resource type cluster-wide and rolls it
+// up with the same summary builder the preview band uses.
+func fetchPinnedSummary(ctx context.Context, kctx string, client *k8s.Client, index int, key string, entry model.ResourceTypeEntry) dashboardData {
+	res := pinnedSummaryResult{index: index, key: key, displayName: model.DisplayNameFor(entry)}
+	items, err := client.GetResources(ctx, kctx, "", entry)
+	if err != nil {
+		res.err = err
+		logger.Warn("Pinned summary list failed", "key", key, "error", err)
+	} else {
+		res.summary = ui.BuildListSummary(entry.Kind, items)
+	}
+	return dashboardData{pinnedSummaries: []pinnedSummaryResult{res}}
 }
 
 // renderBar renders a horizontal bar graph like [████████░░░░░░░░] 52%.
@@ -265,7 +441,9 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 		podBar := renderStackedBar(segments, denom, w.bar)
 		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
-	lines = append(lines, "")
+	// No trailing blank here: pinned rows (dashboardPinnedRows) render
+	// directly below Pods inside the same block; composeDashboard adds the
+	// separating blank after them.
 
 	return lines
 }

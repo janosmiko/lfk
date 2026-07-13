@@ -38,6 +38,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `which_key_delay_ms` | int | `0` | Delay before the popup appears (ms, 0-2000). |
 | `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context and per-union-set in `~/.local/state/lfk/pinned.yaml`). |
+| `pinned_summaries` | list[string] | *(built-in defaults)* | Resource types (`group/resource` pin keys) whose status summaries show on the cluster dashboard. Unset shows built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates); `[]` disables them. Also manageable in-app via the action menu (`x`) at the resource types level (stored per-context and per-union-set in `~/.local/state/lfk/pinned_summaries.yaml`). Max 10 per scope. |
 | `union_sets` | map[string]object or list[object] | `[]` | Named multi-cluster groups that the `--union-set <name>` CLI flag expands. See [Union Sets](#union-sets). |
 | `tips` | bool | `true` | Show a random tip in the status bar on startup. Set to `false` to disable. |
 | `log_viewer` | object | *(see Log Viewer section)* | Log viewer settings: tail sizes, ANSI rendering, and startup-toggle defaults for preview/prefixes/timestamps. See [Log Viewer](#log-viewer). Note: `log_path` (above) is the application's own log file, not a viewer setting. |
@@ -713,6 +714,10 @@ pinned_groups:
 
 Pinned groups can also be managed interactively: press `p` at the resource types level to pin/unpin the selected CRD group. In-app pins are stored per-context, and for named union sets per union set, in `~/.local/state/lfk/pinned.yaml`; they are merged with the config file pins at runtime. Anonymous `--union-context` sessions have no durable name, so interactive pinning remains disabled there.
 
+Pinning a type's dashboard summary is a separate action (the action menu's "Pin summary" entry, `x` at the resource types level) with its own state file; see the `pinned_summaries` field above. With a named union set active, each member cluster's dashboard preview also shows the union set's pinned summaries, not just its own.
+
+When nothing is pinned anywhere (config or state), the dashboard shows a built-in default set instead: `batch/jobs`, `apps/deployments`, `argoproj.io/applications`, `kustomize.toolkit.fluxcd.io/kustomizations`, `cert-manager.io/certificates`. CRD-backed defaults are silently skipped when the cluster doesn't have the type. Your first interactive pin copies the currently-active defaults into your pinned list, then adds (or removes) the selected type, so the defaults you already see are kept, not replaced. Setting `pinned_summaries` in config is still a full explicit list and replaces the defaults outright. Set `pinned_summaries: []` in config to disable the defaults and show none.
+
 ## Union Sets
 
 Define named groups of clusters that the `--union-set <name>` CLI flag expands into a merged ("union") view. Avoids retyping long `--union-context` lists for the same recurring groups (blue/green/canary, region triplets, etc.). The flag is mutually exclusive with `--union-context` and `--context`.
@@ -1096,6 +1101,7 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `$XDG_STATE_HOME/lfk/column_prefs.yaml` | Per-context and per-resource-kind column visibility/order from the `,` toggle overlay, auto-managed (default: `~/.local/state/lfk/column_prefs.yaml`) |
 | `$XDG_STATE_HOME/lfk/pinned.yaml` | Per-context and per-union-set pinned CRD groups, managed via `p` key (default: `~/.local/state/lfk/pinned.yaml`) |
 | `$XDG_STATE_HOME/lfk/hidden_types.yaml` | Per-context and per-union-set hidden resource types, managed via the action menu (`x`) at the resource types level (default: `~/.local/state/lfk/hidden_types.yaml`) |
+| `$XDG_STATE_HOME/lfk/pinned_summaries.yaml` | Per-context and per-union-set resource-type summaries pinned to the cluster dashboard, managed via the action menu (default: `~/.local/state/lfk/pinned_summaries.yaml`) |
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
 
 State files stored at the legacy `~/.config/lfk/` location are automatically migrated to the new XDG state directory on first access.

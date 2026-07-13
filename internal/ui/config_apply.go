@@ -139,6 +139,10 @@ func applyConfigOptions(cfg configFile) {
 	if len(cfg.PinnedTypes) > 0 {
 		ConfigPinnedTypes = cfg.PinnedTypes
 	}
+	if cfg.PinnedSummaries != nil { // nil vs "[]" distinguishes defaults-on from defaults-off; see ConfigPinnedSummariesSet
+		ConfigPinnedSummaries = cfg.PinnedSummaries
+		ConfigPinnedSummariesSet = true
+	}
 	if len(cfg.UnionSets) > 0 {
 		ConfigUnionSets = sanitizeUnionSets([]UnionSetConfig(cfg.UnionSets))
 	}
@@ -563,18 +567,14 @@ func bridgeResourceColumnsToViews(cfg configFile) bool {
 	return bridged
 }
 
-// applyRightsizingDefaults validates the rightsizing_defaults config
-// section and pushes accepted values into the model package-level vars
-// consumed by executeActionRightsizing's sticky-then-config-then-builtin
-// fallback chain.
+// applyRightsizingDefaults validates the rightsizing_defaults config section
+// and pushes accepted values into the model package-level vars consumed by
+// executeActionRightsizing's sticky-then-config-then-builtin fallback chain.
 //
-// A nil section is a no-op (omitting rightsizing_defaults must NOT
-// clobber an already-set value — important for tests and for future
-// reload paths). Invalid strategy literals or off-preset headroom
-// values are dropped with a warning so the user gets a single, visible
-// signal at startup rather than a silent fallthrough; the model var
-// is left at zero in that case so the runtime falls back through the
-// rest of the chain.
+// A nil section is a no-op (omitting rightsizing_defaults must NOT clobber an
+// already-set value - important for tests and future reload paths). Invalid
+// strategy literals or off-preset headroom values are dropped with a warning;
+// the model var is left at zero so the runtime falls back through the chain.
 func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
 	if cfg == nil {
 		return
