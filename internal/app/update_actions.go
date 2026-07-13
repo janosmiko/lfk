@@ -365,6 +365,8 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		return m.toggleHiddenResourceType()
 	case actionLabelPinType, actionLabelUnpinType:
 		return m.handleKeyPinGroup()
+	case actionLabelPinSummary, actionLabelUnpinSummary:
+		return m.togglePinnedSummary()
 	}
 
 	// Cluster-picker actions live outside the kind-based machinery: they

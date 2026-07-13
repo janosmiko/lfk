@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -74,4 +75,47 @@ func TestIsSummaryPinned(t *testing.T) {
 	assert.True(t, m.isSummaryPinned("batch/jobs"))
 	assert.False(t, m.isSummaryPinned("/pods"))
 	assert.False(t, Model{}.isSummaryPinned("batch/jobs"), "nil state must not panic")
+}
+
+// TestTogglePinnedSummary_PinsPersistsAndReloadsDashboard verifies the
+// action-menu toggle pins the selected type's summary, persists it per
+// context, drops the stale dashboard cache so a refresh reflects the change,
+// and un-pins on a second toggle.
+func TestTogglePinnedSummary_PinsPersistsAndReloadsDashboard(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+	m := hiddenTestModel(t)
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+	m.pinnedSummariesState = newPinnedState()
+
+	mdl, cmd := m.togglePinnedSummary()
+	m = mdl.(Model)
+	key := model.PinKeyFromRef(m.selectedMiddleItem().Extra)
+	assert.True(t, m.isSummaryPinned(key))
+	assert.NotNil(t, cmd)
+	// Persisted to disk.
+	assert.Contains(t, loadPinnedSummariesState().Contexts[m.nav.Context], key)
+
+	// Toggle again unpins.
+	mdl, _ = m.togglePinnedSummary()
+	m = mdl.(Model)
+	assert.False(t, m.isSummaryPinned(key))
+}
+
+// TestTogglePinnedSummary_EnforcesCap verifies the cap is checked before the
+// toggle mutates state: pinning an 11th summary is rejected outright rather
+// than added and then trimmed.
+func TestTogglePinnedSummary_EnforcesCap(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+	m := hiddenTestModel(t)
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+	m.pinnedSummariesState = newPinnedState()
+	keys := make([]string, 0, maxPinnedSummaries)
+	for i := range maxPinnedSummaries {
+		keys = append(keys, fmt.Sprintf("group%d/things", i))
+	}
+	m.pinnedSummariesState.Contexts[m.nav.Context] = keys
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], maxPinnedSummaries, "cap rejects the 11th pin")
 }

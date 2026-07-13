@@ -21,10 +21,12 @@ import (
 // Action labels for the resource-type action menu. Kept as constants so the
 // menu builder and executeAction's dispatch switch on the same literal.
 const (
-	actionLabelPinType   = "Pin"
-	actionLabelUnpinType = "Unpin"
-	actionLabelHideType  = "Hide"
-	actionLabelShowType  = "Show"
+	actionLabelPinType      = "Pin"
+	actionLabelUnpinType    = "Unpin"
+	actionLabelHideType     = "Hide"
+	actionLabelShowType     = "Show"
+	actionLabelPinSummary   = "Pin summary"
+	actionLabelUnpinSummary = "Unpin summary"
 )
 
 // hideMenuChip is the in-menu single-letter activator for the hide/show
@@ -33,6 +35,10 @@ const (
 // overlay's j/k navigation. The pin/unpin entry reuses the configured
 // PinGroup key so the chip stays in sync with the global binding.
 const hideMenuChip = "h"
+
+// summaryMenuChip is the in-menu activator for the pin-summary action.
+// Hardcoded like hideMenuChip: there is no global keybinding to echo.
+const summaryMenuChip = "s"
 
 // openResourceTypeActionMenu builds the action menu shown when the user
 // presses the action-menu key at the resource-types level. It offers Pin/Unpin
@@ -60,6 +66,12 @@ func (m Model) openResourceTypeActionMenu() Model {
 	items := []model.Item{
 		{Name: pinLabel, Extra: pinDesc, Status: ui.ActiveKeybindings.PinGroup},
 	}
+
+	sumLabel, sumDesc := actionLabelPinSummary, "Show this type's status summary on the cluster dashboard"
+	if m.isSummaryPinned(key) {
+		sumLabel, sumDesc = actionLabelUnpinSummary, "Remove this type's summary from the cluster dashboard"
+	}
+	items = append(items, model.Item{Name: sumLabel, Extra: sumDesc, Status: summaryMenuChip})
 
 	// Rarely-used types are already hidden by default and only surfaced via
 	// the reveal toggle, so a per-type hide/show would be meaningless — offer

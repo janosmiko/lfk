@@ -95,13 +95,16 @@ func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	m := hiddenTestModel(t)
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
 
-	// Items sort by hotkey chip: hide ("h") precedes pin ("p").
+	// Items sort by hotkey chip: hide ("h") precedes pin ("p") precedes
+	// pin-summary ("s").
 	menu := m.openResourceTypeActionMenu()
-	require.Len(t, menu.overlayItems, 2, "menu offers both Pin and Hide")
+	require.Len(t, menu.overlayItems, 3, "menu offers Pin, Hide, and Pin summary")
 	assert.Equal(t, actionLabelHideType, menu.overlayItems[0].Name)
 	assert.Equal(t, hideMenuChip, menu.overlayItems[0].Status, "hide entry carries a key chip")
 	assert.Equal(t, actionLabelPinType, menu.overlayItems[1].Name)
 	assert.Equal(t, ui.ActiveKeybindings.PinGroup, menu.overlayItems[1].Status, "pin entry carries the pin key chip")
+	assert.Equal(t, actionLabelPinSummary, menu.overlayItems[2].Name)
+	assert.Equal(t, summaryMenuChip, menu.overlayItems[2].Status, "pin-summary entry carries a key chip")
 
 	// Hide it, then reopen: the hide entry flips to Show.
 	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
@@ -110,8 +113,26 @@ func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	rm := res.(Model)
 	rm.setCursor(cursorIndexOfItem(&rm, "Gadgets"))
 	menu2 := rm.openResourceTypeActionMenu()
-	require.Len(t, menu2.overlayItems, 2)
+	require.Len(t, menu2.overlayItems, 3)
 	assert.Equal(t, actionLabelShowType, menu2.overlayItems[0].Name)
+}
+
+// TestResourceTypeActionMenu_OffersPinSummary verifies the menu offers a
+// Pin summary entry that flips to Unpin summary once the type's summary is
+// pinned to the dashboard.
+func TestResourceTypeActionMenu_OffersPinSummary(t *testing.T) {
+	m := hiddenTestModel(t)
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+	m.pinnedSummariesState = newPinnedState()
+
+	menu := m.openResourceTypeActionMenu()
+	assert.Contains(t, itemNames(menu.overlayItems), actionLabelPinSummary)
+
+	// Already pinned -> offers Unpin summary.
+	key := model.PinKeyFromRef(m.selectedMiddleItem().Extra)
+	m.pinnedSummariesState.Contexts[m.nav.Context] = []string{key}
+	menu2 := m.openResourceTypeActionMenu()
+	assert.Contains(t, itemNames(menu2.overlayItems), actionLabelUnpinSummary)
 }
 
 // rareTestModel builds a model whose sidebar includes a rarely-used type
@@ -144,10 +165,12 @@ func TestRareType_NotHideable(t *testing.T) {
 	require.NotEqual(t, -1, idx, "CSIDrivers must be visible with reveal on")
 	m.setCursor(idx)
 
-	// Menu offers Pin only — no hide/show entry for a rare type.
+	// Menu offers Pin and Pin summary only — no hide/show entry for a rare
+	// type. Items sort by hotkey chip: pin ("p") precedes pin-summary ("s").
 	menu := m.openResourceTypeActionMenu()
-	require.Len(t, menu.overlayItems, 1, "rare type offers no hide/show entry")
+	require.Len(t, menu.overlayItems, 2, "rare type offers no hide/show entry")
 	assert.Equal(t, actionLabelPinType, menu.overlayItems[0].Name)
+	assert.Equal(t, actionLabelPinSummary, menu.overlayItems[1].Name)
 
 	// The hide handler refuses and persists nothing.
 	res, _ := m.toggleHiddenResourceType()
@@ -164,9 +187,10 @@ func TestOpenResourceTypeActionMenu_PinLabelReflectsState(t *testing.T) {
 	m.pinnedState = newPinnedState()
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
 
-	// Items sort by hotkey chip: pin ("p") lands after hide ("h").
+	// Items sort by hotkey chip: pin ("p") lands after hide ("h") and before
+	// pin-summary ("s").
 	menu := m.openResourceTypeActionMenu()
-	require.Len(t, menu.overlayItems, 2)
+	require.Len(t, menu.overlayItems, 3)
 	assert.Equal(t, actionLabelPinType, menu.overlayItems[1].Name)
 
 	// Pin via the menu dispatch path, then reopen: the entry flips to Unpin.
@@ -174,6 +198,6 @@ func TestOpenResourceTypeActionMenu_PinLabelReflectsState(t *testing.T) {
 	rm := res.(Model)
 	rm.setCursor(cursorIndexOfItem(&rm, "Gadgets"))
 	menu2 := rm.openResourceTypeActionMenu()
-	require.Len(t, menu2.overlayItems, 2)
+	require.Len(t, menu2.overlayItems, 3)
 	assert.Equal(t, actionLabelUnpinType, menu2.overlayItems[1].Name)
 }
