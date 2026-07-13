@@ -359,6 +359,7 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	var left []string
 	left = append(left, "")
 	left = dashboardHeaderSection(left, data, w)
+	left = dashboardPinnedSection(left, data, w)
 	left = dashboardResourcesSection(left, data, w)
 	left = dashboardNodesSection(left, data, w)
 	if !twoCol {
