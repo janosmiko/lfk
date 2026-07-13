@@ -44,6 +44,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
+	pinnedSummariesSt := loadPinnedSummariesState()
 	hiddenSt := loadHiddenTypesState()
 	sortMem := loadSortMemory()
 	colPrefs := loadColumnPrefs()
@@ -71,6 +72,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			timestamps:     ui.ConfigLogShowTimestamps,
 		},
 		pinnedState:             pinnedSt,
+		pinnedSummariesState:    pinnedSummariesSt,
 		hiddenState:             hiddenSt,
 		namespace:               defaultNS,
 		spinner:                 s,
