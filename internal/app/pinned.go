@@ -30,21 +30,24 @@ func pinnedFilePath() string {
 }
 
 // loadPinnedState reads pinned groups from disk.
-func loadPinnedState() *PinnedState {
-	path := pinnedFilePath()
+func loadPinnedState() *PinnedState { return loadPinStateFile(pinnedFilePath()) }
+
+// loadPinStateFile reads any PinnedState-shaped scope file (sidebar pins,
+// pinned dashboard summaries). Missing or corrupt files start fresh.
+func loadPinStateFile(path string) *PinnedState {
 	if path == "" {
 		return newPinnedState()
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read pinned-groups state", "error", err, "path", path)
+			logger.Warn("Failed to read pinned-scope state", "error", err, "path", path)
 		}
 		return newPinnedState()
 	}
 	var s PinnedState
 	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Pinned-groups file is corrupt; starting fresh", "error", err, "path", path)
+		logger.Warn("Pinned-scope file is corrupt; starting fresh", "error", err, "path", path)
 		return newPinnedState()
 	}
 	if s.Contexts == nil {
@@ -64,8 +67,9 @@ func newPinnedState() *PinnedState {
 }
 
 // savePinnedState writes pinned groups to disk.
-func savePinnedState(s *PinnedState) error {
-	path := pinnedFilePath()
+func savePinnedState(s *PinnedState) error { return savePinStateFile(pinnedFilePath(), s) }
+
+func savePinStateFile(path string, s *PinnedState) error {
 	if path == "" {
 		return nil
 	}
