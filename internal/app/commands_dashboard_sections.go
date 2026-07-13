@@ -231,17 +231,27 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 
 // pinnedSummaryCmds builds one scheduled cmd per pinned summary key. A key
 // unresolved against the cluster's discovery (CRD absent or discovery still
-// warming) gets a synchronous notFound placeholder instead of a scheduled
-// fetch, so the section count still balances against total. A pin resolved
-// before discovery finishes renders the "(not installed in this cluster)"
-// placeholder until the next dashboard refresh re-resolves it - a known
-// transient, not a permanent misclassification.
-func (m Model) pinnedSummaryCmds(kctx string, gen uint64, client *k8s.Client, pins []string, discovered []model.ResourceTypeEntry, total int, sectionTarget func(string) string) []tea.Cmd {
+// warming) normally gets a synchronous notFound placeholder instead of a
+// scheduled fetch, so the section count still balances against total. A pin
+// resolved before discovery finishes renders the "(not installed in this
+// cluster)" placeholder until the next dashboard refresh re-resolves it - a
+// known transient, not a permanent misclassification.
+//
+// silentSkip is set when pins is the built-in default set (nothing pinned):
+// an unresolved default is dropped entirely instead - no cmd, no placeholder
+// - since a default set should never surface "not installed" noise for CRDs
+// the user never asked to pin. The caller (loadDashboardFor) must size total
+// to match: countResolvedPins gives the same count this loop actually
+// schedules.
+func (m Model) pinnedSummaryCmds(kctx string, gen uint64, client *k8s.Client, pins []string, discovered []model.ResourceTypeEntry, total int, silentSkip bool, sectionTarget func(string) string) []tea.Cmd {
 	cmds := make([]tea.Cmd, 0, len(pins))
 	for i, pk := range pins {
 		key := "pinned:" + pk
 		entry, ok := resolvePinnedSummaryEntry(discovered, pk)
 		if !ok {
+			if silentSkip {
+				continue
+			}
 			res := pinnedSummaryResult{index: i, key: pk, displayName: pk, notFound: true}
 			cmds = append(cmds, func() tea.Msg {
 				return dashboardPartialMsg{
@@ -273,6 +283,21 @@ func resolvePinnedSummaryEntry(entries []model.ResourceTypeEntry, key string) (m
 		}
 	}
 	return model.ResourceTypeEntry{}, false
+}
+
+// countResolvedPins counts how many pin keys resolve against discovered.
+// loadDashboardFor uses this to size the fan-out total when defaults are in
+// play: pinnedSummaryCmds schedules nothing for an unresolved default (see
+// silentSkip above), so an unresolved one must not count toward total either,
+// or the accumulator would wait forever for a section that never arrives.
+func countResolvedPins(pins []string, discovered []model.ResourceTypeEntry) int {
+	n := 0
+	for _, pk := range pins {
+		if _, ok := resolvePinnedSummaryEntry(discovered, pk); ok {
+			n++
+		}
+	}
+	return n
 }
 
 // fetchPinnedSummary lists one pinned resource type cluster-wide and rolls it

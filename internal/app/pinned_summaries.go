@@ -20,6 +20,27 @@ import (
 // kind is a full cluster-wide list call on every dashboard refresh.
 const maxPinnedSummaries = 10
 
+// defaultPinnedSummaries render when nothing is pinned anywhere (issue #525,
+// Task 10). CRD-backed entries are silently skipped when the cluster does not
+// have the type - defaults must never show a "(not installed)" placeholder,
+// unlike an explicit pin. Pinning any type (state or config) replaces this
+// whole set, since it only applies when effectivePinnedSummaries is empty.
+var defaultPinnedSummaries = []string{
+	"batch/jobs",
+	"apps/deployments",
+	"argoproj.io/applications",
+	"kustomize.toolkit.fluxcd.io/kustomizations",
+	"cert-manager.io/certificates",
+}
+
+// defaultPinsDisabled reports whether the user explicitly configured
+// pinned_summaries: [] (as opposed to leaving the key absent): "no summaries,
+// not even the defaults" rather than "use the defaults". ConfigPinnedSummaries
+// alone can't distinguish these - both leave it empty.
+func defaultPinsDisabled() bool {
+	return ui.ConfigPinnedSummariesSet && len(ui.ConfigPinnedSummaries) == 0
+}
+
 // pinnedSummariesFilePath returns the path to the pinned-summaries state file.
 func pinnedSummariesFilePath() string {
 	dir, err := paths.StateDir()

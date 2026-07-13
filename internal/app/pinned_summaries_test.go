@@ -234,6 +234,29 @@ func TestTogglePinnedSummary_EnforcesCap_ConfigPinsCountTowardCap(t *testing.T) 
 	assert.True(t, m.statusMessageErr)
 }
 
+// TestDefaultPinsDisabled verifies the config-driven gate on defaultPinnedSummaries:
+// the key being absent leaves defaults enabled, an explicit `pinned_summaries: []`
+// disables them, and a non-empty explicit list also leaves them "enabled" (moot,
+// since effectivePinnedSummaries is non-empty in that case anyway).
+func TestDefaultPinsDisabled(t *testing.T) {
+	origSet, origList := ui.ConfigPinnedSummariesSet, ui.ConfigPinnedSummaries
+	t.Cleanup(func() {
+		ui.ConfigPinnedSummariesSet = origSet
+		ui.ConfigPinnedSummaries = origList
+	})
+
+	ui.ConfigPinnedSummariesSet = false
+	ui.ConfigPinnedSummaries = nil
+	assert.False(t, defaultPinsDisabled(), "key absent -> defaults stay enabled")
+
+	ui.ConfigPinnedSummariesSet = true
+	ui.ConfigPinnedSummaries = nil
+	assert.True(t, defaultPinsDisabled(), "explicit [] -> defaults disabled")
+
+	ui.ConfigPinnedSummaries = []string{"batch/jobs"}
+	assert.False(t, defaultPinsDisabled(), "explicit non-empty list -> defaults not disabled by this gate")
+}
+
 // TestTogglePinnedSummary_EnforcesCap_MixedConfigAndState verifies the cap
 // check sums config and state pins together (3 config + 7 state = 10),
 // rejecting an 11th interactive pin.

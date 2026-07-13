@@ -104,7 +104,22 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 
 	pins := m.effectivePinnedSummaries()
 	discovered := m.discoveredResources[kctx]
-	total := 6 + len(pins)
+	// Nothing pinned anywhere: fall back to the built-in defaults, unless the
+	// user explicitly emptied pinned_summaries in config ("[]" disables
+	// defaults too - see defaultPinsDisabled). Unresolved defaults (a CRD this
+	// cluster lacks) are silently dropped rather than rendering "(not
+	// installed)" noise, so total must count only the ones that will
+	// actually resolve.
+	silentSkip := false
+	if len(pins) == 0 && !defaultPinsDisabled() {
+		pins = defaultPinnedSummaries
+		silentSkip = true
+	}
+	scheduledPins := len(pins)
+	if silentSkip {
+		scheduledPins = countResolvedPins(pins, discovered)
+	}
+	total := 6 + scheduledPins
 
 	fixed := []struct {
 		section dashboardSection
@@ -141,7 +156,7 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 			}))
 	}
 
-	cmds = append(cmds, m.pinnedSummaryCmds(kctx, gen, client, pins, discovered, total, sectionTarget)...)
+	cmds = append(cmds, m.pinnedSummaryCmds(kctx, gen, client, pins, discovered, total, silentSkip, sectionTarget)...)
 	return tea.Batch(cmds...)
 }
 

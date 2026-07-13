@@ -1135,3 +1135,137 @@ func TestHandleDashboardPartial_DuplicateKeyIgnored(t *testing.T) {
 	_, cmd = m.handleDashboardPartial(dashboardPartialMsg{context: m.nav.Context, gen: m.requestGen, key: "pods", total: 2})
 	assert.NotNil(t, cmd)
 }
+
+// --- Task 10: default pinned summaries ---
+
+// TestPinnedSummaryCmds_SilentSkipDropsUnresolvedDefaults verifies an
+// unresolved default pin (a CRD this cluster doesn't have) is dropped
+// entirely when silentSkip is set - no cmd, no notFound placeholder - unlike
+// an explicit pin's "(not installed in this cluster)" row.
+func TestPinnedSummaryCmds_SilentSkipDropsUnresolvedDefaults(t *testing.T) {
+	m := newTestModelWithScheduler()
+	defer m.scheduler.Close()
+
+	pins := []string{"batch/jobs", "unknown.io/widgets"}
+	discovered := []model.ResourceTypeEntry{
+		{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs", Namespaced: true},
+	}
+	cmds := m.pinnedSummaryCmds("ctx", 1, m.client, pins, discovered, 7, true, func(k string) string { return k })
+	assert.Len(t, cmds, 1, "the unresolved default must be dropped, not scheduled as a notFound placeholder")
+}
+
+// TestPinnedSummaryCmds_ExplicitUnresolvedStillRendersPlaceholder verifies
+// silentSkip=false (an explicit pin) keeps the existing notFound placeholder
+// behavior.
+func TestPinnedSummaryCmds_ExplicitUnresolvedStillRendersPlaceholder(t *testing.T) {
+	m := newTestModelWithScheduler()
+	defer m.scheduler.Close()
+
+	cmds := m.pinnedSummaryCmds("ctx", 1, m.client, []string{"unknown.io/widgets"}, nil, 7, false, func(k string) string { return k })
+	require.Len(t, cmds, 1)
+	partial, ok := cmds[0]().(dashboardPartialMsg)
+	require.True(t, ok)
+	require.Len(t, partial.data.pinnedSummaries, 1)
+	assert.True(t, partial.data.pinnedSummaries[0].notFound)
+}
+
+// TestLoadDashboardFor_DefaultsSilentlySkipUnresolvedTypes verifies
+// loadDashboardFor falls back to the built-in defaults when nothing is
+// pinned, and that unresolved defaults (CRDs this cluster lacks) shrink the
+// fan-out total instead of scheduling a notFound placeholder for each one.
+func TestLoadDashboardFor_DefaultsSilentlySkipUnresolvedTypes(t *testing.T) {
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test-ctx": {
+			{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs", Namespaced: true},
+			{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+			// argoproj.io Applications, Flux Kustomizations, and cert-manager
+			// Certificates are absent, as on a cluster without those CRDs.
+		},
+	}
+	m.scheduler.StopWorkers()
+	defer m.scheduler.Close()
+
+	cmd := m.loadDashboardFor("test-ctx")
+	require.NotNil(t, cmd)
+	msg := cmd()
+	batchMsg, ok := msg.(tea.BatchMsg)
+	require.True(t, ok)
+	assert.Len(t, batchMsg, 8, "6 fixed + 2 resolved defaults; the 3 unresolved defaults must not inflate the fan-out")
+
+	var wg sync.WaitGroup
+	for _, subCmd := range batchMsg {
+		wg.Add(1)
+		go func(c tea.Cmd) {
+			defer wg.Done()
+			_ = c()
+		}(subCmd)
+	}
+	t.Cleanup(wg.Wait)
+}
+
+// TestLoadDashboardFor_ConfigPinnedSummariesSetEmptyDisablesDefaults verifies
+// an explicit `pinned_summaries: []` in config (ConfigPinnedSummariesSet) is
+// honored as "no summaries at all", not "use the defaults".
+func TestLoadDashboardFor_ConfigPinnedSummariesSetEmptyDisablesDefaults(t *testing.T) {
+	origList, origSet := ui.ConfigPinnedSummaries, ui.ConfigPinnedSummariesSet
+	ui.ConfigPinnedSummaries = nil
+	ui.ConfigPinnedSummariesSet = true
+	t.Cleanup(func() {
+		ui.ConfigPinnedSummaries = origList
+		ui.ConfigPinnedSummariesSet = origSet
+	})
+
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.scheduler.StopWorkers()
+	defer m.scheduler.Close()
+
+	cmd := m.loadDashboardFor("test-ctx")
+	msg := cmd()
+	batchMsg, ok := msg.(tea.BatchMsg)
+	require.True(t, ok)
+	assert.Len(t, batchMsg, 6, "explicit pinned_summaries: [] must disable the built-in defaults")
+
+	var wg sync.WaitGroup
+	for _, subCmd := range batchMsg {
+		wg.Add(1)
+		go func(c tea.Cmd) {
+			defer wg.Done()
+			_ = c()
+		}(subCmd)
+	}
+	t.Cleanup(wg.Wait)
+}
+
+// TestLoadDashboardFor_ExplicitPinSuppressesDefaults verifies any explicit pin
+// (state or config) suppresses the defaults entirely, per effectivePinnedSummaries
+// returning a non-empty list.
+func TestLoadDashboardFor_ExplicitPinSuppressesDefaults(t *testing.T) {
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.pinnedSummariesState = newPinnedState()
+	m.pinnedSummariesState.Contexts["test-ctx"] = []string{"batch/jobs"}
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test-ctx": {{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs", Namespaced: true}},
+	}
+	m.scheduler.StopWorkers()
+	defer m.scheduler.Close()
+
+	cmd := m.loadDashboardFor("test-ctx")
+	msg := cmd()
+	batchMsg, ok := msg.(tea.BatchMsg)
+	require.True(t, ok)
+	assert.Len(t, batchMsg, 7, "6 fixed + exactly the one explicit pin, not the 5 defaults")
+
+	var wg sync.WaitGroup
+	for _, subCmd := range batchMsg {
+		wg.Add(1)
+		go func(c tea.Cmd) {
+			defer wg.Done()
+			_ = c()
+		}(subCmd)
+	}
+	t.Cleanup(wg.Wait)
+}

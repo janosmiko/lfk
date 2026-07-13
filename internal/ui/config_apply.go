@@ -139,8 +139,9 @@ func applyConfigOptions(cfg configFile) {
 	if len(cfg.PinnedTypes) > 0 {
 		ConfigPinnedTypes = cfg.PinnedTypes
 	}
-	if len(cfg.PinnedSummaries) > 0 {
+	if cfg.PinnedSummaries != nil { // nil vs "[]" distinguishes defaults-on from defaults-off; see ConfigPinnedSummariesSet
 		ConfigPinnedSummaries = cfg.PinnedSummaries
+		ConfigPinnedSummariesSet = true
 	}
 	if len(cfg.UnionSets) > 0 {
 		ConfigUnionSets = sanitizeUnionSets([]UnionSetConfig(cfg.UnionSets))
