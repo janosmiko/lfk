@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.7](https://github.com/janosmiko/lfk/compare/v0.15.6...v0.15.7) (2026-07-13)
+
+
+### Features
+
+* pinned dashboard summaries ([#525](https://github.com/janosmiko/lfk/issues/525)) ([#532](https://github.com/janosmiko/lfk/issues/532)) ([34b8ddf](https://github.com/janosmiko/lfk/commit/34b8ddf61eb93162e1b60c599c3a8d915e8fec43))
+
 ## [0.15.6](https://github.com/janosmiko/lfk/compare/v0.15.5...v0.15.6) (2026-07-10)
 
 
