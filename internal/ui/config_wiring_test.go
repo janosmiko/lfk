@@ -450,6 +450,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origScrollback := ConfigScrollbackLines
 	origPinnedGroups := ConfigPinnedGroups
 	origPinnedTypes := ConfigPinnedTypes
+	origPinnedSummaries := ConfigPinnedSummaries
 	origPinnedSummariesSet := ConfigPinnedSummariesSet
 	origUnionSets := ConfigUnionSets
 	origTips := ConfigTipsEnabled
@@ -541,6 +542,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigScrollbackLines = origScrollback
 		ConfigPinnedGroups = origPinnedGroups
 		ConfigPinnedTypes = origPinnedTypes
+		ConfigPinnedSummaries = origPinnedSummaries
 		ConfigPinnedSummariesSet = origPinnedSummariesSet
 		ConfigUnionSets = origUnionSets
 		ConfigTipsEnabled = origTips

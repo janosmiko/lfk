@@ -133,6 +133,7 @@
     },
     "pinned_summaries": {
       "type": ["array", "null"],
+      "maxItems": 10,
       "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"batch/jobs\") whose status summaries render on the cluster dashboard. Also manageable in-app from the resource-type action menu. Max 10 per scope. Unset uses built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates); an explicit [] disables them.",
       "items": { "type": "string" }
     },
