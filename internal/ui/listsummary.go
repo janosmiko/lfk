@@ -228,7 +228,7 @@ func BuildListSummary(kind string, items []model.Item) ListSummary {
 func buildSummaryBar(dim summaryDimension, items []model.Item) SummaryBar {
 	counts := make(map[string]int)
 	for _, it := range items {
-		v := strings.TrimSpace(dim.valueOf(it))
+		v := strings.TrimSpace(sanitizeSummaryValue(dim.valueOf(it)))
 		if v == "" {
 			continue
 		}
@@ -252,6 +252,24 @@ func buildSummaryBar(dim summaryDimension, items []model.Item) SummaryBar {
 		return bi.Value < bj.Value
 	})
 	return bar
+}
+
+// sanitizeSummaryValue strips ASCII control characters (including ESC and
+// DEL) from a status value before it is bucketed and rendered. Status values
+// (.status.phase, condition types) come from cluster-controlled resources -
+// a hostile CRD status could embed cursor-movement or OSC-52 clipboard-write
+// escapes, and this is the single choke point every summary value passes
+// through on its way to the always-visible dashboard band.
+func sanitizeSummaryValue(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 const summaryBarCells = 14
