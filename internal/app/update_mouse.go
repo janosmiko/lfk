@@ -146,6 +146,16 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // never reach the right pane and the wheel keeps moving the cursor,
 // preserving the prior fullscreen behaviour.
 func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
+	// The fullscreen dashboard has no right pane and reuses previewScroll for
+	// its own content, so route the wheel straight to the dashboard scroll
+	// (mirroring the j/k keys). Without this the collapsed columnBoundaries
+	// (0, m.width) make x never reach a right pane, so the wheel would move the
+	// hidden middle-list cursor instead of scrolling the dashboard (#524).
+	if m.fullscreenDashboard {
+		m.previewScroll += delta
+		m.clampDashboardScroll()
+		return m, nil
+	}
 	_, middleEnd := m.columnBoundaries()
 	if x >= middleEnd {
 		// Live-log preview uses a bottom-anchored offset (fromBottom): wheel up
