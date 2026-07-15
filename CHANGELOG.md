@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.8](https://github.com/janosmiko/lfk/compare/v0.15.7...v0.15.8) (2026-07-14)
+
+
+### Bug Fixes
+
+* **dashboard:** scroll the fullscreen dashboard with the mouse wheel ([#524](https://github.com/janosmiko/lfk/issues/524)) ([#534](https://github.com/janosmiko/lfk/issues/534)) ([654d4b4](https://github.com/janosmiko/lfk/commit/654d4b4bbff7e06d31628cf97f03b6cb4ec8312a))
+
 ## [0.15.7](https://github.com/janosmiko/lfk/compare/v0.15.6...v0.15.7) (2026-07-13)
 
 
