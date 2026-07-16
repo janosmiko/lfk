@@ -161,6 +161,46 @@ func TestStatusSeverity_Established(t *testing.T) {
 	assert.Equal(t, StatusSeverityRank("Running"), StatusSeverityRank("Established"))
 }
 
+// --- statusSeverity: free-form phrases ---
+
+// Operators that break the CamelCase-phase convention (e.g. CloudNativePG's
+// "Cluster in healthy state", "Failing over") must still color by severity in
+// status columns and summary bars, not fall through to the gray unknown bucket
+// (issue #536 follow-up). Classification is word-based on the unknown-status
+// fallback path; exact matches above keep precedence.
+func TestStatusSeverity_FreeFormPhrases(t *testing.T) {
+	tests := []struct {
+		status string
+		want   statusSev
+	}{
+		// CloudNativePG cluster phases.
+		{"Cluster in healthy state", sevRunning},
+		{"Failing over", sevFailed},
+		{"Failing over to replica", sevFailed},
+		{"Setting up primary", sevProgressing},
+		{"Creating a new replica", sevProgressing},
+		{"Waiting for the instances to become active", sevProgressing},
+		{"Upgrading cluster", sevProgressing},
+		{"Switchover in progress", sevProgressing},
+		{"Primary instance is being restarted in-place", sevProgressing},
+		// Worst word wins within a phrase.
+		{"Healthy but degraded", sevFailed},
+		// Single unknown words classify too.
+		{"Unhealthy", sevFailed},
+		// No recognized word stays unknown (gray).
+		{"Jumping", sevUnknown},
+		{"Some bespoke text", sevUnknown},
+		// Exact matches keep precedence over word scanning.
+		{"Failed", sevFailed},
+		{"Running", sevRunning},
+	}
+	for _, tt := range tests {
+		t.Run(tt.status, func(t *testing.T) {
+			assert.Equal(t, tt.want, statusSeverity(tt.status))
+		})
+	}
+}
+
 // --- FillLinesBg ---
 
 // TestFillLinesBgReestablishesBgAfterShortReset guards issue #293's recurrence

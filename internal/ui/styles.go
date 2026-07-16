@@ -3,6 +3,7 @@ package ui
 import (
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -483,8 +484,52 @@ func statusSeverity(status string) statusSev {
 		if status == "" {
 			return sevBlank
 		}
-		return sevUnknown
+		return phraseSeverity(status)
 	}
+}
+
+// phraseSeverityWords maps lowercase words to a severity for statuses that miss
+// the exact-match table above — operators that put free-form phrases in
+// .status.phase (e.g. CloudNativePG's "Cluster in healthy state", "Failing
+// over") instead of conventional CamelCase values. Word-based, so "Unavailable"
+// or "Jumping" never match a fragment.
+var phraseSeverityWords = map[string]statusSev{
+	"failed": sevFailed, "failing": sevFailed, "error": sevFailed,
+	"errored": sevFailed, "degraded": sevFailed, "unhealthy": sevFailed,
+	"pending": sevProgressing, "waiting": sevProgressing, "creating": sevProgressing,
+	"initializing": sevProgressing, "starting": sevProgressing, "setting": sevProgressing,
+	"upgrading": sevProgressing, "provisioning": sevProgressing, "progressing": sevProgressing,
+	"progress": sevProgressing, "reconciling": sevProgressing, "restarting": sevProgressing,
+	"restarted": sevProgressing, "terminating": sevProgressing, "deleting": sevProgressing,
+	"healthy": sevRunning, "ready": sevRunning, "running": sevRunning, "active": sevRunning,
+	"succeeded": sevDone, "completed": sevDone,
+}
+
+// phraseSeverity classifies an unknown status string by scanning its words
+// against phraseSeverityWords. The worst-severity word wins ("Healthy but
+// degraded" is failed); no recognized word yields sevUnknown (gray).
+func phraseSeverity(status string) statusSev {
+	sev := sevUnknown
+	rank := func(s statusSev) int {
+		switch s {
+		case sevFailed:
+			return 3
+		case sevProgressing:
+			return 2
+		case sevRunning, sevDone:
+			return 1
+		default:
+			return 0
+		}
+	}
+	for _, w := range strings.FieldsFunc(strings.ToLower(status), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if s, ok := phraseSeverityWords[w]; ok && rank(s) > rank(sev) {
+			sev = s
+		}
+	}
+	return sev
 }
 
 // StatusStyle returns the appropriate style for a resource status string.
