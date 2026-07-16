@@ -34,6 +34,19 @@ const (
 	modeLogTop
 )
 
+// wheelBurst tracks a single mouse/trackpad wheel burst. Trackpad momentum
+// keeps emitting wheel ticks after the physical gesture ends; those queued
+// ticks otherwise "play out" on whatever list is under the pointer once the
+// user has navigated away or moved the pointer (#524). A gesture is a run of
+// ticks less than wheelQuietGap apart; once it is marked dead (a boundary was
+// reached, a left/right navigation happened, or the pointer moved to another
+// pane) the rest of the gesture is dropped until a real pause starts a new one.
+type wheelBurst struct {
+	lastAt time.Time // when the last wheel tick was processed
+	target string    // wheelTargetID the burst started on
+	dead   bool      // drop remaining ticks in this burst
+}
+
 // overlayKind tracks which overlay is currently open.
 type overlayKind int
 

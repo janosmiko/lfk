@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -45,6 +47,19 @@ func (m Model) toggleMouseCapture() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Trackpad momentum keeps emitting wheel ticks after the physical gesture
+	// ends. Drop the tail once the burst is no longer productive (a boundary
+	// was reached, the pointer moved to another pane, or a left/right
+	// navigation happened) so the queued ticks don't "play out" on whatever
+	// list is now under the pointer (#524).
+	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
+		next, drop := m.beginWheelTick(msg.X)
+		if drop {
+			return next, nil
+		}
+		m = next
+	}
+
 	// Mouse wheel inside the embedded PTY pane scrolls the scrollback
 	// ring (when present). One line per tick matches what most native
 	// terminals do for their own scrollback. We only intercept the
@@ -136,6 +151,78 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// wheelQuietGap is how long the wheel must be silent before a tick counts as a
+// brand-new gesture. It must exceed the largest gap between two ticks of a
+// decelerating trackpad-momentum stream (its sparse tail can be 150-300ms
+// apart), so the whole tail of a voided gesture stays suppressed until the
+// momentum actually stops — not just its dense head. Too small and the tail
+// revives on the wrong list (the #524 "jumps by 3 after navigating" case); too
+// large and a deliberate re-scroll right after navigating feels laggy.
+const wheelQuietGap = 350 * time.Millisecond
+
+// beginWheelTick advances the wheel-burst state machine for a wheel tick at
+// pointer column x and reports whether the tick should be dropped. After
+// wheelQuietGap of silence the tick starts a brand-new gesture and always
+// scrolls; otherwise it is dropped once the gesture has been marked dead (a
+// boundary was reached or a navigation happened) or when the pointer has moved
+// to a different target than the one the gesture started on. Dropped ticks keep
+// the gesture alive (lastAt advances), so a continuous momentum tail stays
+// suppressed until it truly stops.
+func (m Model) beginWheelTick(x int) (Model, bool) {
+	now := time.Now()
+	prev := m.wheel.lastAt
+	m.wheel.lastAt = now
+	target := m.wheelTargetID(x)
+
+	if prev.IsZero() || now.Sub(prev) > wheelQuietGap {
+		m.wheel.target = target
+		m.wheel.dead = false
+		return m, false
+	}
+	if m.wheel.dead || target != m.wheel.target {
+		m.wheel.dead = true // keep suppressing the rest of the tail
+		return m, true
+	}
+	return m, false
+}
+
+// wheelTargetID names what a wheel tick at pointer column x would currently
+// scroll. Its only job is to detect when the pointer (or the screen) has moved
+// off the target a momentum burst started on; the exact strings are internal.
+// It mirrors the routing in handleMouse so a burst is bound to one scroll
+// target.
+func (m Model) wheelTargetID(x int) string {
+	switch {
+	case m.mode == modeExec:
+		return "exec"
+	case m.mode == modeLogs:
+		if logW, previewW := splitLogPreviewWidth(m.width); m.logView.previewVisible && previewW > 0 && x >= logW {
+			return "logs-preview"
+		}
+		return "logs"
+	case m.mode == modeObjectExplorer:
+		if x >= m.objectExplorerRightPaneStart() {
+			return "oe-preview"
+		}
+		return "oe-tree"
+	case isViewerMode(m.mode):
+		return "viewer"
+	case m.mode != modeExplorer:
+		return "other"
+	case m.overlay != overlayNone:
+		return "overlay"
+	case m.fullscreenDashboard:
+		return "dash"
+	}
+	if _, middleEnd := m.columnBoundaries(); x >= middleEnd {
+		if m.fullLogPreview {
+			return "ex-logpreview"
+		}
+		return "ex-preview"
+	}
+	return "ex-cursor"
+}
+
 // handleExplorerWheel routes a wheel tick to the pane under the pointer
 // at x. The right pane scrolls its preview content; the left and middle
 // panes move the row cursor — the whole-window behaviour the wheel had
@@ -152,8 +239,10 @@ func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
 	// (0, m.width) make x never reach a right pane, so the wheel would move the
 	// hidden middle-list cursor instead of scrolling the dashboard (#524).
 	if m.fullscreenDashboard {
+		before := m.previewScroll
 		m.previewScroll += delta
 		m.clampDashboardScroll()
+		m.markWheelBurstDeadIfClamped(before, m.previewScroll)
 		return m, nil
 	}
 	_, middleEnd := m.columnBoundaries()
@@ -162,11 +251,13 @@ func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
 		// (delta<0) scrolls into older lines, wheel down (delta>0) toward the
 		// newest. Subtracting delta maps the shared scroll direction onto it.
 		if m.fullLogPreview {
+			before := m.previewLog.fromBottom
 			m.previewLog.fromBottom -= delta
 			if m.previewLog.fromBottom < 0 {
 				m.previewLog.fromBottom = 0
 			}
 			m.clampPreviewScroll()
+			m.markWheelBurstDeadIfClamped(before, m.previewLog.fromBottom)
 			// Trigger lazy history loading when scrolling up (delta<0) and at top.
 			if delta < 0 {
 				m, cmd := m.maybeLoadMorePreviewHistory()
@@ -177,6 +268,7 @@ func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
 		// Right pane: scroll the preview, mirroring the PreviewUp/PreviewDown
 		// keys (J/K). Scroll-up is a plain decrement with a zero floor;
 		// scroll-down increments and clamps to the rendered content height.
+		before := m.previewScroll
 		m.previewScroll += delta
 		if delta < 0 {
 			if m.previewScroll < 0 {
@@ -185,10 +277,29 @@ func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
 		} else {
 			m.clampPreviewScroll()
 		}
+		m.markWheelBurstDeadIfClamped(before, m.previewScroll)
 		return m, nil
 	}
-	// Left and middle panes: move the selection cursor.
-	return m.moveCursor(delta)
+	// Left and middle panes: move the selection cursor. Reaching the top or
+	// bottom of the list empties the momentum queue so the tail can't keep
+	// firing once there's nothing left to scroll (#524).
+	mdl, cmd := m.moveCursor(delta)
+	m = mdl.(Model)
+	if visible := len(m.visibleMiddleItems()); visible == 0 ||
+		(delta < 0 && m.cursor() == 0) || (delta > 0 && m.cursor() == visible-1) {
+		m.wheel.dead = true
+	}
+	return m, cmd
+}
+
+// markWheelBurstDeadIfClamped ends the current wheel burst when a scroll tick
+// produced no movement — the content is already at the top or bottom, so the
+// rest of a momentum burst has nothing left to do and must not leak onto
+// another target (#524).
+func (m *Model) markWheelBurstDeadIfClamped(before, after int) {
+	if before == after {
+		m.wheel.dead = true
+	}
 }
 
 // handleObjectExplorerWheel routes a wheel tick in the Object Explorer to
@@ -203,6 +314,7 @@ func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 		// Scroll-up is a plain decrement with a zero floor; scroll-down
 		// increments and clamps to the preview content height (which
 		// re-marshals the node YAML, so only do it when scrolling down).
+		before := rt.previewScroll
 		rt.previewScroll += dir * wheelStep
 		if dir < 0 {
 			if rt.previewScroll < 0 {
@@ -211,10 +323,13 @@ func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 		} else {
 			m.clampObjectExplorerPreviewScroll()
 		}
+		m.markWheelBurstDeadIfClamped(before, rt.previewScroll)
 		return m, nil
 	}
+	before := rt.cursor
 	m.moveObjectExplorerCursor(dir * wheelStep)
 	m.clampObjectExplorerScroll()
+	m.markWheelBurstDeadIfClamped(before, rt.cursor)
 	return m, nil
 }
 

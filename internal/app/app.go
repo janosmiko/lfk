@@ -509,6 +509,8 @@ type Model struct {
 	// no-op.
 	mouseAvailable bool
 	mouseCaptured  bool
+	// wheel tracks the active wheel-scroll burst for momentum-tail dropping (#524).
+	wheel wheelBurst
 
 	// Metrics content: rendered bar graph for the preview column.
 	metricsContent string

@@ -434,6 +434,7 @@ func (m *Model) saveCurrentTab() {
 // If the tab was restored from a session and has not been loaded yet (needsLoad),
 // it returns a tea.Cmd that fetches the tab's data; otherwise it returns nil.
 func (m *Model) loadTab(idx int) tea.Cmd {
+	m.wheel.dead = true // switching/reloading a tab empties the wheel momentum queue (#524)
 	t := m.tabs[idx]
 	needsLoad := t.needsLoad
 	m.activeTab = idx
