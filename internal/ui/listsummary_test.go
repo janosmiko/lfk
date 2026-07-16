@@ -184,6 +184,54 @@ func TestBuildListSummary_GenericPhaseFallback(t *testing.T) {
 	assert.Equal(t, "Running", bar.Buckets[2].Value)
 }
 
+// TestBuildListSummary_GenericPhaseFromStatus verifies the issue #536 fix: a
+// generic CRD whose Phase printer column is suppressed as a duplicate of Status
+// still rolls up by phase (via StatusFromPhase) instead of falling back to
+// conditions. Each item also carries a condition, which must be ignored here.
+func TestBuildListSummary_GenericPhaseFromStatus(t *testing.T) {
+	mk := func(phase string) model.Item {
+		return model.Item{
+			Kind:            "Chore",
+			Status:          phase,
+			StatusFromPhase: true,
+			Conditions:      []model.ConditionEntry{{Type: "Ready", Status: "True"}},
+		}
+	}
+	items := []model.Item{
+		mk("Running"), mk("Running"), mk("Failed"),
+		mk("Pending"), mk("Succeeded"), mk("Succeeded"),
+	}
+
+	s := BuildListSummary("Chore", items)
+
+	require.Len(t, s.Bars, 1)
+	bar := s.Bars[0]
+	assert.Equal(t, "Phase", bar.Label)
+	assert.Equal(t, 6, bar.Total)
+	// Worst-first: Failed leads; the phase values (not Ready/NotReady) survive.
+	assert.Equal(t, "Failed", bar.Buckets[0].Value)
+	values := make(map[string]int)
+	for _, b := range bar.Buckets {
+		values[b.Value] = b.Count
+	}
+	assert.Equal(t, map[string]int{"Failed": 1, "Pending": 1, "Running": 2, "Succeeded": 2}, values)
+}
+
+// TestBuildListSummary_StatusNotFromPhaseStaysNoise guards the inverse: a
+// non-phase Status (StatusFromPhase false) must not be treated as a phase, so a
+// StorageClass-style "default" marker still gets no phase bar.
+func TestBuildListSummary_StatusNotFromPhaseStaysNoise(t *testing.T) {
+	items := []model.Item{
+		{Kind: "StorageClass", Status: "default"},
+		{Kind: "StorageClass", Status: "default"},
+	}
+
+	s := BuildListSummary("StorageClass", items)
+
+	assert.Equal(t, 2, s.Total)
+	assert.Empty(t, s.Bars, "non-phase Status must not be rolled up as a phase")
+}
+
 // TestBuildListSummary_GenericPhaseCardinalityCap verifies the noise guard:
 // when the Phase column carries more than maxGenericPhaseValues distinct values
 // (likely free-form text, not a status), no Phase bar is built — it falls back

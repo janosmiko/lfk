@@ -277,6 +277,18 @@ func extractContainerNotReadyReason(containerStatuses []any) string {
 	return ""
 }
 
+// statusPhase returns the non-empty string value of .status.phase, if present.
+// extractStatus prefers phase, so a match tells the caller Status originated
+// from phase (see model.Item.StatusFromPhase, issue #536).
+func statusPhase(obj map[string]any) (string, bool) {
+	status, ok := obj["status"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	phase, ok := status["phase"].(string)
+	return phase, ok && phase != ""
+}
+
 // extractStatus pulls a human-readable status string from an unstructured object.
 func extractStatus(obj map[string]any) string {
 	status, ok := obj["status"]
