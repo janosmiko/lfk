@@ -230,6 +230,13 @@ func (c *Client) buildResourceItem(item *unstructured.Unstructured, rt *model.Re
 		Status: extractStatus(item.Object),
 	}
 
+	// Record when Status was derived from .status.phase, so a generic CRD whose
+	// duplicate Phase column is suppressed still rolls up by phase in the list
+	// summary rather than falling back to conditions (issue #536).
+	if phase, ok := statusPhase(item.Object); ok && phase == ti.Status {
+		ti.StatusFromPhase = true
+	}
+
 	// Check if the resource is being deleted.
 	if item.GetDeletionTimestamp() != nil {
 		ti.Deleting = true

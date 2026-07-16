@@ -101,7 +101,7 @@ func genericSummaryDimensions(items []model.Item) []summaryDimension {
 	distinct := make(map[string]struct{})
 	hasConditions := false
 	for _, it := range items {
-		if v := strings.TrimSpace(it.ColumnValue("Phase")); v != "" {
+		if v := strings.TrimSpace(genericPhaseValue(it)); v != "" {
 			distinct[v] = struct{}{}
 		}
 		if len(it.Conditions) > 0 {
@@ -109,12 +109,27 @@ func genericSummaryDimensions(items []model.Item) []summaryDimension {
 		}
 	}
 	if len(distinct) > 0 && len(distinct) <= maxGenericPhaseValues {
-		return []summaryDimension{{label: "Phase", valueOf: columnValueFn("Phase")}}
+		return []summaryDimension{{label: "Phase", valueOf: genericPhaseValue}}
 	}
 	if hasConditions {
 		return []summaryDimension{{label: "Status", valueOf: genericConditionValue}}
 	}
 	return nil
+}
+
+// genericPhaseValue returns an item's .status.phase for the generic rollup: the
+// visible "Phase" column when the CRD exposes one, otherwise the built-in Status
+// when it was derived from .status.phase. Generic CRDs suppress the Phase
+// printer column as a duplicate of Status, so without this fallback the summary
+// would lose the phase signal and drop to coarse conditions (issue #536).
+func genericPhaseValue(it model.Item) string {
+	if v := it.ColumnValue("Phase"); v != "" {
+		return v
+	}
+	if it.StatusFromPhase {
+		return it.Status
+	}
+	return ""
 }
 
 // genericConditionValue maps an item's primary status condition to a coarse

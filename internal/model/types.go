@@ -262,8 +262,13 @@ type Item struct {
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
-	Hidden        bool             // Resource-type row the user hid; rendered dimmed when revealed via ShowRareResources
-	Rare          bool             // Rarely-used type surfaced only via ShowRareResources; rendered dimmed and not user-hideable
+	// StatusFromPhase records that Status was derived from .status.phase.
+	// Set for generic CRDs whose Phase printer column is suppressed as a
+	// duplicate of Status, so the list summary can still roll up by phase
+	// rather than falling back to coarse Ready/NotReady conditions (issue #536).
+	StatusFromPhase bool
+	Hidden          bool // Resource-type row the user hid; rendered dimmed when revealed via ShowRareResources
+	Rare            bool // Rarely-used type surfaced only via ShowRareResources; rendered dimmed and not user-hideable
 
 	ReadOnly     bool   // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
 	ClusterColor string // Optional named color (one of ui.ClusterColorNames) for context rows; empty = no swatch.
