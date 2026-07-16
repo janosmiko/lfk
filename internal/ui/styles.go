@@ -507,7 +507,9 @@ var phraseSeverityWords = map[string]statusSev{
 
 // phraseSeverity classifies an unknown status string by scanning its words
 // against phraseSeverityWords. The worst-severity word wins ("Healthy but
-// degraded" is failed); no recognized word yields sevUnknown (gray).
+// degraded" is failed); a positive word preceded by "not" reads as
+// progressing-amber, mirroring the exact-match "NotReady"; no recognized word
+// yields sevUnknown (gray).
 func phraseSeverity(status string) statusSev {
 	sev := sevUnknown
 	rank := func(s statusSev) int {
@@ -522,12 +524,23 @@ func phraseSeverity(status string) statusSev {
 			return 0
 		}
 	}
+	negated := false
 	for _, w := range strings.FieldsFunc(strings.ToLower(status), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	}) {
-		if s, ok := phraseSeverityWords[w]; ok && rank(s) > rank(sev) {
-			sev = s
+		if w == "not" {
+			negated = true
+			continue
 		}
+		if s, ok := phraseSeverityWords[w]; ok {
+			if negated && (s == sevRunning || s == sevDone) {
+				s = sevProgressing
+			}
+			if rank(s) > rank(sev) {
+				sev = s
+			}
+		}
+		negated = false
 	}
 	return sev
 }

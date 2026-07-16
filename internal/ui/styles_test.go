@@ -187,6 +187,12 @@ func TestStatusSeverity_FreeFormPhrases(t *testing.T) {
 		{"Healthy but degraded", sevFailed},
 		// Single unknown words classify too.
 		{"Unhealthy", sevFailed},
+		// Negated positives are amber, mirroring the exact-match "NotReady".
+		{"Not ready", sevProgressing},
+		{"Not healthy", sevProgressing},
+		{"Cluster not ready", sevProgressing},
+		// Negation only flips the word it precedes.
+		{"Ready or not", sevRunning},
 		// No recognized word stays unknown (gray).
 		{"Jumping", sevUnknown},
 		{"Some bespoke text", sevUnknown},
