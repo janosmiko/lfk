@@ -432,6 +432,7 @@ func (m Model) selectedNodePath() []string {
 // objectExplorerDrill descends into the object/array field under the cursor.
 // In tree mode the tree re-roots at the selected node's path.
 func (m *Model) objectExplorerDrill() {
+	m.wheel.dead = true // drilling in empties the wheel momentum queue (#524)
 	rt := &m.objectExplorerView
 	if rt.tree {
 		row, ok := rt.selectedTreeRow()
@@ -457,6 +458,7 @@ func (m *Model) objectExplorerDrill() {
 // field it was drilled from. At root it is a no-op (callers decide whether to
 // close).
 func (m *Model) objectExplorerBack() {
+	m.wheel.dead = true // backing out empties the wheel momentum queue (#524)
 	rt := &m.objectExplorerView
 	if len(rt.path) == 0 {
 		return

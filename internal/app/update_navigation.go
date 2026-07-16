@@ -59,6 +59,7 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateParent() (tea.Model, tea.Cmd) {
+	m.wheel.dead = true // left/right nav empties the wheel momentum queue (#524)
 	m.cancelAndReset()
 	m.requestGen++
 	m.reclaimStaleBgWork()
@@ -253,6 +254,7 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	m.wheel.dead = true // left/right nav empties the wheel momentum queue (#524)
 	m.cancelAndReset()
 	m.requestGen++
 	m.reclaimStaleBgWork()
