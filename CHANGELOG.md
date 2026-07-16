@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.9](https://github.com/janosmiko/lfk/compare/v0.15.8...v0.15.9) (2026-07-16)
+
+
+### Bug Fixes
+
+* **dashboard:** stop trackpad momentum from scrolling the wrong list ([#524](https://github.com/janosmiko/lfk/issues/524)) ([#537](https://github.com/janosmiko/lfk/issues/537)) ([d70f7fd](https://github.com/janosmiko/lfk/commit/d70f7fdac4f6d1915814f80e55cf5da4661702c7))
+* roll up generic CRD summaries by phase ([#536](https://github.com/janosmiko/lfk/issues/536)) ([#539](https://github.com/janosmiko/lfk/issues/539)) ([2f52f6c](https://github.com/janosmiko/lfk/commit/2f52f6ce6c05965ba8af3ffd65ba5ce22b53a2c8))
+
 ## [0.15.8](https://github.com/janosmiko/lfk/compare/v0.15.7...v0.15.8) (2026-07-14)
 
 
