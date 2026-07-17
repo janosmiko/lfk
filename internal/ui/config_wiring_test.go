@@ -64,6 +64,7 @@ events:
 scrolloff: 9
 confirm_on_exit: false
 dim_overlay: false
+row_status_tint: background
 transparent_background: true
 mouse: false
 watch_interval: 3s
@@ -230,6 +231,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 9, ConfigScrollOff, "scrolloff")
 	assert.False(t, ConfigConfirmOnExit, "confirm_on_exit")
 	assert.False(t, ConfigDimOverlay, "dim_overlay")
+	assert.Equal(t, RowStatusTintBackground, ConfigRowStatusTint, "row_status_tint")
 	assert.True(t, ConfigTransparentBg, "transparent_background")
 	assert.False(t, ConfigMouse, "mouse")
 	assert.Equal(t, 3*time.Second, ConfigWatchInterval, "watch_interval")
@@ -387,6 +389,7 @@ var wiringCoveredFields = map[string]string{
 	"scrolloff":                 "TestLoadConfig_AllSettingsWired",
 	"confirm_on_exit":           "TestLoadConfig_AllSettingsWired",
 	"dim_overlay":               "TestLoadConfig_AllSettingsWired",
+	"row_status_tint":           "TestLoadConfig_AllSettingsWired + TestRowStatusTint_InvalidFallsBack",
 	"transparent_background":    "TestLoadConfig_AllSettingsWired",
 	"mouse":                     "TestLoadConfig_AllSettingsWired",
 	"watch_interval":            "TestLoadConfig_AllSettingsWired",

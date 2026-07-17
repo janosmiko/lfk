@@ -16,7 +16,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `appearance` | object | *(see Appearance section)* | Visual settings group: `colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`. Canonical home for these knobs. See [Appearance](#appearance). |
+| `appearance` | object | *(see Appearance section)* | Visual settings group: `colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`, `row_status_tint`. Canonical home for these knobs. See [Appearance](#appearance). |
 | `colorscheme` | string | `"tokyonight-storm"` | **Deprecated** — use `appearance.colorscheme`. Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
 | `transparent_background` | bool | `false` | **Deprecated** — use `appearance.transparent_background`. Use the terminal's own background for bars. Selection highlights remain opaque. |
 | `icons` | string | `"auto"` | **Deprecated** — use `appearance.icons`. Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
@@ -61,6 +61,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `log_top_default_profile` | string | `auto` | Default Log Top parser: `auto`, `traefik-json`, `ingress-nginx`, `nginx-combined`, `envoy`, `json`, `logfmt`. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `dim_overlay` | bool | `true` | **Deprecated** — use `appearance.dim_overlay`. Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
+| `row_status_tint` | string | `"foreground"` | **Deprecated** — use `appearance.row_status_tint`. See [Appearance](#appearance). |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
 | `read_only` | bool | `false` | Disable all mutating actions (delete, edit, scale, restart, exec, port-forward, drain, cordon, etc.) globally. Per-context overrides under `clusters.<name>.read_only` and the `--read-only` CLI flag take precedence. See [Read-Only Mode](usage.md#read-only-mode). |
@@ -122,7 +123,7 @@ you want) in your config, or export `LFK_ICONS=nerdfont` in your shell.
 
 ## Appearance
 
-Visual settings, grouped. The flat keys of the same name (`colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`) are deprecated aliases; when both a flat key and its `appearance` equivalent are set, `appearance` wins. The `theme` object (custom color overrides) and per-cluster overrides remain top-level.
+Visual settings, grouped. The flat keys of the same name (`colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`, `row_status_tint`) are deprecated aliases; when both a flat key and its `appearance` equivalent are set, `appearance` wins. The `theme` object (custom color overrides) and per-cluster overrides remain top-level.
 
 ```yaml
 appearance:
@@ -132,6 +133,7 @@ appearance:
   transparent_background: false
   min_contrast_ratio: 0.0
   dim_overlay: true
+  row_status_tint: foreground
 ```
 
 | Field | Type | Default | Description |
@@ -142,6 +144,7 @@ appearance:
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars and surfaces. |
 | `min_contrast_ratio` | float | `0.0` | Readability knob in `[0.0, 1.0]`. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 | `dim_overlay` | bool | `true` | Fade the screen behind overlays. No-op when `no_color: true`. |
+| `row_status_tint` | string | `"foreground"` | Emphasize failed/progressing rows beyond the Status cell: `foreground` colors the whole row text, `background` adds a muted severity background, `off` keeps only the Status cell colored. In `no_color` mode failed rows render bold, progressing rows italic. |
 
 ## Log Viewer
 

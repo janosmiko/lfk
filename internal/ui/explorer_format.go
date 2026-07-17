@@ -176,6 +176,22 @@ func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) s
 	}
 }
 
+// plainRestartsCell preprocesses the restarts value for plain-cell rows
+// (cursor row, tinted rows): an up-arrow tags the item's own recent restart,
+// and a space keeps alignment when any other row has one.
+func plainRestartsCell(item model.Item, anyRecentRestart bool) string {
+	restartCount, _ := strconv.Atoi(item.Restarts)
+	recentRestart := !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour
+	switch {
+	case restartCount > 0 && recentRestart:
+		return "↑" + item.Restarts
+	case anyRecentRestart:
+		return " " + item.Restarts
+	default:
+		return item.Restarts
+	}
+}
+
 // formatTableRowOrdered builds a plain-text table row using the given column
 // order. "Name" is rendered at its position within order; an order without a
 // "Name" entry renders no name cell (the column is hidden). The preprocessed

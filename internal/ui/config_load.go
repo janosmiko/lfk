@@ -138,6 +138,10 @@ type configFile struct {
 	// Set to false for terminals where the SGR faint attribute looks
 	// awkward.
 	DimOverlay *bool `json:"dim_overlay" yaml:"dim_overlay"`
+	// RowStatusTint emphasizes rows whose status is failed/progressing:
+	// "foreground" (default, whole-row text color), "background" (muted row
+	// background), or "off" (status cell only).
+	RowStatusTint string `json:"row_status_tint" yaml:"row_status_tint"`
 	// TransparentBg makes bar and surface backgrounds transparent so the terminal's
 	// own background shows through. Selection highlights remain opaque.
 	// Defaults to false.
@@ -419,6 +423,7 @@ type AppearanceConfig struct {
 	TransparentBg    *bool    `json:"transparent_background" yaml:"transparent_background"`
 	MinContrastRatio *float64 `json:"min_contrast_ratio" yaml:"min_contrast_ratio"`
 	DimOverlay       *bool    `json:"dim_overlay" yaml:"dim_overlay"`
+	RowStatusTint    *string  `json:"row_status_tint" yaml:"row_status_tint"`
 }
 
 // mergeAppearanceConfig folds a present appearance group down onto the flat
@@ -443,6 +448,9 @@ func mergeAppearanceConfig(cfg configFile) configFile {
 	}
 	if a.MinContrastRatio != nil {
 		cfg.MinContrastRatio = a.MinContrastRatio
+	}
+	if a.RowStatusTint != nil {
+		cfg.RowStatusTint = *a.RowStatusTint
 	}
 	if a.DimOverlay != nil {
 		cfg.DimOverlay = a.DimOverlay

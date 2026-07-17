@@ -557,13 +557,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			}
 			cursorRestarts := item.Restarts
 			if hasRestarts {
-				restartCount, _ := strconv.Atoi(item.Restarts)
-				recentRestart := !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour
-				if restartCount > 0 && recentRestart {
-					cursorRestarts = "↑" + item.Restarts
-				} else if anyRecentRestart {
-					cursorRestarts = " " + item.Restarts
-				}
+				cursorRestarts = plainRestartsCell(item, anyRecentRestart)
 			}
 			row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
 				nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
@@ -594,12 +588,35 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 						markerPrefix = SelectionMarkerStyle.Render(selectionMarker)
 					}
 				}
-				tilePrefix := ""
-				if tileW > 0 {
-					tilePrefix = ClusterColorTileBg(item.ClusterColor)
+				if tint, tinted := RowTintForStatus(item.Status); tinted {
+					// Tinted rows render from plain cells wrapped in one
+					// row-wide style — per-cell SGRs would fight the tint.
+					// Mirrors the cursor row's plain-cells + wrap mechanics.
+					tilePrefix := ""
+					if tileW > 0 {
+						tilePrefix = ClusterColorTileBgOver(item.ClusterColor, tint)
+					}
+					tintRestarts := item.Restarts
+					if hasRestarts {
+						tintRestarts = plainRestartsCell(item, anyRecentRestart)
+					}
+					row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, tintRestarts, item.Status, LiveAge(item),
+						nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
+					if ActiveHighlightQuery != "" {
+						row = highlightNameSelectedOver(row, ActiveHighlightQuery, tint)
+					}
+					if lineW := lipgloss.Width(row); lineW < width {
+						row += strings.Repeat(" ", width-lineW)
+					}
+					rendered = RenderOverPrestyled(row, tint)
+				} else {
+					tilePrefix := ""
+					if tileW > 0 {
+						tilePrefix = ClusterColorTileBg(item.ClusterColor)
+					}
+					rendered = markerPrefix + tilePrefix + formatTableRowStyledOrdered(item, nameW, contextW, nsW, readyW, restartsW, statusW, ageW,
+						order, extraCols, anyRecentRestart)
 				}
-				rendered = markerPrefix + tilePrefix + formatTableRowStyledOrdered(item, nameW, contextW, nsW, readyW, restartsW, statusW, ageW,
-					order, extraCols, anyRecentRestart)
 				if ActiveRowCache != nil {
 					ActiveRowCache[i] = rendered
 				}

@@ -126,6 +126,15 @@ var (
 	StatusOther       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 	StatusWarning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
 
+	// Whole-row status tint (issue #540). Fg variants recolor the row text;
+	// Bg variants lay a muted severity background under the theme's text.
+	RowTintFailedFg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
+	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
+	RowTintFailedBg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
+				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend)))
+	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
+				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorWarning, rowTintBgBlend)))
+
 	// Title bar (full-width background).
 	TitleBarStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color(ColorBarBg)).
@@ -543,6 +552,30 @@ func phraseSeverity(status string) statusSev {
 		negated = false
 	}
 	return sev
+}
+
+// RowTintForStatus returns the whole-row emphasis style for a status per
+// ConfigRowStatusTint, and whether one applies (issue #540). Only failed and
+// progressing severities tint; everything else keeps the default row look.
+func RowTintForStatus(status string) (lipgloss.Style, bool) {
+	if ConfigRowStatusTint == RowStatusTintOff {
+		return lipgloss.Style{}, false
+	}
+	bg := ConfigRowStatusTint == RowStatusTintBackground
+	switch statusSeverity(status) {
+	case sevFailed:
+		if bg {
+			return RowTintFailedBg, true
+		}
+		return RowTintFailedFg, true
+	case sevProgressing:
+		if bg {
+			return RowTintProgressingBg, true
+		}
+		return RowTintProgressingFg, true
+	default:
+		return lipgloss.Style{}, false
+	}
 }
 
 // StatusStyle returns the appropriate style for a resource status string.

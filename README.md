@@ -155,6 +155,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
 - **Status-aware coloring**: Running=green, Pending=yellow, Failed=red — also applied to CRD printer-column values: recognized status words (Active, Failed, Pending, ...) get their severity color, and True/False values follow the column's polarity (Established=False red, Failed=False green)
+- **Row status tint**: failed/progressing rows are emphasized beyond the Status cell so broken pods pop out even when that column is hidden — whole-row text color by default, with a muted-background variant or opt-out via `appearance.row_status_tint` (`foreground`/`background`/`off`)
 - **Resource usage metrics**: CPU/MEM with color-coded bars in dashboard
 - **Node uptime column**: time since each node last booted, to spot restarts. Requires Prometheus as the monitoring source and node_exporter (the Kubernetes API does not expose boot time)
 

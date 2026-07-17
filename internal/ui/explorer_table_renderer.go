@@ -55,6 +55,10 @@ type tableFingerprint struct {
 	secBadgesHidden bool
 	secAvailable    bool
 	secIndexPtr     uintptr
+	// ConfigRowStatusTint is deliberately absent: it is a startup-only config
+	// value with no runtime toggle, so it can't change between renders. Add a
+	// field here if a live toggle for row_status_tint is ever introduced, or
+	// cached rows will keep the old tint.
 }
 
 func NewTableRenderer() *TableRenderer {

@@ -18,6 +18,9 @@ appearance:
   # transparent_background: false
   # min_contrast_ratio: 0.0
   # dim_overlay: true
+  # Emphasize failed/progressing rows: foreground (default) colors the whole
+  # row text, background adds a muted severity background, off disables.
+  # row_status_tint: foreground
 
 # ─── Color Scheme ──────────────────────────────────────────────────────────────
 # Built-in color scheme. 460+ themes are available (generated from ghostty themes).
