@@ -26,7 +26,7 @@ func TestStyledNameCellDimsIgnoredRows(t *testing.T) {
 		Columns: []model.KeyValue{{Key: "__ignored__", Value: "true"}},
 	}
 
-	got := styledNameCell(ignored, 30)
-	want := styledNameCell(active, 30)
+	got := styledNameCell(ignored, 30, nil)
+	want := styledNameCell(active, 30, nil)
 	assert.NotEqual(t, want, got, "an __ignored__ row must render with distinct (dim) styling")
 }

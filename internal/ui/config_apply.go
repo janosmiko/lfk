@@ -164,6 +164,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.DimOverlay != nil {
 		ConfigDimOverlay = *cfg.DimOverlay
 	}
+	applyRowStatusTint(cfg.RowStatusTint)
 	if cfg.TransparentBg != nil {
 		ConfigTransparentBg = *cfg.TransparentBg
 	}

@@ -522,7 +522,7 @@ func TestFormatTableRowStyledOrdered_VisibleWidthAndContent(t *testing.T) {
 
 	got := formatTableRowStyledOrdered(item,
 		10, 8, 10, 6, 4, 10, 4,
-		order, nil, false)
+		order, nil, false, nil)
 
 	// Visible width pins padding; ANSI-stripped content pins per-cell text.
 	// Together these catch any styling/padding drift in the registry's

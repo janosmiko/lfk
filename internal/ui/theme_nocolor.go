@@ -85,6 +85,18 @@ func applyNoColorTheme() {
 	StatusOther = lipgloss.NewStyle().Faint(true)
 	StatusWarning = lipgloss.NewStyle().Italic(true)
 
+	// Row tint degrades to attribute cues without color: failed rows bold,
+	// progressing rows italic — both variants share the cue.
+	RowTintFailedFg = lipgloss.NewStyle().Bold(true)
+	RowTintProgressingFg = lipgloss.NewStyle().Italic(true)
+	RowTintFailedBg = lipgloss.NewStyle().Bold(true)
+	RowTintProgressingBg = lipgloss.NewStyle().Italic(true)
+	// Cursor-blend backgrounds are never read in no-color mode (the cursor
+	// falls back to the reverse-video selection), but define them so the
+	// package globals never hold stale colors after a theme switch.
+	RowTintFailedCursorBg = lipgloss.NewStyle().Bold(true)
+	RowTintProgressingCursorBg = lipgloss.NewStyle().Bold(true)
+
 	TitleBarStyle = lipgloss.NewStyle().Padding(0, 1)
 	TitleBreadcrumbStyle = lipgloss.NewStyle().Bold(true)
 	TitleStyle = lipgloss.NewStyle().Bold(true).Padding(0, 1)

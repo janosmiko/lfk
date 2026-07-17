@@ -191,6 +191,17 @@ func ApplyTheme(t Theme) {
 	StatusOther = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed)).Background(baseBg)
 	StatusWarning = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning)).Background(baseBg)
 
+	RowTintFailedFg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error)).Background(baseBg)
+	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Background(baseBg)
+	RowTintFailedBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(blendHexToward(t.Base, t.Error, rowTintBgBlend)))
+	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(blendHexToward(t.Base, t.Primary, rowTintBgBlend)))
+	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
+		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Error, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
+		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+
 	var barBg lipgloss.TerminalColor = lipgloss.NoColor{}
 	if !ConfigTransparentBg {
 		barBg = baseBg

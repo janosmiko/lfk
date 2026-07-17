@@ -233,6 +233,12 @@
       "description": "Deprecated alias for appearance.dim_overlay. Fade the rest of the screen while any overlay is up. Set false for terminals where SGR faint looks awkward.",
       "default": true
     },
+    "row_status_tint": {
+      "type": "string",
+      "enum": ["off", "foreground", "background"],
+      "description": "Deprecated alias for appearance.row_status_tint. Emphasize failed/progressing rows as a fallback for a hidden Status cell: foreground colors the row's Name cell only when the Status column is hidden (and the whole row when the Name column is also hidden), background adds a muted status-colored row background always, off keeps only the Status cell colored.",
+      "default": "foreground"
+    },
     "transparent_background": {
       "type": "boolean",
       "description": "Deprecated alias for appearance.transparent_background. Use the terminal's own background for bars and surfaces. Selection highlights remain opaque.",
@@ -848,6 +854,12 @@
           "type": "boolean",
           "description": "Fade the rest of the screen while any overlay is up.",
           "default": true
+        },
+        "row_status_tint": {
+          "type": "string",
+          "enum": ["off", "foreground", "background"],
+          "description": "Emphasize failed/progressing rows as a fallback for a hidden Status cell: foreground colors the row's Name cell only when the Status column is hidden (and the whole row when the Name column is also hidden), background adds a muted status-colored row background always, off keeps only the Status cell colored.",
+          "default": "foreground"
         }
       }
     },

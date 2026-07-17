@@ -18,6 +18,10 @@ appearance:
   # transparent_background: false
   # min_contrast_ratio: 0.0
   # dim_overlay: true
+  # Emphasize failed/progressing rows as a fallback when the Status cell isn't
+  # visible: foreground (default) colors the Name cell when the Status column is
+  # hidden, background adds a muted status-colored row background, off disables.
+  # row_status_tint: foreground
 
 # ─── Color Scheme ──────────────────────────────────────────────────────────────
 # Built-in color scheme. 460+ themes are available (generated from ghostty themes).

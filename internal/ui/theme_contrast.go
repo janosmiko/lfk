@@ -148,6 +148,29 @@ func hslToRGB(h, s, l float64) (r, g, b float64) {
 	return r, g, b
 }
 
+// rowTintBgBlend is how far a row-tint background moves from the theme base
+// toward the severity color: strong enough to read as a tint, muted enough
+// that the selection highlight stays clearly distinct (issue #540).
+const rowTintBgBlend = 0.22
+
+// rowTintCursorBlend is how far the cursor row's background moves from the
+// status-tint background toward the selection background, so a selected tinted
+// row reads as both "failed" (status hue) and "cursor" (selection hue) instead
+// of losing the cursor highlight (issue #540 UAT).
+const rowTintCursorBlend = 0.5
+
+// blendHexToward linearly blends base toward tint by amount (0 = base,
+// 1 = tint), returning a hex color. Unparsable inputs return tint unchanged.
+func blendHexToward(base, tint string, amount float64) string {
+	br, bg, bb, okB := parseHexColor(base)
+	tr, tg, tb, okT := parseHexColor(tint)
+	if !okB || !okT {
+		return tint
+	}
+	lerp := func(a, b float64) float64 { return a*(1-amount) + b*amount }
+	return fmt.Sprintf("#%02x%02x%02x", int(lerp(br, tr)*255), int(lerp(bg, tg)*255), int(lerp(bb, tb)*255))
+}
+
 // derivedParentHighlightBg returns the background color to use for
 // ParentHighlightStyle (the LEFT pane's selected-row highlight, which
 // renders bold Text on top of the returned color).
