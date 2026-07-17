@@ -250,8 +250,9 @@ func TestRowTintSelectedForeground(t *testing.T) {
 
 // TestRenderTable_BackgroundSelectedKeepsStatusBg asserts that in background
 // mode the cursor row on a failed item KEEPS its status background (does not
-// swap in the selection background) and marks the cursor with the checkmark
-// (issue #540 UAT: selecting a failed row must not erase the red background).
+// swap in the selection background), indicated by bold, with no checkmark when
+// the item is not multi-selected (issue #540 UAT: selecting a failed row must
+// not erase the red background, and the checkmark means multi-selection only).
 func TestRenderTable_BackgroundSelectedKeepsStatusBg(t *testing.T) {
 	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
@@ -266,13 +267,29 @@ func TestRenderTable_BackgroundSelectedKeepsStatusBg(t *testing.T) {
 	out := r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
 
 	if !strings.Contains(out, styleOpenCodes(RowTintFailedBg.Bold(true))) {
-		t.Fatal("selected failed row must keep the (bold) status background")
+		t.Fatal("cursor failed row must keep the (bold) status background")
 	}
 	if strings.Contains(out, styleOpenCodes(SelectedStyle)) {
-		t.Fatal("selected failed row must NOT swap in the selection background in background mode")
+		t.Fatal("cursor failed row must NOT swap in the selection background in background mode")
 	}
-	if !strings.Contains(out, strings.TrimSpace(selectionMarker)) {
-		t.Fatal("selected failed row must show the checkmark cursor marker")
+	// The cursor is not multi-selected here, so no checkmark should appear —
+	// the checkmark is reserved for actual selection (issue #540 UAT).
+	if strings.Contains(out, strings.TrimSpace(selectionMarker)) {
+		t.Fatal("cursor row that is not multi-selected must not show the checkmark")
+	}
+}
+
+// TestTintedSelectionMarker_CarriesBackground pins that the multi-select
+// checkmark carries the row's status background (UAT: no default-bg gap behind
+// the checkmark on a tinted row).
+func TestTintedSelectionMarker_CarriesBackground(t *testing.T) {
+	setTestColorProfile(t)
+	snapshotRowTintGlobals(t)
+	ConfigRowStatusTint = RowStatusTintBackground
+
+	out := tintedSelectionMarker(RowTintFailedBg)
+	if !strings.Contains(out, "48;5;") {
+		t.Fatalf("checkmark must set a background (48;5;...); got %q", out)
 	}
 }
 

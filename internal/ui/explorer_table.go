@@ -564,13 +564,16 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			if bgTint, keepBg := cursorKeptBackgroundTint(item.Status); keepBg {
 				// Background mode: keep the status background on the cursor row
 				// (do not swap in the selection background) and mark the cursor
-				// with the checkmark + bold, so the "failed" background never
-				// disappears on selection (issue #540 UAT).
+				// with bold, so the "failed" background never disappears on
+				// selection (issue #540 UAT). The checkmark stays reserved for
+				// actual multi-selection; a blank marker cell keeps the row's
+				// background.
 				markerPrefix := ""
 				if wantMarker {
-					// Re-assert the tint after the marker's own reset so the
-					// rest of the row keeps the status background.
-					markerPrefix = SelectionMarkerStyle.Render(selectionMarker) + styleOpenCodes(bgTint)
+					markerPrefix = "  "
+					if selected {
+						markerPrefix = tintedSelectionMarker(bgTint)
+					}
 				}
 				tilePrefix := ""
 				if tileW > 0 {
@@ -655,10 +658,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					// (per-cell SGRs would fight the tint). Mirrors the cursor
 					// row's plain-cells + wrap mechanics.
 					if selected && wantMarker {
-						// Re-assert the tint after the checkmark's own reset, or a
-						// multi-selected tinted row loses its background from the
-						// marker onward when there is no cluster tile to restore it.
-						markerPrefix = SelectionMarkerStyle.Render(selectionMarker) + styleOpenCodes(wholeRowTint)
+						// The checkmark carries the row's status background and
+						// re-asserts the tint after its own reset, so a
+						// multi-selected tinted row keeps its background from the
+						// marker onward even without a cluster tile to restore it.
+						markerPrefix = tintedSelectionMarker(wholeRowTint)
 					}
 					tilePrefix := ""
 					if tileW > 0 {

@@ -67,6 +67,15 @@ func cursorKeptBackgroundTint(status string) (lipgloss.Style, bool) {
 	return st.Bold(true), true
 }
 
+// tintedSelectionMarker renders the multi-select checkmark carrying the row's
+// status background, so on a whole-row-tinted line the marker cell blends into
+// the row instead of showing a default-background gap. It then re-asserts the
+// tint so the cells after the marker keep the status background past the
+// marker's own SGR reset (issue #540 UAT).
+func tintedSelectionMarker(tint lipgloss.Style) string {
+	return SelectionMarkerStyle.Background(tint.GetBackground()).Render(selectionMarker) + styleOpenCodes(tint)
+}
+
 // mergeRowTintIntoSelected layers a foreground-variant tint onto the selection
 // style. In color mode the severity foreground color carries the signal. In
 // no-color mode the tint uses bold (failed) / italic (progressing) attributes;
