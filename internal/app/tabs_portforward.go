@@ -72,6 +72,9 @@ func (m *Model) navigateToPortForwards() {
 		resourceTypes = model.BuildSidebarItems(model.SeedResources())
 	}
 
+	// The origin list's quick filter must not carry into the port-forwards
+	// pseudo-list (TASK-839 class).
+	m.resetFilterForTypeSwitch()
 	m.nav.ResourceType = model.ResourceTypeEntry{
 		DisplayName: "Port Forwards",
 		Kind:        "__port_forwards__",

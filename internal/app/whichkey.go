@@ -100,19 +100,10 @@ func (m Model) gotoResourceType(kind, apiGroup string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.saveCursor()
-	// Mirror the descend path's filter bookkeeping: remember this level's
-	// committed filter for back-nav restore, then start the destination list
-	// clean so the old type's quick filter doesn't silently hide every row
-	// (TASK-839). Deliberately no restoreLevelFilter here — like a descend, a
-	// goto is a fresh start; only back-nav (navigateParent) recalls a saved
-	// filter.
-	m.saveLevelFilter()
-	m.filterText = ""
-	m.filterInput.Clear()
-	m.filterActive = false
-	m.activeFilterPreset = nil
-	m.unfilteredMiddleItems = nil
-	m.searchInput.Clear()
+	// Start the destination list clean (TASK-839). Deliberately no
+	// restoreLevelFilter here — like a descend, a goto is a fresh start; only
+	// back-nav (navigateParent) recalls a saved filter.
+	m.resetFilterForTypeSwitch()
 	m.nav.ResourceType = rt
 	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 	m.nav.Level = model.LevelResources

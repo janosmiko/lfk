@@ -308,6 +308,7 @@ func TestGotoResourceType_ClearsQuickFilter(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.filterText = "nginx"
 	m.filterInput.Set("nginx")
+	m.filterBroadMode = true
 	m.searchInput.Set("nginx")
 	m.activeFilterPreset = &FilterPreset{Name: "p"}
 	m.unfilteredMiddleItems = []model.Item{{Name: "pod-a"}}
@@ -322,14 +323,17 @@ func TestGotoResourceType_ClearsQuickFilter(t *testing.T) {
 	if rm.filterActive {
 		t.Fatal("filterActive must be false after a goto jump")
 	}
+	if rm.filterBroadMode {
+		t.Fatal("filterBroadMode must not carry into the destination")
+	}
 	if rm.activeFilterPreset != nil || rm.unfilteredMiddleItems != nil {
 		t.Fatal("filter preset state must be cleared by a goto jump")
 	}
 	if rm.searchInput.Value != "" {
 		t.Fatalf("search highlight must not bleed into destination, got %q", rm.searchInput.Value)
 	}
-	if f, ok := rm.filterMemory[oldKey]; !ok || f.text != "nginx" {
-		t.Fatalf("old level's filter must be saved for back-nav restore; got %+v (ok=%v)", f, ok)
+	if f, ok := rm.filterMemory[oldKey]; !ok || f.text != "nginx" || !f.broad {
+		t.Fatalf("old level's filter (incl. broad mode) must be saved for back-nav restore; got %+v (ok=%v)", f, ok)
 	}
 }
 
