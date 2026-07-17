@@ -144,7 +144,7 @@ appearance:
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars and surfaces. |
 | `min_contrast_ratio` | float | `0.0` | Readability knob in `[0.0, 1.0]`. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 | `dim_overlay` | bool | `true` | Fade the screen behind overlays. No-op when `no_color: true`. |
-| `row_status_tint` | string | `"foreground"` | Emphasize failed/progressing rows as a fallback for when the Status cell is not visible. `foreground`: color the row's **Name** cell in the status color (same color as the Status cell) only when the Status column is hidden — no change while the Status column is shown. `background`: a muted status-colored background across the whole row, always. `off`: only the Status cell is colored. In `no_color` mode the tint degrades to bold (failed) / italic (progressing). |
+| `row_status_tint` | string | `"foreground"` | Emphasize failed/progressing rows as a fallback for when the Status cell is not visible. `foreground`: color the row's **Name** cell in the status color (same color as the Status cell) only when the Status column is hidden — no change while the Status column is shown; when the Name column is also hidden, the whole row is tinted so the signal is not lost. `background`: a muted status-colored background across the whole row, always; the cursor row blends the status color toward the selection color so it stays visible. `off`: only the Status cell is colored. In `no_color` mode the tint degrades to bold (failed) / italic (progressing); a selected failed row uses underline, since the selection is already bold. |
 
 ## Log Viewer
 
