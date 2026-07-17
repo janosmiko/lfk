@@ -317,6 +317,22 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 	order := orderedColumnKeys(hasName, hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
 
+	// Row-status-tint plan for this render (issue #540). Whole-row tint is the
+	// background mode (always) and the foreground fallback when both Status and
+	// Name are hidden; name-only foreground tint applies when the Status column
+	// is hidden but Name is shown — so a failed/pending row stays visible even
+	// without its Status cell, without shouting a full colored line while the
+	// Status cell is right there. Status visible in foreground mode -> no tint.
+	tintWholeRow := ConfigRowStatusTint == RowStatusTintBackground
+	tintNameOnly := false
+	if ConfigRowStatusTint == RowStatusTintForeground && !hasStatus {
+		if nameHidden {
+			tintWholeRow = true
+		} else {
+			tintNameOnly = true
+		}
+	}
+
 	if ActiveMiddleScroll >= 0 && cursor >= 0 {
 		ActiveSortableColumns = ActiveSortableColumns[:0]
 		// order now carries "Name" at its configured position, so the sortable
@@ -541,6 +557,22 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		selected := isItemSelected(item)
 
 		if i == cursor {
+			// Selection owns the background channel; a failed/progressing row
+			// keeps its status visible via the severity foreground color laid
+			// over the selection style (issue #540 — otherwise selecting a
+			// tinted row erased the signal).
+			// The selection background hides the Status cell's own color, so a
+			// tinted cursor row carries the severity on the foreground instead —
+			// but only when this render actually tints (so "no tint while the
+			// Status column is visible" holds for the cursor row too). A single
+			// focused row is not the "whole line of noise" the name-only rule
+			// targets, so the selected row keeps a full-row foreground tint.
+			selStyle := ActiveSelectedStyle(i)
+			if tintWholeRow || tintNameOnly {
+				if tint, tinted := rowTintForeground(item.Status); tinted {
+					selStyle = mergeRowTintIntoSelected(selStyle, tint)
+				}
+			}
 			markerPrefix := ""
 			if wantMarker {
 				markerPrefix = "  "
@@ -553,7 +585,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				// Cursor row: the tile must re-assert the selection style
 				// after its own SGR reset, or the highlight dies for the
 				// rest of the row.
-				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, ActiveSelectedStyle(i))
+				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, selStyle)
 			}
 			cursorRestarts := item.Restarts
 			if hasRestarts {
@@ -563,7 +595,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
 			highlighted := false
 			if ActiveHighlightQuery != "" {
-				row = highlightNameSelectedOver(row, ActiveHighlightQuery, ActiveSelectedStyle(i))
+				row = highlightNameSelectedOver(row, ActiveHighlightQuery, selStyle)
 				highlighted = true
 			}
 			lineW := lipgloss.Width(row)
@@ -571,9 +603,9 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				row += strings.Repeat(" ", width-lineW)
 			}
 			if highlighted {
-				b.WriteString(RenderOverPrestyled(row, ActiveSelectedStyle(i)))
+				b.WriteString(RenderOverPrestyled(row, selStyle))
 			} else {
-				b.WriteString(ActiveSelectedStyle(i).MaxWidth(width).Render(row))
+				b.WriteString(selStyle.MaxWidth(width).Render(row))
 			}
 		} else {
 			var rendered string
@@ -588,13 +620,22 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 						markerPrefix = SelectionMarkerStyle.Render(selectionMarker)
 					}
 				}
-				if tint, tinted := RowTintForStatus(item.Status); tinted {
-					// Tinted rows render from plain cells wrapped in one
-					// row-wide style — per-cell SGRs would fight the tint.
-					// Mirrors the cursor row's plain-cells + wrap mechanics.
+				wholeRowTint, wholeRowOK := lipgloss.Style{}, false
+				if tintWholeRow {
+					wholeRowTint, wholeRowOK = RowTintForStatus(item.Status)
+				}
+				nameTint, nameTintOK := lipgloss.Style{}, false
+				if tintNameOnly {
+					nameTint, nameTintOK = rowTintForeground(item.Status)
+				}
+				switch {
+				case wholeRowOK:
+					// Whole-row tint: plain cells wrapped in one row-wide style
+					// (per-cell SGRs would fight the tint). Mirrors the cursor
+					// row's plain-cells + wrap mechanics.
 					tilePrefix := ""
 					if tileW > 0 {
-						tilePrefix = ClusterColorTileBgOver(item.ClusterColor, tint)
+						tilePrefix = ClusterColorTileBgOver(item.ClusterColor, wholeRowTint)
 					}
 					tintRestarts := item.Restarts
 					if hasRestarts {
@@ -603,19 +644,25 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, tintRestarts, item.Status, LiveAge(item),
 						nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
 					if ActiveHighlightQuery != "" {
-						row = highlightNameSelectedOver(row, ActiveHighlightQuery, tint)
+						row = highlightNameSelectedOver(row, ActiveHighlightQuery, wholeRowTint)
 					}
 					if lineW := lipgloss.Width(row); lineW < width {
 						row += strings.Repeat(" ", width-lineW)
 					}
-					rendered = RenderOverPrestyled(row, tint)
-				} else {
+					rendered = RenderOverPrestyled(row, wholeRowTint)
+				default:
+					// Untinted, or name-only tint: the styled per-cell row, with
+					// the Name cell recolored by severity when name-only applies.
 					tilePrefix := ""
 					if tileW > 0 {
 						tilePrefix = ClusterColorTileBg(item.ClusterColor)
 					}
+					var nameOverride *lipgloss.Style
+					if nameTintOK {
+						nameOverride = &nameTint
+					}
 					rendered = markerPrefix + tilePrefix + formatTableRowStyledOrdered(item, nameW, contextW, nsW, readyW, restartsW, statusW, ageW,
-						order, extraCols, anyRecentRestart)
+						order, extraCols, anyRecentRestart, nameOverride)
 				}
 				if ActiveRowCache != nil {
 					ActiveRowCache[i] = rendered

@@ -32,6 +32,8 @@ func applyRowStatusTint(raw string) {
 	case RowStatusTintOff, RowStatusTintForeground, RowStatusTintBackground:
 		ConfigRowStatusTint = v
 	default:
-		logger.Warn("Invalid row_status_tint; using default", "value", raw, "default", RowStatusTintForeground)
+		logger.Warn("Invalid row_status_tint; using default",
+			"accepted", []string{RowStatusTintOff, RowStatusTintForeground, RowStatusTintBackground},
+			"default", RowStatusTintForeground)
 	}
 }

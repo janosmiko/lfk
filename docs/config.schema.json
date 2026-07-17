@@ -236,7 +236,7 @@
     "row_status_tint": {
       "type": "string",
       "enum": ["off", "foreground", "background"],
-      "description": "Deprecated alias for appearance.row_status_tint. Emphasize rows whose status is failed/progressing: foreground colors the whole row text, background adds a muted severity background, off keeps only the Status cell colored.",
+      "description": "Deprecated alias for appearance.row_status_tint. Emphasize failed/progressing rows as a fallback for a hidden Status cell: foreground colors the row's Name cell only when the Status column is hidden, background adds a muted status-colored row background always, off keeps only the Status cell colored.",
       "default": "foreground"
     },
     "transparent_background": {
@@ -858,7 +858,7 @@
         "row_status_tint": {
           "type": "string",
           "enum": ["off", "foreground", "background"],
-          "description": "Emphasize rows whose status is failed/progressing: foreground colors the whole row text, background adds a muted severity background, off keeps only the Status cell colored.",
+          "description": "Emphasize failed/progressing rows as a fallback for a hidden Status cell: foreground colors the row's Name cell only when the Status column is hidden, background adds a muted status-colored row background always, off keeps only the Status cell colored.",
           "default": "foreground"
         }
       }

@@ -126,14 +126,16 @@ var (
 	StatusOther       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 	StatusWarning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
 
-	// Whole-row status tint (issue #540). Fg variants recolor the row text;
-	// Bg variants lay a muted severity background under the theme's text.
+	// Whole-row status tint (issue #540). Colors mirror the Status cell
+	// (StatusFailed = error, StatusProgressing = primary) so the row tint and
+	// the cell never disagree. Fg variants recolor the row text; Bg variants
+	// lay a muted severity background under the theme's text.
 	RowTintFailedFg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
-	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
+	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	RowTintFailedBg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
 				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend)))
 	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
-				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorWarning, rowTintBgBlend)))
+				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend)))
 
 	// Title bar (full-width background).
 	TitleBarStyle = lipgloss.NewStyle().
@@ -576,6 +578,50 @@ func RowTintForStatus(status string) (lipgloss.Style, bool) {
 	default:
 		return lipgloss.Style{}, false
 	}
+}
+
+// rowTintForeground returns the foreground-variant tint style for a status and
+// whether one applies (failed/progressing, mode != off). Used both for the
+// name-only tint (non-cursor rows whose Status column is hidden) and for the
+// cursor row, where the selection background owns the background channel so the
+// status must ride on the foreground color even in "background" config mode —
+// keeping a selected+failed row reading as "selected AND failed" instead of
+// losing its signal under the highlight (issue #540).
+func rowTintForeground(status string) (lipgloss.Style, bool) {
+	if ConfigRowStatusTint == RowStatusTintOff {
+		return lipgloss.Style{}, false
+	}
+	switch statusSeverity(status) {
+	case sevFailed:
+		return RowTintFailedFg, true
+	case sevProgressing:
+		return RowTintProgressingFg, true
+	default:
+		return lipgloss.Style{}, false
+	}
+}
+
+// mergeRowTintIntoSelected layers a foreground-variant tint onto the selection
+// style. In color mode the severity foreground color carries the signal. In
+// no-color mode the tint uses bold (failed) / italic (progressing) attributes;
+// italic survives on the selection as-is, but the selection style is already
+// bold, so a failed row's bold cue would vanish — fall back to underline so a
+// selected failed row stays distinct from a selected healthy one.
+func mergeRowTintIntoSelected(sel, tint lipgloss.Style) lipgloss.Style {
+	if fg := tint.GetForeground(); fg != (lipgloss.NoColor{}) {
+		return sel.Foreground(fg)
+	}
+	if tint.GetItalic() {
+		sel = sel.Italic(true)
+	}
+	if tint.GetBold() {
+		if sel.GetBold() {
+			sel = sel.Underline(true)
+		} else {
+			sel = sel.Bold(true)
+		}
+	}
+	return sel
 }
 
 // StatusStyle returns the appropriate style for a resource status string.

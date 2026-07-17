@@ -230,14 +230,14 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 // entry renders no name cell (the column is hidden).
 func formatTableRowStyledOrdered(item model.Item,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
-	order []string, extraCols []extraColumn, anyRecentRestart bool,
+	order []string, extraCols []extraColumn, anyRecentRestart bool, nameOverride *lipgloss.Style,
 ) string {
 	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
 	inputs := styledCellInputs{item: item, widths: widths, anyRecentRestart: anyRecentRestart}
 	var base strings.Builder
 	for _, key := range order {
 		if key == "Name" {
-			base.WriteString(styledNameCell(item, nameW))
+			base.WriteString(styledNameCell(item, nameW, nameOverride))
 			continue
 		}
 		if col := renderableBuiltin(key, widths); col != nil {
@@ -286,7 +286,7 @@ func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
 // the styled severity badge is appended inside the column budget (name is
 // truncated to make room). Gated callers (ActiveSecurityAvailable == false)
 // get an empty badge and the row renders identically to the pre-security UI.
-func styledNameCell(item model.Item, nameW int) string {
+func styledNameCell(item model.Item, nameW int, nameOverride *lipgloss.Style) string {
 	// Ignored security findings (revealed by the show-ignored toggle, tagged
 	// __ignored__ by groupFindings / GetSecurityAffectedResources) are dimmed
 	// so they read as de-emphasized next to active findings.
@@ -295,6 +295,11 @@ func styledNameCell(item model.Item, nameW int) string {
 	nameStyle := NormalStyle
 	if isDimmed {
 		nameStyle = DimStyle
+	}
+	// A row-status-tint override (name-only foreground tint, issue #540) recolors
+	// the name text and wins over the default/dimmed style.
+	if nameOverride != nil {
+		nameStyle = *nameOverride
 	}
 	badge := securityBadgeForItem(&item)
 	badgeW := lipgloss.Width(badge)
@@ -329,8 +334,8 @@ func styledNameCell(item model.Item, nameW int) string {
 			badgeSegmentW = lipgloss.Width(badgeSegment)
 		}
 		pad := max(nameW-iconVisualW-nameVisualW-badgeSegmentW, 0)
-		if isDimmed {
-			namePart = DimStyle.Render(namePart)
+		if isDimmed || nameOverride != nil {
+			namePart = nameStyle.Render(namePart)
 		}
 		return icon + namePart + badgeSegment + strings.Repeat(" ", pad)
 	}
