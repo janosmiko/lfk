@@ -410,6 +410,21 @@ func (m *Model) saveLevelFilter() {
 	m.filterMemory[key] = savedFilter{text: m.filterText, broad: m.filterBroadMode}
 }
 
+// resetFilterForTypeSwitch remembers the current list's committed filter for
+// back-nav restore, then clears all live filter/search state so the next list
+// starts clean. Every path landing on a different resource list must call it
+// BEFORE mutating m.nav — saveLevelFilter keys off the old position (TASK-839).
+func (m *Model) resetFilterForTypeSwitch() {
+	m.saveLevelFilter()
+	m.filterText = ""
+	m.filterInput.Clear()
+	m.filterActive = false
+	m.filterBroadMode = false
+	m.activeFilterPreset = nil
+	m.unfilteredMiddleItems = nil
+	m.searchInput.Clear()
+}
+
 // restoreLevelFilter applies the saved filter for the current navigation path,
 // or clears the live filter if none was saved (so a sibling list never inherits
 // another list's filter). Must be called AFTER the destination level is set.

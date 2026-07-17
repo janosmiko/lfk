@@ -64,6 +64,9 @@ func (m Model) openSecurityFindingsForResource(refs []security.ResourceRef, kind
 	m.saveCursor()
 	// Record the origin BEFORE any nav mutation so JumpBack restores it.
 	m.pushJumpHistory()
+	// The origin list's quick filter must not carry into the findings
+	// pseudo-list (TASK-839 class); keyed off the origin, so before unwind.
+	m.resetFilterForTypeSwitch()
 	m.unwindToResourcesLevel()
 	m.nav.ResourceType = model.ResourceTypeEntry{
 		DisplayName: "Findings: " + kind + "/" + name,
@@ -76,7 +79,6 @@ func (m Model) openSecurityFindingsForResource(refs []security.ResourceRef, kind
 	m.securityResourceFilter = refs
 	m.securityActiveGroup = ""
 	m.securityActiveSource = ""
-	m.filterText = ""
 	m.clearRight()
 	m.setMiddleItems(nil)
 	m.setCursor(0)

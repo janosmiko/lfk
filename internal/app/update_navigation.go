@@ -264,24 +264,10 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 	ui.ActiveMiddleScroll = 0
 	ui.ActiveLeftScroll = 0
 
-	// Remember this level's filter before clearing it, so navigating back
-	// (navigateParent) restores the list exactly as the user left it.
-	m.saveLevelFilter()
-
-	// Clear filter when navigating into a child.
-	m.filterText = ""
-	m.filterInput.Clear()
-	m.filterActive = false
-	m.activeFilterPreset = nil
-	m.unfilteredMiddleItems = nil
-
-	// Clear search highlight on level change so it doesn't bleed onto
-	// the child level — opening a resource is a "fresh start" for the
-	// user (issue requested fix). The Esc cascade in handleExplorerEsc
-	// already clears search as its own step before navigating parent,
-	// but programmatic navigateChild/navigateParent paths previously
-	// preserved searchInput.Value, leaving the highlight stuck.
-	m.searchInput.Clear()
+	// Remember this level's filter, then clear all live filter/search state so
+	// the child level is a fresh start; navigating back (navigateParent)
+	// restores the list exactly as the user left it.
+	m.resetFilterForTypeSwitch()
 
 	switch m.nav.Level {
 	case model.LevelClusters:
@@ -687,6 +673,9 @@ func (m Model) jumpToFindingResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	// security view from LevelResourceTypes). After this the Esc cascade
 	// behaves as if the user came from LevelResourceTypes directly.
 	m.popLeft()
+	// The finding view's quick filter must not carry into the real resource
+	// list it teleports to (TASK-839 class).
+	m.resetFilterForTypeSwitch()
 	m.nav.ResourceType = rt
 	m.nav.ResourceName = ""
 	m.nav.Namespace = namespace

@@ -100,6 +100,10 @@ func (m Model) gotoResourceType(kind, apiGroup string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.saveCursor()
+	// Start the destination list clean (TASK-839). Deliberately no
+	// restoreLevelFilter here — like a descend, a goto is a fresh start; only
+	// back-nav (navigateParent) recalls a saved filter.
+	m.resetFilterForTypeSwitch()
 	m.nav.ResourceType = rt
 	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 	m.nav.Level = model.LevelResources
