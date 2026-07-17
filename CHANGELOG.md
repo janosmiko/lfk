@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.10](https://github.com/janosmiko/lfk/compare/v0.15.9...v0.15.10) (2026-07-17)
+
+
+### Features
+
+* **explorer:** tint failed/pending rows by status ([#540](https://github.com/janosmiko/lfk/issues/540)) ([#543](https://github.com/janosmiko/lfk/issues/543)) ([ea872db](https://github.com/janosmiko/lfk/commit/ea872db0dcf9304e91fa1f2a471caba2a0210f7a))
+
+
+### Bug Fixes
+
+* **explorer:** clear quick filter when goto jumps between resource types ([#541](https://github.com/janosmiko/lfk/issues/541)) ([4222cbf](https://github.com/janosmiko/lfk/commit/4222cbfcb25c7ddebdcaea3f5da078031612ea30))
+
 ## [0.15.9](https://github.com/janosmiko/lfk/compare/v0.15.8...v0.15.9) (2026-07-16)
 
 
