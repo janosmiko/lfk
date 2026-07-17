@@ -557,16 +557,41 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		selected := isItemSelected(item)
 
 		if i == cursor {
-			// Selection owns the background channel; a failed/progressing row
-			// keeps its status visible via the severity foreground color laid
-			// over the selection style (issue #540 — otherwise selecting a
-			// tinted row erased the signal).
-			// The selection background hides the Status cell's own color, so a
-			// tinted cursor row carries the severity on the foreground instead —
-			// but only when this render actually tints (so "no tint while the
-			// Status column is visible" holds for the cursor row too). A single
-			// focused row is not the "whole line of noise" the name-only rule
-			// targets, so the selected row keeps a full-row foreground tint.
+			cursorRestarts := item.Restarts
+			if hasRestarts {
+				cursorRestarts = plainRestartsCell(item, anyRecentRestart)
+			}
+			if bgTint, keepBg := cursorKeptBackgroundTint(item.Status); keepBg {
+				// Background mode: keep the status background on the cursor row
+				// (do not swap in the selection background) and mark the cursor
+				// with the checkmark + bold, so the "failed" background never
+				// disappears on selection (issue #540 UAT).
+				markerPrefix := ""
+				if wantMarker {
+					// Re-assert the tint after the marker's own reset so the
+					// rest of the row keeps the status background.
+					markerPrefix = SelectionMarkerStyle.Render(selectionMarker) + styleOpenCodes(bgTint)
+				}
+				tilePrefix := ""
+				if tileW > 0 {
+					tilePrefix = ClusterColorTileBgOver(item.ClusterColor, bgTint)
+				}
+				row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
+					nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
+				if ActiveHighlightQuery != "" {
+					row = highlightNameSelectedOver(row, ActiveHighlightQuery, bgTint)
+				}
+				if lineW := lipgloss.Width(row); lineW < width {
+					row += strings.Repeat(" ", width-lineW)
+				}
+				b.WriteString(RenderOverPrestyled(row, bgTint))
+				continue
+			}
+			// Foreground / off / non-tinted cursor row: the selection owns the
+			// background. A failed/progressing row keeps its status on the
+			// foreground color over the selection style, but only when this
+			// render actually tints (so "no tint while the Status column is
+			// visible" holds for the cursor row too).
 			selStyle := ActiveSelectedStyle(i)
 			if tintWholeRow || tintNameOnly {
 				if tint, tinted := rowTintForeground(item.Status); tinted {
@@ -586,10 +611,6 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				// after its own SGR reset, or the highlight dies for the
 				// rest of the row.
 				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, selStyle)
-			}
-			cursorRestarts := item.Restarts
-			if hasRestarts {
-				cursorRestarts = plainRestartsCell(item, anyRecentRestart)
 			}
 			row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
 				nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
@@ -633,6 +654,12 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					// Whole-row tint: plain cells wrapped in one row-wide style
 					// (per-cell SGRs would fight the tint). Mirrors the cursor
 					// row's plain-cells + wrap mechanics.
+					if selected && wantMarker {
+						// Re-assert the tint after the checkmark's own reset, or a
+						// multi-selected tinted row loses its background from the
+						// marker onward when there is no cluster tile to restore it.
+						markerPrefix = SelectionMarkerStyle.Render(selectionMarker) + styleOpenCodes(wholeRowTint)
+					}
 					tilePrefix := ""
 					if tileW > 0 {
 						tilePrefix = ClusterColorTileBgOver(item.ClusterColor, wholeRowTint)

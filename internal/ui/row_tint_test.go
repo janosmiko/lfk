@@ -248,25 +248,53 @@ func TestRowTintSelectedForeground(t *testing.T) {
 	assert.False(t, ok, "healthy selected row is not tinted")
 }
 
-// TestRenderTable_SelectedRowKeepsStatusSignal asserts the cursor row on a
-// failed item still carries the severity foreground over the selection style,
-// in background config mode (the mode where the bug was reported).
-func TestRenderTable_SelectedRowKeepsStatusSignal(t *testing.T) {
+// TestRenderTable_BackgroundSelectedKeepsStatusBg asserts that in background
+// mode the cursor row on a failed item KEEPS its status background (does not
+// swap in the selection background) and marks the cursor with the checkmark
+// (issue #540 UAT: selecting a failed row must not erase the red background).
+func TestRenderTable_BackgroundSelectedKeepsStatusBg(t *testing.T) {
 	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
 
 	items := []model.Item{
-		{Name: "pod-a", Namespace: "ns1", Kind: "Pod", Status: "CrashLoopBackOff", Age: "1d"},
+		{Name: "pod-a", Namespace: "ns1", Kind: "Pod", Status: "OOMKilled", Age: "1d"},
 		{Name: "pod-b", Namespace: "ns1", Kind: "Pod", Status: "Running", Age: "2d"},
 	}
 	r := NewTableRenderer()
 	// cursor on row 0 (the failed pod).
 	out := r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
 
+	if !strings.Contains(out, styleOpenCodes(RowTintFailedBg.Bold(true))) {
+		t.Fatal("selected failed row must keep the (bold) status background")
+	}
+	if strings.Contains(out, styleOpenCodes(SelectedStyle)) {
+		t.Fatal("selected failed row must NOT swap in the selection background in background mode")
+	}
+	if !strings.Contains(out, strings.TrimSpace(selectionMarker)) {
+		t.Fatal("selected failed row must show the checkmark cursor marker")
+	}
+}
+
+// TestRenderTable_ForegroundSelectedShowsSeverity asserts that in foreground
+// mode the cursor row on a failed item still carries the severity foreground
+// over the selection style (foreground has no background to preserve).
+func TestRenderTable_ForegroundSelectedShowsSeverity(t *testing.T) {
+	setTestColorProfile(t)
+	snapshotRowTintGlobals(t)
+	withHiddenColumns(t, "Status")
+	ConfigRowStatusTint = RowStatusTintForeground
+
+	items := []model.Item{
+		{Name: "pod-a", Namespace: "ns1", Kind: "Pod", Status: "CrashLoopBackOff", Age: "1d"},
+		{Name: "pod-b", Namespace: "ns1", Kind: "Pod", Status: "Running", Age: "2d"},
+	}
+	r := NewTableRenderer()
+	out := r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
 	sel := SelectedStyle.Foreground(lipgloss.Color(ColorError))
 	if !strings.Contains(out, styleOpenCodes(sel)) {
-		t.Fatalf("selected failed row must carry selection bg + severity fg; open codes missing")
+		t.Fatal("foreground-mode selected failed row must carry selection bg + severity fg")
 	}
 }
 
@@ -317,6 +345,37 @@ func TestRowTintMatchesStatusCellColor(t *testing.T) {
 			t.Fatalf("row tint fg for %q (%v) must equal the Status cell fg (%v)",
 				status, tint.GetForeground(), cell.GetForeground())
 		}
+	}
+}
+
+// TestRenderTable_MultiSelectedTintedRowKeepsBg guards the non-cursor
+// whole-row tint path: a multi-selected failed row must re-assert the tint
+// after the checkmark so its background survives past the marker even with no
+// cluster tile to restore it.
+func TestRenderTable_MultiSelectedTintedRowKeepsBg(t *testing.T) {
+	setTestColorProfile(t)
+	snapshotRowTintGlobals(t)
+	ConfigRowStatusTint = RowStatusTintBackground
+
+	items := []model.Item{
+		{Name: "pod-a", Namespace: "ns1", Kind: "Pod", Status: "Running", Age: "1d"},
+		{Name: "pod-b", Namespace: "ns1", Kind: "Pod", Status: "OOMKilled", Age: "2d"},
+	}
+	prev := ActiveSelectedItems
+	ActiveSelectedItems = map[string]bool{items[1].SelectionKey(): true}
+	t.Cleanup(func() { ActiveSelectedItems = prev })
+
+	r := NewTableRenderer()
+	// cursor on row 0 so row 1 goes through the non-cursor (multi-selected) path.
+	_ = r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
+	row := r.rows[1]
+	mark := strings.Index(row, strings.TrimSpace(selectionMarker))
+	if mark < 0 {
+		t.Fatal("multi-selected row must show the checkmark")
+	}
+	if !strings.Contains(row[mark:], styleOpenCodes(RowTintFailedBg)) {
+		t.Fatalf("tint must be re-asserted after the checkmark; got %q", row)
 	}
 }
 
