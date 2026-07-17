@@ -298,6 +298,62 @@ func TestGotoResourceType_LeftPaneIsResourceTypes(t *testing.T) {
 	}
 }
 
+// TestGotoResourceType_ClearsQuickFilter verifies that a goto jump between
+// resource types clears the committed quick filter instead of leaking it into
+// the destination list (TASK-839: pods' filter hid every deployment after gd).
+// The old level's filter must still be remembered for back-nav restore.
+func TestGotoResourceType_ClearsQuickFilter(t *testing.T) {
+	m := gotoTestModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.filterText = "nginx"
+	m.filterInput.Set("nginx")
+	m.searchInput.Set("nginx")
+	m.activeFilterPreset = &FilterPreset{Name: "p"}
+	m.unfilteredMiddleItems = []model.Item{{Name: "pod-a"}}
+	oldKey := m.navKey()
+
+	out, _ := m.gotoResourceType("Deployment", "apps")
+	rm := out.(Model)
+
+	if rm.filterText != "" || rm.filterInput.Value != "" {
+		t.Fatalf("quick filter leaked into destination: filterText=%q filterInput=%q", rm.filterText, rm.filterInput.Value)
+	}
+	if rm.filterActive {
+		t.Fatal("filterActive must be false after a goto jump")
+	}
+	if rm.activeFilterPreset != nil || rm.unfilteredMiddleItems != nil {
+		t.Fatal("filter preset state must be cleared by a goto jump")
+	}
+	if rm.searchInput.Value != "" {
+		t.Fatalf("search highlight must not bleed into destination, got %q", rm.searchInput.Value)
+	}
+	if f, ok := rm.filterMemory[oldKey]; !ok || f.text != "nginx" {
+		t.Fatalf("old level's filter must be saved for back-nav restore; got %+v (ok=%v)", f, ok)
+	}
+}
+
+// TestGotoResourceType_DoesNotRestoreDestinationFilter pins the product
+// decision that a goto is a fresh start like a descend: a filter previously
+// committed on the destination list is NOT re-applied by the jump (only
+// back-nav via navigateParent restores saved filters).
+func TestGotoResourceType_DoesNotRestoreDestinationFilter(t *testing.T) {
+	m := gotoTestModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	// Simulate a filter remembered for the Deployments list from an earlier visit.
+	probe := m
+	probe.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true}
+	m.filterMemory = map[string]savedFilter{probe.navKey(): {text: "old-deploy-filter"}}
+
+	out, _ := m.gotoResourceType("Deployment", "apps")
+	rm := out.(Model)
+
+	if rm.filterText != "" || rm.filterInput.Value != "" {
+		t.Fatalf("goto must not restore the destination's saved filter; got filterText=%q filterInput=%q", rm.filterText, rm.filterInput.Value)
+	}
+}
+
 // TestGotoResourceType_BackNavLandsOnJumpedType verifies that after jumping to a
 // resource type via goto (gv) and pressing h/left to go back, the cursor lands on
 // the resource type that was jumped to rather than a stale or default highlight.
