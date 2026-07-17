@@ -248,12 +248,12 @@ func TestRowTintSelectedForeground(t *testing.T) {
 	assert.False(t, ok, "healthy selected row is not tinted")
 }
 
-// TestRenderTable_BackgroundSelectedKeepsStatusBg asserts that in background
-// mode the cursor row on a failed item KEEPS its status background (does not
-// swap in the selection background), indicated by bold, with no checkmark when
-// the item is not multi-selected (issue #540 UAT: selecting a failed row must
-// not erase the red background, and the checkmark means multi-selection only).
-func TestRenderTable_BackgroundSelectedKeepsStatusBg(t *testing.T) {
+// TestRenderTable_BackgroundSelectedBlendsCursor asserts that in background mode
+// the cursor row on a failed item uses the status-background-blended-with-cursor
+// style (not the plain selection background), with no checkmark when the item is
+// not multi-selected (issue #540 UAT: the cursor stays visible on a tinted row,
+// the status hue is kept, and the checkmark means multi-selection only).
+func TestRenderTable_BackgroundSelectedBlendsCursor(t *testing.T) {
 	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
@@ -266,16 +266,67 @@ func TestRenderTable_BackgroundSelectedKeepsStatusBg(t *testing.T) {
 	// cursor on row 0 (the failed pod).
 	out := r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
 
-	if !strings.Contains(out, styleOpenCodes(RowTintFailedBg.Bold(true))) {
-		t.Fatal("cursor failed row must keep the (bold) status background")
+	if !strings.Contains(out, styleOpenCodes(RowTintFailedCursorBg)) {
+		t.Fatal("cursor failed row must use the status-blended-with-cursor background")
 	}
 	if strings.Contains(out, styleOpenCodes(SelectedStyle)) {
-		t.Fatal("cursor failed row must NOT swap in the selection background in background mode")
+		t.Fatal("cursor failed row must NOT swap in the plain selection background")
+	}
+	// A blended cursor background must differ from both the plain status tint
+	// and the plain selection background.
+	if RowTintFailedCursorBg.GetBackground() == RowTintFailedBg.GetBackground() {
+		t.Fatal("cursor blend background must differ from the non-cursor status background")
+	}
+	if RowTintFailedCursorBg.GetBackground() == SelectedStyle.GetBackground() {
+		t.Fatal("cursor blend background must differ from the plain selection background")
 	}
 	// The cursor is not multi-selected here, so no checkmark should appear —
 	// the checkmark is reserved for actual selection (issue #540 UAT).
 	if strings.Contains(out, strings.TrimSpace(selectionMarker)) {
 		t.Fatal("cursor row that is not multi-selected must not show the checkmark")
+	}
+}
+
+// TestCursorKeptBackgroundTint_NoColorFallsBack pins that no-color background
+// mode does NOT use the cursor-blend background (there is no color to blend);
+// the cursor instead falls back to the reverse-video selection path.
+func TestCursorKeptBackgroundTint_NoColorFallsBack(t *testing.T) {
+	snapshotRowTintGlobals(t)
+	ConfigRowStatusTint = RowStatusTintBackground
+
+	ConfigNoColor = true
+	applyNoColorTheme()
+	if _, ok := cursorKeptBackgroundTint("CrashLoopBackOff"); ok {
+		t.Fatal("no-color background mode must not use the cursor-blend background")
+	}
+
+	ConfigNoColor = false
+	ApplyTheme(ActiveTheme)
+	if _, ok := cursorKeptBackgroundTint("CrashLoopBackOff"); !ok {
+		t.Fatal("color background mode must use the cursor-blend background")
+	}
+}
+
+// TestRenderTable_BackgroundNoColorCursorDistinct asserts the no-color cursor
+// stays distinguishable from a non-cursor failed row: the cursor falls back to
+// the reverse-video selection, which adds underline for a failed row (bold is
+// already the selection weight), while non-cursor failed rows are only bold.
+func TestRenderTable_BackgroundNoColorCursorDistinct(t *testing.T) {
+	setTestColorProfile(t)
+	snapshotRowTintGlobals(t)
+	ConfigRowStatusTint = RowStatusTintBackground
+	ConfigNoColor = true
+	applyNoColorTheme()
+
+	items := []model.Item{
+		{Name: "pod-a", Namespace: "ns1", Kind: "Pod", Status: "OOMKilled", Age: "1d"},
+		{Name: "pod-b", Namespace: "ns1", Kind: "Pod", Status: "OOMKilled", Age: "2d"},
+	}
+	r := NewTableRenderer()
+	out := r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
+	if !strings.Contains(out, "\x1b[4m") {
+		t.Fatal("no-color background cursor must add underline so it stays distinct from a non-cursor failed row")
 	}
 }
 

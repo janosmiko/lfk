@@ -153,6 +153,12 @@ func hslToRGB(h, s, l float64) (r, g, b float64) {
 // that the selection highlight stays clearly distinct (issue #540).
 const rowTintBgBlend = 0.22
 
+// rowTintCursorBlend is how far the cursor row's background moves from the
+// status-tint background toward the selection background, so a selected tinted
+// row reads as both "failed" (status hue) and "cursor" (selection hue) instead
+// of losing the cursor highlight (issue #540 UAT).
+const rowTintCursorBlend = 0.5
+
 // blendHexToward linearly blends base toward tint by amount (0 = base,
 // 1 = tint), returning a hex color. Unparsable inputs return tint unchanged.
 func blendHexToward(base, tint string, amount float64) string {

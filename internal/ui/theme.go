@@ -197,6 +197,10 @@ func ApplyTheme(t Theme) {
 		Background(lipgloss.Color(blendHexToward(t.Base, t.Error, rowTintBgBlend)))
 	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
 		Background(lipgloss.Color(blendHexToward(t.Base, t.Primary, rowTintBgBlend)))
+	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
+		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Error, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
+		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
 
 	var barBg lipgloss.TerminalColor = lipgloss.NoColor{}
 	if !ConfigTransparentBg {

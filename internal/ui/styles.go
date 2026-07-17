@@ -136,6 +136,12 @@ var (
 				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend)))
 	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
 				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend)))
+	// Cursor row in background mode: the status background blended toward the
+	// selection color so the cursor stays visible on a tinted row (#540 UAT).
+	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true).
+				Background(lipgloss.Color(blendHexToward(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
+	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true).
+					Background(lipgloss.Color(blendHexToward(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
 
 	// Title bar (full-width background).
 	TitleBarStyle = lipgloss.NewStyle().

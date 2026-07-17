@@ -51,20 +51,24 @@ func rowTintForeground(status string) (lipgloss.Style, bool) {
 	}
 }
 
-// cursorKeptBackgroundTint returns the (bold) whole-row background tint to keep
-// on a cursor row in background mode, and whether it applies. In background mode
-// the status background must survive selection — instead of swapping in the
-// selection background, the cursor row keeps its status background and marks the
-// cursor with the checkmark + bold text (issue #540 UAT).
+// cursorKeptBackgroundTint returns the cursor row's background style in
+// background mode, and whether it applies. Instead of swapping in the selection
+// background (which would erase the status color) the cursor row uses the status
+// background blended toward the selection color, so it reads as both "failed"
+// and "cursor" (issue #540 UAT). No-color mode has no background to blend, so
+// the cursor falls back to the normal reverse-video selection.
 func cursorKeptBackgroundTint(status string) (lipgloss.Style, bool) {
-	if ConfigRowStatusTint != RowStatusTintBackground {
+	if ConfigRowStatusTint != RowStatusTintBackground || ConfigNoColor {
 		return lipgloss.Style{}, false
 	}
-	st, ok := RowTintForStatus(status)
-	if !ok {
+	switch statusSeverity(status) {
+	case sevFailed:
+		return RowTintFailedCursorBg, true
+	case sevProgressing:
+		return RowTintProgressingCursorBg, true
+	default:
 		return lipgloss.Style{}, false
 	}
-	return st.Bold(true), true
 }
 
 // tintedSelectionMarker renders the multi-select checkmark carrying the row's
