@@ -344,25 +344,46 @@ func TestTintedSelectionMarker_CarriesBackground(t *testing.T) {
 	}
 }
 
-// TestRenderTable_ForegroundSelectedShowsSeverity asserts that in foreground
-// mode the cursor row on a failed item still carries the severity foreground
-// over the selection style (foreground has no background to preserve).
-func TestRenderTable_ForegroundSelectedShowsSeverity(t *testing.T) {
+// TestRenderTable_ForegroundSelectedIsPlainSelection asserts that in foreground
+// mode the focused (cursor) row is the plain selection highlight with no
+// severity tint, even on a failed row with the Status column hidden. The tint
+// on the focused row was either invisible (severity color == selection
+// background) or flooded the whole bar, so foreground mode now leaves the
+// cursor row untinted (issue #540).
+func TestRenderTable_ForegroundSelectedIsPlainSelection(t *testing.T) {
 	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	withHiddenColumns(t, "Status")
-	ConfigRowStatusTint = RowStatusTintForeground
 
 	items := []model.Item{
 		{Name: "pod-a", Namespace: "ns1", Kind: "Pod", Status: "CrashLoopBackOff", Age: "1d"},
 		{Name: "pod-b", Namespace: "ns1", Kind: "Pod", Status: "Running", Age: "2d"},
 	}
-	r := NewTableRenderer()
-	out := r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
 
-	sel := SelectedStyle.Foreground(lipgloss.Color(ColorError))
-	if !strings.Contains(out, styleOpenCodes(sel)) {
-		t.Fatal("foreground-mode selected failed row must carry selection bg + severity fg")
+	// The focused failed row must render identically in off mode and foreground
+	// mode: foreground adds no tint to the cursor row.
+	ConfigRowStatusTint = RowStatusTintOff
+	off := NewTableRenderer()
+	offOut := off.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
+	ConfigRowStatusTint = RowStatusTintForeground
+	fg := NewTableRenderer()
+	fgOut := fg.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
+	cursorLine := func(out string) string {
+		for line := range strings.SplitSeq(out, "\n") {
+			if strings.Contains(stripANSI(line), "pod-a") {
+				return line
+			}
+		}
+		return ""
+	}
+	if offLine, fgLine := cursorLine(offOut), cursorLine(fgOut); offLine != fgLine {
+		t.Fatalf("foreground mode must leave the focused row as the plain selection.\noff=%q\nfg =%q", offLine, fgLine)
+	}
+	// And it must not carry the severity color on the foreground channel.
+	if strings.Contains(fgOut, styleOpenCodes(SelectedStyle.Foreground(lipgloss.Color(ColorError)))) {
+		t.Fatal("foreground-mode focused row must not carry the severity tint")
 	}
 }
 
