@@ -67,7 +67,7 @@ func helpSections() []helpSection {
 				{kb.SessionManager, "Session manager (save/switch/delete named workspace sessions)"},
 				{helpKeyDisplay(kb.FinalizerSearch), "Finalizer search and remove (scan, select, remove finalizers)"},
 				{kb.ErrorLog, "Error log"},
-				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
+				{kb.Monitoring, "Cycle Cluster / Monitoring dashboard"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
 				{kb.TasksOverlay, "Scheduler / task queue overlay (Tab: running/completed, a: show all entries)"},
 			},

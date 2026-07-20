@@ -1290,3 +1290,59 @@ func TestLoadDiffSecurityNoFetch(t *testing.T) {
 	require.Error(t, msg.err)
 	assert.Contains(t, msg.err.Error(), "__security_falco__", "error must identify the synthetic kind")
 }
+
+// --- handleExplorerActionKeyMonitoring: cycle Cluster <-> Monitoring ---
+
+// dashboardTypesModel builds a resource-types view with a normal resource type
+// followed by the two dashboard pseudo-items.
+func dashboardTypesModel(cursor int) Model {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.ResourceType = model.ResourceTypeEntry{}
+	m.middleItems = []model.Item{
+		{Name: "Pods", Kind: "Pod"},
+		{Name: "Cluster", Kind: "__overview__", Extra: "__overview__", Category: "Dashboards"},
+		{Name: "Monitoring", Kind: "__monitoring__", Extra: "__monitoring__", Category: "Dashboards"},
+	}
+	m.setCursor(cursor)
+	return m
+}
+
+func TestActionKeyMonitoringStartsWithCluster(t *testing.T) {
+	m := dashboardTypesModel(0) // cursor on a normal resource type
+	ret, _, handled := m.handleExplorerActionKeyMonitoring()
+	assert.True(t, handled)
+	rm := ret.(Model)
+	sel := rm.selectedMiddleItem()
+	require.NotNil(t, sel)
+	assert.Equal(t, "__overview__", sel.Extra, "first press opens the Cluster dashboard")
+}
+
+func TestActionKeyMonitoringClusterToMonitoring(t *testing.T) {
+	m := dashboardTypesModel(1) // cursor already on Cluster dashboard
+	ret, _, handled := m.handleExplorerActionKeyMonitoring()
+	assert.True(t, handled)
+	rm := ret.(Model)
+	sel := rm.selectedMiddleItem()
+	require.NotNil(t, sel)
+	assert.Equal(t, "__monitoring__", sel.Extra, "from Cluster the key switches to Monitoring")
+}
+
+func TestActionKeyMonitoringMonitoringBackToCluster(t *testing.T) {
+	m := dashboardTypesModel(2) // cursor on Monitoring dashboard
+	ret, _, handled := m.handleExplorerActionKeyMonitoring()
+	assert.True(t, handled)
+	rm := ret.(Model)
+	sel := rm.selectedMiddleItem()
+	require.NotNil(t, sel)
+	assert.Equal(t, "__overview__", sel.Extra, "from Monitoring the key cycles back to Cluster")
+}
+
+func TestActionKeyMonitoringNeedsCluster(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+	ret, _, handled := m.handleExplorerActionKeyMonitoring()
+	assert.True(t, handled)
+	rm := ret.(Model)
+	assert.Equal(t, "Select a cluster first", rm.statusMessage)
+}
