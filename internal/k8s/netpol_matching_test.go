@@ -17,6 +17,7 @@ func netpolMatchFakeDyn(objects ...runtime.Object) *dynamicfake.FakeDynamicClien
 	gvrs := map[schema.GroupVersionResource]string{
 		{Group: "", Version: "v1", Resource: "pods"}:                                      "PodList",
 		{Group: "", Version: "v1", Resource: "services"}:                                  "ServiceList",
+		{Group: "", Version: "v1", Resource: "namespaces"}:                                "NamespaceList",
 		{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"}:          "NetworkPolicyList",
 		{Group: "cilium.io", Version: "v2", Resource: "ciliumnetworkpolicies"}:            "CiliumNetworkPolicyList",
 		{Group: "cilium.io", Version: "v2", Resource: "ciliumclusterwidenetworkpolicies"}: "CiliumClusterwideNetworkPolicyList",
@@ -32,6 +33,29 @@ func testPod(name string, lbls map[string]any) *unstructured.Unstructured {
 			"name":      name,
 			"namespace": "default",
 			"labels":    lbls,
+		},
+	}}
+}
+
+func testPodInNS(name, namespace string, lbls map[string]any) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": namespace,
+			"labels":    lbls,
+		},
+	}}
+}
+
+func testNamespace(name string, lbls map[string]any) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Namespace",
+		"metadata": map[string]any{
+			"name":   name,
+			"labels": lbls,
 		},
 	}}
 }
