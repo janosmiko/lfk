@@ -351,11 +351,12 @@ func (c *Client) GetCiliumNetworkPolicyInfo(ctx context.Context, kubeCtx, namesp
 		pods = podList.Items
 	}
 
+	nsLabels := lazyNamespaceLabels(ctx, dynClient)
 	parsed := parseCiliumPolicy(obj, kind)
 	infos := make([]NetworkPolicyInfo, 0, len(parsed))
 	for _, ps := range parsed {
 		if ps.selector != nil {
-			ps.info.AffectedPods = matchingCiliumPodNames(pods, ps.selector)
+			ps.info.AffectedPods = matchingCiliumPodNames(pods, ps.selector, nsLabels())
 		}
 		infos = append(infos, ps.info)
 	}

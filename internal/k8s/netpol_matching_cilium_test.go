@@ -78,6 +78,124 @@ func TestGetNetworkPoliciesForPod_ClusterwideMatchesByNamespaceLabel(t *testing.
 	assert.Equal(t, "CiliumClusterwideNetworkPolicy", info.Policies[0].Kind)
 }
 
+func TestGetNetworkPoliciesForPod_ClusterwideMatchesByNamespaceDerivedLabel(t *testing.T) {
+	// Cilium projects a namespace's labels onto every endpoint in that
+	// namespace under the io.cilium.k8s.namespace.labels.<key> prefix, so a
+	// policy selecting such a label must match all pods in labeled namespaces.
+	dyn := netpolMatchFakeDyn(
+		testNamespace("mynamespace", map[string]any{"egress/kube-dns": "true"}),
+		testNamespace("other", map[string]any{}),
+		testPodInNS("app-1", "mynamespace", map[string]any{"app": "foo"}),
+		testPodInNS("app-2", "other", map[string]any{"app": "foo"}),
+		testCCNP("egress-kube-dns", map[string]any{
+			"endpointSelector": map[string]any{
+				"matchLabels": map[string]any{
+					"k8s:io.cilium.k8s.namespace.labels.egress/kube-dns": "true",
+				},
+			},
+		}),
+	)
+	c := NewTestClient(nil, dyn)
+
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "mynamespace", "app-1")
+	require.NoError(t, err)
+	require.Len(t, info.Policies, 1)
+	assert.Equal(t, "egress-kube-dns", info.Policies[0].Name)
+	// app-2 sits in "other" (no matching namespace label) -> excluded.
+	assert.Equal(t, []string{"app-1"}, info.Policies[0].AffectedPods)
+}
+
+func TestGetNetworkPoliciesForPod_NamespaceDerivedLabelExcludesUnlabeledNS(t *testing.T) {
+	dyn := netpolMatchFakeDyn(
+		testNamespace("mynamespace", map[string]any{"egress/kube-dns": "true"}),
+		testNamespace("other", map[string]any{}),
+		testPodInNS("app-2", "other", map[string]any{"app": "foo"}),
+		testCCNP("egress-kube-dns", map[string]any{
+			"endpointSelector": map[string]any{
+				"matchLabels": map[string]any{
+					"k8s:io.cilium.k8s.namespace.labels.egress/kube-dns": "true",
+				},
+			},
+		}),
+	)
+	c := NewTestClient(nil, dyn)
+
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "other", "app-2")
+	require.NoError(t, err)
+	assert.Empty(t, info.Policies, "pod in an unlabeled namespace must not match")
+}
+
+func TestGetCiliumNetworkPolicyInfo_MatchesByNamespaceDerivedLabel(t *testing.T) {
+	dyn := netpolMatchFakeDyn(
+		testNamespace("mynamespace", map[string]any{"egress/kube-dns": "true"}),
+		testPodInNS("app-1", "mynamespace", map[string]any{"app": "foo"}),
+		testCCNP("egress-kube-dns", map[string]any{
+			"endpointSelector": map[string]any{
+				"matchLabels": map[string]any{
+					"k8s:io.cilium.k8s.namespace.labels.egress/kube-dns": "true",
+				},
+			},
+		}),
+	)
+	c := NewTestClient(nil, dyn)
+
+	infos, err := c.GetCiliumNetworkPolicyInfo(t.Context(), "test-ctx", "", "egress-kube-dns", "CiliumClusterwideNetworkPolicy")
+	require.NoError(t, err)
+	require.Len(t, infos, 1)
+	assert.Equal(t, []string{"app-1"}, infos[0].AffectedPods)
+}
+
+func TestGetNetworkPoliciesForPod_NamespacedCNPMatchesByNamespaceDerivedLabel(t *testing.T) {
+	// A namespaced CiliumNetworkPolicy (not clusterwide) may also select on a
+	// namespace-derived label; the service/pod matcher must resolve it too.
+	dyn := netpolMatchFakeDyn(
+		testNamespace("mynamespace", map[string]any{"egress/kube-dns": "true"}),
+		testPodInNS("app-1", "mynamespace", map[string]any{"app": "foo"}),
+		testCNP("cnp-egress", "mynamespace", map[string]any{
+			"endpointSelector": map[string]any{
+				"matchLabels": map[string]any{
+					"k8s:io.cilium.k8s.namespace.labels.egress/kube-dns": "true",
+				},
+			},
+		}, nil),
+	)
+	c := NewTestClient(nil, dyn)
+
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "mynamespace", "app-1")
+	require.NoError(t, err)
+	require.Len(t, info.Policies, 1)
+	assert.Equal(t, "cnp-egress", info.Policies[0].Name)
+	assert.Equal(t, "CiliumNetworkPolicy", info.Policies[0].Kind)
+	assert.Equal(t, []string{"app-1"}, info.Policies[0].AffectedPods)
+}
+
+func TestGetNetworkPoliciesForService_MatchesByNamespaceDerivedLabel(t *testing.T) {
+	dyn := netpolMatchFakeDyn(
+		testNamespace("mynamespace", map[string]any{"egress/kube-dns": "true"}),
+		&unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Service",
+			"metadata":   map[string]any{"name": "web-svc", "namespace": "mynamespace"},
+			"spec":       map[string]any{"selector": map[string]any{"app": "foo"}},
+		}},
+		testPodInNS("app-1", "mynamespace", map[string]any{"app": "foo"}),
+		testCCNP("egress-kube-dns", map[string]any{
+			"endpointSelector": map[string]any{
+				"matchLabels": map[string]any{
+					"k8s:io.cilium.k8s.namespace.labels.egress/kube-dns": "true",
+				},
+			},
+		}),
+	)
+	c := NewTestClient(nil, dyn)
+
+	info, err := c.GetNetworkPoliciesForService(t.Context(), "test-ctx", "mynamespace", "web-svc")
+	require.NoError(t, err)
+	require.Len(t, info.Policies, 1)
+	assert.Equal(t, "egress-kube-dns", info.Policies[0].Name)
+	assert.Equal(t, []string{"app-1"}, info.Policies[0].MatchedPods)
+}
+
 func TestGetNetworkPoliciesForPod_CiliumNodePolicySkipped(t *testing.T) {
 	dyn := netpolMatchFakeDyn(
 		testPod("web-1", map[string]any{"app": "web"}),
