@@ -289,7 +289,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `-` | Reset sort to default (Name ascending) |
 | `W` | Save resource to file / toggle warnings-only (Events) |
 | `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
-| `@` | Monitoring overview (active Prometheus alerts) |
+| `@` | Cycle Cluster / Monitoring dashboard |
 | `Q` | Namespace resource quota dashboard |
 
 ### Actions

@@ -746,9 +746,25 @@ func (m Model) handleExplorerActionKeyMonitoring() (tea.Model, tea.Cmd, bool) {
 		m.setStatusMessage("Select a cluster first", true)
 		return m, scheduleStatusClear(), true
 	}
-	// Find the Monitoring item in the middle column and select it.
+	// The dashboards live at the resource-types level. Back out to it so the
+	// key works from the resource list or any deeper view, not only when the
+	// resource-type column is focused.
+	for m.nav.Level > model.LevelResourceTypes {
+		before := m.nav.Level
+		ret, _ := m.navigateParent()
+		m = ret.(Model)
+		if m.nav.Level == before {
+			break
+		}
+	}
+	// Cycle Cluster -> Monitoring -> Cluster. Start with the Cluster dashboard
+	// unless it is already selected, in which case switch to Monitoring.
+	target := "__overview__"
+	if sel := m.selectedMiddleItem(); sel != nil && sel.Extra == "__overview__" {
+		target = "__monitoring__"
+	}
 	for i, item := range m.middleItems {
-		if item.Extra == "__monitoring__" {
+		if item.Extra == target {
 			m.setCursor(i)
 			m.clampCursor()
 			return m, m.loadPreview(), true

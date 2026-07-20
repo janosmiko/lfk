@@ -78,7 +78,7 @@ All built-in chords are rebindable under `keybindings`.
 | `C` | Session manager (save/switch/delete named workspace sessions) |
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
-| `@` | Monitoring overview (active Prometheus alerts) |
+| `@` | Cycle Cluster / Monitoring dashboard |
 | `Ctrl+N` | Open the Local Clusters Manager overlay (only at LevelClusters) |
 | `Q` | Namespace resource quota dashboard |
 | `` ` `` | Scheduler / task queue overlay (Tab toggles running / completed history; `a` toggles show-all entries in completed view) |
