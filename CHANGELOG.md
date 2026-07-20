@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.12](https://github.com/janosmiko/lfk/compare/v0.15.11...v0.15.12) (2026-07-20)
+
+
+### Features
+
+* **explorer:** make @ cycle Cluster/Monitoring dashboard from any level ([#547](https://github.com/janosmiko/lfk/issues/547)) ([43ad7a3](https://github.com/janosmiko/lfk/commit/43ad7a34f74bffaec9201e5222ccf83106db68c8))
+
 ## [0.15.11](https://github.com/janosmiko/lfk/compare/v0.15.10...v0.15.11) (2026-07-20)
 
 
