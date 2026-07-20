@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.11](https://github.com/janosmiko/lfk/compare/v0.15.10...v0.15.11) (2026-07-20)
+
+
+### Bug Fixes
+
+* **netpol:** match Cilium namespace-derived label selectors ([#545](https://github.com/janosmiko/lfk/issues/545)) ([97e3862](https://github.com/janosmiko/lfk/commit/97e3862a01d93ddbc56c28384e1646f1e5521c80)), closes [#544](https://github.com/janosmiko/lfk/issues/544)
+
 ## [0.15.10](https://github.com/janosmiko/lfk/compare/v0.15.9...v0.15.10) (2026-07-17)
 
 
