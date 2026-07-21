@@ -378,11 +378,15 @@ func TestRenderTable_ForegroundSelectedIsPlainSelection(t *testing.T) {
 		}
 		return ""
 	}
-	if offLine, fgLine := cursorLine(offOut), cursorLine(fgOut); offLine != fgLine {
+	offLine, fgLine := cursorLine(offOut), cursorLine(fgOut)
+	if fgLine == "" {
+		t.Fatal("expected to find pod-a in the rendered output")
+	}
+	if offLine != fgLine {
 		t.Fatalf("foreground mode must leave the focused row as the plain selection.\noff=%q\nfg =%q", offLine, fgLine)
 	}
 	// And it must not carry the severity color on the foreground channel.
-	if strings.Contains(fgOut, styleOpenCodes(SelectedStyle.Foreground(lipgloss.Color(ColorError)))) {
+	if strings.Contains(fgLine, styleOpenCodes(SelectedStyle.Foreground(lipgloss.Color(ColorError)))) {
 		t.Fatal("foreground-mode focused row must not carry the severity tint")
 	}
 }
