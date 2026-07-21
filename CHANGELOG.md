@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.13](https://github.com/janosmiko/lfk/compare/v0.15.12...v0.15.13) (2026-07-21)
+
+
+### Bug Fixes
+
+* **explorer:** keep focused row untinted in foreground row-status-tint ([#540](https://github.com/janosmiko/lfk/issues/540)) ([#552](https://github.com/janosmiko/lfk/issues/552)) ([bc702d0](https://github.com/janosmiko/lfk/commit/bc702d091627a8beea57588ceb51e35a18031160))
+
 ## [0.15.12](https://github.com/janosmiko/lfk/compare/v0.15.11...v0.15.12) (2026-07-20)
 
 
