@@ -590,13 +590,16 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				b.WriteString(RenderOverPrestyled(row, bgTint))
 				continue
 			}
-			// Foreground / off / non-tinted cursor row: the selection owns the
-			// background. A failed/progressing row keeps its status on the
-			// foreground color over the selection style, but only when this
-			// render actually tints (so "no tint while the Status column is
-			// visible" holds for the cursor row too).
+			// Cursor row: the selection highlight owns the row. In foreground
+			// mode the focused row is left as the plain selection — no severity
+			// tint fights the highlight (issue #540: the tint on the focused row
+			// was either invisible when the severity color matched the selection
+			// background, or flooded the whole bar). Background mode is the loud
+			// opt-in and keeps its cursor emphasis: the color path is handled
+			// above via cursorKeptBackgroundTint, so only its no-color
+			// fallthrough reaches here.
 			selStyle := ActiveSelectedStyle(i)
-			if tintWholeRow || tintNameOnly {
+			if ConfigRowStatusTint == RowStatusTintBackground {
 				if tint, tinted := rowTintForeground(item.Status); tinted {
 					selStyle = mergeRowTintIntoSelected(selStyle, tint)
 				}
