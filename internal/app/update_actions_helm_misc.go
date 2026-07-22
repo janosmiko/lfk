@@ -180,10 +180,36 @@ func (m Model) executeActionUpgrade() (tea.Model, tea.Cmd) {
 }
 
 // executeActionPermissions handles the "Permissions" action.
+// For ServiceAccount/Role/ClusterRole kinds it opens the CanI (RBAC Explorer)
+// browser with the selected resource pre-selected as the subject, so the user
+// sees what that resource can actually do.  For all other kinds it falls back
+// to a SelfSubjectAccessReview on the current user.
 func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
-	m.loading = true
-	m.setStatusMessage("Checking RBAC permissions...", false)
-	return m, m.checkRBAC()
+	kind := m.actionCtx.kind
+	switch kind {
+	case "ServiceAccount":
+		ns := m.actionCtx.namespace
+		name := m.actionCtx.name
+		subject := fmt.Sprintf("system:serviceaccount:%s:%s", ns, name)
+		m.canISubject = subject
+		m.canISubjectName = name
+		m.loading = true
+		m.setStatusMessage("Loading RBAC permissions for "+name+"...", false)
+		return m, m.loadCanIRules()
+	case "Role", "ClusterRole":
+		// Role/ClusterRole define permissions but cannot be impersonated
+		// directly. Open the CanI subject picker so the user can choose
+		// which SA/User/Group to evaluate against this role.
+		m.canISubject = ""
+		m.canISubjectName = "Current User"
+		m.loading = true
+		m.setStatusMessage("Loading RBAC permissions...", false)
+		return m, m.loadCanIRules()
+	default:
+		m.loading = true
+		m.setStatusMessage("Checking RBAC permissions...", false)
+		return m, m.checkRBAC()
+	}
 }
 
 // executeActionStartupAnalysis handles the "Startup Analysis" action.
