@@ -30,6 +30,8 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:nyan` | Toggle Nyan mode |
 | `:kubetris` | Play Kubetris |
 | `:credits` | Show credits |
+| `:dashboard` | Show Cluster Dashboard
+| `:monitoring`| Show Monitoring Dashboard
 
 ### `:sort <column>`
 
