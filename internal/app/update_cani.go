@@ -92,6 +92,31 @@ func groupHasResource(groupMap map[string][]model.CanIResource, group, resource 
 
 // processCanIRules converts raw access rules into grouped CanIResource entries,
 // cross-referencing with discovered CRDs for kind names.
+// processCanIRoleRules renders rules that come directly from a Role or
+// ClusterRole spec. Unlike processCanIRules it does NOT cross-reference
+// discovered API resources — it renders exactly what the role defines.
+func (m *Model) processCanIRoleRules(rules []k8s.AccessRule) {
+	perms := buildPermLookup(rules)
+	groupMap := make(map[string][]model.CanIResource)
+
+	for key, verbSet := range perms {
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) != 2 || parts[1] == "*" {
+			continue
+		}
+		group, resource := parts[0], parts[1]
+		verbs := make(map[string]bool, len(canIAllVerbs))
+		for _, v := range canIAllVerbs {
+			verbs[v] = verbSet[v]
+		}
+		groupMap[group] = append(groupMap[group], model.CanIResource{
+			APIGroup: group, Resource: resource, Kind: resource, Verbs: verbs,
+		})
+	}
+
+	m.canIGroups = buildSortedCanIGroups(groupMap)
+}
+
 func (m *Model) processCanIRules(rules []k8s.AccessRule) {
 	// Defensive: this single-context path indexes discoveredResources by
 	// m.nav.Context, which is the union sentinel in union mode. The normal

@@ -498,6 +498,7 @@ type canILoadedMsg struct {
 	contextRules []canIContextRules
 	union        bool
 	err          error
+	roleRules    bool // true when rules come from a Role/ClusterRole spec, not SSR
 }
 
 // canISAListMsg carries the list of ServiceAccounts and RBAC subjects for the can-i browser.
