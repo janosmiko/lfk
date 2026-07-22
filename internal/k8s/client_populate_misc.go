@@ -48,7 +48,6 @@ func populateStorageClass(ti *model.Item, obj map[string]any) {
 	metadata, _ := obj["metadata"].(map[string]any)
 	annotations, _ := metadata["annotations"].(map[string]any)
 	if val, ok := annotations["storageclass.kubernetes.io/is-default-class"].(string); ok && val == "true" {
-		ti.Name += " (default)"
 		ti.Status = "default"
 	}
 	if provisioner, ok := obj["provisioner"].(string); ok && provisioner != "" {

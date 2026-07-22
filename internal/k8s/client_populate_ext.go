@@ -57,7 +57,6 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 		// PriorityClass has no spec: value, globalDefault, and preemptionPolicy
 		// are top-level fields on the object.
 		if val, ok := obj["globalDefault"].(bool); ok && val {
-			ti.Name += " (default)"
 			ti.Status = "default"
 		}
 		switch v := obj["value"].(type) {
