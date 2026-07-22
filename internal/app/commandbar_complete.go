@@ -81,10 +81,6 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 	// Add full CRD selectors for disambiguation (e.g. "clusters.cluster.x-k8s.io").
 	// Always show selectors for non-core groups so the user can disambiguate
 	// even when there is only one CRD with a given resource name.
-	resourceGroupCounts := make(map[string]int) // resource name -> how many groups
-	for _, info := range clusterTypes {
-		resourceGroupCounts[info.resource]++
-	}
 	for _, info := range clusterTypes {
 		if info.group != "core" {
 			selector := info.resource + "." + info.group
@@ -108,9 +104,9 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 	// the full resource name almost always meant that resource, even if
 	// it lives in a lower-priority API group.
 	//
-	// Sorting must run BEFORE the maxSuggestions truncation — `clusterTypes`
-	// is a map, so the pre-sort order is non-deterministic, and truncating
-	// first can throw the exact-match candidate out of the window.
+	// Sorting must run BEFORE the maxSuggestions truncation so the leftItems
+	// ordering is preserved — truncating first can throw the exact-match
+	// candidate out of the window.
 	sort.SliceStable(results, func(i, j int) bool {
 		iExact := strings.EqualFold(results[i].Text, prefix)
 		jExact := strings.EqualFold(results[j].Text, prefix)

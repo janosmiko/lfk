@@ -95,13 +95,15 @@ func groupHasResource(groupMap map[string][]model.CanIResource, group, resource 
 // processCanIRoleRules renders rules that come directly from a Role or
 // ClusterRole spec. Unlike processCanIRules it does NOT cross-reference
 // discovered API resources — it renders exactly what the role defines.
+// Wildcard resources ("*") are retained so the user sees the role grants
+// access to every resource in that API group.
 func (m *Model) processCanIRoleRules(rules []k8s.AccessRule) {
 	perms := buildPermLookup(rules)
 	groupMap := make(map[string][]model.CanIResource)
 
 	for key, verbSet := range perms {
 		parts := strings.SplitN(key, "/", 2)
-		if len(parts) != 2 || parts[1] == "*" {
+		if len(parts) != 2 {
 			continue
 		}
 		group, resource := parts[0], parts[1]

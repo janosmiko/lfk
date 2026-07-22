@@ -465,13 +465,9 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	}
 
 	// Navigate back to resource types level.
-	for m.nav.Level > model.LevelResourceTypes {
-		ret, _ := m.navigateParent()
-		m = ret.(Model)
-	}
-
-	// If we're at cluster level, we can't jump to a resource type.
-	if m.nav.Level < model.LevelResourceTypes {
+	var ok bool
+	m, ok = ensureAtResourceTypesLevel(m)
+	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
 		return m, scheduleStatusClear()
 	}
@@ -562,6 +558,23 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	return m.navigateChild()
 }
 
+// ensureAtResourceTypesLevel navigates parent until reaching
+// model.LevelResourceTypes. Returns the updated model and true on
+// success; if the level drops below that threshold (cluster level)
+// it returns false without mutating the model further.
+func ensureAtResourceTypesLevel(m Model) (Model, bool) {
+	for m.nav.Level > model.LevelResourceTypes {
+		ret, _ := m.navigateParent()
+		if nm, ok := ret.(Model); ok {
+			m = nm
+		}
+	}
+	if m.nav.Level < model.LevelResourceTypes {
+		return m, false
+	}
+	return m, true
+}
+
 // resourceFromExtra extracts the resource name (last segment) from an
 // Extra field that typically looks like "group/version/resource" or "v1/resource".
 func resourceFromExtra(extra string) string {
@@ -585,11 +598,9 @@ func (m Model) executeMonitoringCommand() (tea.Model, tea.Cmd) {
 // navigateToSelector finds an item by its Extra/Kind value and navigates into it.
 func (m Model) navigateToSelector(kind string) (tea.Model, tea.Cmd) {
 	// Navigate back to resource types level.
-	for m.nav.Level > model.LevelResourceTypes {
-		ret, _ := m.navigateParent()
-		m = ret.(Model)
-	}
-	if m.nav.Level < model.LevelResourceTypes {
+	var ok bool
+	m, ok = ensureAtResourceTypesLevel(m)
+	if !ok {
 		m.setStatusMessage("Resource not found: "+kind, true)
 		return m, scheduleStatusClear()
 	}

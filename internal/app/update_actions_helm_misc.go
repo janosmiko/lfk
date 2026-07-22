@@ -197,7 +197,7 @@ func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
 		m.canISubjectName = name
 		m.loading = true
 		m.setStatusMessage("Loading RBAC permissions for "+name+"...", false)
-		return m, m.loadCanIRules()
+		return m, tea.Batch(m.loadCanIRules(), scheduleStatusClear())
 	case "Role", "ClusterRole":
 		// Role/ClusterRole define permissions but cannot be impersonated
 		// directly. Extract the rules from the resource spec and display
@@ -207,7 +207,7 @@ func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
 		m.canISubjectName = m.actionCtx.name
 		m.loading = true
 		m.setStatusMessage("Loading RBAC permissions for "+m.actionCtx.name+"...", false)
-		return m, m.loadRoleRules(rules)
+		return m, tea.Batch(m.loadRoleRules(rules), scheduleStatusClear())
 	case "RoleBinding", "ClusterRoleBinding":
 		// Extract the first subject from the binding and check its permissions.
 		subject, subjectName := extractBindingSubject(m.actionCtx.raw, m.actionCtx.namespace)
@@ -215,7 +215,7 @@ func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
 		m.canISubjectName = subjectName
 		m.loading = true
 		m.setStatusMessage("Loading RBAC permissions for "+subjectName+"...", false)
-		return m, m.loadCanIRules()
+		return m, tea.Batch(m.loadCanIRules(), scheduleStatusClear())
 	default:
 		m.loading = true
 		m.setStatusMessage("Checking RBAC permissions...", false)
