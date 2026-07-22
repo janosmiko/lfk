@@ -27,28 +27,30 @@ type token struct {
 
 // builtinCommands maps command names and aliases to their canonical form.
 var builtinCommands = map[string]string{
-	"namespace": "namespace",
-	"ns":        "namespace",
-	"context":   "context",
-	"ctx":       "context",
-	"set":       "set",
-	"sort":      "sort",
-	"export":    "export",
-	"quit":      "quit",
-	"q":         "quit",
-	"q!":        "quit",
-	"nyan":      "nyan",
-	"kubetris":  "kubetris",
-	"credits":   "credits",
-	"scheduler": "scheduler",
-	"errors":    "errors",
-	"warnings":  "errors",
-	"bookmarks": "bookmarks",
-	"orphans":   "orphans",
-	"reload":    "reload",
-	"refresh":   "reload",
-	"session":   "session",
-	"sessions":  "sessions",
+	"namespace":  "namespace",
+	"ns":         "namespace",
+	"context":    "context",
+	"ctx":        "context",
+	"set":        "set",
+	"sort":       "sort",
+	"export":     "export",
+	"quit":       "quit",
+	"q":          "quit",
+	"q!":         "quit",
+	"nyan":       "nyan",
+	"kubetris":   "kubetris",
+	"credits":    "credits",
+	"scheduler":  "scheduler",
+	"errors":     "errors",
+	"warnings":   "errors",
+	"bookmarks":  "bookmarks",
+	"orphans":    "orphans",
+	"reload":     "reload",
+	"refresh":    "reload",
+	"session":    "session",
+	"sessions":   "sessions",
+	"dashboard":  "dashboard",
+	"monitoring": "monitoring",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.
@@ -131,6 +133,27 @@ func classifyInputWithCRDs(input string, crdNames []string) commandType {
 		lower := strings.ToLower(crd)
 		if lower == firstWord || toSingular(lower) == firstWord {
 			return cmdResourceJump
+		}
+	}
+	// Also check if the input matches a full CRD selector "resource.api-group"
+	// (e.g. "clusters.cluster.x-k8s.io"). The resource part (before the dot)
+	// must match a known resource name.
+	if dotIdx := strings.Index(firstWord, "."); dotIdx > 0 {
+		resourcePart := firstWord[:dotIdx]
+		if model.KnownResourceNames()[resourcePart] {
+			return cmdResourceJump
+		}
+		if ui.SearchAbbreviations != nil {
+			if _, ok := ui.SearchAbbreviations[resourcePart]; ok {
+				return cmdResourceJump
+			}
+		}
+		// Check against CRD names (the resource part).
+		for _, crd := range crdNames {
+			lower := strings.ToLower(crd)
+			if lower == resourcePart || toSingular(lower) == resourcePart {
+				return cmdResourceJump
+			}
 		}
 	}
 	return cmdUnknown

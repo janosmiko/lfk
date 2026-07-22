@@ -36,13 +36,13 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 		results = append(results, ui.Suggestion{Text: name, Category: category})
 	}
 
-	// Build a lookup from leftItems Extra field (group/version/resource) to determine
-	// which types actually exist in the cluster and their API group.
+	// Build a list of all cluster types (preserving duplicates for CRDs
+	// that share the same resource name but differ in API group).
 	type itemInfo struct {
 		resource string
 		group    string
 	}
-	clusterTypes := make(map[string]itemInfo)
+	var clusterTypes []itemInfo
 	for _, item := range leftItems {
 		if item.Extra == "" || item.Extra == "__overview__" || item.Extra == "__monitoring__" {
 			continue
@@ -54,11 +54,11 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 			if group == "" {
 				group = "core"
 			}
-			clusterTypes[resource] = itemInfo{resource: resource, group: group}
+			clusterTypes = append(clusterTypes, itemInfo{resource: resource, group: group})
 		} else if len(parts) == 2 {
 			// "v1/resource" format (core types).
 			resource := strings.ToLower(parts[1])
-			clusterTypes[resource] = itemInfo{resource: resource, group: "core"}
+			clusterTypes = append(clusterTypes, itemInfo{resource: resource, group: "core"})
 		}
 	}
 
@@ -75,6 +75,20 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 	for _, item := range leftItems {
 		if item.Extra != "" && item.Extra != "__overview__" && item.Extra != "__monitoring__" {
 			clusterTypeNames[strings.ToLower(item.Name)] = true
+		}
+	}
+
+	// Add full CRD selectors for disambiguation (e.g. "clusters.cluster.x-k8s.io").
+	// Always show selectors for non-core groups so the user can disambiguate
+	// even when there is only one CRD with a given resource name.
+	resourceGroupCounts := make(map[string]int) // resource name -> how many groups
+	for _, info := range clusterTypes {
+		resourceGroupCounts[info.resource]++
+	}
+	for _, info := range clusterTypes {
+		if info.group != "core" {
+			selector := info.resource + "." + info.group
+			add(selector, info.group)
 		}
 	}
 
@@ -342,6 +356,9 @@ func filterSuggestionsTyped(candidates []string, prefix, category string) []ui.S
 
 // extractCRDNames collects CRD display names from the left column items.
 // It skips special entries like __overview__ and __monitoring__.
+// Returns both the bare resource name (e.g. "clusters") and the full
+// group/resource selector (e.g. "clusters.cluster.x-k8s.io") so the
+// fuzzy finder can match either form.
 func extractCRDNames(m *Model) []string {
 	var names []string
 	seen := make(map[string]bool)
@@ -360,6 +377,22 @@ func extractCRDNames(m *Model) []string {
 		if !seen[nameLower] {
 			seen[nameLower] = true
 			names = append(names, nameLower)
+		}
+		// Build a full group/resource selector for CRDs (non-core groups).
+		// Format: "resource.api-group" (e.g. "clusters.cluster.x-k8s.io").
+		// This lets the user type ":clusters.cluster.x-k8s.io" to disambiguate.
+		if res != "" {
+			parts := strings.Split(item.Extra, "/")
+			if len(parts) >= 3 {
+				group := strings.ToLower(parts[0])
+				if group != "" && group != "core" {
+					selector := res + "." + group
+					if !seen[selector] {
+						seen[selector] = true
+						names = append(names, selector)
+					}
+				}
+			}
 		}
 	}
 	return names
