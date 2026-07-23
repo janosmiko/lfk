@@ -208,24 +208,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		return m.executeNamespaceCommand(tokens[1:])
 
 	case "context":
-		if m.unionMode {
-			m.setStatusMessage(":ctx is disabled in union view", true)
-			return m, scheduleStatusClear()
-		}
-		if arg == "" {
-			m.setStatusMessage("Usage: :ctx <context>", true)
-			return m, scheduleStatusClear()
-		}
-		oldCtx := m.nav.Context
-		m.nav.Context = arg
-		m.invalidateOrphanCacheForContext(oldCtx)
-		m.recomputeReadOnly(arg)
-		m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
-		cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
-		if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-		return m, tea.Batch(cmds...)
+		return m.executeContextCommand(arg)
 
 	case "set":
 		return m.executeSetCommand(arg)
@@ -330,6 +313,30 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
 		return m, scheduleStatusClear()
 	}
+}
+
+// executeContextCommand handles the :ctx builtin: switches the active
+// kube context, refreshes the read-only state and resource types, and
+// warms the namespace cache. Disabled in union view.
+func (m Model) executeContextCommand(arg string) (tea.Model, tea.Cmd) {
+	if m.unionMode {
+		m.setStatusMessage(":ctx is disabled in union view", true)
+		return m, scheduleStatusClear()
+	}
+	if arg == "" {
+		m.setStatusMessage("Usage: :ctx <context>", true)
+		return m, scheduleStatusClear()
+	}
+	oldCtx := m.nav.Context
+	m.nav.Context = arg
+	m.invalidateOrphanCacheForContext(oldCtx)
+	m.recomputeReadOnly(arg)
+	m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
+	cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) executeNamespaceCommand(namespaces []string) (tea.Model, tea.Cmd) {

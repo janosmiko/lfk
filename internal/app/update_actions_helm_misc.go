@@ -202,7 +202,7 @@ func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
 		// Role/ClusterRole define permissions but cannot be impersonated
 		// directly. Extract the rules from the resource spec and display
 		// them directly in the RBAC explorer.
-		rules := extractRoleRules(m.actionCtx.raw, m.actionCtx.kind)
+		rules := extractRoleRules(m.actionCtx.raw)
 		m.canISubject = ""
 		m.canISubjectName = m.actionCtx.name
 		m.loading = true
@@ -268,7 +268,7 @@ func extractBindingSubject(raw map[string]any, bindingNS string) (subject, displ
 // extractRoleRules extracts the rules from a Role or ClusterRole spec
 // and returns them as []k8s.AccessRule.  When the raw object or its
 // rules field is missing it returns nil.
-func extractRoleRules(raw map[string]any, kind string) []k8s.AccessRule {
+func extractRoleRules(raw map[string]any) []k8s.AccessRule {
 	if raw == nil {
 		return nil
 	}
