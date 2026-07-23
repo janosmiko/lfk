@@ -28,6 +28,21 @@ func (m Model) checkRBAC() tea.Cmd {
 	)
 }
 
+// loadRoleRules extracts rules from a Role/ClusterRole spec and loads
+// them into the CanI view. The rules are rendered directly without
+// looking up discovered API resources.
+func (m Model) loadRoleRules(rules []k8s.AccessRule) tea.Cmd {
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindRBACCheck,
+		"Role rules: "+m.actionCtx.name,
+		bgtaskTarget(m.effectiveContext(), m.namespace),
+		func(sctx context.Context) tea.Msg {
+			return canILoadedMsg{rules: rules, roleRules: true}
+		},
+	)
+}
+
 func (m Model) loadCanIRules() tea.Cmd {
 	client := m.client
 	if m.isUnionSentinel() {

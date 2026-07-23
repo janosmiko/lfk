@@ -26,7 +26,11 @@ func (m Model) updateCanILoaded(msg canILoadedMsg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("RBAC rules check failed: %v", msg.err), true)
 		return m, scheduleStatusClear()
 	}
-	if msg.union {
+	if msg.roleRules {
+		// Rules come directly from a Role/ClusterRole spec — render them
+		// without looking up discovered API resources.
+		m.processCanIRoleRules(msg.rules)
+	} else if msg.union {
 		m.processCanIRulesUnion(msg.contextRules)
 	} else {
 		m.processCanIRules(msg.rules)
@@ -38,6 +42,9 @@ func (m Model) updateCanILoaded(msg canILoadedMsg) (tea.Model, tea.Cmd) {
 	// message, but the user-visible scope must still read "ns: all".
 	if msg.union {
 		m.canINamespaces = msg.namespaces
+	} else if msg.roleRules {
+		// Role-derived permissions always use the resource's namespace.
+		m.canINamespaces = []string{m.namespace}
 	} else if m.allNamespaces {
 		m.canINamespaces = []string{""}
 	} else {

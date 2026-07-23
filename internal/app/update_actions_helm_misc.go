@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -180,10 +181,142 @@ func (m Model) executeActionUpgrade() (tea.Model, tea.Cmd) {
 }
 
 // executeActionPermissions handles the "Permissions" action.
+// For ServiceAccount/Role/ClusterRole/RoleBinding/ClusterRoleBinding kinds
+// it opens the CanI (RBAC Explorer) browser with the selected resource
+// pre-selected as the subject, so the user sees what that resource can
+// actually do.  For all other kinds it falls back to a
+// SelfSubjectAccessReview on the current user.
 func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
-	m.loading = true
-	m.setStatusMessage("Checking RBAC permissions...", false)
-	return m, m.checkRBAC()
+	kind := m.actionCtx.kind
+	switch kind {
+	case "ServiceAccount":
+		ns := m.actionCtx.namespace
+		name := m.actionCtx.name
+		subject := fmt.Sprintf("system:serviceaccount:%s:%s", ns, name)
+		m.canISubject = subject
+		m.canISubjectName = name
+		m.loading = true
+		m.setStatusMessage("Loading RBAC permissions for "+name+"...", false)
+		return m, tea.Batch(m.loadCanIRules(), scheduleStatusClear())
+	case "Role", "ClusterRole":
+		// Role/ClusterRole define permissions but cannot be impersonated
+		// directly. Extract the rules from the resource spec and display
+		// them directly in the RBAC explorer.
+		rules := extractRoleRules(m.actionCtx.raw)
+		m.canISubject = ""
+		m.canISubjectName = m.actionCtx.name
+		m.loading = true
+		m.setStatusMessage("Loading RBAC permissions for "+m.actionCtx.name+"...", false)
+		return m, tea.Batch(m.loadRoleRules(rules), scheduleStatusClear())
+	case "RoleBinding", "ClusterRoleBinding":
+		// Extract the first subject from the binding and check its permissions.
+		subject, subjectName := extractBindingSubject(m.actionCtx.raw, m.actionCtx.namespace)
+		m.canISubject = subject
+		m.canISubjectName = subjectName
+		m.loading = true
+		m.setStatusMessage("Loading RBAC permissions for "+subjectName+"...", false)
+		return m, tea.Batch(m.loadCanIRules(), scheduleStatusClear())
+	default:
+		m.loading = true
+		m.setStatusMessage("Checking RBAC permissions...", false)
+		return m, m.checkRBAC()
+	}
+}
+
+// extractBindingSubject extracts the first subject from a RoleBinding or
+// ClusterRoleBinding's raw object and returns the impersonation string and
+// a display name.  When no subjects are present it returns empty strings.
+func extractBindingSubject(raw map[string]any, bindingNS string) (subject, displayName string) {
+	if raw == nil {
+		return "", ""
+	}
+	subjects, ok := raw["subjects"].([]any)
+	if !ok || len(subjects) == 0 {
+		return "", ""
+	}
+	first, ok := subjects[0].(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	kind, _ := first["kind"].(string)
+	name, _ := first["name"].(string)
+	if name == "" {
+		return "", ""
+	}
+	switch kind {
+	case "ServiceAccount":
+		saNS, _ := first["namespace"].(string)
+		if saNS == "" {
+			saNS = bindingNS
+		}
+		subject = fmt.Sprintf("system:serviceaccount:%s:%s", saNS, name)
+		displayName = name
+	case "User":
+		subject = name
+		displayName = name
+	case "Group":
+		subject = "group:" + name
+		displayName = "group:" + name
+	default:
+		// Unknown subject kind — treat as a user name.
+		subject = name
+		displayName = name
+	}
+	return subject, displayName
+}
+
+// extractRoleRules extracts the rules from a Role or ClusterRole spec
+// and returns them as []k8s.AccessRule.  When the raw object or its
+// rules field is missing it returns nil.
+func extractRoleRules(raw map[string]any) []k8s.AccessRule {
+	if raw == nil {
+		return nil
+	}
+	// Role and ClusterRole store rules at the top level (not under spec).
+	rulesRaw, ok := raw["rules"].([]any)
+	if !ok || len(rulesRaw) == 0 {
+		return nil
+	}
+	var rules []k8s.AccessRule
+	for _, r := range rulesRaw {
+		ruleMap, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		rules = append(rules, k8s.AccessRule{
+			Verbs:         toStringSlice(ruleMap["verbs"]),
+			APIGroups:     toStringSlice(ruleMap["apiGroups"]),
+			Resources:     toStringSlice(ruleMap["resources"]),
+			ResourceNames: toStringSlice(ruleMap["resourceNames"]),
+		})
+	}
+	return rules
+}
+
+// toStringSlice converts an any value that is a slice of strings (or
+// float64 numbers from unmarshalled JSON) into []string.  Values that
+// are already []string are returned as-is; numeric values from JSON
+// unmarshalling are converted via fmt.Sprintf.
+func toStringSlice(v any) []string {
+	if v == nil {
+		return nil
+	}
+	switch s := v.(type) {
+	case []string:
+		return s
+	case []any:
+		var out []string
+		for _, item := range s {
+			switch val := item.(type) {
+			case string:
+				out = append(out, val)
+			case float64:
+				out = append(out, fmt.Sprintf("%.0f", val))
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 // executeActionStartupAnalysis handles the "Startup Analysis" action.

@@ -208,24 +208,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		return m.executeNamespaceCommand(tokens[1:])
 
 	case "context":
-		if m.unionMode {
-			m.setStatusMessage(":ctx is disabled in union view", true)
-			return m, scheduleStatusClear()
-		}
-		if arg == "" {
-			m.setStatusMessage("Usage: :ctx <context>", true)
-			return m, scheduleStatusClear()
-		}
-		oldCtx := m.nav.Context
-		m.nav.Context = arg
-		m.invalidateOrphanCacheForContext(oldCtx)
-		m.recomputeReadOnly(arg)
-		m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
-		cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
-		if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-		return m, tea.Batch(cmds...)
+		return m.executeContextCommand(arg)
 
 	case "set":
 		return m.executeSetCommand(arg)
@@ -307,6 +290,12 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 	case "orphans":
 		return m.executeOrphansCommand(arg)
 
+	case "dashboard":
+		return m.executeDashboardCommand()
+
+	case "monitoring":
+		return m.executeMonitoringCommand()
+
 	case "reload", "refresh":
 		// Force-fetch the current resource list -- equivalent to Shift+R.
 		// Useful when watch mode is off or the user wants an immediate
@@ -324,6 +313,30 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
 		return m, scheduleStatusClear()
 	}
+}
+
+// executeContextCommand handles the :ctx builtin: switches the active
+// kube context, refreshes the read-only state and resource types, and
+// warms the namespace cache. Disabled in union view.
+func (m Model) executeContextCommand(arg string) (tea.Model, tea.Cmd) {
+	if m.unionMode {
+		m.setStatusMessage(":ctx is disabled in union view", true)
+		return m, scheduleStatusClear()
+	}
+	if arg == "" {
+		m.setStatusMessage("Usage: :ctx <context>", true)
+		return m, scheduleStatusClear()
+	}
+	oldCtx := m.nav.Context
+	m.nav.Context = arg
+	m.invalidateOrphanCacheForContext(oldCtx)
+	m.recomputeReadOnly(arg)
+	m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
+	cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) executeNamespaceCommand(namespaces []string) (tea.Model, tea.Cmd) {
@@ -416,6 +429,15 @@ func (m Model) executeSetCommand(option string) (tea.Model, tea.Cmd) {
 
 // executeResourceJump resolves a resource type name (or abbreviation) and
 // moves the cursor to the matching item in the left column.
+//
+// When the input contains a dot (e.g. "clusters.cluster.x-k8s.io") it is
+// treated as a full GVK-style selector: group/resource.  The function matches
+// against the Extra field which carries "group/version/resource".
+//
+// When multiple CRDs share the same resource name (e.g. two "clusters" kinds
+// from different API groups) and the input is ambiguous, the function picks
+// the first match — the fuzzy finder in the completion layer should have
+// disambiguated before the user pressed Enter.
 func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	fields := strings.Fields(input)
 	if len(fields) == 0 {
@@ -450,36 +472,114 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	}
 
 	// Navigate back to resource types level.
-	for m.nav.Level > model.LevelResourceTypes {
-		ret, _ := m.navigateParent()
-		m = ret.(Model)
-	}
-
-	// If we're at cluster level, we can't jump to a resource type.
-	if m.nav.Level < model.LevelResourceTypes {
+	var ok bool
+	m, ok = ensureAtResourceTypesLevel(m)
+	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
 		return m, scheduleStatusClear()
 	}
 
-	// Find matching resource type in the middle items (which are resource types at this level).
+	// Check if the input looks like a full CRD selector: "resource.api-group"
+	// (e.g. "clusters.cluster.x-k8s.io"). Extract the group part for disambiguation.
+	var targetGroup string
+	if dotIdx := strings.Index(lower, "."); dotIdx > 0 {
+		// Everything after the first dot is treated as the API group.
+		targetGroup = strings.ToLower(lower[dotIdx+1:])
+		// The part before the dot is the resource name to match.
+		resolved = strings.ToLower(lower[:dotIdx])
+	}
+
+	// Collect all matches so we can detect ambiguity.
+	type match struct {
+		index int
+		item  model.Item
+	}
+	var matches []match
+
 	for i, item := range m.middleItems {
+		// Skip dashboard pseudo-items — they are not real resource types.
+		if item.Extra == "__overview__" || item.Extra == "__monitoring__" {
+			continue
+		}
 		itemResource := strings.ToLower(resourceFromExtra(item.Extra))
 		itemName := strings.ToLower(item.Name)
 		itemKind := strings.ToLower(item.Kind)
 
 		itemSingular := toSingular(itemResource)
 		nameSingular := toSingular(itemName)
-		if itemResource == resolved || itemSingular == resolved ||
+
+		// Check resource name match (plural or singular).
+		nameMatch := itemResource == resolved || itemSingular == resolved ||
 			itemName == resolved || nameSingular == resolved ||
-			itemKind == resolved {
-			m.setCursor(i)
-			// Navigate into the resource type (loads resources).
-			return m.navigateChild()
+			itemKind == resolved
+
+		// If a target group was specified, also check the group.
+		groupMatch := true
+		if targetGroup != "" {
+			// Extra format: "group/version/resource" — group is the first segment.
+			parts := strings.Split(item.Extra, "/")
+			var itemGroup string
+			if len(parts) >= 3 {
+				itemGroup = strings.ToLower(parts[0])
+			} else if len(parts) == 2 {
+				itemGroup = "core" // "v1/resource" format
+			}
+			groupMatch = strings.Contains(itemGroup, targetGroup)
+		}
+
+		if nameMatch && groupMatch {
+			matches = append(matches, match{index: i, item: item})
 		}
 	}
 
-	m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
-	return m, scheduleStatusClear()
+	if len(matches) == 0 {
+		m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
+		return m, scheduleStatusClear()
+	}
+
+	// If exactly one match, navigate to it.
+	if len(matches) == 1 {
+		m.setCursor(matches[0].index)
+		return m.navigateChild()
+	}
+
+	// Multiple matches: pick the one that best matches the group if specified,
+	// otherwise pick the first (the fuzzy finder should have disambiguated).
+	if targetGroup != "" {
+		// Prefer exact group match.
+		for _, mm := range matches {
+			parts := strings.Split(mm.item.Extra, "/")
+			if len(parts) >= 3 && strings.ToLower(parts[0]) == targetGroup {
+				m.setCursor(mm.index)
+				return m.navigateChild()
+			}
+		}
+		// Fallback: first match.
+		m.setCursor(matches[0].index)
+		return m.navigateChild()
+	}
+
+	// Ambiguous — pick first match. The completion layer should have shown
+	// all candidates so the user could pick the right one before pressing Enter.
+	m.setCursor(matches[0].index)
+	return m.navigateChild()
+}
+
+// ensureAtResourceTypesLevel navigates parent until reaching
+// model.LevelResourceTypes. Returns the updated model and true on
+// success; if the level drops below that threshold (cluster level)
+// it returns false without mutating the model further.
+func ensureAtResourceTypesLevel(m Model) (Model, bool) {
+	for m.nav.Level > model.LevelResourceTypes {
+		ret, _ := m.navigateParent()
+		if nm, ok := ret.(Model); ok {
+			m = nm
+		}
+	}
+	if m.nav.Level < model.LevelResourceTypes {
+		return m, false
+	}
+	return m, true
 }
 
 // resourceFromExtra extracts the resource name (last segment) from an
@@ -490,6 +590,35 @@ func resourceFromExtra(extra string) string {
 	}
 	parts := strings.Split(extra, "/")
 	return parts[len(parts)-1]
+}
+
+// executeDashboardCommand navigates to the Cluster dashboard.
+func (m Model) executeDashboardCommand() (tea.Model, tea.Cmd) {
+	return m.navigateToSelector("__overview__")
+}
+
+// executeMonitoringCommand navigates to the Monitoring dashboard.
+func (m Model) executeMonitoringCommand() (tea.Model, tea.Cmd) {
+	return m.navigateToSelector("__monitoring__")
+}
+
+// navigateToSelector finds an item by its Extra/Kind value and navigates into it.
+func (m Model) navigateToSelector(kind string) (tea.Model, tea.Cmd) {
+	// Navigate back to resource types level.
+	var ok bool
+	m, ok = ensureAtResourceTypesLevel(m)
+	if !ok {
+		m.setStatusMessage("Resource not found: "+kind, true)
+		return m, scheduleStatusClear()
+	}
+	for i, item := range m.middleItems {
+		if item.Kind == kind || item.Extra == kind {
+			m.setCursor(i)
+			return m.navigateChild()
+		}
+	}
+	m.setStatusMessage("Resource not found: "+kind, true)
+	return m, scheduleStatusClear()
 }
 
 // findItemNamespace looks up the namespace of the first positional resource name

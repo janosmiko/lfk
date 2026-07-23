@@ -926,7 +926,7 @@ func TestPopulateResourceDetailsExt_StorageClass(t *testing.T) {
 		ti := &model.Item{Name: "gp3"}
 		populateResourceDetailsExt(ti, obj, "StorageClass", nil, nil)
 
-		assert.Equal(t, "gp3 (default)", ti.Name)
+		assert.Equal(t, "gp3", ti.Name)
 		assert.Equal(t, "default", ti.Status)
 
 		colMap := columnsToMap(ti.Columns)
@@ -974,7 +974,7 @@ func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 		}
 		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
 
-		assert.Equal(t, "high-priority (default)", ti.Name)
+		assert.Equal(t, "high-priority", ti.Name)
 		assert.Equal(t, "default", ti.Status)
 	})
 

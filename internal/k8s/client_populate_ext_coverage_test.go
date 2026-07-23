@@ -58,7 +58,7 @@ func TestPopulateExt_StorageClassCoverage(t *testing.T) {
 		ti := &model.Item{Name: "standard"}
 		populateResourceDetailsExt(ti, obj, "StorageClass", nil, nil)
 
-		assert.Equal(t, "standard (default)", ti.Name)
+		assert.Equal(t, "standard", ti.Name)
 		assert.Equal(t, "default", ti.Status)
 
 		colMap := columnsToMap(ti.Columns)
@@ -128,7 +128,7 @@ func TestPopulateExt_PriorityClassCoverage(t *testing.T) {
 		}
 		ti := &model.Item{Name: "high-priority"}
 		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, nil)
-		assert.Equal(t, "high-priority (default)", ti.Name)
+		assert.Equal(t, "high-priority", ti.Name)
 		assert.Equal(t, "default", ti.Status)
 	})
 
