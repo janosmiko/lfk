@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.14](https://github.com/janosmiko/lfk/compare/v0.15.13...v0.15.14) (2026-07-23)
+
+
+### Bug Fixes
+
+* **release:** lint PR titles as conventional commits to prevent missed releases ([#555](https://github.com/janosmiko/lfk/issues/555)) ([0115088](https://github.com/janosmiko/lfk/commit/011508892f83b1e53982cc8cd907f3c22822d409))
+
 ## [0.15.13](https://github.com/janosmiko/lfk/compare/v0.15.12...v0.15.13) (2026-07-21)
 
 
