@@ -7,6 +7,11 @@
 #
 # Only workflow-level expressions reference `github.head_ref`; the branch name
 # is never expanded into shell input, avoiding script-injection risks.
+#
+# It also lints the PR title against Conventional Commits. Because PRs are
+# squash-merged with the PR title as the commit subject, a non-conventional
+# title (e.g. a raw branch name) makes release-please skip the release. This
+# check blocks that before merge.
 name: Validate PR
 
 on:
@@ -36,3 +41,14 @@ jobs:
           echo ""
           echo "See the Contributing section in README.md for the full workflow."
           exit 1
+
+  lint-pr-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check PR title against Conventional Commits
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
