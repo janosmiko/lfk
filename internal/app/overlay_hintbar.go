@@ -147,6 +147,8 @@ func (m Model) overlayHintBarSelector() string {
 		return m.renderHints(copyFieldPickerHints())
 	case overlayTaintEditor:
 		return m.renderHints(m.taintEditorHints())
+	case overlayTaintPresets:
+		return m.renderHints(taintPresetHints())
 	case overlayPortForward:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "select port"},

@@ -257,7 +257,7 @@ func TestCov80EnterFullViewNoSel(t *testing.T) {
 func TestCov80NavigateToOwnerUnknownKind(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelResources
-	result, cmd := m.navigateToOwner("UnknownKind999", "my-resource")
+	result, cmd := m.navigateToOwner("UnknownKind999", "my-resource", "")
 	rm := result.(Model)
 	assert.True(t, rm.statusMessageErr)
 	assert.NotNil(t, cmd)
@@ -407,7 +407,7 @@ func TestCovBoost2NavigateChildNoSelection(t *testing.T) {
 func TestCovNavigateToOwnerUnknownKind(t *testing.T) {
 	m := baseModelCov()
 	m.discoveredResources = map[string][]model.ResourceTypeEntry{}
-	ret, cmd := m.navigateToOwner("UnknownKind", "some-name")
+	ret, cmd := m.navigateToOwner("UnknownKind", "some-name", "")
 	result := ret.(Model)
 	assert.True(t, result.hasStatusMessage())
 	assert.NotNil(t, cmd)

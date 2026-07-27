@@ -45,7 +45,7 @@ func (m Model) executeActionGoToPod() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	if len(podNames) == 1 {
-		return m.navigateToOwner("Pod", podNames[0])
+		return m.navigateToOwner("Pod", podNames[0], "v1")
 	}
 	var items []model.Item
 	for _, pn := range podNames {
@@ -79,7 +79,7 @@ func (m Model) executeActionGoToNode() (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Pod is not scheduled to a node", true)
 		return m, scheduleStatusClear()
 	}
-	return m.navigateToOwner("Node", nodeName)
+	return m.navigateToOwner("Node", nodeName, "v1")
 }
 
 // executeActionDebugMount handles the "Debug Mount" action.
