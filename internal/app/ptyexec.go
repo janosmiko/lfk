@@ -166,8 +166,18 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+] pressed: set prefix flag and show hint.
 	if msg.String() == "ctrl+]" {
 		m.execEscPressed = true
-		m.setStatusMessage("Ctrl+]: ]/[ tabs, t new, Ctrl+U/D half-page, Ctrl+B/F page, g/G top/live, Ctrl+] exit", false)
+		m.setStatusMessage("Ctrl+]: ]/[ tabs, t new, Ctrl+U/D half-page, Ctrl+B/F page, PgUp/Dn page, g/G top/live, Ctrl+] exit", false)
 		return m, nil
+	}
+
+	// Direct scroll bindings (no Ctrl+] prefix needed).
+	if m.execPTY != nil {
+		switch msg.String() {
+		case "pgdown":
+			return m.execScrollBy(m.execViewportRows()), nil
+		case "pgup":
+			return m.execScrollBy(-m.execViewportRows()), nil
+		}
 	}
 
 	if m.execPTY == nil {
