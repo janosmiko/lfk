@@ -154,35 +154,82 @@ func TestHandleExecKeyPageKeysRespectAltScreen(t *testing.T) {
 			mode:           modeExec,
 			execPTY:        w,
 			execTerm:       term,
-			execScrollback: newScrollback(100),
+			execScrollback: newScrollback(500),
 			execMu:         &sync.Mutex{},
 			tabs:           []TabState{{}},
 			width:          80,
 			height:         40,
 		}
+		// Deep enough history that a full-viewport scroll never clamps.
+		_, err = m.execScrollback.Write([]byte(strings.Repeat("line\n", 400)))
+		require.NoError(t, err)
 		return m, r
 	}
 
-	t.Run("normal screen scrolls scrollback", func(t *testing.T) {
-		m, _ := newModel(t, false)
-		_, err := m.execScrollback.Write([]byte(strings.Repeat("line\n", 200)))
-		require.NoError(t, err)
-		ret, _ := m.handleExecKey(tea.KeyMsg{Type: tea.KeyPgUp})
-		assert.Positive(t, ret.(Model).execScrollOffset, "PgUp should scroll back into history")
-	})
-
-	t.Run("alt screen forwards to the PTY", func(t *testing.T) {
-		m, r := newModel(t, true)
-		_, err := m.execScrollback.Write([]byte(strings.Repeat("line\n", 200)))
-		require.NoError(t, err)
-		ret, _ := m.handleExecKey(tea.KeyMsg{Type: tea.KeyPgUp})
-		assert.Zero(t, ret.(Model).execScrollOffset, "PgUp must not scroll while a full-screen program is running")
-
-		// Deadline so a swallowed key fails the test instead of hanging it.
+	// readForwarded returns what the handler wrote to the PTY, failing the
+	// test rather than hanging when the key was swallowed instead.
+	readForwarded := func(t *testing.T, r *os.File) []byte {
+		t.Helper()
 		require.NoError(t, r.SetReadDeadline(time.Now().Add(2*time.Second)))
 		buf := make([]byte, 8)
 		n, err := r.Read(buf)
-		require.NoError(t, err, "PgUp should reach the PTY process")
-		assert.Equal(t, []byte{'\x1b', '[', '5', '~'}, buf[:n])
+		require.NoError(t, err, "key should reach the PTY process")
+		return buf[:n]
+	}
+
+	// assertSwallowed fails if a key we handled ourselves also reached the
+	// PTY, which would page the program and our scrollback at once.
+	assertSwallowed := func(t *testing.T, r *os.File) {
+		t.Helper()
+		require.NoError(t, r.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
+		buf := make([]byte, 8)
+		_, err := r.Read(buf)
+		assert.ErrorIs(t, err, os.ErrDeadlineExceeded, "scroll key must not also reach the PTY")
+	}
+
+	t.Run("normal screen scrolls by exactly one viewport", func(t *testing.T) {
+		m, r := newModel(t, false)
+		rows := m.execViewportRows()
+		require.Positive(t, rows)
+
+		ret, _ := m.handleExecKey(tea.KeyMsg{Type: tea.KeyPgUp})
+		up := ret.(Model)
+		assert.Equal(t, rows, up.execScrollOffset, "PgUp scrolls back a full viewport, not a half page")
+
+		ret, _ = up.handleExecKey(tea.KeyMsg{Type: tea.KeyPgDown})
+		assert.Zero(t, ret.(Model).execScrollOffset, "PgDown returns to live")
+		assertSwallowed(t, r)
+	})
+
+	t.Run("normal screen PgDown steps forward from deep history", func(t *testing.T) {
+		m, r := newModel(t, false)
+		rows := m.execViewportRows()
+		m.execScrollOffset = 3 * rows
+
+		ret, _ := m.handleExecKey(tea.KeyMsg{Type: tea.KeyPgDown})
+		assert.Equal(t, 2*rows, ret.(Model).execScrollOffset, "PgDown moves exactly one viewport toward live")
+		assertSwallowed(t, r)
+	})
+
+	t.Run("alt screen forwards page keys and snaps to live", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			key  tea.KeyType
+			want []byte
+		}{
+			{"pgup", tea.KeyPgUp, []byte{'\x1b', '[', '5', '~'}},
+			{"pgdown", tea.KeyPgDown, []byte{'\x1b', '[', '6', '~'}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				m, r := newModel(t, true)
+				// Start scrolled back: forwarding must snap the view to live
+				// rather than page our scrollback.
+				m.execScrollOffset = 2 * m.execViewportRows()
+
+				ret, _ := m.handleExecKey(tea.KeyMsg{Type: tc.key})
+				assert.Zero(t, ret.(Model).execScrollOffset, "forwarding a key snaps back to live")
+				assert.Equal(t, tc.want, readForwarded(t, r))
+			})
+		}
 	})
 }
