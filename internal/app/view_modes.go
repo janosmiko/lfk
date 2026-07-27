@@ -552,6 +552,7 @@ func (m Model) viewExecTerminal() string {
 		{"ctrl+] t", "new tab"},
 		{"ctrl+] ctrl+u/d", "half-page"},
 		{"ctrl+] ctrl+b/f", "page"},
+		{"pgup/pgdown", "page"},
 		{"ctrl+] g/G", "top/live"},
 		{"shift+drag", "select"},
 	}

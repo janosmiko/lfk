@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
@@ -595,4 +596,38 @@ func TestRenderResourceTree_BadgeBuckets(t *testing.T) {
 
 		assert.Contains(t, out, "(2 refs)")
 	})
+}
+
+// --- minimal summary (no columns, no YAML) ---
+
+func TestRenderResourceSummaryMinimal(t *testing.T) {
+	t.Run("identity rows rendered without columns", func(t *testing.T) {
+		item := &model.Item{Name: "sa-1", Namespace: "kube-system"}
+		result := stripANSI(RenderResourceSummary(item, "", 60, 20))
+		assert.Contains(t, result, "NAME")
+		assert.Contains(t, result, "sa-1")
+		assert.Contains(t, result, "NAMESPACE")
+		assert.Contains(t, result, "kube-system")
+	})
+
+	t.Run("terminating item shows deletion row", func(t *testing.T) {
+		item := &model.Item{Name: "sa-1", Deleting: true}
+		result := stripANSI(RenderResourceSummary(item, "", 60, 20))
+		assert.Contains(t, result, "DELETION")
+	})
+
+	t.Run("multibyte value truncates on display width without breaking UTF-8", func(t *testing.T) {
+		item := &model.Item{Name: strings.Repeat("日", 40), Namespace: "default"}
+		result := stripANSI(RenderResourceSummary(item, "", 30, 20))
+		for line := range strings.SplitSeq(result, "\n") {
+			assert.True(t, utf8.ValidString(line), "line must stay valid UTF-8: %q", line)
+			assert.LessOrEqual(t, lipgloss.Width(line), 30, "line must fit width: %q", line)
+		}
+	})
+}
+
+func TestRenderMinimalSummaryNoIdentity(t *testing.T) {
+	// An item with nothing to show must not render a blank pane.
+	result := stripANSI(RenderResourceSummary(&model.Item{}, "", 60, 20))
+	assert.Contains(t, result, "No preview")
 }

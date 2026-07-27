@@ -592,7 +592,12 @@ func (m Model) renderRightResources(width, height int) string {
 	// on every interval, and branching on it here would flash a spinner and
 	// clear the details every tick.
 	if m.nav.ResourceType.Kind != "Pod" {
-		if sel := m.selectedMiddleItem(); sel != nil && (len(sel.Columns) > 0 || m.secretDataCachedFor(sel)) {
+		if sel := m.selectedMiddleItem(); sel != nil && (sel.Name != "" || m.secretDataCachedFor(sel)) {
+			// Loaded YAML beats the minimal identity-summary fallback.
+			if len(sel.Columns) == 0 && !m.secretDataCachedFor(sel) &&
+				(m.previewYAML != "" || m.yamlView.content != "") {
+				return m.renderFallbackYAML(width, height)
+			}
 			return ui.RenderResourceSummary(sel, "", width, height)
 		}
 		// No item selected yet (e.g., initial load before the list arrives):
@@ -635,10 +640,11 @@ func (m Model) renderRightOwned(width, height int) string {
 		return m.renderSplitPreview(width, height)
 	}
 	if sel.Kind != "Pod" {
-		if len(sel.Columns) > 0 {
-			return ui.RenderResourceSummary(sel, "", width, height)
+		// Same precedence as renderRightResources: YAML first, then summary.
+		if len(sel.Columns) == 0 && (m.previewYAML != "" || m.yamlView.content != "") {
+			return m.renderFallbackYAML(width, height)
 		}
-		return m.renderFallbackYAML(width, height)
+		return ui.RenderResourceSummary(sel, "", width, height)
 	}
 	return m.renderRightDefault(width, height)
 }
