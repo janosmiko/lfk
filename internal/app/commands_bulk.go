@@ -138,7 +138,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 
 			// Remove finalizers first.
 			patchArgs := []string{
-				"patch", rt.Resource, ref.Name, "--context", kubectlCtx,
+				"patch", kubectlResourceArg(rt), ref.Name, "--context", kubectlCtx,
 				"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
 			}
 			if rt.Namespaced {
@@ -160,7 +160,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 
 			// Force delete.
 			deleteArgs := []string{
-				"delete", rt.Resource, ref.Name, "--context", kubectlCtx,
+				"delete", kubectlResourceArg(rt), ref.Name, "--context", kubectlCtx,
 				"--grace-period=0", "--force",
 			}
 			if rt.Namespaced {
