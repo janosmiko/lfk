@@ -40,7 +40,7 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.logView.podFilterActive = false
 			if m.pendingAction == "Go to Pod" {
 				m.pendingAction = ""
-				return m.navigateToOwner("Pod", sel.Name)
+				return m.navigateToOwner("Pod", sel.Name, "v1")
 			}
 			if m.pendingAction == "Logs" {
 				m.pendingAction = ""

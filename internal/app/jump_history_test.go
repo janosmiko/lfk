@@ -74,7 +74,7 @@ func TestTeleportThenJumpBackReturnsToOrigin(t *testing.T) {
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
 		{Kind: "Deployment", APIVersion: "apps/v1", Resource: "deployments"},
 	}
-	result, _ := m.navigateToOwner("Deployment", "my-deploy")
+	result, _ := m.navigateToOwner("Deployment", "my-deploy", "apps/v1")
 	rm := result.(Model)
 	require.Len(t, rm.jumpBackStack, 1, "navigateToOwner must record the origin")
 
@@ -225,7 +225,7 @@ func TestJumpHistoryIsIndependentPerTab(t *testing.T) {
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
 		{Kind: "Deployment", APIVersion: "apps/v1", Resource: "deployments"},
 	}
-	resA, _ := m.navigateToOwner("Deployment", "deploy-a")
+	resA, _ := m.navigateToOwner("Deployment", "deploy-a", "apps/v1")
 	m = resA.(Model)
 	require.Len(t, m.jumpBackStack, 1, "tab A must record its own jump")
 	m.saveCurrentTab()
