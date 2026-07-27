@@ -1732,13 +1732,6 @@ func TestCov80CompareNumeric(t *testing.T) {
 	assert.True(t, compareNumeric("abc", "1")) // "abc" parses as 0
 }
 
-func TestCov80StatusPriority(t *testing.T) {
-	assert.Equal(t, 0, statusPriority("Running"))
-	assert.Equal(t, 1, statusPriority("Pending"))
-	assert.Equal(t, 2, statusPriority("Failed"))
-	assert.Equal(t, 3, statusPriority("Unknown"))
-}
-
 func TestCov80SortModeName(t *testing.T) {
 	m := basePush80Model()
 	m.sortColumnName = ""
@@ -2013,15 +2006,6 @@ func TestCovCompareNumeric(t *testing.T) {
 	assert.True(t, compareNumeric("1", "2"))
 	assert.False(t, compareNumeric("5", "3"))
 	assert.False(t, compareNumeric("abc", "def"))
-}
-
-func TestCovStatusPriority(t *testing.T) {
-	assert.Equal(t, 0, statusPriority("Running"))
-	assert.Equal(t, 0, statusPriority("Active"))
-	assert.Equal(t, 1, statusPriority("Pending"))
-	assert.Equal(t, 2, statusPriority("Failed"))
-	assert.Equal(t, 2, statusPriority("CrashLoopBackOff"))
-	assert.Equal(t, 3, statusPriority("Unknown"))
 }
 
 func TestCovGetColumnValue(t *testing.T) {

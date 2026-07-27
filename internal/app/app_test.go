@@ -177,58 +177,6 @@ func TestSelectionKey(t *testing.T) {
 	}
 }
 
-// --- statusPriority ---
-
-func TestStatusPriority(t *testing.T) {
-	tests := []struct {
-		status   string
-		priority int
-	}{
-		// Priority 0: healthy statuses.
-		{"Running", 0},
-		{"Active", 0},
-		{"Bound", 0},
-		{"Available", 0},
-		{"Ready", 0},
-		{"Healthy", 0},
-		{"Healthy/Synced", 0},
-		{"Deployed", 0},
-		// Priority 1: in-progress statuses.
-		{"Pending", 1},
-		{"ContainerCreating", 1},
-		{"Waiting", 1},
-		{"Init", 1},
-		{"Progressing", 1},
-		{"Progressing/Synced", 1},
-		{"Suspended", 1},
-		{"Pending-install", 1},
-		{"Pending-upgrade", 1},
-		{"Pending-rollback", 1},
-		{"Uninstalling", 1},
-		// Priority 2: failed statuses.
-		{"Failed", 2},
-		{"CrashLoopBackOff", 2},
-		{"Error", 2},
-		{"ImagePullBackOff", 2},
-		{"Degraded", 2},
-		{"Degraded/OutOfSync", 2},
-		// Priority 3: unknown statuses.
-		{"Unknown", 3},
-		{"SomeRandomStatus", 3},
-		{"", 3},
-	}
-
-	for _, tt := range tests {
-		name := tt.status
-		if name == "" {
-			name = "empty string"
-		}
-		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.priority, statusPriority(tt.status))
-		})
-	}
-}
-
 // --- severityRank ---
 
 func TestSeverityRank(t *testing.T) {
