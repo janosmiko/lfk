@@ -1057,7 +1057,7 @@ The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the H
 `e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
 ### Node Actions
-`c` Cordon/Uncordon (toggle schedulability), `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
+`c` Cordon/Uncordon (toggle schedulability), `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, pick a common taint with `p`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 Drain streams the eviction progress live: in PTY terminal mode (default on macOS/Linux) the `kubectl drain` output renders in lfk's embedded scrollable terminal; in Exec mode the host terminal is handed over. The same applies to Drain Node on a Karpenter NodeClaim.
 

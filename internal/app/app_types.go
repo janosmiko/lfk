@@ -106,6 +106,7 @@ const (
 	overlayLogTopProfile      // single-select log format profile picker for Log Top
 	overlayLogTopColumns      // show/hide and reorder column picker for Log Top
 	overlayTaintEditor        // node taint editor (action menu key t on a Node)
+	overlayTaintPresets       // common-taint picker over the taint editor (p key)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

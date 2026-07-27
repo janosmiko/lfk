@@ -28,6 +28,8 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "a":
 		p.focus = taintFocusKey
 		return m, nil
+	case "p":
+		return m.openTaintPresets()
 	case " ":
 		if p.cursor < 0 || p.cursor >= n {
 			return m, nil
@@ -175,6 +177,7 @@ func (m Model) taintEditorHints() []ui.HintEntry {
 	return []ui.HintEntry{
 		{Key: "space", Desc: "mark remove"},
 		{Key: "a", Desc: "add"},
+		{Key: "p", Desc: "common taints"},
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "enter", Desc: "apply"},
 		{Key: "esc", Desc: "cancel"},

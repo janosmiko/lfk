@@ -117,6 +117,15 @@ func OverlayListWidth(items []OverlayListItem, cfg OverlayListConfig, maxWidth i
 			contentW = w
 		}
 	}
+	return OverlayContentWidth(contentW, maxWidth)
+}
+
+// OverlayContentWidth returns the overlay box width that shows contentW
+// columns of content, applying the same chrome, floor and cap as
+// OverlayListWidth. Overlays that render their own content below the list
+// (the taint editor's add-row) size themselves against this so the box grows
+// to fit them instead of truncating them against a list-derived width.
+func OverlayContentWidth(contentW, maxWidth int) int {
 	w := max(contentW+overlayListChrome, OverlayListFloor)
 	if maxWidth > 0 && w > maxWidth {
 		w = maxWidth

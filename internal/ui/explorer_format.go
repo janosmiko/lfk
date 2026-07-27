@@ -560,6 +560,24 @@ func Truncate(s string, maxW int) string {
 	return ansi.Truncate(s, maxW-1, "") + "~"
 }
 
+// TruncateStart truncates a string from the left to maxW visual columns,
+// prefixing "~" when it was cut. The mirror of Truncate, for text whose end
+// matters more than its start: a text input's caret sits after the last
+// character, so the tail is the part the user needs to see while typing.
+func TruncateStart(s string, maxW int) string {
+	if maxW <= 0 {
+		return ""
+	}
+	w := lipgloss.Width(s)
+	if w <= maxW {
+		return s
+	}
+	if maxW <= 1 {
+		return "~"
+	}
+	return ansi.TruncateLeft(s, w-maxW+1, "~")
+}
+
 // TruncateWithSuffix truncates body so that body + suffix fits within maxW
 // visual columns, then right-pads with spaces so the suffix lands flush
 // against the right edge. Empty suffix degrades to plain Truncate.

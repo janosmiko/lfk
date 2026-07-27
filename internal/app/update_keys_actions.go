@@ -498,7 +498,7 @@ func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 	}
 	// Use first owner (most resources have exactly one).
 	owner := owners[0]
-	ret, cmd := m.navigateToOwner(owner.kind, owner.name)
+	ret, cmd := m.navigateToOwner(owner.kind, owner.name, owner.apiVersion)
 	return ret, cmd, true
 }
 
