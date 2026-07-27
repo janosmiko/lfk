@@ -8,16 +8,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// addRowBlock returns the add-row portion of the rendered editor — everything
-// from the "add:" label on. Assertions must target this, not the whole
-// overlay: the taint list above it also contains effect names.
+// addRowBlock returns the add-row portion of the rendered editor. Assertions
+// must target this, not the whole overlay: the taint list above it also
+// contains effect names. Anchored on the blank line the renderer joins the
+// block with, not on the "add:" label — at narrow widths the label is itself
+// truncated away.
 func addRowBlock(t *testing.T, m Model) (block string, width int) {
 	t.Helper()
 	content, w, _ := m.renderOverlayTaintEditor()
 	plain := stripANSI(content)
-	_, after, found := strings.Cut(plain, "add:")
-	require.True(t, found, "add-row must render while an input is focused")
-	return after, w
+	sep := strings.LastIndex(plain, "\n\n")
+	require.Positive(t, sep, "add-row must render while an input is focused")
+	return plain[sep+2:], w
 }
 
 // The effect selector is a cycling control with no scroll of its own, so it
@@ -80,4 +82,20 @@ func TestRenderOverlayTaintEditor_BoxWidensForAddRow(t *testing.T) {
 	assert.Contains(t, block, "node-role.kubernetes.io/control-plane", "key fits without truncation")
 	assert.Equal(t, 1, strings.Count(strings.TrimSpace(block), "\n")+1,
 		"a fitting add-row stays on one line")
+}
+
+// At a terminal narrow enough that a field's label alone exceeds the line
+// budget, taintAddRowFields returns a field wider than innerW and the final
+// safety-net truncation runs. That last cut must respect focus too: cutting the
+// focused field from the right strips exactly the caret the per-field
+// front-truncation just preserved.
+func TestRenderTaintEditorAddRow_NarrowOverlayKeepsCaret(t *testing.T) {
+	m := openTaintEditorLoaded(t, taintEditorTestModel())
+	m.width = 20 // innerW lands well below the "add: key [" label width
+	m = taintKey(t, m, "a")
+	m = taintKey(t, m, "node.kubernetes.io/some-taint")
+
+	block, _ := addRowBlock(t, m)
+
+	assert.Contains(t, block, "█", "the caret must survive the safety-net truncation")
 }

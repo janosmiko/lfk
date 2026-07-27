@@ -165,7 +165,15 @@ func (m Model) renderTaintEditorAddRow(innerW int) string {
 		sep = "\n"
 	}
 	for i, f := range fields {
-		fields[i] = style(i).Render(ui.Truncate(f, innerW))
+		// Safety net for a field whose label alone outgrows innerW (the
+		// per-field budget floors at one column). It has to respect focus for
+		// the same reason the budget does: cutting the focused field from the
+		// right strips the caret the front-truncation just preserved.
+		trunc := ui.Truncate
+		if p.focus == taintAddRowFocus[i] {
+			trunc = ui.TruncateStart
+		}
+		fields[i] = style(i).Render(trunc(f, innerW))
 	}
 	return strings.Join(fields, sep)
 }
