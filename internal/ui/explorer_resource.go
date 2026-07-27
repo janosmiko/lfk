@@ -154,25 +154,12 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	// 4. Sync/Operation details
 	// 5. Spec fields
 	// 6. Messages/Reasons
-	var identityRows []detailRow
-	if item.Name != "" {
-		identityRows = append(identityRows, detailRow{"NAME", item.Name})
-	}
-	if item.Namespace != "" {
-		identityRows = append(identityRows, detailRow{"NAMESPACE", item.Namespace})
-	}
-	if item.Deleting {
-		// Find deletion timestamp from columns.
-		for _, kv := range item.Columns {
-			if kv.Key == "Deletion" || kv.Key == "DELETION" {
-				identityRows = append(identityRows, detailRow{"DELETION", kv.Value})
-				break
-			}
-		}
-	}
+	identityRows := identityRowsFor(item)
 
 	allRows := make([]detailRow, 0, len(identityRows)+len(statusRows)+len(syncRows)+len(specRows)+len(messageRows))
-	allRows = append(allRows, identityRows...)
+	for _, r := range identityRows {
+		allRows = append(allRows, detailRow(r))
+	}
 	allRows = append(allRows, statusRows...)
 	allRows = append(allRows, syncRows...)
 	allRows = append(allRows, specRows...)
@@ -181,32 +168,13 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	// Calculate key column width for table alignment.
 	keyW := 0
 	for _, r := range allRows {
-		if len(r.key) > keyW {
-			keyW = len(r.key)
-		}
+		keyW = max(keyW, lipgloss.Width(r.key))
 	}
 	keyW += 2
 
-	// Style for detail keys: bold + primary, no underline (HeaderStyle has underline).
-	detailKeyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
+	detailKeyStyle := newDetailKeyStyle()
 
-	// Render identity rows.
-	for _, r := range identityRows {
-		if len(lines) >= height {
-			break
-		}
-		valW := max(width-keyW-2, 4)
-		val := r.value
-		if len(val) > valW {
-			val = val[:valW-3] + "..."
-		}
-		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
-		if r.key == "DELETION" {
-			lines = append(lines, keyStr+ErrorStyle.Render(val))
-		} else {
-			lines = append(lines, keyStr+DimStyle.Render(val))
-		}
-	}
+	lines = renderIdentityRows(lines, identityRows, keyW, width, height)
 
 	// renderRow appends a detail row with word-wrapping for long values.
 	valW := max(width-keyW-2, 4)
@@ -404,59 +372,80 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	return strings.Join(lines, "\n")
 }
 
-// renderMinimalSummary renders a minimal details view with only identity rows
-// (NAME, NAMESPACE, DELETION) for resources that have no summary columns
-// (e.g., a ServiceAccount without labels or annotations).
-func renderMinimalSummary(item *model.Item, width, height int) string {
-	var lines []string
+// identityRow is a NAME / NAMESPACE / DELETION row at the top of a details pane.
+type identityRow struct {
+	key   string
+	value string
+}
 
-	// Build identity rows.
-	type detailRow struct {
-		key   string
-		value string
-	}
-	var identityRows []detailRow
+// identityRowsFor builds the identity rows for an item. DELETION prefers the
+// deletion timestamp column when the list carries one, falling back to a plain
+// "Terminating" marker.
+func identityRowsFor(item *model.Item) []identityRow {
+	var rows []identityRow
 	if item.Name != "" {
-		identityRows = append(identityRows, detailRow{"NAME", item.Name})
+		rows = append(rows, identityRow{"NAME", item.Name})
 	}
 	if item.Namespace != "" {
-		identityRows = append(identityRows, detailRow{"NAMESPACE", item.Namespace})
+		rows = append(rows, identityRow{"NAMESPACE", item.Namespace})
 	}
 	if item.Deleting {
-		identityRows = append(identityRows, detailRow{"DELETION", "Terminating"})
-	}
-
-	// Calculate key column width for table alignment.
-	keyW := 0
-	for _, r := range identityRows {
-		if len(r.key) > keyW {
-			keyW = len(r.key)
+		val := "Terminating"
+		for _, kv := range item.Columns {
+			if kv.Key == "Deletion" || kv.Key == "DELETION" {
+				val = kv.Value
+				break
+			}
 		}
+		rows = append(rows, identityRow{"DELETION", val})
 	}
-	keyW += 2
+	return rows
+}
 
-	// Style for detail keys: bold + primary.
-	detailKeyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
+// newDetailKeyStyle is the style for detail keys: bold + primary, no underline
+// (HeaderStyle has one).
+func newDetailKeyStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
+}
 
-	// Render identity rows.
-	for _, r := range identityRows {
+// renderIdentityRows appends identity rows to lines as an aligned key/value
+// table, stopping at height. keyW is the shared key column width so the rows
+// line up with the detail rows rendered beneath them.
+func renderIdentityRows(lines []string, rows []identityRow, keyW, width, height int) []string {
+	keyStyle := newDetailKeyStyle()
+	valW := max(width-keyW-2, 4)
+	for _, r := range rows {
 		if len(lines) >= height {
 			break
 		}
-		valW := max(width-keyW-2, 4)
-		val := r.value
-		if len(val) > valW {
-			val = val[:valW-3] + "..."
-		}
-		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
+		val := Truncate(r.value, valW)
+		keyStr := keyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
 		if r.key == "DELETION" {
 			lines = append(lines, keyStr+ErrorStyle.Render(val))
 		} else {
 			lines = append(lines, keyStr+DimStyle.Render(val))
 		}
 	}
+	return lines
+}
 
-	return strings.Join(lines, "\n")
+// renderMinimalSummary renders a minimal details view with only identity rows
+// (NAME, NAMESPACE, DELETION) for resources that have no summary columns
+// (e.g., a ServiceAccount without labels or annotations).
+func renderMinimalSummary(item *model.Item, width, height int) string {
+	rows := identityRowsFor(item)
+	if len(rows) == 0 {
+		return DimStyle.Render("No preview")
+	}
+
+	// Calculate key column width for table alignment.
+	keyW := 0
+	for _, r := range rows {
+		keyW = max(keyW, lipgloss.Width(r.key))
+	}
+	keyW += 2
+
+	return strings.Join(renderIdentityRows(nil, rows, keyW, width, height), "\n")
 }
 
 // RenderPreviewEvents renders an event timeline section for the preview pane.
