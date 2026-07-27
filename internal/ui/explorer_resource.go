@@ -13,12 +13,17 @@ import (
 // followed by truncated YAML if space permits. It shows metadata that is NOT
 // already visible in the middle column table (Name, Ready, Restarts, Status, Age).
 func RenderResourceSummary(item *model.Item, yaml string, width, height int) string { //nolint:gocyclo // rendering function with inherent layout complexity
-	if item == nil || len(item.Columns) == 0 {
-		// No summary data, fall back to YAML.
+	if item == nil {
 		if yaml != "" {
 			return RenderYAMLContent(yaml, width, height)
 		}
 		return DimStyle.Render("No preview")
+	}
+	if len(item.Columns) == 0 && yaml == "" {
+		// No summary columns and no YAML — still render identity rows
+		// (NAME, NAMESPACE) so resources without labels/annotations show
+		// something useful instead of "No preview".
+		return renderMinimalSummary(item, width, height)
 	}
 
 	var lines []string
@@ -394,6 +399,61 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		lines = append(lines, "")
 		yamlContent := RenderYAMLContent(yaml, width, remaining)
 		lines = append(lines, yamlContent)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderMinimalSummary renders a minimal details view with only identity rows
+// (NAME, NAMESPACE, DELETION) for resources that have no summary columns
+// (e.g., a ServiceAccount without labels or annotations).
+func renderMinimalSummary(item *model.Item, width, height int) string {
+	var lines []string
+
+	// Build identity rows.
+	type detailRow struct {
+		key   string
+		value string
+	}
+	var identityRows []detailRow
+	if item.Name != "" {
+		identityRows = append(identityRows, detailRow{"NAME", item.Name})
+	}
+	if item.Namespace != "" {
+		identityRows = append(identityRows, detailRow{"NAMESPACE", item.Namespace})
+	}
+	if item.Deleting {
+		identityRows = append(identityRows, detailRow{"DELETION", "Terminating"})
+	}
+
+	// Calculate key column width for table alignment.
+	keyW := 0
+	for _, r := range identityRows {
+		if len(r.key) > keyW {
+			keyW = len(r.key)
+		}
+	}
+	keyW += 2
+
+	// Style for detail keys: bold + primary.
+	detailKeyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
+
+	// Render identity rows.
+	for _, r := range identityRows {
+		if len(lines) >= height {
+			break
+		}
+		valW := max(width-keyW-2, 4)
+		val := r.value
+		if len(val) > valW {
+			val = val[:valW-3] + "..."
+		}
+		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
+		if r.key == "DELETION" {
+			lines = append(lines, keyStr+ErrorStyle.Render(val))
+		} else {
+			lines = append(lines, keyStr+DimStyle.Render(val))
+		}
 	}
 
 	return strings.Join(lines, "\n")
