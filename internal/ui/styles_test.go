@@ -243,3 +243,63 @@ func TestFillLinesBgReestablishesBgAfterShortReset(t *testing.T) {
 	assert.NotContains(t, got, "\x1b[m ",
 		"no un-backgrounded padding may follow a parameterless reset")
 }
+
+// --- StatusSortRank ---
+
+// StatusSortRank drives the Status column sort. It orders healthy-first
+// (matching the column's long-standing ascending order) and, unlike the old
+// hand-maintained table in internal/app, derives every bucket from
+// statusSeverity — so a status the coloring understands can never fall into an
+// unranked catch-all and sort by name instead.
+func TestStatusSortRank(t *testing.T) {
+	tests := []struct {
+		status string
+		want   int
+	}{
+		// 0: healthy.
+		{"Running", 0},
+		{"Active", 0},
+		{"Ready", 0},
+		{"Healthy/Synced", 0},
+		{"Established", 0},
+		// 1: in progress, including the statuses the old table never ranked.
+		{"Pending", 1},
+		{"ContainerCreating", 1},
+		{"Terminating", 1},
+		{"NotReady", 1},
+		{"Unknown", 1},
+		{"Suspended", 1},
+		// 2: failed.
+		{"Failed", 2},
+		{"CrashLoopBackOff", 2},
+		{"OOMKilled", 2},
+		{"Degraded/OutOfSync", 2},
+		// 3: terminal success — completed rows are noise, so they sit below
+		// anything still running or broken instead of burying it.
+		{"Succeeded", 3},
+		{"Completed", 3},
+		{"Superseded", 3},
+		// 4: no signal.
+		{"", 4},
+		{"Normal", 4},
+		{"SomeRandomStatus", 4},
+	}
+	for _, tt := range tests {
+		name := tt.status
+		if name == "" {
+			name = "empty string"
+		}
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.want, StatusSortRank(tt.status))
+		})
+	}
+}
+
+// Free-form CRD phrases must bucket through the same word fallback the
+// coloring uses, so an operator's "Cluster in healthy state" sorts with the
+// healthy rows rather than dropping into the no-signal bucket.
+func TestStatusSortRank_FreeFormPhrases(t *testing.T) {
+	assert.Equal(t, StatusSortRank("Running"), StatusSortRank("Cluster in healthy state"))
+	assert.Equal(t, StatusSortRank("Failed"), StatusSortRank("Failing over"))
+	assert.Equal(t, StatusSortRank("Pending"), StatusSortRank("Setting up primary"))
+}

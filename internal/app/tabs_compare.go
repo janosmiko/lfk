@@ -209,10 +209,15 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 	case "Restarts":
 		return compareNumericCmp(a.Restarts, b.Restarts)
 	case "Status":
-		if c := cmpInt(statusPriority(a.Status), statusPriority(b.Status)); c != 0 {
+		if c := cmpInt(ui.StatusSortRank(a.Status), ui.StatusSortRank(b.Status)); c != 0 {
 			return c
 		}
-		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		// Same bucket: group identical status strings. Without this, every
+		// status sharing a bucket (Terminating and NotReady, Succeeded and
+		// Completed) interleaves alphabetically by name and the column reads
+		// as unsorted. Equal statuses fall through to the shared tiebreaker
+		// chain, which orders by name ascending in both directions.
+		return strings.Compare(a.Status, b.Status)
 	case "Age":
 		return compareAgeCmp(a, b)
 	case "Ports":
@@ -633,19 +638,4 @@ func severityRank(sev string) int {
 		return 3
 	}
 	return 4
-}
-
-// statusPriority returns a sort priority for a status string.
-func statusPriority(status string) int {
-	switch status {
-	case "Running", "Active", "Bound", "Available", "Ready", "Healthy", "Healthy/Synced", "Deployed":
-		return 0
-	case "Pending", "ContainerCreating", "Waiting", "Init", "Progressing", "Progressing/Synced", "Suspended",
-		"Pending-install", "Pending-upgrade", "Pending-rollback", "Uninstalling":
-		return 1
-	case "Failed", "CrashLoopBackOff", "Error", "ImagePullBackOff", "Degraded", "Degraded/OutOfSync":
-		return 2
-	default:
-		return 3
-	}
 }

@@ -600,6 +600,27 @@ func StatusSeverityRank(status string) int {
 	}
 }
 
+// StatusSortRank orders a status string healthy-first (0 = healthy) for the
+// Status column sort, where ascending has always put Running at the top.
+// Completed work ranks below both live and broken rows so a wall of Succeeded
+// cron pods never buries them. Derived from statusSeverity, so every status the
+// coloring understands gets a real bucket — the catch-all is reserved for rows
+// carrying no signal at all.
+func StatusSortRank(status string) int {
+	switch statusSeverity(status) {
+	case sevRunning:
+		return 0
+	case sevProgressing:
+		return 1
+	case sevFailed:
+		return 2
+	case sevDone:
+		return 3
+	default: // normal / default / blank / unknown
+		return 4
+	}
+}
+
 // condPolarity classifies how a status condition's type relates to health.
 type condPolarity int
 
