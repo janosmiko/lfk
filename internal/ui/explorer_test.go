@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -239,6 +240,33 @@ func TestTruncate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, Truncate(tt.s, tt.maxW))
+		})
+	}
+}
+
+// TruncateStart is Truncate's mirror: it keeps the tail, which is where a
+// text input's caret sits, so the user can see what they are typing.
+func TestTruncateStart(t *testing.T) {
+	tests := []struct {
+		name     string
+		s        string
+		maxW     int
+		expected string
+	}{
+		{"zero maxW", "hello", 0, ""},
+		{"negative maxW", "hello", -1, ""},
+		{"fits exactly", "hello", 5, "hello"},
+		{"fits with room", "hi", 5, "hi"},
+		{"needs truncation", "hello world", 6, "~world"},
+		{"maxW 1", "hello", 1, "~"},
+		{"empty string", "", 5, ""},
+		{"unicode", "héllo", 4, "~llo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TruncateStart(tt.s, tt.maxW)
+			assert.Equal(t, tt.expected, got)
+			assert.LessOrEqual(t, lipgloss.Width(got), max(tt.maxW, 0), "never exceeds maxW")
 		})
 	}
 }
