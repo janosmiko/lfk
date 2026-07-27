@@ -167,11 +167,14 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+]" {
 		m.execEscPressed = true
 		m.setStatusMessage("Ctrl+]: ]/[ tabs, t new, Ctrl+U/D half-page, Ctrl+B/F page, PgUp/Dn page, g/G top/live, Ctrl+] exit", false)
-		return m, nil
+		return m, scheduleStatusClear()
 	}
 
-	// Direct scroll bindings (no Ctrl+] prefix needed).
-	if m.execPTY != nil {
+	// Direct scroll bindings (no Ctrl+] prefix needed). Unlike the prefixed
+	// scroll keys these shadow the PTY program, so hand them back to
+	// full-screen programs (vim, less, htop) that page themselves — our
+	// line-stream scrollback cannot reconstruct their output anyway.
+	if m.execPTY != nil && !m.execAltScreen() {
 		switch msg.String() {
 		case "pgdown":
 			return m.execScrollBy(m.execViewportRows()), nil
@@ -197,6 +200,13 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		_, _ = m.execPTY.Write(raw)
 	}
 	return m, nil
+}
+
+// execAltScreen reports whether the PTY program has switched to the alternate
+// screen buffer (vim, less, htop). Those programs own the whole viewport and
+// handle paging themselves, so the unprefixed scroll keys must pass through.
+func (m Model) execAltScreen() bool {
+	return m.execTerm != nil && m.execTerm.Mode()&vt10x.ModeAltScreen != 0
 }
 
 // execViewportRows reports the number of PTY rows the user can see in

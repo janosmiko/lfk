@@ -1,10 +1,16 @@
 package app
 
 import (
+	"os"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- keyToBytes: additional key types not covered in ptyexec_test.go ---
@@ -114,4 +120,69 @@ func TestHandleExecKeyNoPTYNoOp(t *testing.T) {
 	result := ret.(Model)
 	assert.Equal(t, modeExec, result.mode)
 	assert.Nil(t, cmd)
+}
+
+func TestHandleExecKeyCtrlBracketSchedulesStatusClear(t *testing.T) {
+	m := Model{
+		mode:    modeExec,
+		execPTY: nil,
+		tabs:    []TabState{{}},
+		width:   80,
+		height:  40,
+	}
+	_, cmd := m.handleExecKey(tea.KeyMsg{Type: tea.KeyCtrlCloseBracket})
+	// The prefix hint must expire instead of lingering in the status bar.
+	assert.NotNil(t, cmd)
+}
+
+// PgUp/PgDown scroll lfk's scrollback for ordinary shell output, but must be
+// forwarded to full-screen programs (vim, less, htop) that page themselves.
+func TestHandleExecKeyPageKeysRespectAltScreen(t *testing.T) {
+	newModel := func(t *testing.T, altScreen bool) (Model, *os.File) {
+		t.Helper()
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = r.Close(); _ = w.Close() })
+
+		term := vt10x.New(vt10x.WithSize(80, 24))
+		if altScreen {
+			_, err = term.Write([]byte("\x1b[?1049h"))
+			require.NoError(t, err)
+			require.NotZero(t, term.Mode()&vt10x.ModeAltScreen, "terminal should be on the alternate screen")
+		}
+		m := Model{
+			mode:           modeExec,
+			execPTY:        w,
+			execTerm:       term,
+			execScrollback: newScrollback(100),
+			execMu:         &sync.Mutex{},
+			tabs:           []TabState{{}},
+			width:          80,
+			height:         40,
+		}
+		return m, r
+	}
+
+	t.Run("normal screen scrolls scrollback", func(t *testing.T) {
+		m, _ := newModel(t, false)
+		_, err := m.execScrollback.Write([]byte(strings.Repeat("line\n", 200)))
+		require.NoError(t, err)
+		ret, _ := m.handleExecKey(tea.KeyMsg{Type: tea.KeyPgUp})
+		assert.Positive(t, ret.(Model).execScrollOffset, "PgUp should scroll back into history")
+	})
+
+	t.Run("alt screen forwards to the PTY", func(t *testing.T) {
+		m, r := newModel(t, true)
+		_, err := m.execScrollback.Write([]byte(strings.Repeat("line\n", 200)))
+		require.NoError(t, err)
+		ret, _ := m.handleExecKey(tea.KeyMsg{Type: tea.KeyPgUp})
+		assert.Zero(t, ret.(Model).execScrollOffset, "PgUp must not scroll while a full-screen program is running")
+
+		// Deadline so a swallowed key fails the test instead of hanging it.
+		require.NoError(t, r.SetReadDeadline(time.Now().Add(2*time.Second)))
+		buf := make([]byte, 8)
+		n, err := r.Read(buf)
+		require.NoError(t, err, "PgUp should reach the PTY process")
+		assert.Equal(t, []byte{'\x1b', '[', '5', '~'}, buf[:n])
+	})
 }

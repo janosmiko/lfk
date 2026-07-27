@@ -453,14 +453,14 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `Ctrl+]` `Ctrl+U` / `Ctrl+D` | Scroll back / forward by half a viewport |
 | `Ctrl+]` `Ctrl+B` / `Ctrl+F` | Scroll back / forward by a full viewport |
 | `Ctrl+]` `g` / `G` | Jump to oldest captured line / back to live |
-| `PgUp` / `PgDown` | Scroll back / forward by a full viewport (no prefix needed) |
+| `PgUp` / `PgDown` | Scroll back / forward by a full viewport (no prefix needed; passed through to full-screen programs) |
 | Mouse wheel | Scroll the PTY scrollback (1 line per tick) |
 
 All other keys are forwarded to the PTY process. The PTY session continues running when you switch tabs, so you can return to it later. Typing any character snaps the view back to the live shell so you don't accidentally type into history.
 
 ### Scrollback
 
-Each PTY tab keeps a ring of up to 5000 ANSI-stripped lines captured from the byte stream. Use `Ctrl+]` then `Ctrl+U` / `Ctrl+D` / `Ctrl+B` / `Ctrl+F` to navigate it; `Ctrl+]` `g` / `G` jump to the oldest captured line / back to live. `PgUp` / `PgDown` scroll by a full viewport without any prefix. The hint bar shows `scrolled N` while you're not at the live tail. Full-screen curses programs (vim, less, htop) write absolute-position output that the line-stream capture can't reconstruct cleanly — their scrollback view will look messy while they're running, but normal output cleans up afterward. If you need precise scrollback, switch to `exec` or `mux` mode (`Ctrl+T`) so the host terminal's own scrollback handles it.
+Each PTY tab keeps a ring of up to 5000 ANSI-stripped lines captured from the byte stream. Use `Ctrl+]` then `Ctrl+U` / `Ctrl+D` / `Ctrl+B` / `Ctrl+F` to navigate it; `Ctrl+]` `g` / `G` jump to the oldest captured line / back to live. `PgUp` / `PgDown` scroll by a full viewport without any prefix, except while a full-screen program is on the alternate screen — there they are forwarded to the program so its own paging keeps working. The hint bar shows `scrolled N` while you're not at the live tail. Full-screen curses programs (vim, less, htop) write absolute-position output that the line-stream capture can't reconstruct cleanly — their scrollback view will look messy while they're running, but normal output cleans up afterward. If you need precise scrollback, switch to `exec` or `mux` mode (`Ctrl+T`) so the host terminal's own scrollback handles it.
 
 ### Selecting and copying text
 
