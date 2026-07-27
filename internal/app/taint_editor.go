@@ -47,6 +47,9 @@ type taintEditorState struct {
 	addEff  int // index into model.ValidTaintEffects
 	loading bool
 	seq     int // fetch sequence — stale taintsLoadedMsg are dropped
+	// Common-taint picker (overlayTaintPresets), opened over the editor.
+	presetCursor int
+	presetScroll int
 }
 
 // taintsLoadedMsg carries the fetched node taints for the editor.
