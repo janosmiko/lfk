@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.15.15](https://github.com/janosmiko/lfk/compare/v0.15.14...v0.15.15) (2026-07-27)
+
+
+### Features
+
+* **taints:** add a picker for widely used taints ([#565](https://github.com/janosmiko/lfk/issues/565)) ([1e3b7f1](https://github.com/janosmiko/lfk/commit/1e3b7f198a96c4bbbb2b9d06089b674bfad7d44a))
+
+
+### Bug Fixes
+
+* **actions:** target the correct API group when two kinds collide ([#566](https://github.com/janosmiko/lfk/issues/566)) ([5eddf5f](https://github.com/janosmiko/lfk/commit/5eddf5fa04ab5ac963f3bbeeffede398af82bc52)), closes [#562](https://github.com/janosmiko/lfk/issues/562)
+* details preview without labels and fast terminal scrolling buttons ([#568](https://github.com/janosmiko/lfk/issues/568)) ([57b33da](https://github.com/janosmiko/lfk/commit/57b33da965963f83e62d7358f62e16d84c57d764))
+* **sort:** derive Status order from the shared severity classifier ([#563](https://github.com/janosmiko/lfk/issues/563)) ([4a46cf6](https://github.com/janosmiko/lfk/commit/4a46cf670945409aac1b468ad54e2acb28c04eaf))
+* **taints:** keep the effect field visible in the add-row ([#564](https://github.com/janosmiko/lfk/issues/564)) ([a12df04](https://github.com/janosmiko/lfk/commit/a12df04f190f9cad8de94f11f51fdf22af1807a8))
+
 ## [0.15.14](https://github.com/janosmiko/lfk/compare/v0.15.13...v0.15.14) (2026-07-23)
 
 
