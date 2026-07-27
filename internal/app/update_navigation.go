@@ -216,9 +216,32 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) navigateToOwner(kind, name string) (tea.Model, tea.Cmd) {
+// resolveOwnerResourceType finds the resource type an owner reference points
+// at. apiVersion ("group/version", or "v1" for the core group) disambiguates
+// the Kind: two CRDs can share one Kind across groups, and the Kind-only
+// lookup returns whichever group discovery listed first — which sent jumps to
+// the wrong CRD entirely (issue #562). Falls back to the Kind-only lookup when
+// the caller has no apiVersion, or names a group this cluster never
+// discovered, so a best-effort jump still beats a dead end.
+func resolveOwnerResourceType(kind, apiVersion string, discovered []model.ResourceTypeEntry) (model.ResourceTypeEntry, bool) {
+	if apiVersion != "" {
+		group, _, _ := strings.Cut(apiVersion, "/")
+		if !strings.Contains(apiVersion, "/") {
+			group = "" // bare "v1" is the core group
+		}
+		if rt, ok := model.FindResourceTypeByKindAndGroup(kind, group, discovered); ok {
+			return rt, true
+		}
+	}
+	return model.FindResourceTypeByKind(kind, discovered)
+}
+
+// navigateToOwner teleports to the owning resource. apiVersion may be empty
+// for callers that only know a built-in Kind ("Pod", "Node"); see
+// resolveOwnerResourceType.
+func (m Model) navigateToOwner(kind, name, apiVersion string) (tea.Model, tea.Cmd) {
 	crds := m.discoveredResources[m.discoveryContext()]
-	rt, ok := model.FindResourceTypeByKind(kind, crds)
+	rt, ok := resolveOwnerResourceType(kind, apiVersion, crds)
 	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Unknown resource type: %s", kind), true)
 		return m, scheduleStatusClear()

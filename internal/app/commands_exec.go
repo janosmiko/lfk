@@ -70,7 +70,7 @@ func (m Model) execKubectlEdit() tea.Cmd {
 
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
-	args := []string{"edit", rt.Resource, m.actionCtx.name, "--context", m.kubectlContext(m.actionCtx.context)}
+	args := []string{"edit", kubectlResourceArg(rt), m.actionCtx.name, "--context", m.kubectlContext(m.actionCtx.context)}
 	if rt.Namespaced {
 		args = append(args, "-n", ns)
 	}
@@ -97,7 +97,7 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
-	args := []string{"describe", rt.Resource, name, "--context", m.kubectlContext(m.actionCtx.context)}
+	args := []string{"describe", kubectlResourceArg(rt), name, "--context", m.kubectlContext(m.actionCtx.context)}
 	if rt.Namespaced {
 		args = append(args, "-n", ns)
 	}

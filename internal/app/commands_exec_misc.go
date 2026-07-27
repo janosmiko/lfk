@@ -48,7 +48,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 	logger.Info("Force deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
 
 	deleteArgs := []string{
-		"delete", rt.Resource, name, "--context", m.kubectlContext(ctx),
+		"delete", kubectlResourceArg(rt), name, "--context", m.kubectlContext(ctx),
 		"--grace-period=0", "--force",
 	}
 	if rt.Namespaced {
@@ -82,7 +82,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 	logger.Info("Removing finalizers from resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
 
 	patchArgs := []string{
-		"patch", rt.Resource, name, "--context", m.kubectlContext(ctx),
+		"patch", kubectlResourceArg(rt), name, "--context", m.kubectlContext(ctx),
 		"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
 	}
 	if rt.Namespaced {
