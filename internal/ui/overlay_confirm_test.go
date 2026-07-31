@@ -50,14 +50,17 @@ func TestRenderOverlayConfirm(t *testing.T) {
 		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
 		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 
-		cfg := OverlayConfirmConfig{
+		plain := RenderOverlayConfirm(OverlayConfirmConfig{
 			Title:       "Confirm Delete",
 			ChoiceLabel: "Cascade",
 			ChoiceValue: "Orphan",
-		}
-		plain := RenderOverlayConfirm(cfg)
-		cfg.ChoiceWarn = true
-		warned := RenderOverlayConfirm(cfg)
+		})
+		warned := RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:       "Confirm Delete",
+			ChoiceLabel: "Cascade",
+			ChoiceValue: "Orphan",
+			ChoiceWarn:  true,
+		})
 
 		assert.Equal(t, stripANSI(plain), stripANSI(warned), "only styling may differ")
 		assert.NotEqual(t, plain, warned, "a warned choice must not render identically to a safe one")

@@ -17,14 +17,21 @@ import (
 var ConfigDeletePropagationPolicy = model.DeletePropagationBackground
 
 // applyDeletePropagationPolicy validates and applies the
-// delete_propagation_policy config value. Empty keeps the compiled default;
-// unknown values warn and keep it too.
+// delete_propagation_policy config value. An empty or unrecognized value
+// resolves to Background.
+//
+// Both fallbacks assign Background rather than returning early: leaving the
+// global untouched would make the result depend on whatever a previous load
+// set, so the warning below could claim Background while a stale orphan stayed
+// active.
 func applyDeletePropagationPolicy(raw string) {
 	if raw == "" {
+		ConfigDeletePropagationPolicy = model.DeletePropagationBackground
 		return
 	}
 	policy, ok := model.ParseDeletePropagation(raw)
 	if !ok {
+		ConfigDeletePropagationPolicy = model.DeletePropagationBackground
 		logger.Warn("Invalid delete_propagation_policy; using default",
 			"accepted", []string{
 				string(model.DeletePropagationBackground),

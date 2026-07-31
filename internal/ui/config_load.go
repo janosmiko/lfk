@@ -134,8 +134,9 @@ type configFile struct {
 	// Defaults to true. Set to false to exit immediately on ctrl+c.
 	ConfirmOnExit *bool `json:"confirm_on_exit" yaml:"confirm_on_exit"`
 	// DeletePropagationPolicy is the cascade policy the delete confirm dialog
-	// starts on: "background" (default), "foreground", or "orphan". Tab cycles
-	// it per delete.
+	// starts on: "background" (default), "foreground", "orphan", or "none"
+	// (send no policy and let the API server decide). Tab cycles it per delete;
+	// force delete clamps "none" to "background".
 	DeletePropagationPolicy string `json:"delete_propagation_policy" yaml:"delete_propagation_policy"`
 	// DimOverlay fades the rest of the screen while any overlay is up,
 	// keeping only the bottom hint bar at full intensity. Defaults to true.
