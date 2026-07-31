@@ -195,6 +195,39 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 
 Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping.
 
+### Delete confirm dialog
+
+| Key | Action |
+|---|---|
+| `Enter` / `y` | Confirm |
+| `Tab` | Cycle cascade policy: Background / Foreground / Orphan / None |
+| `Esc` / `n` | Cancel |
+
+Cascade controls what happens to dependent objects (a Job's pods, a Deployment's ReplicaSets):
+
+| Policy | Effect |
+|---|---|
+| `Background` | Delete the object now; the garbage collector removes dependents (kubectl's default) |
+| `Foreground` | Keep the object until every dependent is gone |
+| `Orphan` | Leave dependents running |
+| `None` | Send no policy; the API server applies its own per-resource default |
+
+`Orphan` and `None` are highlighted in the dialog because both can leave workloads running. The server default behind `None` is Background for most kinds but Orphan for Jobs and ReplicationControllers, so deleting a Job with `None` leaves its pods running.
+
+Set the starting policy with `delete_propagation_policy` in the config. Bulk delete uses the policy shown in the dialog.
+
+### Force delete confirm dialog
+
+| Key | Action |
+|---|---|
+| Type `DELETE` + `Enter` | Confirm |
+| `Tab` | Cycle cascade policy: Background / Foreground / Orphan |
+| `Esc` | Cancel |
+
+`None` is not offered here: force delete runs through `kubectl delete`, which always sends a policy, so a configured `none` default is clamped to `background`. `Tab` is inert on the other typed confirmations (Force Finalize, Finalizer Remove, Disrupt) and on Longhorn nodes, since none of them cascade through `kubectl delete`.
+
+Force delete with `Orphan` is the widest-reaching combination in lfk: bulk force delete strips finalizers before deleting, so the owner disappears immediately while its pods keep running with no owner reference and no finalizer trail to trace. Prefer `Background` unless you specifically intend to keep the dependents.
+
 Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. In the port-forward dialog, select an exposed port with `j`/`k`, or type a `local:remote` mapping (e.g. `8080:80`) to choose a specific local port — omit the local port (e.g. `:80`) for a random one. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group; press `D` there to remove the selected forward. On a Service, `Ctrl+O` (or the "Port Forward & Open" action) starts a port forward and opens the resolved `http://localhost:<port>` in the browser once it is ready.
 
 Resource-specific actions (exec, scale, restart, secret editor, etc.) are available through the action menu (`x`).

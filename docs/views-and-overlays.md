@@ -121,8 +121,8 @@ category, and every entry maps to a constant in `app_types.go`.
 
 | Overlay              | Default trigger                  | Purpose                                                      |
 | -------------------- | -------------------------------- | ------------------------------------------------------------ |
-| `overlayConfirm`     | delete / drain                   | y/n confirmation for reversible actions.                      |
-| `overlayConfirmType` | force delete / force finalize    | Requires typing `DELETE` for destructive ops.                 |
+| `overlayConfirm`     | delete / drain                   | y/n confirmation for reversible actions. Delete shows a cascade policy row (`Tab` cycles it). |
+| `overlayConfirmType` | force delete / force finalize    | Requires typing `DELETE` for destructive ops. Force delete shows a cascade policy row (`Tab` cycles it). |
 | `overlayQuitConfirm` | `q`                              | Confirm before exiting lfk.                                   |
 | `overlayShuttingDown`| after confirming quit            | Notice shown while background processes drain; force quits after 10s if it hangs. |
 | `overlayPasteConfirm`| paste into search / filter       | Confirm multi-line paste.                                     |
