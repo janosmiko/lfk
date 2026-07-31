@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.16](https://github.com/janosmiko/lfk/compare/v0.15.15...v0.15.16) (2026-07-31)
+
+
+### Features
+
+* **delete:** select the cascade policy for force delete too ([9ee809f](https://github.com/janosmiko/lfk/commit/9ee809f0ded0371025a9cb7ca1e601f5c37238ac))
+* **delete:** selectable cascade policy for delete and force delete ([#570](https://github.com/janosmiko/lfk/issues/570)) ([9ee809f](https://github.com/janosmiko/lfk/commit/9ee809f0ded0371025a9cb7ca1e601f5c37238ac))
+
 ## [0.15.15](https://github.com/janosmiko/lfk/compare/v0.15.14...v0.15.15) (2026-07-27)
 
 
