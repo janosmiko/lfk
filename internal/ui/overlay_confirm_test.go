@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,6 +28,51 @@ func TestRenderOverlayConfirm(t *testing.T) {
 		})
 		assert.Contains(t, out, "Paste contains 12 lines.")
 		assert.Contains(t, out, "Flatten and paste?")
+	})
+
+	t.Run("choice row renders label and value", func(t *testing.T) {
+		out := RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:       "Confirm Delete",
+			Warning:     "Delete job/backup-nightly?",
+			ChoiceLabel: "Cascade",
+			ChoiceValue: "Background",
+		})
+		assert.Contains(t, out, "Cascade")
+		assert.Contains(t, out, "Background")
+		// The choice belongs below the question, not spliced into it.
+		assert.Less(t, strings.Index(stripANSI(out), "Delete job"), strings.Index(stripANSI(out), "Cascade"))
+	})
+
+	t.Run("ChoiceWarn styles the value differently from the safe default", func(t *testing.T) {
+		// Styles collapse to bare text without a color profile, which would
+		// make this assertion vacuous.
+		origProfile := lipgloss.DefaultRenderer().ColorProfile()
+		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
+		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+
+		plain := RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:       "Confirm Delete",
+			ChoiceLabel: "Cascade",
+			ChoiceValue: "Orphan",
+		})
+		warned := RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:       "Confirm Delete",
+			ChoiceLabel: "Cascade",
+			ChoiceValue: "Orphan",
+			ChoiceWarn:  true,
+		})
+
+		assert.Equal(t, stripANSI(plain), stripANSI(warned), "only styling may differ")
+		assert.NotEqual(t, plain, warned, "a warned choice must not render identically to a safe one")
+	})
+
+	t.Run("choice row omitted when value empty", func(t *testing.T) {
+		out := RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:       "Confirm Delete",
+			Warning:     "Delete my-pod?",
+			ChoiceLabel: "Cascade",
+		})
+		assert.NotContains(t, out, "Cascade")
 	})
 
 	t.Run("type-to-confirm renders DELETE token + input", func(t *testing.T) {

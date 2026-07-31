@@ -60,6 +60,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `log_render_ansi` | bool | `true` | **Deprecated** — use `log_viewer.render_ansi`. Render ANSI SGR sequences from log producers. |
 | `log_top_default_profile` | string | `auto` | Default Log Top parser: `auto`, `traefik-json`, `ingress-nginx`, `nginx-combined`, `envoy`, `json`, `logfmt`. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
+| `delete_propagation_policy` | string | `"background"` | Cascade policy the delete confirm starts on. `background`: delete now, garbage collector removes dependents (kubectl's default). `foreground`: keep the object until dependents are gone. `orphan`: leave dependents running. `none`: send no policy, letting the API server apply its per-resource default. `Tab` cycles it per delete; force delete clamps `none` to `background` because it runs through `kubectl`. |
 | `dim_overlay` | bool | `true` | **Deprecated** — use `appearance.dim_overlay`. Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
 | `row_status_tint` | string | `"foreground"` | **Deprecated** — use `appearance.row_status_tint`. See [Appearance](#appearance). |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |

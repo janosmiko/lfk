@@ -107,6 +107,7 @@ func helpSections() []helpSection {
 				{kb.LabelEditor, "Edit labels/annotations for selected resource"},
 				{kb.Refresh, "Refresh current view"},
 				{kb.Delete, "Delete (force delete Pod/Job if already deleting, force finalize others)"},
+				{"", "In the delete confirm: Tab cycles the cascade policy (Background / Foreground / Orphan / None; force delete omits None)"},
 				{kb.ForceDelete, "Force delete (Pod/Job only)"},
 				{kb.SaveResource, "Save resource to file / toggle warnings-only (Events)"},
 				{kb.CopyName, "Copy resource name to clipboard"},

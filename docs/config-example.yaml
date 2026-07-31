@@ -610,6 +610,15 @@ tips: true
 # Set to false to exit immediately on ctrl+c.
 confirm_on_exit: true
 
+# ─── Delete Propagation Policy ───────────────────────────────────────────────
+# Cascade policy the delete confirm dialog starts on. Tab cycles it per delete.
+#   background - delete now, garbage collector removes dependents (default)
+#   foreground - keep the object until every dependent is gone
+#   orphan     - leave dependents running
+#   none       - send no policy; the API server applies its own default
+#                (Orphan for Jobs and ReplicationControllers)
+# delete_propagation_policy: background
+
 # ─── Dim Overlay ─────────────────────────────────────────────────────────────
 # Fade the rest of the screen while any overlay is up. Enabled by default;
 # uncomment to opt out (e.g. for terminals where SGR faint looks awkward).

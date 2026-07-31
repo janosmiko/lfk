@@ -228,6 +228,12 @@
       "description": "Show a quit confirmation when pressing ctrl+c on the last tab. Set false to exit immediately.",
       "default": true
     },
+    "delete_propagation_policy": {
+      "type": "string",
+      "enum": ["background", "foreground", "orphan", "none"],
+      "description": "Cascade policy the delete confirm dialog starts on. background: delete the object now, the garbage collector removes dependents (kubectl's default). foreground: keep the object until every dependent is gone. orphan: leave dependents running. none: send no policy and let the API server apply its per-resource default (Orphan for Jobs and ReplicationControllers). Tab cycles it per delete.",
+      "default": "background"
+    },
     "dim_overlay": {
       "type": "boolean",
       "description": "Deprecated alias for appearance.dim_overlay. Fade the rest of the screen while any overlay is up. Set false for terminals where SGR faint looks awkward.",

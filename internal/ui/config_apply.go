@@ -161,6 +161,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ConfirmOnExit != nil {
 		ConfigConfirmOnExit = *cfg.ConfirmOnExit
 	}
+	applyDeletePropagationPolicy(cfg.DeletePropagationPolicy)
 	if cfg.DimOverlay != nil {
 		ConfigDimOverlay = *cfg.DimOverlay
 	}
@@ -405,17 +406,6 @@ func applyTailLines(src *int, dst *int) {
 func applyBoolPtr(src *bool, dst *bool) {
 	if src != nil {
 		*dst = *src
-	}
-}
-
-func applyWatchIntervalConfig(raw string) {
-	if raw == "" {
-		return
-	}
-	if d, err := time.ParseDuration(raw); err == nil {
-		if clamped := ClampWatchInterval(d); clamped > 0 {
-			ConfigWatchInterval = clamped
-		}
 	}
 }
 
