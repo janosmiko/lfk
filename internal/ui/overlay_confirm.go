@@ -21,6 +21,15 @@ type OverlayConfirmConfig struct {
 	Warning string   // warning-styled question line (e.g. "Delete my-pod?")
 	Body    []string // optional plain-style body lines
 
+	// ChoiceLabel/ChoiceValue render a labeled, cycleable value row below the
+	// warning (e.g. "Cascade: Background"). An empty ChoiceValue omits the
+	// row; the hotkey that cycles it lives in the hint bar. ChoiceWarn styles
+	// the value as a warning so a riskier selection is not visually
+	// interchangeable with a safe one.
+	ChoiceLabel string
+	ChoiceValue string
+	ChoiceWarn  bool
+
 	// TypeToken triggers the type-to-confirm row. When non-empty, the
 	// overlay prompts the user to type the token verbatim; Input is the
 	// current accumulator. An empty Input renders a dim placeholder.
@@ -115,6 +124,19 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 			warning = strings.Join(wrapConfirmText(warning, cfg.WrapWidth), "\n")
 		}
 		b.WriteString(OverlayWarningStyle.Render(warning))
+		b.WriteString("\n\n")
+	}
+	if cfg.ChoiceValue != "" {
+		// An empty label drops the prefix entirely — callers shed it to fit a
+		// narrow box, and ": value" would read as a rendering bug.
+		if cfg.ChoiceLabel != "" {
+			b.WriteString(OverlayNormalStyle.Render(cfg.ChoiceLabel + ": "))
+		}
+		valueStyle := OverlayFilterStyle
+		if cfg.ChoiceWarn {
+			valueStyle = OverlayWarningStyle
+		}
+		b.WriteString(valueStyle.Render(cfg.ChoiceValue))
 		b.WriteString("\n\n")
 	}
 	for i, line := range cfg.Body {

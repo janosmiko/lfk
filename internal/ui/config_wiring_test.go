@@ -63,6 +63,7 @@ events:
   grouping: false
 scrolloff: 9
 confirm_on_exit: false
+delete_propagation_policy: orphan
 dim_overlay: false
 row_status_tint: background
 transparent_background: true
@@ -230,6 +231,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigEventsGrouping, "events.grouping")
 	assert.Equal(t, 9, ConfigScrollOff, "scrolloff")
 	assert.False(t, ConfigConfirmOnExit, "confirm_on_exit")
+	assert.Equal(t, model.DeletePropagationOrphan, ConfigDeletePropagationPolicy, "delete_propagation_policy")
 	assert.False(t, ConfigDimOverlay, "dim_overlay")
 	assert.Equal(t, RowStatusTintBackground, ConfigRowStatusTint, "row_status_tint")
 	assert.True(t, ConfigTransparentBg, "transparent_background")
@@ -388,6 +390,7 @@ var wiringCoveredFields = map[string]string{
 	"events":                    "TestLoadConfig_AllSettingsWired",
 	"scrolloff":                 "TestLoadConfig_AllSettingsWired",
 	"confirm_on_exit":           "TestLoadConfig_AllSettingsWired",
+	"delete_propagation_policy": "TestLoadConfig_AllSettingsWired + TestDeletePropagationPolicy_InvalidFallsBack",
 	"dim_overlay":               "TestLoadConfig_AllSettingsWired",
 	"row_status_tint":           "TestLoadConfig_AllSettingsWired + TestRowStatusTint_InvalidFallsBack",
 	"transparent_background":    "TestLoadConfig_AllSettingsWired",

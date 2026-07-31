@@ -12,6 +12,14 @@ import (
 
 func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab":
+		// Cycle the cascade policy in place. Ignored on confirms that don't
+		// delete, so tab stays inert rather than silently changing state the
+		// overlay isn't showing.
+		if m.deleteConfirmShowsPolicy() {
+			m.cycleDeletePropagation()
+		}
+		return m, nil
 	case "enter", "y", "Y":
 		// Read-only safety net: if RO was toggled on while a confirm overlay
 		// was already showing, refuse to commit the mutation.
@@ -118,6 +126,14 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab":
+		// Cycle the cascade policy in place, skipping None: this path shells
+		// out to kubectl, which cannot express it. Inert on the confirms that
+		// are not cascading deletes.
+		if m.forceDeleteConfirmShowsPolicy() {
+			m.cycleForceDeletePropagation()
+		}
+		return m, nil
 	case "esc", "q":
 		m.overlay = overlayNone
 		m.confirmAction = ""
@@ -166,7 +182,7 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			if m.bulkMode && len(m.bulkItems) > 0 && action == "Force Delete" {
 				m.clearSelection()
 				expanded := expandGroupedItems(m.bulkItems)
-				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 --cascade=%s %s (%d items)%s --context %s", m.deletePropagation().KubectlCascade(), rt.Resource, len(expanded), nsArg, ctx))
 				cmd := m.bulkForceDeleteResources()
 				m.resetBulkAction()
 				return m, cmd
@@ -181,7 +197,7 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 					m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s.longhorn.io %s --type merge -p '{\"spec\":{\"allowScheduling\":false}}'%s; kubectl delete %s.longhorn.io %s%s --context %s", rt.Resource, name, nsArg, rt.Resource, name, nsArg, ctx))
 					return m, m.forceDeleteLonghornNode()
 				}
-				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force --cascade=%s%s --context %s", rt.Resource, name, m.deletePropagation().KubectlCascade(), nsArg, ctx))
 				return m, m.forceDeleteResource()
 			case "Finalizer Remove":
 				m.loading = false

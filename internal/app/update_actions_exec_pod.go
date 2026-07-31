@@ -207,6 +207,7 @@ func (m Model) executeActionDelete() (tea.Model, tea.Cmd) { //nolint:unparam // 
 	// confirm overlay falls back to its "Delete X?" wording.
 	m.confirmTitle = ""
 	m.confirmQuestion = ""
+	m.resetDeletePropagation()
 	m.overlay = overlayConfirm
 	m.pendingAction = "Delete"
 	return m, nil
@@ -402,6 +403,7 @@ func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) { //nolint:unpara
 	m.confirmTitle = "Confirm Force Delete"
 	m.confirmQuestion = fmt.Sprintf("Force delete %s?", m.actionCtx.name)
 	m.confirmTypeInput.Clear()
+	m.resetForceDeletePropagation()
 	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"
 	return m, nil

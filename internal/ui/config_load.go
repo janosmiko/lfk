@@ -133,6 +133,10 @@ type configFile struct {
 	// ConfirmOnExit controls whether ctrl+c on the last tab shows a quit confirmation.
 	// Defaults to true. Set to false to exit immediately on ctrl+c.
 	ConfirmOnExit *bool `json:"confirm_on_exit" yaml:"confirm_on_exit"`
+	// DeletePropagationPolicy is the cascade policy the delete confirm dialog
+	// starts on: "background" (default), "foreground", or "orphan". Tab cycles
+	// it per delete.
+	DeletePropagationPolicy string `json:"delete_propagation_policy" yaml:"delete_propagation_policy"`
 	// DimOverlay fades the rest of the screen while any overlay is up,
 	// keeping only the bottom hint bar at full intensity. Defaults to true.
 	// Set to false for terminals where the SGR faint attribute looks

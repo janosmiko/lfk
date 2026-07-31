@@ -287,6 +287,7 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 			m.confirmAction = sel.Name + " (FORCE)"
 			m.confirmTitle = "Confirm Force Delete"
 			m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
+			m.resetForceDeletePropagation()
 		} else {
 			// Other kinds: offer force finalize (remove finalizers).
 			m.confirmAction = sel.Name
@@ -328,6 +329,7 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 	m.confirmTitle = "Confirm Force Delete"
 	m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
 	m.confirmTypeInput.Clear()
+	m.resetForceDeletePropagation()
 	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"
 	return m, nil
@@ -696,6 +698,7 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		return m.startMultiLogStream(m.bulkItems)
 	case "Delete":
 		m.confirmAction = fmt.Sprintf("%d resources%s", len(m.bulkItems), clustersSuffix)
+		m.resetDeletePropagation()
 		m.overlay = overlayConfirm
 		m.pendingAction = "Delete"
 		return m, nil
@@ -704,6 +707,7 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.confirmTitle = "Confirm Force Delete"
 		m.confirmQuestion = fmt.Sprintf("Force delete %d resources%s?", len(m.bulkItems), clustersSuffix)
 		m.confirmTypeInput.Clear()
+		m.resetForceDeletePropagation()
 		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Delete"
 		return m, nil

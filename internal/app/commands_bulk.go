@@ -22,6 +22,7 @@ func (m Model) bulkDeleteResources() tea.Cmd {
 	ns := m.actionNamespace()
 	registry := m.scheduler
 	total := len(refs)
+	policy := m.deletePropagation()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Delete %s (%d)", rt.Resource, total)
@@ -48,8 +49,8 @@ func (m Model) bulkDeleteResources() tea.Cmd {
 			if ref.ClusterName != "" {
 				itemCtx = ref.ClusterName
 			}
-			logger.Info("Bulk deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx)
-			err := client.DeleteResource(itemCtx, itemNs, rt, ref.Name)
+			logger.Info("Bulk deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx, "propagation", policy)
+			err := client.DeleteResource(itemCtx, itemNs, rt, ref.Name, policy)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", ref.Name, err.Error()))
@@ -98,6 +99,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 	ns := m.actionNamespace()
 	registry := m.scheduler
 	total := len(refs)
+	cascade := m.deletePropagation()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Force delete %s (%d)", rt.Resource, total)
@@ -126,7 +128,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if ref.ClusterName != "" {
 				itemCtx = ref.ClusterName
 			}
-			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx)
+			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx, "cascade", cascade.KubectlCascade())
 
 			// Resolve KUBECONFIG to just the file that defines itemCtx so
 			// that overlapping cluster/user names across kubeconfigs do not
@@ -159,13 +161,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			}
 
 			// Force delete.
-			deleteArgs := []string{
-				"delete", kubectlResourceArg(rt), ref.Name, "--context", kubectlCtx,
-				"--grace-period=0", "--force",
-			}
-			if rt.Namespaced {
-				deleteArgs = append(deleteArgs, "-n", itemNs)
-			}
+			deleteArgs := forceDeleteArgs(rt, ref.Name, kubectlCtx, itemNs, cascade)
 			cmd := exec.CommandContext(ctx, kubectlPath, deleteArgs...)
 			cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", cmd)

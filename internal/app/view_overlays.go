@@ -147,32 +147,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 			InnerHeight: sh - 2,
 		}), sw, sh, true
 	case overlayConfirm:
-		// Default to the delete wording; non-delete confirm actions (e.g.
-		// Longhorn replica eviction) set confirmTitle/confirmQuestion to
-		// override it.
-		title := m.confirmTitle
-		if title == "" {
-			title = "Confirm Delete"
-		}
-		warning := m.confirmQuestion
-		if warning == "" {
-			warning = fmt.Sprintf("Delete %s?", m.confirmAction)
-		}
-		w := min(50, m.width-10)
-		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
-			Title:     title,
-			Warning:   warning,
-			WrapWidth: w - 4,
-		}), w, min(8, m.height-6), true
+		return m.renderOverlayConfirm()
 	case overlayConfirmType:
-		w := min(55, m.width-10)
-		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
-			Title:     m.confirmTitle,
-			Warning:   m.confirmQuestion,
-			TypeToken: "DELETE",
-			Input:     m.confirmTypeInput.Value,
-			WrapWidth: w - 4,
-		}), w, min(10, m.height-6), true
+		return m.renderOverlayConfirmType()
 	case overlayScaleInput:
 		w := min(45, m.width-10)
 		return ui.RenderOverlayInput(ui.OverlayInputConfig{

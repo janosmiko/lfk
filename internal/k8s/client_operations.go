@@ -102,9 +102,31 @@ func (c *Client) GetPodYAML(ctx context.Context, contextName, namespace, podName
 	}, podName)
 }
 
-// DeleteResource deletes a Kubernetes resource by type and name.
-func (c *Client) DeleteResource(contextName, namespace string, rt model.ResourceTypeEntry, name string) error {
-	logger.Info("Deleting resource", "context", contextName, "namespace", namespace, "kind", rt.Kind, "name", name)
+// deletionPropagation maps a config-level policy to the API type. A nil result
+// means send no PropagationPolicy, which only DeletePropagationNone asks for:
+// it hands the decision to the API server, which still defaults batch/v1 Jobs
+// and v1 ReplicationControllers to OrphanDependents and would leave their pods
+// running. Unknown values resolve to Background rather than nil so a typo
+// cannot land in that trap.
+func deletionPropagation(p model.DeletePropagation) *metav1.DeletionPropagation {
+	var propagation metav1.DeletionPropagation
+	switch p {
+	case model.DeletePropagationNone:
+		return nil
+	case model.DeletePropagationForeground:
+		propagation = metav1.DeletePropagationForeground
+	case model.DeletePropagationOrphan:
+		propagation = metav1.DeletePropagationOrphan
+	default:
+		propagation = metav1.DeletePropagationBackground
+	}
+	return &propagation
+}
+
+// DeleteResource deletes a Kubernetes resource by type and name, cascading
+// per policy.
+func (c *Client) DeleteResource(contextName, namespace string, rt model.ResourceTypeEntry, name string, policy model.DeletePropagation) error {
+	logger.Info("Deleting resource", "context", contextName, "namespace", namespace, "kind", rt.Kind, "name", name, "propagation", policy)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
@@ -123,7 +145,9 @@ func (c *Client) DeleteResource(contextName, namespace string, rt model.Resource
 		deleter = dynClient.Resource(gvr)
 	}
 
-	err = deleter.Delete(context.Background(), name, metav1.DeleteOptions{})
+	err = deleter.Delete(context.Background(), name, metav1.DeleteOptions{
+		PropagationPolicy: deletionPropagation(policy),
+	})
 	if err != nil {
 		return fmt.Errorf("deleting %s/%s: %w", rt.Resource, name, err)
 	}

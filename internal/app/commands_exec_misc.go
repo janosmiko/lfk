@@ -23,9 +23,10 @@ func (m Model) deleteResource() tea.Cmd {
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
-	logger.Info("Deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
+	policy := m.deletePropagation()
+	logger.Info("Deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx, "propagation", policy)
 	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, fmt.Sprintf("Delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
-		err := m.client.DeleteResource(ctx, ns, rt, name)
+		err := m.client.DeleteResource(ctx, ns, rt, name, policy)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -45,15 +46,11 @@ func (m Model) forceDeleteResource() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	logger.Info("Force deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
+	// Cascading() guarantees a value kubectl accepts; --cascade=none is not one.
+	cascade := m.deletePropagation().Cascading()
+	logger.Info("Force deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx, "cascade", cascade)
 
-	deleteArgs := []string{
-		"delete", kubectlResourceArg(rt), name, "--context", m.kubectlContext(ctx),
-		"--grace-period=0", "--force",
-	}
-	if rt.Namespaced {
-		deleteArgs = append(deleteArgs, "-n", ns)
-	}
+	deleteArgs := forceDeleteArgs(rt, name, m.kubectlContext(ctx), ns, cascade)
 
 	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, deleteArgs...)

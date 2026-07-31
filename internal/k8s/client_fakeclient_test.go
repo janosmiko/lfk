@@ -1529,7 +1529,7 @@ func TestDeleteResource_Namespaced(t *testing.T) {
 
 	err := c.DeleteResource("", "default", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "configmaps", Namespaced: true,
-	}, "my-cm")
+	}, "my-cm", model.DeletePropagationBackground)
 	require.NoError(t, err)
 
 	// Verify it's gone.
@@ -1548,7 +1548,7 @@ func TestDeleteResource_ClusterScoped(t *testing.T) {
 
 	err := c.DeleteResource("", "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "namespaces", Namespaced: false,
-	}, "my-ns")
+	}, "my-ns", model.DeletePropagationBackground)
 	require.NoError(t, err)
 }
 
