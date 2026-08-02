@@ -1,12 +1,12 @@
 package app
 
 import (
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleHelpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.helpFilterActive {
 		return m.handleHelpFilterInput(msg)
 	}
@@ -120,7 +120,7 @@ func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // input. Updates helpSearchQuery on every keystroke (so highlights
 // follow the typed text), supports ctrl+n / ctrl+p to jump between
 // matches in real time, Enter to apply, Esc to cancel.
-func (m Model) handleHelpSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleHelpSearchInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.helpSearchActive = false
@@ -162,7 +162,7 @@ func (m Model) handleHelpSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleHelpFilterInput runs while the user is typing in the f filter
 // input. Filter narrows visible lines as the user types; Enter applies
 // (closes input), Esc clears.
-func (m Model) handleHelpFilterInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleHelpFilterInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.helpFilterActive = false

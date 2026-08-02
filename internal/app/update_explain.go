@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -226,13 +226,13 @@ func (m *Model) clampExplainScroll() {
 // handleExplainKey handles keyboard input in the explain view mode. In tree
 // mode, every key dispatch is followed by a lazy fetch of the cursor row's
 // level descriptions when they are not loaded yet (see explain_tree.go).
-func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	mdl, cmd := m.handleExplainKeyDispatch(msg)
 	return withExplainTreeDescFetch(mdl, cmd)
 }
 
 // handleExplainKeyDispatch routes a key press to the explain view's handlers.
-func (m Model) handleExplainKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainKeyDispatch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	fieldCount := len(m.explainFields)
 	visibleLines := m.explainVisibleLines()
 
@@ -254,7 +254,7 @@ func (m Model) handleExplainKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ui.ActiveKeybindings.TreeView:
 		m.explainLineInput = ""
 		return m.toggleExplainTree()
-	case " ", ui.ActiveKeybindings.ToggleFold:
+	case "space", ui.ActiveKeybindings.ToggleFold:
 		m.explainLineInput = ""
 		return m.toggleExplainTreeFold()
 	case "j", "down":
@@ -308,12 +308,12 @@ func (m Model) handleExplainKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleExplainSearchKey handles keyboard input when search is active in the
 // explain view. Search jumps move the cursor, so tree mode chains the same
 // lazy description fetch as handleExplainKey.
-func (m Model) handleExplainSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	mdl, cmd := m.handleExplainSearchKeyDispatch(msg)
 	return withExplainTreeDescFetch(mdl, cmd)
 }
 
-func (m Model) handleExplainSearchKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainSearchKeyDispatch(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.explainSearchActive = false
@@ -338,9 +338,8 @@ func (m Model) handleExplainSearchKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cm
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.explainSearchInput.Insert(key)
+		if msg.Text != "" {
+			m.explainSearchInput.Insert(msg.Text)
 			m.explainJumpToMatch(m.explainSearchInput.Value, m.explainCursor, true)
 		}
 		return m, nil
@@ -379,7 +378,7 @@ func (m *Model) explainJumpToMatch(searchQuery string, startIdx int, forward boo
 }
 
 // handleExplainSearchOverlayKey handles keyboard input for the recursive search results overlay.
-func (m Model) handleExplainSearchOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainSearchOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.explainRecursiveFilterActive {
 		return m.handleExplainSearchOverlayFilterKey(msg)
 	}
@@ -409,7 +408,7 @@ func (m Model) explainRecursiveOverlayDims() (w, h, maxVisible int) {
 }
 
 // handleExplainSearchOverlayNormalKey handles navigation keys in the recursive field browser.
-func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	filtered := m.filteredExplainRecursiveResults()
 	resultCount := len(filtered)
 	_, _, visibleLines := m.explainRecursiveOverlayDims()
@@ -510,7 +509,7 @@ func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyMsg) (tea.Model, t
 }
 
 // handleExplainSearchOverlayFilterKey handles typing keys when the filter bar is active.
-func (m Model) handleExplainSearchOverlayFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainSearchOverlayFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.explainRecursiveFilterActive = false
@@ -550,9 +549,8 @@ func (m Model) handleExplainSearchOverlayFilterKey(msg tea.KeyMsg) (tea.Model, t
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.explainRecursiveFilter.Insert(key)
+		if msg.Text != "" {
+			m.explainRecursiveFilter.Insert(msg.Text)
 			m.explainRecursiveCursor = 0
 			m.explainRecursiveScroll = 0
 		}

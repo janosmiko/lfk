@@ -245,8 +245,10 @@ func TestLogPreviewMaxScroll(t *testing.T) {
 func TestRenderLogPreviewPane_ScrollHidesEarlierRows(t *testing.T) {
 	// Render the same content at scroll 0 vs scroll 2. The first body
 	// row at scroll 0 must not appear in the scroll-2 output.
-	at0 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0, false)
-	at2 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 2, false)
+	// Compare stripped renders: the pane styles each cell, so a raw
+	// substring search would not find the row token.
+	at0 := stripANSI(RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0, false))
+	at2 := stripANSI(RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 2, false))
 	if at0 == at2 {
 		t.Fatal("scrolled and unscrolled output should differ")
 	}

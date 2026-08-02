@@ -165,7 +165,6 @@ func TestHighlightDiffSearchInLine(t *testing.T) {
 	})
 
 	t.Run("current match uses a distinct style from non-current", func(t *testing.T) {
-		setTestColorProfile(t)
 		normal := highlightDiffSearchInLine("hello world", "world", false)
 		current := highlightDiffSearchInLine("hello world", "world", true)
 		// The current match must render with a different (distinct) style than

@@ -6,7 +6,7 @@
 // Wizard sub-screens and delete confirmation are rendered by separate
 // helpers. Keymap hints live in overlayHintBarMisc (overlay_hintbar.go);
 // do not add inline hint rows here. Caller wraps the returned content
-// in OverlayStyle.Width(w).Height(h).Render(...) — consistent with the
+// in BoxHeight(BoxWidth(OverlayStyle, w), h).Render(...) — consistent with the
 // other standard overlays routed through renderOverlayContent.
 package ui
 
@@ -42,7 +42,7 @@ type LocalClusterRowView struct {
 }
 
 // RenderLocalClusterOverlay produces the overlay content. The caller
-// wraps the result in OverlayStyle.Width(w).Height(h).Render(...).
+// wraps the result in BoxHeight(BoxWidth(OverlayStyle, w), h).Render(...).
 //
 // Pending Create rows are merged into Clusters by the caller, so an
 // in-flight first-ever Create lands in the populated-list path even
@@ -191,7 +191,7 @@ type LocalClusterDeleteConfirmView struct {
 // RenderLocalClusterDeleteConfirm renders the delete-confirm sub-screen
 // using the same shape as the project's Force Delete confirmation so
 // destructive actions feel uniform across the app. The caller wraps the
-// result in OverlayStyle.Width(w).Height(h).Render(...).
+// result in BoxHeight(BoxWidth(OverlayStyle, w), h).Render(...).
 func RenderLocalClusterDeleteConfirm(s LocalClusterOverlayState, v LocalClusterDeleteConfirmView) string {
 	innerH := max(s.Height-2, 1)
 	question := fmt.Sprintf("Delete cluster %s? This destroys the cluster and removes its kubeconfig context. This cannot be undone.",
@@ -223,7 +223,7 @@ type LocalClusterWizardView struct {
 }
 
 // RenderLocalClusterWizard renders the wizard sub-screen body. The
-// caller wraps the result in OverlayStyle.Width(w).Height(h).Render(...)
+// caller wraps the result in BoxHeight(BoxWidth(OverlayStyle, w), h).Render(...)
 // — same as the list view.
 func RenderLocalClusterWizard(s LocalClusterOverlayState, w LocalClusterWizardView) string {
 	innerH := max(s.Height-2, 1)

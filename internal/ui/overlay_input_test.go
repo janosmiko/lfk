@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,7 +77,7 @@ func TestRenderOverlayInput(t *testing.T) {
 			Title: "Add Labels",
 			Rows:  []OverlayInputRow{{Label: "key=value: ", Input: "app=foo", ShowCursor: true, Cursor: 7}},
 		})
-		assert.Contains(t, out, "app=foo ")
+		assert.Contains(t, stripANSI(out), "app=foo ")
 	})
 
 	t.Run("ShowCursor off renders no cursor cell", func(t *testing.T) {
@@ -95,11 +95,12 @@ func TestRenderOverlayInput(t *testing.T) {
 			Width: 30,
 			Rows:  []OverlayInputRow{{Label: "Replicas: ", Input: "3", ShowCursor: true}},
 		})
-		// The active row carries the label + value and is padded to Width
-		// (styles are stripped in tests, leaving the spacing).
+		// The active row carries the label + value and is padded to Width.
+		// Match on the stripped line: the rendered row interleaves SGR with
+		// the text, so a raw substring search would not find it.
 		var rowLine string
 		for line := range strings.SplitSeq(out, "\n") {
-			if strings.Contains(line, "Replicas: 3") {
+			if strings.Contains(stripANSI(line), "Replicas: 3") {
 				rowLine = line
 			}
 		}

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/creack/pty"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -54,8 +54,12 @@ func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateWindowSize(msg)
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.PasteMsg:
+		// v2 splits bracketed paste out of the key stream; re-encode it so it
+		// reaches the focused input through the same routing as key presses.
+		return m.handleKey(pasteKey(msg.Content))
 	case tea.FocusMsg:
 		return m.updateFocus(msg)
 	case tea.BlurMsg:

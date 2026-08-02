@@ -4,11 +4,11 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDiffKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	foldRegions := ui.ComputeDiffFoldRegions(m.diffView.left, m.diffView.right)
 	m.ensureDiffFoldState(foldRegions)
 
@@ -47,7 +47,7 @@ func (m Model) diffViewMetrics(foldRegions []ui.DiffFoldRegion) (totalLines, vis
 }
 
 // handleDiffSearchInput handles key events in diff search input mode.
-func (m Model) handleDiffSearchInput(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, visibleLines int) (tea.Model, tea.Cmd) {
+func (m Model) handleDiffSearchInput(msg tea.KeyPressMsg, foldRegions []ui.DiffFoldRegion, visibleLines int) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.diffView.searchMode = false
@@ -91,8 +91,8 @@ func (m Model) handleDiffSearchInput(msg tea.KeyMsg, foldRegions []ui.DiffFoldRe
 		m.diffView.matchLines = nil
 		return m, nil
 	default:
-		if len(msg.String()) == 1 || msg.String() == " " {
-			m.diffView.searchText.Insert(msg.String())
+		if msg.Text != "" {
+			m.diffView.searchText.Insert(msg.Text)
 		}
 		return m, nil
 	}
@@ -101,7 +101,7 @@ func (m Model) handleDiffSearchInput(msg tea.KeyMsg, foldRegions []ui.DiffFoldRe
 // handleDiffNormalKey handles key events in normal diff view mode.
 //
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
-func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
+func (m Model) handleDiffNormalKey(msg tea.KeyPressMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	maxCursor := max(totalLines-1, 0)
 	kb := ui.ActiveKeybindings
 
@@ -375,7 +375,7 @@ func (m *Model) diffCurrentLineText(foldRegions []ui.DiffFoldRegion) string {
 }
 
 // handleDiffVisualKey handles key events while in diff visual selection mode.
-func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
+func (m Model) handleDiffVisualKey(msg tea.KeyPressMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	maxCursor := max(totalLines-1, 0)
 	key := msg.String()
 

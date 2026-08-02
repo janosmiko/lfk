@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"

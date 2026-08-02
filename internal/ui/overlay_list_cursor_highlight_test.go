@@ -5,8 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,17 +21,14 @@ var (
 // it last is what makes the color stick when other package tests have run.
 func forceTrueColorTheme(t *testing.T) {
 	t.Helper()
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origNoColor := ConfigNoColor
 	origTheme := ActiveTheme
 	t.Cleanup(func() {
 		ConfigNoColor = origNoColor
 		ApplyTheme(origTheme)
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 	})
 	ConfigNoColor = false
 	ApplyTheme(DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 }
 
 // selectedHighlightWidth returns the visible width of the leading run of cells
@@ -46,7 +42,7 @@ func selectedHighlightWidth(out string) int {
 		return -1
 	}
 	total := 0
-	for seg := range strings.SplitSeq(out, "\x1b[0m") {
+	for seg := range strings.SplitSeq(out, "\x1b[m") {
 		if !strings.Contains(seg, bg) {
 			break
 		}

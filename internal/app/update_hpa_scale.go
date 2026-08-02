@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
@@ -113,7 +113,7 @@ func (m Model) openHPAScaleOverlay() Model {
 // handleHPAScaleOverlayKey routes a keypress in the HPA scale overlay: j/k move
 // between fields, h/- and l/+ step the active value, arrows move the cursor,
 // digits type, enter applies, esc cancels.
-func (m Model) handleHPAScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleHPAScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.overlay = overlayNone

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1208,11 +1208,11 @@ func TestBookmarkOverlay_TabTogglesLoadNamespace(t *testing.T) {
 	m.bookmarks = []model.Bookmark{{Slot: "a", Name: "x"}}
 	m.bookmarkLoadNamespace = true // matches the open default
 
-	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	result, _ := m.handleBookmarkOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm := result.(Model)
 	assert.False(t, rm.bookmarkLoadNamespace, "first Tab must opt out of loading")
 
-	result, _ = rm.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	result, _ = rm.handleBookmarkOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm = result.(Model)
 	assert.True(t, rm.bookmarkLoadNamespace, "second Tab must re-enable loading")
 }
@@ -1225,7 +1225,7 @@ func TestBookmarkOverlay_EscapeResetsLoadNamespace(t *testing.T) {
 	m.overlay = overlayBookmarks
 	m.bookmarkLoadNamespace = false
 
-	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	result, _ := m.handleBookmarkOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := result.(Model)
 	assert.True(t, rm.bookmarkLoadNamespace,
 		"closing the overlay must reset the flag to the load default")
@@ -1262,15 +1262,15 @@ func TestNavigateToBookmark_LocalResourceNotFound(t *testing.T) {
 func TestCovHandleBookmarkOverlayKeyDispatch(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeFilter
-	r, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handleBookmarkOverlayKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 
 	m.bookmarkSearchMode = bookmarkModeConfirmDelete
-	r, _ = m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, _ = m.handleBookmarkOverlayKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 
 	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
-	r, _ = m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, _ = m.handleBookmarkOverlayKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 }
 
@@ -1279,45 +1279,45 @@ func TestCovHandleBookmarkNormalMode(t *testing.T) {
 	m := baseModelCov()
 	m.overlay = overlayBookmarks
 
-	r, _ := m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyEscape}, nil)
+	r, _ := m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: tea.KeyEscape}, nil)
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'j', Text: "j"}, filtered)
 	assert.Equal(t, 1, r.(Model).overlayCursor)
 
 	m.overlayCursor = 1
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'k', Text: "k"}, filtered)
 	assert.Equal(t, 0, r.(Model).overlayCursor)
 
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'G', Text: "G"}, filtered)
 	assert.Equal(t, 2, r.(Model).overlayCursor)
 
 	m.pendingG = true
 	m.overlayCursor = 2
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'g', Text: "g"}, filtered)
 	assert.Equal(t, 0, r.(Model).overlayCursor)
 
 	// "D" is no longer a delete hotkey — it must fall through to slot jump
 	// (which is a no-op here because no bookmark is stored in slot D).
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'D', Text: "D"}, filtered)
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 
 	// ctrl+x is now the single-delete hotkey.
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlX}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'x', Mod: tea.ModCtrl}, filtered)
 	assert.Equal(t, bookmarkModeConfirmDelete, r.(Model).bookmarkSearchMode)
 
 	// alt+x is now the delete-all hotkey.
 	m.bookmarkSearchMode = bookmarkModeNormal
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}, Alt: true}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'x', Mod: tea.ModAlt}, filtered)
 	assert.Equal(t, bookmarkModeConfirmDeleteAll, r.(Model).bookmarkSearchMode)
 
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: '/', Text: "/"}, filtered)
 	assert.Equal(t, bookmarkModeFilter, r.(Model).bookmarkSearchMode)
 
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlD}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, filtered)
 	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
 
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlU}, filtered)
+	r, _ = m.handleBookmarkNormalMode(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, filtered)
 	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
 }
 
@@ -1325,23 +1325,23 @@ func TestCovHandleBookmarkFilterMode(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeFilter
 
-	r, _ := m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleBookmarkFilterMode(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 
 	m.bookmarkSearchMode = bookmarkModeFilter
 	m.bookmarkFilter = TextInput{Value: "pr", Cursor: 2}
-	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ = m.handleBookmarkFilterMode(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "p", r.(Model).bookmarkFilter.Value)
 
 	m.bookmarkFilter = TextInput{}
-	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	r, _ = m.handleBookmarkFilterMode(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	assert.Equal(t, "p", r.(Model).bookmarkFilter.Value)
 
 	m.bookmarkFilter = TextInput{Value: "hello", Cursor: 5}
-	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ = m.handleBookmarkFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Empty(t, r.(Model).bookmarkFilter.Value)
 
-	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleBookmarkFilterMode(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 }
 
@@ -1350,11 +1350,11 @@ func TestCovHandleBookmarkConfirmDelete(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeConfirmDelete
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
-	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd)
 
-	r, cmd = m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, cmd = m.handleBookmarkConfirmDelete(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd)
 }
@@ -1365,7 +1365,7 @@ func TestBookmarkConfirmDeleteEnterConfirms(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeConfirmDelete
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
-	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyEnter})
+	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd, "Enter should issue the delete command, not the no-op cancel path")
 	assert.Empty(t, r.(Model).bookmarks, "bookmark should be deleted")
@@ -1377,7 +1377,7 @@ func TestBookmarkConfirmDeleteEscCancels(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeConfirmDelete
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
-	r, _ := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyEsc})
+	r, _ := m.handleBookmarkConfirmDelete(tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.Len(t, r.(Model).bookmarks, 1, "bookmark must remain after cancel")
 }
@@ -1386,12 +1386,12 @@ func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := baseModelCov()
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
-	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd)
 
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
-	r, cmd = m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, cmd = m.handleBookmarkConfirmDeleteAll(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd)
 }
@@ -1401,7 +1401,7 @@ func TestBookmarkConfirmDeleteAllEnterConfirms(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
 	m.bookmarks = []model.Bookmark{{Name: "a", Slot: "a"}, {Name: "b", Slot: "b"}}
-	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyEnter})
+	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd, "Enter should issue the delete-all command")
 	assert.Empty(t, r.(Model).bookmarks, "all bookmarks should be deleted")
@@ -1412,7 +1412,7 @@ func TestBookmarkConfirmDeleteAllEscCancels(t *testing.T) {
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
 	m.bookmarks = []model.Bookmark{{Name: "a", Slot: "a"}, {Name: "b", Slot: "b"}}
-	r, _ := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyEsc})
+	r, _ := m.handleBookmarkConfirmDeleteAll(tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.Len(t, r.(Model).bookmarks, 2, "bookmarks must remain after cancel")
 }

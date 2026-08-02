@@ -5,8 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -215,10 +214,6 @@ func TestStatusSeverity_FreeFormPhrases(t *testing.T) {
 // re-apply the background after both, or column padding following a
 // wrap-induced reset renders with the terminal default (a black "tear").
 func TestFillLinesBgReestablishesBgAfterShortReset(t *testing.T) {
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-
 	// Use an explicit color (not the theme-dependent BaseBg) so the test does
 	// not depend on global theme state another test may have mutated.
 	bg := lipgloss.Color("#1a1a2e")

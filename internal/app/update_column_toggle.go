@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -291,7 +291,7 @@ func (m *Model) collectExtraToggleEntries(items []model.Item) []columnToggleEntr
 }
 
 // handleColumnToggleKey handles keyboard input for the column toggle overlay.
-func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleColumnToggleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.columnToggleFilterActive {
 		return m.handleColumnToggleFilterKey(msg)
 	}
@@ -328,7 +328,7 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.columnToggleCursor = clampOverlayCursor(m.columnToggleCursor, -20, maxIdx)
 		return m, nil
 
-	case " ":
+	case "space":
 		// Toggle visibility, persist live, then advance cursor.
 		if m.columnToggleCursor >= 0 && m.columnToggleCursor < len(items) {
 			key := items[m.columnToggleCursor].key
@@ -383,7 +383,7 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleColumnToggleFilterKey handles text input in the column toggle filter.
-func (m Model) handleColumnToggleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleColumnToggleFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		if m.columnToggleFilter != "" {
@@ -414,9 +414,8 @@ func (m Model) handleColumnToggleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.columnToggleFilter += key
+		if msg.Text != "" {
+			m.columnToggleFilter += msg.Text
 			m.columnToggleCursor = 0
 		}
 		return m, nil

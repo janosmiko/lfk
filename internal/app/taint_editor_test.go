@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -48,22 +48,22 @@ func openTaintEditorLoaded(t *testing.T, m Model) Model {
 func taintKey(t *testing.T, m Model, keys ...string) Model {
 	t.Helper()
 	for _, k := range keys {
-		var msg tea.KeyMsg
+		var msg tea.KeyPressMsg
 		switch k {
 		case "space":
-			msg = tea.KeyMsg{Type: tea.KeySpace}
+			msg = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 		case "enter":
-			msg = tea.KeyMsg{Type: tea.KeyEnter}
+			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 		case "esc":
-			msg = tea.KeyMsg{Type: tea.KeyEsc}
+			msg = tea.KeyPressMsg{Code: tea.KeyEsc}
 		case "tab":
-			msg = tea.KeyMsg{Type: tea.KeyTab}
+			msg = tea.KeyPressMsg{Code: tea.KeyTab}
 		case "right":
-			msg = tea.KeyMsg{Type: tea.KeyRight}
+			msg = tea.KeyPressMsg{Code: tea.KeyRight}
 		case "backspace":
-			msg = tea.KeyMsg{Type: tea.KeyBackspace}
+			msg = tea.KeyPressMsg{Code: tea.KeyBackspace}
 		default:
-			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+			msg = keyPressText(k)
 		}
 		mdl, _ := m.handleTaintEditorKey(msg)
 		var ok bool
@@ -185,7 +185,7 @@ func TestTaintEditor_ConfirmCancelReturnsToEditor(t *testing.T) {
 	m = taintKey(t, m, "space", "enter")
 	require.Equal(t, overlayConfirm, m.overlay)
 
-	mdl, _ := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	res := mdl.(Model)
 	assert.Equal(t, overlayTaintEditor, res.overlay, "cancel returns to the editor")
 	assert.True(t, res.taintEditor.active)
@@ -249,7 +249,7 @@ func TestTaintEditor_ReadOnlyToggleDuringConfirmBlocksApply(t *testing.T) {
 	// RO toggled on while the confirm dialog is already showing: the
 	// confirm-time safety net must refuse to commit the mutation.
 	m.readOnly = true
-	mdl, _ := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	res := mdl.(Model)
 	assert.True(t, res.statusMessageErr, "read-only block message shown")
 	assert.Contains(t, res.statusMessage, "Read-only")
@@ -302,7 +302,7 @@ func TestTaintEditor_EndToEndApply(t *testing.T) {
 	res = taintKey(t, res, "a", "team", "tab", "ml", "tab", "enter")
 	res = taintKey(t, res, "enter")
 	require.Equal(t, overlayConfirm, res.overlay)
-	mdl, applyCmd := res.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, applyCmd := res.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	res = mdl.(Model)
 	require.NotNil(t, applyCmd)
 	assert.False(t, res.taintEditor.active, "editor closed on confirmed apply")

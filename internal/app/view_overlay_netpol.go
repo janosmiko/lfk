@@ -42,7 +42,7 @@ func (m Model) renderOverlayNetworkPolicy(background string) string {
 		netpolContent = ui.RenderNetworkPolicyOverlay(convertNetpolInfo(*m.netpolData), m.netpolScroll, innerW, innerH, m.netpolSearchQuery)
 	}
 	netpolContent = ui.FillLinesBg(netpolContent, innerW, ui.SurfaceBg)
-	overlay := ui.OverlayStyle.Width(w).Render(netpolContent)
+	overlay := ui.BoxWidth(ui.OverlayStyle, w).Render(netpolContent)
 	bg := ui.PadToHeight(background, m.height)
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)
 }

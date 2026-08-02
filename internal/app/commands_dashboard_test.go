@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"

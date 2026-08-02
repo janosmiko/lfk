@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) updateCommandBarResult(msg commandBarResultMsg) (tea.Model, tea.Cmd) {

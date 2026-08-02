@@ -4,7 +4,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

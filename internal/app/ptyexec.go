@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/creack/pty"
 	"github.com/hinshun/vt10x"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -120,7 +120,7 @@ func (m *Model) cleanupExecPTY() {
 //   - Ctrl+] then G                = jump back to live (offset 0)
 //   - Ctrl+] then Ctrl+]           = exit terminal
 //   - Ctrl+] then any other key    = cancel, return to PTY
-func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// If process has exited, any key returns to explorer.
 	if m.execDone != nil && m.execDone.Load() {
 		m.cleanupExecPTY()
@@ -341,68 +341,71 @@ func startExecPTYReader(ptmx *os.File, term vt10x.Terminal, sb *scrollback, cmd 
 	}()
 }
 
-// keyBytesMap maps tea.KeyType to raw terminal byte sequences (normal cursor mode).
-var keyBytesMap = map[tea.KeyType][]byte{
-	tea.KeyEnter:     {'\r'},
-	tea.KeyTab:       {'\t'},
-	tea.KeyBackspace: {'\x7f'},
-	tea.KeyDelete:    {'\x1b', '[', '3', '~'},
-	tea.KeySpace:     {' '},
-	tea.KeyEscape:    {'\x1b'},
-	tea.KeyUp:        {'\x1b', '[', 'A'},
-	tea.KeyDown:      {'\x1b', '[', 'B'},
-	tea.KeyRight:     {'\x1b', '[', 'C'},
-	tea.KeyLeft:      {'\x1b', '[', 'D'},
-	tea.KeyHome:      {'\x1b', '[', 'H'},
-	tea.KeyEnd:       {'\x1b', '[', 'F'},
-	tea.KeyPgUp:      {'\x1b', '[', '5', '~'},
-	tea.KeyPgDown:    {'\x1b', '[', '6', '~'},
-	tea.KeyCtrlA:     {'\x01'},
-	tea.KeyCtrlB:     {'\x02'},
-	tea.KeyCtrlC:     {'\x03'},
-	tea.KeyCtrlD:     {'\x04'},
-	tea.KeyCtrlE:     {'\x05'},
-	tea.KeyCtrlF:     {'\x06'},
-	tea.KeyCtrlG:     {'\x07'},
-	tea.KeyCtrlH:     {'\x08'},
-	tea.KeyCtrlK:     {'\x0b'},
-	tea.KeyCtrlL:     {'\x0c'},
-	tea.KeyCtrlN:     {'\x0e'},
-	tea.KeyCtrlO:     {'\x0f'},
-	tea.KeyCtrlP:     {'\x10'},
-	tea.KeyCtrlQ:     {'\x11'},
-	tea.KeyCtrlR:     {'\x12'},
-	tea.KeyCtrlS:     {'\x13'},
-	tea.KeyCtrlT:     {'\x14'},
-	tea.KeyCtrlU:     {'\x15'},
-	tea.KeyCtrlV:     {'\x16'},
-	tea.KeyCtrlW:     {'\x17'},
-	tea.KeyCtrlX:     {'\x18'},
-	tea.KeyCtrlY:     {'\x19'},
-	tea.KeyCtrlZ:     {'\x1a'},
+// keyBytesMap maps a keystroke to raw terminal byte sequences (normal cursor
+// mode). Keyed by Keystroke() rather than a key code because Bubble Tea v2
+// models ctrl as a modifier, so ctrl+a and a share one code.
+var keyBytesMap = map[string][]byte{
+	"enter":     {'\r'},
+	"tab":       {'\t'},
+	"backspace": {'\x7f'},
+	"delete":    {'\x1b', '[', '3', '~'},
+	"space":     {' '},
+	"esc":       {'\x1b'},
+	"up":        {'\x1b', '[', 'A'},
+	"down":      {'\x1b', '[', 'B'},
+	"right":     {'\x1b', '[', 'C'},
+	"left":      {'\x1b', '[', 'D'},
+	"home":      {'\x1b', '[', 'H'},
+	"end":       {'\x1b', '[', 'F'},
+	"pgup":      {'\x1b', '[', '5', '~'},
+	"pgdown":    {'\x1b', '[', '6', '~'},
+	"ctrl+a":    {'\x01'},
+	"ctrl+b":    {'\x02'},
+	"ctrl+c":    {'\x03'},
+	"ctrl+d":    {'\x04'},
+	"ctrl+e":    {'\x05'},
+	"ctrl+f":    {'\x06'},
+	"ctrl+g":    {'\x07'},
+	"ctrl+h":    {'\x08'},
+	"ctrl+k":    {'\x0b'},
+	"ctrl+l":    {'\x0c'},
+	"ctrl+n":    {'\x0e'},
+	"ctrl+o":    {'\x0f'},
+	"ctrl+p":    {'\x10'},
+	"ctrl+q":    {'\x11'},
+	"ctrl+r":    {'\x12'},
+	"ctrl+s":    {'\x13'},
+	"ctrl+t":    {'\x14'},
+	"ctrl+u":    {'\x15'},
+	"ctrl+v":    {'\x16'},
+	"ctrl+w":    {'\x17'},
+	"ctrl+x":    {'\x18'},
+	"ctrl+y":    {'\x19'},
+	"ctrl+z":    {'\x1a'},
 }
 
 // keyBytesAppCursorMap overrides cursor-key sequences for application cursor
 // mode (DECCKM active): arrow keys send \x1bO_ instead of \x1b[_.
-var keyBytesAppCursorMap = map[tea.KeyType][]byte{
-	tea.KeyUp:    {'\x1b', 'O', 'A'},
-	tea.KeyDown:  {'\x1b', 'O', 'B'},
-	tea.KeyRight: {'\x1b', 'O', 'C'},
-	tea.KeyLeft:  {'\x1b', 'O', 'D'},
+var keyBytesAppCursorMap = map[string][]byte{
+	"up":    {'\x1b', 'O', 'A'},
+	"down":  {'\x1b', 'O', 'B'},
+	"right": {'\x1b', 'O', 'C'},
+	"left":  {'\x1b', 'O', 'D'},
 }
 
 // keyToBytes converts a Bubbletea key message to raw terminal bytes.
 // appCursor should be true when the terminal has DECCKM active (ModeAppCursor).
-func keyToBytes(msg tea.KeyMsg, appCursor bool) []byte {
-	if msg.Type == tea.KeyRunes {
-		return []byte(string(msg.Runes))
+func keyToBytes(msg tea.KeyPressMsg, appCursor bool) []byte {
+	if msg.Text != "" {
+		return []byte(msg.Text)
 	}
+	ks := msg.Keystroke()
 	if appCursor {
-		if b, ok := keyBytesAppCursorMap[msg.Type]; ok {
+		if b, ok := keyBytesAppCursorMap[ks]; ok {
 			return b
 		}
 	}
-	if b, ok := keyBytesMap[msg.Type]; ok {
+	if b, ok := keyBytesMap[ks]; ok {
 		return b
 	}
 	// Fallback: try the raw string representation.

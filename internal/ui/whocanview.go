@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -77,7 +77,7 @@ func RenderWhoCanView(p WhoCanViewParams) string {
 		leftInner, contentHeight,
 	)
 	leftContent = PadToHeight(leftContent, contentHeight)
-	left := ActiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftContent)
+	left := BoxHeight(BoxWidth(ActiveColumnStyle, leftW), contentHeight).MaxHeight(contentHeight + 2).Render(leftContent)
 
 	rightContent := renderWhoCanSubjects(
 		p.Subjects, p.SubjectsScroll, p.Loading,
@@ -85,7 +85,7 @@ func RenderWhoCanView(p WhoCanViewParams) string {
 		middleInner, contentHeight,
 	)
 	rightContent = PadToHeight(rightContent, contentHeight)
-	right := InactiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
+	right := BoxHeight(BoxWidth(InactiveColumnStyle, middleW), contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 	// Footer row matches caniview: same vertical position, same role

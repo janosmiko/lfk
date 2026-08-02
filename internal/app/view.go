@@ -5,7 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -48,8 +49,25 @@ func isFullscreenRenderMode(mode viewMode) bool {
 	}
 }
 
-// View renders the UI.
-func (m Model) View() string {
+// View renders the UI and declares the terminal modes the program needs.
+//
+// Bubble Tea v2 takes alt-screen, focus reporting and mouse capture as fields
+// on the returned view rather than as program options or commands, so they are
+// re-declared on every render from model state. Mouse capture therefore
+// follows m.mouseCaptured directly — toggling the field is the whole
+// mechanism, no enable/disable command needed.
+func (m Model) View() tea.View {
+	v := tea.NewView(m.renderView())
+	v.AltScreen = true
+	v.ReportFocus = true
+	if m.mouseCaptured {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
+	return v
+}
+
+// renderView builds the screen content.
+func (m Model) renderView() string {
 	if m.width == 0 {
 		return "Loading..."
 	}
@@ -421,7 +439,7 @@ func (m Model) viewExplorer() string {
 	ui.ActiveSortColumnName = ""
 	middleCol = ui.PadToHeight(middleCol, contentHeight)
 	middleCol = ui.FillLinesBg(middleCol, middleInner, ui.BaseBg)
-	middle := ui.ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleCol)
+	middle := ui.BoxHeight(ui.BoxWidth(ui.ActiveColumnStyle, middleW), contentHeight).MaxHeight(contentHeight + 2).Render(middleCol)
 
 	columns := m.viewExplorerColumns(middle, leftW, leftInner, rightW, rightInner, contentHeight)
 
@@ -618,8 +636,8 @@ func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rig
 	rightCol = ui.PadToHeight(rightCol, contentHeight)
 	leftCol = ui.FillLinesBg(leftCol, leftInner, ui.BaseBg)
 	rightCol = ui.FillLinesBg(rightCol, rightInner, ui.BaseBg)
-	left := ui.InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
-	right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
+	left := ui.BoxHeight(ui.BoxWidth(ui.InactiveColumnStyle, leftW), contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
+	right := ui.BoxHeight(ui.BoxWidth(ui.InactiveColumnStyle, rightW), contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 }
 
@@ -641,7 +659,7 @@ func (m Model) viewExplorerTwoColMiddleRight(middle string, rightW, rightInner, 
 	ui.ActiveHighlightQuery = savedHighlight
 	rightCol = ui.PadToHeight(rightCol, contentHeight)
 	rightCol = ui.FillLinesBg(rightCol, rightInner, ui.BaseBg)
-	right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
+	right := ui.BoxHeight(ui.BoxWidth(ui.InactiveColumnStyle, rightW), contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
 	return lipgloss.JoinHorizontal(lipgloss.Top, middle, right)
 }
 

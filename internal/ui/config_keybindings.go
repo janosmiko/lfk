@@ -1,6 +1,11 @@
 package ui
 
-import "reflect"
+import (
+	"reflect"
+	"slices"
+	"strings"
+	"unicode"
+)
 
 // Keybindings defines configurable keybindings for the application.
 type Keybindings struct {
@@ -225,7 +230,7 @@ func DefaultKeybindings() Keybindings {
 		PasteApply: "ctrl+p", Diff: "d",
 
 		// Multi-selection
-		ToggleSelect: " ", SelectRange: "ctrl+@", SelectAll: "ctrl+a",
+		ToggleSelect: "space", SelectRange: "ctrl+@", SelectAll: "ctrl+a",
 
 		// Tabs. Move keys mirror the switch keys: "}" (shift+]) moves the
 		// active tab one slot right, "{" (shift+[) one slot left.
@@ -240,9 +245,10 @@ func DefaultKeybindings() Keybindings {
 
 		// Mouse capture toggle. Ctrl+Option+Y (Ctrl+Alt+Y) avoids the Ctrl+X
 		// collision with the bookmark-overlay delete and is hard to hit by
-		// accident; rebindable like any other key. Bubble Tea reports the
-		// Option/Alt prefix first, so the stored string is "alt+ctrl+y".
-		MouseToggle: "alt+ctrl+y",
+		// accident; rebindable like any other key. Bubble Tea prints modifiers
+		// in a fixed order (ctrl, alt, shift, ...), so the stored string is
+		// "ctrl+alt+y".
+		MouseToggle: "ctrl+alt+y",
 
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",
@@ -289,16 +295,82 @@ func DefaultKeybindings() Keybindings {
 	}
 }
 
-// MergeKeybindings copies non-empty string fields from src to dst.
+// MergeKeybindings copies non-empty string fields from src to dst,
+// normalising each value first.
 func MergeKeybindings(dst, src *Keybindings) {
 	dv := reflect.ValueOf(dst).Elem()
 	sv := reflect.ValueOf(src).Elem()
 	for i := range dv.NumField() {
 		sf := sv.Field(i)
 		if sf.Kind() == reflect.String && sf.String() != "" {
-			dv.Field(i).SetString(sf.String())
+			dv.Field(i).SetString(NormalizeKeybinding(sf.String()))
 		}
 	}
+}
+
+// modifierOrder is the order Bubble Tea prints modifiers in. Bindings are
+// matched by string, so a config written in any other order never fires.
+var modifierOrder = []string{"ctrl", "alt", "shift", "meta", "hyper", "super"}
+
+// NormalizeKeybinding rewrites a configured keystroke into the spelling the
+// terminal layer reports, so a binding written the natural way still fires:
+//
+//   - a literal space used to arrive as " " and now arrives as "space"
+//   - modifiers used to appear in the order the terminal sent them
+//     ("alt+ctrl+y") and are now always printed in modifierOrder ("ctrl+alt+y")
+//   - a shift chord reports the SHIFTED character, so "ctrl+shift+x" has to
+//     become "ctrl+shift+X" — the lowercase form never matches
+//   - shift on its own is not reported as a modifier at all; the terminal just
+//     sends the shifted character, so "shift+x" becomes plain "X"
+//
+// A binding naming an unrecognised modifier is returned untouched rather than
+// silently reordered into something that also would not match.
+func NormalizeKeybinding(s string) string {
+	if s == " " {
+		return "space"
+	}
+	if !strings.Contains(s, "+") {
+		return s
+	}
+	parts := strings.Split(s, "+")
+	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
+	if key == "" && len(mods) > 0 {
+		// The key itself is "+", e.g. "ctrl++".
+		key, mods = "+", mods[:len(mods)-1]
+	}
+	if len(mods) == 0 {
+		return s
+	}
+	seen := make(map[string]bool, len(mods))
+	for _, m := range mods {
+		seen[m] = true
+	}
+	ordered := make([]string, 0, len(mods)+1)
+	for _, m := range modifierOrder {
+		if seen[m] {
+			ordered = append(ordered, m)
+			delete(seen, m)
+		}
+	}
+	if len(seen) > 0 {
+		return s
+	}
+
+	// Shift is expressed in the character itself, not as a prefix, whenever the
+	// key is a single letter. Named keys (tab, up, f1) keep the prefix.
+	if isSingleLetter(key) && slices.Contains(ordered, "shift") {
+		key = strings.ToUpper(key)
+		if len(ordered) == 1 {
+			return key
+		}
+	}
+	return strings.Join(append(ordered, key), "+")
+}
+
+// isSingleLetter reports whether s is exactly one alphabetic rune.
+func isSingleLetter(s string) bool {
+	r := []rune(s)
+	return len(r) == 1 && unicode.IsLetter(r[0])
 }
 
 // ActiveKeybindings holds the currently active keybinding configuration.

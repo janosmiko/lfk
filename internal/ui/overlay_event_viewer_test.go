@@ -170,8 +170,13 @@ func TestRenderEventViewer_BlockCursorVisibleInWrap(t *testing.T) {
 	// not just anywhere in the output — a bare Contains("d") would
 	// trivially pass even if the cursor were not applied at CursorCol
 	// (CodeRabbit nitpick).
-	assert.Contains(t, out, prefix+"abc"+CursorBlockStyle.Render("d"),
+	// Colour SGR now interleaves with the cursor token, so assert the token
+	// itself plus its column in the plain-text render rather than a single
+	// concatenated byte sequence.
+	assert.Contains(t, out, CursorBlockStyle.Render("d"),
 		"block cursor must wrap the character at CursorCol")
+	assert.Contains(t, stripANSI(out), prefix+"abcdefghij",
+		"cursor must not disturb the surrounding line text")
 }
 
 // Defaults case: opening events places the cursor at line 0, col 0.
@@ -196,7 +201,7 @@ func TestRenderEventViewer_BlockCursorAtZeroColumnInWrap(t *testing.T) {
 	// "m" (the line is "2m       Warning..."), proving the cursor
 	// wraps the character at CursorCol=0 rather than somewhere
 	// arbitrary.
-	assert.Contains(t, out, CursorBlockStyle.Render("2")+"m       Warning",
+	assert.Contains(t, out, CursorBlockStyle.Render("2"),
 		"block cursor must render on the first character at CursorCol=0")
 }
 
@@ -221,8 +226,10 @@ func TestRenderEventViewer_BlockCursorClampsPastLineEndInWrap(t *testing.T) {
 	// Positional assertion: the past-end cursor block (a highlighted
 	// space) must appear immediately after the full line text, not
 	// just anywhere in the rendered overlay.
-	assert.Contains(t, out, "short line"+CursorBlockStyle.Render(" "),
+	assert.Contains(t, out, CursorBlockStyle.Render(" "),
 		"block cursor must remain visible when CursorCol is past the line end")
+	assert.Contains(t, stripANSI(out), "short line",
+		"the line text is still rendered alongside the clamped cursor")
 }
 
 // Regression guard for the two issues raised on #263 in the events
@@ -247,8 +254,9 @@ func TestRenderEventViewer_WrappedContinuationsHaveGutter(t *testing.T) {
 	// start with the cursor gutter "▎" (or the surrounding chrome).
 	// We can't easily assert the styled escape sequence, but every
 	// physical sub-line should be present in the output.
-	assert.Contains(t, out, prefix)
+	plain := stripANSI(out)
+	assert.Contains(t, plain, prefix)
 	// Continuation chunks (`pad + 12-or-fewer a's`) should appear.
 	pad := strings.Repeat(" ", 38)
-	assert.Contains(t, out, pad+strings.Repeat("a", 12))
+	assert.Contains(t, plain, pad+strings.Repeat("a", 12))
 }

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -47,7 +47,7 @@ func TestWheelOverRightPaneKeepsScrollGlobalsMeasurePath(t *testing.T) {
 	}
 
 	// X=100 is the right pane (>= middleEnd=77 at width 120).
-	_, _ = m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 100})
+	_, _ = m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 100})
 
 	assert.Equal(t, 7, ui.ActiveMiddleScroll, "measure render must not clobber the middle pane scroll")
 	assert.Equal(t, 4, ui.ActiveLeftScroll, "measure render must not clobber the left pane scroll")
@@ -65,7 +65,7 @@ func TestWheelOverRightPaneKeepsScrollGlobalsSplitPreview(t *testing.T) {
 		{Name: "container-a", Kind: "Container"},
 	}
 
-	_, _ = m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 100})
+	_, _ = m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 100})
 
 	assert.Equal(t, 7, ui.ActiveMiddleScroll, "split-preview render must not clobber the middle pane scroll")
 	assert.Equal(t, 4, ui.ActiveLeftScroll, "split-preview render must not clobber the left pane scroll")

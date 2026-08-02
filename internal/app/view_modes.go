@@ -2,11 +2,12 @@ package app
 
 import (
 	"fmt"
+	"image/color"
 	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/hinshun/vt10x"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -666,6 +667,6 @@ func (m Model) viewExecTerminal() string {
 }
 
 // vt10xColorToLipgloss converts a vt10x color to a lipgloss terminal color.
-func vt10xColorToLipgloss(c vt10x.Color) lipgloss.TerminalColor {
+func vt10xColorToLipgloss(c vt10x.Color) color.Color {
 	return lipgloss.Color(fmt.Sprintf("%d", int(c)))
 }

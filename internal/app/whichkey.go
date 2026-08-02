@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -187,7 +187,7 @@ func (m *Model) primeTypesReturnCursor(rt model.ResourceTypeEntry) {
 // the prefix and the popup (which-key semantics): a registered chord navigates,
 // and an unregistered key (e.g. gP) is swallowed as a silent noop rather than
 // falling through to the key's normal explorer action.
-func (m Model) handleGotoChord(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleGotoChord(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	key := msg.String()
 	if key == ui.ActiveKeybindings.JumpTop { // "g" -> belongs to gg jump-top
 		return m, nil, false

@@ -3,12 +3,12 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePodSelectOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.logView.podFilterActive {
 		return m.handleLogPodFilterMode(msg)
 	}
@@ -78,7 +78,7 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleLogPodSelectOverlayKey handles keyboard input for the inline pod selector
 // overlay shown within the log viewer (triggered by pressing P while viewing logs).
-func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.logView.podFilterActive {
 		return m.handleLogPodFilterMode(msg)
 	}
@@ -181,21 +181,21 @@ func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
 }
 
 // handleLogPodFilterMode handles keyboard input while the pod selector filter is active.
-func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogPodFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	fi := &stringFilterInput{ptr: &m.logView.podFilterText}
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(fi, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(fi, []rune(msg.Text)) {
 		case filterContinue:
 			m.overlayCursor = 0
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetLogPodFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetLogPodFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(fi, msg.String()) {
+	switch handleFilterKey(fi, msg) {
 	case filterEscape:
 		m.logView.podFilterActive = false
 		m.logView.podFilterText = ""
@@ -225,7 +225,7 @@ func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleLogContainerSelectOverlayKey handles keyboard input for the log container
 // filter overlay (triggered by pressing C in the log viewer).
-func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.logView.containerFilterActive {
 		return m.handleLogContainerFilterMode(msg)
 	}
@@ -244,7 +244,7 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 		m.logView.containerFilterText = ""
 		m.logView.containerFilterActive = false
 		return m, nil
-	case " ":
+	case "space":
 		m.logView.containerSelectionModified = true
 		// Toggle selection (namespace-selector style).
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
@@ -352,21 +352,21 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 }
 
 // handleLogContainerFilterMode handles keyboard input while the container selector filter is active.
-func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogContainerFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	fi := &stringFilterInput{ptr: &m.logView.containerFilterText}
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(fi, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(fi, []rune(msg.Text)) {
 		case filterContinue:
 			m.overlayCursor = 0
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetLogContainerFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetLogContainerFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(fi, msg.String()) {
+	switch handleFilterKey(fi, msg) {
 	case filterEscape:
 		m.logView.containerFilterActive = false
 		m.logView.containerFilterText = ""

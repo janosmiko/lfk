@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,9 +47,6 @@ func TestClusterColorTileBg(t *testing.T) {
 func TestClusterColorTileBgOver(t *testing.T) {
 	// Force a color-capable profile so the tile emits real escape codes;
 	// in a no-TTY test context lipgloss otherwise downgrades to no-color.
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 
 	origNoColor := ConfigNoColor
 	t.Cleanup(func() { ConfigNoColor = origNoColor })
@@ -63,7 +59,8 @@ func TestClusterColorTileBgOver(t *testing.T) {
 		// cyan is palette-relative (not theme-mapped), so it resolves to a
 		// concrete background regardless of ActiveTheme state in the test.
 		got := ClusterColorTileBgOver("cyan", outer)
-		const reset = "\x1b[0m"
+		// lipgloss v2 closes a styled run with the parameterless reset.
+		const reset = "\x1b[m"
 		resetIdx := strings.LastIndex(got, reset)
 		if !assert.GreaterOrEqualf(t, resetIdx, 0, "a colored tile must contain an SGR reset; got %q", got) {
 			return

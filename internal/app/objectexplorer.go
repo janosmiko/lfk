@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -242,7 +242,7 @@ func (m *Model) exitObjectExplorer() {
 
 // handleObjectExplorerKey routes input to the active sub-mode (find / filter
 // typing) or handles normal browsing keys.
-func (m Model) handleObjectExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleObjectExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.objectExplorerView.filterActive {
 		return m.handleObjectExplorerFilterKey(msg)
 	}
@@ -250,7 +250,7 @@ func (m Model) handleObjectExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleObjectExplorerNavKey handles normal browsing keys.
-func (m Model) handleObjectExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleObjectExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	kb := ui.ActiveKeybindings
 	rt := &m.objectExplorerView
 	n := len(rt.visible())
@@ -293,7 +293,7 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.toggleObjectExplorerLive()
 	case kb.TreeView:
 		return m.toggleObjectExplorerTree()
-	case " ", kb.ToggleFold:
+	case "space", kb.ToggleFold:
 		return m.toggleObjectExplorerTreeFold()
 	case kb.Refresh:
 		return m.refreshObjectExplorer()
@@ -341,7 +341,7 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleObjectExplorerFilterKey handles typing in the in-level filter input.
-func (m Model) handleObjectExplorerFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleObjectExplorerFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	rt := &m.objectExplorerView
 	switch msg.String() {
 	case "esc":
@@ -360,8 +360,8 @@ func (m Model) handleObjectExplorerFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		rt.cursor = 0
 		rt.previewScroll = 0
 	default:
-		if msg.Type == tea.KeyRunes {
-			rt.filter += string(msg.Runes)
+		if msg.Text != "" {
+			rt.filter += msg.Text
 			rt.cursor = 0
 			rt.previewScroll = 0
 		}

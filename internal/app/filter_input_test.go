@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,7 +12,7 @@ import (
 
 func TestHandleFilterKeyEscape(t *testing.T) {
 	ti := &TextInput{Value: "test", Cursor: 4}
-	action := handleFilterKey(ti, "esc")
+	action := handleFilterKey(ti, keyMsg("esc"))
 	assert.Equal(t, filterEscape, action)
 	// handleFilterKey does NOT clear the input; the caller decides behavior.
 	assert.Equal(t, "test", ti.Value)
@@ -22,7 +22,7 @@ func TestHandleFilterKeyEscape(t *testing.T) {
 
 func TestHandleFilterKeyEnter(t *testing.T) {
 	ti := &TextInput{Value: "test", Cursor: 4}
-	action := handleFilterKey(ti, "enter")
+	action := handleFilterKey(ti, keyMsg("enter"))
 	assert.Equal(t, filterAccept, action)
 	assert.Equal(t, "test", ti.Value)
 }
@@ -31,7 +31,7 @@ func TestHandleFilterKeyEnter(t *testing.T) {
 
 func TestHandleFilterKeyCtrlC(t *testing.T) {
 	ti := &TextInput{Value: "test", Cursor: 4}
-	action := handleFilterKey(ti, "ctrl+c")
+	action := handleFilterKey(ti, keyMsg("ctrl+c"))
 	assert.Equal(t, filterClose, action)
 }
 
@@ -39,7 +39,7 @@ func TestHandleFilterKeyCtrlC(t *testing.T) {
 
 func TestHandleFilterKeyBackspace(t *testing.T) {
 	ti := &TextInput{Value: "abc", Cursor: 3}
-	action := handleFilterKey(ti, "backspace")
+	action := handleFilterKey(ti, keyMsg("backspace"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "ab", ti.Value)
 	assert.Equal(t, 2, ti.Cursor)
@@ -47,7 +47,7 @@ func TestHandleFilterKeyBackspace(t *testing.T) {
 
 func TestHandleFilterKeyBackspaceEmpty(t *testing.T) {
 	ti := &TextInput{Value: "", Cursor: 0}
-	action := handleFilterKey(ti, "backspace")
+	action := handleFilterKey(ti, keyMsg("backspace"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "", ti.Value)
 }
@@ -56,14 +56,14 @@ func TestHandleFilterKeyBackspaceEmpty(t *testing.T) {
 
 func TestHandleFilterKeyCtrlW(t *testing.T) {
 	ti := &TextInput{Value: "hello world", Cursor: 11}
-	action := handleFilterKey(ti, "ctrl+w")
+	action := handleFilterKey(ti, keyMsg("ctrl+w"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "hello ", ti.Value)
 }
 
 func TestHandleFilterKeyCtrlWEmpty(t *testing.T) {
 	ti := &TextInput{Value: "", Cursor: 0}
-	action := handleFilterKey(ti, "ctrl+w")
+	action := handleFilterKey(ti, keyMsg("ctrl+w"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "", ti.Value)
 }
@@ -72,7 +72,7 @@ func TestHandleFilterKeyCtrlWEmpty(t *testing.T) {
 
 func TestHandleFilterKeyCtrlA(t *testing.T) {
 	ti := &TextInput{Value: "hello", Cursor: 3}
-	action := handleFilterKey(ti, "ctrl+a")
+	action := handleFilterKey(ti, keyMsg("ctrl+a"))
 	assert.Equal(t, filterNavigate, action)
 	assert.Equal(t, 0, ti.Cursor)
 }
@@ -81,7 +81,7 @@ func TestHandleFilterKeyCtrlA(t *testing.T) {
 
 func TestHandleFilterKeyCtrlE(t *testing.T) {
 	ti := &TextInput{Value: "hello", Cursor: 0}
-	action := handleFilterKey(ti, "ctrl+e")
+	action := handleFilterKey(ti, keyMsg("ctrl+e"))
 	assert.Equal(t, filterNavigate, action)
 	assert.Equal(t, 5, ti.Cursor)
 }
@@ -90,14 +90,14 @@ func TestHandleFilterKeyCtrlE(t *testing.T) {
 
 func TestHandleFilterKeyLeft(t *testing.T) {
 	ti := &TextInput{Value: "hello", Cursor: 3}
-	action := handleFilterKey(ti, "left")
+	action := handleFilterKey(ti, keyMsg("left"))
 	assert.Equal(t, filterNavigate, action)
 	assert.Equal(t, 2, ti.Cursor)
 }
 
 func TestHandleFilterKeyLeftAtStart(t *testing.T) {
 	ti := &TextInput{Value: "hello", Cursor: 0}
-	action := handleFilterKey(ti, "left")
+	action := handleFilterKey(ti, keyMsg("left"))
 	assert.Equal(t, filterNavigate, action)
 	assert.Equal(t, 0, ti.Cursor)
 }
@@ -106,14 +106,14 @@ func TestHandleFilterKeyLeftAtStart(t *testing.T) {
 
 func TestHandleFilterKeyRight(t *testing.T) {
 	ti := &TextInput{Value: "hello", Cursor: 3}
-	action := handleFilterKey(ti, "right")
+	action := handleFilterKey(ti, keyMsg("right"))
 	assert.Equal(t, filterNavigate, action)
 	assert.Equal(t, 4, ti.Cursor)
 }
 
 func TestHandleFilterKeyRightAtEnd(t *testing.T) {
 	ti := &TextInput{Value: "hello", Cursor: 5}
-	action := handleFilterKey(ti, "right")
+	action := handleFilterKey(ti, keyMsg("right"))
 	assert.Equal(t, filterNavigate, action)
 	assert.Equal(t, 5, ti.Cursor)
 }
@@ -122,7 +122,7 @@ func TestHandleFilterKeyRightAtEnd(t *testing.T) {
 
 func TestHandleFilterKeyInsertChar(t *testing.T) {
 	ti := &TextInput{Value: "", Cursor: 0}
-	action := handleFilterKey(ti, "a")
+	action := handleFilterKey(ti, keyMsg("a"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "a", ti.Value)
 	assert.Equal(t, 1, ti.Cursor)
@@ -130,7 +130,7 @@ func TestHandleFilterKeyInsertChar(t *testing.T) {
 
 func TestHandleFilterKeyInsertCharMidString(t *testing.T) {
 	ti := &TextInput{Value: "hllo", Cursor: 1}
-	action := handleFilterKey(ti, "e")
+	action := handleFilterKey(ti, keyMsg("e"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "hello", ti.Value)
 	assert.Equal(t, 2, ti.Cursor)
@@ -142,7 +142,7 @@ func TestHandleFilterKeyUnhandled(t *testing.T) {
 	// Multi-char key names like "tab" are ignored by handleFilterKey.
 	// Paste events are handled separately via handlePastedText.
 	ti := &TextInput{Value: "test", Cursor: 4}
-	action := handleFilterKey(ti, "tab")
+	action := handleFilterKey(ti, keyMsg("tab"))
 	assert.Equal(t, filterIgnored, action)
 	assert.Equal(t, "test", ti.Value)
 }
@@ -150,7 +150,7 @@ func TestHandleFilterKeyUnhandled(t *testing.T) {
 func TestHandleFilterKeyUnhandledControlChar(t *testing.T) {
 	// Single non-printable byte (e.g. raw control char) is ignored.
 	ti := &TextInput{Value: "test", Cursor: 4}
-	action := handleFilterKey(ti, "\x01")
+	action := handleFilterKey(ti, keyMsg("\x01"))
 	assert.Equal(t, filterIgnored, action)
 	assert.Equal(t, "test", ti.Value)
 }
@@ -245,19 +245,19 @@ func TestHandleFilterKeyWithStringAdapter(t *testing.T) {
 	s := ""
 	sfi := &stringFilterInput{ptr: &s}
 
-	action := handleFilterKey(sfi, "h")
+	action := handleFilterKey(sfi, keyMsg("h"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "h", s)
 
-	action = handleFilterKey(sfi, "i")
+	action = handleFilterKey(sfi, keyMsg("i"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "hi", s)
 
-	action = handleFilterKey(sfi, "backspace")
+	action = handleFilterKey(sfi, keyMsg("backspace"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, "h", s)
 
-	action = handleFilterKey(sfi, "esc")
+	action = handleFilterKey(sfi, keyMsg("esc"))
 	assert.Equal(t, filterEscape, action)
 }
 
@@ -333,7 +333,7 @@ func TestTemplateFilterModeViaShared_CtrlW(t *testing.T) {
 		width:              80,
 		height:             40,
 	}
-	ret, _ := m.handleTemplateFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleTemplateFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.templateFilter.Value)
 }
@@ -396,7 +396,7 @@ func TestLogContainerFilterModeViaShared_CtrlW(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogContainerFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleLogContainerFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.logView.containerFilterText)
 }
@@ -507,7 +507,7 @@ func TestCovHandleCommandBarKeyEsc(t *testing.T) {
 	m.commandBarActive = true
 	m.commandBarInput = TextInput{Value: "test"}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.False(t, r.(Model).commandBarActive)
 	assert.Empty(t, r.(Model).commandBarInput.Value)
 }
@@ -518,7 +518,7 @@ func TestCovHandleCommandBarKeyEnterEmpty(t *testing.T) {
 	m.commandBarInput = TextInput{Value: ""}
 	m.commandHistory = &commandHistory{cursor: -1}
 
-	r, cmd := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, cmd := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, r.(Model).commandBarActive)
 	assert.Nil(t, cmd)
 }
@@ -529,7 +529,7 @@ func TestCovHandleCommandBarKeyEnterQuit(t *testing.T) {
 	m.commandBarInput = TextInput{Value: "q", Cursor: 1}
 	m.commandHistory = &commandHistory{cursor: -1}
 
-	_, cmd := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.NotNil(t, cmd)
 }
 
@@ -542,11 +542,11 @@ func TestCovHandleCommandBarKeyUpDown(t *testing.T) {
 	}
 	m.commandBarInput = TextInput{Value: "current", Cursor: 7}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyUp})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyUp})
 	assert.Equal(t, "second", r.(Model).commandBarInput.Value)
 
 	m2 := r.(Model)
-	r, _ = m2.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyDown})
+	r, _ = m2.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyDown})
 	assert.Equal(t, "current", r.(Model).commandBarInput.Value)
 }
 
@@ -560,7 +560,7 @@ func TestCovHandleCommandBarKeyTab(t *testing.T) {
 	m.commandHistory = &commandHistory{cursor: -1}
 
 	// Tab accepts the ghost preview.
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyTab})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	assert.Contains(t, r.(Model).commandBarInput.Value, "get")
 }
 
@@ -571,7 +571,7 @@ func TestCovHandleCommandBarKeyCtrlN(t *testing.T) {
 	m.commandBarSelectedSuggestion = 0
 
 	// Ctrl+N cycles forward.
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlN})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	assert.Equal(t, 1, r.(Model).commandBarSelectedSuggestion)
 }
 
@@ -582,7 +582,7 @@ func TestCovHandleCommandBarKeyCtrlP(t *testing.T) {
 	m.commandBarSelectedSuggestion = 0
 
 	// Ctrl+P cycles backward (wraps).
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlP})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
 	assert.Equal(t, 2, r.(Model).commandBarSelectedSuggestion)
 }
 
@@ -592,7 +592,7 @@ func TestCovHandleCommandBarKeyBackspace(t *testing.T) {
 	m.commandBarInput = TextInput{Value: "get", Cursor: 3}
 	m.commandHistory = &commandHistory{cursor: -1}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "ge", r.(Model).commandBarInput.Value)
 }
 
@@ -602,7 +602,7 @@ func TestCovHandleCommandBarKeyCtrlW(t *testing.T) {
 	m.commandBarInput = TextInput{Value: "get pods", Cursor: 8}
 	m.commandHistory = &commandHistory{cursor: -1}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Equal(t, "get ", r.(Model).commandBarInput.Value)
 }
 
@@ -611,7 +611,7 @@ func TestCovHandleCommandBarKeyCtrlC(t *testing.T) {
 	m.commandBarActive = true
 	m.commandBarInput = TextInput{Value: "test"}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlC})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	assert.False(t, r.(Model).commandBarActive)
 }
 
@@ -621,7 +621,7 @@ func TestCovHandleCommandBarKeyInsert(t *testing.T) {
 	m.commandBarInput = TextInput{}
 	m.commandHistory = &commandHistory{cursor: -1}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	assert.Equal(t, "x", r.(Model).commandBarInput.Value)
 }
 
@@ -631,10 +631,10 @@ func TestCovHandleCommandBarKeyRightLeft(t *testing.T) {
 	m.commandBarInput = TextInput{Value: "hello", Cursor: 3}
 
 	// Right/left now always move cursor (no longer cycle suggestions).
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyRight})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyRight})
 	assert.Equal(t, 4, r.(Model).commandBarInput.Cursor)
 
-	r, _ = m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyLeft})
+	r, _ = m.handleCommandBarKey(tea.KeyPressMsg{Code: tea.KeyLeft})
 	assert.Equal(t, 2, r.(Model).commandBarInput.Cursor)
 }
 
@@ -643,10 +643,10 @@ func TestCovHandleCommandBarKeyCtrlAE(t *testing.T) {
 	m.commandBarActive = true
 	m.commandBarInput = TextInput{Value: "hello", Cursor: 3}
 
-	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	r, _ := m.handleCommandBarKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	assert.Equal(t, 0, r.(Model).commandBarInput.Cursor)
 
-	r, _ = m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	r, _ = m.handleCommandBarKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	assert.Equal(t, 5, r.(Model).commandBarInput.Cursor)
 }
 
@@ -654,7 +654,7 @@ func TestCovHandleErrorLogOverlayKeyEsc(t *testing.T) {
 	m := baseModelCov()
 	m.overlayErrorLog = true
 
-	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.False(t, r.(Model).overlayErrorLog)
 }
 
@@ -662,11 +662,11 @@ func TestCovHandleErrorLogOverlayKeyFullscreen(t *testing.T) {
 	m := baseModelCov()
 	m.overlayErrorLog = true
 
-	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyPressMsg{Code: 'F', Text: "F"})
 	assert.True(t, r.(Model).errorLogFullscreen)
 
 	m2 := r.(Model)
-	r, _ = m2.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
+	r, _ = m2.handleErrorLogOverlayKey(tea.KeyPressMsg{Code: 'F', Text: "F"})
 	assert.False(t, r.(Model).errorLogFullscreen)
 }
 
@@ -674,12 +674,12 @@ func TestCovHandleErrorLogOverlayKeyVisualMode(t *testing.T) {
 	m := baseModelCov()
 	m.overlayErrorLog = true
 
-	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'V'}})
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyPressMsg{Code: 'V', Text: "V"})
 	assert.Equal(t, byte('V'), r.(Model).errorLogVisualMode)
 
 	// Esc cancels visual mode.
 	m2 := r.(Model)
-	r, _ = m2.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m2.handleErrorLogOverlayKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, byte(0), r.(Model).errorLogVisualMode)
 }
 
@@ -688,7 +688,7 @@ func TestCovHandleQuitConfirmOverlayKey(t *testing.T) {
 	m.overlay = overlayQuitConfirm
 
 	// 'n' cancels.
-	r, _ := m.handleQuitConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, _ := m.handleQuitConfirmOverlayKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 }
 

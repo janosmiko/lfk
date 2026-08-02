@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // OverlayListFloor is the minimum overlay box width returned by
@@ -14,10 +14,9 @@ const OverlayListFloor = 70
 
 // overlayListChrome is the horizontal chrome that needs to be added to
 // the longest content row to compute the outer overlay width passed to
-// OverlayStyle.Width(). lipgloss treats Width() as the content area
-// INSIDE padding (the border lives outside and is rendered around the
-// styled output without counting toward Width), so the chrome that
-// affects width math is just the 2+2 cell padding.
+// BoxWidth(OverlayStyle, w), which sizes the content area INSIDE padding.
+// BoxWidth adds the border back on top, so the chrome that affects this
+// width math is just the 2+2 cell padding.
 const overlayListChrome = 4
 
 // OverlayListItem is a single row in the unified overlay list. Optional

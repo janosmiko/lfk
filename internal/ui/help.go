@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // innerPanelStyle is used for the content panel inside the help overlay.
@@ -28,23 +28,36 @@ type helpSection struct {
 	bindings []helpEntry
 }
 
+// helpKeyDisplayModifiers is the display casing for each modifier name.
+var helpKeyDisplayModifiers = map[string]string{
+	"ctrl": "Ctrl", "alt": "Alt", "shift": "Shift",
+	"meta": "Meta", "hyper": "Hyper", "super": "Super",
+}
+
 // helpKeyDisplay formats a keybinding value for display in the help screen.
-// It capitalizes "ctrl+" and "alt+" modifier prefixes for readability (e.g.
-// "alt+ctrl+y" -> "Alt+Ctrl+Y"); other bindings display verbatim.
+// A modified chord gets its modifiers capitalized and its key uppercased
+// ("ctrl+shift+x" -> "Ctrl+Shift+X", "shift+tab" -> "Shift+Tab"); an
+// unmodified binding displays verbatim.
 func helpKeyDisplay(key string) string {
-	if !strings.HasPrefix(key, "ctrl+") && !strings.HasPrefix(key, "alt+") {
+	parts := strings.Split(key, "+")
+	if len(parts) < 2 {
 		return key
 	}
-	parts := strings.Split(key, "+")
-	for i, p := range parts {
-		switch p {
-		case "ctrl":
-			parts[i] = "Ctrl"
-		case "alt":
-			parts[i] = "Alt"
-		default:
-			parts[i] = strings.ToUpper(p)
+	// Every leading segment must be a modifier, otherwise this is a plain
+	// binding that happens to contain "+" (e.g. the literal "+" key).
+	for _, p := range parts[:len(parts)-1] {
+		if _, ok := helpKeyDisplayModifiers[p]; !ok {
+			return key
 		}
+	}
+	for i, p := range parts[:len(parts)-1] {
+		parts[i] = helpKeyDisplayModifiers[p]
+	}
+	last := len(parts) - 1
+	if k := parts[last]; len([]rune(k)) == 1 {
+		parts[last] = strings.ToUpper(k)
+	} else {
+		parts[last] = strings.ToUpper(k[:1]) + k[1:]
 	}
 	return strings.Join(parts, "+")
 }
@@ -465,15 +478,12 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 
 	content := strings.Join(displayLines, "\n")
 	content = FillLinesBg(content, contentW-2, SurfaceBg) // -2 for innerPanelStyle padding
-	innerPanel := innerPanelStyle.
-		Width(contentW).
+	innerPanel := BoxWidth(innerPanelStyle, contentW).
 		Render(content)
 
 	body := title + "\n" + innerPanel
 	body = FillLinesBg(body, boxW-4, SurfaceBg) // -4 for OverlayStyle padding(1,2)
 
-	return OverlayStyle.
-		Width(boxW).
-		Height(boxH).
+	return BoxHeight(BoxWidth(OverlayStyle, boxW), boxH).
 		Render(body)
 }

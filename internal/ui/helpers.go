@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // PadToHeight ensures a string has exactly `height` newline-separated lines,

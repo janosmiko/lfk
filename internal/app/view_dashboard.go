@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -150,7 +150,7 @@ func (m Model) viewExplorerDashboardSingleCol(dashContent string, fullW, content
 	}
 	dashCol := ui.PadToHeight(dashContent, contentHeight)
 	dashCol = ui.FillLinesBg(dashCol, m.width-4, ui.BaseBg)
-	return ui.ActiveColumnStyle.Width(fullW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
+	return ui.BoxHeight(ui.BoxWidth(ui.ActiveColumnStyle, fullW), contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
 }
 
 // dashboardColumnWidths computes the left/right column widths for the
@@ -223,7 +223,7 @@ func (m Model) viewExplorerDashboardTwoCol(dashContent string, fullW, contentHei
 	// terminal's default background, which "tears" black rectangles into the
 	// dashboard under themes whose base colour isn't black.
 	dashCol = ui.FillLinesBg(dashCol, leftW+1+rightW, ui.BaseBg)
-	return ui.ActiveColumnStyle.Width(fullW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
+	return ui.BoxHeight(ui.BoxWidth(ui.ActiveColumnStyle, fullW), contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
 }
 
 // scrollContent applies scroll offset to a newline-separated content string.

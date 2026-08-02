@@ -1,12 +1,12 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle log filter input mode.
 	if m.logView.filterActive {
 		return m.handleLogFilterKey(msg)
@@ -34,7 +34,7 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleLogMovementKey handles cursor/scroll movement keys in the log viewer.
-func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleLogMovementKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case "j", "down":
 		ret := m.handleLogKeyJ()
@@ -107,7 +107,7 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 }
 
 // handleLogActionKey handles action/mode keys in the log viewer.
-func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleLogActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case kb.Help, "f1":
@@ -196,7 +196,7 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if op, motion, ok := m.consumeTextObjectPrelude(key); ok {
 		return m.applyLogTextObject(op, motion)
@@ -270,7 +270,7 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.logView.searchActive = false
@@ -317,9 +317,8 @@ func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.logView.searchInput.Insert(key)
+		if msg.Text != "" {
+			m.logView.searchInput.Insert(msg.Text)
 			// Live-update the highlight query so matches paint as the user
 			// types. Enter still "commits" search-input mode and triggers
 			// findNextLogMatch; before that the user only saw the input

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -140,7 +140,7 @@ func TestLogKeyHashTogglesLineNumbers(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'#'}})
+	ret, _ := m.handleLogKey(tea.KeyPressMsg{Code: '#', Text: "#"})
 	result := ret.(Model)
 	assert.True(t, result.logView.lineNumbers)
 }
@@ -355,7 +355,7 @@ func TestLogKeyCtrlDHalfPageDown(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleLogKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Greater(t, result.logView.cursor, 0)
 }
@@ -371,7 +371,7 @@ func TestLogKeyCtrlUHalfPageUp(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleLogKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Less(t, result.logView.cursor, 50)
 }
@@ -387,7 +387,7 @@ func TestLogKeyCtrlFFullPageDown(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _ := m.handleLogKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Greater(t, result.logView.cursor, 0)
 }
@@ -403,7 +403,7 @@ func TestLogKeyCtrlBFullPageUp(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _ := m.handleLogKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Less(t, result.logView.cursor, 50)
 }
@@ -570,7 +570,7 @@ func TestLogKeyCtrlVEntersBlockVisualMode(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+	ret, _ := m.handleLogKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.True(t, result.logView.visualMode)
 	assert.Equal(t, rune('B'), result.logView.visualType)
@@ -697,7 +697,7 @@ func TestLogVisualKeyCtrlVToggle(t *testing.T) {
 			width:  80,
 			height: 40,
 		}
-		ret, _ := m.handleLogVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+		ret, _ := m.handleLogVisualKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.logView.visualMode)
 	})
@@ -714,7 +714,7 @@ func TestLogVisualKeyCtrlVToggle(t *testing.T) {
 			width:  80,
 			height: 40,
 		}
-		ret, _ := m.handleLogVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+		ret, _ := m.handleLogVisualKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.True(t, result.logView.visualMode)
 		assert.Equal(t, rune('B'), result.logView.visualType)
@@ -876,7 +876,7 @@ func TestLogVisualKeyCtrlDU(t *testing.T) {
 			width:  80,
 			height: 40,
 		}
-		ret, _ := m.handleLogVisualKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		ret, _ := m.handleLogVisualKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Greater(t, result.logView.cursor, 0)
 	})
@@ -894,7 +894,7 @@ func TestLogVisualKeyCtrlDU(t *testing.T) {
 			width:  80,
 			height: 40,
 		}
-		ret, _ := m.handleLogVisualKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+		ret, _ := m.handleLogVisualKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Less(t, result.logView.cursor, 50)
 	})

@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -11,7 +11,7 @@ import (
 // overlay's / search bar is active. Mirrors the describe-view search bar:
 // printable keys live-update the highlight query, Enter commits and jumps
 // to the first match, Esc cancels.
-func (m Model) handleNetpolSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleNetpolSearchKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.netpolSearchActive = false
@@ -41,9 +41,8 @@ func (m Model) handleNetpolSearchKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "right":
 		m.netpolSearchInput.Right()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.netpolSearchInput.Insert(key)
+		if msg.Text != "" {
+			m.netpolSearchInput.Insert(msg.Text)
 			// Live-update the highlight query so matches paint as the
 			// user types instead of waiting for Enter to commit.
 			m.netpolSearchQuery = m.netpolSearchInput.Value
@@ -102,11 +101,12 @@ func (m Model) findNetpolMatch(forward bool) (Model, tea.Cmd) {
 // handleNetpolWheel scrolls the network policy overlay on mouse wheel
 // ticks. The 3-line step matches the explorer-mode wheel speed.
 func (m Model) handleNetpolWheel(msg tea.MouseMsg) Model {
+	mouse := msg.Mouse()
 	const wheelStep = 3
-	switch msg.Button {
-	case tea.MouseButtonWheelDown:
+	switch mouse.Button {
+	case tea.MouseWheelDown:
 		m.netpolScroll = min(m.netpolScroll+wheelStep, m.netpolMaxScroll())
-	case tea.MouseButtonWheelUp:
+	case tea.MouseWheelUp:
 		m.netpolScroll = max(m.netpolScroll-wheelStep, 0)
 	}
 	return m

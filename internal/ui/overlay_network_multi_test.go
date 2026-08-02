@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -220,7 +220,7 @@ func TestRenderNetworkPolicyOverlay_ScrollbarReplacesIndicator(t *testing.T) {
 	bottom := RenderNetworkPolicyOverlay(info, OverlayMaxScroll(NetworkPolicyOverlayLineCount(info, width), height), width, height, "")
 	topRows := strings.SplitN(out, "\n", 2)
 	bottomRows := strings.SplitN(bottom, "\n", 2)
-	assert.True(t, strings.HasSuffix(topRows[0], "█"), "thumb starts at the top row")
+	assert.True(t, strings.HasSuffix(stripANSI(topRows[0]), "█"), "thumb starts at the top row")
 	assert.False(t, strings.HasSuffix(bottomRows[0], "█"), "thumb must leave the top row when scrolled to the bottom")
 }
 

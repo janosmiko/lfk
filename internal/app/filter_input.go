@@ -1,6 +1,11 @@
 package app
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // filterAction describes the outcome of a key press inside a filter input.
 type filterAction int
@@ -177,10 +182,10 @@ func handlePastedText(input FilterInput, runes []rune) filterAction {
 // mode flag changes (esc/enter behavior varies per overlay) and any
 // overlay-specific side effects (cursor resets, preview updates, etc.).
 //
-// NOTE: Callers must check msg.Paste BEFORE calling this function and
+// NOTE: Callers must check isPaste(msg) BEFORE calling this function and
 // use handlePastedText instead for paste events.
-func handleFilterKey(input FilterInput, key string) filterAction {
-	switch key {
+func handleFilterKey(input FilterInput, msg tea.KeyPressMsg) filterAction {
+	switch msg.String() {
 	case "esc":
 		return filterEscape
 	case "enter":
@@ -209,10 +214,29 @@ func handleFilterKey(input FilterInput, key string) filterAction {
 		input.Right()
 		return filterNavigate
 	default:
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			input.Insert(key)
+		// Text is non-empty only for keys that produce characters, so it is
+		// both the printable test and the payload. Matching on String() would
+		// insert key names like "space" literally.
+		if isTypedText(msg.Text) {
+			input.Insert(msg.Text)
 			return filterContinue
 		}
 		return filterIgnored
 	}
+}
+
+// isTypedText reports whether s is text a user actually typed and a filter
+// input should accept. A real terminal leaves Key.Text empty for control
+// chords, but guard anyway so a synthesized key cannot inject a control
+// character into an input.
+func isTypedText(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
 }

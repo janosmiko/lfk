@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
+	"charm.land/bubbles/v2/spinner"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"

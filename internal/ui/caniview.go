@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -66,14 +66,14 @@ func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor
 	leftContent := leftHeader + "\n" + strings.Join(leftLines, "\n")
 	leftContent = PadToHeight(leftContent, contentHeight)
 
-	left := ActiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftContent)
+	left := BoxHeight(BoxWidth(ActiveColumnStyle, leftW), contentHeight).MaxHeight(contentHeight + 2).Render(leftContent)
 
 	// Middle column: resources with verb summary (display-only, no cursor).
 	middleLines := renderCanIResources(resources, middleInner, contentHeight-1, resourceScroll)
 	middleHeader := DimStyle.Bold(true).Render(renderCanIMiddleHeader(middleInner))
 	middleContent := middleHeader + "\n" + strings.Join(middleLines, "\n")
 	middleContent = PadToHeight(middleContent, contentHeight)
-	middle := InactiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleContent)
+	middle := BoxHeight(BoxWidth(InactiveColumnStyle, middleW), contentHeight).MaxHeight(contentHeight + 2).Render(middleContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle)
 

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -134,7 +134,7 @@ func TestHandleConfirmOverlayKey_RestartDispatchesBulkRestart(t *testing.T) {
 		resourceType: model.ResourceTypeEntry{Resource: "deployments"},
 	}
 
-	model, cmd := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	model, cmd := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := model.(Model)
 
 	require.NotNil(t, cmd, "confirm must dispatch a command for bulk Restart")
@@ -167,7 +167,7 @@ func TestHandleConfirmOverlayKey_BulkDeleteClearsBulkSnapshot(t *testing.T) {
 		resourceType: model.ResourceTypeEntry{Resource: "pods", Namespaced: true},
 	}
 
-	res, cmd := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	res, cmd := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := res.(Model)
 
 	require.NotNil(t, cmd, "bulk delete must dispatch a command")
@@ -191,7 +191,7 @@ func TestHandleConfirmTypeOverlayKey_BulkForceDeleteClearsBulkSnapshot(t *testin
 		resourceType: model.ResourceTypeEntry{Resource: "pods", Namespaced: true},
 	}
 
-	res, cmd := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	res, cmd := m.handleConfirmTypeOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := res.(Model)
 
 	require.NotNil(t, cmd, "bulk force delete must dispatch a command")
@@ -214,7 +214,7 @@ func TestHandleScaleOverlayKey_BulkScaleClearsBulkSnapshot(t *testing.T) {
 		resourceType: model.ResourceTypeEntry{Resource: "deployments", Namespaced: true},
 	}
 
-	res, cmd := m.handleScaleOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	res, cmd := m.handleScaleOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := res.(Model)
 
 	require.NotNil(t, cmd, "bulk scale must dispatch a command")
@@ -229,7 +229,7 @@ func TestHandleConfirmOverlayKey_CancelClearsBulkSnapshot(t *testing.T) {
 	m.overlay = overlayConfirm
 	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
 
-	res, _ := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	res, _ := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := res.(Model)
 
 	assert.False(t, rm.bulkMode, "cancelling a bulk delete must reset bulkMode")
@@ -244,7 +244,7 @@ func TestHandleConfirmTypeOverlayKey_CancelClearsBulkSnapshot(t *testing.T) {
 	m.confirmTypeInput = TextInput{Value: "DEL"}
 	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
 
-	res, _ := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	res, _ := m.handleConfirmTypeOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := res.(Model)
 
 	assert.False(t, rm.bulkMode, "cancelling a bulk force delete must reset bulkMode")
@@ -258,7 +258,7 @@ func TestHandleScaleOverlayKey_CancelClearsBulkSnapshot(t *testing.T) {
 	m.scaleInput = TextInput{Value: "3"}
 	m.bulkItems = []model.Item{{Name: "deploy-1", Namespace: "default", Kind: "Deployment"}}
 
-	res, _ := m.handleScaleOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	res, _ := m.handleScaleOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := res.(Model)
 
 	assert.False(t, rm.bulkMode, "cancelling a bulk scale must reset bulkMode")
@@ -278,7 +278,7 @@ func TestHandleConfirmOverlayKey_ReadOnlyBlockedClearsBulkSnapshot(t *testing.T)
 	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
 	m.actionCtx = actionContext{context: "test-ctx", kind: "Pod"}
 
-	res, _ := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	res, _ := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := res.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay, "read-only block must close the overlay")
@@ -296,7 +296,7 @@ func TestHandleConfirmTypeOverlayKey_ReadOnlyBlockedClearsBulkSnapshot(t *testin
 	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
 	m.actionCtx = actionContext{context: "test-ctx", kind: "Pod"}
 
-	res, _ := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	res, _ := m.handleConfirmTypeOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := res.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay, "read-only block must close the overlay")
@@ -329,7 +329,7 @@ func TestHandleOverlayKey_ToggleCloseClearsBulkSnapshot(t *testing.T) {
 	m.overlay = overlayAction
 	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
 
-	res, _ := m.handleOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(ui.ActiveKeybindings.ActionMenu)})
+	res, _ := m.handleOverlayKey(keyPressText(ui.ActiveKeybindings.ActionMenu))
 	rm := res.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay, "toggle key must close the bulk action menu")

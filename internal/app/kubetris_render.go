@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -373,7 +373,7 @@ func overlayPaused(width, height int) string {
 }
 
 // handleKubetrisKey processes keyboard input during the Kubetris game.
-func (m Model) handleKubetrisKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKubetrisKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	g := m.kubetrisGame
 	if g == nil {
 		m.mode = modeExplorer
@@ -421,7 +421,7 @@ func (m Model) handleKubetrisKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		rescheduleLock = g.rotateCW()
 	case "i", "d":
 		rescheduleLock = g.rotateCCW()
-	case " ":
+	case "space":
 		g.hardDrop()
 		if g.gameOver {
 			g.saveHighScore()

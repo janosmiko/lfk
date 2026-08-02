@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -865,7 +865,7 @@ func TestHandleFilterKeyPasteAfterRecallLeavesBrowse(t *testing.T) {
 	require.NotEqual(t, -1, m.queryHistory.cursor)
 
 	// Paste: must mutate the input and exit history-browse.
-	pasteMsg := tea.KeyMsg{Runes: []rune("XYZ"), Paste: true}
+	pasteMsg := pasteKey("XYZ")
 	result, _ = m.handleFilterKey(pasteMsg)
 	m = result.(Model)
 	require.Equal(t, "defaultXYZ", m.filterInput.Value)
@@ -887,7 +887,7 @@ func TestHandleSearchKeyPasteAfterRecallLeavesBrowse(t *testing.T) {
 	require.Equal(t, "redis", m.searchInput.Value)
 	require.NotEqual(t, -1, m.queryHistory.cursor)
 
-	pasteMsg := tea.KeyMsg{Runes: []rune("XYZ"), Paste: true}
+	pasteMsg := pasteKey("XYZ")
 	result, _ = m.handleSearchKey(pasteMsg)
 	m = result.(Model)
 	require.Equal(t, "redisXYZ", m.searchInput.Value)
@@ -970,7 +970,7 @@ func TestCovHandleFilterKeyEnter(t *testing.T) {
 	m.filterActive = true
 	m.filterInput = TextInput{Value: "test"}
 
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, "test", r.(Model).filterText)
 	assert.False(t, r.(Model).filterActive)
 }
@@ -982,7 +982,7 @@ func TestCovHandleFilterKeyEsc(t *testing.T) {
 	m.filterInput = TextInput{Value: "test"}
 	m.filterText = "test"
 
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.False(t, r.(Model).filterActive)
 	assert.Empty(t, r.(Model).filterText)
 }
@@ -993,7 +993,7 @@ func TestCovHandleFilterKeyBackspace(t *testing.T) {
 	m.filterActive = true
 	m.filterInput = TextInput{Value: "test", Cursor: 4}
 
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "tes", r.(Model).filterInput.Value)
 }
 
@@ -1002,7 +1002,7 @@ func TestCovHandleFilterKeyCtrlW(t *testing.T) {
 	m.cursors = [5]int{}
 	m.filterInput = TextInput{Value: "hello world", Cursor: 11}
 
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Equal(t, "hello ", r.(Model).filterInput.Value)
 }
 
@@ -1011,18 +1011,18 @@ func TestCovHandleFilterKeyCursorMovement(t *testing.T) {
 	m.cursors = [5]int{}
 	m.filterInput = TextInput{Value: "hello", Cursor: 3}
 
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	assert.Equal(t, 0, r.(Model).filterInput.Cursor)
 
-	r, _ = m.handleFilterKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	r, _ = m.handleFilterKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	assert.Equal(t, 5, r.(Model).filterInput.Cursor)
 
 	m.filterInput.Cursor = 3
-	r, _ = m.handleFilterKey(tea.KeyMsg{Type: tea.KeyLeft})
+	r, _ = m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyLeft})
 	assert.Equal(t, 2, r.(Model).filterInput.Cursor)
 
 	m.filterInput.Cursor = 3
-	r, _ = m.handleFilterKey(tea.KeyMsg{Type: tea.KeyRight})
+	r, _ = m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyRight})
 	assert.Equal(t, 4, r.(Model).filterInput.Cursor)
 }
 
@@ -1031,7 +1031,7 @@ func TestCovHandleFilterKeyInsert(t *testing.T) {
 	m.cursors = [5]int{}
 	m.filterInput = TextInput{Value: "", Cursor: 0}
 
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	assert.Equal(t, "x", r.(Model).filterInput.Value)
 }
 
@@ -1359,7 +1359,7 @@ func TestCovFilterKeyTyping(t *testing.T) {
 func TestCovCommandBarKeyHelpSearchActive(t *testing.T) {
 	m := baseModelSearch()
 	m.helpSearchActive = true
-	result, _ := m.handleHelpKey(tea.KeyMsg{Type: tea.KeyCtrlC})
+	result, _ := m.handleHelpKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	_ = result
 }
 
@@ -1384,7 +1384,7 @@ func TestCovHandleFilterKeyAllActions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ti := &TextInput{Value: "hello", Cursor: 3}
-			result := handleFilterKey(ti, tt.key)
+			result := handleFilterKey(ti, keyMsg(tt.key))
 			assert.Equal(t, tt.expect, result)
 		})
 	}

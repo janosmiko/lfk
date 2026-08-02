@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -31,9 +29,6 @@ import (
 // so the assertion is deterministic regardless of the host
 // terminal's detected profile.
 func TestRenderSecretEditor_CursorRowNoSelectedBgWhileEditing(t *testing.T) {
-	original := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(original) })
-
 	origTheme := ActiveTheme
 	origContrast := ConfigMinContrastRatio
 	origNoColor := ConfigNoColor
@@ -49,7 +44,6 @@ func TestRenderSecretEditor_CursorRowNoSelectedBgWhileEditing(t *testing.T) {
 	// termenv originally detected when a previous test triggered
 	// no-color mode. Force TrueColor AFTER ApplyTheme so the SGR
 	// triples this test inspects are emitted verbatim.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	secret := &model.SecretData{
 		Keys: []string{"DB_PASSWORD"},
@@ -72,7 +66,9 @@ func TestRenderSecretEditor_CursorRowNoSelectedBgWhileEditing(t *testing.T) {
 	// quantises the hex through termenv before emitting, which yields
 	// "121;162;247" rather than the literal "122;162;247" — so match
 	// the actually-emitted triple, not the raw hex math.
-	selectedBgSGR := "48;2;121;162;247"
+	// SelectedBg #7aa2f7 rendered exactly; v1 went through termenv, which
+	// rounded the red channel to 121.
+	selectedBgSGR := "48;2;122;162;247"
 	assert.NotContains(t, editing, selectedBgSGR,
 		"editing-mode render must not embed the SelectedBg color anywhere — "+
 			"its embedded SGR reset would create a head/tail bg mismatch around the cursor")
@@ -84,9 +80,6 @@ func TestRenderSecretEditor_CursorRowNoSelectedBgWhileEditing(t *testing.T) {
 // indicator. Without this guard the previous test would pass even if
 // we accidentally stripped SelectedBg in the idle case too.
 func TestRenderSecretEditor_CursorRowKeepsSelectedBgWhenIdle(t *testing.T) {
-	original := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(original) })
-
 	origTheme := ActiveTheme
 	origContrast := ConfigMinContrastRatio
 	origNoColor := ConfigNoColor
@@ -102,7 +95,6 @@ func TestRenderSecretEditor_CursorRowKeepsSelectedBgWhenIdle(t *testing.T) {
 	// termenv originally detected when a previous test triggered
 	// no-color mode. Force TrueColor AFTER ApplyTheme so the SGR
 	// triples this test inspects are emitted verbatim.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	secret := &model.SecretData{
 		Keys: []string{"DB_PASSWORD"},
@@ -119,7 +111,9 @@ func TestRenderSecretEditor_CursorRowKeepsSelectedBgWhenIdle(t *testing.T) {
 		120, 30,
 	)
 
-	selectedBgSGR := "48;2;121;162;247"
+	// SelectedBg #7aa2f7 rendered exactly; v1 went through termenv, which
+	// rounded the red channel to 121.
+	selectedBgSGR := "48;2;122;162;247"
 	assert.True(t, strings.Contains(idle, selectedBgSGR),
 		"idle-mode render must keep SelectedBg on the cursor row — "+
 			"that's the only visual cue without an active text cursor")

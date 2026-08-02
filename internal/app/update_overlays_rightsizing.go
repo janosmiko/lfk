@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -24,7 +24,7 @@ import (
 //   - y       → copy as strategic-merge YAML container block
 //   - [ / ]   → cycle strategy (vim-style wrap, no-op when 1 strategy)
 //   - < / >   → cycle headroom multiplier (vim-style wrap, snap-to-nearest)
-func (m Model) handleRightsizingOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRightsizingOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.overlay = overlayNone

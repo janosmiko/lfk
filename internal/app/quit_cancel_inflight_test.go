@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,10 +39,7 @@ func TestHandleQuitConfirmOverlayKey_CancelsInFlightRequests(t *testing.T) {
 	require.NoError(t, reqCtx.Err(),
 		"precondition: reqCtx must not be canceled before quit")
 
-	result, cmd := m.handleQuitConfirmOverlayKey(tea.KeyMsg{
-		Type:  tea.KeyRunes,
-		Runes: []rune{'y'},
-	})
+	result, cmd := m.handleQuitConfirmOverlayKey(tea.KeyPressMsg{Code: 'y', Text: "y"})
 
 	require.NotNil(t, cmd, "quit handler must dispatch tea.Quit")
 	_ = result.(Model)

@@ -3,7 +3,7 @@ package app
 import (
 	"maps"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) updateSecretDataLoaded(msg secretDataLoadedMsg) (tea.Model, tea.Cmd) {

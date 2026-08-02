@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -64,7 +64,7 @@ func (m *Model) editorFormatCancel() {
 // filter active but exits input mode), printable characters extend
 // the query. Cursor clamps to the new filtered list size after each
 // edit so the user never lands on an out-of-range index.
-func (m Model) handleEditorSearchKey(msg tea.KeyMsg, clampCursor func(*Model)) (tea.Model, tea.Cmd) {
+func (m Model) handleEditorSearchKey(msg tea.KeyPressMsg, clampCursor func(*Model)) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.editorSearch.active = false
@@ -80,8 +80,8 @@ func (m Model) handleEditorSearchKey(msg tea.KeyMsg, clampCursor func(*Model)) (
 		clampCursor(&m)
 		return m, nil
 	}
-	if len(msg.Runes) > 0 {
-		m.editorSearch.query.Insert(string(msg.Runes))
+	if msg.Text != "" {
+		m.editorSearch.query.Insert(msg.Text)
 		clampCursor(&m)
 	}
 	return m, nil

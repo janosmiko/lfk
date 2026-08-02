@@ -1132,6 +1132,55 @@ Custom actions defined in the config file appear after the built-in actions.
 
 All keybindings can be overridden in `~/.config/lfk/config.yaml`. Only specify the keys you want to change — defaults apply for everything else.
 
+### Key string syntax
+
+| Form | Example | Notes |
+|---|---|---|
+| Plain key | `j`, `G`, `/` | Single character |
+| Named key | `enter`, `esc`, `tab`, `space`, `backspace`, `up`, `pgdown`, `f1` | Use `space`, not `" "` |
+| Modified key | `ctrl+d`, `alt+y`, `shift+tab` | |
+| Modifier chord | `ctrl+alt+y`, `ctrl+shift+x` | Order: `ctrl`, `alt`, `shift`, `meta`, `hyper`, `super` |
+
+Case is significant — `d` (diff) and `D` (delete) are different keys. The one exception is `shift`, which already implies the shifted character, so these are normalised on load:
+
+| Written | Stored | Why |
+|---|---|---|
+| `shift+ctrl+x` | `ctrl+shift+X` | Modifiers reordered; terminals report the shifted character |
+| `ctrl+shift+x` | `ctrl+shift+X` | Same |
+| `shift+x` | `X` | Shift alone is not reported as a modifier |
+| `shift+tab` | `shift+tab` | Named keys keep the modifier |
+
+The legacy `" "` spelling for space is also accepted and normalised to `space`.
+
+### Ctrl+Shift chords
+
+`Ctrl+Shift+<key>` is bindable and stays distinct from plain `Ctrl+<key>`, so `ctrl+x` and `ctrl+shift+x` can trigger different actions.
+
+**This requires terminal support.** A terminal that reports only legacy control codes cannot express the difference — `Ctrl+Shift+X` arrives as plain `Ctrl+X`, and the chord binding silently never fires. lfk requests the capability on every render via both mechanisms below; the terminal has to answer:
+
+- **Kitty keyboard protocol** — Ghostty, kitty, WezTerm, foot, recent Alacritty
+- **xterm `modifyOtherKeys`** — xterm and close derivatives
+
+macOS Terminal.app supports neither and cannot use Ctrl+Shift bindings.
+
+Under tmux you also need extended keys forwarded, or tmux flattens the chord before lfk sees it:
+
+```tmux
+set -s extended-keys on
+set -as terminal-features '<your-outer-TERM>:extkeys'   # e.g. xterm-ghostty
+```
+
+Check what tmux thinks your outer terminal is with `tmux display -p '#{client_termname}'` — the `terminal-features` pattern must match it.
+
+No default binding uses Ctrl+Shift, so nothing breaks on a terminal without support. To verify yours, bind one temporarily and press it:
+
+```yaml
+keybindings:
+  force_delete: "ctrl+shift+x"
+```
+
+Avoid `ctrl+i`, `ctrl+m`, and `ctrl+[` — terminals emit those as `tab`, `enter`, and `esc`.
+
 For example, to swap the live-log preview and the fullscreen log viewer (fullscreen on plain `L`, preview on `Ctrl+L`):
 
 ```yaml
@@ -1210,7 +1259,7 @@ keybindings:
   diff: "d"              # Diff resources
 
   # Multi-selection
-  toggle_select: " "     # Toggle selection (space)
+  toggle_select: "space" # Toggle selection (space bar)
   select_range: "ctrl+@" # Select range (Ctrl+Space)
   select_all: "ctrl+a"   # Select all
 

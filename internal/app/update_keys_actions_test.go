@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -166,7 +166,7 @@ func TestActionKeyCtrlDHalfPageDown(t *testing.T) {
 	m.middleItems = items
 	m.setCursor(0)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Greater(t, result.cursor(), 0)
@@ -183,7 +183,7 @@ func TestActionKeyCtrlUHalfPageUp(t *testing.T) {
 	m.middleItems = items
 	m.setCursor(30)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Less(t, result.cursor(), 30)
@@ -200,7 +200,7 @@ func TestActionKeyCtrlFFullPageDown(t *testing.T) {
 	m.middleItems = items
 	m.setCursor(0)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Greater(t, result.cursor(), 0)
@@ -217,7 +217,7 @@ func TestActionKeyCtrlBFullPageUp(t *testing.T) {
 	m.middleItems = items
 	m.setCursor(50)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Less(t, result.cursor(), 50)
@@ -655,7 +655,7 @@ func TestActionKeyBangOpensErrorLog(t *testing.T) {
 func TestActionKeyUnhandledReturnsFalse(t *testing.T) {
 	m := baseExplorerModel()
 
-	_, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'^'}})
+	_, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: '^', Text: "^"})
 	assert.False(t, handled)
 }
 
@@ -670,7 +670,7 @@ func TestActionKeyCtrlDInFullscreenDashboard(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}}
 	m.dashboardPreview = strings.Repeat("dashboard line\n", 200)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Greater(t, result.previewScroll, 0)
@@ -684,7 +684,7 @@ func TestActionKeyCtrlUInFullscreenDashboard(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}}
 	m.dashboardPreview = strings.Repeat("dashboard line\n", 200)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Less(t, result.previewScroll, 50)
@@ -698,7 +698,7 @@ func TestActionKeyCtrlFInFullscreenDashboard(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}}
 	m.dashboardPreview = strings.Repeat("dashboard line\n", 200)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Greater(t, result.previewScroll, 0)
@@ -712,7 +712,7 @@ func TestActionKeyCtrlBInFullscreenDashboard(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}}
 	m.dashboardPreview = strings.Repeat("dashboard line\n", 200)
 
-	ret, _, handled := m.handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _, handled := m.handleExplorerActionKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Less(t, result.previewScroll, 50)

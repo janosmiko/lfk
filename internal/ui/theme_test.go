@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 )

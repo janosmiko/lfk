@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -188,7 +188,7 @@ func TestSecretEditor_CtrlSUnderActiveFilterMutatesVisibleKey(t *testing.T) {
 	assert.Equal(t, "BETA", r1.secretEditKey.Value, "edit-mode entry must pull from the visible (filtered) list")
 
 	r1.secretEditValue = TextInput{Value: "b-new", Cursor: 5}
-	ret, _ = r1.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	ret, _ = r1.handleSecretEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	r2 := ret.(Model)
 
 	assert.Equal(t, "b-new", r2.secretData.Data["BETA"],
@@ -220,7 +220,7 @@ func TestSecretEditor_CtrlSRenameUnderActiveFilterRewritesCorrectKey(t *testing.
 	r1 := ret.(Model)
 	r1.secretEditKey = TextInput{Value: "BETA-NEW", Cursor: 8}
 
-	ret, _ = r1.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	ret, _ = r1.handleSecretEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	r2 := ret.(Model)
 
 	assert.Equal(t, []string{"alpha", "BETA-NEW", "gamma"}, r2.secretData.Keys,
@@ -249,7 +249,7 @@ func TestConfigMapEditor_CtrlSUnderActiveFilterMutatesVisibleKey(t *testing.T) {
 	r1 := ret.(Model)
 	r1.configMapEditValue = TextInput{Value: "b-new", Cursor: 5}
 
-	ret, _ = r1.handleConfigMapEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	ret, _ = r1.handleConfigMapEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	r2 := ret.(Model)
 
 	assert.Equal(t, "b-new", r2.configMapData.Data["BETA"], "BETA's value must be the new edit")
@@ -275,7 +275,7 @@ func TestLabelEditor_CtrlSUnderActiveFilterMutatesVisibleKey(t *testing.T) {
 	r1 := ret.(Model)
 	r1.labelEditValue = TextInput{Value: "b-new", Cursor: 5}
 
-	ret, _ = r1.handleLabelEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	ret, _ = r1.handleLabelEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	r2 := ret.(Model)
 
 	assert.Equal(t, "b-new", r2.labelData.Labels["BETA"], "BETA's label value must be the new edit")
@@ -844,7 +844,7 @@ func TestSecretEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+s saves key rename", func(t *testing.T) {
 		m := makeEditingModel(0)
 		m.secretEditKey.Value = "username"
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.secretEditing)
 		assert.Contains(t, result.secretData.Keys, "username")
@@ -855,7 +855,7 @@ func TestSecretEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+s saves value edit", func(t *testing.T) {
 		m := makeEditingModel(1)
 		m.secretEditValue.Value = "newpassword"
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.secretEditing)
 		assert.Equal(t, "newpassword", result.secretData.Data["user"])
@@ -863,28 +863,28 @@ func TestSecretEditorEditingMode(t *testing.T) {
 
 	t.Run("ctrl+w deletes word in key column", func(t *testing.T) {
 		m := makeEditingModel(0)
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Empty(t, result.secretEditKey.Value)
 	})
 
 	t.Run("ctrl+w deletes word in value column", func(t *testing.T) {
 		m := makeEditingModel(1)
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Empty(t, result.secretEditValue.Value)
 	})
 
 	t.Run("ctrl+a moves home in key column", func(t *testing.T) {
 		m := makeEditingModel(0)
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, "user", result.secretEditKey.Value)
 	})
 
 	t.Run("ctrl+e moves end in value column", func(t *testing.T) {
 		m := makeEditingModel(1)
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, "admin", result.secretEditValue.Value)
 	})
@@ -910,7 +910,7 @@ func TestSecretEditorEditingMode(t *testing.T) {
 		// line-Home should land at the start of the second line.
 		m := makeEditingModel(1)
 		m.secretEditValue = TextInput{Value: "first\nsecond", Cursor: 9} // on "second" col 3
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 6, result.secretEditValue.Cursor,
 			"ctrl+a should land at start of 'second' (offset 6), not buffer offset 0")
@@ -919,7 +919,7 @@ func TestSecretEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+e is line-scoped (not buffer End)", func(t *testing.T) {
 		m := makeEditingModel(1)
 		m.secretEditValue = TextInput{Value: "first\nsecond", Cursor: 2} // mid 'first'
-		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+		ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 5, result.secretEditValue.Cursor,
 			"ctrl+e should land at end of 'first' (offset 5), not buffer end (12)")
@@ -1026,7 +1026,7 @@ func TestSecretEditor_CtrlDScrollsByHalfPage(t *testing.T) {
 		tabs:             []TabState{{}},
 		width:            120, height: 30,
 	}
-	ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleSecretEditorKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Greater(t, result.secretEditValue.Cursor, 0,
 		"ctrl+d must move the cursor down by half a page")
@@ -1208,7 +1208,7 @@ func TestConfigMapEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+s saves value", func(t *testing.T) {
 		m := makeEditingModel(1)
 		m.configMapEditValue.Value = "newval"
-		ret, _ := m.handleConfigMapEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+		ret, _ := m.handleConfigMapEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.configMapEditing)
 		assert.Equal(t, "newval", result.configMapData.Data["mykey"])
@@ -1217,7 +1217,7 @@ func TestConfigMapEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+s renames key", func(t *testing.T) {
 		m := makeEditingModel(0)
 		m.configMapEditKey.Value = "renamed"
-		ret, _ := m.handleConfigMapEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+		ret, _ := m.handleConfigMapEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.configMapEditing)
 		assert.Contains(t, result.configMapData.Keys, "renamed")
@@ -1444,7 +1444,7 @@ func TestLabelEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+s saves value edit", func(t *testing.T) {
 		m := makeEditingModel(1)
 		m.labelEditValue.Value = "apache"
-		ret, _ := m.handleLabelEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+		ret, _ := m.handleLabelEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.labelEditing)
 		assert.Equal(t, "apache", result.labelData.Labels["app"])
@@ -1478,7 +1478,7 @@ func TestLabelEditorEditingMode(t *testing.T) {
 	t.Run("ctrl+s renames key", func(t *testing.T) {
 		m := makeEditingModel(0)
 		m.labelEditKey.Value = "application"
-		ret, _ := m.handleLabelEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+		ret, _ := m.handleLabelEditorKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Contains(t, result.labelData.LabelKeys, "application")
 		_, hasOld := result.labelData.Labels["app"]
@@ -1562,7 +1562,7 @@ func TestCovHandlePVCResizeOverlayKeyEsc(t *testing.T) {
 	m.overlay = overlayPVCResize
 	m.scaleInput = TextInput{Value: "10Gi"}
 
-	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 	assert.Empty(t, r.(Model).scaleInput.Value)
 }
@@ -1572,7 +1572,7 @@ func TestCovHandlePVCResizeOverlayKeyEnterEmpty(t *testing.T) {
 	m.overlay = overlayPVCResize
 	m.scaleInput = TextInput{}
 
-	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 	assert.True(t, r.(Model).statusMessageErr)
 }
@@ -1581,7 +1581,7 @@ func TestCovHandlePVCResizeOverlayKeyBackspace(t *testing.T) {
 	m := baseModelCov()
 	m.scaleInput = TextInput{Value: "10G", Cursor: 3}
 
-	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "10", r.(Model).scaleInput.Value)
 }
 
@@ -1589,7 +1589,7 @@ func TestCovHandlePVCResizeOverlayKeyCtrlW(t *testing.T) {
 	m := baseModelCov()
 	m.scaleInput = TextInput{Value: "10 Gi", Cursor: 5}
 
-	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Equal(t, "10 ", r.(Model).scaleInput.Value)
 }
 
@@ -1597,18 +1597,18 @@ func TestCovHandlePVCResizeOverlayKeyCursorMovement(t *testing.T) {
 	m := baseModelCov()
 	m.scaleInput = TextInput{Value: "10Gi", Cursor: 2}
 
-	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	assert.Equal(t, 0, r.(Model).scaleInput.Cursor)
 
-	r, _ = m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	r, _ = m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	assert.Equal(t, 4, r.(Model).scaleInput.Cursor)
 
 	m.scaleInput.Cursor = 2
-	r, _ = m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyLeft})
+	r, _ = m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: tea.KeyLeft})
 	assert.Equal(t, 1, r.(Model).scaleInput.Cursor)
 
 	m.scaleInput.Cursor = 2
-	r, _ = m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyRight})
+	r, _ = m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: tea.KeyRight})
 	assert.Equal(t, 3, r.(Model).scaleInput.Cursor)
 }
 
@@ -1616,6 +1616,6 @@ func TestCovHandlePVCResizeOverlayKeyInsert(t *testing.T) {
 	m := baseModelCov()
 	m.scaleInput = TextInput{Value: "10", Cursor: 2}
 
-	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, "10G", r.(Model).scaleInput.Value)
 }

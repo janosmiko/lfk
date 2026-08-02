@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,11 +23,11 @@ func TestMouseWheelScrollsYAMLViewer(t *testing.T) {
 	m.height = 20
 	m.yamlView.cursor = 10
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	rm := ret.(Model)
 	assert.Greater(t, rm.yamlView.cursor, 10, "wheel down must advance the YAML cursor")
 
-	ret2, _ := rm.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	ret2, _ := rm.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	rm2 := ret2.(Model)
 	assert.Less(t, rm2.yamlView.cursor, rm.yamlView.cursor, "wheel up must move the cursor back")
 }
@@ -41,7 +41,7 @@ func TestMouseWheelScrollsDescribeViewer(t *testing.T) {
 	m.height = 20
 	m.describeView.cursor = 10
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	rm := ret.(Model)
 	assert.Greater(t, rm.describeView.cursor, 10, "wheel down must advance the describe cursor")
 }
@@ -51,11 +51,11 @@ func TestMouseWheelScrollsHelpViewer(t *testing.T) {
 	m.mode = modeHelp
 	m.helpScroll = 5
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	rm := ret.(Model)
 	assert.Greater(t, rm.helpScroll, 5, "wheel down must scroll the help viewer")
 
-	ret2, _ := rm.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	ret2, _ := rm.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	rm2 := ret2.(Model)
 	assert.Less(t, rm2.helpScroll, rm.helpScroll)
 }
@@ -67,7 +67,7 @@ func TestMouseWheelInExplainOutlineMode(t *testing.T) {
 	// to confirm wheel doesn't no-op.
 	before := m.explainCursor
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	rm := ret.(Model)
 	// Either explainCursor or explainScroll should advance — the test
 	// allows either depending on the explain sub-mode.

@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -37,7 +37,7 @@ func (m *Model) closeObjectExplorerFind() {
 
 // handleObjectExplorerFindKey handles input for the recursive-find overlay,
 // delegating to the filter-input sub-handler when the filter is focused.
-func (m Model) handleObjectExplorerFindKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleObjectExplorerFindKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.objectExplorerView.findFilterActive {
 		return m.handleObjectExplorerFindFilterKey(msg)
 	}
@@ -73,7 +73,7 @@ func (m Model) handleObjectExplorerFindKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 // handleObjectExplorerFindFilterKey handles typing in the overlay's filter input.
-func (m Model) handleObjectExplorerFindFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleObjectExplorerFindFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	rt := &m.objectExplorerView
 	switch msg.String() {
 	case "esc":
@@ -92,8 +92,8 @@ func (m Model) handleObjectExplorerFindFilterKey(msg tea.KeyMsg) (tea.Model, tea
 		}
 		m.recomputeFind()
 	default:
-		if msg.Type == tea.KeyRunes {
-			rt.findFilter += string(msg.Runes)
+		if msg.Text != "" {
+			rt.findFilter += msg.Text
 			m.recomputeFind()
 		}
 	}

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -103,7 +103,7 @@ func TestHighlightNameSelected(t *testing.T) {
 
 	t.Run("match is processed", func(t *testing.T) {
 		result := highlightNameSelected("Hello World", "world")
-		assert.Contains(t, result, "World")
+		assert.Contains(t, stripANSI(result), "World")
 		assert.Contains(t, result, "Hello ")
 	})
 }

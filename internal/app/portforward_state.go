@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"

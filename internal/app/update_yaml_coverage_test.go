@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -147,7 +147,7 @@ func TestYAMLSearchModeCtrlA(t *testing.T) {
 	m := baseYAMLModel()
 	m.yamlView.searchMode = true
 	m.yamlView.searchText = TextInput{Value: "hello", Cursor: 5}
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.yamlView.searchText.Cursor)
 }
@@ -156,7 +156,7 @@ func TestYAMLSearchModeCtrlE(t *testing.T) {
 	m := baseYAMLModel()
 	m.yamlView.searchMode = true
 	m.yamlView.searchText = TextInput{Value: "hello", Cursor: 0}
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 5, result.yamlView.searchText.Cursor)
 }
@@ -184,7 +184,7 @@ func TestYAMLSearchModeCtrlCCancels(t *testing.T) {
 	m.yamlView.searchMode = true
 	m.yamlView.searchText = TextInput{Value: "test", Cursor: 4}
 	m.yamlView.matchLines = []int{1}
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlC})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.False(t, result.yamlView.searchMode)
 	assert.Equal(t, "", result.yamlView.searchText.Value)
@@ -352,7 +352,7 @@ func TestYAMLKeyCtrlFClampsAtEnd(t *testing.T) {
 	m := baseYAMLModel()
 	m.yamlView.collapsed = make(map[string]bool)
 	m.yamlView.cursor = 45
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 49, result.yamlView.cursor)
 }
@@ -361,7 +361,7 @@ func TestYAMLKeyCtrlBClampsAtZero(t *testing.T) {
 	m := baseYAMLModel()
 	m.yamlView.collapsed = make(map[string]bool)
 	m.yamlView.cursor = 5
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.yamlView.cursor)
 }

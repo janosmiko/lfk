@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleNamespaceOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleNamespaceOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.nsFilterMode {
 		return m.handleNamespaceFilterMode(msg)
 	}
@@ -77,7 +77,7 @@ func (m Model) quickFilterToSelectedNamespace() (tea.Model, tea.Cmd) {
 }
 
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
-func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleNamespaceNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	items := m.filteredOverlayItems()
 
 	switch msg.String() {
@@ -170,7 +170,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, refresh
 
-	case " ":
+	case "space":
 		if m.pendingUnionSetName != "" {
 			return m.rejectPendingUnionSetNamespaceMultiSelect()
 		}
@@ -345,20 +345,20 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleNamespaceFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(&m.overlayFilter, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(&m.overlayFilter, []rune(msg.Text)) {
 		case filterContinue:
 			m.overlayCursor = 0
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetOverlayFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetOverlayFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(&m.overlayFilter, msg.String()) {
+	switch handleFilterKey(&m.overlayFilter, msg) {
 	case filterEscape:
 		// Restore the cursor to the item that was selected when filter
 		// mode was entered — not whatever the user navigated to in the
@@ -415,7 +415,7 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTemplateOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTemplateOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.templateSearchMode {
 		return m.handleTemplateFilterMode(msg)
 	}
@@ -492,20 +492,20 @@ func (m Model) handleTemplateOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleTemplateFilterMode handles keys when the template overlay is in filter input mode.
-func (m Model) handleTemplateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTemplateFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(&m.templateFilter, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(&m.templateFilter, []rune(msg.Text)) {
 		case filterContinue:
 			m.templateCursor = 0
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetTemplateFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetTemplateFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(&m.templateFilter, msg.String()) {
+	switch handleFilterKey(&m.templateFilter, msg) {
 	case filterEscape:
 		// Preserve cursor on the same template across filter exit.
 		var targetName string

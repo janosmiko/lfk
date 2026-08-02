@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -104,14 +103,10 @@ func TestRenderWhoCanView_FooterBarRenderedAtBottom(t *testing.T) {
 // the resource under the cursor is rendered with the selection style
 // (the user must see which resource the right pane is for).
 func TestRenderWhoCanView_CursorHighlight(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ApplyTheme(DefaultTheme())
 	})
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	out := RenderWhoCanView(WhoCanViewParams{
 		Resources:      []string{"pods", "secrets", "services"},
@@ -165,23 +160,19 @@ func TestRenderWhoCanSubjects_RowsFitAvailableWidth(t *testing.T) {
 // producing a visible alternating band along the row. Every cell style
 // must therefore set Background(BaseBg) explicitly.
 func TestRenderWhoCanRow_CellsBindBaseBackground(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	originalTransparent := ConfigTransparentBg
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ConfigNoColor = originalNoColor
 		ConfigTransparentBg = originalTransparent
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
 	ConfigTransparentBg = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
 	// ApplyTheme restores originalColorProfile (theme.go:109-110), so
 	// re-force TrueColor here for the SGR-counting assertion to be
 	// observable at all.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	row := renderWhoCanRow(WhoCanRow{
 		Kind: "User", Name: "alice", Namespace: "default",

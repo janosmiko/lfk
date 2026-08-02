@@ -88,7 +88,7 @@ func (m Model) renderOverlay(background string) string {
 	}
 
 	content = ui.FillLinesBg(content, overlayW-4, ui.SurfaceBg)
-	overlay := ui.OverlayStyle.Width(overlayW).Height(overlayH).Render(content)
+	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle, overlayW), overlayH).Render(content)
 	bg := ui.PadToHeight(background, m.height)
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)
 }
@@ -537,7 +537,7 @@ func (m Model) renderOverlayCanISubject(background string) string {
 	w, h := min(80, m.width-10), min(20, m.height-6)
 	content := renderCanISubjectOverlay(m, w-4)
 	content = ui.FillLinesBg(content, w-4, ui.SurfaceBg)
-	overlay := ui.OverlayStyle.Width(w).Height(h).Render(content)
+	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle, w), h).Render(content)
 	return ui.PlaceOverlay(m.width, m.height, overlay, canIBg)
 }
 
@@ -753,7 +753,7 @@ func (m Model) renderErrorLogOverlay(background string) string {
 	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, innerW, innerH, m.showDebugLogs, vp)
 	content = clampErrorLogLines(content, innerW, innerH)
 	content = ui.FillLinesBg(content, innerW, ui.SurfaceBg)
-	overlay := ui.OverlayStyle.Width(overlayW).Height(overlayH).Render(content)
+	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle, overlayW), overlayH).Render(content)
 	bg := ui.PadToHeight(background, m.height)
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)
 }

@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -119,7 +119,7 @@ func adjustEditValueScrollFor(m *Model, value string, cursor, col, titleH int) {
 }
 
 // handleSecretEditorEditKey handles key events while editing a secret value.
-func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd tea.Cmd) {
+func (m Model) handleSecretEditorEditKey(msg tea.KeyPressMsg) (newM tea.Model, cmd tea.Cmd) {
 	keyInput := &m.secretEditKey
 	valInput := &m.secretEditValue
 	col := m.secretEditColumn
@@ -141,8 +141,8 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd te
 	// Handle paste events (Cmd+V on macOS, Ctrl+Shift+V on Linux) by
 	// inserting the pasted text at the cursor. Newlines are stripped from
 	// the key field but kept in the value field.
-	if msg.Paste {
-		text := string(msg.Runes)
+	if isPaste(msg) {
+		text := msg.Text
 		if col == 0 {
 			text = strings.ReplaceAll(text, "\n", "")
 			text = strings.ReplaceAll(text, "\r", "")
@@ -222,7 +222,7 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd te
 }
 
 // handleConfigMapEditorEditKey handles key events while editing a configmap value.
-func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd tea.Cmd) {
+func (m Model) handleConfigMapEditorEditKey(msg tea.KeyPressMsg) (newM tea.Model, cmd tea.Cmd) {
 	keyInput := &m.configMapEditKey
 	valInput := &m.configMapEditValue
 	col := m.configMapEditColumn
@@ -241,8 +241,8 @@ func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd
 	// Handle paste events (Cmd+V on macOS, Ctrl+Shift+V on Linux) by
 	// inserting the pasted text at the cursor. Newlines are stripped from
 	// the key field but kept in the value field.
-	if msg.Paste {
-		text := string(msg.Runes)
+	if isPaste(msg) {
+		text := msg.Text
 		if col == 0 {
 			text = strings.ReplaceAll(text, "\n", "")
 			text = strings.ReplaceAll(text, "\r", "")
@@ -317,7 +317,7 @@ func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd
 }
 
 // handleLabelEditorEditKey handles key events while editing a label/annotation value.
-func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, currentData map[string]string) (newM tea.Model, cmd tea.Cmd) {
+func (m Model) handleLabelEditorEditKey(msg tea.KeyPressMsg, currentKeys []string, currentData map[string]string) (newM tea.Model, cmd tea.Cmd) {
 	keyInput := &m.labelEditKey
 	valInput := &m.labelEditValue
 	col := m.labelEditColumn
@@ -336,8 +336,8 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, cu
 	// Handle paste events (Cmd+V on macOS, Ctrl+Shift+V on Linux) by
 	// inserting the pasted text at the cursor. Newlines are stripped from
 	// the key field but kept in the value field.
-	if msg.Paste {
-		text := string(msg.Runes)
+	if isPaste(msg) {
+		text := msg.Text
 		if col == 0 {
 			text = strings.ReplaceAll(text, "\n", "")
 			text = strings.ReplaceAll(text, "\r", "")

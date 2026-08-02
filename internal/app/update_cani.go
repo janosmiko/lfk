@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -302,7 +302,7 @@ func (m *Model) canIVisibleGroups() []int {
 // The left column (API groups) is the only interactive column.
 //
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
-func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCanIKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// If search is active, delegate to the search key handler first —
 	// Tab inside / search has its own meaning and must not be hijacked
 	// by the WhoCan pivot.
@@ -482,7 +482,7 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleCanISubjectOverlayKey handles the subject selector overlay in the can-i browser.
-func (m Model) handleCanISubjectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCanISubjectOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.canISubjectFilterMode {
 		return m.handleCanISubjectFilterMode(msg)
 	}
@@ -490,7 +490,7 @@ func (m Model) handleCanISubjectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 // handleCanISubjectNormalMode handles normal-mode keys in the subject selector overlay.
-func (m Model) handleCanISubjectNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCanISubjectNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	items := m.filteredOverlayItems()
 
 	switch msg.String() {
@@ -578,20 +578,20 @@ func (m Model) handleCanISubjectNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 // handleCanISubjectFilterMode handles filter-mode keys in the subject selector overlay.
-func (m Model) handleCanISubjectFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCanISubjectFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(&m.overlayFilter, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(&m.overlayFilter, []rune(msg.Text)) {
 		case filterContinue:
 			m.overlayCursor = 0
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetOverlayFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetOverlayFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(&m.overlayFilter, msg.String()) {
+	switch handleFilterKey(&m.overlayFilter, msg) {
 	case filterEscape:
 		m.canISubjectFilterMode = false
 		m.overlayFilter.Clear()
@@ -696,10 +696,10 @@ func (m *Model) exitCanIView() {
 }
 
 // handleCanISearchKey handles keyboard input when search is active in the can-i browser.
-func (m Model) handleCanISearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCanISearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		text := strings.TrimRight(string(msg.Runes), "\n")
+	if isPaste(msg) {
+		text := strings.TrimRight(msg.Text, "\n")
 		if strings.Contains(text, "\n") {
 			m.triggerPasteConfirm(text, pasteTargetOverlayFilter)
 			return m, nil
@@ -745,9 +745,8 @@ func (m Model) handleCanISearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.canISearchInput.Insert(key)
+		if msg.Text != "" {
+			m.canISearchInput.Insert(msg.Text)
 			m.canIGroupCursor = 0
 			m.canIGroupScroll = 0
 			m.canIResourceScroll = 0

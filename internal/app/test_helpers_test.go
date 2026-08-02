@@ -2,10 +2,11 @@ package app
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"charm.land/bubbles/v2/textinput"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -14,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	corev1 "k8s.io/api/core/v1"
 	dynfake "k8s.io/client-go/dynamic/fake"
 	fake "k8s.io/client-go/kubernetes/fake"
@@ -630,64 +631,58 @@ func execScheduled(t *testing.T, m Model, cmd tea.Cmd) tea.Msg {
 	return cmd()
 }
 
-func keyMsg(s string) tea.KeyMsg {
-	switch s {
-	case "esc":
-		return tea.KeyMsg{Type: tea.KeyEsc}
-	case "enter":
-		return tea.KeyMsg{Type: tea.KeyEnter}
-	case "tab":
-		return tea.KeyMsg{Type: tea.KeyTab}
-	case "backspace":
-		return tea.KeyMsg{Type: tea.KeyBackspace}
-	case "ctrl+c":
-		return tea.KeyMsg{Type: tea.KeyCtrlC}
-	case "ctrl+d":
-		return tea.KeyMsg{Type: tea.KeyCtrlD}
-	case "ctrl+u":
-		return tea.KeyMsg{Type: tea.KeyCtrlU}
-	case "ctrl+f":
-		return tea.KeyMsg{Type: tea.KeyCtrlF}
-	case "ctrl+b":
-		return tea.KeyMsg{Type: tea.KeyCtrlB}
-	case "ctrl+w":
-		return tea.KeyMsg{Type: tea.KeyCtrlW}
-	case "ctrl+a":
-		return tea.KeyMsg{Type: tea.KeyCtrlA}
-	case "ctrl+e":
-		return tea.KeyMsg{Type: tea.KeyCtrlE}
-	case "ctrl+n":
-		return tea.KeyMsg{Type: tea.KeyCtrlN}
-	case "ctrl+p":
-		return tea.KeyMsg{Type: tea.KeyCtrlP}
-	case "ctrl+v":
-		return tea.KeyMsg{Type: tea.KeyCtrlV}
-	case "pgup":
-		return tea.KeyMsg{Type: tea.KeyPgUp}
-	case "pgdown":
-		return tea.KeyMsg{Type: tea.KeyPgDown}
-	case "shift+up":
-		return tea.KeyMsg{Type: tea.KeyShiftUp}
-	case "shift+down":
-		return tea.KeyMsg{Type: tea.KeyShiftDown}
-	case "home":
-		return tea.KeyMsg{Type: tea.KeyHome}
-	case "end":
-		return tea.KeyMsg{Type: tea.KeyEnd}
-	case "up":
-		return tea.KeyMsg{Type: tea.KeyUp}
-	case "down":
-		return tea.KeyMsg{Type: tea.KeyDown}
-	case "left":
-		return tea.KeyMsg{Type: tea.KeyLeft}
-	case "right":
-		return tea.KeyMsg{Type: tea.KeyRight}
-	default:
-		if len(s) == 1 {
-			return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
-		}
-		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+// keyNameCodes maps the key names Bubble Tea prints back to their key codes,
+// so keyMsg can round-trip any keystroke string a binding might contain.
+var keyNameCodes = map[string]rune{
+	"esc": tea.KeyEsc, "escape": tea.KeyEscape, "enter": tea.KeyEnter,
+	"tab": tea.KeyTab, "backspace": tea.KeyBackspace, "space": tea.KeySpace,
+	"delete": tea.KeyDelete, "insert": tea.KeyInsert,
+	"up": tea.KeyUp, "down": tea.KeyDown, "left": tea.KeyLeft, "right": tea.KeyRight,
+	"pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown, "home": tea.KeyHome, "end": tea.KeyEnd,
+	"f1": tea.KeyF1, "f2": tea.KeyF2, "f3": tea.KeyF3, "f4": tea.KeyF4,
+	"f5": tea.KeyF5, "f6": tea.KeyF6, "f7": tea.KeyF7, "f8": tea.KeyF8,
+	"f9": tea.KeyF9, "f10": tea.KeyF10, "f11": tea.KeyF11, "f12": tea.KeyF12,
+}
+
+var keyNameMods = map[string]tea.KeyMod{
+	"ctrl": tea.ModCtrl, "alt": tea.ModAlt, "shift": tea.ModShift,
+	"meta": tea.ModMeta, "hyper": tea.ModHyper, "super": tea.ModSuper,
+}
+
+// keyMsg builds the key-press message a terminal would deliver for the
+// keystroke string s ("j", "ctrl+u", "shift+tab", "space").
+//
+// Text is set only for a bare printable character, matching what a real
+// terminal does: modified and named keys carry a code but produce no text, so
+// text inputs correctly ignore them.
+func keyMsg(s string) tea.KeyPressMsg {
+	parts := strings.Split(s, "+")
+	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
+	if key == "" && len(mods) > 0 { // the key itself is "+", e.g. "ctrl++"
+		key, mods = "+", mods[:len(mods)-1]
 	}
+
+	var mod tea.KeyMod
+	for _, m := range mods {
+		mod |= keyNameMods[m]
+	}
+
+	if code, ok := keyNameCodes[key]; ok {
+		k := tea.KeyPressMsg{Code: code, Mod: mod}
+		if code == tea.KeySpace && mod == 0 {
+			k.Text = " " // a real terminal reports the character it produced
+		}
+		return k
+	}
+	if r := []rune(key); len(r) == 1 {
+		k := tea.KeyPressMsg{Code: r[0], Mod: mod}
+		if mod == 0 {
+			k.Text = key
+		}
+		return k
+	}
+	// Unknown multi-rune name: a key with no text, so inputs ignore it.
+	return tea.KeyPressMsg{Mod: mod}
 }
 
 func logContainerOverlayItems(containers []string) []model.Item {

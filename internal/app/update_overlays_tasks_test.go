@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
@@ -18,7 +18,7 @@ func TestBgTasksOverlayClosesOnEsc(t *testing.T) {
 		overlay:   overlayBackgroundTasks,
 		scheduler: scheduler.New(0),
 	}
-	ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	result := ret.(Model)
 	assert.Equal(t, overlayNone, result.overlay)
 }
@@ -60,7 +60,7 @@ func TestBgTasksOverlayTabTogglesMode(t *testing.T) {
 	// Start: running view (flag is false).
 	assert.False(t, m.tasksOverlayShowCompleted)
 
-	ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	result := ret.(Model)
 	assert.Equal(t, overlayBackgroundTasks, result.overlay,
 		"Tab must not close the overlay")
@@ -70,7 +70,7 @@ func TestBgTasksOverlayTabTogglesMode(t *testing.T) {
 		"Tab must reset scroll so the new view starts from its top")
 
 	// A second Tab flips back.
-	ret2, _ := result.handleBackgroundTasksOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	ret2, _ := result.handleBackgroundTasksOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	result2 := ret2.(Model)
 	assert.False(t, result2.tasksOverlayShowCompleted,
 		"second Tab must switch back to the running view")
@@ -84,16 +84,16 @@ func TestBgTasksOverlayScrollKeys(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name     string
-		key      tea.KeyMsg
+		key      tea.KeyPressMsg
 		start    int
 		wantDiff int // expected change from start; >=0 means down
 	}{
 		{"j scrolls down", runeKey('j'), 3, +1},
-		{"down arrow scrolls down", tea.KeyMsg{Type: tea.KeyDown}, 3, +1},
+		{"down arrow scrolls down", tea.KeyPressMsg{Code: tea.KeyDown}, 3, +1},
 		{"k scrolls up", runeKey('k'), 3, -1},
-		{"up arrow scrolls up", tea.KeyMsg{Type: tea.KeyUp}, 3, -1},
-		{"ctrl+d half-page down", tea.KeyMsg{Type: tea.KeyCtrlD}, 3, +5},
-		{"ctrl+u half-page up", tea.KeyMsg{Type: tea.KeyCtrlU}, 10, -5},
+		{"up arrow scrolls up", tea.KeyPressMsg{Code: tea.KeyUp}, 3, -1},
+		{"ctrl+d half-page down", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 3, +5},
+		{"ctrl+u half-page up", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 10, -5},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -247,7 +247,7 @@ func TestBgTasksOverlayEscResetsMode(t *testing.T) {
 		scheduler:                 scheduler.New(0),
 		tasksOverlayShowCompleted: true,
 	}
-	ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	result := ret.(Model)
 	assert.Equal(t, overlayNone, result.overlay)
 	assert.False(t, result.tasksOverlayShowCompleted,
@@ -316,7 +316,7 @@ func TestBgTasksOverlayToggleShowAll(t *testing.T) {
 			tasksOverlayShowCompleted: true,
 			tasksOverlayShowAll:       true,
 		}
-		ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+		ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 		result := ret.(Model)
 		assert.False(t, result.tasksOverlayShowAll, "esc must reset showAll so the next open starts filtered")
 	})
@@ -395,7 +395,7 @@ func TestBgTasksOverlayFreezesHistoryWhenScrolled(t *testing.T) {
 			tasksOverlayScroll:        5,
 			tasksOverlayFrozenHistory: []ui.BackgroundTaskRow{{Name: "stale"}},
 		}
-		ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+		ret, _ := m.handleBackgroundTasksOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 		result := ret.(Model)
 		assert.Nil(t, result.tasksOverlayFrozenHistory,
 			"Tab must clear the snapshot — the new view has its own row set")

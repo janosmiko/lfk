@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +33,7 @@ func TestObjectExplorerWheel_RightPaneScrollsPreview(t *testing.T) {
 	cursorBefore := m.objectExplorerView.cursor
 	x := m.objectExplorerRightPaneStart() + 2 // inside the preview pane
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: x})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: x})
 	rm := ret.(Model)
 	assert.Greater(t, rm.objectExplorerView.previewScroll, 0,
 		"wheel down over the right pane must scroll the preview")
@@ -46,7 +46,7 @@ func TestObjectExplorerWheel_RightPaneClampsAtTop(t *testing.T) {
 	m.objectExplorerView.previewScroll = 2
 	x := m.objectExplorerRightPaneStart() + 2
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: x})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: x})
 	rm := ret.(Model)
 	assert.Equal(t, 0, rm.objectExplorerView.previewScroll,
 		"wheel up must clamp the preview scroll at the top")
@@ -58,7 +58,7 @@ func TestObjectExplorerWheel_MiddlePaneMovesCursor(t *testing.T) {
 	m.objectExplorerView.previewScroll = 5
 	x := 0 // far-left: in the left/middle band, never the right pane
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: x})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: x})
 	rm := ret.(Model)
 	assert.Greater(t, rm.objectExplorerView.cursor, 0,
 		"wheel down over the middle pane must move the tree cursor")

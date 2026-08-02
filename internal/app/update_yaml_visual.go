@@ -4,10 +4,10 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleYAMLVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	maxScroll := m.yamlMaxScroll(totalVisible)
 

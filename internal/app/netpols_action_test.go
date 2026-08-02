@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -221,11 +221,11 @@ func TestNetpolOverlayScrollClampedAtBottom(t *testing.T) {
 	require.Positive(t, maxScroll)
 
 	for range maxScroll + 50 {
-		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	}
 	assert.Equal(t, maxScroll, m.netpolScroll, "j must clamp at the bottom")
 
-	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, maxScroll-1, m.netpolScroll, "first k after the bottom must scroll up")
 }
 
@@ -235,12 +235,12 @@ func TestNetpolOverlayPagingClampedAtBottom(t *testing.T) {
 	require.Positive(t, maxScroll)
 
 	for range 20 {
-		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	}
 	assert.Equal(t, maxScroll, m.netpolScroll, "ctrl+f must clamp at the bottom")
 
 	for range 20 {
-		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	}
 	assert.Equal(t, maxScroll, m.netpolScroll, "ctrl+d must clamp at the bottom")
 }
@@ -249,11 +249,11 @@ func TestNetpolOverlayJumpToBottomClamped(t *testing.T) {
 	m := tallNetpolModel()
 	maxScroll := m.netpolMaxScroll()
 
-	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, maxScroll, m.netpolScroll, "G must land exactly on the bottom")
 
 	m.netpolScroll = 0
-	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyEnd})
+	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnd})
 	assert.Equal(t, maxScroll, m.netpolScroll, "end must land exactly on the bottom")
 }
 
@@ -261,7 +261,7 @@ func TestNetpolOverlayEscClearsMultiData(t *testing.T) {
 	m := baseOverlayModel()
 	m.overlay = overlayNetworkPolicy
 	m.netpolsData = &k8s.NetpolsForResource{Kind: "Pod", Name: "my-pod", Namespace: "default"}
-	result, _ := m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	result, _ := m.handleNetworkPolicyOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, overlayNone, result.overlay)
 	assert.Nil(t, result.netpolsData)
 }

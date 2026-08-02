@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // SyncWavePane mirrors the app-side syncWavePane enum. Determines

@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -444,10 +442,6 @@ func TestHighlightSearchInLine(t *testing.T) {
 // HighlightMatchInline re-emits the active SGR after each highlight reset
 // so the post-match segment keeps the token's color.
 func TestHighlightSearchInLine_PostMatchKeepsTokenStyle(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
-
 	// "name: nginx" — match "ngi" inside the value token "nginx".
 	line := "  name: nginx"
 	result := HighlightSearchInLine(line, "ngi", false)
@@ -477,10 +471,6 @@ func TestHighlightSearchInLine_PostMatchKeepsTokenStyle(t *testing.T) {
 // Now matched lines keep their YAML token styling (the open codes the
 // renderer would have applied) and the search highlight overlays on top.
 func TestHighlightSearchInLine_PreservesYAMLSyntaxStyling(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
-
 	line := "  name: nginx"
 	withMatch := HighlightSearchInLine(line, "nginx", false)
 	noMatch := HighlightSearchInLine(line, "", false)

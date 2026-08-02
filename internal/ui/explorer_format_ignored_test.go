@@ -3,8 +3,6 @@ package ui
 import (
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -15,10 +13,6 @@ import (
 // styling versus an otherwise identical active row, so the show-ignored view
 // visually distinguishes ignored entries.
 func TestStyledNameCellDimsIgnoredRows(t *testing.T) {
-	orig := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(orig) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
-
 	active := model.Item{Kind: "__security_finding_group__", Name: "CVE-2024-1"}
 	ignored := model.Item{
 		Kind:    "__security_finding_group__",

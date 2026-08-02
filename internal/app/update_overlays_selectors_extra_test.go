@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -142,7 +142,7 @@ func TestNamespaceOverlayJKNavigation(t *testing.T) {
 			width:         80,
 			height:        40,
 		}
-		ret, _ := m.handleNamespaceNormalMode(tea.KeyMsg{Type: tea.KeyCtrlD})
+		ret, _ := m.handleNamespaceNormalMode(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 2, result.overlayCursor) // clamps to max
 	})
@@ -156,7 +156,7 @@ func TestNamespaceOverlayJKNavigation(t *testing.T) {
 			width:         80,
 			height:        40,
 		}
-		ret, _ := m.handleNamespaceNormalMode(tea.KeyMsg{Type: tea.KeyCtrlU})
+		ret, _ := m.handleNamespaceNormalMode(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 0, result.overlayCursor)
 	})
@@ -484,7 +484,7 @@ func TestTemplateOverlayCtrlDPageDown(t *testing.T) {
 		width:          80,
 		height:         40,
 	}
-	ret, _ := m.handleTemplateOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleTemplateOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 10, result.templateCursor)
 }
@@ -502,7 +502,7 @@ func TestTemplateOverlayCtrlDClampsToEnd(t *testing.T) {
 		width:          80,
 		height:         40,
 	}
-	ret, _ := m.handleTemplateOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleTemplateOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 4, result.templateCursor)
 }
@@ -520,7 +520,7 @@ func TestTemplateOverlayCtrlUPageUp(t *testing.T) {
 		width:          80,
 		height:         40,
 	}
-	ret, _ := m.handleTemplateOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleTemplateOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 5, result.templateCursor)
 }
@@ -538,7 +538,7 @@ func TestTemplateOverlayCtrlUClampsToZero(t *testing.T) {
 		width:          80,
 		height:         40,
 	}
-	ret, _ := m.handleTemplateOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleTemplateOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.templateCursor)
 }
@@ -556,7 +556,7 @@ func TestTemplateOverlayCtrlFFullPage(t *testing.T) {
 		width:          80,
 		height:         40,
 	}
-	ret, _ := m.handleTemplateOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _ := m.handleTemplateOverlayKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 20, result.templateCursor)
 }
@@ -574,7 +574,7 @@ func TestTemplateOverlayCtrlBFullPageUp(t *testing.T) {
 		width:          80,
 		height:         40,
 	}
-	ret, _ := m.handleTemplateOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _ := m.handleTemplateOverlayKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 5, result.templateCursor)
 }
@@ -683,7 +683,7 @@ func TestRollbackOverlayCtrlDPageDown(t *testing.T) {
 		width:             80,
 		height:            40,
 	}
-	ret, _ := m.handleRollbackOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleRollbackOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 10, result.rollbackCursor)
 }
@@ -698,7 +698,7 @@ func TestRollbackOverlayCtrlUPageUp(t *testing.T) {
 		width:             80,
 		height:            40,
 	}
-	ret, _ := m.handleRollbackOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleRollbackOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 5, result.rollbackCursor)
 }
@@ -749,7 +749,7 @@ func TestHelmRollbackOverlayCtrlDPageDown(t *testing.T) {
 		width:                 80,
 		height:                40,
 	}
-	ret, _ := m.handleHelmRollbackOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleHelmRollbackOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 10, result.helmRollbackCursor)
 }
@@ -800,19 +800,19 @@ func TestHelmHistoryOverlayPageNavigation(t *testing.T) {
 		width:                80,
 		height:               40,
 	}
-	ret, _ := m.handleHelmHistoryOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleHelmHistoryOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 10, result.helmHistoryCursor)
 
-	ret, _ = result.handleHelmHistoryOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ = result.handleHelmHistoryOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.Equal(t, 0, result.helmHistoryCursor)
 
-	ret, _ = result.handleHelmHistoryOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _ = result.handleHelmHistoryOverlayKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.Equal(t, 20, result.helmHistoryCursor)
 
-	ret, _ = result.handleHelmHistoryOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _ = result.handleHelmHistoryOverlayKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.Equal(t, 0, result.helmHistoryCursor)
 }
@@ -914,7 +914,7 @@ func TestLogPodFilterModeCtrlW(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogPodFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleLogPodFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.logView.podFilterText)
 }
@@ -981,7 +981,7 @@ func TestLogContainerFilterModeCtrlW(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogContainerFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleLogContainerFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.logView.containerFilterText)
 }

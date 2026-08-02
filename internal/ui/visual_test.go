@@ -4,9 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,9 +94,6 @@ func TestRenderCursorAtCol_PreservesANSIInPlainLine(t *testing.T) {
 	// Force ANSI so CursorBlockStyle emits real reverse-video codes.
 	// In the default test profile lipgloss strips styles and the regression
 	// becomes invisible.
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 
 	line := "\x1b[90m2026-04-27T12:52:19Z TRC msg\x1b[0m"
 
@@ -143,10 +138,6 @@ func TestRenderCursorAtCol_PreservesANSIInPlainLine(t *testing.T) {
 // owns the visual presentation -- consistent legibility across themes and
 // producers.
 func TestRenderVisualSelection_LineModeKeepsAllTextLegible(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
-
 	// Mid-line "\x1b[34m" deliberately matches a common selection bg
 	// color (blue 4) -- the regression scenario where producer fg and
 	// selection bg collide and text disappears.
@@ -420,10 +411,6 @@ func TestRenderCharSelection(t *testing.T) {
 // highlight the timestamp and leave the rest of the row in its producer
 // colors with no broken SGR fragments leaking as plain text.
 func TestHighlightColumnRange_ANSIAware(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
-
 	line := "\x1b[90mtimestamp\x1b[0m \x1b[34mlevel\x1b[0m message"
 	width := ansi.StringWidth(line)
 

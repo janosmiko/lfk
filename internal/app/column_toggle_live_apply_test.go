@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -36,7 +36,7 @@ func TestColumnToggleSpaceAppliesImmediately(t *testing.T) {
 	openColumnToggleSnapshot(&m)
 
 	// Space on cursor (Namespace, builtin) should hide it AND persist.
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: ' ', Text: " "})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayColumnToggle, rm.overlay,
@@ -52,7 +52,7 @@ func TestColumnToggleSpaceOnExtraPersistsSession(t *testing.T) {
 	m.columnToggleCursor = 3 // "Node" (extra, currently hidden)
 	openColumnToggleSnapshot(&m)
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: ' ', Text: " "})
 	rm := r.(Model)
 
 	assert.True(t, rm.columnToggleItems[3].visible)
@@ -70,14 +70,14 @@ func TestColumnToggleEscDiscardsChanges(t *testing.T) {
 	openColumnToggleSnapshot(&m)
 
 	// Mutate while overlay is open.
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	rm := r.(Model)
 	// c clears all visible — should persist (live-apply).
 	assert.NotEqual(t, []string{"IP"}, rm.sessionColumns[colKey("pod")],
 		"clear must mutate state live")
 
 	// Esc: revert to the snapshot.
-	r2, _ := rm.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r2, _ := rm.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	rm2 := r2.(Model)
 
 	assert.Equal(t, overlayNone, rm2.overlay)
@@ -95,12 +95,12 @@ func TestColumnToggleEnterClosesWithSavedState(t *testing.T) {
 	openColumnToggleSnapshot(&m)
 
 	// Toggle off Namespace.
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: ' ', Text: " "})
 	rm := r.(Model)
 	assert.Contains(t, rm.hiddenBuiltinColumns[colKey("pod")], "Namespace")
 
 	// Enter closes; saved state is preserved.
-	r2, _ := rm.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r2, _ := rm.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm2 := r2.(Model)
 
 	assert.Equal(t, overlayNone, rm2.overlay)
@@ -114,7 +114,7 @@ func TestColumnToggleReorderJPersistsOrder(t *testing.T) {
 	openColumnToggleSnapshot(&m)
 
 	// Move Namespace (cursor 0) down past Ready.
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'J', Text: "J"})
 	rm := r.(Model)
 
 	assert.Equal(t, "Ready", rm.columnToggleItems[0].key)

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
@@ -14,13 +14,19 @@ import (
 )
 
 // helper to make a rune key message.
-func runeKey(r rune) tea.KeyMsg {
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}
+func runeKey(r rune) tea.KeyPressMsg {
+	return keyPressRunes([]rune{r})
 }
 
 // helper to make a special key message.
-func specialKey(k tea.KeyType) tea.KeyMsg {
-	return tea.KeyMsg{Type: k}
+func specialKey(k rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: k}
+}
+
+// helper to make a ctrl+<letter> key message. v2 models ctrl as a modifier
+// rather than a distinct key code.
+func ctrlKey(r rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: r, Mod: tea.ModCtrl}
 }
 
 // baseExplorerModel returns a minimal Model for key handling tests in explorer mode.
@@ -74,7 +80,7 @@ func TestHandleKeyDismissesStatusTip(t *testing.T) {
 func TestHandleKeyNavigationClearsStatusMessage(t *testing.T) {
 	cases := []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{"down (j)", runeKey('j')},
 		{"up (k)", runeKey('k')},
@@ -111,7 +117,7 @@ func TestHandleKeyNavigationClearsStatusMessage(t *testing.T) {
 func TestClearStatusOnNavigationKey(t *testing.T) {
 	clears := []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{"down (j)", runeKey('j')},
 		{"up (k)", runeKey('k')},
@@ -121,10 +127,10 @@ func TestClearStatusOnNavigationKey(t *testing.T) {
 		{"jump bottom (G)", runeKey('G')},
 		{"home", specialKey(tea.KeyHome)},
 		{"end", specialKey(tea.KeyEnd)},
-		{"half page down (ctrl+d)", specialKey(tea.KeyCtrlD)},
-		{"half page up (ctrl+u)", specialKey(tea.KeyCtrlU)},
-		{"full page down (ctrl+f)", specialKey(tea.KeyCtrlF)},
-		{"full page up (ctrl+b)", specialKey(tea.KeyCtrlB)},
+		{"half page down (ctrl+d)", ctrlKey('d')},
+		{"half page up (ctrl+u)", ctrlKey('u')},
+		{"full page down (ctrl+f)", ctrlKey('f')},
+		{"full page up (ctrl+b)", ctrlKey('b')},
 		{"pgdown", specialKey(tea.KeyPgDown)},
 		{"pgup", specialKey(tea.KeyPgUp)},
 		{"preview down (J)", runeKey('J')},
@@ -156,7 +162,7 @@ func TestClearStatusOnNavigationKey(t *testing.T) {
 	// Non-navigation keys must leave the message intact.
 	for _, tc := range []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{"action menu (x)", runeKey('x')},
 		{"filter (f)", runeKey('f')},
@@ -391,11 +397,11 @@ func TestHandleKeyCtrlSTogglesSecrets(t *testing.T) {
 	m := baseExplorerModel()
 	assert.False(t, m.showSecretValues)
 
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	ret, _ := m.handleKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.True(t, result.showSecretValues)
 
-	ret, _ = result.handleKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	ret, _ = result.handleKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.False(t, result.showSecretValues)
 }
@@ -446,12 +452,12 @@ func TestHandleKeyFCyclesLayout(t *testing.T) {
 func TestHandleKeyCtrlASelectsAll(t *testing.T) {
 	m := baseExplorerModel()
 
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	ret, _ := m.handleKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 3, len(result.selectedItems))
 
 	// Second ctrl+a deselects all.
-	ret, _ = result.handleKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	ret, _ = result.handleKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.Equal(t, 0, len(result.selectedItems))
 }
@@ -1535,7 +1541,7 @@ func TestCovHandleKeyExplorerLeft(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeExplorer
 	m.nav.Level = model.LevelResources
-	result, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyLeft})
+	result, _ := m.handleKey(tea.KeyPressMsg{Code: tea.KeyLeft})
 	rm := result.(Model)
 	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
 }
@@ -1585,7 +1591,7 @@ func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
 	m := baseModelNav()
 	m.scheduler = r
 
-	result, cmd, handled := m.handleExplorerNavKey(specialKey(tea.KeyCtrlC))
+	result, cmd, handled := m.handleExplorerNavKey(ctrlKey('c'))
 	assert.True(t, handled)
 	assert.Nil(t, cmd)
 	assert.True(t, cancelled, "Ctrl+C should cancel active mutations")
@@ -1617,7 +1623,7 @@ func TestCtrlCClosesTabWhenNoMutationsActive(t *testing.T) {
 	m.scheduler = r
 	m.tabs = []TabState{{}, {}} // 2 tabs so close-tab doesn't quit
 
-	_, _, handled := m.handleExplorerNavKey(specialKey(tea.KeyCtrlC))
+	_, _, handled := m.handleExplorerNavKey(ctrlKey('c'))
 	assert.True(t, handled)
 	// Should fall through to normal close-tab behavior (not cancelled)
 }

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -449,7 +449,7 @@ func TestCovBoost2DiffVisualKeyCtrlV(t *testing.T) {
 	m := baseModelBoost2()
 	m.diffView.visualMode = true
 	m.diffView.visualType = 'v'
-	result, _ := m.handleDiffVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV}, nil, 10, 5, 5)
+	result, _ := m.handleDiffVisualKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, nil, 10, 5, 5)
 	rm := result.(Model)
 	assert.Equal(t, rune('B'), rm.diffView.visualType)
 }
@@ -458,7 +458,7 @@ func TestCovBoost2DiffVisualKeyCtrlVToggleOff(t *testing.T) {
 	m := baseModelBoost2()
 	m.diffView.visualMode = true
 	m.diffView.visualType = 'B'
-	result, _ := m.handleDiffVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV}, nil, 10, 5, 5)
+	result, _ := m.handleDiffVisualKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, nil, 10, 5, 5)
 	rm := result.(Model)
 	assert.False(t, rm.diffView.visualMode)
 }
@@ -595,7 +595,7 @@ func TestCovEventTimelineVisualSmallVToggleOff(t *testing.T) {
 func TestCovEventTimelineVisualCtrlV(t *testing.T) {
 	m := baseModelBoost2()
 	m.eventTimelineVisualMode = 'v'
-	result, _ := m.handleEventTimelineVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+	result, _ := m.handleEventTimelineVisualKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 	rm := result.(Model)
 	assert.Equal(t, byte('B'), rm.eventTimelineVisualMode)
 }
@@ -603,7 +603,7 @@ func TestCovEventTimelineVisualCtrlV(t *testing.T) {
 func TestCovEventTimelineVisualCtrlVToggleOff(t *testing.T) {
 	m := baseModelBoost2()
 	m.eventTimelineVisualMode = 'B'
-	result, _ := m.handleEventTimelineVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+	result, _ := m.handleEventTimelineVisualKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 	rm := result.(Model)
 	assert.Equal(t, byte(0), rm.eventTimelineVisualMode)
 }

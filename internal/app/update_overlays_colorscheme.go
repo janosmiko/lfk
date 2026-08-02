@@ -3,20 +3,20 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // handleColorschemeOverlayKey handles keyboard input for the color scheme selector overlay.
-func (m Model) handleColorschemeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleColorschemeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.schemeFilterMode {
 		return m.handleColorschemeFilterMode(msg)
 	}
 	return m.handleColorschemeNormalMode(msg)
 }
 
-func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleColorschemeNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	filtered := m.filteredSchemeNames()
 	selectableCount := len(filtered)
 
@@ -167,22 +167,22 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleColorschemeFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(&m.schemeFilter, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(&m.schemeFilter, []rune(msg.Text)) {
 		case filterContinue:
 			m.schemeCursor = 0
 			ui.ResetOverlaySchemeScroll()
 			m.previewSchemeAtCursor(m.filteredSchemeNames())
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetSchemeFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetSchemeFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(&m.schemeFilter, msg.String()) {
+	switch handleFilterKey(&m.schemeFilter, msg) {
 	case filterEscape:
 		// Restore the cursor to the scheme that was selected when filter
 		// mode was entered. The snapshot was taken in the "/" case.

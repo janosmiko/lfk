@@ -3,7 +3,7 @@ package ui
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // DiffFoldRegion represents a contiguous run of unchanged lines that can be

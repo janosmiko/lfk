@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -22,7 +22,7 @@ func copyFieldPickerHints() []ui.HintEntry {
 // handleCopyFieldPickerKey routes key events to the ctrl+y field
 // picker, delegating to the filter-input sub-handler when the filter is
 // focused (same split as the Object Explorer's find overlay).
-func (m Model) handleCopyFieldPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCopyFieldPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.copyFieldPicker.filterActive {
 		return m.handleCopyFieldPickerFilterKey(msg)
 	}
@@ -74,7 +74,7 @@ func (m Model) handleCopyFieldPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleCopyFieldPickerFilterKey handles typing in the picker's filter input.
-func (m Model) handleCopyFieldPickerFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCopyFieldPickerFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	p := &m.copyFieldPicker
 	switch msg.String() {
 	case "esc":
@@ -92,8 +92,8 @@ func (m Model) handleCopyFieldPickerFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 		p.scroll = 0
 		m.recomputeCopyFieldVisible()
 	default:
-		if msg.Type == tea.KeyRunes {
-			p.filter += string(msg.Runes)
+		if msg.Text != "" {
+			p.filter += msg.Text
 			p.cursor = 0
 			p.scroll = 0
 			m.recomputeCopyFieldVisible()

@@ -3,20 +3,20 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // handleCommandBarKey processes key events when the command bar is active.
-func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.Paste {
+func (m Model) handleCommandBarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if isPaste(msg) {
 		return m.handleCommandBarPaste(msg)
 	}
 
 	key := msg.String()
 
 	// Right or Space accepts ghost preview if active (not loading placeholders).
-	if (key == "right" || key == " ") && m.commandBarPreview != "" && m.commandBarPreview != "loading..." {
+	if (key == "right" || key == "space") && m.commandBarPreview != "" && m.commandBarPreview != "loading..." {
 		m.commandBarInput.Set(m.commandBarApplySuggestion(m.commandBarPreview))
 		m.commandBarPreview = ""
 		return m.commandBarRefreshSuggestions()
@@ -66,8 +66,8 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commandBarInput.Right()
 		return m, nil
 	default:
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.commandBarInput.Insert(key)
+		if msg.Text != "" {
+			m.commandBarInput.Insert(msg.Text)
 		}
 		return m.commandBarRefreshSuggestions()
 	}
@@ -166,8 +166,8 @@ func (m Model) commandBarActionableSuggestionCount() int {
 	return count
 }
 
-func (m Model) handleCommandBarPaste(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	text := strings.TrimRight(string(msg.Runes), "\n")
+func (m Model) handleCommandBarPaste(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	text := strings.TrimRight(msg.Text, "\n")
 	if strings.Contains(text, "\n") {
 		m.triggerPasteConfirm(text, pasteTargetCommandBar)
 		return m, nil

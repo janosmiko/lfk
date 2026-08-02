@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/k8s/localcluster"
@@ -66,7 +66,7 @@ func TestCtrlN_AtLevelClusters_OpensOverlay(t *testing.T) {
 	client := k8s.NewTestClient(nil, nil)
 	m := NewModel(client, StartupOptions{})
 	m.nav.Level = model.LevelClusters
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	rm := updated.(Model)
 	if rm.overlay != overlayLocalClusters {
 		t.Fatalf("overlay = %v, want overlayLocalClusters", rm.overlay)
@@ -84,7 +84,7 @@ func TestCtrlN_NotAtLevelClusters_Ignored(t *testing.T) {
 	client := k8s.NewTestClient(nil, nil)
 	m := NewModel(client, StartupOptions{})
 	m.nav.Level = model.LevelResourceTypes
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	rm := updated.(Model)
 	if rm.overlay == overlayLocalClusters {
 		t.Fatal("Ctrl+N must be ignored away from LevelClusters")
@@ -130,7 +130,7 @@ func TestEsc_ClosesOverlay(t *testing.T) {
 	m := NewModel(client, StartupOptions{})
 	m.overlay = overlayLocalClusters
 	m.localClusterState.screen = localClusterScreenList
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := updated.(Model)
 	if rm.overlay == overlayLocalClusters {
 		t.Fatal("Esc on list view should close overlay")
@@ -168,14 +168,14 @@ func TestCtrlN_TogglesOverlayClosed(t *testing.T) {
 	m.nav.Level = model.LevelClusters
 
 	// Open
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	rm := updated.(Model)
 	if rm.overlay != overlayLocalClusters {
 		t.Fatalf("first Ctrl+N must open overlay, got %v", rm.overlay)
 	}
 
 	// Press Ctrl+N again -- must close (not re-open)
-	updated2, _ := rm.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	updated2, _ := rm.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	rm2 := updated2.(Model)
 	if rm2.overlay == overlayLocalClusters {
 		t.Fatal("second Ctrl+N must close overlay (toggle), got still-open")
@@ -189,7 +189,7 @@ func TestList_SKey_DispatchesStart(t *testing.T) {
 	}
 	m.localClusterState.cursor = 0
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	rm := updated.(Model)
 	if cmd == nil {
 		t.Fatal("s key must return a tea.Cmd for k3d")
@@ -206,7 +206,7 @@ func TestList_SKey_IgnoredForKind(t *testing.T) {
 	}
 	m.localClusterState.cursor = 0
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	if cmd != nil {
 		t.Fatal("s key on kind row must be ignored (no cmd)")
 	}
@@ -219,7 +219,7 @@ func TestList_CapitalSKey_DispatchesStop(t *testing.T) {
 	}
 	m.localClusterState.cursor = 0
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'S', Text: "S"})
 	if cmd == nil {
 		t.Fatal("S key must return a cmd for minikube")
 	}
@@ -232,7 +232,7 @@ func TestList_DoubleStop_GuardedByMutatingFlag(t *testing.T) {
 	}
 	// Capital S triggers stop now; the mutating flag should still suppress
 	// a second dispatch.
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'S', Text: "S"})
 	if cmd != nil {
 		t.Fatal("s on a row already mutating must be ignored")
 	}
@@ -259,14 +259,14 @@ func TestList_DKey_OpensDeleteConfirm(t *testing.T) {
 	m.localClusterState.cursor = 0
 
 	// Lowercase d is the global Diff key — it must NOT open delete-confirm.
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	rm := updated.(Model)
 	if rm.localClusterState.screen == localClusterScreenDeleteConfirm {
 		t.Fatal("lowercase d must not open delete-confirm; it's reserved for global Diff")
 	}
 
 	// Shift+D opens the delete-confirm sub-screen.
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'D', Text: "D"})
 	rm = updated.(Model)
 	if rm.localClusterState.screen != localClusterScreenDeleteConfirm {
 		t.Fatalf("screen = %v, want DeleteConfirm", rm.localClusterState.screen)
@@ -279,7 +279,7 @@ func TestList_DKey_OpensDeleteConfirm(t *testing.T) {
 func TestList_QKey_ClosesOverlay(t *testing.T) {
 	m := openManagerForTest(t)
 	m.localClusterState.clusters = []localClusterRow{{Provider: "kind", Name: "dev"}}
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	rm := updated.(Model)
 	if rm.overlay == overlayLocalClusters {
 		t.Fatal("q must close the local-cluster manager overlay")
@@ -291,7 +291,7 @@ func TestDeleteConfirm_TypingBuildsBuffer(t *testing.T) {
 	m.localClusterState.screen = localClusterScreenDeleteConfirm
 
 	for _, r := range "DEL" {
-		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		updated, _ := m.Update(keyPressRunes([]rune{r}))
 		m = updated.(Model)
 	}
 	if m.localClusterState.deleteBuf != "DEL" {
@@ -305,7 +305,7 @@ func TestDeleteConfirm_EnterBlocksUntilFullDelete(t *testing.T) {
 	m.localClusterState.deleteBuf = "DEL"
 	m.localClusterState.clusters = []localClusterRow{{Provider: "kind", Name: "dev"}}
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := updated.(Model)
 	if cmd != nil {
 		t.Fatal("partial DELETE must not dispatch")
@@ -322,7 +322,7 @@ func TestDeleteConfirm_FullDeleteDispatches(t *testing.T) {
 	m.localClusterState.clusters = []localClusterRow{{Provider: "kind", Name: "dev"}}
 	m.localClusterState.deleteRow = 0
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := updated.(Model)
 	if cmd == nil {
 		t.Fatal("full DELETE must dispatch a cmd")
@@ -338,7 +338,7 @@ func TestDeleteConfirm_FullDeleteDispatches(t *testing.T) {
 func TestDeleteConfirm_EscReturnsToList(t *testing.T) {
 	m := openManagerForTest(t)
 	m.localClusterState.screen = localClusterScreenDeleteConfirm
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := updated.(Model)
 	if rm.localClusterState.screen != localClusterScreenList {
 		t.Fatal("Esc on confirm must return to list")
@@ -356,7 +356,7 @@ func TestList_EnterSwitches(t *testing.T) {
 		{Name: "gke-prod"},
 	}
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := updated.(Model)
 	if rm.overlay != overlayNone {
 		t.Fatal("Enter on a row must close the overlay")
@@ -379,7 +379,7 @@ func TestList_EnterSwitches_PositionsToMatchingContext(t *testing.T) {
 		{Name: "k3d-staging"},
 	}
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := updated.(Model)
 	if rm.overlay != overlayNone {
 		t.Fatal("Enter must close overlay")
@@ -392,7 +392,7 @@ func TestList_EnterSwitches_PositionsToMatchingContext(t *testing.T) {
 func TestList_EnterOnEmpty_NoOp(t *testing.T) {
 	m := openManagerForTest(t)
 	m.localClusterState.clusters = nil
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		t.Fatal("Enter on empty list must be a no-op")
 	}

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -133,7 +133,7 @@ func TestCovBoost2AutoSyncKeyEnter(t *testing.T) {
 func TestCovBoost2AutoSyncKeyCtrlS(t *testing.T) {
 	m := baseModelBoost2()
 	m.middleItems = []model.Item{{Name: "app-1", Namespace: "default"}}
-	result, cmd := m.handleAutoSyncKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	result, cmd := m.handleAutoSyncKey(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	assert.NotNil(t, cmd)
 	_ = result
 }
@@ -641,7 +641,7 @@ func TestCovPortForwardKeyBackspaceEmpty(t *testing.T) {
 func TestCovPortForwardKeyCtrlW(t *testing.T) {
 	m := baseModelBoost2()
 	m.portForwardInput.Insert("123 456")
-	result, _ := m.handlePortForwardOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	result, _ := m.handlePortForwardOverlayKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	rm := result.(Model)
 	assert.True(t, len(rm.portForwardInput.Value) < len("123 456"))
 }
@@ -649,14 +649,14 @@ func TestCovPortForwardKeyCtrlW(t *testing.T) {
 func TestCovPortForwardKeyCtrlA(t *testing.T) {
 	m := baseModelBoost2()
 	m.portForwardInput.Insert("123")
-	result, _ := m.handlePortForwardOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	result, _ := m.handlePortForwardOverlayKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	_ = result
 }
 
 func TestCovPortForwardKeyCtrlE(t *testing.T) {
 	m := baseModelBoost2()
 	m.portForwardInput.Insert("123")
-	result, _ := m.handlePortForwardOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	result, _ := m.handlePortForwardOverlayKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	_ = result
 }
 

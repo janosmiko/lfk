@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -41,9 +41,8 @@ func TestOverlayMouseClickOutsideDismissesActionMenu(t *testing.T) {
 	m := actionOverlayModel(3)
 
 	// Click well to the left of the box (box.x = 24).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      2,
 		Y:      20,
 	})
@@ -56,9 +55,8 @@ func TestOverlayMouseClickAboveBoxDismisses(t *testing.T) {
 	m := actionOverlayModel(3)
 
 	// Click well above the box (box.y = 11).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      60,
 		Y:      2,
 	})
@@ -69,9 +67,8 @@ func TestOverlayMouseClickAboveBoxDismisses(t *testing.T) {
 func TestOverlayMouseRightClickOutsideAlsoDismisses(t *testing.T) {
 	m := actionOverlayModel(3)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      2,
 		Y:      20,
 	})
@@ -85,9 +82,8 @@ func TestOverlayMouseClickOutsideDismissesNamespaceOverlay(t *testing.T) {
 	m.overlay = overlayNamespace
 	m.overlayItems = []model.Item{{Name: "default"}, {Name: "kube-system"}}
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      2, // outside the centered overlay
 		Y:      2,
 	})
@@ -102,9 +98,8 @@ func TestOverlayMouseClickActionMenuItemSetsCursorAndActivates(t *testing.T) {
 	m := actionOverlayModel(3)
 
 	// box.y = 11; first item at y = box.y + 4 = 15. Click row 1 (item idx 1).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      50, // inside the box (x in [24,96))
 		Y:      16,
 	})
@@ -121,9 +116,8 @@ func TestOverlayMouseClickActionMenuTitleRowIsNoOp(t *testing.T) {
 	m := actionOverlayModel(3)
 
 	// Title row is the first inner row, screen y = box.y + 2 = 13.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      50,
 		Y:      13,
 	})
@@ -140,9 +134,8 @@ func TestOverlayMouseClickActionMenuPaddingRowIsNoOp(t *testing.T) {
 	// Inner content has title (row 0), blank (row 1), 2 items (rows 2,3),
 	// then trailing blank rows up to inner H. Click a trailing blank row.
 	// box.y=11, inner items run y=15..16, blanks at y=17..27.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      50,
 		Y:      22, // empty padding row inside the box
 	})
@@ -157,9 +150,8 @@ func TestOverlayMouseClickActionMenuBorderIsNoOp(t *testing.T) {
 	m := actionOverlayModel(3)
 
 	// Top-left corner of the box is the border at (box.x, box.y) = (24, 11).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      24,
 		Y:      11,
 	})
@@ -174,9 +166,8 @@ func TestOverlayMouseRightClickInsideActionMenuIsNoOp(t *testing.T) {
 	// Right-click on item 0 (y = box.y + 4 = 15). We treat right-click
 	// inside the overlay as a no-op so users can right-click on the
 	// underlying explorer only after they dismiss the overlay.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      50,
 		Y:      15,
 	})
@@ -191,9 +182,8 @@ func TestOverlayMouseRightClickInsideActionMenuIsNoOp(t *testing.T) {
 func TestOverlayMouseReleaseIgnored(t *testing.T) {
 	m := actionOverlayModel(3)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	ret, _ := m.handleMouse(tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      2, // would be outside, but release should still be ignored
 		Y:      2,
 	})
@@ -207,9 +197,8 @@ func TestOverlayMouseWheelDownAdvancesOverlayCursor(t *testing.T) {
 
 	// Wheel down dispatches 3 "down" keys, so the action menu cursor
 	// should advance from 0 toward 3 (clamped to len-1).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{
+		Button: tea.MouseWheelDown,
 		X:      50,
 		Y:      15,
 	})
@@ -226,9 +215,8 @@ func TestOverlayMouseWheelUpMovesOverlayCursorBack(t *testing.T) {
 	m := actionOverlayModel(5)
 	m.overlayCursor = 4
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonWheelUp,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{
+		Button: tea.MouseWheelUp,
 		X:      50,
 		Y:      15,
 	})
@@ -243,9 +231,8 @@ func TestOverlayMouseFullscreenOverlayClickIgnored(t *testing.T) {
 	m := baseExplorerModel()
 	m.overlay = overlaySecretEditor // fullscreen renderer, no centered box
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      2,
 		Y:      2,
 	})
@@ -265,9 +252,8 @@ func TestOverlayMouseWheelIgnoredForFullscreenOverlay(t *testing.T) {
 	m.overlay = overlaySecretEditor
 	originalCursor := m.cursor()
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonWheelDown,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{
+		Button: tea.MouseWheelDown,
 		X:      50,
 		Y:      10,
 	})
@@ -340,7 +326,10 @@ func TestCenteredOverlayBoxMatchesActualRenderAtNarrowHeights(t *testing.T) {
 			// Render the same way view_overlays.go does and measure the
 			// actual rendered dimensions.
 			content, ow, oh, _ := m.renderOverlayContent()
-			rendered := ui.OverlayStyle.Width(ow).Height(oh).Render(content)
+			// Must mirror renderOverlay in view_overlays.go: BoxWidth/BoxHeight
+			// add the border back, since lipgloss v2 counts it inside
+			// Width/Height.
+			rendered := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle, ow), oh).Render(content)
 			lines := strings.Split(rendered, "\n")
 			actualH := len(lines)
 			actualW := lipgloss.Width(lines[0])
@@ -366,9 +355,8 @@ func TestTitleBarClickOnNamespaceBadgeOpensSelector(t *testing.T) {
 	}
 
 	clickX := (r.nsStartX + r.nsEndX) / 2 // dead center of the badge
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      clickX,
 		Y:      0,
 	})
@@ -382,9 +370,8 @@ func TestTitleBarClickOutsideNamespaceBadgeIsNoOp(t *testing.T) {
 	_ = m.renderTitleBar()
 
 	// Click far left on the title bar — outside the ns badge range.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      2,
 		Y:      0,
 	})
@@ -404,9 +391,8 @@ func TestTitleBarRightClickIsNoOp(t *testing.T) {
 	}
 
 	clickX := (r.nsStartX + r.nsEndX) / 2
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      clickX,
 		Y:      0,
 	})
@@ -438,9 +424,8 @@ func TestOverlayMouseClickNamespaceItemSetsCursorAndApplies(t *testing.T) {
 	//   box.y = (40 - 22) / 2 = 9
 	// Inner row 0 = box.y + 2 = 11.
 	// Item 1 ("default") is at inner row 6, screen y = 11 + 6 = 17.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      60, // inside the namespace overlay box
 		Y:      17, // item index 1 ("default")
 	})
@@ -459,9 +444,8 @@ func TestOverlayMouseClickNamespaceFilterRowIsNoOp(t *testing.T) {
 	ui.ResetOverlayNsScroll()
 
 	// Filter row is inner row 2, screen y = 9 + 2 + 2 = 13.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      60,
 		Y:      13,
 	})

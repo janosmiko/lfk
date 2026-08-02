@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -106,7 +106,6 @@ func rowTintTestItems() []model.Item {
 // already carries the color, so no whole-row or name tint is added (issue #540
 // UAT refinement).
 func TestRenderTable_ForegroundNoTintWhenStatusVisible(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 
 	ConfigRowStatusTint = RowStatusTintOff
@@ -126,7 +125,6 @@ func TestRenderTable_ForegroundNoTintWhenStatusVisible(t *testing.T) {
 // hidden but Name is shown, the failed row tints only the Name cell — the row
 // carries the severity code (on the name) but does NOT wrap the whole line.
 func TestRenderTable_ForegroundNameOnlyWhenStatusHidden(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	withHiddenColumns(t, "Status")
 	ConfigRowStatusTint = RowStatusTintForeground
@@ -147,7 +145,6 @@ func TestRenderTable_ForegroundNameOnlyWhenStatusHidden(t *testing.T) {
 // Name hidden there is no name cell to carry the tint, so foreground mode falls
 // back to a whole-row wrap so the signal is not lost.
 func TestRenderTable_ForegroundBothHiddenFallsBackToWholeRow(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	withHiddenColumns(t, "Status", "Name")
 	ConfigRowStatusTint = RowStatusTintForeground
@@ -164,7 +161,6 @@ func TestRenderTable_ForegroundBothHiddenFallsBackToWholeRow(t *testing.T) {
 // deliberately loud opt-in and tints the whole row regardless of whether the
 // Status column is shown.
 func TestRenderTable_BackgroundIgnoresColumnVisibility(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	withHiddenColumns(t, "Status")
 	ConfigRowStatusTint = RowStatusTintBackground
@@ -180,7 +176,6 @@ func TestRenderTable_BackgroundIgnoresColumnVisibility(t *testing.T) {
 // TestRenderTable_RowTintOffKeepsCellStyling asserts off mode renders rows
 // exactly like today: no row-wide tint codes on a failed row.
 func TestRenderTable_RowTintOffKeepsCellStyling(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintOff
 
@@ -200,7 +195,6 @@ func TestRenderTable_RowTintOffKeepsCellStyling(t *testing.T) {
 // TestRenderTable_RowTintBackground asserts background mode lays the blended
 // background across the row and pads it to the full pane width.
 func TestRenderTable_RowTintBackground(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
 
@@ -254,7 +248,6 @@ func TestRowTintSelectedForeground(t *testing.T) {
 // not multi-selected (issue #540 UAT: the cursor stays visible on a tinted row,
 // the status hue is kept, and the checkmark means multi-selection only).
 func TestRenderTable_BackgroundSelectedBlendsCursor(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
 
@@ -312,7 +305,6 @@ func TestCursorKeptBackgroundTint_NoColorFallsBack(t *testing.T) {
 // the reverse-video selection, which adds underline for a failed row (bold is
 // already the selection weight), while non-cursor failed rows are only bold.
 func TestRenderTable_BackgroundNoColorCursorDistinct(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
 	ConfigNoColor = true
@@ -334,13 +326,12 @@ func TestRenderTable_BackgroundNoColorCursorDistinct(t *testing.T) {
 // checkmark carries the row's status background (UAT: no default-bg gap behind
 // the checkmark on a tinted row).
 func TestTintedSelectionMarker_CarriesBackground(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
 
 	out := tintedSelectionMarker(RowTintFailedBg)
-	if !strings.Contains(out, "48;5;") {
-		t.Fatalf("checkmark must set a background (48;5;...); got %q", out)
+	if !strings.Contains(out, "48;5;") && !strings.Contains(out, "48;2;") {
+		t.Fatalf("checkmark must set a background (48;5;... or 48;2;...); got %q", out)
 	}
 }
 
@@ -351,7 +342,6 @@ func TestTintedSelectionMarker_CarriesBackground(t *testing.T) {
 // background) or flooded the whole bar, so foreground mode now leaves the
 // cursor row untinted (issue #540).
 func TestRenderTable_ForegroundSelectedIsPlainSelection(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	withHiddenColumns(t, "Status")
 
@@ -446,7 +436,6 @@ func TestRowTintMatchesStatusCellColor(t *testing.T) {
 // after the checkmark so its background survives past the marker even with no
 // cluster tile to restore it.
 func TestRenderTable_MultiSelectedTintedRowKeepsBg(t *testing.T) {
-	setTestColorProfile(t)
 	snapshotRowTintGlobals(t)
 	ConfigRowStatusTint = RowStatusTintBackground
 

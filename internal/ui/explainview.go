@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -33,13 +33,13 @@ func renderExplainLayout(d objectExplorerColumnDims, middleHeader string, fieldL
 	leftCol := leftHeader + "\n" + strings.Join(renderExplainKeyList(parentFields, parentCursor, d.leftInner, d.contentHeight-1), "\n")
 	leftCol = PadToHeight(leftCol, d.contentHeight)
 	leftCol = FillLinesBg(leftCol, d.leftInner, BaseBg)
-	left := InactiveColumnStyle.Width(d.leftW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(leftCol)
+	left := BoxHeight(BoxWidth(InactiveColumnStyle, d.leftW), d.contentHeight).MaxHeight(d.contentHeight + 2).Render(leftCol)
 
 	// Middle column: field list (active).
 	middleContent := middleHeader + "\n" + strings.Join(fieldLines, "\n")
 	middleContent = PadToHeight(middleContent, d.contentHeight)
 	middleContent = FillLinesBg(middleContent, d.middleInner, BaseBg)
-	middle := ActiveColumnStyle.Width(d.middleW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(middleContent)
+	middle := BoxHeight(BoxWidth(ActiveColumnStyle, d.middleW), d.contentHeight).MaxHeight(d.contentHeight + 2).Render(middleContent)
 
 	// Right column: description (inactive).
 	descLines := renderFieldDescription(fields, cursor, resourceDesc, d.rightInner, d.contentHeight-1) // -1 for header
@@ -47,7 +47,7 @@ func renderExplainLayout(d objectExplorerColumnDims, middleHeader string, fieldL
 	rightContent := rightHeader + "\n" + strings.Join(descLines, "\n")
 	rightContent = PadToHeight(rightContent, d.contentHeight)
 	rightContent = FillLinesBg(rightContent, d.rightInner, BaseBg)
-	right := InactiveColumnStyle.Width(d.rightW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(rightContent)
+	right := BoxHeight(BoxWidth(InactiveColumnStyle, d.rightW), d.contentHeight).MaxHeight(d.contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 	framed := explorerFrameStyle().Render(columns)

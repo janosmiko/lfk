@@ -4,7 +4,7 @@
 // styles.go / theme.go / theme_nocolor.go; the selection logic lives here.
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // RowTintForStatus returns the whole-row emphasis style for a status per
 // ConfigRowStatusTint, and whether one applies (issue #540). Only failed and

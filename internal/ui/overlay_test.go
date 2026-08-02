@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -177,9 +176,6 @@ func TestRenderErrorLogOverlay_CursorMarkerMatchesEventsAndPersistsInVisual(t *t
 func TestRenderErrorLogOverlay_BlockCursorTracksColumnInNormalMode(t *testing.T) {
 	// Force a real color profile so the reverse-video block cursor is emitted
 	// (the default test renderer strips styling).
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	entries := []ErrorLogEntry{
 		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: "abcdefgh"},
@@ -766,7 +762,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			},
 		}
 		result := RenderNetworkPolicyOverlay(info, 0, 70, 50, "")
-		assert.Contains(t, result, "INGRESS RULES")
+		assert.Contains(t, stripANSI(result), "INGRESS RULES")
 		assert.Contains(t, result, "Rule 1")
 		assert.Contains(t, result, "app=frontend")
 		assert.Contains(t, result, "TCP/8080")
@@ -790,7 +786,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			},
 		}
 		result := RenderNetworkPolicyOverlay(info, 0, 70, 50, "")
-		assert.Contains(t, result, "EGRESS RULES")
+		assert.Contains(t, stripANSI(result), "EGRESS RULES")
 		assert.Contains(t, result, "10.0.0.0/8")
 		assert.Contains(t, result, "10.0.1.0/24")
 		assert.Contains(t, result, "TCP/5432")

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -119,7 +119,7 @@ func TestOverlayCommit_RecordsPreOverlayScopeAfterSpaceEdit(t *testing.T) {
 	m.nsSelectionModified = true
 	m.selectedNamespaces = map[string]bool{"kube-system": true}
 
-	out, _ := m.handleNamespaceOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	out, _ := m.handleNamespaceOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := out.(Model)
 
 	if assert.NotNil(t, rm.previousNsScope, "commit after a Space edit must record the pre-overlay scope") {

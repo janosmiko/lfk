@@ -1,39 +1,25 @@
 package ui
 
 import (
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
-)
-
-// originalColorProfile captures the renderer's profile before no-color mode
-// first forced it to ANSI so returning to color mode can restore whatever
-// termenv originally detected (TrueColor, ANSI256, Ascii...).
-var (
-	originalColorProfile      termenv.Profile
-	originalColorProfileSaved bool
+	"charm.land/lipgloss/v2"
 )
 
 // applyNoColorTheme rebuilds every style global without foreground or
 // background colors. The approach:
 //
-//  1. Force the renderer to the ANSI profile so SGR attribute codes (bold,
-//     reverse, underline, faint) still reach the terminal.
-//  2. Blank every Color* variable so inline lipgloss.Color(ColorX) calls
+//  1. Blank every Color* variable so inline lipgloss.Color(ColorX) calls
 //     scattered through the codebase resolve to an empty hex string, which
 //     lipgloss treats as NoColor{} and emits no color SGR.
-//  3. Rebuild each theme style global without Foreground/Background.
+//  2. Rebuild each theme style global without Foreground/Background.
 //
 // Selection visibility is preserved by Bold+Reverse on SelectedStyle and
 // OverlaySelectedStyle — terminal-native inverse video, which is visible
 // in any terminal and does not shift row layout.
+//
+// lipgloss v2 has no global renderer, so there is no color profile to force
+// here. Blanking the slots is the whole mechanism: SGR attribute codes (bold,
+// reverse, underline, faint) are emitted independently of color.
 func applyNoColorTheme() {
-	r := lipgloss.DefaultRenderer()
-	if !originalColorProfileSaved {
-		originalColorProfile = r.ColorProfile()
-		originalColorProfileSaved = true
-	}
-	r.SetColorProfile(termenv.ANSI)
-
 	// Blank every theme color slot so inline Foreground(lipgloss.Color(...))
 	// calls emit no color SGR (empty string → NoColor{}).
 	ColorPrimary = ""

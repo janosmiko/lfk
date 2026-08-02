@@ -1,6 +1,6 @@
 package app
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 // spinnerNeeded reports whether any load is in flight that the spinner
 // animates: a pane/preview/metrics/helm/finalizer/command-bar load, or any

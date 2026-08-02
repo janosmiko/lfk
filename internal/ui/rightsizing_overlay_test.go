@@ -27,7 +27,7 @@ func TestRenderRightsizingOverlay_VPASource(t *testing.T) {
 	// for the full "CURRENT" / "SUGGESTION" / "Δ" labels.
 	out := RenderRightsizingOverlay(data, false, nil, 0, 200, 40)
 	stripped := ansi.Strip(out)
-	assert.Contains(t, out, "Strategy: VPA")
+	assert.Contains(t, stripANSI(out), "Strategy: VPA")
 	assert.Contains(t, out, "Pods aggregated: 2")
 	assert.Contains(t, out, "app")
 	// Group headers (top row) and sub-headers (bottom row) coexist:
@@ -79,7 +79,7 @@ func TestRenderRightsizingOverlay_EstimatedSourceHidesBounds(t *testing.T) {
 	}})
 	out := RenderRightsizingOverlay(data, false, nil, 0, 120, 30)
 	stripped := ansi.Strip(out)
-	assert.Contains(t, out, "Strategy: estimated")
+	assert.Contains(t, stripANSI(out), "Strategy: estimated")
 	// estimated source has no LowerBound/UpperBound for any container,
 	// so the BOUNDS group is dropped to free up width for the variable
 	// REQUEST and LIMIT columns.

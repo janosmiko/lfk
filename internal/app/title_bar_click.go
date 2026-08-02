@@ -3,7 +3,7 @@ package app
 import (
 	"sync"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // titleBarLayout records click-target regions on the title bar so the

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )

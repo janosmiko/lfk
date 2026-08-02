@@ -501,7 +501,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `error_log` | `!` | Error log overlay |
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
 | `terminal_toggle` | `ctrl+t` | Cycle terminal mode (pty/exec/mux) |
-| `mouse_toggle` | `alt+ctrl+y` | Suspend/resume mouse capture (Ctrl+Option+Y) for native text selection |
+| `mouse_toggle` | `ctrl+alt+y` | Suspend/resume mouse capture (Ctrl+Option+Y) for native text selection |
 | `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
 
 ## Views

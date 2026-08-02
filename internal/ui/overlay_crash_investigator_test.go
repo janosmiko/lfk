@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +40,7 @@ func TestRenderCrashInvestigatorOverlay_SummaryTab(t *testing.T) {
 	assert.Contains(t, out, "STATE")
 	assert.Contains(t, out, "RESTARTS")
 	// Init sub-table label
-	assert.Contains(t, out, "Init")
+	assert.Contains(t, stripANSI(out), "Init")
 	// All container names
 	assert.Contains(t, out, "init-db")
 	assert.Contains(t, out, "app")
@@ -151,23 +149,19 @@ func TestRenderCrashInvestigatorOverlay_DescribeTabError(t *testing.T) {
 }
 
 func TestRenderCrashInvestigatorOverlay_ThemeBg(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	originalTransparent := ConfigTransparentBg
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ConfigNoColor = originalNoColor
 		ConfigTransparentBg = originalTransparent
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
 	ConfigTransparentBg = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
 	// ApplyTheme restores originalColorProfile (theme.go:109-110), so
 	// re-force TrueColor here for the SGR-counting assertion to be
 	// observable at all.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	entry := CrashInvestigatorEntry{
 		PodName: "p", Namespace: "default", ActiveContainer: "app",

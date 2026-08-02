@@ -473,7 +473,7 @@ func TestViewDescribeMode(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "Describe: test")
 }
@@ -489,7 +489,7 @@ func TestViewLogsMode(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "Logs: my-pod")
 }
@@ -510,7 +510,7 @@ func TestViewYAMLMode(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "YAML")
 }
@@ -528,7 +528,7 @@ func TestViewDiffMode(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 
@@ -546,7 +546,7 @@ func TestViewExplainMode(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "Explain: Deployment") // title line is back
 	assert.Contains(t, stripped, "apiVersion")
@@ -576,7 +576,7 @@ func TestViewHelpMode(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	// Help mode renders an overlay on top of explorer view.
 	assert.NotEmpty(t, stripped)
@@ -600,7 +600,7 @@ func TestViewWithTabs(t *testing.T) {
 		},
 		activeTab: 0,
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	// Tab labels are derived from context names.
 	assert.Contains(t, stripped, "active-ctx")
@@ -619,14 +619,14 @@ func TestVt10xColorToLipgloss(t *testing.T) {
 func TestPush3ViewHelpNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeHelp
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
 func TestPush3ViewExplorerNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeExplorer
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -634,7 +634,7 @@ func TestPush3ViewYAMLNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeYAML
 	m.yamlView.content = "apiVersion: v1"
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -643,7 +643,7 @@ func TestPush3ViewDiffNotEmpty(t *testing.T) {
 	m.mode = modeDiff
 	m.diffView.left = "left"
 	m.diffView.right = "right"
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -651,7 +651,7 @@ func TestPush3ViewDescribeNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeDescribe
 	m.describeView.content = "Name: pod-1\nStatus: Running"
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -662,7 +662,7 @@ func TestPush3ViewExplainNotEmpty(t *testing.T) {
 	m.explainFields = []model.ExplainField{
 		{Name: "apiVersion", Type: "string", Description: "API version"},
 	}
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -671,7 +671,7 @@ func TestPush3ViewFullscreenDashboard(t *testing.T) {
 	m.mode = modeExplorer
 	m.fullscreenDashboard = true
 	m.dashboardPreview = "CLUSTER DASHBOARD\n..."
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -680,7 +680,7 @@ func TestPush3ViewWithTabs(t *testing.T) {
 	m.mode = modeExplorer
 	m.tabs = []TabState{{}, {}}
 	m.activeTab = 0
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -688,7 +688,7 @@ func TestPush3ViewWithError(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeExplorer
 	m.err = assert.AnError
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -696,7 +696,7 @@ func TestPush3ViewWithSelection(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeExplorer
 	m.selectedItems = map[string]bool{"default/pod-1": true}
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 
@@ -704,7 +704,7 @@ func TestPush3ViewFullscreenMiddle(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeExplorer
 	m.fullscreenMiddle = true
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 

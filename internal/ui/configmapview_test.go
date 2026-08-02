@@ -73,8 +73,8 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Data: map[string]string{},
 		}
 		result := renderConfigMapEditorTable(cm, 0, false, "", 0, "", 0, 0, nil, 60, 20)
-		assert.Contains(t, result, "KEY")
-		assert.Contains(t, result, "VALUE")
+		assert.Contains(t, stripANSI(result), "KEY")
+		assert.Contains(t, stripANSI(result), "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add a key)")
 	})
 
@@ -87,8 +87,8 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			},
 		}
 		result := renderConfigMapEditorTable(cm, 0, false, "", 0, "", 0, 0, nil, 80, 20)
-		assert.Contains(t, result, "KEY")
-		assert.Contains(t, result, "VALUE")
+		assert.Contains(t, stripANSI(result), "KEY")
+		assert.Contains(t, stripANSI(result), "VALUE")
 		assert.Contains(t, result, "APP_NAME")
 		assert.Contains(t, result, "myapp")
 		assert.Contains(t, result, "DB_HOST")

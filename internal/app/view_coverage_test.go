@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"charm.land/bubbles/v2/textinput"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -21,7 +21,7 @@ func TestViewExecMode(t *testing.T) {
 		execTitle: "Exec: my-pod",
 		tabs:      []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "Terminal not initialized")
 }
@@ -114,7 +114,7 @@ func TestViewExecModeWithTabs(t *testing.T) {
 		tabs:      []TabState{{}, {}},
 		nav:       model.NavigationState{Context: "ctx-1"},
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 
@@ -129,7 +129,7 @@ func TestViewExplainModeSearchActive(t *testing.T) {
 		explainSearchInput:  TextInput{Value: "spec"},
 		tabs:                []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 
@@ -150,7 +150,7 @@ func TestViewYAMLModeWithOverlay(t *testing.T) {
 		tabs:    []TabState{{}},
 		overlay: overlayQuitConfirm,
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 
@@ -181,7 +181,7 @@ func TestViewExplorerErrorLogOverlayVisible(t *testing.T) {
 		selectedNamespaces: make(map[string]bool),
 		overlayErrorLog:    true,
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 
@@ -211,7 +211,7 @@ func TestViewExplorerWithHelpOverlay(t *testing.T) {
 		helpFilter:         TextInput{},
 		helpSearchInput:    textinput.New(),
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 

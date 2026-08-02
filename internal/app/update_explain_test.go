@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -158,7 +158,7 @@ func TestCov80OpenExplainBrowserEmptyResource(t *testing.T) {
 func TestCovHandleExplainKeyHelp(t *testing.T) {
 	m := baseModelCov()
 	m.mode = modeExplain
-	result, cmd := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	result, cmd := m.handleExplainKey(tea.KeyPressMsg{Code: '?', Text: "?"})
 	assert.Equal(t, modeHelp, result.(Model).mode)
 	assert.Nil(t, cmd)
 }
@@ -166,7 +166,7 @@ func TestCovHandleExplainKeyHelp(t *testing.T) {
 func TestCovHandleExplainKeyQuit(t *testing.T) {
 	m := baseModelCov()
 	m.mode = modeExplain
-	result, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	result, _ := m.handleExplainKey(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	assert.Equal(t, modeExplorer, result.(Model).mode)
 }
 
@@ -174,13 +174,13 @@ func TestCovHandleExplainKeyEscRoot(t *testing.T) {
 	m := baseModelCov()
 	m.mode = modeExplain
 	m.explainPath = ""
-	result, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyEscape})
+	result, _ := m.handleExplainKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, modeExplorer, result.(Model).mode)
 }
 
 func TestCovHandleExplainKeySlash(t *testing.T) {
 	m := baseModelCov()
-	result, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	result, _ := m.handleExplainKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	assert.True(t, result.(Model).explainSearchActive)
 }
 
@@ -188,11 +188,11 @@ func TestCovHandleExplainKeyJK(t *testing.T) {
 	m := baseModelCov()
 	m.explainFields = []model.ExplainField{{Name: "a"}, {Name: "b"}, {Name: "c"}}
 	m.explainCursor = 0
-	r, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	r, _ := m.handleExplainKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 1, r.(Model).explainCursor)
 
 	m.explainCursor = 2
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 1, r.(Model).explainCursor)
 }
 
@@ -200,16 +200,16 @@ func TestCovHandleExplainKeyGG(t *testing.T) {
 	m := baseModelCov()
 	m.explainFields = []model.ExplainField{{Name: "a"}, {Name: "b"}}
 
-	r, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	r, _ := m.handleExplainKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, 1, r.(Model).explainCursor)
 
 	m.explainCursor = 1
 	m.pendingG = true
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	assert.Equal(t, 0, r.(Model).explainCursor)
 
 	m.pendingG = false
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	assert.True(t, r.(Model).pendingG)
 }
 
@@ -218,13 +218,13 @@ func TestCovHandleExplainKeyDrillPrimitive(t *testing.T) {
 	// which dereferences m.client (nil in unit tests).
 	m := baseModelCov()
 	m.explainFields = []model.ExplainField{{Name: "name", Type: "string"}}
-	r, cmd := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	r, cmd := m.handleExplainKey(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	assert.True(t, r.(Model).statusMessageErr)
 	assert.NotNil(t, cmd)
 
 	// Also test enter/l with no fields (out-of-bounds cursor).
 	m.explainFields = nil
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.NotNil(t, r)
 }
 
@@ -233,7 +233,7 @@ func TestCovHandleExplainKeyBackRoot(t *testing.T) {
 	// which dereferences m.client (nil in unit tests).
 	m := baseModelCov()
 	m.explainPath = ""
-	r, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	r, _ := m.handleExplainKey(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	assert.Equal(t, modeExplorer, r.(Model).mode)
 }
 
@@ -242,24 +242,24 @@ func TestCovHandleExplainKeySearchNextPrev(t *testing.T) {
 	m.explainSearchQuery = "status"
 	m.explainFields = []model.ExplainField{{Name: "spec"}, {Name: "status"}, {Name: "meta"}}
 
-	r, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, _ := m.handleExplainKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.Equal(t, 1, r.(Model).explainCursor)
 
 	m2 := baseModelCov()
 	m2.explainSearchQuery = "spec"
 	m2.explainFields = m.explainFields
 	m2.explainCursor = 2
-	r, _ = m2.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'N'}})
+	r, _ = m2.handleExplainKey(tea.KeyPressMsg{Code: 'N', Text: "N"})
 	assert.Equal(t, 0, r.(Model).explainCursor)
 
 	m3 := baseModelCov()
 	m3.explainSearchQuery = "zzz"
 	m3.explainFields = m.explainFields
-	r, cmd := m3.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	r, cmd := m3.handleExplainKey(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	assert.True(t, r.(Model).statusMessageErr)
 	assert.NotNil(t, cmd)
 
-	r, cmd = m3.handleExplainKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'N'}})
+	r, cmd = m3.handleExplainKey(tea.KeyPressMsg{Code: 'N', Text: "N"})
 	assert.True(t, r.(Model).statusMessageErr)
 	assert.NotNil(t, cmd)
 }
@@ -272,19 +272,19 @@ func TestCovHandleExplainKeyPages(t *testing.T) {
 	m := baseModelCov()
 	m.explainFields = fields
 
-	r, _ := m.handleExplainKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	r, _ := m.handleExplainKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.Greater(t, r.(Model).explainCursor, 0)
 
 	m.explainCursor = 25
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	assert.Less(t, r.(Model).explainCursor, 25)
 
 	m.explainCursor = 0
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	assert.Greater(t, r.(Model).explainCursor, 0)
 
 	m.explainCursor = 40
-	r, _ = m.handleExplainKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	r, _ = m.handleExplainKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	assert.Less(t, r.(Model).explainCursor, 40)
 }
 
@@ -292,29 +292,29 @@ func TestCovHandleExplainSearchKey(t *testing.T) {
 	m := baseModelCov()
 	m.explainSearchActive = true
 	m.explainSearchInput = TextInput{Value: "spec"}
-	r, _ := m.handleExplainSearchKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleExplainSearchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, r.(Model).explainSearchActive)
 	assert.Equal(t, "spec", r.(Model).explainSearchQuery)
 
 	m.explainSearchActive = true
 	m.explainSearchPrevCursor = 3
-	r, _ = m.handleExplainSearchKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleExplainSearchKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.False(t, r.(Model).explainSearchActive)
 	assert.Equal(t, 3, r.(Model).explainCursor)
 
 	m.explainSearchActive = true
 	m.explainSearchInput = TextInput{Value: "sp", Cursor: 2}
 	m.explainFields = []model.ExplainField{{Name: "spec"}}
-	r, _ = m.handleExplainSearchKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ = m.handleExplainSearchKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "s", r.(Model).explainSearchInput.Value)
 
 	m.explainSearchInput = TextInput{Value: "hello", Cursor: 5}
-	r, _ = m.handleExplainSearchKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ = m.handleExplainSearchKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.NotEqual(t, "hello", r.(Model).explainSearchInput.Value)
 
 	m.explainSearchInput = TextInput{}
 	m.explainFields = []model.ExplainField{{Name: "spec"}}
-	r, _ = m.handleExplainSearchKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	r, _ = m.handleExplainSearchKey(tea.KeyPressMsg{Code: 's', Text: "s"})
 	assert.Equal(t, "s", r.(Model).explainSearchInput.Value)
 }
 
@@ -322,26 +322,26 @@ func TestCovExplainSearchOverlayNormalNav(t *testing.T) {
 	m := baseModelCov()
 	m.explainRecursiveResults = []model.ExplainField{{Name: "a", Path: "a"}, {Name: "b", Path: "b"}}
 
-	r, _ := m.handleExplainSearchOverlayNormalKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	r, _ := m.handleExplainSearchOverlayNormalKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 1, r.(Model).explainRecursiveCursor)
 
 	m2 := r.(Model)
-	r, _ = m2.handleExplainSearchOverlayNormalKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	r, _ = m2.handleExplainSearchOverlayNormalKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 0, r.(Model).explainRecursiveCursor)
 
-	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 
-	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	assert.True(t, r.(Model).explainRecursiveFilterActive)
 
 	m.pendingG = true
 	m.explainRecursiveCursor = 1
-	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	assert.Equal(t, 0, r.(Model).explainRecursiveCursor)
 
 	m.explainRecursiveCursor = 0
-	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	r, _ = m.handleExplainSearchOverlayNormalKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, 1, r.(Model).explainRecursiveCursor)
 }
 
@@ -350,22 +350,22 @@ func TestCovExplainSearchOverlayFilterKey(t *testing.T) {
 	m.explainRecursiveFilterActive = true
 	m.explainRecursiveFilter = TextInput{}
 
-	r, _ := m.handleExplainSearchOverlayFilterKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	r, _ := m.handleExplainSearchOverlayFilterKey(tea.KeyPressMsg{Code: 's', Text: "s"})
 	assert.Equal(t, "s", r.(Model).explainRecursiveFilter.Value)
 
-	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, r.(Model).explainRecursiveFilterActive)
 
 	m.explainRecursiveFilter = TextInput{Value: "test"}
-	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Empty(t, r.(Model).explainRecursiveFilter.Value)
 
 	m.explainRecursiveFilter = TextInput{Value: "ab", Cursor: 2}
-	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "a", r.(Model).explainRecursiveFilter.Value)
 
 	m.explainRecursiveFilter = TextInput{Value: "hello", Cursor: 5}
-	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ = m.handleExplainSearchOverlayFilterKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Empty(t, r.(Model).explainRecursiveFilter.Value)
 }
 

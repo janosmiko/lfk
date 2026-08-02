@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // executeActionExtended dispatches Argo / Helm / Flux / cert-manager /

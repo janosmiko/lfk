@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/logagg"
 )
@@ -43,7 +43,7 @@ func (m Model) openLogTopGroupBy() Model {
 }
 
 // handleLogTopGroupByKey handles key presses inside the group-by overlay.
-func (m Model) handleLogTopGroupByKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+func (m Model) handleLogTopGroupByKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
 	cands := m.logTopGroupByCandidates()
 	switch msg.String() {
 	case "esc":
@@ -59,7 +59,7 @@ func (m Model) handleLogTopGroupByKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //n
 			m.overlayCursor--
 		}
 		return m, nil
-	case " ":
+	case "space":
 		if m.overlayCursor < len(cands) {
 			k := cands[m.overlayCursor]
 			m.logTop.pendingGroup[k] = !m.logTop.pendingGroup[k]
@@ -92,7 +92,7 @@ func (m Model) openLogTopProfile() Model {
 }
 
 // handleLogTopProfileKey handles key presses inside the profile overlay.
-func (m Model) handleLogTopProfileKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+func (m Model) handleLogTopProfileKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
 	kinds := logagg.AllKinds()
 	switch msg.String() {
 	case "esc":
@@ -173,7 +173,7 @@ func (m *Model) logTopFilteredColumns() []string {
 }
 
 // handleLogTopColumnsKey handles key presses inside the column overlay.
-func (m Model) handleLogTopColumnsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention
+func (m Model) handleLogTopColumnsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention
 	if m.logTop.colFilterActive {
 		return m.handleLogTopColumnsFilterKey(msg)
 	}
@@ -210,7 +210,7 @@ func (m Model) handleLogTopColumnsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //n
 	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, maxIdx)
 		return m, nil
-	case " ":
+	case "space":
 		if m.overlayCursor >= 0 && m.overlayCursor < len(cols) {
 			m = m.logTopColumnsToggleByName(cols[m.overlayCursor])
 			if m.overlayCursor < maxIdx {
@@ -232,7 +232,7 @@ func (m Model) handleLogTopColumnsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //n
 }
 
 // handleLogTopColumnsFilterKey handles key presses when the column filter input is active.
-func (m Model) handleLogTopColumnsFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam
+func (m Model) handleLogTopColumnsFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam
 	switch msg.String() {
 	case "esc":
 		if m.logTop.colFilter != "" {

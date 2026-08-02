@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strconv"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s/localcluster"
 )
@@ -35,8 +35,8 @@ func (m Model) startWizard() Model {
 	return m
 }
 
-func (m Model) updateWizardProviderKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateWizardProviderKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.localClusterState.screen = localClusterScreenList
 		return m, nil, true
@@ -64,8 +64,8 @@ func (m Model) updateWizardProviderKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-func (m Model) updateWizardNameKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateWizardNameKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.localClusterState.screen = localClusterScreenWizardProvider
 		return m, nil, true
@@ -81,8 +81,10 @@ func (m Model) updateWizardNameKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		}
 		m.localClusterState.wizard.nameErr = m.validateWizardName(m.localClusterState.wizard.name)
 		return m, nil, true
-	case tea.KeyRunes:
-		for _, r := range msg.Runes {
+	default:
+		// Printable input. msg.Text is empty for non-text keys, so the loop
+		// below is a no-op for them and the switch stays exhaustive.
+		for _, r := range msg.Text {
 			if isValidWizardNameRune(r) {
 				m.localClusterState.wizard.name += string(r)
 			}
@@ -90,7 +92,6 @@ func (m Model) updateWizardNameKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		m.localClusterState.wizard.nameErr = m.validateWizardName(m.localClusterState.wizard.name)
 		return m, nil, true
 	}
-	return m, nil, true
 }
 
 func isValidWizardNameRune(r rune) bool {
@@ -105,8 +106,8 @@ func isValidWizardNameRune(r rune) bool {
 	return false
 }
 
-func (m Model) updateWizardVersionKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateWizardVersionKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.localClusterState.screen = localClusterScreenWizardName
 		return m, nil, true
@@ -124,8 +125,10 @@ func (m Model) updateWizardVersionKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		}
 		m.localClusterState.wizard.versionErr = validateWizardVersion(m.localClusterState.wizard.version)
 		return m, nil, true
-	case tea.KeyRunes:
-		for _, r := range msg.Runes {
+	default:
+		// Printable input. msg.Text is empty for non-text keys, so the loop
+		// below is a no-op for them and the switch stays exhaustive.
+		for _, r := range msg.Text {
 			if isValidWizardVersionRune(r) {
 				m.localClusterState.wizard.version += string(r)
 			}
@@ -133,7 +136,6 @@ func (m Model) updateWizardVersionKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		m.localClusterState.wizard.versionErr = validateWizardVersion(m.localClusterState.wizard.version)
 		return m, nil, true
 	}
-	return m, nil, true
 }
 
 func isValidWizardVersionRune(r rune) bool {
@@ -146,8 +148,8 @@ func isValidWizardVersionRune(r rune) bool {
 	return false
 }
 
-func (m Model) updateWizardConfirmKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateWizardConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.localClusterState.screen = localClusterScreenWizardNodes
 		return m, nil, true
@@ -183,8 +185,8 @@ func (m Model) updateWizardConfirmKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-func (m Model) updateWizardNodesKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateWizardNodesKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.localClusterState.screen = localClusterScreenWizardVersion
 		return m, nil, true
@@ -204,9 +206,11 @@ func (m Model) updateWizardNodesKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		}
 		_, m.localClusterState.wizard.nodesErr = validateWizardNodes(m.localClusterState.wizard.nodesStr)
 		return m, nil, true
-	case tea.KeyRunes:
+	default:
+		// Printable input. msg.Text is empty for non-text keys, so the loop
+		// below is a no-op for them and the switch stays exhaustive.
 		// Single-digit field: a fresh keypress overwrites any prior value.
-		for _, r := range msg.Runes {
+		for _, r := range msg.Text {
 			if r >= '0' && r <= '9' {
 				m.localClusterState.wizard.nodesStr = string(r)
 			}
@@ -214,7 +218,6 @@ func (m Model) updateWizardNodesKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 		_, m.localClusterState.wizard.nodesErr = validateWizardNodes(m.localClusterState.wizard.nodesStr)
 		return m, nil, true
 	}
-	return m, nil, true
 }
 
 // validateWizardName returns "" when the name is valid, or a

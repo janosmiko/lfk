@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,14 +15,14 @@ import (
 func taintPresetKey(t *testing.T, m Model, keys ...string) Model {
 	t.Helper()
 	for _, k := range keys {
-		var msg tea.KeyMsg
+		var msg tea.KeyPressMsg
 		switch k {
 		case "enter":
-			msg = tea.KeyMsg{Type: tea.KeyEnter}
+			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 		case "esc":
-			msg = tea.KeyMsg{Type: tea.KeyEsc}
+			msg = tea.KeyPressMsg{Code: tea.KeyEsc}
 		default:
-			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+			msg = keyPressText(k)
 		}
 		mdl, _ := m.handleTaintPresetKey(msg)
 		var ok bool

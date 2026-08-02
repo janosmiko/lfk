@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -57,7 +57,7 @@ func TestCrashInvestigator_TabCycle(t *testing.T) {
 	m.crashInv = crashInvState{data: sampleCrashInfo(), activeTab: crashInvTabSummary, activeContainer: "app"}
 
 	for _, want := range []crashInvTab{crashInvTabEvents, crashInvTabLogs, crashInvTabDescribe, crashInvTabSummary} {
-		mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+		mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 		m = mdl.(Model)
 		assert.Equal(t, want, m.crashInv.activeTab)
 	}
@@ -72,7 +72,7 @@ func TestCrashInvestigator_DirectJumpKeys(t *testing.T) {
 			m := baseModel()
 			m.overlay = overlayCrashInvestigator
 			m.crashInv = crashInvState{data: sampleCrashInfo(), activeTab: crashInvTabSummary, activeContainer: "app"}
-			mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+			mdl, _ := m.handleCrashInvestigatorOverlayKey(keyPressText(key))
 			m = mdl.(Model)
 			assert.Equal(t, want, m.crashInv.activeTab)
 		})
@@ -84,7 +84,7 @@ func TestCrashInvestigator_ContainerSwitch(t *testing.T) {
 	m.overlay = overlayCrashInvestigator
 	m.crashInv = crashInvState{data: sampleCrashInfo(), activeTab: crashInvTabLogs, activeContainer: "app"}
 
-	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = mdl.(Model)
 	assert.Equal(t, "sidecar", m.crashInv.activeContainer)
 	assert.Equal(t, crashInvTabLogs, m.crashInv.activeTab, "tab must be preserved across container switch")
@@ -96,13 +96,13 @@ func TestCrashInvestigator_PreviousToggleOnLogsTabOnly(t *testing.T) {
 	m.crashInv = crashInvState{data: sampleCrashInfo(), activeTab: crashInvTabSummary, showPrevious: true}
 
 	// On Summary tab — p must NOT toggle.
-	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m = mdl.(Model)
 	assert.True(t, m.crashInv.showPrevious)
 
 	// Switch to Logs — p toggles.
 	m.crashInv.activeTab = crashInvTabLogs
-	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	m = mdl.(Model)
 	assert.False(t, m.crashInv.showPrevious)
 }
@@ -112,7 +112,7 @@ func TestCrashInvestigator_EscClosesAndClearsState(t *testing.T) {
 	m.overlay = overlayCrashInvestigator
 	m.crashInv = crashInvState{data: sampleCrashInfo(), activeContainer: "app"}
 
-	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 	assert.Equal(t, overlayNone, m.overlay)
 	assert.Nil(t, m.crashInv.data)
@@ -161,12 +161,12 @@ func TestCrashInvestigator_ScrollDownUp(t *testing.T) {
 		scroll:          map[crashInvScrollKey]int{},
 	}
 
-	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = mdl.(Model)
 	key := crashInvScrollKey{tab: crashInvTabLogs, container: "app"}
 	assert.Equal(t, 1, m.crashInv.scroll[key])
 
-	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	m = mdl.(Model)
 	assert.Equal(t, 0, m.crashInv.scroll[key], "k must clamp at 0, not go negative")
 }
@@ -183,12 +183,12 @@ func TestCrashInvestigator_ScrollGTopBottom(t *testing.T) {
 	}
 
 	// g — top
-	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	m = mdl.(Model)
 	assert.Equal(t, 0, m.crashInv.scroll[key])
 
 	// G — bottom (sentinel; renderer clamps)
-	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	m = mdl.(Model)
 	assert.GreaterOrEqual(t, m.crashInv.scroll[key], 100,
 		"G must set a large sentinel so the renderer's clamp lands on the last page")
@@ -222,11 +222,11 @@ func TestCrashInvestigator_ScrollHalfPage(t *testing.T) {
 	}
 	key := crashInvScrollKey{tab: crashInvTabLogs, container: "app"}
 
-	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	mdl, _ := m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	m = mdl.(Model)
 	assert.Equal(t, 10, m.crashInv.scroll[key])
 
-	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	mdl, _ = m.handleCrashInvestigatorOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	m = mdl.(Model)
 	assert.Equal(t, 0, m.crashInv.scroll[key])
 }

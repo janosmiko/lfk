@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -18,7 +18,7 @@ var capturePresetFilters = map[string]string{
 }
 
 // updateOverlayCapture is the entry point routed from update_overlays.go.
-func (m Model) updateOverlayCapture(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateOverlayCapture(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.captureOverlay.phase {
 	case capturePhaseEndpointPick:
 		return m.updateOverlayCaptureEndpointPick(msg)
@@ -32,21 +32,21 @@ func (m Model) updateOverlayCapture(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateOverlayCaptureEndpointPick(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateOverlayCaptureEndpointPick(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case msg.Type == tea.KeyEsc, msg.String() == "q":
+	case msg.Code == tea.KeyEsc, msg.String() == "q":
 		return m.dismissCaptureOverlay(), nil
-	case msg.Type == tea.KeyDown, msg.String() == "j":
+	case msg.Code == tea.KeyDown, msg.String() == "j":
 		if m.captureOverlay.endpointCursor < len(m.captureOverlay.endpoints)-1 {
 			m.captureOverlay.endpointCursor++
 		}
 		return m, nil
-	case msg.Type == tea.KeyUp, msg.String() == "k":
+	case msg.Code == tea.KeyUp, msg.String() == "k":
 		if m.captureOverlay.endpointCursor > 0 {
 			m.captureOverlay.endpointCursor--
 		}
 		return m, nil
-	case msg.Type == tea.KeyEnter:
+	case msg.Code == tea.KeyEnter:
 		if m.captureOverlay.endpointCursor < len(m.captureOverlay.endpoints) {
 			m.captureOverlay.resolvedPod = m.captureOverlay.endpoints[m.captureOverlay.endpointCursor].PodName
 			m.captureOverlay.phase = capturePhaseConfig
@@ -68,18 +68,21 @@ func (m Model) updateOverlayCaptureEndpointPick(msg tea.KeyMsg) (tea.Model, tea.
 // Filter, all printable characters (including hjkl) edit the filter input —
 // only Tab/Shift+Tab navigate, so a BPF expression like `tcp and host
 // 1.2.3.4` types correctly.
-func (m Model) updateOverlayCaptureConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateOverlayCaptureConfig(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Always-active keys that work regardless of which field is focused.
-	switch msg.Type {
+	switch msg.Code {
 	case tea.KeyEsc:
 		return m.dismissCaptureOverlay(), nil
 	case tea.KeyEnter:
 		return m.startSelectedBackend()
 	case tea.KeyTab:
+		// v2 reports shift+tab as tab with the shift modifier rather than as
+		// its own key code, so the two share a case.
+		if msg.Mod&tea.ModShift != 0 {
+			m.captureOverlay.configFocus = m.captureOverlay.configFocus.prev()
+			return m, nil
+		}
 		m.captureOverlay.configFocus = m.captureOverlay.configFocus.next()
-		return m, nil
-	case tea.KeyShiftTab:
-		m.captureOverlay.configFocus = m.captureOverlay.configFocus.prev()
 		return m, nil
 	}
 
@@ -90,7 +93,7 @@ func (m Model) updateOverlayCaptureConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Up/Down still navigate fields when on Filter — those keys aren't
 		// printable and we don't want to trap the user inside the filter
 		// with no way to reach Backend/Interface without Tab.
-		switch msg.Type {
+		switch msg.Code {
 		case tea.KeyUp:
 			m.captureOverlay.configFocus = m.captureOverlay.configFocus.prev()
 			return m, nil
@@ -102,7 +105,7 @@ func (m Model) updateOverlayCaptureConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Non-filter focus: vim navigation + arrow-key navigation.
-	switch msg.Type {
+	switch msg.Code {
 	case tea.KeyUp:
 		m.captureOverlay.configFocus = m.captureOverlay.configFocus.prev()
 		return m, nil
@@ -116,8 +119,8 @@ func (m Model) updateOverlayCaptureConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Vim-style key bindings (only when NOT on the filter field).
-	if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 {
-		switch msg.Runes[0] {
+	if len([]rune(msg.Text)) == 1 {
+		switch msg.Code {
 		case 'j':
 			m.captureOverlay.configFocus = m.captureOverlay.configFocus.next()
 			return m, nil
@@ -203,13 +206,13 @@ func (m Model) startSelectedBackend() (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m Model) updateCaptureFilterInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.Type == tea.KeyBackspace && len(m.captureOverlay.filterValue) > 0 {
+func (m Model) updateCaptureFilterInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if msg.Code == tea.KeyBackspace && len(m.captureOverlay.filterValue) > 0 {
 		m.captureOverlay.filterValue = m.captureOverlay.filterValue[:len(m.captureOverlay.filterValue)-1]
 		return m, nil
 	}
-	if msg.Type == tea.KeyRunes {
-		m.captureOverlay.filterValue += string(msg.Runes)
+	if msg.Text != "" {
+		m.captureOverlay.filterValue += msg.Text
 	}
 	return m, nil
 }
@@ -270,9 +273,9 @@ func prevInterface(current string) string {
 	}
 }
 
-func (m Model) updateOverlayCaptureLive(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateOverlayCaptureLive(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case msg.Type == tea.KeyEsc, msg.String() == "q":
+	case msg.Code == tea.KeyEsc, msg.String() == "q":
 		// Esc/q stops the active capture and stays in the overlay so the
 		// final stats land in the stopped phase visibly — the user can
 		// then copy the path with Y, edit the filter with `e`, restart
@@ -358,11 +361,11 @@ func captureOutputPath(m *Model, id int) string {
 	return ""
 }
 
-func (m Model) updateOverlayCaptureStopped(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateOverlayCaptureStopped(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case msg.Type == tea.KeyEsc, msg.String() == "q":
+	case msg.Code == tea.KeyEsc, msg.String() == "q":
 		return m.dismissCaptureOverlay(), nil
-	case msg.Type == tea.KeyEnter:
+	case msg.Code == tea.KeyEnter:
 		return m.startSelectedBackend()
 	case msg.String() == "e":
 		// Go back to the config phase so the user can tweak the filter

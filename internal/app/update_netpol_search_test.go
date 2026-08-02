@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -132,20 +132,20 @@ func TestNetpolWheelScrollsOverlay(t *testing.T) {
 	m := searchableNetpolModel()
 	require.Positive(t, m.netpolMaxScroll())
 
-	mdl, _ := m.handleOverlayMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	mdl, _ := m.handleOverlayMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	m = mdl.(Model)
 	assert.Equal(t, 3, m.netpolScroll, "wheel down must scroll 3 lines")
 
-	mdl, _ = m.handleOverlayMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	mdl, _ = m.handleOverlayMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	m = mdl.(Model)
 	assert.Equal(t, 0, m.netpolScroll, "wheel up must scroll back 3 lines")
 
-	mdl, _ = m.handleOverlayMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	mdl, _ = m.handleOverlayMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	m = mdl.(Model)
 	assert.Equal(t, 0, m.netpolScroll, "wheel up at the top must clamp at 0")
 
 	m.netpolScroll = m.netpolMaxScroll()
-	mdl, _ = m.handleOverlayMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	mdl, _ = m.handleOverlayMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	m = mdl.(Model)
 	assert.Equal(t, m.netpolMaxScroll(), m.netpolScroll, "wheel down at the bottom must clamp at maxScroll")
 }
@@ -173,7 +173,7 @@ func TestNetpolWheelMultiPolicyView(t *testing.T) {
 	}
 	require.Positive(t, m.netpolMaxScroll())
 
-	mdl, _ := m.handleOverlayMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	mdl, _ := m.handleOverlayMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	m = mdl.(Model)
 	assert.Equal(t, 3, m.netpolScroll)
 }

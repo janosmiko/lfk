@@ -8,7 +8,7 @@ import (
 	"context"
 	"runtime/debug"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/security/advisor"

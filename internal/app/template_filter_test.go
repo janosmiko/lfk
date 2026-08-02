@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -212,7 +212,7 @@ func TestTemplateFilterModeCtrlW(t *testing.T) {
 		width:              80,
 		height:             40,
 	}
-	ret, _ := m.handleTemplateFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleTemplateFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.templateFilter.Value)
 }

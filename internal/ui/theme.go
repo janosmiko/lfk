@@ -1,9 +1,10 @@
 package ui
 
 import (
+	"image/color"
 	"sync/atomic"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // ActiveTheme holds the theme currently applied via ApplyTheme. SetNoColor
@@ -43,9 +44,9 @@ type Theme struct {
 // When ConfigTransparentBg is true they are NoColor{}; otherwise they hold
 // the theme's Base, BarBg, and Surface colors respectively.
 var (
-	BaseBg    lipgloss.TerminalColor = lipgloss.NoColor{}
-	BarBg     lipgloss.TerminalColor = lipgloss.NoColor{}
-	SurfaceBg lipgloss.TerminalColor = lipgloss.NoColor{}
+	BaseBg    color.Color = lipgloss.NoColor{}
+	BarBg     color.Color = lipgloss.NoColor{}
+	SurfaceBg color.Color = lipgloss.NoColor{}
 )
 
 // DefaultTheme returns the default Tokyonight Storm theme.
@@ -102,9 +103,7 @@ func ApplyTheme(t Theme) {
 		applyNoColorTheme()
 		return
 	}
-	// Returning to color mode after no-color was active: restore whatever
-	// profile termenv originally detected (typically TrueColor in a normal
-	// terminal, Ascii when NO_COLOR was set externally) and repopulate the
+	// Returning to color mode after no-color was active: repopulate the
 	// Color* theme variables from the active theme — inline
 	// lipgloss.Color(ColorX) call sites otherwise stay frozen at the default
 	// Tokyonight palette regardless of which theme is loaded.
@@ -112,9 +111,6 @@ func ApplyTheme(t Theme) {
 	// ColorOrange / ColorCyan have no Theme field (they are special-purpose
 	// constants — high-CPU warning amber, freshly-created cyan) and stay at
 	// their compile-time defaults.
-	if originalColorProfileSaved {
-		lipgloss.DefaultRenderer().SetColorProfile(originalColorProfile)
-	}
 	ColorPrimary = t.Primary
 	ColorSecondary = t.Secondary
 	ColorFile = t.Text
@@ -133,7 +129,7 @@ func ApplyTheme(t Theme) {
 	// baseBg is applied to all column/content text styles so the theme
 	// background shows behind text (ANSI resets from inner styled content
 	// would otherwise clear the container background). NoColor when transparent.
-	var baseBg lipgloss.TerminalColor = lipgloss.NoColor{}
+	var baseBg color.Color = lipgloss.NoColor{}
 	if !ConfigTransparentBg {
 		baseBg = lipgloss.Color(t.Base)
 	}
@@ -202,7 +198,7 @@ func ApplyTheme(t Theme) {
 	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
 		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
 
-	var barBg lipgloss.TerminalColor = lipgloss.NoColor{}
+	var barBg color.Color = lipgloss.NoColor{}
 	if !ConfigTransparentBg {
 		barBg = baseBg
 	}
@@ -348,7 +344,7 @@ func ApplyTheme(t Theme) {
 		Background(baseBg).
 		Bold(true)
 
-	var surfaceBg lipgloss.TerminalColor = lipgloss.NoColor{}
+	var surfaceBg color.Color = lipgloss.NoColor{}
 	if !ConfigTransparentBg {
 		surfaceBg = lipgloss.Color(t.Surface)
 	}

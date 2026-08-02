@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // handleFinalizerSearchKey handles keyboard input for the finalizer search overlay.
-func (m Model) handleFinalizerSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFinalizerSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	// When filter input is active, handle text input first.
@@ -69,7 +69,7 @@ func (m Model) handleFinalizerSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.finalizerSearchCursor = clampOverlayCursor(m.finalizerSearchCursor, -20, maxIdx)
 		return m, nil
 
-	case " ":
+	case "space":
 		// Toggle selection on the current item and advance cursor.
 		if m.finalizerSearchCursor >= 0 && m.finalizerSearchCursor < len(filtered) {
 			match := filtered[m.finalizerSearchCursor]
@@ -135,13 +135,13 @@ func (m Model) handleFinalizerSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleFinalizerSearchFilterKey handles keyboard input when the filter bar
 // is active inside the finalizer search overlay.
-func (m Model) handleFinalizerSearchFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFinalizerSearchFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Pasted text arrives as a single key event with Paste=true and the
 	// pasted content in Runes. Append single-line pastes to the filter;
 	// drop multi-line pastes (the finalizer filter is single-line by
 	// design, so collapsing newlines would silently hide content).
-	if msg.Paste {
-		pasted := strings.TrimRight(string(msg.Runes), "\n")
+	if isPaste(msg) {
+		pasted := strings.TrimRight(msg.Text, "\n")
 		if !strings.ContainsAny(pasted, "\n\r") {
 			m.finalizerSearchFilter += pasted
 			m.finalizerSearchCursor = 0
@@ -197,8 +197,8 @@ func (m Model) handleFinalizerSearchFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.finalizerSearchFilter += key
+		if msg.Text != "" {
+			m.finalizerSearchFilter += msg.Text
 			m.finalizerSearchCursor = 0
 		}
 		return m, nil

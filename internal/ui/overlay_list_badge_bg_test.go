@@ -4,8 +4,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +19,6 @@ var nakedSpaceAfterReset = regexp.MustCompile(`\x1b\[0m +`)
 // Overlay* styles carry a real background, restoring everything on cleanup.
 func applyBadgeBgTestTheme(t *testing.T) {
 	t.Helper()
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origNoColor := ConfigNoColor
 	origContrast := ConfigMinContrastRatio
 	origTransparent := ConfigTransparentBg
@@ -30,9 +28,7 @@ func applyBadgeBgTestTheme(t *testing.T) {
 		ConfigMinContrastRatio = origContrast
 		ConfigTransparentBg = origTransparent
 		ApplyTheme(origTheme)
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 	})
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ConfigNoColor = false
 	ConfigMinContrastRatio = 0
 	ConfigTransparentBg = false

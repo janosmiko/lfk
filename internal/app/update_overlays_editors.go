@@ -3,10 +3,10 @@ package app
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSecretEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.secretData == nil {
 		m.overlay = overlayNone
 		return m, nil
@@ -52,7 +52,7 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Toggle all values visibility.
 		m.secretAllRevealed = !m.secretAllRevealed
 		return m, nil
-	case " ":
+	case "space":
 		// Toggle current row in the multi-select set. Space is the
 		// canonical TUI selection key; the set lives across cursor
 		// moves so users can select non-adjacent rows.
@@ -122,7 +122,7 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConfigMapEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.configMapData == nil {
 		m.overlay = overlayNone
 		return m, nil
@@ -155,7 +155,7 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfigMapEditorKeyJ()
 	case "k", "up":
 		return m.handleConfigMapEditorKeyK()
-	case " ":
+	case "space":
 		// Space toggles selection — see secret editor for rationale.
 		return m.handleConfigMapEditorKeyS()
 	case "Y":
@@ -218,7 +218,7 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleAutoSyncKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAutoSyncKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.overlay = overlayNone
@@ -233,7 +233,7 @@ func (m Model) handleAutoSyncKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.autoSyncCursor--
 		}
 		return m, nil
-	case " ":
+	case "space":
 		switch m.autoSyncCursor {
 		case 0:
 			m.autoSyncEnabled = !m.autoSyncEnabled
@@ -259,7 +259,7 @@ func (m Model) handleAutoSyncKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLabelEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.labelData == nil {
 		m.overlay = overlayNone
 		return m, nil
@@ -308,7 +308,7 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "k", "up":
 		return m.handleLabelEditorKeyK()
-	case " ":
+	case "space":
 		// Space toggles selection — see secret editor for rationale.
 		return m.handleLabelEditorKeyS()
 	case "Y":

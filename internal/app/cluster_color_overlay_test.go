@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,7 +50,7 @@ func TestHandleKeyClusterColorPicker_AtClusterPickerOpensOverlay(t *testing.T) {
 // "L" continues to open Logs everywhere else.
 func TestHandleKey_ShiftL_RoutesToClusterColorPicker(t *testing.T) {
 	m := newClusterPickerModel(t)
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
+	ret, _ := m.handleKey(tea.KeyPressMsg{Code: 'L', Text: "L"})
 	result := ret.(Model)
 	assert.Equal(t, overlayClusterColor, result.overlay,
 		"Shift+L at the cluster picker must route through handleKey to the cluster-color overlay")
@@ -66,7 +66,7 @@ func TestHandleKey_ShiftL_FallsThroughAboveClusterPicker(t *testing.T) {
 	m.nav.Level = model.LevelResources
 	m.nav.Context = "prod-eu"
 	before := m.overlay
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
+	ret, _ := m.handleKey(tea.KeyPressMsg{Code: 'L', Text: "L"})
 	result := ret.(Model)
 	assert.Equal(t, before, result.overlay,
 		"above the cluster picker, Shift+L must fall through the cluster-colour case so the existing Logs handler still fires")
@@ -121,7 +121,7 @@ func TestClusterColorOverlay_DownArrowMovesCursor(t *testing.T) {
 	m = ret.(Model)
 	start := m.clusterColorOverlayCursor
 
-	ret, _ = m.handleClusterColorOverlayKey("down")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("down"))
 	result := ret.(Model)
 	expected := (start + 1) % (len(ui.ClusterColorNames) + 1)
 	assert.Equal(t, expected, result.clusterColorOverlayCursor, "down arrow advances the cursor (wraps at end)")
@@ -133,7 +133,7 @@ func TestClusterColorOverlay_UpArrowMovesCursor(t *testing.T) {
 	m = ret.(Model)
 	m.clusterColorOverlayCursor = 0
 
-	ret, _ = m.handleClusterColorOverlayKey("up")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("up"))
 	result := ret.(Model)
 	assert.Equal(t, len(ui.ClusterColorNames), result.clusterColorOverlayCursor,
 		"up arrow at top wraps to the bottom (None row)")
@@ -145,7 +145,7 @@ func TestClusterColorOverlay_EnterAppliesColorAndCloses(t *testing.T) {
 	m = ret.(Model)
 	m.clusterColorOverlayCursor = 0 // first color = "red"
 
-	ret, _ = m.handleClusterColorOverlayKey("enter")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("enter"))
 	result := ret.(Model)
 	assert.Equal(t, "red", result.clusterColors["prod-eu"], "Enter writes the selected color to the in-memory map")
 	assert.Equal(t, overlayNone, result.overlay, "Enter closes the overlay")
@@ -164,7 +164,7 @@ func TestClusterColorOverlay_NoneRowClearsAndPersists(t *testing.T) {
 	m = ret.(Model)
 	m.clusterColorOverlayCursor = len(ui.ClusterColorNames) // "None" row
 
-	ret, _ = m.handleClusterColorOverlayKey("enter")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("enter"))
 	result := ret.(Model)
 	_, present := result.clusterColors["prod-eu"]
 	assert.False(t, present, "selecting None deletes the entry rather than storing an empty string")
@@ -180,7 +180,7 @@ func TestClusterColorOverlay_SlashEntersFilterMode(t *testing.T) {
 	m = ret.(Model)
 	require.False(t, m.clusterColorFilterMode, "filter mode is off by default when the overlay opens")
 
-	ret, _ = m.handleClusterColorOverlayKey("/")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("/"))
 	result := ret.(Model)
 	assert.True(t, result.clusterColorFilterMode,
 		"`/` flips into filter-input mode so the next keystrokes go into the filter buffer")
@@ -195,11 +195,11 @@ func TestClusterColorOverlay_FilterNarrowsList(t *testing.T) {
 	// the names list narrows down to "yellow" only. Single letters
 	// match too liberally for an assertable test ("y" matches yellow,
 	// cyan, gray) so use a longer disambiguating substring.
-	ret, _ = m.handleClusterColorOverlayKey("/")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("/"))
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("l")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("l"))
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("l")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("l"))
 	result := ret.(Model)
 
 	filtered := result.filteredClusterColorNames()
@@ -213,12 +213,12 @@ func TestClusterColorOverlay_FilterModeEscClearsFilter(t *testing.T) {
 	m := newClusterPickerModel(t)
 	ret, _ := m.handleKeyClusterColorPicker()
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("/")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("/"))
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("y")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("y"))
 	m = ret.(Model)
 
-	ret, _ = m.handleClusterColorOverlayKey("esc")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("esc"))
 	result := ret.(Model)
 	assert.False(t, result.clusterColorFilterMode, "Esc in filter mode exits filter mode")
 	assert.Empty(t, result.clusterColorFilter.Value, "Esc in filter mode clears the buffer")
@@ -232,24 +232,24 @@ func TestClusterColorOverlay_NormalModeEscClearsFilterFirstThenCloses(t *testing
 	m := newClusterPickerModel(t)
 	ret, _ := m.handleKeyClusterColorPicker()
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("/")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("/"))
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("y")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("y"))
 	m = ret.(Model)
 	// Exit filter mode with Enter so we're back in normal mode but with
 	// the filter buffer still set.
-	ret, _ = m.handleClusterColorOverlayKey("enter")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("enter"))
 	m = ret.(Model)
 	require.NotEmpty(t, m.clusterColorFilter.Value, "filter buffer survives an Enter from filter mode")
 
 	// First Esc in normal mode: clears the filter, leaves overlay open.
-	ret, _ = m.handleClusterColorOverlayKey("esc")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("esc"))
 	m = ret.(Model)
 	assert.Empty(t, m.clusterColorFilter.Value)
 	assert.Equal(t, overlayClusterColor, m.overlay)
 
 	// Second Esc: closes.
-	ret, _ = m.handleClusterColorOverlayKey("esc")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("esc"))
 	result := ret.(Model)
 	assert.Equal(t, overlayNone, result.overlay)
 }
@@ -262,17 +262,17 @@ func TestClusterColorOverlay_FilterAffectsApply(t *testing.T) {
 	m := newClusterPickerModel(t)
 	ret, _ := m.handleKeyClusterColorPicker()
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("/")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("/"))
 	m = ret.(Model)
-	ret, _ = m.handleClusterColorOverlayKey("y")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("y"))
 	m = ret.(Model)
 	// Exit filter mode but keep the filter active.
-	ret, _ = m.handleClusterColorOverlayKey("enter")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("enter"))
 	m = ret.(Model)
 	// Cursor is at 0 = first filtered match = "yellow".
 	require.Equal(t, 0, m.clusterColorOverlayCursor)
 
-	ret, _ = m.handleClusterColorOverlayKey("enter")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("enter"))
 	result := ret.(Model)
 	assert.Equal(t, "yellow", result.clusterColors["prod-eu"],
 		"Apply with a filter active must read from the filtered list, not from ClusterColorNames directly")
@@ -286,7 +286,7 @@ func TestClusterColorOverlay_EscDoesNotMutate(t *testing.T) {
 	m = ret.(Model)
 	m.clusterColorOverlayCursor = 0 // would have applied "red"
 
-	ret, _ = m.handleClusterColorOverlayKey("esc")
+	ret, _ = m.handleClusterColorOverlayKey(keyMsg("esc"))
 	result := ret.(Model)
 	assert.Equal(t, "yellow", result.clusterColors["prod-eu"], "Esc must leave the in-memory state untouched")
 	assert.Equal(t, overlayNone, result.overlay, "Esc closes the overlay")

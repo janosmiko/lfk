@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -150,7 +150,7 @@ func (m Model) sessionRows() []sessionRow {
 
 // handleSessionsOverlayKey handles keys for the sessions picker overlay:
 // enter=switch, s=save-as, d=delete, /=filter, esc/q=close.
-func (m Model) handleSessionsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSessionsOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.sessionsSaveMode {
 		return m.handleSessionsSaveMode(msg)
 	}
@@ -216,8 +216,8 @@ func (m Model) deleteSessionRow(rows []sessionRow) (tea.Model, tea.Cmd) {
 // handleSessionsFilterMode mirrors handleNamespaceFilterMode: type to narrow,
 // Enter/Esc leave filter mode (they do NOT switch — switching is an explicit
 // Enter in normal mode).
-func (m Model) handleSessionsFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch handleFilterKey(&m.sessionsFilter, msg.String()) {
+func (m Model) handleSessionsFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch handleFilterKey(&m.sessionsFilter, msg) {
 	case filterEscape, filterAccept:
 		m.sessionsFilterMode = false
 		m.overlayCursor = 0
@@ -234,8 +234,8 @@ func (m Model) handleSessionsFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleSessionsSaveMode drives the save-as name prompt: Enter commits, Esc
 // cancels, other keys edit the name.
-func (m Model) handleSessionsSaveMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch handleFilterKey(&m.sessionsSaveInput, msg.String()) {
+func (m Model) handleSessionsSaveMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch handleFilterKey(&m.sessionsSaveInput, msg) {
 	case filterAccept:
 		return m.commitSessionSaveAs()
 	case filterEscape, filterClose:

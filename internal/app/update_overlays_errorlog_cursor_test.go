@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
@@ -181,7 +181,7 @@ func TestErrorLogWordMotionInNormalMode(t *testing.T) {
 
 	t.Run("word motion routes through the overlay key dispatch", func(t *testing.T) {
 		m := at(0)
-		res, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+		res, _ := m.handleErrorLogOverlayKey(tea.KeyPressMsg{Code: 'w', Text: "w"})
 		assert.Equal(t, 3, col(res))
 	})
 }
