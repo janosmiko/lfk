@@ -209,7 +209,9 @@ func (m Model) handleOrphansFilterInput(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	default:
 		// Accept printable single-rune keys.
 		if len([]rune(msg.Text)) == 1 {
-			m.orphans.filter.Insert(string(msg.Code))
+			// Insert the character produced, not the key pressed: shift+a
+			// reports Code 'a' but Text "A".
+			m.orphans.filter.Insert(msg.Text)
 			return m.orphansResetCursor(), nil
 		}
 		return m, nil

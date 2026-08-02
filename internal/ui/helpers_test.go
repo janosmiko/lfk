@@ -54,9 +54,12 @@ func TestPadToHeight(t *testing.T) {
 func TestFullscreenBorderStyle(t *testing.T) {
 	t.Run("returns style with expected dimensions", func(t *testing.T) {
 		s := FullscreenBorderStyle(100, 30)
-		// Width should be width-2 to account for border characters.
-		assert.Equal(t, 98, s.GetWidth())
-		assert.Equal(t, 30, s.GetHeight())
+		// lipgloss v2 counts the border inside Width/Height, so the style
+		// carries the full outer box: 100 wide, and 30 content rows plus the
+		// two border rows. See TestFullscreenBorderStyleFillsRequestedBox for
+		// the rendered-output check.
+		assert.Equal(t, 100, s.GetWidth())
+		assert.Equal(t, 32, s.GetHeight())
 		assert.Equal(t, 32, s.GetMaxHeight())
 	})
 

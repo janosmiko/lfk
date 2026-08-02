@@ -437,3 +437,22 @@ func TestOrphansOverlay_LastVisibleRowNotClipped(t *testing.T) {
 		m, _ = m.handleOrphansKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	}
 }
+
+// The filter must insert the character the terminal produced, not the key
+// that was pressed: shift+a reports Code 'a' but Text "A", so keying off
+// Code silently lowercased every capital letter typed into the filter.
+func TestOrphansFilterInsertsShiftedCharacter(t *testing.T) {
+	m := newTestModel()
+	m.orphans.filterActive = true
+
+	for _, k := range []tea.KeyPressMsg{
+		{Code: 'n', Text: "n"},
+		{Code: 'g', Text: "G", Mod: tea.ModShift, ShiftedCode: 'G'},
+		{Code: 'x', Text: "X", Mod: tea.ModShift, ShiftedCode: 'X'},
+	} {
+		m, _ = m.handleOrphansFilterInput(k)
+	}
+
+	assert.Equal(t, "nGX", m.orphans.filter.Value,
+		"filter must record the produced characters, preserving case")
+}

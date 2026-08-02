@@ -173,6 +173,19 @@ func (m Model) handleClusterColorOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea
 // mode (Enter keeps the current filter, Esc clears it); other keys
 // edit the buffer via the shared FilterInput helper.
 func (m Model) handleClusterColorOverlayFilterKey(msg tea.KeyPressMsg) Model {
+	// Paste routes through the confirm flow for multi-line content, matching
+	// every other filter overlay. pasteTargetClusterColorFilter already
+	// resolves to this input; before v2 the handler took a plain key string,
+	// so paste could never reach it.
+	if isPaste(msg) {
+		switch handlePastedText(&m.clusterColorFilter, []rune(msg.Text)) {
+		case filterContinue:
+			m.clusterColorOverlayCursor = 0
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetClusterColorFilter)
+		}
+		return m
+	}
 	action := handleFilterKey(&m.clusterColorFilter, msg)
 	switch action {
 	case filterContinue, filterNavigate:

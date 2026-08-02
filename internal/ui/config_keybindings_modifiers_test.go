@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -104,6 +106,40 @@ func TestHelpKeyDisplayFormatsModifiers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.given, func(t *testing.T) {
 			assert.Equal(t, tt.want, helpKeyDisplay(tt.given))
+		})
+	}
+}
+
+// helpKeyDisplay must not panic or split a multibyte key mid-rune.
+func TestHelpKeyDisplayEdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		given string
+		want  string
+	}{
+		{"plus as the key is left verbatim", "ctrl++", "ctrl++"},
+		{"multibyte key is not split mid-rune", "ctrl+é", "Ctrl+É"},
+		{"multibyte named key", "ctrl+ñabc", "Ctrl+Ñabc"},
+		{"unknown modifier left verbatim", "hyperctrl+x", "hyperctrl+x"},
+		{"bare plus", "+", "+"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.NotPanics(t, func() { helpKeyDisplay(tt.given) })
+			assert.Equal(t, tt.want, helpKeyDisplay(tt.given))
+		})
+	}
+}
+
+// FullscreenBorderStyle must render at exactly the requested outer size.
+// lipgloss v2 counts the border inside Width/Height, so the pre-v2 arithmetic
+// silently produced a box two cells narrow and two rows short.
+func TestFullscreenBorderStyleFillsRequestedBox(t *testing.T) {
+	for _, tc := range []struct{ w, h int }{{40, 10}, {80, 24}, {120, 30}} {
+		t.Run(fmt.Sprintf("%dx%d", tc.w, tc.h), func(t *testing.T) {
+			out := FullscreenBorderStyle(tc.w, tc.h).Render("hello")
+			assert.Equal(t, tc.w, lipgloss.Width(out), "rendered width must match the requested width")
+			assert.Equal(t, tc.h+2, lipgloss.Height(out), "rendered height must be the content height plus both border rows")
 		})
 	}
 }

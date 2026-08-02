@@ -50,16 +50,20 @@ func helpKeyDisplay(key string) string {
 			return key
 		}
 	}
-	for i, p := range parts[:len(parts)-1] {
-		parts[i] = helpKeyDisplayModifiers[p]
+	last := parts[len(parts)-1]
+	if last == "" {
+		// The key itself is "+", e.g. "ctrl++" — leave it verbatim.
+		return key
 	}
-	last := len(parts) - 1
-	if k := parts[last]; len([]rune(k)) == 1 {
-		parts[last] = strings.ToUpper(k)
-	} else {
-		parts[last] = strings.ToUpper(k[:1]) + k[1:]
+	// Build a separate slice rather than mutating parts in place, and title
+	// the key rune-wise so a multibyte key is not split mid-rune.
+	display := make([]string, 0, len(parts))
+	for _, p := range parts[:len(parts)-1] {
+		display = append(display, helpKeyDisplayModifiers[p])
 	}
-	return strings.Join(parts, "+")
+	r := []rune(last)
+	display = append(display, strings.ToUpper(string(r[0]))+string(r[1:]))
+	return strings.Join(display, "+")
 }
 
 // helpSections lives in help_sections.go.
