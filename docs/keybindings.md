@@ -259,11 +259,12 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 
 ## Which-Key Panel
 
-`?` opens a compact strip above the status bar listing the hotkeys actionable on the current row, grouped Actions / Views / Filter / Selection / Sort / Settings.
+`?` opens a panel above the status bar listing the hotkeys actionable on the current row, grouped Actions / Views / Filter / Selection / Sort / Settings. Entries are sorted like neovim's which-key: letters and digits first, then modifier chords, then punctuation. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
 
 | Key | Action |
 |---|---|
-| `?` | Open the panel / page to the next page (wraps) |
+| `?` | Open the panel / close it again |
+| `Ctrl+D` / `Ctrl+U` | Scroll half a page (only when the content overflows) |
 | `Esc` | Close |
 | any other key | Close, and still run normally |
 

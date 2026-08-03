@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -202,59 +203,72 @@ func TestExplorerJumpTop_GGClearsWhichKeyShown(t *testing.T) {
 	}
 }
 
-func TestLayoutWhichKey(t *testing.T) {
-	// layoutWhichKey takes pre-measured display widths, so these build the
-	// widths the equivalent cell strings would have measured to.
-	mk := func(n int) []int {
-		out := make([]int, n)
-		for i := range out {
-			out[i] = len("x x") // width 3
+// wkGridGroups builds one untitled group of n cells whose labels are descLen
+// columns wide, which is all whichKeyGridFor measures.
+func wkGridGroups(n, descLen int) []whichKeyGroupCells {
+	cells := make([]whichKeyCell, n)
+	for i := range cells {
+		cells[i] = whichKeyCell{key: "k", desc: strings.Repeat("d", descLen)}
+	}
+	return []whichKeyGroupCells{{Cells: cells}}
+}
+
+// TestWhichKeyGridFor pins the ported which-key.nvim box arithmetic
+// (view.lua:340-344). The property that matters is that every column is the
+// SAME width and the columns divide the container evenly — the old per-column
+// widest sizing plus gap-spreading is what read as ragged.
+func TestWhichKeyGridFor(t *testing.T) {
+	// max_row_width = 1 (key) + 4 (sep and its two spaces) + 20 = 25.
+	// box_width = clamp(25, 20, 100) = 25; box_count = floor(100/(25+3)) = 3;
+	// box_width = floor(100/3) = 33.
+	g := whichKeyGridFor(wkGridGroups(15, 20), 100)
+	if g.boxN != 3 || g.boxW != 33 {
+		t.Fatalf("container 100: got box_count=%d box_width=%d, want 3 and 33", g.boxN, g.boxW)
+	}
+	if g.rows(15) != 5 {
+		t.Fatalf("15 entries over 3 columns must be 5 rows, got %d", g.rows(15))
+	}
+
+	// Even division: the columns fill the container with less than one column
+	// of slack left, and never overflow it.
+	for _, container := range []int{40, 60, 74, 100, 114, 200} {
+		for _, descLen := range []int{3, 12, 20, 45} {
+			g := whichKeyGridFor(wkGridGroups(9, descLen), container)
+			if used := g.boxN * g.boxW; used > container || container-used >= g.boxN {
+				t.Errorf("container=%d desc=%d: %d columns of %d use %d — not an even division",
+					container, descLen, g.boxN, g.boxW, used)
+			}
 		}
-		return out
 	}
 
-	sumOf := func(xs []int) int {
-		s := 0
-		for _, x := range xs {
-			s += x
-		}
-		return s
+	// layout.width.min floors the column width, so tiny entries still get
+	// readable columns rather than a dozen sliver ones.
+	if g := whichKeyGridFor(wkGridGroups(15, 1), 100); g.boxN != 4 {
+		t.Fatalf("min column width must cap the column count at 4, got %d (box_width=%d)", g.boxN, g.boxW)
 	}
 
-	// 15 entries -> whichKeyMaxCols columns, ceil(15/cols) rows; stretched to
-	// the target width with the slack in the gaps and no trailing space past
-	// the last column (inner == sum(colW) + sum(gaps)). Expressed against the
-	// constant rather than a literal so a geometry re-tune does not silently
-	// turn this into a test of the old shape.
-	cols := whichKeyMaxCols
-	lay := layoutWhichKey(mk(15), 100, 200)
-	if wantRows := (15 + cols - 1) / cols; len(lay.colW) != cols || lay.rows != wantRows {
-		t.Fatalf("15 entries: want %d cols / %d rows, got %d cols / %d rows", cols, wantRows, len(lay.colW), lay.rows)
+	// A container narrower than one column collapses to a single column
+	// instead of producing a zero-width or negative layout.
+	g = whichKeyGridFor(wkGridGroups(15, 20), 14)
+	if g.boxN != 1 || g.boxW != 14 {
+		t.Fatalf("narrow container: got box_count=%d box_width=%d, want 1 and 14", g.boxN, g.boxW)
 	}
-	if lay.inner != 100 {
-		t.Fatalf("grid must stretch to target inner 100, got %d", lay.inner)
+	if g.descW < 0 || g.keyW < 1 {
+		t.Fatalf("narrow container produced an unusable cell: keyW=%d descW=%d", g.keyW, g.descW)
 	}
-	if sumOf(lay.colW)+sumOf(lay.gaps) != lay.inner {
-		t.Fatalf("no-trailing-gap invariant broken: cols=%v gaps=%v inner=%d", lay.colW, lay.gaps, lay.inner)
-	}
+}
 
-	// Adding entries keeps the column count and grows rows (expand vertically).
-	lay2 := layoutWhichKey(mk(23), 100, 200)
-	if wantRows := (23 + cols - 1) / cols; len(lay2.colW) != cols || lay2.rows != wantRows {
-		t.Fatalf("23 entries: want %d cols / %d rows, got %d cols / %d rows", cols, wantRows, len(lay2.colW), lay2.rows)
+// TestWhichKeyGridFor_KeyFieldIsSharedAcrossGroups: the right-aligned keys form
+// one vertical edge for the whole panel, so the key field is measured across
+// every group rather than per group.
+func TestWhichKeyGridFor_KeyFieldIsSharedAcrossGroups(t *testing.T) {
+	groups := []whichKeyGroupCells{
+		{Title: "A", Cells: []whichKeyCell{{"d", "Delete"}}},
+		{Title: "B", Cells: []whichKeyCell{{"ctrl+alt+y", "Mouse capture"}}},
 	}
-
-	// Each column is sized to its own widest entry. 4 entries, 4 columns, 1 row.
-	wide := []int{len("short"), len("a-very-long-entry"), len("short"), len("short")}
-	lay3 := layoutWhichKey(wide, 100, 200)
-	if lay3.colW[1] != len("a-very-long-entry") || lay3.colW[0] != len("short") {
-		t.Fatalf("per-column widths wrong: %v", lay3.colW)
-	}
-
-	// Narrow terminal reduces the column count to fit.
-	lay4 := layoutWhichKey(mk(15), 5, 5)
-	if len(lay4.colW) >= 4 {
-		t.Fatalf("narrow width must reduce columns, got %d", len(lay4.colW))
+	g := whichKeyGridFor(groups, 100)
+	if g.keyW != len("ctrl+alt+y") {
+		t.Fatalf("key field = %d, want %d (the widest key in ANY group)", g.keyW, len("ctrl+alt+y"))
 	}
 }
 

@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -191,6 +190,13 @@ func (m Model) handleGotoChord(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	if key == ui.ActiveKeybindings.JumpTop { // "g" -> belongs to gg jump-top
 		return m, nil, false
 	}
+	// The popup shares the leader panel's scrolling viewport, so the scroll
+	// keys must move it rather than be swallowed as an unregistered chord.
+	if m.whichKey.shown {
+		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.gotoWhichKeyGroups()); scrolled {
+			return out, nil, true
+		}
+	}
 	m.pendingG = false
 	m.whichKey.shown = false
 	chord := ui.ActiveKeybindings.JumpTop + key
@@ -224,9 +230,9 @@ func (m Model) armWhichKey() (Model, tea.Cmd) {
 	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyTickMsg{} })
 }
 
-// whichKeyCells builds the sorted continuation entries for the g prefix: gg
-// (list top) plus every goto target, keyed by the part of the chord after the
-// prefix. Sorted alphanumerically like neovim's which-key.
+// whichKeyCells builds the continuation entries for the g prefix: gg (list top)
+// plus every goto target, keyed by the part of the chord after the prefix, in
+// neovim's which-key order (sortWhichKeyCells).
 func (m Model) whichKeyCells() []whichKeyCell {
 	prefix := ui.ActiveKeybindings.JumpTop
 	targets := m.gotoTargets()
@@ -238,12 +244,12 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" {
 		cells = append(cells, whichKeyCell{strings.TrimPrefix(pn, prefix), "Previous namespace"})
 	}
-	sort.SliceStable(cells, func(i, j int) bool {
-		li, lj := strings.ToLower(cells[i].key), strings.ToLower(cells[j].key)
-		if li != lj {
-			return li < lj
-		}
-		return cells[i].key < cells[j].key
-	})
+	sortWhichKeyCells(cells)
 	return cells
+}
+
+// gotoWhichKeyGroups wraps the goto entries as the single untitled group the
+// shared panel renderer takes.
+func (m Model) gotoWhichKeyGroups() []whichKeyGroupCells {
+	return []whichKeyGroupCells{{Cells: m.whichKeyCells()}}
 }

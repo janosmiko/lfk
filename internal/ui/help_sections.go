@@ -53,7 +53,7 @@ func helpSections() []helpSection {
 			title: "Views & Tools",
 			bindings: []helpEntry{
 				{"F1", "Toggle help screen (" + kb.Help + " too, outside the explorer)"},
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable right now (press again to page, Esc to close)"},
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable right now (" + kb.PageDown + "/" + kb.PageUp + " to scroll, press again or Esc to close)"},
 				{kb.TogglePreview, "Toggle between details and YAML preview"},
 				{"", "Details pane shows labels, finalizers, annotations, and metadata"},
 				{"", "Details view shows deletion timestamp for resources being deleted"},

@@ -24,7 +24,7 @@ func TestStatusBar_GotoPopupKeepsExplorerHints(t *testing.T) {
 	m.whichKey = whichKeyState{shown: true}
 
 	bar := stripANSI(m.statusBar())
-	if strings.Contains(bar, ui.ActiveKeybindings.WhichKeyLeader+": more") {
+	if strings.Contains(bar, "esc: close") {
 		t.Fatalf("goto popup must not show the leader hints; got %q", bar)
 	}
 	if !strings.Contains(bar, "namespace") {
@@ -54,24 +54,25 @@ func TestStatusBar_LeaderPanelKeepsSelectedCountChip(t *testing.T) {
 		m.selectedItems[selectionKey(it)] = true
 	}
 
-	leaderHint := ui.ActiveKeybindings.WhichKeyLeader + ": more"
-	for press := 1; press <= 3; press++ {
-		out, _ := m.handleExplorerKey(leaderKey())
-		m = out.(Model)
-		if !m.whichKey.shown {
-			t.Fatal("panel must be shown at a zero delay")
-		}
+	out, _ := m.handleExplorerKey(leaderKey())
+	m = out.(Model)
+	if !m.whichKey.shown {
+		t.Fatal("panel must be shown at a zero delay")
+	}
+	for step := 1; step <= 3; step++ {
 		bar := stripANSI(m.statusBar())
-		if !strings.Contains(bar, leaderHint) {
-			t.Fatalf("press %d: leader hints must still render; got %q", press, bar)
+		if !strings.Contains(bar, "esc: close") {
+			t.Fatalf("step %d: leader hints must still render; got %q", step, bar)
 		}
 		chip := fmt.Sprintf("%d selected", len(m.selectedItems))
 		if !strings.Contains(bar, chip) {
-			t.Fatalf("press %d: status bar must keep the %q chip while the panel is shown; got %q", press, chip, bar)
+			t.Fatalf("step %d: status bar must keep the %q chip while the panel is shown; got %q", step, chip, bar)
 		}
+		out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+		m = out.(Model)
 	}
 	if len(m.selectedItems) != 5 {
-		t.Fatalf("paging must not change the selection; got %d, want 5", len(m.selectedItems))
+		t.Fatalf("scrolling must not change the selection; got %d, want 5", len(m.selectedItems))
 	}
 }
 

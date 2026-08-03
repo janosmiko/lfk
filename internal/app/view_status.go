@@ -426,14 +426,19 @@ func explorerHelpHintKey(kb ui.Keybindings) string {
 	return kb.Help
 }
 
+// The scroll hint appears only when the panel actually overflows, the way
+// which-key.nvim conditions its own "<c-d>/<c-u> scroll" help entry
+// (view.lua:447-449).
 func (m Model) leaderOrExplorerHints() []ui.HintEntry {
-	if m.whichKey.armed && m.whichKey.shown {
-		return []ui.HintEntry{
-			{Key: ui.ActiveKeybindings.WhichKeyLeader, Desc: "more"},
-			{Key: "esc", Desc: "close"},
-		}
+	if !m.whichKey.armed || !m.whichKey.shown {
+		return m.explorerHintEntries()
 	}
-	return m.explorerHintEntries()
+	hints := make([]ui.HintEntry, 0, 2)
+	if lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups()); ok && lay.maxScroll > 0 {
+		kb := ui.ActiveKeybindings
+		hints = append(hints, ui.HintEntry{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"})
+	}
+	return append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
 }
 
 // explorerStatusChips composes the right-anchored chip group for the

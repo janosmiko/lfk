@@ -145,9 +145,10 @@ func TestWhichKeyLeader_RebindingLeaderGivesQuestionMarkBackToHelp(t *testing.T)
 	}
 }
 
-// TestWhichKeyLeader_PagingLeavesSelectionAlone: with the leader off space,
-// paging is purely a view operation.
-func TestWhichKeyLeader_PagingLeavesSelectionAlone(t *testing.T) {
+// TestWhichKeyLeader_ScrollingLeavesTheListAlone: with the leader off space,
+// scrolling the panel is purely a view operation — in particular ctrl+d must
+// move the PANEL, not the explorer cursor, while the panel is up.
+func TestWhichKeyLeader_ScrollingLeavesTheListAlone(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -160,17 +161,19 @@ func TestWhichKeyLeader_PagingLeavesSelectionAlone(t *testing.T) {
 	})
 	m.setCursor(0)
 
+	out, _ := m.handleExplorerKey(leaderKey())
+	m = out.(Model)
 	for i := range 3 {
-		out, _ := m.handleExplorerKey(leaderKey())
+		out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
 		m = out.(Model)
 		if len(m.selectedItems) != 0 {
-			t.Fatalf("press %d: paging must not change the selection; selected=%d", i+1, len(m.selectedItems))
+			t.Fatalf("scroll %d: must not change the selection; selected=%d", i+1, len(m.selectedItems))
 		}
 		if m.cursor() != 0 {
-			t.Fatalf("press %d: paging must not move the cursor; cursor=%d", i+1, m.cursor())
+			t.Fatalf("scroll %d: must not move the explorer cursor; cursor=%d", i+1, m.cursor())
 		}
 	}
-	if m.whichKey.page != 2 {
-		t.Fatalf("three leader presses must land on page index 2, got %d", m.whichKey.page)
+	if m.whichKey.scroll == 0 {
+		t.Fatal("three ctrl+d presses must have scrolled the panel")
 	}
 }

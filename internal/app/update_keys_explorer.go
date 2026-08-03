@@ -23,18 +23,15 @@ func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// The which-key leader is a pure overlay: esc closes it, and every other key
-	// closes it and then runs its normal action. Because every listed action
-	// already has a bare binding here, "run the listed action" and "fall
-	// through" are the same thing — one dispatch path, so the panel can never
-	// disagree with what the key actually does. esc is consumed only while the
-	// panel is actually shown — see the same guard in handleKey.
-	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.WhichKeyLeader {
-		shown := m.whichKey.shown
-		m = m.disarmWhichKeyLeader()
-		if shown && msg.String() == "esc" {
-			return m, nil
-		}
+	// The which-key leader is a pure overlay: the scroll keys move it, esc
+	// closes it, and every other key closes it and then runs its normal action.
+	// Because every listed action already has a bare binding here, "run the
+	// listed action" and "fall through" are the same thing — one dispatch path,
+	// so the panel can never disagree with what the key actually does.
+	mdl, consumed := m.whichKeyLeaderIntercept(msg)
+	m = mdl
+	if consumed {
+		return m, nil
 	}
 
 	if m.pendingMark {

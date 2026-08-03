@@ -164,11 +164,11 @@ func TestWhichKeyLeader_DoesNotArmWhileFiltering(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeader_PageAdvancesAndWraps pins the USER DECISION paging
-// behavior: a repeated leader press (while already armed) pages forward, and
-// wraps back to page 0 after the last page — using the real catalog at 80x24,
-// the size the design was validated against.
-func TestWhichKeyLeader_PageAdvancesAndWraps(t *testing.T) {
+// TestWhichKeyLeader_RepeatPressTogglesClosed pins the USER DECISION that
+// replaced paging: with the panel scrolling there is nothing for a repeat press
+// to advance to, so the leader key toggles — press to open, press again to
+// close, press again to reopen at the top.
+func TestWhichKeyLeader_RepeatPressTogglesClosed(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -178,75 +178,34 @@ func TestWhichKeyLeader_PageAdvancesAndWraps(t *testing.T) {
 
 	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
-	_, idx0, count := m.whichKeyLeaderPage()
-	if idx0 != 0 {
-		t.Fatalf("first arming must land on page 0, got %d", idx0)
-	}
-	if count < 2 {
-		t.Fatalf("test assumes the full catalog needs multiple pages at 80x24; got %d page(s)", count)
+	if !m.whichKey.armed || !m.whichKey.shown {
+		t.Fatal("the first press must open the panel")
 	}
 
-	for i := 1; i < count+2; i++ {
-		out, _ = m.handleExplorerKey(leaderKey())
-		m = out.(Model)
-		_, idx, c := m.whichKeyLeaderPage()
-		if c != count {
-			t.Fatalf("press %d: page count changed mid-sequence: got %d, want %d", i, c, count)
-		}
-		want := i % count
-		if idx != want {
-			t.Fatalf("press %d: page = %d, want %d (must wrap at %d pages)", i, idx, want, count)
-		}
+	m = m.scrollWhichKey(m.whichKeyLeaderGroups(), true)
+	if m.whichKey.scroll == 0 {
+		t.Fatal("precondition: the full catalog must be scrollable at 80x24")
 	}
-}
 
-// TestWhichKeyLeader_PageAdvanceDoesNotReHideAtDefaultDelay is CRITICAL-1
-// from review round 1: at the shipped default delay (300ms), a page-advance
-// press must not re-hide an already-revealed panel. armWhichKeyLeader used
-// to unconditionally set shown=false whenever the delay was > 0, including
-// on a repeat press — so every page advance blinked the panel off for
-// another full delay before it reappeared. Only a FRESH arm (not already
-// armed) may hide the panel; a repeat press while already armed and shown
-// must leave shown alone.
-func TestWhichKeyLeader_PageAdvanceDoesNotReHideAtDefaultDelay(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	ui.ConfigWhichKeyLeaderDelayMs = 300
-	m := whichKeyTestModel()
-	m.width, m.height = 80, 24
-
-	// Fresh arm: must not show immediately at a nonzero delay.
-	out, _ := m.handleExplorerKey(leaderKey())
+	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
-	if m.whichKey.shown {
-		t.Fatal("precondition: fresh arm must not show immediately at 300ms delay")
+	if m.whichKey.armed || m.whichKey.shown {
+		t.Fatal("a repeat press must close the panel, not advance it")
 	}
 
-	// Simulate the delay elapsing: the scheduled tick fires for this seq.
-	out, _, _ = m.updateEasterEggMsg(whichKeyLeaderTickMsg{seq: m.whichKey.seq})
-	m = out.(Model)
-	if !m.whichKey.shown {
-		t.Fatal("precondition: the tick must reveal the panel")
-	}
-
-	// Page-advance press: the panel is already shown and must stay shown —
-	// not blink off for another 300ms before the next page appears.
 	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if !m.whichKey.shown {
-		t.Fatal("CRITICAL-1: a page-advance press must not hide an already-shown panel")
+		t.Fatal("a third press must reopen the panel")
 	}
-	if m.whichKey.page != 1 {
-		t.Fatalf("the press must still advance the page: got %d, want 1", m.whichKey.page)
+	if m.whichKey.scroll != 0 {
+		t.Fatalf("reopening must start at the top, got scroll=%d", m.whichKey.scroll)
 	}
 }
 
-// TestWhichKeyLeader_PageResetsOnDisarmAndRearm covers both halves of "page
-// lives on whichKeyState and resets whenever the leader disarms": disarming
-// (via esc) zeroes the stored page, and arming fresh afterward starts back on
-// page 0 rather than continuing where the previous arming left off.
-func TestWhichKeyLeader_PageResetsOnDisarmAndRearm(t *testing.T) {
+// TestWhichKeyLeader_ScrollKeysMoveTheViewport: ctrl+d/ctrl+u scroll the panel
+// by half a viewport and clamp at both ends.
+func TestWhichKeyLeader_ScrollKeysMoveTheViewport(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -256,51 +215,118 @@ func TestWhichKeyLeader_PageResetsOnDisarmAndRearm(t *testing.T) {
 
 	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
-	out, _ = m.handleExplorerKey(leaderKey()) // second press: advance off page 0
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+	if !ok || lay.maxScroll == 0 {
+		t.Fatalf("precondition: the full catalog must overflow at 80x24; maxScroll=%d", lay.maxScroll)
+	}
+
+	kb := ui.ActiveKeybindings
+	out, _ = m.handleExplorerKey(keyMsg(kb.PageDown))
 	m = out.(Model)
-	if m.whichKey.page == 0 {
-		t.Fatal("precondition: a second press while armed should have advanced the page")
+	if !m.whichKey.armed || !m.whichKey.shown {
+		t.Fatal("a scroll key must not close the panel")
+	}
+	if want := min(max(lay.viewRows/2, 1), lay.maxScroll); m.whichKey.scroll != want {
+		t.Fatalf("ctrl+d moved to %d, want a half page (%d)", m.whichKey.scroll, want)
+	}
+
+	for range 20 {
+		out, _ = m.handleExplorerKey(keyMsg(kb.PageDown))
+		m = out.(Model)
+	}
+	if m.whichKey.scroll != lay.maxScroll {
+		t.Fatalf("scrolling past the end must clamp to %d, got %d", lay.maxScroll, m.whichKey.scroll)
+	}
+
+	for range 20 {
+		out, _ = m.handleExplorerKey(keyMsg(kb.PageUp))
+		m = out.(Model)
+	}
+	if m.whichKey.scroll != 0 {
+		t.Fatalf("scrolling back past the top must clamp to 0, got %d", m.whichKey.scroll)
+	}
+	if !m.whichKey.armed {
+		t.Fatal("scrolling must leave the panel open throughout")
+	}
+}
+
+// TestWhichKeyLeader_ScrollKeysActNormallyWhenPanelHidden is the dispatch trap
+// the scroll exemption creates: ctrl+d/ctrl+u are the explorer's own half-page
+// cursor keys, so the exemption must apply ONLY while the panel is on screen.
+// Covers both "never armed" and "armed but still inside the reveal delay".
+func TestWhichKeyLeader_ScrollKeysActNormallyWhenPanelHidden(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	kb := ui.ActiveKeybindings
+
+	rows := make([]model.Item, 40)
+	for i := range rows {
+		rows[i] = model.Item{Name: fmt.Sprintf("p%d", i), Kind: "Pod", Namespace: "default"}
+	}
+
+	t.Run("never armed", func(t *testing.T) {
+		ui.ConfigWhichKeyLeaderDelayMs = 0
+		m := whichKeyTestModel()
+		m.width, m.height = 80, 24
+		m.setMiddleItems(rows)
+		m.setCursor(0)
+		out, _ := m.handleExplorerKey(keyMsg(kb.PageDown))
+		moved := out.(Model)
+		if moved.cursor() == 0 {
+			t.Fatal("ctrl+d must still page the list when no panel is shown")
+		}
+	})
+
+	t.Run("armed but not yet shown", func(t *testing.T) {
+		ui.ConfigWhichKeyLeaderDelayMs = 300
+		m := whichKeyTestModel()
+		m.width, m.height = 80, 24
+		m.setMiddleItems(rows)
+		m.setCursor(0)
+		out, _ := m.handleExplorerKey(leaderKey())
+		m = out.(Model)
+		if !m.whichKey.armed || m.whichKey.shown {
+			t.Fatalf("precondition: armed=%v shown=%v at a 300ms delay", m.whichKey.armed, m.whichKey.shown)
+		}
+		out, _ = m.handleExplorerKey(keyMsg(kb.PageDown))
+		got := out.(Model)
+		if got.whichKey.armed {
+			t.Fatal("a key arriving before the reveal must still close the leader")
+		}
+		if got.cursor() == 0 {
+			t.Fatal("ctrl+d must still page the list while the panel is invisible")
+		}
+	})
+}
+
+// TestWhichKeyLeader_ScrollResetsOnDisarmAndRearm: the offset lives on
+// whichKeyState and must not survive a close/reopen.
+func TestWhichKeyLeader_ScrollResetsOnDisarmAndRearm(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 24
+
+	out, _ := m.handleExplorerKey(leaderKey())
+	m = out.(Model)
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+	m = out.(Model)
+	if m.whichKey.scroll == 0 {
+		t.Fatal("precondition: ctrl+d should have scrolled")
 	}
 
 	out, _ = m.handleExplorerKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = out.(Model)
-	if m.whichKey.page != 0 {
-		t.Fatalf("disarm (esc) must reset the stored page to 0, got %d", m.whichKey.page)
+	if m.whichKey.scroll != 0 {
+		t.Fatalf("disarm (esc) must reset the scroll offset, got %d", m.whichKey.scroll)
 	}
 
 	out, _ = m.handleExplorerKey(leaderKey())
-	m = out.(Model)
-	_, idx, _ := m.whichKeyLeaderPage()
-	if idx != 0 {
-		t.Fatalf("re-arming from scratch must start on page 0, got %d", idx)
-	}
-}
-
-// TestWhichKeyLeader_StaysArmedAcrossRepeatedPresses: paging must not drop the
-// arming, or the second press would re-open on page 0 forever.
-func TestWhichKeyLeader_StaysArmedAcrossRepeatedPresses(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	ui.ConfigWhichKeyLeaderDelayMs = 0
-	m := whichKeyTestModel()
-	m.width, m.height = 80, 24
-	m.setMiddleItems([]model.Item{
-		{Name: "p1", Kind: "Pod", Namespace: "default"},
-		{Name: "p2", Kind: "Pod", Namespace: "default"},
-		{Name: "p3", Kind: "Pod", Namespace: "default"},
-	})
-	m.setCursor(0)
-
-	for i := 1; i <= 3; i++ {
-		out, _ := m.handleExplorerKey(leaderKey())
-		m = out.(Model)
-		if !m.whichKey.armed {
-			t.Fatalf("press %d: the leader must stay armed across repeated presses", i)
-		}
-		if m.whichKey.page != i-1 {
-			t.Fatalf("press %d: page = %d, want %d", i, m.whichKey.page, i-1)
-		}
+	if got := out.(Model).whichKey.scroll; got != 0 {
+		t.Fatalf("re-arming must start at the top, got %d", got)
 	}
 }
 
@@ -338,27 +364,32 @@ func TestSpace_MultiSelectNeverArmsTheLeader(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeaderPage_Page1HighestPriorityAt80x24 pins the USER DECISION
-// group order at the terminal size it was validated against: page 1 must open
-// on Actions, the highest-priority group in whichKeyGroupOrder.
-func TestWhichKeyLeaderPage_Page1HighestPriorityAt80x24(t *testing.T) {
+// TestWhichKeyLeader_OpensOnHighestPriorityGroupAt80x24 pins the USER DECISION
+// group order at the terminal size it was validated against: the unscrolled
+// panel must open on Actions, the highest-priority group in whichKeyGroupOrder.
+func TestWhichKeyLeader_OpensOnHighestPriorityGroupAt80x24(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
 	m := whichKeyTestModel()
 	m.width, m.height = 80, 24
+	m.whichKey.armed = true
+	m.whichKey.shown = true
 
-	groups, idx, count := m.whichKeyLeaderPage()
-	if idx != 0 {
-		t.Fatalf("a freshly-queried page index must be 0, got %d", idx)
-	}
+	groups := m.whichKeyLeaderGroups()
 	if len(groups) == 0 {
-		t.Fatal("page 1 must not be empty at 80x24")
+		t.Fatal("the panel must not be empty at 80x24")
 	}
 	if groups[0].Title != string(wkActions) {
-		t.Fatalf("page 1's first group must be %q (highest priority), got %q", wkActions, groups[0].Title)
+		t.Fatalf("the first group must be %q (highest priority), got %q", wkActions, groups[0].Title)
 	}
-	if count < 2 {
-		t.Fatalf("expected the full catalog to need multiple pages at 80x24, got %d", count)
+	out := stripANSI(m.renderWhichKeyLeader(strings.Repeat("\n", m.height)))
+	if !strings.Contains(out, string(wkActions)) {
+		t.Fatalf("the unscrolled panel must open on %q:\n%s", wkActions, out)
+	}
+	lay, _ := m.whichKeyLayoutFor(groups)
+	if lay.maxScroll == 0 {
+		t.Fatal("expected the full catalog to overflow at 80x24")
 	}
 }
 
@@ -371,7 +402,7 @@ func TestWhichKeyLeaderPage_Page1HighestPriorityAt80x24(t *testing.T) {
 // len(body)==0 empty-content guard couldn't fire because the footer line was
 // appended before that check ran. The panel must now either show real
 // entries or not render at all — never a box with nothing actionable in it.
-func TestWhichKeyLeaderPage_NeverEmptyBoxAtShortHeights(t *testing.T) {
+func TestWhichKeyLeader_NeverEmptyBoxAtShortHeights(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -391,45 +422,53 @@ func TestWhichKeyLeaderPage_NeverEmptyBoxAtShortHeights(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeaderPage_AllEntriesReachableViaPaging is IMPORTANT-3 from
-// review round 1: paginateWhichKeyGroups used to give an oversized group its
-// own solo page without ever fitting it, so renderWhichKeyPanel's "+N more"
-// fallback silently swallowed the rest of that group at RENDER time — and
-// because paging only ever moved between groups (never split one), those
-// entries were permanently unreachable by any number of space presses, even
-// though whichKeyLeaderPage's own returned (unfit) groups still technically
-// contained them. This asserts reachability the way a user experiences it:
-// by scanning the actual rendered text of every page, not the raw group
-// data the renderer hasn't yet truncated.
-func TestWhichKeyLeaderPage_AllEntriesReachableViaPaging(t *testing.T) {
+// TestWhichKeyLeader_AllEntriesReachableViaScrolling is IMPORTANT-3 from review
+// round 1, rewritten for scrolling: no entry may be unreachable. The old paging
+// version scanned every page; this scans every scroll offset, and — because the
+// scroll offsets are driven through the real ctrl+d key path rather than by
+// poking the state — it also proves the scroll keys actually reach the end.
+// Asserts on the rendered text, not the group data the renderer might still
+// clip.
+func TestWhichKeyLeader_AllEntriesReachableViaScrolling(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
-	m := whichKeyTestModel()
-	m.width, m.height = 80, 14
-	m.whichKey.armed = true
-	m.whichKey.shown = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
 
-	want := map[string]bool{}
-	for _, a := range m.availableWhichKeyActions() {
-		want[a.Label] = true
-	}
+	for _, size := range [][2]int{{80, 14}, {80, 24}, {120, 40}} {
+		m := whichKeyTestModel()
+		m.width, m.height = size[0], size[1]
 
-	_, _, count := m.whichKeyLeaderPage()
-	if count < 2 {
-		t.Fatalf("test assumes the full catalog needs multiple pages at 80x14; got %d", count)
-	}
-	var allRendered strings.Builder
-	for p := range count {
-		m.whichKey.page = p
+		want := map[string]bool{}
+		for _, a := range m.availableWhichKeyActions() {
+			want[a.Label] = true
+		}
+
+		out, _ := m.handleExplorerKey(leaderKey())
+		m = out.(Model)
+		lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+		if !ok {
+			t.Fatalf("%dx%d: the panel must lay out", size[0], size[1])
+		}
+
 		bg := strings.Repeat("\n", m.height)
-		allRendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
-		allRendered.WriteString("\n")
-	}
-	rendered := allRendered.String()
-	for label := range want {
-		if !strings.Contains(rendered, label) {
-			t.Errorf("IMPORTANT-3: %q never appears in any of the %d rendered pages — unreachable via paging", label, count)
+		var rendered strings.Builder
+		rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
+		for step := 0; m.whichKey.scroll < lay.maxScroll; step++ {
+			if step > lay.bodyRows {
+				t.Fatalf("%dx%d: ctrl+d never reached the end (%d of %d)", size[0], size[1], m.whichKey.scroll, lay.maxScroll)
+			}
+			out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+			m = out.(Model)
+			rendered.WriteString("\n")
+			rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
+		}
+		// A label wider than the description field is ellipsized, so match the
+		// text the panel is actually supposed to draw rather than the raw label.
+		for label := range want {
+			if !strings.Contains(rendered.String(), ui.Truncate(label, lay.grid.descW)) {
+				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], label)
+			}
 		}
 	}
 }
@@ -453,7 +492,9 @@ func TestWhichKeyLeader_HintBarGatesOnShownNotArmed(t *testing.T) {
 	if m.whichKey.shown {
 		t.Fatal("precondition: fresh arm must not be shown yet at 300ms delay")
 	}
-	leaderHint := ui.ActiveKeybindings.WhichKeyLeader + ": more"
+	// "?: more" is gone with paging; the leader hints are now the scroll keys
+	// (only while overflowing) and esc.
+	leaderHint := ui.ActiveKeybindings.PageDown + "/" + ui.ActiveKeybindings.PageUp + ": scroll"
 	if hint := stripANSI(m.statusBar()); strings.Contains(hint, leaderHint) {
 		t.Fatalf("IMPORTANT-4: hint bar switched to leader hints before the panel is shown:\n%s", hint)
 	}
@@ -522,62 +563,53 @@ func TestWhichKeyLeader_MouseInputDisarms(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeaderPage_IndicatorAlwaysShownWhenMultiplePages guards the
-// other half of IMPORTANT-3: once entries are reachable via splitting
-// (rather than dropped into "+N more"), every page of a multi-page panel
-// must show its page indicator — the whole point of paging is defeated if
-// the user can't tell there's more to see.
-func TestWhichKeyLeaderPage_IndicatorAlwaysShownWhenMultiplePages(t *testing.T) {
+// TestWhichKeyLeader_ScrollHintOnlyWhenOverflowing replaces the page-indicator
+// pair. which-key.nvim adds its "<c-d>/<c-u> scroll" help entry only when the
+// content overflows (view.lua:447-449); advertising it on a panel that already
+// fits promises movement that cannot happen, and omitting it on one that
+// doesn't hides the only way to see the rest.
+func TestWhichKeyLeader_ScrollHintOnlyWhenOverflowing(t *testing.T) {
 	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
-	m := whichKeyTestModel()
-	m.width, m.height = 80, 14
-	m.whichKey.armed = true
-	m.whichKey.shown = true
+	kb := ui.DefaultKeybindings()
+	scrollHint := kb.PageDown + "/" + kb.PageUp
 
-	_, _, count := m.whichKeyLeaderPage()
-	if count < 2 {
-		t.Fatalf("test assumes multiple pages at 80x14; got %d", count)
-	}
-	for p := range count {
-		m.whichKey.page = p
-		bg := strings.Repeat("\n", m.height)
-		out := stripANSI(m.renderWhichKeyLeader(bg))
-		want := fmt.Sprintf("(%d/%d)", p+1, count)
-		if !strings.Contains(out, want) {
-			t.Errorf("IMPORTANT-3: page %d/%d missing its indicator %q:\n%s", p+1, count, want, out)
+	t.Run("overflowing", func(t *testing.T) {
+		ui.ActiveKeybindings = kb
+		m := whichKeyTestModel()
+		m.width, m.height = 80, 14
+		m.whichKey.armed = true
+		m.whichKey.shown = true
+		if lay, _ := m.whichKeyLayoutFor(m.whichKeyLeaderGroups()); lay.maxScroll == 0 {
+			t.Fatal("precondition: the full catalog must overflow at 80x14")
 		}
-	}
-}
+		if bar := stripANSI(m.statusBar()); !strings.Contains(bar, scrollHint) {
+			t.Fatalf("an overflowing panel must advertise the scroll keys; got %q", bar)
+		}
+	})
 
-// TestWhichKeyLeaderPage_NoIndicatorOnSinglePage is a review round 1 minor:
-// a single-page panel has nothing to page to, so "(1/1)" would falsely
-// promise more content than exists.
-func TestWhichKeyLeaderPage_NoIndicatorOnSinglePage(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	// The strip is capped at whichKeyMaxBodyRows regardless of terminal size,
-	// so the real catalog never fits one page. Clear every binding but two:
-	// availableWhichKeyActions drops entries whose key the user cleared.
-	kb := ui.Keybindings{}
-	kb.Refresh = "R"
-	kb.CopyName = "y"
-	ui.ActiveKeybindings = kb
+	t.Run("fits", func(t *testing.T) {
+		// availableWhichKeyActions drops entries whose key the user cleared, so
+		// clearing all but two leaves a catalog that fits any real terminal.
+		small := ui.Keybindings{}
+		small.Refresh = "R"
+		small.CopyName = "y"
+		small.PageDown, small.PageUp = kb.PageDown, kb.PageUp
+		small.WhichKeyLeader = kb.WhichKeyLeader
+		ui.ActiveKeybindings = small
 
-	m := whichKeyTestModel()
-	m.width, m.height = 120, 40
-	m.whichKey.armed = true
-	m.whichKey.shown = true
-
-	_, _, count := m.whichKeyLeaderPage()
-	if count != 1 {
-		t.Fatalf("test assumes a single page for a two-entry catalog; got %d", count)
-	}
-	bg := strings.Repeat("\n", m.height)
-	out := stripANSI(m.renderWhichKeyLeader(bg))
-	if strings.Contains(out, "(1/1)") {
-		t.Fatalf("a single page must not show a page indicator:\n%s", out)
-	}
+		m := whichKeyTestModel()
+		m.width, m.height = 120, 40
+		m.whichKey.armed = true
+		m.whichKey.shown = true
+		if lay, _ := m.whichKeyLayoutFor(m.whichKeyLeaderGroups()); lay.maxScroll != 0 {
+			t.Fatal("precondition: a two-entry catalog must fit at 120x40")
+		}
+		if bar := stripANSI(m.statusBar()); strings.Contains(bar, scrollHint) {
+			t.Fatalf("a panel that fits must not advertise the scroll keys; got %q", bar)
+		}
+		if bar := stripANSI(m.statusBar()); !strings.Contains(bar, "esc") {
+			t.Fatalf("the close hint must always render while the panel is up; got %q", bar)
+		}
+	})
 }

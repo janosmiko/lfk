@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,65 +10,58 @@ import (
 // whichKeyState holds the which-key popup state, shared by the g prefix and the
 // leader panel. seq is a generation counter: a delayed reveal carries the seq it
 // was scheduled with, so a tick from a superseded arming is dropped instead of
-// flashing a stale panel. page is the leader's raw page counter — it only ever
-// increases while armed and is read back modulo the current page count, so it
-// never needs to know that count itself to wrap correctly.
+// flashing a stale panel. scroll is the panel's row offset, clamped at render
+// time against the content the current terminal size can show.
 type whichKeyState struct {
-	armed bool // leader pressed, waiting for the next key
-	shown bool // delay elapsed, panel drawn
-	seq   int
-	page  int
+	armed  bool // leader pressed, waiting for the next key
+	shown  bool // delay elapsed, panel drawn
+	seq    int
+	scroll int
 }
 
 // whichKeyLeaderTickMsg reveals the leader panel once the delay elapses.
 type whichKeyLeaderTickMsg struct{ seq int }
 
-// armWhichKeyLeader is called on every leader keypress, whether that is a fresh
-// arming or a repeat press while already armed. A fresh arming resets to page 1;
-// a repeat press while still armed advances the page instead, so "? ? ?" pages
-// through the panel. With the default zero delay the panel shows at once;
-// which_key_leader_delay_ms instead schedules a reveal tick.
+// armWhichKeyLeader is called on every leader keypress. The panel scrolls
+// rather than pages, so a repeat press while already armed has nothing to
+// advance to and toggles the panel shut instead. With the default zero delay
+// the panel shows at once; which_key_leader_delay_ms instead schedules a
+// reveal tick.
 func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 	if !ui.ConfigWhichKeyEnabled {
 		m.whichKey = whichKeyState{}
 		return m, nil
 	}
-	freshArm := !m.whichKey.armed
-	if freshArm {
-		m.whichKey.page = 0
-	} else {
-		m.whichKey.page++
+	if m.whichKey.armed {
+		return m.disarmWhichKeyLeader(), nil
 	}
 	m.whichKey.seq++
 	m.whichKey.armed = true
+	m.whichKey.scroll = 0
 	if ui.ConfigWhichKeyLeaderDelayMs <= 0 {
 		m.whichKey.shown = true
 		return m, nil
 	}
-	// CRITICAL-1 (review round 1): only a fresh arm hides the panel for the
-	// delay. A repeat press while already armed only advances the page —
-	// forcing shown=false here too re-hid an already-visible panel on every
-	// single page advance, blinking it off for another full delay each time.
-	if freshArm {
-		m.whichKey.shown = false
-	}
+	m.whichKey.shown = false
 	seq := m.whichKey.seq
 	d := time.Duration(ui.ConfigWhichKeyLeaderDelayMs) * time.Millisecond
 	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyLeaderTickMsg{seq: seq} })
 }
 
-// disarmWhichKeyLeader hides the panel and resets its page. Bumping seq
+// disarmWhichKeyLeader hides the panel and resets its scroll. Bumping seq
 // invalidates any tick still in flight.
 func (m Model) disarmWhichKeyLeader() Model {
 	m.whichKey.armed = false
 	m.whichKey.shown = false
-	m.whichKey.page = 0
+	m.whichKey.scroll = 0
 	m.whichKey.seq++
 	return m
 }
 
 // whichKeyLeaderGroups turns the currently-available actions into render groups,
-// in the declared group order. Groups with no available action are omitted.
+// in the declared group order. Groups with no available action are omitted, and
+// each group's entries are ordered by sortWhichKeyCells rather than by their
+// position in the catalog.
 func (m Model) whichKeyLeaderGroups() []whichKeyGroupCells {
 	acts := m.availableWhichKeyActions()
 	kb := ui.ActiveKeybindings
@@ -80,57 +72,75 @@ func (m Model) whichKeyLeaderGroups() []whichKeyGroupCells {
 	out := make([]whichKeyGroupCells, 0, len(byGroup))
 	for _, g := range whichKeyGroupOrder() {
 		if cells := byGroup[g]; len(cells) > 0 {
+			sortWhichKeyCells(cells)
 			out = append(out, whichKeyGroupCells{Title: string(g), Cells: cells})
 		}
 	}
 	return out
 }
 
-// whichKeyLeaderPage returns the groups for the leader's current page,
-// the page index, and the page count. Pagination reuses the renderer's own
-// geometry (whichKeyPanelGeometry) and per-cell layout (layoutWhichKey, via
-// paginateWhichKeyGroups) rather than re-deriving row-fitting arithmetic, so
-// the count this reports can never disagree with what renderWhichKeyLeader
-// actually draws. One row is always reserved for the page-indicator footer,
-// matching renderWhichKeyPanel's own reservation when footer != "".
-func (m Model) whichKeyLeaderPage() ([]whichKeyGroupCells, int, int) {
-	groups := m.whichKeyLeaderGroups()
-	targetInner, maxInner, maxBodyRows, ok := m.whichKeyPanelGeometry()
-	if !ok {
-		return nil, 0, 0
+// scrollWhichKey moves the panel viewport by half a page, the same half-page
+// step ctrl+d/ctrl+u take everywhere else in the app. A no-op when everything
+// already fits.
+func (m Model) scrollWhichKey(groups []whichKeyGroupCells, down bool) Model {
+	lay, ok := m.whichKeyLayoutFor(groups)
+	if !ok || lay.maxScroll == 0 {
+		return m
 	}
-	maxBodyRows--
-	if maxBodyRows < 1 {
-		return nil, 0, 0
+	step := max(lay.viewRows/2, 1)
+	if down {
+		m.whichKey.scroll = min(m.whichKey.scroll+step, lay.maxScroll)
+	} else {
+		m.whichKey.scroll = max(m.whichKey.scroll-step, 0)
 	}
-	pages := paginateWhichKeyGroups(groups, maxBodyRows, targetInner, maxInner)
-	if len(pages) == 0 {
-		return nil, 0, 0
-	}
-	idx := m.whichKey.page % len(pages)
-	return pages[idx], idx, len(pages)
+	return m
 }
 
-// renderWhichKeyLeader draws the leader panel when it is armed and
-// visible. The page indicator is the panel's only in-box footer — the
-// "space: more / esc: close" hotkey hint lives in the bottom hint bar
-// (statusBar), matching every other overlay in this app.
+// handleWhichKeyScrollKey consumes the half-page scroll keys for a visible
+// panel. Callers MUST gate this on whichKey.shown so ctrl+d/ctrl+u keep their
+// normal explorer action whenever no panel is on screen.
+func (m Model) handleWhichKeyScrollKey(msg tea.KeyPressMsg, groups []whichKeyGroupCells) (Model, bool) {
+	kb := ui.ActiveKeybindings
+	switch key := msg.String(); {
+	case kb.PageDown != "" && key == kb.PageDown:
+		return m.scrollWhichKey(groups, true), true
+	case kb.PageUp != "" && key == kb.PageUp:
+		return m.scrollWhichKey(groups, false), true
+	}
+	return m, false
+}
+
+// whichKeyLeaderIntercept applies the leader panel's "any key but the leader
+// closes it" rule, shared by handleKey and handleExplorerKey. It reports
+// whether the key was consumed outright: the scroll keys are (they move the
+// visible panel), esc is while the panel is actually SHOWN, and every other key
+// still falls through to whatever it would normally do.
+//
+// esc is consumed only while shown so closing it is a visible effect. The
+// default delay is 0, but a user who configures which_key_leader_delay_ms has a
+// window where the panel is not drawn yet, and swallowing esc there steals it
+// from handleExplorerEsc (clear selection / search / filter / preset, exit
+// fullscreen, close tab) with no on-screen feedback at all.
+func (m Model) whichKeyLeaderIntercept(msg tea.KeyPressMsg) (Model, bool) {
+	if !m.whichKey.armed || msg.String() == ui.ActiveKeybindings.WhichKeyLeader {
+		return m, false
+	}
+	if m.whichKey.shown {
+		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.whichKeyLeaderGroups()); scrolled {
+			return out, true
+		}
+	}
+	shown := m.whichKey.shown
+	m = m.disarmWhichKeyLeader()
+	return m, shown && msg.String() == "esc"
+}
+
+// renderWhichKeyLeader draws the leader panel when it is armed and visible.
+// The panel has no in-box footer — the scroll and close hints live in the
+// bottom hint bar (statusBar), matching every other overlay in this app.
 func (m Model) renderWhichKeyLeader(background string) string {
 	if !m.whichKey.armed || !m.whichKey.shown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	groups, idx, count := m.whichKeyLeaderPage()
-	if len(groups) == 0 {
-		return background
-	}
-	// A single-page panel has nothing to page to — showing "(1/1)" would
-	// promise "more" that doesn't exist (review round 1, minor). Leaving the
-	// footer empty also lets renderWhichKeyPanel skip its footer-row
-	// reservation for the common small-catalog case, showing one extra row
-	// of real content instead.
-	var footer string
-	if count > 1 {
-		footer = fmt.Sprintf("(%d/%d)", idx+1, count)
-	}
-	return m.renderWhichKeyPanel(background, groups, footer)
+	return m.renderWhichKeyPanel(background, m.whichKeyLeaderGroups(), m.whichKey.scroll)
 }

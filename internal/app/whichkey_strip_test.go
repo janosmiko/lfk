@@ -30,25 +30,79 @@ func whichKeyStripBox(t *testing.T, m Model) (lines []string, first, last int) {
 	return lines, first, last
 }
 
-// TestWhichKeyStrip_HeightCappedRegardlessOfTerminal is the user-facing
-// complaint the rework fixes: the panel used to grow with the terminal until
-// it dominated the screen. It must stay the same short strip at every height.
-func TestWhichKeyStrip_HeightCappedRegardlessOfTerminal(t *testing.T) {
+// TestWhichKeyStrip_HeightGrowsToFitAndCapsAt25 pins the USER DECISION that
+// replaced the old fixed six-row strip: like which-key.nvim, the panel is as
+// tall as its content, bounded by win.height {min = 4, max = 25} and by what
+// the terminal has left over the status bar.
+func TestWhichKeyStrip_HeightGrowsToFitAndCapsAt25(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 
-	wantHeight := 2 + 2*whichKeyPadV + whichKeyMaxBodyRows // border + padding + body
+	chrome := 2 + 2*whichKeyPadV // border + vertical padding
 	for _, h := range []int{24, 40, 60, 120} {
 		m := whichKeyTestModel()
 		m.width, m.height = 120, h
 		m.whichKey.armed = true
 		m.whichKey.shown = true
 
-		_, first, last := whichKeyStripBox(t, m)
-		if got := last - first + 1; got != wantHeight {
-			t.Errorf("height=%d: panel is %d rows, want a fixed %d-row strip", h, got, wantHeight)
+		lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+		if !ok {
+			t.Fatalf("height=%d: the panel must lay out", h)
 		}
+		availRows := h - (chrome + whichKeyBottomGap)
+		want := min(min(max(lay.bodyRows, whichKeyMinRows), whichKeyMaxRows), availRows)
+		if lay.viewRows != want {
+			t.Errorf("height=%d: viewport is %d rows, want %d (content %d, min %d, max %d, avail %d)",
+				h, lay.viewRows, want, lay.bodyRows, whichKeyMinRows, whichKeyMaxRows, availRows)
+		}
+
+		_, first, last := whichKeyStripBox(t, m)
+		if got := last - first + 1; got != lay.viewRows+chrome {
+			t.Errorf("height=%d: panel is %d rows, want %d", h, got, lay.viewRows+chrome)
+		}
+	}
+
+	// The cap really is 25 rows and not "whatever the terminal has".
+	tall := whichKeyTestModel()
+	tall.width, tall.height = 120, 120
+	tall.whichKey.armed = true
+	tall.whichKey.shown = true
+	if _, first, last := whichKeyStripBox(t, tall); last-first+1 > whichKeyMaxRows+chrome {
+		t.Errorf("a 120-row terminal must not grow the panel past %d content rows; got %d", whichKeyMaxRows, last-first+1-chrome)
+	}
+}
+
+// TestWhichKeyStrip_ShortContentStillMeetsTheMinimumHeight covers the other end
+// of the clamp (win.height.min = 4): a two-entry catalog must not render a
+// one-row sliver.
+func TestWhichKeyStrip_ShortContentStillMeetsTheMinimumHeight(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ConfigWhichKeyEnabled = true
+	// availableWhichKeyActions drops entries whose key the user cleared, so a
+	// single binding leaves one group: a title row plus one grid row.
+	kb := ui.Keybindings{}
+	kb.Refresh = "R"
+	kb.WhichKeyLeader = "?" // so whichKeyHelpKey resolves to the (cleared) kb.Help
+	ui.ActiveKeybindings = kb
+
+	m := whichKeyTestModel()
+	m.width, m.height = 120, 40
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+	if !ok {
+		t.Fatal("precondition: a two-entry catalog must still lay out")
+	}
+	if lay.bodyRows >= whichKeyMinRows {
+		t.Fatalf("precondition: the content must be shorter than the minimum; bodyRows=%d", lay.bodyRows)
+	}
+	if lay.viewRows != whichKeyMinRows {
+		t.Errorf("viewport is %d rows, want the %d-row minimum", lay.viewRows, whichKeyMinRows)
+	}
+	if lay.maxScroll != 0 {
+		t.Errorf("content shorter than the viewport must not be scrollable; maxScroll=%d", lay.maxScroll)
 	}
 }
 

@@ -17,27 +17,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.statusMessageTip = false
 	}
 
-	// The which-key leader must close on any key other than its own, before ANY
-	// other handler gets a chance to claim it — mouse-toggle, tab-switch,
-	// and mode-specific handlers below all run ahead of handleExplorerKey's
-	// own copy of this guard (kept there too, for callers that invoke it
-	// directly), and previously left the leader armed indefinitely after,
-	// e.g., the mouse-capture toggle key (IMPORTANT-5, review round 1). esc
-	// is consumed outright (closes the leader, does nothing else); every
-	// other key still falls through to whatever it would normally do.
-	//
-	// esc is consumed only while the panel is actually SHOWN, so closing it is
-	// a visible effect. The default delay is 0, but a user who configures
-	// which_key_leader_delay_ms has a window where the panel is not drawn yet,
-	// and swallowing esc there steals it from handleExplorerEsc (clear
-	// selection / search / filter / preset, exit fullscreen, close tab) with
-	// no on-screen feedback at all.
-	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.WhichKeyLeader {
-		shown := m.whichKey.shown
-		m = m.disarmWhichKeyLeader()
-		if shown && msg.String() == "esc" {
-			return m, nil
-		}
+	// The which-key leader must claim its keys before ANY other handler gets a
+	// chance to — mouse-toggle, tab-switch, and mode-specific handlers below
+	// all run ahead of handleExplorerKey's own copy of this guard (kept there
+	// too, for callers that invoke it directly), and previously left the leader
+	// armed indefinitely after, e.g., the mouse-capture toggle key
+	// (IMPORTANT-5, review round 1).
+	mdl, consumed := m.whichKeyLeaderIntercept(msg)
+	m = mdl
+	if consumed {
+		return m, nil
 	}
 
 	// Handle regular overlays first so when an overlay (e.g. the theme
