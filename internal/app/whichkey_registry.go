@@ -33,7 +33,35 @@ type whichKeyAction struct {
 	Key   func(kb ui.Keybindings) string
 	Label string
 	Group whichKeyGroup
-	Avail func(m *Model) bool
+	Avail func(c *wkCtx) bool
+}
+
+// wkCtx carries the row state every predicate needs, resolved once per call.
+// Predicates used to each call selectedMiddleItem() -> visibleMiddleItems(),
+// which re-filters the whole list; at ~14 predicates that was 14 filter passes
+// per render. unionSentinel and readOnly are included because multiple
+// predicates (wkSingleCluster/wkUnionAllowed and wkWritable/wkWritableKindIn/
+// PasteApply, respectively) each derive the same value from m.
+type wkCtx struct {
+	m             *Model
+	sel           *model.Item
+	kind          string
+	level         model.Level
+	unionSentinel bool
+	readOnly      bool
+}
+
+// newWKCtx resolves the row, kind, level and the two shared context checks
+// exactly once. Safe on a zero-value Model: selectedMiddleItem,
+// selectedResourceKind, isUnionSentinel and readOnlyForContext all tolerate a
+// zero Model without panicking (see TestWhichKeyPredicates_ZeroValueModelDoesNotPanic).
+func newWKCtx(m *Model) *wkCtx {
+	c := &wkCtx{m: m, level: m.nav.Level}
+	c.sel = m.selectedMiddleItem()
+	c.kind = m.selectedResourceKind()
+	c.unionSentinel = m.isUnionSentinel()
+	c.readOnly = m.readOnlyForContext(m.nav.Context)
+	return c
 }
 
 // --- shared predicates ---
@@ -45,8 +73,8 @@ type whichKeyAction struct {
 // see availableCopyFormats (copy_format.go), which explicitly documents
 // "Clusters and ResourceTypes only support Table ... All other levels offer
 // the full YAML / JSON / Table set" rather than refusing those levels.
-func wkRowSelected(m *Model) bool {
-	return m.selectedMiddleItem() != nil
+func wkRowSelected(c *wkCtx) bool {
+	return c.sel != nil
 }
 
 // wkLevelIn wraps a predicate with a navigation-level allowlist, so a
@@ -55,13 +83,13 @@ func wkRowSelected(m *Model) bool {
 // whenever a handler's level branches are narrower or wider than
 // wkOnRow's default (LevelResources/LevelOwned/LevelContainers) — see the
 // per-entry level audit in the Task 2 report.
-func wkLevelIn(pred func(m *Model) bool, levels ...model.Level) func(m *Model) bool {
+func wkLevelIn(pred func(c *wkCtx) bool, levels ...model.Level) func(c *wkCtx) bool {
 	allowed := make(map[model.Level]bool, len(levels))
 	for _, lvl := range levels {
 		allowed[lvl] = true
 	}
-	return func(m *Model) bool {
-		return pred(m) && allowed[m.nav.Level]
+	return func(c *wkCtx) bool {
+		return pred(c) && allowed[c.level]
 	}
 }
 
@@ -73,8 +101,8 @@ func wkLevelIn(pred func(m *Model) bool, levels ...model.Level) func(m *Model) b
 // comparison rather than a wkLevelIn call for cheapness. Delete is the
 // exception — directActionDelete (update_actions.go) opens with an explicit
 // LevelContainers refusal — so its entry composes wkLevelIn on top.
-func wkOnRow(m *Model) bool {
-	return m.nav.Level >= model.LevelResources && m.selectedMiddleItem() != nil
+func wkOnRow(c *wkCtx) bool {
+	return c.level >= model.LevelResources && c.sel != nil
 }
 
 // wkActionMenuAvailable mirrors openActionMenu's dispatch (update_actions.go),
@@ -87,53 +115,53 @@ func wkOnRow(m *Model) bool {
 // requires selectedItemsList() to be non-empty, which is a full scan of the
 // visible rows. hasSelection() only differs from it when every selected row is
 // filtered out of view, so the cheap check is used instead.
-func wkActionMenuAvailable(m *Model) bool {
-	sel := m.selectedMiddleItem()
+func wkActionMenuAvailable(c *wkCtx) bool {
+	sel := c.sel
 	if sel == nil {
 		return false
 	}
 	// Security rows get their own menu ahead of the level dispatch.
-	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") || strings.HasPrefix(sel.Kind, "__security_") {
+	if strings.HasPrefix(c.m.nav.ResourceType.Kind, "__security_") || strings.HasPrefix(sel.Kind, "__security_") {
 		return true
 	}
-	if m.hasSelection() {
-		return m.selectedResourceKind() != ""
+	if c.m.hasSelection() {
+		return c.kind != ""
 	}
-	switch m.nav.Level {
+	switch c.level {
 	case model.LevelClusters:
 		return !isUnionSetItem(sel)
 	case model.LevelResourceTypes:
 		return sel.Kind != "__collapsed_group__" && sel.Category != "Dashboards" && model.PinKeyFromRef(sel.Extra) != ""
 	default:
-		return m.selectedResourceKind() != ""
+		return c.kind != ""
 	}
 }
 
 // wkWritable reports whether mutating actions apply: a row is highlighted and
 // the active context is not read-only.
-func wkWritable(m *Model) bool {
-	return wkOnRow(m) && !m.readOnlyForContext(m.nav.Context)
+func wkWritable(c *wkCtx) bool {
+	return wkOnRow(c) && !c.readOnly
 }
 
 // wkKindIn returns a predicate matching the highlighted row's kind.
-func wkKindIn(kinds ...string) func(*Model) bool {
+func wkKindIn(kinds ...string) func(*wkCtx) bool {
 	set := make(map[string]bool, len(kinds))
 	for _, k := range kinds {
 		set[k] = true
 	}
-	return func(m *Model) bool {
-		if !wkOnRow(m) {
+	return func(c *wkCtx) bool {
+		if !wkOnRow(c) {
 			return false
 		}
-		return set[m.selectedResourceKind()]
+		return set[c.kind]
 	}
 }
 
 // wkWritableKindIn is wkKindIn plus the read-only gate.
-func wkWritableKindIn(kinds ...string) func(*Model) bool {
+func wkWritableKindIn(kinds ...string) func(*wkCtx) bool {
 	kindOK := wkKindIn(kinds...)
-	return func(m *Model) bool {
-		return kindOK(m) && !m.readOnlyForContext(m.nav.Context)
+	return func(c *wkCtx) bool {
+		return kindOK(c) && !c.readOnly
 	}
 }
 
@@ -148,9 +176,9 @@ func wkWritableKindIn(kinds ...string) func(*Model) bool {
 // kind-conditional (isUnionAllowedActionForKind allows Delete for
 // kind == "Pod"), so a blanket gate there would hide an entry that actually
 // works — see wkUnionAllowed for that case.
-func wkSingleCluster(pred func(m *Model) bool) func(m *Model) bool {
-	return func(m *Model) bool {
-		return pred(m) && !m.isUnionSentinel()
+func wkSingleCluster(pred func(c *wkCtx) bool) func(c *wkCtx) bool {
+	return func(c *wkCtx) bool {
+		return pred(c) && !c.unionSentinel
 	}
 }
 
@@ -161,9 +189,9 @@ func wkSingleCluster(pred func(m *Model) bool) func(m *Model) bool {
 // kubectl-backed actions) explicitly supports LevelResources/Owned/Containers
 // regardless of kind (update_keys_actions.go), so it doesn't share this
 // restriction.
-func wkRealKind(pred func(m *Model) bool) func(m *Model) bool {
-	return func(m *Model) bool {
-		return pred(m) && !isVirtualResourceKind(m.selectedResourceKind())
+func wkRealKind(pred func(c *wkCtx) bool) func(c *wkCtx) bool {
+	return func(c *wkCtx) bool {
+		return pred(c) && !isVirtualResourceKind(c.kind)
 	}
 }
 
@@ -172,13 +200,13 @@ func wkRealKind(pred func(m *Model) bool) func(m *Model) bool {
 // separate from wkRealKind because the blocked set differs — e.g. the label
 // editor rejects only "__port_forwards__" and "__captures__", not the wider
 // virtual-kind set (blank kind, port-forward entries, security findings).
-func wkExcludeKind(pred func(m *Model) bool, kinds ...string) func(m *Model) bool {
+func wkExcludeKind(pred func(c *wkCtx) bool, kinds ...string) func(c *wkCtx) bool {
 	blocked := make(map[string]bool, len(kinds))
 	for _, k := range kinds {
 		blocked[k] = true
 	}
-	return func(m *Model) bool {
-		return pred(m) && !blocked[m.selectedResourceKind()]
+	return func(c *wkCtx) bool {
+		return pred(c) && !blocked[c.kind]
 	}
 }
 
@@ -188,15 +216,15 @@ func wkExcludeKind(pred func(m *Model) bool, kinds ...string) func(m *Model) boo
 // Delete and Force Delete that some kinds still permit at the union
 // sentinel. Reuses the handler's own helper rather than restating its
 // per-label kind rules here.
-func wkUnionAllowed(pred func(m *Model) bool, label string) func(m *Model) bool {
-	return func(m *Model) bool {
-		if !pred(m) {
+func wkUnionAllowed(pred func(c *wkCtx) bool, label string) func(c *wkCtx) bool {
+	return func(c *wkCtx) bool {
+		if !pred(c) {
 			return false
 		}
-		if !m.isUnionSentinel() {
+		if !c.unionSentinel {
 			return true
 		}
-		return isUnionAllowedActionForKind(m.selectedResourceKind(), label)
+		return isUnionAllowedActionForKind(c.kind, label)
 	}
 }
 
@@ -224,7 +252,7 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkRowSelected},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkRowSelected},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkRowSelected},
-	{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Apply from clipboard", Group: wkActions, Avail: wkSingleCluster(func(m *Model) bool { return !m.readOnlyForContext(m.nav.Context) })},
+	{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Apply from clipboard", Group: wkActions, Avail: wkSingleCluster(func(c *wkCtx) bool { return !c.readOnly })},
 	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Open in browser", Group: wkActions, Avail: wkKindIn("Ingress", "__port_forwards__", "__port_forward_entry__")},
 	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Port forward & open", Group: wkActions, Avail: wkWritableKindIn("Service")},
 	{Key: func(kb ui.Keybindings) string { return kb.SaveResource }, Label: "Save to file", Group: wkActions, Avail: wkOnRow},
@@ -246,12 +274,13 @@ func whichKeyExplorerActions() []whichKeyAction {
 func (m *Model) availableWhichKeyActions() []whichKeyAction {
 	kb := ui.ActiveKeybindings
 	all := whichKeyExplorerCatalog
+	c := newWKCtx(m)
 	out := make([]whichKeyAction, 0, len(all))
 	for _, a := range all {
 		if a.Key(kb) == "" {
 			continue
 		}
-		if a.Avail != nil && !a.Avail(m) {
+		if a.Avail != nil && !a.Avail(c) {
 			continue
 		}
 		out = append(out, a)

@@ -657,6 +657,7 @@ func TestWhichKeyPredicates_ZeroValueModelDoesNotPanic(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	var m Model
+	c := newWKCtx(&m)
 	for _, a := range whichKeyExplorerActions() {
 		if a.Avail == nil {
 			continue
@@ -667,7 +668,20 @@ func TestWhichKeyPredicates_ZeroValueModelDoesNotPanic(t *testing.T) {
 					t.Fatalf("predicate for %q panicked on zero-value Model: %v", a.Label, r)
 				}
 			}()
-			_ = a.Avail(&m)
+			_ = a.Avail(c)
 		}()
+	}
+}
+
+// The panel re-renders on every keypress while it is open. Resolving the row
+// once per render is the difference between one filter pass and one per entry.
+func TestAvailableWhichKeyActions_ResolvesRowOncePerCall(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.filterText = "p" // force visibleMiddleItems to do real filtering work
+	before := testing.AllocsPerRun(100, func() { _ = m.availableWhichKeyActions() })
+	if before > 12 {
+		t.Fatalf("availableWhichKeyActions allocates %.0f times per call; the row must be resolved once, not per predicate", before)
 	}
 }
