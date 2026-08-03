@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -74,51 +75,190 @@ func layoutWhichKey(plain []string, targetInner, maxInner int) whichKeyLayout {
 	}
 }
 
-// renderWhichKey draws the goto cheatsheet near the bottom of the screen when
-// the g prefix is armed and visible, styled after neovim's which-key "modern"
-// preset: a rounded-border panel of key/desc columns with uniform padding over
-// a dimmed background. Returns background unchanged when hidden/disabled.
+// whichKeyGroupCells is one titled section of the panel. An empty Title renders
+// the section without a header, which is what the goto popup uses.
+type whichKeyGroupCells struct {
+	Title string
+	Cells []whichKeyCell
+}
+
+// Panel geometry.
+const (
+	whichKeyPadV      = 1  // rows of padding above and below
+	whichKeyPadH      = 2  // columns of padding left and right
+	whichKeyWidthPct  = 60 // panel spans this percent of the screen width
+	whichKeyBottomGap = 5  // rows between the panel and the screen bottom
+	whichKeyMinWidth  = 20
+	whichKeyMinHeight = 6
+)
+
+// renderWhichKey draws the goto cheatsheet while the g prefix is armed and
+// visible. Returns background unchanged when hidden or disabled.
 func (m Model) renderWhichKey(background string) string {
 	if !m.pendingG || !m.whichKeyShown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	cells := m.whichKeyCells()
-	if len(cells) == 0 {
+	return m.renderWhichKeyPanel(background, []whichKeyGroupCells{{Cells: m.whichKeyCells()}})
+}
+
+// renderWhichKeyPanel draws the given groups as a bordered panel near the bottom
+// of the screen, styled after neovim's which-key "modern" preset. Groups render
+// in slice order. When the full catalog doesn't fit the screen height, the last
+// group that doesn't fit is truncated cell-by-cell rather than dropped whole —
+// with 40+ catalog entries the panel is routinely shorter than the content, and
+// dropping whole groups can leave a short terminal showing nothing at all even
+// though rows were available. A "+N more" footer discloses exactly how many
+// entries were cut. Returns background unchanged when there is nothing to show
+// or the terminal is too small.
+func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCells) string {
+	total := 0
+	for _, g := range groups {
+		total += len(g.Cells)
+	}
+	if total == 0 || m.width < whichKeyMinWidth || m.height < whichKeyMinHeight {
 		return background
 	}
 
-	// Panel-local styles: foreground only, all on the theme base background so
-	// the panel matches the theme rather than carrying the status bar's grey
-	// surface. Keys use the help-key accent; descriptions use normal text.
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
+	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorPrimary)).Bold(true).Background(ui.BaseBg)
 
+	chrome := 2*whichKeyPadH + 2
+	maxInner := max(m.width-chrome, 1)
+	targetInner := max(m.width*whichKeyWidthPct/100-chrome, 1)
+	// Border + vertical padding + the bottom gap all eat into the rows the body
+	// may occupy.
+	maxBodyRows := m.height - (2 + 2*whichKeyPadV + whichKeyBottomGap)
+	if maxBodyRows < 1 {
+		return background
+	}
+
+	body, shown, inner := fitWhichKeyGroups(groups, maxBodyRows, targetInner, maxInner, keyStyle, descStyle, titleStyle)
+	if hidden := total - shown; hidden > 0 {
+		// Width is measured on the plain string: lipgloss.Width on a styled
+		// string would count the ANSI escapes.
+		plainFooter := fmt.Sprintf("+%d more (%s for help)", hidden, ui.ActiveKeybindings.Help)
+		body = append(body, descStyle.Render(plainFooter))
+		inner = max(inner, lipgloss.Width(plainFooter))
+	}
+	if len(body) == 0 {
+		return background
+	}
+
+	content := ui.FillLinesBg(strings.Join(body, "\n"), min(inner, maxInner), ui.BaseBg)
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
+		Background(ui.BaseBg).
+		Padding(whichKeyPadV, whichKeyPadH).
+		Render(content)
+
+	bg := ui.PadToHeight(background, m.height)
+	if ui.ConfigDimOverlay {
+		bg = ui.DimBackground(bg, 1)
+	}
+	return ui.PlaceOverlayBottom(m.width, m.height, whichKeyBottomGap, box, bg)
+}
+
+// whichKeyRenderedGroup is a group's full block, rendered once up front so
+// fitWhichKeyGroups can size against it without re-rendering per candidate.
+type whichKeyRenderedGroup struct {
+	group whichKeyGroupCells
+	block []string
+	width int
+}
+
+// fitWhichKeyGroups lays out as many groups as fit within maxBodyRows, in
+// order. A row is reserved for the "+N more" footer up front whenever the full
+// catalog would overflow, so the caller never has to retroactively make room
+// for it. The first group that doesn't fully fit is truncated to as many of
+// its own cells as remain — every group after it is fully hidden.
+func fitWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) (body []string, shown, inner int) {
+	rendered := make([]whichKeyRenderedGroup, 0, len(groups))
+	totalNeeded := 0
+	for _, g := range groups {
+		if len(g.Cells) == 0 {
+			continue
+		}
+		block, w := renderWhichKeyGroup(g, keyStyle, descStyle, titleStyle, targetInner, maxInner)
+		rendered = append(rendered, whichKeyRenderedGroup{g, block, w})
+		totalNeeded += len(block)
+	}
+
+	budget := maxBodyRows
+	if totalNeeded > maxBodyRows {
+		budget-- // reserve the footer row
+	}
+
+	inner = 1
+	for _, r := range rendered {
+		remaining := budget - len(body)
+		if remaining <= 0 {
+			break
+		}
+		if len(r.block) <= remaining {
+			body = append(body, r.block...)
+			inner = max(inner, r.width)
+			shown += len(r.group.Cells)
+			continue
+		}
+		titleRows := 0
+		if r.group.Title != "" {
+			titleRows = 1
+		}
+		if k := fitPartialGroupCells(r.group.Cells, remaining-titleRows, targetInner, maxInner); k > 0 {
+			partial := whichKeyGroupCells{Title: r.group.Title, Cells: r.group.Cells[:k]}
+			block, w := renderWhichKeyGroup(partial, keyStyle, descStyle, titleStyle, targetInner, maxInner)
+			body = append(body, block...)
+			inner = max(inner, w)
+			shown += k
+		}
+		break
+	}
+	return body, shown, inner
+}
+
+// fitPartialGroupCells returns the largest prefix length (0..len(cells)) whose
+// laid-out rows fit within dataRows, so a group that doesn't fully fit still
+// shows an accurate truncated slice instead of disappearing outright.
+func fitPartialGroupCells(cells []whichKeyCell, dataRows, targetInner, maxInner int) int {
+	if dataRows <= 0 {
+		return 0
+	}
 	plain := make([]string, len(cells))
-	styled := make([]string, len(cells))
 	for i, c := range cells {
+		plain[i] = c.key + " " + c.desc
+	}
+	best := 0
+	for k := 1; k <= len(cells); k++ {
+		if layoutWhichKey(plain[:k], targetInner, maxInner).rows <= dataRows {
+			best = k
+		}
+	}
+	return best
+}
+
+// renderWhichKeyGroup lays one group out as rows, returning the rendered lines
+// and the inner width they occupy. A non-empty title becomes a header row.
+func renderWhichKeyGroup(g whichKeyGroupCells, keyStyle, descStyle, titleStyle lipgloss.Style, targetInner, maxInner int) ([]string, int) {
+	plain := make([]string, len(g.Cells))
+	styled := make([]string, len(g.Cells))
+	for i, c := range g.Cells {
 		plain[i] = c.key + " " + c.desc
 		styled[i] = keyStyle.Render(c.key) + " " + descStyle.Render(c.desc)
 	}
-
-	const (
-		padV     = 1  // rows of padding above and below
-		padH     = 2  // columns of padding left and right
-		widthPct = 60 // panel spans this percent of the screen width
-	)
-	// Target ~widthPct of the screen, but never wider than the screen leaves
-	// room for once padding and the border are accounted for.
-	chrome := 2*padH + 2
-	maxInner := max(m.width-chrome, 1)
-	targetInner := max(m.width*widthPct/100-chrome, 1)
 	lay := layoutWhichKey(plain, targetInner, maxInner)
 	cols := len(lay.colW)
 
-	body := make([]string, lay.rows)
+	var out []string
+	if g.Title != "" {
+		out = append(out, titleStyle.Render(g.Title))
+	}
 	for r := range lay.rows {
 		var sb strings.Builder
 		for c := range cols {
 			idx := c*lay.rows + r // column-major: fill down each column first
-			if idx < len(cells) {
+			if idx < len(g.Cells) {
 				sb.WriteString(styled[idx])
 				sb.WriteString(strings.Repeat(" ", max(lay.colW[c]-lipgloss.Width(plain[idx]), 0)))
 			} else {
@@ -128,22 +268,7 @@ func (m Model) renderWhichKey(background string) string {
 				sb.WriteString(strings.Repeat(" ", lay.gaps[c]))
 			}
 		}
-		body[r] = sb.String()
+		out = append(out, sb.String())
 	}
-	content := ui.FillLinesBg(strings.Join(body, "\n"), lay.inner, ui.BaseBg)
-
-	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
-		Background(ui.BaseBg).
-		Padding(padV, padH).
-		Render(content)
-
-	// Dim the screen behind the panel like the other overlays do, then lift the
-	// panel a few rows off the bottom.
-	bg := ui.PadToHeight(background, m.height)
-	if ui.ConfigDimOverlay {
-		bg = ui.DimBackground(bg, 1)
-	}
-	return ui.PlaceOverlayBottom(m.width, m.height, 5, box, bg)
+	return out, lay.inner
 }
