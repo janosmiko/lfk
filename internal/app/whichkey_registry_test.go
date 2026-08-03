@@ -533,20 +533,76 @@ var levelName = map[model.Level]string{
 // table pins. extra is the row's resource ref, needed only by entries whose
 // handler parses it (the resource-type action menu's PinKeyFromRef).
 //
-// New Task 3 entries should add a row here rather than relying on the
-// blanket wkOnRow default.
+// New catalog entries must add a row here rather than relying on the blanket
+// wkOnRow default — TestAvailableWhichKeyActions_LevelScopingTableIsComplete
+// enforces that, so the requirement is checked rather than merely requested.
 func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
 	allLevels := []model.Level{model.LevelClusters, model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}
 
-	cases := []struct {
-		label  string
-		kind   string
-		extra  string
-		levels []model.Level // levels where the entry must be offered
-	}{
+	for _, tc := range wkLevelScopingCases() {
+		t.Run(tc.label, func(t *testing.T) {
+			want := make(map[model.Level]bool, len(tc.levels))
+			for _, lvl := range tc.levels {
+				want[lvl] = true
+			}
+			for _, lvl := range allLevels {
+				t.Run(levelName[lvl], func(t *testing.T) {
+					m := whichKeyTestModel()
+					m.nav.Level = lvl
+					// Raw is set unconditionally: real explorer rows always
+					// carry the source object once loaded, and Object
+					// Explorer's gate (sel.Raw != nil) is otherwise
+					// untestable through this generic per-level harness.
+					item := model.Item{Name: "row1", Extra: tc.extra, Raw: map[string]any{}}
+					switch lvl {
+					case model.LevelResources:
+						m.nav.ResourceType = model.ResourceTypeEntry{Kind: tc.kind}
+						item.Kind = tc.kind
+					case model.LevelOwned:
+						item.Kind = tc.kind
+					}
+					m.setMiddleItems([]model.Item{item})
+					m.setCursor(0)
+
+					got := slices.Contains(whichKeyLabels(m), tc.label)
+					if got != want[lvl] {
+						t.Errorf("%q at %s: got offered=%v, want %v", tc.label, levelName[lvl], got, want[lvl])
+					}
+				})
+			}
+		})
+	}
+}
+
+// wkLevelScopingCase is one row of the level-scoping table.
+type wkLevelScopingCase struct {
+	label  string
+	kind   string
+	extra  string
+	levels []model.Level // levels where the entry must be offered
+}
+
+// wkLevelScopingExclusions names the catalog entries deliberately absent from
+// the table, each with the reason a level alone cannot decide whether they are
+// offered. Every one has a dedicated test instead. Read by the completeness
+// guard, so an undocumented omission fails CI rather than sitting in a comment.
+func wkLevelScopingExclusions() map[string]string {
+	return map[string]string{
+		"Diff two selected":     "needs exactly 2 selected rows, not level-dependent alone",
+		"Mouse capture":         "needs m.mouseAvailable, false by default here",
+		"Show ignored findings": "needs a security-prefixed kind",
+	}
+}
+
+// wkLevelScopingCases is the table itself, at package scope so the
+// completeness guard can compare it against the catalog.
+func wkLevelScopingCases() []wkLevelScopingCase {
+	allLevels := []model.Level{model.LevelClusters, model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}
+
+	return []wkLevelScopingCase{
 		{"Action menu", "Pod", "apps/v1/deployments", allLevels},
 		{"Logs (fullscreen)", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
 		{"Describe", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
@@ -590,6 +646,8 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 		{"Pin/unpin type", "", "apps/v1/deployments", []model.Level{model.LevelResourceTypes}},
 		{"Show rare/hidden types", "", "", allLevels},
 		{"Local cluster manager", "", "", []model.Level{model.LevelClusters}},
+		// handleKeyOpenMarks opens the overlay unconditionally (update_keys.go).
+		{"Bookmarks", "", "", allLevels},
 
 		{"Filter list", "", "", allLevels},
 		{"Search and jump", "", "", allLevels},
@@ -611,45 +669,6 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 		{"Security badge", "", "", allLevels},
 		{"Cluster color", "", "", []model.Level{model.LevelClusters}},
 		{"Full help", "", "", allLevels},
-		// Not in this table: "Diff two selected" (needs exactly 2 selected
-		// rows, not level-dependent alone), "Mouse capture" (needs
-		// m.mouseAvailable, false by default here), and "Show ignored
-		// findings" (needs a security-prefixed kind) — each covered by a
-		// dedicated test instead.
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.label, func(t *testing.T) {
-			want := make(map[model.Level]bool, len(tc.levels))
-			for _, lvl := range tc.levels {
-				want[lvl] = true
-			}
-			for _, lvl := range allLevels {
-				t.Run(levelName[lvl], func(t *testing.T) {
-					m := whichKeyTestModel()
-					m.nav.Level = lvl
-					// Raw is set unconditionally: real explorer rows always
-					// carry the source object once loaded, and Object
-					// Explorer's gate (sel.Raw != nil) is otherwise
-					// untestable through this generic per-level harness.
-					item := model.Item{Name: "row1", Extra: tc.extra, Raw: map[string]any{}}
-					switch lvl {
-					case model.LevelResources:
-						m.nav.ResourceType = model.ResourceTypeEntry{Kind: tc.kind}
-						item.Kind = tc.kind
-					case model.LevelOwned:
-						item.Kind = tc.kind
-					}
-					m.setMiddleItems([]model.Item{item})
-					m.setCursor(0)
-
-					got := slices.Contains(whichKeyLabels(m), tc.label)
-					if got != want[lvl] {
-						t.Errorf("%q at %s: got offered=%v, want %v", tc.label, levelName[lvl], got, want[lvl])
-					}
-				})
-			}
-		})
 	}
 }
 

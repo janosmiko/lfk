@@ -384,22 +384,6 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
 	}
 
-	// While the space-leader panel is actually visible, its hotkeys replace
-	// the normal explorer hints — CLAUDE.md's convention keeps hotkey text in
-	// the hint bar, never inside the panel box, so the panel itself only
-	// shows the page indicator. Gated on shown, not armed (IMPORTANT-4,
-	// review round 1): armed alone is true for the whole delay window on
-	// every ordinary multi-select press, and gating on it replaced the
-	// selected-count/sort/position chips for that entire window even though
-	// the panel itself was still invisible.
-	if m.whichKey.shown {
-		hint := m.renderHints([]ui.HintEntry{
-			{Key: "space", Desc: "more"},
-			{Key: "esc", Desc: "close"},
-		})
-		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
-	}
-
 	// Layout: the informational chip group (sort, counter / selected
 	// count, filter preset, NYAN) anchors the FAR RIGHT; the keymap
 	// hints fill the remaining space on the left. JoinStatusBar treats
@@ -416,10 +400,32 @@ func (m Model) statusBar() string {
 	// 2 columns so the gap between keymap and chips reads as a clear gutter
 	// (the elastic-spacer minimum is 1, but a 2-col gutter is more comfortable).
 	leftBudget := max(innerWidth-lipgloss.Width(right)-2, 0)
-	left := ui.FormatHintPartsFit(m.explorerHintEntries(), leftBudget)
+	left := ui.FormatHintPartsFit(m.leaderOrExplorerHints(), leftBudget)
 
 	content := ui.JoinStatusBar(left, right, innerWidth)
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+}
+
+// leaderOrExplorerHints returns the space-leader's own hints while its panel
+// is visible, and the normal explorer keymap otherwise. Only the LEFT half of
+// the bar swaps: space is simultaneously the pager and the selection toggle,
+// so every page advance changes the selected count, and suppressing the chip
+// group here (as an early return once did) hid the only indicator of it while
+// the user was actively changing it.
+//
+// Gated on armed AND shown. shown alone is also set by the g-prefix goto
+// popup, which shares whichKeyState but swallows space as an unregistered
+// chord — advertising "space: more" there promises paging that cannot happen.
+// armed alone is true for the whole delay window on every ordinary
+// multi-select press, when the panel is still invisible.
+func (m Model) leaderOrExplorerHints() []ui.HintEntry {
+	if m.whichKey.armed && m.whichKey.shown {
+		return []ui.HintEntry{
+			{Key: "space", Desc: "more"},
+			{Key: "esc", Desc: "close"},
+		}
+	}
+	return m.explorerHintEntries()
 }
 
 // explorerStatusChips composes the right-anchored chip group for the

@@ -254,7 +254,7 @@ When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and
 
 When items are selected, press `x` to open the bulk action menu (delete, force delete, scale, restart, diff).
 
-`Space` also arms the space-leader which-key panel: a context-aware action panel appears after a short delay (configurable via `which_key_enabled` and `which_key_leader_delay_ms`), grouped by Actions / Views / Filter / Selection / Sort / Settings. Press `Space` again to page through it (wraps at the last page), `Esc` closes it, and any other key or mouse input closes it and still runs normally.
+`Space` also arms the space-leader which-key panel: a context-aware action panel appears after a short delay (configurable via `which_key_enabled` and `which_key_leader_delay_ms`), grouped by Actions / Views / Filter / Selection / Sort / Settings. Press `Space` again to page through it (wraps at the last page), `Esc` closes it once it is visible, and any other key or mouse input closes it and still runs normally. Before the delay elapses the panel is not yet on screen, so `Esc` keeps its normal job (clear selection, search, or filter).
 
 ## Bookmarks
 

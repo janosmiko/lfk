@@ -27,10 +27,12 @@ func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// closes it and then runs its normal action. Because every listed action
 	// already has a bare binding here, "run the listed action" and "fall
 	// through" are the same thing — one dispatch path, so the panel can never
-	// disagree with what the key actually does.
+	// disagree with what the key actually does. esc is consumed only while the
+	// panel is actually shown — see the same guard in handleKey.
 	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.ToggleSelect {
+		shown := m.whichKey.shown
 		m = m.disarmWhichKeyLeader()
-		if msg.String() == "esc" {
+		if shown && msg.String() == "esc" {
 			return m, nil
 		}
 	}

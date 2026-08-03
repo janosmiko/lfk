@@ -62,6 +62,46 @@ func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 	}
 }
 
+// TestAvailableWhichKeyActions_LevelScopingTableIsComplete is the forcing
+// function the level-scoping table's "add a row here" comment used to only
+// request: every catalog entry must have a table row or a documented
+// exclusion. Without it, "Bookmarks" was added with neither and went
+// unnoticed.
+func TestAvailableWhichKeyActions_LevelScopingTableIsComplete(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+
+	inTable := map[string]bool{}
+	for _, tc := range wkLevelScopingCases() {
+		inTable[tc.label] = true
+	}
+	excluded := wkLevelScopingExclusions()
+
+	inCatalog := map[string]bool{}
+	for _, a := range whichKeyExplorerActions() {
+		inCatalog[a.Label] = true
+		if inTable[a.Label] {
+			if _, dup := excluded[a.Label]; dup {
+				t.Errorf("catalog entry %q is both in the level-scoping table and excluded; remove the exclusion", a.Label)
+			}
+			continue
+		}
+		if _, ok := excluded[a.Label]; !ok {
+			t.Errorf("catalog entry %q has no level-scoping table row and no documented exclusion; add it to one", a.Label)
+		}
+	}
+
+	for label := range excluded {
+		if !inCatalog[label] {
+			t.Errorf("wkLevelScopingExclusions names %q, which is not a catalog entry anymore; remove the stale entry", label)
+		}
+	}
+	for label := range inTable {
+		if !inCatalog[label] {
+			t.Errorf("the level-scoping table has a row for %q, which is not a catalog entry anymore; remove the stale row", label)
+		}
+	}
+}
+
 // assertNoDuplicateWhichKeyBindings fails if two entries in the panel resolve
 // to the same key at once. A duplicate is worse than a wrong Avail on a
 // single entry: whichever handler actually owns the key at runtime silently

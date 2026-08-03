@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -67,7 +68,18 @@ func newWKCtx(m *Model) *wkCtx {
 	c.sel = m.selectedMiddleItem()
 	c.kind = m.selectedResourceKind()
 	c.unionSentinel = m.isUnionSentinel()
-	c.readOnly = m.readOnlyForContext(m.nav.Context)
+	// Resolve read-only against the row's OWN source cluster. In union mode
+	// nav.Context is the sentinel, and readOnlyForContext short-circuits to
+	// writable whenever ctx == nav.Context — so passing nav.Context back in
+	// offered Delete and Force delete on rows the handlers then refuse
+	// (update_actions.go). Read c.sel.ClusterName directly rather than calling
+	// effectiveContext(), which re-runs selectedMiddleItem() and would undo
+	// the once-per-call row resolution this struct exists for.
+	roCtx := m.nav.Context
+	if c.sel != nil && c.sel.ClusterName != "" {
+		roCtx = c.sel.ClusterName
+	}
+	c.readOnly = m.readOnlyForContext(roCtx)
 	return c
 }
 
@@ -456,6 +468,11 @@ func wkDiffAvailable(c *wkCtx) bool {
 // bindings are absent by construction — the panel is for actions the user is
 // unlikely to remember, not for h/j/k/l.
 //
+// The section comments below group entries for reading only; they are NOT the
+// render order. Each entry's Group field decides its section, and
+// whichKeyGroupOrder() decides the order those sections are drawn in — adding
+// an entry under a section comment does not place it on screen there.
+//
 // Built once at package init rather than per call: the panel re-filters on
 // every render, and rebuilding the catalog would re-run every wkKindIn /
 // wkLevelIn / wkExcludeKind constructor and so reallocate their lookup sets
@@ -542,10 +559,12 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.Help }, Label: "Full help", Group: wkSettings},
 }
 
-// whichKeyExplorerActions returns the shared explorer catalog. The slice is
-// read-only for callers; entries are copied out by availableWhichKeyActions.
+// whichKeyExplorerActions returns a copy of the shared explorer catalog, so a
+// caller cannot reorder or overwrite the package slice through it. Only tests
+// call this; the render path reads whichKeyExplorerCatalog directly, so the
+// clone costs nothing per frame.
 func whichKeyExplorerActions() []whichKeyAction {
-	return whichKeyExplorerCatalog
+	return slices.Clone(whichKeyExplorerCatalog)
 }
 
 // availableWhichKeyActions filters the explorer catalog to what applies right

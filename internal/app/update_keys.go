@@ -25,9 +25,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// e.g., the mouse-capture toggle key (IMPORTANT-5, review round 1). esc
 	// is consumed outright (closes the leader, does nothing else); every
 	// other key still falls through to whatever it would normally do.
+	//
+	// esc is consumed only while the panel is actually SHOWN, so closing it is
+	// a visible effect. During the delay window the panel is not drawn yet,
+	// and swallowing esc there stole it from handleExplorerEsc (clear
+	// selection / search / filter / preset, exit fullscreen, close tab) with
+	// no on-screen feedback at all.
 	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.ToggleSelect {
+		shown := m.whichKey.shown
 		m = m.disarmWhichKeyLeader()
-		if msg.String() == "esc" {
+		if shown && msg.String() == "esc" {
 			return m, nil
 		}
 	}
