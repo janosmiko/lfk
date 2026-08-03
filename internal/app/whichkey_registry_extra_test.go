@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"testing"
@@ -59,6 +60,85 @@ func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 			t.Errorf("whichKeyExcludedBindings names %q, which is not a ui.Keybindings field anymore; remove the stale entry", name)
 		}
 	}
+}
+
+// assertNoDuplicateWhichKeyBindings fails if two entries in the panel resolve
+// to the same key at once. A duplicate is worse than a wrong Avail on a
+// single entry: whichever handler actually owns the key at runtime silently
+// makes the other entry's advertised keystroke a lie, and dispatch order
+// (nav keys -> UI keys -> action keys, see handleExplorerKey) decides the
+// winner, not the registry.
+func assertNoDuplicateWhichKeyBindings(t *testing.T, scenario string, m Model) {
+	t.Helper()
+	kb := ui.ActiveKeybindings
+	byKey := map[string][]string{}
+	for _, a := range m.availableWhichKeyActions() {
+		k := a.Key(kb)
+		byKey[k] = append(byKey[k], a.Label)
+	}
+	for k, labels := range byKey {
+		if len(labels) > 1 {
+			t.Errorf("%s: key %q offered by multiple entries at once: %v", scenario, k, labels)
+		}
+	}
+}
+
+// TestAvailableWhichKeyActions_NoDuplicateKeysOffered is the structural guard
+// against the class of defect wkTogglePreviewLogsAvailable and LabelEditor's
+// predicate both had: an Avail that is individually plausible but, combined
+// with dispatch order, offers a key the row doesn't actually own. Sweeps
+// every (kind, extra, level) combination the LevelScopingTable already
+// exercises, plus two scenarios that combination alone does not reach: a
+// security-view row (only reachable by setting nav.ResourceType.Kind to a
+// "__security_" kind, not from the generic kind list at every level) and a
+// LevelClusters row with the live log preview already on (only reachable by
+// setting m.fullLogPreview directly).
+func TestAvailableWhichKeyActions_NoDuplicateKeysOffered(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	allLevels := []model.Level{model.LevelClusters, model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}
+	kinds := []string{
+		"", "Pod", "Container", "Deployment", "StatefulSet", "ReplicaSet", "HorizontalPodAutoscaler",
+		"Secret", "ConfigMap", "Ingress", "Service", "__port_forwards__", "__port_forward_entry__",
+		"__captures__", "__security_findings__", "__collapsed_group__",
+	}
+	extras := []string{"", "apps/v1/deployments"}
+
+	for _, lvl := range allLevels {
+		for _, kind := range kinds {
+			for _, extra := range extras {
+				m := whichKeyTestModel()
+				m.nav.Level = lvl
+				if lvl == model.LevelResources {
+					m.nav.ResourceType = model.ResourceTypeEntry{Kind: kind}
+				}
+				m.setMiddleItems([]model.Item{{Name: "row1", Kind: kind, Extra: extra, Raw: map[string]any{}}})
+				m.setCursor(0)
+				assertNoDuplicateWhichKeyBindings(t, fmt.Sprintf("level=%s kind=%q extra=%q", levelName[lvl], kind, extra), m)
+			}
+		}
+	}
+
+	// Security view: nav.ResourceType.Kind carries the "__security_" prefix
+	// (model/sidebar.go builds Kind: "__security_"+src.SourceName+"__" for the
+	// sidebar entry), which the kind-only sweep above never sets on nav —
+	// only on the row.
+	sec := whichKeyTestModel()
+	sec.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_findings__"}
+	sec.setMiddleItems([]model.Item{{Name: "f1", Kind: "__security_findings__"}})
+	sec.setCursor(0)
+	assertNoDuplicateWhichKeyBindings(t, "security view via nav kind", sec)
+
+	// LevelClusters with the live log preview already on: ClusterColorPicker
+	// consumes "L" unconditionally at this level (update_keys_explorer.go),
+	// regardless of fullLogPreview — the sweep above never sets fullLogPreview.
+	cl := whichKeyTestModel()
+	cl.nav.Level = model.LevelClusters
+	cl.fullLogPreview = true
+	cl.setMiddleItems([]model.Item{{Name: "ctx-a"}})
+	cl.setCursor(0)
+	assertNoDuplicateWhichKeyBindings(t, "LevelClusters with fullLogPreview", cl)
 }
 
 func TestAvailableWhichKeyActions_LevelScoping(t *testing.T) {
@@ -404,5 +484,83 @@ func TestWhichKeyExcludedBindings_RestartAndExecAreDeadBindings(t *testing.T) {
 		if a.Key(kb) == kb.Restart || a.Key(kb) == kb.Exec {
 			t.Errorf("registry entry %q resolves to Restart/Exec's key, but neither is dispatched by the explorer", a.Label)
 		}
+	}
+}
+
+// Regression: OpenMarks ("'") was previously excluded with a false, circular
+// reason ("reachable from the bookmarks overlay") — it is in fact the key
+// that OPENS that overlay. handleKeyOpenMarks (update_keys.go) has no gate at
+// all; the case in handleExplorerNavKey (update_keys_explorer.go:327-329)
+// dispatches it unconditionally. It belongs in the registry, not the
+// exclusion map.
+func TestAvailableWhichKeyActions_OpenMarksIsRegisteredAndUnconditional(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	if _, excluded := whichKeyExcludedBindings()["OpenMarks"]; excluded {
+		t.Fatal("OpenMarks must not be in whichKeyExcludedBindings; it is a real, unconditionally-available explorer action")
+	}
+
+	for _, lvl := range []model.Level{model.LevelClusters, model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		if !containsKey(whichKeyKeys(m), ui.ActiveKeybindings.OpenMarks) {
+			t.Errorf("OpenMarks must be offered at %s; got %v", levelName[lvl], whichKeyKeys(m))
+		}
+	}
+}
+
+// Regression (M2): handleKeySelectAll (update_keys.go:325) gates only on
+// level, not on the cursor row — it operates on m.selectedItems (which
+// survives filtering) and m.visibleMiddleItems() directly, not
+// selectedMiddleItem(). With existing selections but the filter narrowed to
+// zero visible rows, hasSelection() is still true and ctrl+a still clears
+// them; wkOnRow's sel != nil requirement hid that working keystroke.
+func TestAvailableWhichKeyActions_SelectAllAvailableWithNoVisibleRows(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Namespace: "default"}})
+	m.selectedItems[selectionKey(model.Item{Name: "p1", Kind: "Pod", Namespace: "default"})] = true
+	m.filterText = "does-not-match-anything" // visibleMiddleItems() becomes empty
+	m.setCursor(0)
+	if !containsKey(whichKeyKeys(m), ui.ActiveKeybindings.SelectAll) {
+		t.Fatal("select/deselect all must stay offered when a selection exists but the filter hides every row")
+	}
+}
+
+// Regression (M1): handleExplorerFullscreen (update_keys_explorer.go) refuses
+// with only a toast ("Open dashboard members with right-arrow") — neither
+// toggling the dashboard fullscreen nor cycling the three-pane layout — when
+// hovering the Overview/Monitoring dashboard pseudo-item at LevelResourceTypes
+// while in union mode. Every other entry in this file treats a toast-only
+// branch as unavailable (Diff, CreateTemplate, Scale, ...); Fullscreen had no
+// Avail at all and so was offered even here.
+func TestAvailableWhichKeyActions_HidesFullscreenOnUnionDashboardRow(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.setMiddleItems([]model.Item{{Name: "Overview", Extra: "__overview__"}})
+	m.setCursor(0)
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	if containsKey(whichKeyKeys(m), ui.ActiveKeybindings.Fullscreen) {
+		t.Fatal("cycle layout must be hidden on the dashboard row in union mode; the key only shows a toast there")
+	}
+
+	// Guard against over-correcting: the layout-cycle branch is unconditional
+	// on an ordinary row, and the dashboard-toggle branch works fine outside
+	// union mode.
+	m.unionMode = false
+	m.nav.Context = "ctx-a"
+	if !containsKey(whichKeyKeys(m), ui.ActiveKeybindings.Fullscreen) {
+		t.Fatal("cycle layout must stay offered on the dashboard row outside union mode")
+	}
+	plain := whichKeyTestModel()
+	if !containsKey(whichKeyKeys(plain), ui.ActiveKeybindings.Fullscreen) {
+		t.Fatal("cycle layout must stay offered on an ordinary resource row")
 	}
 }

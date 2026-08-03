@@ -346,12 +346,21 @@ func wkTogglePreviewAvailable(c *wkCtx) bool {
 }
 
 // wkTogglePreviewLogsAvailable mirrors handleExplorerToggleLogPreview via
-// selectedPodForLogPreview (previewlog.go): turning the preview OFF always
+// selectedPodForLogPreview (previewlog.go), plus the dispatch order that
+// decides which handler actually sees the key: at LevelClusters, "L" is
+// consumed unconditionally by ClusterColorPicker's case in
+// handleExplorerNavKey (update_keys_explorer.go), which runs before
+// handleExplorerUIKey (where TogglePreviewLogs is dispatched) — so the key
+// never reaches handleExplorerToggleLogPreview there, regardless of
+// fullLogPreview. Below LevelClusters: turning the preview OFF always
 // succeeds, so once it is already on the key stays available regardless of
 // kind; turning it ON only produces a real log stream for a Pod row, or a
 // Container row with an owning pod name resolved (m.nav.OwnedName, set at
 // LevelContainers).
 func wkTogglePreviewLogsAvailable(c *wkCtx) bool {
+	if c.level == model.LevelClusters {
+		return false
+	}
 	if c.m.fullLogPreview {
 		return true
 	}
@@ -380,6 +389,47 @@ func wkAPIExplorerAvailable(c *wkCtx) bool {
 	default:
 		return false
 	}
+}
+
+// wkOnSecurityView mirrors onSecurityView (update_actions_security_menu.go)
+// exactly — same two checks, same source fields — but reads the already
+// resolved c.sel instead of calling selectedMiddleItem() -> visibleMiddleItems()
+// again, which is a full re-filter of the row list on every render (measured
+// on BenchmarkAvailableWhichKeyActions/LevelResourcesFiltered at 200 rows:
+// 211->420 allocs/op, 232KB->466KB, 36us->69us — exactly the cost wkCtx was
+// introduced in Task 2.5 to eliminate). Reuses the same pattern already used
+// inline in wkActionMenuAvailable above.
+func wkOnSecurityView(c *wkCtx) bool {
+	return strings.HasPrefix(c.m.nav.ResourceType.Kind, "__security_") ||
+		(c.sel != nil && strings.HasPrefix(c.sel.Kind, "__security_"))
+}
+
+// wkNotOnSecurityView excludes a security view from a predicate. LabelEditor
+// needs this: handleExplorerSecurityViewKeys (update_keys_actions_security.go)
+// dispatches ahead of handleExplorerToolKeys (where LabelEditor is dispatched)
+// and consumes the same default key ("i") whenever onSecurityView is true —
+// SecurityIgnoreToggle deliberately reuses LabelEditor's binding, meaningless
+// on a synthetic finding row. wkExcludeKind (LabelEditor's existing kind
+// exclusion) can't express this: it blocks exact kinds via a map, not a
+// "__security_" prefix across an open-ended set of source names.
+func wkNotOnSecurityView(pred func(c *wkCtx) bool) func(c *wkCtx) bool {
+	return func(c *wkCtx) bool {
+		return pred(c) && !wkOnSecurityView(c)
+	}
+}
+
+// wkFullscreenAvailable mirrors handleExplorerFullscreen (update_keys_explorer.go):
+// unavailable only in the one branch that shows a toast instead of doing
+// anything — hovering the Overview/Monitoring dashboard pseudo-item at
+// LevelResourceTypes while in union mode ("Open dashboard members with
+// right-arrow"). Every other row/level either toggles the dashboard
+// fullscreen or cycles the three-pane layout unconditionally.
+func wkFullscreenAvailable(c *wkCtx) bool {
+	if c.level != model.LevelResourceTypes || c.sel == nil {
+		return true
+	}
+	onDashboard := c.sel.Extra == "__overview__" || c.sel.Extra == "__monitoring__"
+	return !onDashboard || !c.unionSentinel
 }
 
 // wkDiffAvailable mirrors handleExplorerActionKeyDiff (update_keys_actions.go):
@@ -415,7 +465,7 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Remove port forward", Group: wkActions, Avail: wkLevelIn(wkKindIn("__port_forwards__"), model.LevelResources)},
 	{Key: func(kb ui.Keybindings) string { return kb.ForceDelete }, Label: "Force delete", Group: wkActions, Avail: wkUnionAllowed(wkWritableKindIn("Pod", "Job"), "Force Delete")},
 	{Key: func(kb ui.Keybindings) string { return kb.SecretEditor }, Label: "Secret/ConfigMap editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkWritableKindIn("Secret", "ConfigMap")), model.LevelResources)},
-	{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__")), model.LevelResources, model.LevelOwned)},
+	{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkLevelIn(wkNotOnSecurityView(wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__"))), model.LevelResources, model.LevelOwned)},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkRowSelected},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkRowSelected},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkRowSelected},
@@ -428,7 +478,12 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.Scale }, Label: "Scale", Group: wkActions, Avail: wkSingleCluster(wkWritableKindIn("Deployment", "StatefulSet", "ReplicaSet", "HorizontalPodAutoscaler"))},
 
 	// Selection
-	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkOnRow},
+	// SelectAll's gate is level-only (handleKeySelectAll, update_keys.go):
+	// unlike SelectRange, it never reads the cursor row, only
+	// m.selectedItems (survives filtering) and visibleMiddleItems() directly,
+	// so wkOnRow's "sel != nil" would wrongly hide it when a selection exists
+	// but the filter has narrowed the visible list to zero rows.
+	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range from anchor", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.Diff }, Label: "Diff two selected", Group: wkSelection, Avail: wkDiffAvailable},
 
@@ -447,10 +502,11 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.TasksOverlay }, Label: "Task queue", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.ErrorLog }, Label: "Error log", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.FinalizerSearch }, Label: "Finalizer search", Group: wkViews},
-	{Key: func(kb ui.Keybindings) string { return kb.Fullscreen }, Label: "Cycle layout", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.Fullscreen }, Label: "Cycle layout", Group: wkViews, Avail: wkFullscreenAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.PinGroup }, Label: "Pin/unpin resource type", Group: wkViews, Avail: wkPinGroupAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleRare }, Label: "Show rare/hidden types", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.LocalClusterManager }, Label: "Local cluster manager", Group: wkViews, Avail: wkAtLevel(model.LevelClusters)},
+	{Key: func(kb ui.Keybindings) string { return kb.OpenMarks }, Label: "Bookmarks", Group: wkViews},
 
 	// Filter
 	{Key: func(kb ui.Keybindings) string { return kb.Filter }, Label: "Filter list", Group: wkFilter, Avail: wkNotFullscreenDashboard},
@@ -474,7 +530,7 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.MouseToggle }, Label: "Mouse capture", Group: wkSettings, Avail: func(c *wkCtx) bool { return c.m.mouseAvailable }},
 	{Key: func(kb ui.Keybindings) string { return kb.SecretToggle }, Label: "Reveal secret values", Group: wkSettings},
 	{Key: func(kb ui.Keybindings) string { return kb.SecurityBadgeToggle }, Label: "Security badge", Group: wkSettings},
-	{Key: func(kb ui.Keybindings) string { return kb.SecurityIgnoreToggle }, Label: "Show ignored findings", Group: wkSettings, Avail: func(c *wkCtx) bool { return onSecurityView(c.m) }},
+	{Key: func(kb ui.Keybindings) string { return kb.SecurityIgnoreToggle }, Label: "Show ignored findings", Group: wkSettings, Avail: wkOnSecurityView},
 	{Key: func(kb ui.Keybindings) string { return kb.ClusterColorPicker }, Label: "Cluster color", Group: wkSettings, Avail: wkClusterRowSelected},
 	{Key: func(kb ui.Keybindings) string { return kb.Help }, Label: "Full help", Group: wkSettings},
 }
@@ -523,7 +579,6 @@ func whichKeyExcludedBindings() map[string]string {
 		"PreviewDown": "navigation", "PreviewUp": "navigation",
 		"JumpOwner": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
 		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
-		"SeverityUp": "navigation within security views", "SeverityDown": "navigation within security views",
 
 		// Viewer-local: only meaningful inside a fullscreen viewer, which the
 		// v1 panel does not cover.
@@ -535,12 +590,20 @@ func whichKeyExcludedBindings() map[string]string {
 		// LogTop (openLogTopFromViewer, update_logs.go) only dispatches from
 		// inside the open fullscreen log viewer's key handler.
 		"LogTop": "viewer-local",
+		// SeverityUp/SeverityDown (severityStep, update_logs.go:137-140) only
+		// dispatch inside handleLogKey, the open fullscreen log viewer's key
+		// handler — a severity-filter step, not a security-view concept
+		// (corrected from an earlier, wrong "navigation within security
+		// views" reason).
+		"SeverityUp": "viewer-local", "SeverityDown": "viewer-local",
 
-		// The leader itself, and chord prefixes whose continuations get their
-		// own popup.
+		// The leader itself.
 		"ToggleSelect": "the leader key itself",
-		"SetMark":      "chord prefix with its own popup",
-		"OpenMarks":    "reachable from the bookmarks overlay",
+		// SetMark ("m") arms m.pendingMark and waits for the bookmark-slot
+		// key (update_keys_explorer.go:26-33,330-332); unlike the g-prefix
+		// (armWhichKey/renderWhichKey), nothing renders while pendingMark is
+		// true — there is no popup, just a silent wait for the next key.
+		"SetMark": "chord prefix, no rendered continuation",
 
 		// Tabs: muscle-memory keys that would crowd out the actions.
 		"NewTab": "tab management", "NextTab": "tab management", "PrevTab": "tab management",

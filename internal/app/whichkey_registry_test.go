@@ -729,13 +729,35 @@ func TestWhichKeyPredicates_ZeroValueModelDoesNotPanic(t *testing.T) {
 
 // The panel re-renders on every keypress while it is open. Resolving the row
 // once per render is the difference between one filter pass and one per entry.
+// TestAvailableWhichKeyActions_ResolvesRowOncePerCall is deliberately
+// adversarial: 200 rows plus an active filter, matching
+// BenchmarkAvailableWhichKeyActions/LevelResourcesFiltered. A 3-row model (the
+// prior version of this test, threshold 12) hid a real regression — a
+// predicate that calls selectedMiddleItem() -> visibleMiddleItems() a second
+// time only costs ~2 extra allocs against a handful of rows, comfortably
+// under a threshold of 12, but costs a full extra re-filter pass at list
+// sizes the panel actually renders against (measured: 211 allocs/op for one
+// pass at 200 rows vs 420 allocs/op with the stray second pass wkOnSecurityView
+// now avoids — see its doc comment). The threshold below sits with headroom
+// above the single-pass cost and well below what a second pass would add, so
+// it stays stable across minor allocation-count drift from unrelated changes
+// while still catching a reintroduced re-filter.
+const wkResolvesRowOncePerCallThreshold = 300
+
 func TestAvailableWhichKeyActions_ResolvesRowOncePerCall(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	rows := make([]model.Item, 200)
+	for i := range rows {
+		rows[i] = model.Item{Name: fmt.Sprintf("pod-%03d", i), Kind: "Pod", Namespace: "default", Category: "Workloads", Extra: "/v1/pods"}
+	}
 	m := whichKeyTestModel()
-	m.filterText = "p" // force visibleMiddleItems to do real filtering work
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+	m.setMiddleItems(rows)
+	m.filterText = "pod" // force visibleMiddleItems to do real filtering work
+	m.setCursor(0)
 	before := testing.AllocsPerRun(100, func() { _ = m.availableWhichKeyActions() })
-	if before > 12 {
-		t.Fatalf("availableWhichKeyActions allocates %.0f times per call; the row must be resolved once, not per predicate", before)
+	if before > wkResolvesRowOncePerCallThreshold {
+		t.Fatalf("availableWhichKeyActions allocates %.0f times per call (threshold %d); the row must be resolved once per entry, not re-filtered by an individual predicate", before, wkResolvesRowOncePerCallThreshold)
 	}
 }
