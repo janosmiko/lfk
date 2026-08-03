@@ -15,11 +15,13 @@ func restoreWhichKeyGlobals(t *testing.T) {
 	kb := ui.ActiveKeybindings
 	enabled := ui.ConfigWhichKeyEnabled
 	delay := ui.ConfigWhichKeyDelayMs
+	leaderDelay := ui.ConfigWhichKeyLeaderDelayMs
 	dim := ui.ConfigDimOverlay
 	t.Cleanup(func() {
 		ui.ActiveKeybindings = kb
 		ui.ConfigWhichKeyEnabled = enabled
 		ui.ConfigWhichKeyDelayMs = delay
+		ui.ConfigWhichKeyLeaderDelayMs = leaderDelay
 		ui.ConfigDimOverlay = dim
 	})
 }
@@ -147,7 +149,7 @@ func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out, cmd, handled := m.handleGotoChord(tea.KeyPressMsg{Code: 'P', Text: "P"})
 	if !handled {
 		t.Fatal("unregistered second key must be consumed (handled=true)")
@@ -156,7 +158,7 @@ func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
 		t.Fatal("unregistered second key must be a noop (no command)")
 	}
 	rm := out.(Model)
-	if rm.pendingG || rm.whichKeyShown {
+	if rm.pendingG || rm.whichKey.shown {
 		t.Fatal("unregistered second key must close the prefix and the popup")
 	}
 	// A real goto sets Level to LevelResources; an unregistered key must leave
@@ -176,27 +178,27 @@ func TestHandleGotoChord_EscClosesPopup(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out, cmd, handled := m.handleGotoChord(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if !handled || cmd != nil {
 		t.Fatal("esc must be consumed as a noop while the prefix is armed")
 	}
 	rm := out.(Model)
-	if rm.pendingG || rm.whichKeyShown {
+	if rm.pendingG || rm.whichKey.shown {
 		t.Fatal("esc must close the prefix and the popup")
 	}
 }
 
-// Completing gg (jump to top) must clear whichKeyShown along with pendingG so
+// Completing gg (jump to top) must clear whichKey.shown along with pendingG so
 // no stale visibility flag lingers.
 func TestExplorerJumpTop_GGClearsWhichKeyShown(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out, _ := m.handleExplorerJumpTop()
 	rm := out.(Model)
-	if rm.pendingG || rm.whichKeyShown {
-		t.Fatalf("gg must clear both pendingG and whichKeyShown; got pendingG=%v whichKeyShown=%v", rm.pendingG, rm.whichKeyShown)
+	if rm.pendingG || rm.whichKey.shown {
+		t.Fatalf("gg must clear both pendingG and whichKey.shown; got pendingG=%v whichKey.shown=%v", rm.pendingG, rm.whichKey.shown)
 	}
 }
 

@@ -196,6 +196,7 @@ func (m Model) renderView() string {
 	// Render which-key popup when g prefix is armed and delay has elapsed.
 	// Placed after regular overlays so a real overlay still wins.
 	view = m.renderWhichKey(view)
+	view = m.renderWhichKeyLeader(view)
 
 	// Render help screen as an overlay on top of the explorer view.
 	// The status bar (bottom line) already renders the help search prompt,

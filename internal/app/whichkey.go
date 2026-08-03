@@ -192,7 +192,7 @@ func (m Model) handleGotoChord(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 	m.pendingG = false
-	m.whichKeyShown = false
+	m.whichKey.shown = false
 	chord := ui.ActiveKeybindings.JumpTop + key
 	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" && chord == pn {
 		out, cmd := m.jumpToPreviousNamespace()
@@ -212,14 +212,14 @@ type whichKeyTickMsg struct{}
 // popup immediately; otherwise it schedules a reveal tick.
 func (m Model) armWhichKey() (Model, tea.Cmd) {
 	if !ui.ConfigWhichKeyEnabled {
-		m.whichKeyShown = false
+		m.whichKey.shown = false
 		return m, nil
 	}
 	if ui.ConfigWhichKeyDelayMs <= 0 {
-		m.whichKeyShown = true
+		m.whichKey.shown = true
 		return m, nil
 	}
-	m.whichKeyShown = false
+	m.whichKey.shown = false
 	d := time.Duration(ui.ConfigWhichKeyDelayMs) * time.Millisecond
 	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyTickMsg{} })
 }

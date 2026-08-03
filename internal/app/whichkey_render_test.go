@@ -18,7 +18,7 @@ func TestRenderWhichKey_ListsTargets(t *testing.T) {
 	ui.ConfigWhichKeyDelayMs = 0
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out := stripANSI(m.renderWhichKey(strings.Repeat("\n", m.height)))
 	for _, want := range []string{"Pods", "Deployments", "list top"} {
 		if !strings.Contains(out, want) {
@@ -36,7 +36,7 @@ func TestRenderWhichKey_AnchoredToBottom(t *testing.T) {
 	ui.ConfigWhichKeyDelayMs = 0
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	lines := strings.Split(stripANSI(m.renderWhichKey(strings.Repeat("\n", m.height))), "\n")
 	podsRow := -1
 	for i, l := range lines {
@@ -58,7 +58,7 @@ func TestRenderWhichKey_HiddenWhenDisabled(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = false
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	bg := strings.Repeat("\n", m.height)
 	if got := m.renderWhichKey(bg); got != bg {
 		t.Fatal("popup must not render when which_key_enabled is false")
@@ -74,7 +74,7 @@ func TestRenderWhichKeyPanel_ShowsGroupHeaders(t *testing.T) {
 		{Title: "Actions", Cells: []whichKeyCell{{"d", "Delete"}, {"e", "Edit"}}},
 		{Title: "Sort", Cells: []whichKeyCell{{"s", "Sort next column"}}},
 	}
-	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups))
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, ""))
 	for _, want := range []string{"Actions", "Delete", "Edit", "Sort", "Sort next column"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("panel missing %q:\n%s", want, out)
@@ -90,11 +90,11 @@ func TestRenderWhichKeyPanel_EmptyGroupsRenderNothing(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
 	bg := strings.Repeat("\n", m.height)
-	if got := m.renderWhichKeyPanel(bg, nil); got != bg {
+	if got := m.renderWhichKeyPanel(bg, nil, ""); got != bg {
 		t.Fatal("an empty group list must render nothing, not an empty box")
 	}
 	empty := []whichKeyGroupCells{{Title: "Actions", Cells: nil}}
-	if got := m.renderWhichKeyPanel(bg, empty); got != bg {
+	if got := m.renderWhichKeyPanel(bg, empty, ""); got != bg {
 		t.Fatal("groups with no cells must render nothing")
 	}
 }
@@ -106,7 +106,7 @@ func TestRenderWhichKeyPanel_TinyTerminalRendersNothing(t *testing.T) {
 	m.width, m.height = 10, 4
 	bg := strings.Repeat("\n", m.height)
 	groups := []whichKeyGroupCells{{Title: "Actions", Cells: []whichKeyCell{{"d", "Delete"}}}}
-	if got := m.renderWhichKeyPanel(bg, groups); got != bg {
+	if got := m.renderWhichKeyPanel(bg, groups, ""); got != bg {
 		t.Fatal("panel must be skipped when the terminal is too small")
 	}
 }
@@ -125,7 +125,7 @@ func TestRenderWhichKeyPanel_OverflowShowsMoreFooter(t *testing.T) {
 		}
 		groups = append(groups, whichKeyGroupCells{Title: fmt.Sprintf("G%d", g), Cells: cells})
 	}
-	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups))
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, ""))
 	if !strings.Contains(out, "more") {
 		t.Fatalf("overflow must be disclosed with a 'more' footer, never silently truncated:\n%s", out)
 	}
@@ -170,7 +170,7 @@ func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
 	}
 	for _, w := range []int{20, 25, 34} {
 		m.width = w
-		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups))
+		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, ""))
 		for line := range strings.SplitSeq(out, "\n") {
 			if got := lipgloss.Width(line); got > w {
 				t.Fatalf("width %d: rendered line %q is %d columns wide", w, line, got)

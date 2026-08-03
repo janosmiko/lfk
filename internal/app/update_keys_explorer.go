@@ -23,6 +23,18 @@ func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// The space leader is a pure overlay: esc closes it, and every other key
+	// closes it and then runs its normal action. Because every listed action
+	// already has a bare binding here, "run the listed action" and "fall
+	// through" are the same thing — one dispatch path, so the panel can never
+	// disagree with what the key actually does.
+	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.ToggleSelect {
+		m = m.disarmWhichKeyLeader()
+		if msg.String() == "esc" {
+			return m, nil
+		}
+	}
+
 	if m.pendingMark {
 		m.pendingMark = false
 		key := msg.String()
@@ -130,8 +142,10 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 		mdl := m.handleKeySelectRange()
 		return mdl, nil, true
 	case kb.ToggleSelect:
-		mdl := m.handleKeyToggleSelect()
-		return mdl, nil, true
+		// Space keeps toggling selection and additionally arms the which-key
+		// leader; the delay keeps rapid multi-select from flashing the panel.
+		mdl, cmd := m.handleKeyToggleSelect().armWhichKeyLeader()
+		return mdl, cmd, true
 	case kb.SelectAll:
 		mdl := m.handleKeySelectAll()
 		return mdl, nil, true
@@ -266,7 +280,7 @@ func (m Model) handleExplorerJumpTop() (tea.Model, tea.Cmd) {
 	}
 	if m.pendingG {
 		m.pendingG = false
-		m.whichKeyShown = false
+		m.whichKey.shown = false
 		m.setCursor(0)
 		m.clampCursor()
 		m.syncExpandedGroup()

@@ -384,6 +384,17 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
 	}
 
+	// While the space leader is armed, its hotkeys replace the normal explorer
+	// hints — CLAUDE.md's convention keeps hotkey text in the hint bar, never
+	// inside the panel box, so the panel itself only shows the page indicator.
+	if m.whichKey.armed {
+		hint := m.renderHints([]ui.HintEntry{
+			{Key: "space", Desc: "more"},
+			{Key: "esc", Desc: "close"},
+		})
+		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
+	}
+
 	// Layout: the informational chip group (sort, counter / selected
 	// count, filter preset, NYAN) anchors the FAR RIGHT; the keymap
 	// hints fill the remaining space on the left. JoinStatusBar treats

@@ -19,10 +19,17 @@ const (
 	wkSettings  whichKeyGroup = "Settings"
 )
 
-// whichKeyGroupOrder is the fixed render order. Later groups are the first to be
-// dropped when the panel does not fit.
-func whichKeyGroupOrder() []whichKeyGroup { //nolint:unused // wired by the Task 4 renderer
-	return []whichKeyGroup{wkActions, wkSelection, wkViews, wkFilter, wkSort, wkSettings}
+// whichKeyGroupOrder is the fixed render order — also the space leader's
+// page-1-first order (Task 5): Actions and Views are what a user reaches for
+// most (mutate/inspect the highlighted row, switch what pane is showing), so
+// they lead and land on page 1 at common terminal sizes. Filter, Selection,
+// Sort, and Settings follow in that order: filtering/namespace scoping is
+// still a frequent reach, multi-select and sort are situational, and Settings
+// (theme, mouse, watch mode) is configuration a user sets once and rarely
+// revisits. Later groups are the first to be dropped when a single page still
+// doesn't fit (the goto popup's fallback path).
+func whichKeyGroupOrder() []whichKeyGroup {
+	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
 }
 
 // whichKeyAction is one row of the space-leader panel. Key is a function so a
@@ -467,9 +474,9 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.SecretEditor }, Label: "Secret/ConfigMap editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkWritableKindIn("Secret", "ConfigMap")), model.LevelResources)},
 	{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkLevelIn(wkNotOnSecurityView(wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__"))), model.LevelResources, model.LevelOwned)},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkRowSelected},
-	{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkRowSelected},
+	{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as...", Group: wkActions, Avail: wkRowSelected},
 	{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkRowSelected},
-	{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Apply from clipboard", Group: wkActions, Avail: wkSingleCluster(func(c *wkCtx) bool { return !c.readOnly })},
+	{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Paste & apply", Group: wkActions, Avail: wkSingleCluster(func(c *wkCtx) bool { return !c.readOnly })},
 	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Open in browser", Group: wkActions, Avail: wkKindIn("Ingress", "__port_forwards__", "__port_forward_entry__")},
 	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Port forward & open", Group: wkActions, Avail: wkWritableKindIn("Service")},
 	{Key: func(kb ui.Keybindings) string { return kb.SaveResource }, Label: "Save to file", Group: wkActions, Avail: wkOnRow},
@@ -484,12 +491,12 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	// so wkOnRow's "sel != nil" would wrongly hide it when a selection exists
 	// but the filter has narrowed the visible list to zero rows.
 	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkLevelResourcesUp},
-	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range from anchor", Group: wkSelection, Avail: wkOnRow},
+	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.Diff }, Label: "Diff two selected", Group: wkSelection, Avail: wkDiffAvailable},
 
 	// Views
 	{Key: func(kb ui.Keybindings) string { return kb.TogglePreview }, Label: "Details / YAML preview", Group: wkViews, Avail: wkTogglePreviewAvailable},
-	{Key: func(kb ui.Keybindings) string { return kb.TogglePreviewLogs }, Label: "Live log preview pane", Group: wkViews, Avail: wkTogglePreviewLogsAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.TogglePreviewLogs }, Label: "Live log preview", Group: wkViews, Avail: wkTogglePreviewLogsAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.ResourceMap }, Label: "Resource map", Group: wkViews, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.ObjectExplorer }, Label: "Object Explorer", Group: wkViews, Avail: func(c *wkCtx) bool { return wkOnRow(c) && c.sel.Raw != nil }},
 	{Key: func(kb ui.Keybindings) string { return kb.APIExplorer }, Label: "API Explorer", Group: wkViews, Avail: wkAPIExplorerAvailable},
@@ -497,13 +504,13 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.OrphanOverlay }, Label: "Orphan overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},
 	{Key: func(kb ui.Keybindings) string { return kb.SessionManager }, Label: "Session manager", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.ColumnToggle }, Label: "Column visibility", Group: wkViews, Avail: wkLevelResourcesUp},
-	{Key: func(kb ui.Keybindings) string { return kb.Monitoring }, Label: "Cluster / monitoring dashboard", Group: wkViews, Avail: func(c *wkCtx) bool { return c.level >= model.LevelResourceTypes }},
+	{Key: func(kb ui.Keybindings) string { return kb.Monitoring }, Label: "Monitoring dashboard", Group: wkViews, Avail: func(c *wkCtx) bool { return c.level >= model.LevelResourceTypes }},
 	{Key: func(kb ui.Keybindings) string { return kb.QuotaDashboard }, Label: "Quota dashboard", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.TasksOverlay }, Label: "Task queue", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.ErrorLog }, Label: "Error log", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.FinalizerSearch }, Label: "Finalizer search", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.Fullscreen }, Label: "Cycle layout", Group: wkViews, Avail: wkFullscreenAvailable},
-	{Key: func(kb ui.Keybindings) string { return kb.PinGroup }, Label: "Pin/unpin resource type", Group: wkViews, Avail: wkPinGroupAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.PinGroup }, Label: "Pin/unpin type", Group: wkViews, Avail: wkPinGroupAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleRare }, Label: "Show rare/hidden types", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.LocalClusterManager }, Label: "Local cluster manager", Group: wkViews, Avail: wkAtLevel(model.LevelClusters)},
 	{Key: func(kb ui.Keybindings) string { return kb.OpenMarks }, Label: "Bookmarks", Group: wkViews},
@@ -513,7 +520,7 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.Search }, Label: "Search and jump", Group: wkFilter, Avail: wkNotFullscreenDashboard},
 	{Key: func(kb ui.Keybindings) string { return kb.FilterPresets }, Label: "Filter presets", Group: wkFilter, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.NamespaceSelector }, Label: "Namespace selector", Group: wkFilter, Avail: wkNotAtClusters},
-	{Key: func(kb ui.Keybindings) string { return kb.AllNamespaces }, Label: "Toggle all namespaces", Group: wkFilter, Avail: wkAllNamespacesAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.AllNamespaces }, Label: "All namespaces", Group: wkFilter, Avail: wkAllNamespacesAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.CommandBar }, Label: "Command bar", Group: wkFilter},
 
 	// Sort

@@ -99,10 +99,40 @@ const (
 // renderWhichKey draws the goto cheatsheet while the g prefix is armed and
 // visible. Returns background unchanged when hidden or disabled.
 func (m Model) renderWhichKey(background string) string {
-	if !m.pendingG || !m.whichKeyShown || !ui.ConfigWhichKeyEnabled {
+	if !m.pendingG || !m.whichKey.shown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	return m.renderWhichKeyPanel(background, []whichKeyGroupCells{{Cells: m.whichKeyCells()}})
+	return m.renderWhichKeyPanel(background, []whichKeyGroupCells{{Cells: m.whichKeyCells()}}, "")
+}
+
+// whichKeyStyles are the three styles every which-key panel path renders
+// with, factored out so the leader's pagination pass and the real render pass
+// build cells identically.
+func whichKeyStyles() (key, desc, title lipgloss.Style) {
+	key = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
+	desc = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
+	title = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorPrimary)).Bold(true).Background(ui.BaseBg)
+	return key, desc, title
+}
+
+// whichKeyPanelGeometry derives the inner-width and body-row budget every
+// which-key panel layout path needs — the real render pass and the leader's
+// pagination pass alike — so the two can never disagree about how much fits.
+// ok is false when the terminal is too small to show anything.
+func (m Model) whichKeyPanelGeometry() (targetInner, maxInner, maxBodyRows int, ok bool) {
+	if m.width < whichKeyMinWidth || m.height < whichKeyMinHeight {
+		return 0, 0, 0, false
+	}
+	chrome := 2*whichKeyPadH + 2
+	maxInner = max(m.width-chrome, 1)
+	targetInner = max(m.width*whichKeyWidthPct/100-chrome, 1)
+	// Border + vertical padding + the bottom gap all eat into the rows the body
+	// may occupy.
+	maxBodyRows = m.height - (2 + 2*whichKeyPadV + whichKeyBottomGap)
+	if maxBodyRows < 1 {
+		return 0, 0, 0, false
+	}
+	return targetInner, maxInner, maxBodyRows, true
 }
 
 // renderWhichKeyPanel draws the given groups as a bordered panel near the bottom
@@ -112,38 +142,44 @@ func (m Model) renderWhichKey(background string) string {
 // with 40+ catalog entries the panel is routinely shorter than the content, and
 // dropping whole groups can leave a short terminal showing nothing at all even
 // though rows were available. A "+N more" footer discloses exactly how many
-// entries were cut. Returns background unchanged when there is nothing to show
-// or the terminal is too small.
-func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCells) string {
+// entries were cut, unless the caller supplies its own footer (e.g. the space
+// leader's page indicator) — footer then takes that row instead, and only
+// yields back to "+N more" if the supplied groups still don't fit even a
+// single page. Returns background unchanged when there is nothing to show or
+// the terminal is too small.
+func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCells, footer string) string {
 	total := 0
 	for _, g := range groups {
 		total += len(g.Cells)
 	}
-	if total == 0 || m.width < whichKeyMinWidth || m.height < whichKeyMinHeight {
+	if total == 0 {
 		return background
 	}
-
-	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
-	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorPrimary)).Bold(true).Background(ui.BaseBg)
-
-	chrome := 2*whichKeyPadH + 2
-	maxInner := max(m.width-chrome, 1)
-	targetInner := max(m.width*whichKeyWidthPct/100-chrome, 1)
-	// Border + vertical padding + the bottom gap all eat into the rows the body
-	// may occupy.
-	maxBodyRows := m.height - (2 + 2*whichKeyPadV + whichKeyBottomGap)
+	targetInner, maxInner, maxBodyRows, ok := m.whichKeyPanelGeometry()
+	if !ok {
+		return background
+	}
+	if footer != "" {
+		maxBodyRows-- // reserve the row the caller-supplied footer occupies
+	}
 	if maxBodyRows < 1 {
 		return background
 	}
 
+	keyStyle, descStyle, titleStyle := whichKeyStyles()
+
 	body, shown, inner := fitWhichKeyGroups(groups, maxBodyRows, targetInner, maxInner, keyStyle, descStyle, titleStyle)
-	if hidden := total - shown; hidden > 0 {
+	switch {
+	case total-shown > 0:
+		hidden := total - shown
 		// Width is measured on the plain string: lipgloss.Width on a styled
 		// string would count the ANSI escapes.
 		plainFooter := fmt.Sprintf("+%d more (%s for help)", hidden, ui.ActiveKeybindings.Help)
 		body = append(body, descStyle.Render(plainFooter))
 		inner = max(inner, lipgloss.Width(plainFooter))
+	case footer != "":
+		body = append(body, descStyle.Render(footer))
+		inner = max(inner, lipgloss.Width(footer))
 	}
 	if len(body) == 0 {
 		return background
@@ -172,21 +208,62 @@ type whichKeyRenderedGroup struct {
 	width int
 }
 
-// fitWhichKeyGroups lays out as many groups as fit within maxBodyRows, in
-// order. A row is reserved for the "+N more" footer up front whenever the full
-// catalog would overflow, so the caller never has to retroactively make room
-// for it. The first group that doesn't fully fit is truncated to as many of
-// its own cells as remain — every group after it is fully hidden.
-func fitWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) (body []string, shown, inner int) {
+// renderWhichKeyGroups renders every non-empty group once, up front, so a
+// caller sizing multiple candidate layouts (fitWhichKeyGroups's own budget
+// pass, and the space leader's pagination) shares exactly the block each
+// group produces instead of re-deriving row counts separately.
+func renderWhichKeyGroups(groups []whichKeyGroupCells, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) []whichKeyRenderedGroup {
 	rendered := make([]whichKeyRenderedGroup, 0, len(groups))
-	totalNeeded := 0
 	for _, g := range groups {
 		if len(g.Cells) == 0 {
 			continue
 		}
 		block, w := renderWhichKeyGroup(g, keyStyle, descStyle, titleStyle, targetInner, maxInner)
 		rendered = append(rendered, whichKeyRenderedGroup{g, block, w})
-		totalNeeded += len(block)
+	}
+	return rendered
+}
+
+// paginateWhichKeyGroups bins pre-rendered groups into pages that each fit
+// within maxBodyRows, in caller-given order, without splitting one group's
+// cells across two pages — a page break falls between groups, never inside
+// one. A group whose own block is taller than a whole page gets a dedicated
+// (possibly still-overflowing) page of its own rather than blocking
+// pagination; renderWhichKeyPanel's "+N more" footer is the fallback that
+// discloses the rest of that oversized group's cells when it actually renders.
+func paginateWhichKeyGroups(rendered []whichKeyRenderedGroup, maxBodyRows int) [][]whichKeyGroupCells {
+	if maxBodyRows < 1 {
+		return nil
+	}
+	var pages [][]whichKeyGroupCells
+	var page []whichKeyGroupCells
+	used := 0
+	for _, r := range rendered {
+		cost := len(r.block)
+		if len(page) > 0 && used+cost > maxBodyRows {
+			pages = append(pages, page)
+			page = nil
+			used = 0
+		}
+		page = append(page, r.group)
+		used += cost
+	}
+	if len(page) > 0 {
+		pages = append(pages, page)
+	}
+	return pages
+}
+
+// fitWhichKeyGroups lays out as many groups as fit within maxBodyRows, in
+// order. A row is reserved for the "+N more" footer up front whenever the full
+// catalog would overflow, so the caller never has to retroactively make room
+// for it. The first group that doesn't fully fit is truncated to as many of
+// its own cells as remain — every group after it is fully hidden.
+func fitWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) (body []string, shown, inner int) {
+	rendered := renderWhichKeyGroups(groups, targetInner, maxInner, keyStyle, descStyle, titleStyle)
+	totalNeeded := 0
+	for _, r := range rendered {
+		totalNeeded += len(r.block)
 	}
 
 	budget := maxBodyRows
