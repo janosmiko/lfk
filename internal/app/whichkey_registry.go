@@ -36,7 +36,39 @@ type whichKeyAction struct {
 
 // --- shared predicates ---
 
-// wkOnRow reports whether a resource row is highlighted.
+// wkRowSelected reports whether a row is highlighted, independent of
+// navigation level. Handlers that only read the row's Name or visible
+// columns (CopyName, the copy-as-YAML/JSON/table picker, CopyField) work
+// identically at every level from LevelClusters through LevelContainers —
+// see availableCopyFormats (copy_format.go), which explicitly documents
+// "Clusters and ResourceTypes only support Table ... All other levels offer
+// the full YAML / JSON / Table set" rather than refusing those levels.
+func wkRowSelected(m *Model) bool {
+	return m.selectedMiddleItem() != nil
+}
+
+// wkLevelIn wraps a predicate with a navigation-level allowlist, so a
+// handler's level scope is expressed once and read off its source rather
+// than inherited by accident from a shared base like wkOnRow. Use this
+// whenever a handler's level branches are narrower or wider than
+// wkOnRow's default (LevelResources/LevelOwned/LevelContainers) — see the
+// per-entry level audit in the Task 2 report.
+func wkLevelIn(pred func(m *Model) bool, levels ...model.Level) func(m *Model) bool {
+	allowed := make(map[model.Level]bool, len(levels))
+	for _, lvl := range levels {
+		allowed[lvl] = true
+	}
+	return func(m *Model) bool {
+		return pred(m) && allowed[m.nav.Level]
+	}
+}
+
+// wkOnRow reports whether a resource row is highlighted at a level a direct
+// kubectl-backed action (Describe/Edit/Delete/Logs/Force Delete/...) can
+// act on. Handlers in that family don't level-check explicitly; they rely
+// on selectedResourceKind() returning "" (blocked by isVirtualResourceKind
+// or an empty wkKindIn match) above LevelResources, so this stays a plain
+// comparison rather than a wkLevelIn call for cheapness.
 func wkOnRow(m *Model) bool {
 	return m.nav.Level >= model.LevelResources && m.selectedMiddleItem() != nil
 }
@@ -89,8 +121,10 @@ func wkSingleCluster(pred func(m *Model) bool) func(m *Model) bool {
 // wkRealKind wraps a predicate with the isVirtualResourceKind gate the
 // direct-action dispatchers (Describe/Edit/Delete) use to silently no-op on
 // synthetic rows (port forwards, captures, security findings). Not folded
-// into wkOnRow: other wkOnRow users (copy, save) act on the row's Name/Extra
-// rather than dispatching kubectl, so they don't share this restriction.
+// into wkOnRow: SaveResource (the other remaining wkOnRow user besides the
+// kubectl-backed actions) explicitly supports LevelResources/Owned/Containers
+// regardless of kind (update_keys_actions.go), so it doesn't share this
+// restriction.
 func wkRealKind(pred func(m *Model) bool) func(m *Model) bool {
 	return func(m *Model) bool {
 		return pred(m) && !isVirtualResourceKind(m.selectedResourceKind())
@@ -140,12 +174,13 @@ func whichKeyExplorerActions() []whichKeyAction {
 		{Key: func(kb ui.Keybindings) string { return kb.Describe }, Label: "Describe", Group: wkActions, Avail: wkRealKind(wkOnRow)},
 		{Key: func(kb ui.Keybindings) string { return kb.Edit }, Label: "Edit in $EDITOR", Group: wkActions, Avail: wkSingleCluster(wkRealKind(wkWritable))},
 		{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Delete", Group: wkActions, Avail: wkUnionAllowed(wkRealKind(wkWritable), "Delete")},
+		{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Remove port forward", Group: wkActions, Avail: wkLevelIn(wkKindIn("__port_forwards__"), model.LevelResources)},
 		{Key: func(kb ui.Keybindings) string { return kb.ForceDelete }, Label: "Force delete", Group: wkActions, Avail: wkUnionAllowed(wkWritableKindIn("Pod", "Job"), "Force Delete")},
-		{Key: func(kb ui.Keybindings) string { return kb.SecretEditor }, Label: "Secret/ConfigMap editor", Group: wkActions, Avail: wkSingleCluster(wkWritableKindIn("Secret", "ConfigMap"))},
-		{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__"))},
-		{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkOnRow},
-		{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkOnRow},
-		{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkOnRow},
+		{Key: func(kb ui.Keybindings) string { return kb.SecretEditor }, Label: "Secret/ConfigMap editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkWritableKindIn("Secret", "ConfigMap")), model.LevelResources)},
+		{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__")), model.LevelResources, model.LevelOwned)},
+		{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkRowSelected},
+		{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkRowSelected},
+		{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkRowSelected},
 		{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Apply from clipboard", Group: wkActions, Avail: wkSingleCluster(func(m *Model) bool { return !m.readOnlyForContext(m.nav.Context) })},
 		{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Open in browser", Group: wkActions, Avail: wkKindIn("Ingress", "__port_forwards__", "__port_forward_entry__")},
 		{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Port forward & open", Group: wkActions, Avail: wkWritableKindIn("Service")},

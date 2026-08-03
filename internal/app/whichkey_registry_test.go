@@ -306,6 +306,219 @@ func TestAvailableWhichKeyActions_DeleteUnionModeRestrictedToPod(t *testing.T) {
 	}
 }
 
+// Regression for review finding E (round 3): handleExplorerActionKeySecretEditor
+// (update_keys_actions.go) only has an "m.nav.Level == model.LevelResources"
+// branch — no LevelOwned branch, unlike LabelEditor — and silently no-ops
+// otherwise. Reachable via Helm/ArgoCD/Flux-managed Secret/ConfigMap rows at
+// LevelOwned (commands_load.go -> k8s/resources.go; Item.Kind copied
+// straight from the manifest in k8s/gitops_argo.go, k8s/helm.go,
+// k8s/gitops_flux.go).
+func TestAvailableWhichKeyActions_HidesSecretEditorAtLevelOwned(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.nav.Level = model.LevelOwned
+	m.setMiddleItems([]model.Item{{Name: "s1", Kind: "Secret", Namespace: "default"}})
+	m.setCursor(0)
+	keys := whichKeyKeys(m)
+	if containsKey(keys, ui.ActiveKeybindings.SecretEditor) {
+		t.Fatalf("secret editor must be hidden at LevelOwned; got %v", keys)
+	}
+}
+
+// Regression for review finding F (round 3): handleExplorerActionKeyLabelEditor
+// (update_keys_actions.go) only has LevelResources and LevelOwned branches —
+// no LevelContainers branch — and silently no-ops otherwise.
+func TestAvailableWhichKeyActions_HidesLabelEditorAtLevelContainers(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.nav.Level = model.LevelContainers
+	m.setMiddleItems([]model.Item{{Name: "c1", Kind: "Container"}})
+	m.setCursor(0)
+	keys := whichKeyKeys(m)
+	if containsKey(keys, ui.ActiveKeybindings.LabelEditor) {
+		t.Fatalf("label editor must be hidden at LevelContainers; got %v", keys)
+	}
+}
+
+// Guards against over-correcting finding F: LabelEditor's LevelOwned branch
+// is real (update_keys_actions.go:672-679, resolveOwnedResourceType), so
+// LevelOwned must stay offered.
+func TestAvailableWhichKeyActions_ShowsLabelEditorAtLevelOwned(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.nav.Level = model.LevelOwned
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod"}})
+	m.setCursor(0)
+	if !containsKey(whichKeyKeys(m), ui.ActiveKeybindings.LabelEditor) {
+		t.Fatal("label editor must still be offered at LevelOwned")
+	}
+}
+
+// Regression found during the round-3 level audit (same class, not one of
+// the two named findings): CopyName never checked level at all, and
+// availableCopyFormats (copy_format.go) explicitly documents that
+// CopyYAML/CopyField also work at every level — "Clusters and ResourceTypes
+// only support Table ... All other levels offer the full YAML / JSON / Table
+// set" — yet all three predicates inherited wkOnRow's ">= LevelResources"
+// and were hidden at LevelClusters/LevelResourceTypes where the key still
+// works.
+func TestAvailableWhichKeyActions_CopyActionsAvailableAtEveryLevel(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	keysToCheck := []struct {
+		name string
+		key  func(ui.Keybindings) string
+	}{
+		{"CopyName", func(kb ui.Keybindings) string { return kb.CopyName }},
+		{"CopyYAML", func(kb ui.Keybindings) string { return kb.CopyYAML }},
+		{"CopyField", func(kb ui.Keybindings) string { return kb.CopyField }},
+	}
+	for lvl, name := range levelName {
+		t.Run(name, func(t *testing.T) {
+			m := whichKeyTestModel()
+			m.nav.Level = lvl
+			m.setMiddleItems([]model.Item{{Name: "row1", Kind: "Pod"}})
+			m.setCursor(0)
+			keys := whichKeyKeys(m)
+			for _, kc := range keysToCheck {
+				if !containsKey(keys, kc.key(ui.ActiveKeybindings)) {
+					t.Errorf("%s must be offered at %s; got %v", kc.name, name, keys)
+				}
+			}
+		})
+	}
+}
+
+// Regression found during the round-3 level/handler audit while verifying
+// Delete (same entry named in finding C.2/D last round): the dispatcher for
+// kb.Delete special-cases the port-forwards list before ever reaching
+// directActionDelete —
+//
+//	case kb.Delete:
+//	    if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "__port_forwards__" {
+//	        ret, cmd := m.removeSelectedPortForward()
+//	        ...
+//
+// removeSelectedPortForward (update_actions_helm_misc.go) is a local,
+// ungated operation (no read-only or union check — it only touches
+// m.portForwardMgr). The Delete entry's wkRealKind gate correctly hides the
+// k8s-mutation "Delete" label there (isVirtualResourceKind("__port_forwards__")
+// is true), but nothing offered the key's real behavior — a "hidden
+// available action" of the same severity as finding 3 in round 1.
+func TestAvailableWhichKeyActions_DeleteOffersRemovePortForwardOnPortForwardsList(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__port_forwards__", APIGroup: "_portforward", APIVersion: "v1", Resource: "portforwards", Namespaced: false}
+	m.setMiddleItems([]model.Item{{Name: "pf1", Kind: "__port_forward_entry__"}})
+	m.setCursor(0)
+	// removeSelectedPortForward has no read-only or union gate — assert the
+	// entry survives even with both set, matching the handler exactly.
+	m.readOnly = true
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+
+	labels := whichKeyLabels(m)
+	if !slices.Contains(labels, "Remove port forward") {
+		t.Fatalf("remove port forward must be offered on the port-forwards list even when read-only/union; got %v", labels)
+	}
+	if slices.Contains(labels, "Delete") {
+		t.Fatalf("the k8s-mutation Delete entry must not be offered on the port-forwards list; got %v", labels)
+	}
+}
+
+// levelName is a small helper for subtest names in the level-scoping table
+// below; model.Level has no String() method.
+var levelName = map[model.Level]string{
+	model.LevelClusters:      "LevelClusters",
+	model.LevelResourceTypes: "LevelResourceTypes",
+	model.LevelResources:     "LevelResources",
+	model.LevelOwned:         "LevelOwned",
+	model.LevelContainers:    "LevelContainers",
+}
+
+// TestAvailableWhichKeyActions_LevelScopingTable pins the navigation levels
+// at which every current catalog entry is offered, verified against each
+// entry's real handler (see the round-3 per-entry audit table in the Task 2
+// report for file:line citations). kind is a resource kind compatible with
+// the entry's own kind gate (ignored by entries with none); it is only
+// honored at LevelResources (nav.ResourceType.Kind) and LevelOwned
+// (the row's Kind) — LevelContainers always reads back "Container" via
+// selectedResourceKind(), and LevelClusters/LevelResourceTypes always read
+// back "", regardless of what's set here, which is itself part of what this
+// table pins.
+//
+// New Task 3 entries should add a row here rather than relying on the
+// blanket wkOnRow default.
+func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	allLevels := []model.Level{model.LevelClusters, model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}
+
+	cases := []struct {
+		label  string
+		kind   string
+		levels []model.Level // levels where the entry must be offered
+	}{
+		// Deferred (not fixed this round, see task-2-report.md): the real
+		// handler (openActionMenu) also supports LevelClusters and
+		// LevelResourceTypes via dedicated menus, but wkOnRow is left as-is
+		// per explicit coordinator instruction. This row pins CURRENT
+		// (known-incomplete) behavior, not ideal behavior.
+		{"Action menu", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Logs (fullscreen)", "Pod", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Describe", "Pod", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Edit in $EDITOR", "Pod", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Delete", "Pod", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Remove port forward", "__port_forwards__", []model.Level{model.LevelResources}},
+		{"Force delete", "Pod", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Secret/ConfigMap editor", "Secret", []model.Level{model.LevelResources}},
+		{"Label/annotation editor", "Pod", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Copy name", "", allLevels},
+		{"Copy as (YAML/JSON/table)", "", allLevels},
+		{"Copy a field", "", allLevels},
+		{"Apply from clipboard", "", allLevels},
+		{"Open in browser", "Ingress", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Port forward & open", "Service", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Save to file", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Refresh view", "", allLevels},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			want := make(map[model.Level]bool, len(tc.levels))
+			for _, lvl := range tc.levels {
+				want[lvl] = true
+			}
+			for _, lvl := range allLevels {
+				t.Run(levelName[lvl], func(t *testing.T) {
+					m := whichKeyTestModel()
+					m.nav.Level = lvl
+					item := model.Item{Name: "row1"}
+					switch lvl {
+					case model.LevelResources:
+						m.nav.ResourceType = model.ResourceTypeEntry{Kind: tc.kind}
+						item.Kind = tc.kind
+					case model.LevelOwned:
+						item.Kind = tc.kind
+					}
+					m.setMiddleItems([]model.Item{item})
+					m.setCursor(0)
+
+					got := slices.Contains(whichKeyLabels(m), tc.label)
+					if got != want[lvl] {
+						t.Errorf("%q at %s: got offered=%v, want %v", tc.label, levelName[lvl], got, want[lvl])
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestWhichKeyPredicates_ZeroValueModelDoesNotPanic(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
