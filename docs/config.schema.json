@@ -110,6 +110,13 @@
       "description": "Delay before the which-key popup appears, in milliseconds (0 = immediate).",
       "default": 0
     },
+    "which_key_leader_delay_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2000,
+      "description": "Delay before the space-leader which-key panel appears, in milliseconds (0 = immediate).",
+      "default": 300
+    },
     "terminal": {
       "type": "string",
       "description": "How exec/shell commands run: \"pty\" (embedded in the TUI), \"exec\" (takes over the terminal), or \"mux\" (open in a new tmux/zellij window or pane).",

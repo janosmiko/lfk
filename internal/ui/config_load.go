@@ -277,6 +277,9 @@ type configFile struct {
 	// WhichKeyDelayMs is the delay before the which-key popup appears after a
 	// prefix is pressed, in milliseconds. Clamped to [0, 2000].
 	WhichKeyDelayMs *int `json:"which_key_delay_ms" yaml:"which_key_delay_ms"`
+	// WhichKeyLeaderDelayMs is the delay before the space-leader which-key
+	// panel appears, in milliseconds (0..2000).
+	WhichKeyLeaderDelayMs *int `json:"which_key_leader_delay_ms" yaml:"which_key_leader_delay_ms"`
 }
 
 // UnionSetsConfig accepts both supported top-level shapes:

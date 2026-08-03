@@ -415,6 +415,7 @@ var wiringCoveredFields = map[string]string{
 	"goto_targets":              "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
 	"which_key_enabled":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
 	"which_key_delay_ms":        "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"which_key_leader_delay_ms": "config_whichkey_test.go (TestLoadConfig_WhichKeyLeaderDelay*)",
 }
 
 // TestConfigFile_EveryFieldHasWiringCoverage is a forcing function: it fails if

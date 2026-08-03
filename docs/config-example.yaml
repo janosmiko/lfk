@@ -565,6 +565,9 @@ filter_presets:
 # which_key_enabled: true
 # which_key_delay_ms: 0
 
+# Delay before the space-leader which-key panel appears (ms, 0-2000).
+# which_key_leader_delay_ms: 300
+
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories
 # (Workloads, Networking, etc.) instead of being sorted alphabetically.

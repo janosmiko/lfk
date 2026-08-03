@@ -660,6 +660,11 @@ var ConfigWhichKeyEnabled = true
 // ConfigWhichKeyDelayMs delays the popup after a prefix is pressed (0..2000).
 var ConfigWhichKeyDelayMs = 0
 
+// ConfigWhichKeyLeaderDelayMs delays the space-leader panel (0..2000). Longer
+// than the g-prefix default because space also toggles selection and is pressed
+// in bursts; a short delay keeps rapid multi-select from flashing the panel.
+var ConfigWhichKeyLeaderDelayMs = 300
+
 // ConfigShowRareTypes is the startup default for the "show rarely-used resource
 // types" toggle (the ToggleRare / H key). When true the sidebar surfaces the
 // rare and "Advanced" resource types from launch. The runtime H toggle
