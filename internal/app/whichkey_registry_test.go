@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -430,6 +431,86 @@ func TestAvailableWhichKeyActions_DeleteOffersRemovePortForwardOnPortForwardsLis
 	}
 }
 
+// Regression for review finding G (round 4): directActionDelete
+// (update_actions.go:256-259) opens with an unconditional
+// "m.nav.Level == model.LevelContainers" check that toasts
+// "Delete not available for containers" and returns — before the kind check
+// and before hasSelection(). The key can never delete at that level, so the
+// panel must not advertise it.
+func TestAvailableWhichKeyActions_HidesDeleteAtLevelContainers(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.nav.Level = model.LevelContainers
+	m.setMiddleItems([]model.Item{{Name: "c1", Kind: "Container"}})
+	m.setCursor(0)
+	if slices.Contains(whichKeyLabels(m), "Delete") {
+		t.Fatalf("delete must be hidden at LevelContainers; got %v", whichKeyLabels(m))
+	}
+}
+
+// Regression for review finding H (round 4): openActionMenu
+// (update_actions.go:25-30) routes LevelClusters to openClusterPickerActionMenu
+// and LevelResourceTypes to openResourceTypeActionMenu, neither of which has a
+// level floor — the key opens a real menu there.
+func TestAvailableWhichKeyActions_ActionMenuAtClusterAndResourceTypeLevels(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	clusters := whichKeyTestModel()
+	clusters.nav.Level = model.LevelClusters
+	clusters.setMiddleItems([]model.Item{{Name: "ctx-a"}})
+	clusters.setCursor(0)
+	if !slices.Contains(whichKeyLabels(clusters), "Action menu") {
+		t.Fatalf("action menu must be offered at LevelClusters; got %v", whichKeyLabels(clusters))
+	}
+
+	types := whichKeyTestModel()
+	types.nav.Level = model.LevelResourceTypes
+	// Expand the row's category: an unexpanded one collapses to a
+	// __collapsed_group__ header, which the real handler refuses (asserted in
+	// TestAvailableWhichKeyActions_ActionMenuHiddenOnNonActionableRows).
+	types.expandedGroup = "Workloads"
+	types.setMiddleItems([]model.Item{{Name: "Pods", Extra: "/v1/pods", Category: "Workloads"}})
+	types.setCursor(0)
+	if !slices.Contains(whichKeyLabels(types), "Action menu") {
+		t.Fatalf("action menu must be offered at LevelResourceTypes; got %v", whichKeyLabels(types))
+	}
+}
+
+// Guards against over-correcting finding H with a bare wkRowSelected: both
+// newly-allowed levels have per-row conditions of their own.
+// openClusterPickerActionMenu (update_actions_cluster_picker.go:19) returns
+// unchanged for a union-set row; openResourceTypeActionMenu
+// (update_actions_hidden.go:51-60) returns unchanged for collapsed-group
+// headers, the Dashboards category, and any ref PinKeyFromRef can't parse.
+func TestAvailableWhichKeyActions_ActionMenuHiddenOnNonActionableRows(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	cases := []struct {
+		name  string
+		level model.Level
+		item  model.Item
+	}{
+		{"union set row at LevelClusters", model.LevelClusters, model.Item{Name: "prod-set", Kind: unionSetItemKind}},
+		{"collapsed group header", model.LevelResourceTypes, model.Item{Name: "Workloads", Kind: "__collapsed_group__", Extra: "/v1/pods"}},
+		{"dashboard pseudo-item", model.LevelResourceTypes, model.Item{Name: "Overview", Category: "Dashboards", Extra: "/v1/pods"}},
+		{"unparseable pin ref", model.LevelResourceTypes, model.Item{Name: "Overview", Extra: "__overview__"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := whichKeyTestModel()
+			m.nav.Level = tc.level
+			m.setMiddleItems([]model.Item{tc.item})
+			m.setCursor(0)
+			if slices.Contains(whichKeyLabels(m), "Action menu") {
+				t.Fatalf("action menu must be hidden for %s; got %v", tc.name, whichKeyLabels(m))
+			}
+		})
+	}
+}
+
 // levelName is a small helper for subtest names in the level-scoping table
 // below; model.Level has no String() method.
 var levelName = map[model.Level]string{
@@ -449,7 +530,8 @@ var levelName = map[model.Level]string{
 // (the row's Kind) — LevelContainers always reads back "Container" via
 // selectedResourceKind(), and LevelClusters/LevelResourceTypes always read
 // back "", regardless of what's set here, which is itself part of what this
-// table pins.
+// table pins. extra is the row's resource ref, needed only by entries whose
+// handler parses it (the resource-type action menu's PinKeyFromRef).
 //
 // New Task 3 entries should add a row here rather than relying on the
 // blanket wkOnRow default.
@@ -462,30 +544,28 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 	cases := []struct {
 		label  string
 		kind   string
+		extra  string
 		levels []model.Level // levels where the entry must be offered
 	}{
-		// Deferred (not fixed this round, see task-2-report.md): the real
-		// handler (openActionMenu) also supports LevelClusters and
-		// LevelResourceTypes via dedicated menus, but wkOnRow is left as-is
-		// per explicit coordinator instruction. This row pins CURRENT
-		// (known-incomplete) behavior, not ideal behavior.
-		{"Action menu", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"Logs (fullscreen)", "Pod", []model.Level{model.LevelResources, model.LevelOwned}},
-		{"Describe", "Pod", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"Edit in $EDITOR", "Pod", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"Delete", "Pod", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"Remove port forward", "__port_forwards__", []model.Level{model.LevelResources}},
-		{"Force delete", "Pod", []model.Level{model.LevelResources, model.LevelOwned}},
-		{"Secret/ConfigMap editor", "Secret", []model.Level{model.LevelResources}},
-		{"Label/annotation editor", "Pod", []model.Level{model.LevelResources, model.LevelOwned}},
-		{"Copy name", "", allLevels},
-		{"Copy as (YAML/JSON/table)", "", allLevels},
-		{"Copy a field", "", allLevels},
-		{"Apply from clipboard", "", allLevels},
-		{"Open in browser", "Ingress", []model.Level{model.LevelResources, model.LevelOwned}},
-		{"Port forward & open", "Service", []model.Level{model.LevelResources, model.LevelOwned}},
-		{"Save to file", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"Refresh view", "", allLevels},
+		{"Action menu", "Pod", "apps/v1/deployments", allLevels},
+		{"Logs (fullscreen)", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Describe", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Edit in $EDITOR", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		// LevelContainers is excluded: directActionDelete refuses it outright
+		// with a toast before any kind or selection check (finding G).
+		{"Delete", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Remove port forward", "__port_forwards__", "", []model.Level{model.LevelResources}},
+		{"Force delete", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Secret/ConfigMap editor", "Secret", "", []model.Level{model.LevelResources}},
+		{"Label/annotation editor", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Copy name", "", "", allLevels},
+		{"Copy as (YAML/JSON/table)", "", "", allLevels},
+		{"Copy a field", "", "", allLevels},
+		{"Apply from clipboard", "", "", allLevels},
+		{"Open in browser", "Ingress", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Port forward & open", "Service", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Save to file", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Refresh view", "", "", allLevels},
 	}
 
 	for _, tc := range cases {
@@ -498,7 +578,7 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 				t.Run(levelName[lvl], func(t *testing.T) {
 					m := whichKeyTestModel()
 					m.nav.Level = lvl
-					item := model.Item{Name: "row1"}
+					item := model.Item{Name: "row1", Extra: tc.extra}
 					switch lvl {
 					case model.LevelResources:
 						m.nav.ResourceType = model.ResourceTypeEntry{Kind: tc.kind}
@@ -514,6 +594,60 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 						t.Errorf("%q at %s: got offered=%v, want %v", tc.label, levelName[lvl], got, want[lvl])
 					}
 				})
+			}
+		})
+	}
+}
+
+// BenchmarkAvailableWhichKeyActions measures the per-render cost of the
+// filter, which Task 4 calls from View() on every frame. LevelResources with
+// no filter is the common case; the ResourceTypes and Filtered variants
+// isolate the cost of selectedMiddleItem -> visibleMiddleItems, which
+// allocates a fresh slice on those paths and is called once per predicate.
+func BenchmarkAvailableWhichKeyActions(b *testing.B) {
+	prevKb := ui.ActiveKeybindings
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	b.Cleanup(func() { ui.ActiveKeybindings = prevKb })
+
+	rows := make([]model.Item, 200)
+	for i := range rows {
+		rows[i] = model.Item{Name: fmt.Sprintf("pod-%03d", i), Kind: "Pod", Namespace: "default", Category: "Workloads", Extra: "/v1/pods"}
+	}
+
+	variants := []struct {
+		name  string
+		build func() Model
+	}{
+		{"LevelResources", func() Model {
+			m := whichKeyTestModel()
+			m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+			m.setMiddleItems(rows)
+			m.setCursor(0)
+			return m
+		}},
+		{"LevelResourceTypes", func() Model {
+			m := whichKeyTestModel()
+			m.nav.Level = model.LevelResourceTypes
+			m.setMiddleItems(rows)
+			m.setCursor(0)
+			return m
+		}},
+		{"LevelResourcesFiltered", func() Model {
+			m := whichKeyTestModel()
+			m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+			m.setMiddleItems(rows)
+			m.filterText = "pod"
+			m.setCursor(0)
+			return m
+		}},
+	}
+
+	for _, v := range variants {
+		m := v.build()
+		b.Run(v.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = m.availableWhichKeyActions()
 			}
 		})
 	}

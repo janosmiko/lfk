@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -64,13 +66,47 @@ func wkLevelIn(pred func(m *Model) bool, levels ...model.Level) func(m *Model) b
 }
 
 // wkOnRow reports whether a resource row is highlighted at a level a direct
-// kubectl-backed action (Describe/Edit/Delete/Logs/Force Delete/...) can
-// act on. Handlers in that family don't level-check explicitly; they rely
-// on selectedResourceKind() returning "" (blocked by isVirtualResourceKind
-// or an empty wkKindIn match) above LevelResources, so this stays a plain
-// comparison rather than a wkLevelIn call for cheapness.
+// kubectl-backed action (Describe/Edit/Logs/Force Delete/...) can act on.
+// Most handlers in that family don't level-check explicitly; they rely on
+// selectedResourceKind() returning "" (blocked by isVirtualResourceKind or
+// an empty wkKindIn match) above LevelResources, so this stays a plain
+// comparison rather than a wkLevelIn call for cheapness. Delete is the
+// exception — directActionDelete (update_actions.go) opens with an explicit
+// LevelContainers refusal — so its entry composes wkLevelIn on top.
 func wkOnRow(m *Model) bool {
 	return m.nav.Level >= model.LevelResources && m.selectedMiddleItem() != nil
+}
+
+// wkActionMenuAvailable mirrors openActionMenu's dispatch (update_actions.go),
+// which picks a different menu builder per level, each with its own row
+// conditions, and silently returns an unchanged model when none apply. Spelled
+// out rather than composed from the generic wrappers because the branches are
+// alternatives, not stacked gates.
+//
+// One condition is deliberately approximated: openBulkSelectionMenu also
+// requires selectedItemsList() to be non-empty, which is a full scan of the
+// visible rows. hasSelection() only differs from it when every selected row is
+// filtered out of view, so the cheap check is used instead.
+func wkActionMenuAvailable(m *Model) bool {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return false
+	}
+	// Security rows get their own menu ahead of the level dispatch.
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") || strings.HasPrefix(sel.Kind, "__security_") {
+		return true
+	}
+	if m.hasSelection() {
+		return m.selectedResourceKind() != ""
+	}
+	switch m.nav.Level {
+	case model.LevelClusters:
+		return !isUnionSetItem(sel)
+	case model.LevelResourceTypes:
+		return sel.Kind != "__collapsed_group__" && sel.Category != "Dashboards" && model.PinKeyFromRef(sel.Extra) != ""
+	default:
+		return m.selectedResourceKind() != ""
+	}
 }
 
 // wkWritable reports whether mutating actions apply: a row is highlighted and
@@ -164,42 +200,58 @@ func wkUnionAllowed(pred func(m *Model) bool, label string) func(m *Model) bool 
 	}
 }
 
-// whichKeyExplorerActions is the full catalog for explorer mode. Navigation
+// whichKeyExplorerCatalog is the full catalog for explorer mode. Navigation
 // bindings are absent by construction — the panel is for actions the user is
 // unlikely to remember, not for h/j/k/l.
+//
+// Built once at package init rather than per call: the panel re-filters on
+// every render, and rebuilding the catalog would re-run every wkKindIn /
+// wkLevelIn / wkExcludeKind constructor and so reallocate their lookup sets
+// each frame. Only the Key indirection stays dynamic, so a runtime rebind is
+// still picked up.
+var whichKeyExplorerCatalog = []whichKeyAction{
+	{Key: func(kb ui.Keybindings) string { return kb.ActionMenu }, Label: "Action menu", Group: wkActions, Avail: wkActionMenuAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.Logs }, Label: "Logs (fullscreen)", Group: wkActions, Avail: wkKindIn("Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob")},
+	{Key: func(kb ui.Keybindings) string { return kb.Describe }, Label: "Describe", Group: wkActions, Avail: wkRealKind(wkOnRow)},
+	{Key: func(kb ui.Keybindings) string { return kb.Edit }, Label: "Edit in $EDITOR", Group: wkActions, Avail: wkSingleCluster(wkRealKind(wkWritable))},
+	// LevelContainers is excluded: directActionDelete refuses it outright with
+	// a toast, ahead of every other check (update_actions.go).
+	{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Delete", Group: wkActions, Avail: wkLevelIn(wkUnionAllowed(wkRealKind(wkWritable), "Delete"), model.LevelResources, model.LevelOwned)},
+	{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Remove port forward", Group: wkActions, Avail: wkLevelIn(wkKindIn("__port_forwards__"), model.LevelResources)},
+	{Key: func(kb ui.Keybindings) string { return kb.ForceDelete }, Label: "Force delete", Group: wkActions, Avail: wkUnionAllowed(wkWritableKindIn("Pod", "Job"), "Force Delete")},
+	{Key: func(kb ui.Keybindings) string { return kb.SecretEditor }, Label: "Secret/ConfigMap editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkWritableKindIn("Secret", "ConfigMap")), model.LevelResources)},
+	{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__")), model.LevelResources, model.LevelOwned)},
+	{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkRowSelected},
+	{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkRowSelected},
+	{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkRowSelected},
+	{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Apply from clipboard", Group: wkActions, Avail: wkSingleCluster(func(m *Model) bool { return !m.readOnlyForContext(m.nav.Context) })},
+	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Open in browser", Group: wkActions, Avail: wkKindIn("Ingress", "__port_forwards__", "__port_forward_entry__")},
+	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Port forward & open", Group: wkActions, Avail: wkWritableKindIn("Service")},
+	{Key: func(kb ui.Keybindings) string { return kb.SaveResource }, Label: "Save to file", Group: wkActions, Avail: wkOnRow},
+	{Key: func(kb ui.Keybindings) string { return kb.Refresh }, Label: "Refresh view", Group: wkActions},
+}
+
+// whichKeyExplorerActions returns the shared explorer catalog. The slice is
+// read-only for callers; entries are copied out by availableWhichKeyActions.
 func whichKeyExplorerActions() []whichKeyAction {
-	return []whichKeyAction{
-		{Key: func(kb ui.Keybindings) string { return kb.ActionMenu }, Label: "Action menu", Group: wkActions, Avail: wkOnRow},
-		{Key: func(kb ui.Keybindings) string { return kb.Logs }, Label: "Logs (fullscreen)", Group: wkActions, Avail: wkKindIn("Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob")},
-		{Key: func(kb ui.Keybindings) string { return kb.Describe }, Label: "Describe", Group: wkActions, Avail: wkRealKind(wkOnRow)},
-		{Key: func(kb ui.Keybindings) string { return kb.Edit }, Label: "Edit in $EDITOR", Group: wkActions, Avail: wkSingleCluster(wkRealKind(wkWritable))},
-		{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Delete", Group: wkActions, Avail: wkUnionAllowed(wkRealKind(wkWritable), "Delete")},
-		{Key: func(kb ui.Keybindings) string { return kb.Delete }, Label: "Remove port forward", Group: wkActions, Avail: wkLevelIn(wkKindIn("__port_forwards__"), model.LevelResources)},
-		{Key: func(kb ui.Keybindings) string { return kb.ForceDelete }, Label: "Force delete", Group: wkActions, Avail: wkUnionAllowed(wkWritableKindIn("Pod", "Job"), "Force Delete")},
-		{Key: func(kb ui.Keybindings) string { return kb.SecretEditor }, Label: "Secret/ConfigMap editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkWritableKindIn("Secret", "ConfigMap")), model.LevelResources)},
-		{Key: func(kb ui.Keybindings) string { return kb.LabelEditor }, Label: "Label/annotation editor", Group: wkActions, Avail: wkLevelIn(wkSingleCluster(wkExcludeKind(wkWritable, "__port_forwards__", "__captures__")), model.LevelResources, model.LevelOwned)},
-		{Key: func(kb ui.Keybindings) string { return kb.CopyName }, Label: "Copy name", Group: wkActions, Avail: wkRowSelected},
-		{Key: func(kb ui.Keybindings) string { return kb.CopyYAML }, Label: "Copy as (YAML/JSON/table)", Group: wkActions, Avail: wkRowSelected},
-		{Key: func(kb ui.Keybindings) string { return kb.CopyField }, Label: "Copy a field", Group: wkActions, Avail: wkRowSelected},
-		{Key: func(kb ui.Keybindings) string { return kb.PasteApply }, Label: "Apply from clipboard", Group: wkActions, Avail: wkSingleCluster(func(m *Model) bool { return !m.readOnlyForContext(m.nav.Context) })},
-		{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Open in browser", Group: wkActions, Avail: wkKindIn("Ingress", "__port_forwards__", "__port_forward_entry__")},
-		{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Port forward & open", Group: wkActions, Avail: wkWritableKindIn("Service")},
-		{Key: func(kb ui.Keybindings) string { return kb.SaveResource }, Label: "Save to file", Group: wkActions, Avail: wkOnRow},
-		{Key: func(kb ui.Keybindings) string { return kb.Refresh }, Label: "Refresh view", Group: wkActions},
-	}
+	return whichKeyExplorerCatalog
 }
 
 // availableWhichKeyActions filters the explorer catalog to what applies right
 // now, dropping entries whose binding the user cleared.
-func (m Model) availableWhichKeyActions() []whichKeyAction {
+//
+// Pointer receiver on purpose: Model is ~18 KB, and taking its address for the
+// predicates makes a value receiver's copy escape to the heap on every render.
+// Safe because every predicate is required to be read-only.
+func (m *Model) availableWhichKeyActions() []whichKeyAction {
 	kb := ui.ActiveKeybindings
-	all := whichKeyExplorerActions()
+	all := whichKeyExplorerCatalog
 	out := make([]whichKeyAction, 0, len(all))
 	for _, a := range all {
 		if a.Key(kb) == "" {
 			continue
 		}
-		if a.Avail != nil && !a.Avail(&m) {
+		if a.Avail != nil && !a.Avail(m) {
 			continue
 		}
 		out = append(out, a)
