@@ -228,6 +228,173 @@ func wkUnionAllowed(pred func(c *wkCtx) bool, label string) func(c *wkCtx) bool 
 	}
 }
 
+// wkAtLevel returns a predicate matching an exact navigation level.
+func wkAtLevel(lvl model.Level) func(*wkCtx) bool {
+	return func(c *wkCtx) bool { return c.level == lvl }
+}
+
+// wkNotAtClusters excludes LevelClusters — the shared "requires a selected
+// context" gate handleKeyNamespaceSelector, handleExplorerActionKeyAllNamespaces,
+// and handleExplorerActionKeyCreateTemplate (update_keys.go,
+// update_keys_actions.go) each open with.
+func wkNotAtClusters(c *wkCtx) bool {
+	return c.level != model.LevelClusters
+}
+
+// wkLevelResourcesUp reports whether the navigation is at LevelResources or
+// deeper, with no row required. Shared by handleExplorerResourceMap (map
+// view toggle), handleKeyColumnToggle (column visibility overlay), and
+// handleExplorerActionKeyFilterPresets (update_keys_explorer.go,
+// update_keys.go, update_keys_actions.go), none of which read the cursor row.
+func wkLevelResourcesUp(c *wkCtx) bool {
+	return c.level >= model.LevelResources
+}
+
+// wkNotFullscreenDashboard excludes the one state handleKeyFilter and
+// handleKeySearch (update_keys_explorer.go) swallow the key for: the
+// fullscreen dashboard scrolls a rendered preview, not a list, so there is
+// nothing to filter or search.
+func wkNotFullscreenDashboard(c *wkCtx) bool {
+	return !c.m.fullscreenDashboard
+}
+
+// wkSortApplies delegates to Model.sortApplies (tabs.go), the exact gate
+// handleExplorerActionKeySortNext/Prev/Flip/Reset (update_keys_sort.go) each
+// check before touching the sort state. It already covers "no row needed"
+// (sortMiddleItems on an empty list is a harmless no-op that still updates
+// the remembered sort), so no further wrapping is needed.
+func wkSortApplies(c *wkCtx) bool {
+	return c.m.sortApplies()
+}
+
+// wkClusterRowSelected reports whether a real cluster context (not a union
+// set) is highlighted at LevelClusters — the gate handleKeyClusterColorPicker
+// (cluster_color_overlay.go) applies before opening the color overlay, and
+// handleKeyReadOnlyToggle (readonly.go) applies identically for its
+// LevelClusters branch.
+func wkClusterRowSelected(c *wkCtx) bool {
+	return c.level == model.LevelClusters && c.sel != nil && !isUnionSetItem(c.sel)
+}
+
+// wkPinnableResourceTypeRow mirrors the pin-eligibility check
+// handleKeyPinGroup (update_keys_explorer.go) applies, which is also
+// openResourceTypeActionMenu's own LevelResourceTypes condition
+// (wkActionMenuAvailable): a collapsed-group header, the Dashboards
+// pseudo-category, and any row PinKeyFromRef can't parse are all
+// "cannot be pinned".
+func wkPinnableResourceTypeRow(c *wkCtx) bool {
+	if c.level != model.LevelResourceTypes || c.sel == nil {
+		return false
+	}
+	return c.sel.Kind != "__collapsed_group__" && c.sel.Category != "Dashboards" && model.PinKeyFromRef(c.sel.Extra) != ""
+}
+
+// wkPinGroupAvailable mirrors handleKeyPinGroup (update_keys_explorer.go) in
+// full: a pin-eligible row (wkPinnableResourceTypeRow) at LevelResourceTypes,
+// plus its union-mode branch, which blocks pinning at the sentinel unless a
+// named union set (m.unionSetName) is active.
+func wkPinGroupAvailable(c *wkCtx) bool {
+	if !wkPinnableResourceTypeRow(c) {
+		return false
+	}
+	return !c.unionSentinel || c.m.unionSetName != ""
+}
+
+// wkCreateTemplateAvailable mirrors handleExplorerActionKeyCreateTemplate
+// (update_keys_actions.go): blocked at LevelClusters (no selected context to
+// create under), when read-only, or at the union sentinel — the same
+// "requires a single cluster" shape as Edit/SecretEditor. Unlike those, no
+// row is required: the template overlay lists choices independent of the
+// cursor.
+func wkCreateTemplateAvailable(c *wkCtx) bool {
+	return wkNotAtClusters(c) && !c.readOnly && !c.unionSentinel
+}
+
+// wkAllNamespacesAvailable mirrors handleExplorerActionKeyAllNamespaces
+// (update_keys_actions.go): blocked at LevelClusters and while union mode is
+// active — checked via the raw m.unionMode flag rather than the
+// unionSentinel context, because the toast fires for any navigated context
+// while a union is active, not only at the sentinel.
+func wkAllNamespacesAvailable(c *wkCtx) bool {
+	return wkNotAtClusters(c) && !c.m.unionMode
+}
+
+// wkReadOnlyToggleAvailable mirrors handleKeyReadOnlyToggle (readonly.go):
+// blocked outright when --read-only was set at startup (cliReadOnly, sticky
+// for the process); at LevelClusters it additionally needs a selected
+// context that isn't a union-set row (wkClusterRowSelected); every other
+// level needs no row.
+func wkReadOnlyToggleAvailable(c *wkCtx) bool {
+	if c.m.cliReadOnly {
+		return false
+	}
+	if c.level == model.LevelClusters {
+		return c.sel != nil && !isUnionSetItem(c.sel)
+	}
+	return true
+}
+
+// wkTogglePreviewAvailable mirrors handleExplorerTogglePreview
+// (update_keys_explorer.go): blocked only when hovering the Overview or
+// Monitoring dashboard pseudo-item at LevelResourceTypes, a silent no-op in
+// the handler; every other row and level toggles the preview.
+func wkTogglePreviewAvailable(c *wkCtx) bool {
+	if c.level != model.LevelResourceTypes || c.sel == nil {
+		return true
+	}
+	return c.sel.Extra != "__overview__" && c.sel.Extra != "__monitoring__"
+}
+
+// wkTogglePreviewLogsAvailable mirrors handleExplorerToggleLogPreview via
+// selectedPodForLogPreview (previewlog.go): turning the preview OFF always
+// succeeds, so once it is already on the key stays available regardless of
+// kind; turning it ON only produces a real log stream for a Pod row, or a
+// Container row with an owning pod name resolved (m.nav.OwnedName, set at
+// LevelContainers).
+func wkTogglePreviewLogsAvailable(c *wkCtx) bool {
+	if c.m.fullLogPreview {
+		return true
+	}
+	return c.kind == "Pod" || (c.kind == "Container" && c.m.nav.OwnedName != "")
+}
+
+// wkAPIExplorerAvailable mirrors openExplainBrowser's level switch
+// (update_explain.go): unavailable at LevelClusters; at LevelResourceTypes it
+// additionally needs a selected row that isn't a collapsed-group header or
+// one of the dashboard pseudo-items (kind or Extra "__overview__" /
+// "__monitoring__"); LevelResources/Owned/Containers work off the navigated
+// resource type and need no row.
+func wkAPIExplorerAvailable(c *wkCtx) bool {
+	switch c.level {
+	case model.LevelResourceTypes:
+		if c.sel == nil {
+			return false
+		}
+		if c.sel.Kind == "__collapsed_group__" || c.sel.Kind == "__overview__" || c.sel.Kind == "__monitoring__" ||
+			c.sel.Extra == "__overview__" || c.sel.Extra == "__monitoring__" {
+			return false
+		}
+		return true
+	case model.LevelResources, model.LevelOwned, model.LevelContainers:
+		return true
+	default:
+		return false
+	}
+}
+
+// wkDiffAvailable mirrors handleExplorerActionKeyDiff (update_keys_actions.go):
+// available from LevelResources down, and only when exactly two rows are
+// selected — one or three-plus still "handles" the key but only to show a
+// "select exactly 2" toast, so those counts are excluded the same way
+// Delete/Edit exclude union-blocked kinds. len(m.selectedItems) is used
+// instead of the handler's selectedItemsList() to avoid an extra
+// visibleMiddleItems filter pass per render; the two differ only when a
+// selected row has since scrolled out of the current filter, the same
+// accepted approximation wkActionMenuAvailable documents for hasSelection().
+func wkDiffAvailable(c *wkCtx) bool {
+	return c.level >= model.LevelResources && len(c.m.selectedItems) == 2
+}
+
 // whichKeyExplorerCatalog is the full catalog for explorer mode. Navigation
 // bindings are absent by construction — the panel is for actions the user is
 // unlikely to remember, not for h/j/k/l.
@@ -257,6 +424,59 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.OpenBrowser }, Label: "Port forward & open", Group: wkActions, Avail: wkWritableKindIn("Service")},
 	{Key: func(kb ui.Keybindings) string { return kb.SaveResource }, Label: "Save to file", Group: wkActions, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.Refresh }, Label: "Refresh view", Group: wkActions},
+	{Key: func(kb ui.Keybindings) string { return kb.CreateTemplate }, Label: "Create from template", Group: wkActions, Avail: wkCreateTemplateAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.Scale }, Label: "Scale", Group: wkActions, Avail: wkSingleCluster(wkWritableKindIn("Deployment", "StatefulSet", "ReplicaSet", "HorizontalPodAutoscaler"))},
+
+	// Selection
+	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkOnRow},
+	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range from anchor", Group: wkSelection, Avail: wkOnRow},
+	{Key: func(kb ui.Keybindings) string { return kb.Diff }, Label: "Diff two selected", Group: wkSelection, Avail: wkDiffAvailable},
+
+	// Views
+	{Key: func(kb ui.Keybindings) string { return kb.TogglePreview }, Label: "Details / YAML preview", Group: wkViews, Avail: wkTogglePreviewAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.TogglePreviewLogs }, Label: "Live log preview pane", Group: wkViews, Avail: wkTogglePreviewLogsAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.ResourceMap }, Label: "Resource map", Group: wkViews, Avail: wkLevelResourcesUp},
+	{Key: func(kb ui.Keybindings) string { return kb.ObjectExplorer }, Label: "Object Explorer", Group: wkViews, Avail: func(c *wkCtx) bool { return wkOnRow(c) && c.sel.Raw != nil }},
+	{Key: func(kb ui.Keybindings) string { return kb.APIExplorer }, Label: "API Explorer", Group: wkViews, Avail: wkAPIExplorerAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.RBACBrowser }, Label: "RBAC browser", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.OrphanOverlay }, Label: "Orphan overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},
+	{Key: func(kb ui.Keybindings) string { return kb.SessionManager }, Label: "Session manager", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.ColumnToggle }, Label: "Column visibility", Group: wkViews, Avail: wkLevelResourcesUp},
+	{Key: func(kb ui.Keybindings) string { return kb.Monitoring }, Label: "Cluster / monitoring dashboard", Group: wkViews, Avail: func(c *wkCtx) bool { return c.level >= model.LevelResourceTypes }},
+	{Key: func(kb ui.Keybindings) string { return kb.QuotaDashboard }, Label: "Quota dashboard", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.TasksOverlay }, Label: "Task queue", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.ErrorLog }, Label: "Error log", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.FinalizerSearch }, Label: "Finalizer search", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.Fullscreen }, Label: "Cycle layout", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.PinGroup }, Label: "Pin/unpin resource type", Group: wkViews, Avail: wkPinGroupAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.ToggleRare }, Label: "Show rare/hidden types", Group: wkViews},
+	{Key: func(kb ui.Keybindings) string { return kb.LocalClusterManager }, Label: "Local cluster manager", Group: wkViews, Avail: wkAtLevel(model.LevelClusters)},
+
+	// Filter
+	{Key: func(kb ui.Keybindings) string { return kb.Filter }, Label: "Filter list", Group: wkFilter, Avail: wkNotFullscreenDashboard},
+	{Key: func(kb ui.Keybindings) string { return kb.Search }, Label: "Search and jump", Group: wkFilter, Avail: wkNotFullscreenDashboard},
+	{Key: func(kb ui.Keybindings) string { return kb.FilterPresets }, Label: "Filter presets", Group: wkFilter, Avail: wkLevelResourcesUp},
+	{Key: func(kb ui.Keybindings) string { return kb.NamespaceSelector }, Label: "Namespace selector", Group: wkFilter, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.AllNamespaces }, Label: "Toggle all namespaces", Group: wkFilter, Avail: wkAllNamespacesAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.CommandBar }, Label: "Command bar", Group: wkFilter},
+
+	// Sort
+	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Avail: wkSortApplies},
+	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Avail: wkSortApplies},
+	{Key: func(kb ui.Keybindings) string { return kb.SortFlip }, Label: "Flip sort direction", Group: wkSort, Avail: wkSortApplies},
+	{Key: func(kb ui.Keybindings) string { return kb.SortReset }, Label: "Reset sort", Group: wkSort, Avail: wkSortApplies},
+
+	// Settings
+	{Key: func(kb ui.Keybindings) string { return kb.WatchMode }, Label: "Watch mode", Group: wkSettings},
+	{Key: func(kb ui.Keybindings) string { return kb.ReadOnlyToggle }, Label: "Read-only mode", Group: wkSettings, Avail: wkReadOnlyToggleAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.ThemeSelector }, Label: "Color scheme", Group: wkSettings},
+	{Key: func(kb ui.Keybindings) string { return kb.TerminalToggle }, Label: "Terminal mode", Group: wkSettings},
+	{Key: func(kb ui.Keybindings) string { return kb.MouseToggle }, Label: "Mouse capture", Group: wkSettings, Avail: func(c *wkCtx) bool { return c.m.mouseAvailable }},
+	{Key: func(kb ui.Keybindings) string { return kb.SecretToggle }, Label: "Reveal secret values", Group: wkSettings},
+	{Key: func(kb ui.Keybindings) string { return kb.SecurityBadgeToggle }, Label: "Security badge", Group: wkSettings},
+	{Key: func(kb ui.Keybindings) string { return kb.SecurityIgnoreToggle }, Label: "Show ignored findings", Group: wkSettings, Avail: func(c *wkCtx) bool { return onSecurityView(c.m) }},
+	{Key: func(kb ui.Keybindings) string { return kb.ClusterColorPicker }, Label: "Cluster color", Group: wkSettings, Avail: wkClusterRowSelected},
+	{Key: func(kb ui.Keybindings) string { return kb.Help }, Label: "Full help", Group: wkSettings},
 }
 
 // whichKeyExplorerActions returns the shared explorer catalog. The slice is
@@ -286,4 +506,73 @@ func (m *Model) availableWhichKeyActions() []whichKeyAction {
 		out = append(out, a)
 	}
 	return out
+}
+
+// whichKeyExcludedBindings lists the ui.Keybindings fields that deliberately do
+// not appear in the space-leader panel, keyed by Go field name. Navigation and
+// viewer-local keys are excluded because the panel is a discovery aid for
+// actions, not a full keymap. TestWhichKeyRegistry_CoversEveryBinding fails when
+// a new binding is neither registered nor listed here.
+func whichKeyExcludedBindings() map[string]string {
+	return map[string]string{
+		// Navigation — excluded by design.
+		"Left": "navigation", "Right": "navigation", "Down": "navigation", "Up": "navigation",
+		"Enter": "navigation", "JumpTop": "navigation", "JumpBottom": "navigation",
+		"PageDown": "navigation", "PageUp": "navigation", "PageForward": "navigation", "PageBack": "navigation",
+		"LevelCluster": "navigation", "LevelTypes": "navigation", "LevelResources": "navigation",
+		"PreviewDown": "navigation", "PreviewUp": "navigation",
+		"JumpOwner": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
+		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
+		"SeverityUp": "navigation within security views", "SeverityDown": "navigation within security views",
+
+		// Viewer-local: only meaningful inside a fullscreen viewer, which the
+		// v1 panel does not cover.
+		"ToggleWrap": "viewer-local", "ToggleLineNumbers": "viewer-local",
+		"ToggleFold": "viewer-local", "ToggleFoldAll": "viewer-local",
+		"ToggleFollow": "viewer-local", "ToggleTimestamps": "viewer-local",
+		"TogglePrefixes": "viewer-local", "ToggleUnified": "viewer-local",
+		"TreeView": "viewer-local",
+		// LogTop (openLogTopFromViewer, update_logs.go) only dispatches from
+		// inside the open fullscreen log viewer's key handler.
+		"LogTop": "viewer-local",
+
+		// The leader itself, and chord prefixes whose continuations get their
+		// own popup.
+		"ToggleSelect": "the leader key itself",
+		"SetMark":      "chord prefix with its own popup",
+		"OpenMarks":    "reachable from the bookmarks overlay",
+
+		// Tabs: muscle-memory keys that would crowd out the actions.
+		"NewTab": "tab management", "NextTab": "tab management", "PrevTab": "tab management",
+		"MoveTabLeft": "tab management", "MoveTabRight": "tab management",
+
+		// Goto chords (whichkey.go): each is a full "g<x>" chord dispatched by
+		// handleGotoChord while the g prefix is armed, and already has its own
+		// which-key-style popup (renderWhichKey) distinct from the space-leader
+		// panel this registry drives.
+		"GotoPods": "goto chord, has its own popup", "GotoDeployments": "goto chord, has its own popup",
+		"GotoServices": "goto chord, has its own popup", "GotoNodes": "goto chord, has its own popup",
+		"GotoNamespaces": "goto chord, has its own popup", "GotoIngresses": "goto chord, has its own popup",
+		"GotoJobs": "goto chord, has its own popup", "GotoCronJobs": "goto chord, has its own popup",
+		"GotoReplicaSets": "goto chord, has its own popup", "GotoDaemonSets": "goto chord, has its own popup",
+		"GotoStatefulSets": "goto chord, has its own popup", "GotoConfigMaps": "goto chord, has its own popup",
+		"GotoSecrets": "goto chord, has its own popup", "GotoHPAs": "goto chord, has its own popup",
+		"GotoPVCs": "goto chord, has its own popup", "GotoPVs": "goto chord, has its own popup",
+		"GotoPDBs": "goto chord, has its own popup",
+		// PreviousNamespace ("g\\") is dispatched by the same handleGotoChord
+		// and listed in the same goto popup (whichKeyCells), even though it
+		// swaps namespace scope rather than switching resource type.
+		"PreviousNamespace": "goto chord, has its own popup",
+
+		// Restart and Exec are defined in DefaultKeybindings and read by
+		// TestDefaultKeybindings, but no explorer dispatcher ever compares a
+		// keypress against kb.Restart or kb.Exec: the "Restart"/"Exec" actions
+		// (update_actions.go, update_actions_exec_pod.go) are reachable only
+		// through the Action menu, whose per-kind items (model.ActionsForKind)
+		// carry their own hardcoded quick-key hints independent of these
+		// fields. Registering either here would advertise a keystroke that the
+		// explorer never dispatches.
+		"Restart": "not dispatched outside the action menu (dead binding)",
+		"Exec":    "not dispatched outside the action menu (dead binding)",
+	}
 }

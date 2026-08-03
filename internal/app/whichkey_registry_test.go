@@ -566,6 +566,56 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 		{"Port forward & open", "Service", "", []model.Level{model.LevelResources, model.LevelOwned}},
 		{"Save to file", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Refresh view", "", "", allLevels},
+		{"Create from template", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Scale", "Deployment", "", []model.Level{model.LevelResources, model.LevelOwned}},
+
+		{"Select/deselect all", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Select range from anchor", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+
+		{"Details / YAML preview", "", "", allLevels},
+		{"Live log preview pane", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		{"Resource map", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Object Explorer", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"API Explorer", "Pod", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"RBAC browser", "", "", allLevels},
+		{"Orphan overview", "", "", allLevels},
+		{"Session manager", "", "", allLevels},
+		{"Column visibility", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Cluster / monitoring dashboard", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Quota dashboard", "", "", allLevels},
+		{"Task queue", "", "", allLevels},
+		{"Error log", "", "", allLevels},
+		{"Finalizer search", "", "", allLevels},
+		{"Cycle layout", "", "", allLevels},
+		{"Pin/unpin resource type", "", "apps/v1/deployments", []model.Level{model.LevelResourceTypes}},
+		{"Show rare/hidden types", "", "", allLevels},
+		{"Local cluster manager", "", "", []model.Level{model.LevelClusters}},
+
+		{"Filter list", "", "", allLevels},
+		{"Search and jump", "", "", allLevels},
+		{"Filter presets", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Namespace selector", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Toggle all namespaces", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Command bar", "", "", allLevels},
+
+		{"Sort next column", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Sort previous column", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Flip sort direction", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Reset sort", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+
+		{"Watch mode", "", "", allLevels},
+		{"Read-only mode", "", "", allLevels},
+		{"Color scheme", "", "", allLevels},
+		{"Terminal mode", "", "", allLevels},
+		{"Reveal secret values", "", "", allLevels},
+		{"Security badge", "", "", allLevels},
+		{"Cluster color", "", "", []model.Level{model.LevelClusters}},
+		{"Full help", "", "", allLevels},
+		// Not in this table: "Diff two selected" (needs exactly 2 selected
+		// rows, not level-dependent alone), "Mouse capture" (needs
+		// m.mouseAvailable, false by default here), and "Show ignored
+		// findings" (needs a security-prefixed kind) — each covered by a
+		// dedicated test instead.
 	}
 
 	for _, tc := range cases {
@@ -578,7 +628,11 @@ func TestAvailableWhichKeyActions_LevelScopingTable(t *testing.T) {
 				t.Run(levelName[lvl], func(t *testing.T) {
 					m := whichKeyTestModel()
 					m.nav.Level = lvl
-					item := model.Item{Name: "row1", Extra: tc.extra}
+					// Raw is set unconditionally: real explorer rows always
+					// carry the source object once loaded, and Object
+					// Explorer's gate (sel.Raw != nil) is otherwise
+					// untestable through this generic per-level harness.
+					item := model.Item{Name: "row1", Extra: tc.extra, Raw: map[string]any{}}
 					switch lvl {
 					case model.LevelResources:
 						m.nav.ResourceType = model.ResourceTypeEntry{Kind: tc.kind}
