@@ -38,16 +38,24 @@ type whichKeyLayout struct {
 // widening the inter-column gaps, so the grid fills the width without any
 // trailing gap past the last column. Column-major fill: entries go down each
 // column.
-func layoutWhichKey(plain []string, targetInner, maxInner int) whichKeyLayout {
-	cols := min(whichKeyMaxCols, len(plain))
+//
+// The cols == 1 branch returns inner unclamped, so callers MUST pre-clamp each
+// cell's text with fitCellText — a single overlong cell otherwise blows the
+// panel past m.width.
+//
+// Takes pre-measured display widths rather than the cell strings: it probes the
+// same cell once per candidate column count, and re-measuring inside that loop
+// made grapheme-cluster scanning the dominant render cost.
+func layoutWhichKey(widths []int, targetInner, maxInner int) whichKeyLayout {
+	cols := min(whichKeyMaxCols, len(widths))
 	for {
-		rows := (len(plain) + cols - 1) / cols
+		rows := (len(widths) + cols - 1) / cols
 		colW := make([]int, cols)
 		sumW := 0
 		for c := range cols {
 			for r := range rows {
-				if idx := c*rows + r; idx < len(plain) {
-					colW[c] = max(colW[c], lipgloss.Width(plain[idx]))
+				if idx := c*rows + r; idx < len(widths) {
+					colW[c] = max(colW[c], widths[idx])
 				}
 			}
 			sumW += colW[c]
@@ -270,10 +278,14 @@ func paginateWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInne
 		if g.Title != "" {
 			titleRows = 1
 		}
+		// Measure the group's cells once for the whole packing loop: every
+		// chunk below is a prefix of what's left, so its widths are a
+		// sub-slice rather than a fresh measuring pass.
+		widths := whichKeyCellWidths(g.Cells, maxInner)
 		remaining := g.Cells
 		for len(remaining) > 0 {
 			budget := maxBodyRows - used
-			k, rows := fitPartialGroupCellsRows(remaining, budget-titleRows, targetInner, maxInner)
+			k, rows := fitCellsRows(widths[len(g.Cells)-len(remaining):], budget-titleRows, targetInner, maxInner)
 			if k == 0 {
 				if len(page) == 0 {
 					// Not even one cell of this group fits an empty page —
@@ -343,42 +355,50 @@ func fitWhichKeyGroups(rendered []whichKeyRenderedGroup, maxBodyRows, targetInne
 	return body, shown, inner
 }
 
-// fitPartialGroupCells returns the largest prefix length (0..len(cells)) whose
-// laid-out rows fit within dataRows, so a group that doesn't fully fit still
-// shows an accurate truncated slice instead of disappearing outright.
-func fitPartialGroupCells(cells []whichKeyCell, dataRows, targetInner, maxInner int) int {
-	if dataRows <= 0 {
-		return 0
-	}
-	plain := make([]string, len(cells))
+// whichKeyCellWidths measures each cell's clamped display width once. Every
+// layout path probes the same cells repeatedly — once per candidate column
+// count, and once per candidate prefix length while fitting — so measuring
+// here rather than inside layoutWhichKey turns an O(n^2) grapheme scan into a
+// single O(n) pass.
+func whichKeyCellWidths(cells []whichKeyCell, maxInner int) []int {
+	widths := make([]int, len(cells))
 	for i, c := range cells {
 		key, desc := fitCellText(c.key, c.desc, maxInner)
-		plain[i] = joinCellText(key, desc)
+		widths[i] = lipgloss.Width(joinCellText(key, desc))
 	}
-	best := 0
-	for k := 1; k <= len(cells); k++ {
-		if layoutWhichKey(plain[:k], targetInner, maxInner).rows <= dataRows {
-			best = k
-		}
-	}
-	return best
+	return widths
 }
 
-// fitPartialGroupCellsRows is fitPartialGroupCells plus the row count the
-// chosen prefix actually lays out to, so a caller packing multiple chunks
-// onto a page (pagination) doesn't need a second layout pass to find out how
-// much of its budget the chunk consumed.
-func fitPartialGroupCellsRows(cells []whichKeyCell, dataRows, targetInner, maxInner int) (k, rows int) {
-	k = fitPartialGroupCells(cells, dataRows, targetInner, maxInner)
-	if k == 0 {
+// fitCellsRows returns the largest prefix length (0..len(widths)) whose
+// laid-out rows fit within dataRows, plus the rows that prefix occupies — so a
+// group that doesn't fully fit still shows an accurate truncated slice instead
+// of disappearing outright, and a caller packing chunks onto a page doesn't
+// need a second layout pass to learn how much budget the chunk consumed.
+//
+// The scan is linear and deliberately has no early break: the row count is NOT
+// monotonic in the prefix length, so neither a binary search nor a "stop at the
+// first prefix that doesn't fit" shortcut is sound. Adding a cell can let a
+// WIDER column count fit, which drops the row count outright — with descending
+// widths 60..52 at targetInner 60 / maxInner 118, rows climb 1..8 for k=1..8
+// and then fall to 5 at k=9 (two columns of 60+55 finally fit where 60+56 did
+// not). TestFitCellsRows_RowCountIsNotMonotonic pins that counterexample.
+func fitCellsRows(widths []int, dataRows, targetInner, maxInner int) (k, rows int) {
+	if dataRows <= 0 {
 		return 0, 0
 	}
-	plain := make([]string, k)
-	for i, c := range cells[:k] {
-		key, desc := fitCellText(c.key, c.desc, maxInner)
-		plain[i] = joinCellText(key, desc)
+	for i := 1; i <= len(widths); i++ {
+		if lay := layoutWhichKey(widths[:i], targetInner, maxInner); lay.rows <= dataRows {
+			k, rows = i, lay.rows
+		}
 	}
-	return k, layoutWhichKey(plain, targetInner, maxInner).rows
+	return k, rows
+}
+
+// fitPartialGroupCells is fitCellsRows for a caller that has cells rather than
+// pre-measured widths and only needs the prefix length.
+func fitPartialGroupCells(cells []whichKeyCell, dataRows, targetInner, maxInner int) int {
+	k, _ := fitCellsRows(whichKeyCellWidths(cells, maxInner), dataRows, targetInner, maxInner)
+	return k
 }
 
 // fitCellText ellipsizes desc (never key) so the rendered "key desc" text
@@ -413,18 +433,18 @@ func joinCellText(key, desc string) string {
 // renderWhichKeyGroup lays one group out as rows, returning the rendered lines
 // and the inner width they occupy. A non-empty title becomes a header row.
 func renderWhichKeyGroup(g whichKeyGroupCells, keyStyle, descStyle, titleStyle lipgloss.Style, targetInner, maxInner int) ([]string, int) {
-	plain := make([]string, len(g.Cells))
+	widths := make([]int, len(g.Cells))
 	styled := make([]string, len(g.Cells))
 	for i, c := range g.Cells {
 		key, desc := fitCellText(c.key, c.desc, maxInner)
-		plain[i] = joinCellText(key, desc)
+		widths[i] = lipgloss.Width(joinCellText(key, desc))
 		if desc == "" {
 			styled[i] = keyStyle.Render(key)
 		} else {
 			styled[i] = keyStyle.Render(key) + " " + descStyle.Render(desc)
 		}
 	}
-	lay := layoutWhichKey(plain, targetInner, maxInner)
+	lay := layoutWhichKey(widths, targetInner, maxInner)
 	cols := len(lay.colW)
 
 	var out []string
@@ -437,7 +457,7 @@ func renderWhichKeyGroup(g whichKeyGroupCells, keyStyle, descStyle, titleStyle l
 			idx := c*lay.rows + r // column-major: fill down each column first
 			if idx < len(g.Cells) {
 				sb.WriteString(styled[idx])
-				sb.WriteString(strings.Repeat(" ", max(lay.colW[c]-lipgloss.Width(plain[idx]), 0)))
+				sb.WriteString(strings.Repeat(" ", max(lay.colW[c]-widths[idx], 0)))
 			} else {
 				sb.WriteString(strings.Repeat(" ", lay.colW[c]))
 			}

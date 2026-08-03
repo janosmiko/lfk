@@ -203,10 +203,12 @@ func TestExplorerJumpTop_GGClearsWhichKeyShown(t *testing.T) {
 }
 
 func TestLayoutWhichKey(t *testing.T) {
-	mk := func(n int) []string {
-		out := make([]string, n)
+	// layoutWhichKey takes pre-measured display widths, so these build the
+	// widths the equivalent cell strings would have measured to.
+	mk := func(n int) []int {
+		out := make([]int, n)
 		for i := range out {
-			out[i] = "x x" // width 3
+			out[i] = len("x x") // width 3
 		}
 		return out
 	}
@@ -240,7 +242,7 @@ func TestLayoutWhichKey(t *testing.T) {
 	}
 
 	// Each column is sized to its own widest entry. 4 entries, 4 columns, 1 row.
-	wide := []string{"short", "a-very-long-entry", "short", "short"}
+	wide := []int{len("short"), len("a-very-long-entry"), len("short"), len("short")}
 	lay3 := layoutWhichKey(wide, 100, 200)
 	if lay3.colW[1] != len("a-very-long-entry") || lay3.colW[0] != len("short") {
 		t.Fatalf("per-column widths wrong: %v", lay3.colW)
