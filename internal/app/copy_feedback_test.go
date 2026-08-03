@@ -16,7 +16,7 @@ func TestViewDescribeShowsStatusMessage(t *testing.T) {
 	m := baseModelDescribe()
 	m.statusMessage = "Copied 1 line"
 	m.statusMessageExp = time.Now().Add(5 * time.Second)
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	assert.Contains(t, out, "Copied 1 line")
 }
 
@@ -31,7 +31,7 @@ func TestViewYAMLShowsStatusMessage(t *testing.T) {
 		statusMessage:    "Copied 1 line",
 		statusMessageExp: time.Now().Add(5 * time.Second),
 	}
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	assert.Contains(t, out, "Copied 1 line")
 }
 
@@ -46,7 +46,7 @@ func TestViewDiffShowsStatusMessage(t *testing.T) {
 		statusMessage:    "Copied 1 line",
 		statusMessageExp: time.Now().Add(5 * time.Second),
 	}
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	assert.Contains(t, out, "Copied 1 line")
 }
 
@@ -58,7 +58,7 @@ func TestViewEventViewerShowsStatusMessage(t *testing.T) {
 		statusMessage:      "Copied 1 line",
 		statusMessageExp:   time.Now().Add(5 * time.Second),
 	}
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	assert.Contains(t, out, "Copied 1 line")
 }
 
@@ -365,7 +365,7 @@ func TestStatusBeatsSearchBarInDescribe(t *testing.T) {
 	m.describeView.searchQuery = "Name"
 	m.statusMessage = "Copied 1 line"
 	m.statusMessageExp = time.Now().Add(5 * time.Second)
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	assert.Contains(t, out, "Copied 1 line")
 	// Search overlay shouldn't claim the footer simultaneously.
 	lines := strings.Split(out, "\n")

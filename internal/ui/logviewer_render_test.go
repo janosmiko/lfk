@@ -6,8 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -424,9 +422,6 @@ func TestColorizePodPrefix(t *testing.T) {
 	})
 
 	t.Run("different containers in same pod get different colors", func(t *testing.T) {
-		origProfile := lipgloss.DefaultRenderer().ColorProfile()
-		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 		resetPodPrefixColors()
 		t.Cleanup(resetPodPrefixColors)
 
@@ -441,9 +436,6 @@ func TestColorizePodPrefix(t *testing.T) {
 	})
 
 	t.Run("first palette-size prefixes all get distinct colors", func(t *testing.T) {
-		origProfile := lipgloss.DefaultRenderer().ColorProfile()
-		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 		resetPodPrefixColors()
 		t.Cleanup(resetPodPrefixColors)
 
@@ -464,9 +456,6 @@ func TestColorizePodPrefix(t *testing.T) {
 	})
 
 	t.Run("prefix keeps its color once assigned", func(t *testing.T) {
-		origProfile := lipgloss.DefaultRenderer().ColorProfile()
-		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 		resetPodPrefixColors()
 		t.Cleanup(resetPodPrefixColors)
 
@@ -479,9 +468,6 @@ func TestColorizePodPrefix(t *testing.T) {
 	})
 
 	t.Run("palette exhaustion still colorizes without panic", func(t *testing.T) {
-		origProfile := lipgloss.DefaultRenderer().ColorProfile()
-		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 		resetPodPrefixColors()
 		t.Cleanup(resetPodPrefixColors)
 

@@ -3,9 +3,6 @@ package ui
 import (
 	"strings"
 	"testing"
-
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 )
 
 func TestRenderTrafficCaptureOverlay_PhaseConfig_ShowsBackendChips(t *testing.T) {
@@ -205,14 +202,10 @@ func TestRenderTrafficCaptureOverlay_NoInnerBorder(t *testing.T) {
 	// (view_overlays.go) wraps the result with OverlayStyle. Adding an inner
 	// border on top of OverlayStyle's outer border doubles the chrome and
 	// causes lines to soft-wrap on narrow terminals (the bug the user reported).
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ApplyTheme(DefaultTheme())
 	})
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	e := CaptureOverlayEntry{
 		Title: "Traffic Capture — ns/pod-xyz",

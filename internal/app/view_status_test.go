@@ -456,7 +456,7 @@ func TestStatusBarNonBulkOverlayHidesSelectionBadge(t *testing.T) {
 
 func TestViewLoadingScreen(t *testing.T) {
 	m := Model{width: 0}
-	assert.Equal(t, "Loading...", m.View())
+	assert.Equal(t, "Loading...", m.View().Content)
 }
 
 func TestViewExplorerMode(t *testing.T) {
@@ -485,7 +485,7 @@ func TestViewExplorerMode(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	stripped := stripANSI(view)
 	// Should contain breadcrumb elements.
 	assert.Contains(t, stripped, "lfk")

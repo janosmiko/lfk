@@ -376,7 +376,7 @@
     },
     "keybindings": {
       "type": "object",
-      "description": "Custom keybinding overrides. Each value is a key string (e.g. \"j\", \"ctrl+d\", \"alt+ctrl+y\"). Avoid ctrl+i / ctrl+m / ctrl+[ (terminals emit these as tab/enter/esc).",
+      "description": "Custom keybinding overrides. Each value is a key string (e.g. \"j\", \"ctrl+d\", \"ctrl+alt+y\", \"ctrl+shift+x\"). Modifiers are ordered ctrl, alt, shift, meta, hyper, super; other orders are accepted and normalised. Case is significant except in a shift chord, where the key is folded to the shifted character (\"ctrl+shift+x\" -> \"ctrl+shift+X\", \"shift+x\" -> \"X\"). Use \"space\" for the space bar. Ctrl+Shift chords need a terminal that reports them (see docs/keybindings.md). Avoid ctrl+i / ctrl+m / ctrl+[ (terminals emit these as tab/enter/esc).",
       "additionalProperties": false,
       "properties": {
         "left": { "type": "string" },

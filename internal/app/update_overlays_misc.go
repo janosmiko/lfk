@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // handleNetworkPolicyOverlayKey handles keyboard input in the network policy visualizer overlay.
-func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.netpolSearchActive {
 		return m.handleNetpolSearchKey(msg)
 	}
@@ -98,7 +98,7 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleFilterPresetOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFilterPresetOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	switch key {
 	case "esc", "q":
@@ -174,7 +174,7 @@ func (m Model) applyFilterPreset(preset FilterPreset) (tea.Model, tea.Cmd) {
 }
 
 // handleAlertsOverlayKey handles keyboard input for the alerts overlay.
-func (m Model) handleAlertsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAlertsOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	maxScroll := max(len(m.alertsData)-1, 0)
 
@@ -248,7 +248,7 @@ func (m Model) handleAlertsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleBatchLabelOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBatchLabelOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	switch key {
 	case "esc":
@@ -319,14 +319,14 @@ func (m Model) handleBatchLabelOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.batchLabelInput.Insert(key)
+		if msg.Text != "" {
+			m.batchLabelInput.Insert(msg.Text)
 		}
 		return m, nil
 	}
 }
 
-func (m Model) handleActionOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleActionOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	switch key {
 	case "esc", "q":
@@ -357,7 +357,7 @@ func (m Model) handleActionOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleOverlayKeyOverlayQuotaDashboard(msg tea.KeyMsg) Model {
+func (m Model) handleOverlayKeyOverlayQuotaDashboard(msg tea.KeyPressMsg) Model {
 	if msg.String() == "esc" || msg.String() == "q" {
 		m.overlay = overlayNone
 	}

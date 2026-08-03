@@ -1,11 +1,12 @@
 package ui
 
 import (
+	"image/color"
 	"strconv"
 	"strings"
 	"unicode"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -38,7 +39,7 @@ const (
 // 16-color ANSI number ("2"). Use this helper for inline styles that
 // reference raw color literals (not the Color* slots) so they also respect
 // no-color mode.
-func ThemeColor(spec string) lipgloss.TerminalColor {
+func ThemeColor(spec string) color.Color {
 	if ConfigNoColor {
 		return lipgloss.NoColor{}
 	}
@@ -368,7 +369,7 @@ var (
 //  2. Pads each line to the given width with the background color.
 //
 // bg should be BaseBg, BarBg, or SurfaceBg.
-func FillLinesBg(content string, width int, bg lipgloss.TerminalColor) string {
+func FillLinesBg(content string, width int, bg color.Color) string {
 	if _, ok := bg.(lipgloss.NoColor); ok {
 		return content // transparent mode, nothing to fill
 	}
@@ -750,4 +751,20 @@ func ConditionStyle(condType, status string) lipgloss.Style {
 		}
 		return DimStyle // False or status-less = neutral
 	}
+}
+
+// BoxWidth sets style's width so its rendered CONTENT is w columns wide.
+//
+// lipgloss v2 counts the border inside Width(); v1 counted it outside. Every
+// caller computes a content width and budgets the border columns separately,
+// so the border has to be added back or each box renders two columns narrow —
+// and nested boxes compound the loss.
+func BoxWidth(style lipgloss.Style, w int) lipgloss.Style {
+	return style.Width(w + style.GetHorizontalBorderSize())
+}
+
+// BoxHeight sets style's height so its rendered CONTENT is h rows tall.
+// Counterpart to BoxWidth: lipgloss v2 counts the border inside Height() too.
+func BoxHeight(style lipgloss.Style, h int) lipgloss.Style {
+	return style.Height(h + style.GetVerticalBorderSize())
 }

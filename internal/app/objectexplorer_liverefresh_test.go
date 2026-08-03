@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,7 +83,7 @@ func TestObjectExplorer_LiveRefreshWithActiveFilter(t *testing.T) {
 	// Filter the status level down to "phase" and select it.
 	m = pressTree(m, key("/"))
 	m = pressTree(m, key("p"))
-	m = pressTree(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = pressTree(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	require.Equal(t, "phase", func() string { f, _ := m.objectExplorerView.selected(); return f.Key }())
 
 	updated := choreTreeItem()

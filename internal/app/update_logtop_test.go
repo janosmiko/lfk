@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/logagg"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -34,7 +34,7 @@ func TestLogTopKey_NavigateAndDrill(t *testing.T) {
 		t.Fatalf("cursor = %d, want 1", m.logTop.cursor)
 	}
 	// drill into the selected group
-	mdl, _ = m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ = m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 	if len(m.logTop.drillStack) == 0 {
 		t.Error("expected drill frame on stack after enter")
@@ -43,7 +43,7 @@ func TestLogTopKey_NavigateAndDrill(t *testing.T) {
 
 func TestLogTopKey_EscReturnsToLogs(t *testing.T) {
 	m := newLogTopModel(t)
-	mdl, _ := m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ := m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 	if m.mode != modeLogs {
 		t.Errorf("mode after esc = %v, want modeLogs", m.mode)
@@ -58,7 +58,7 @@ func TestLogTopKey_EscRebuildsLogView(t *testing.T) {
 	if len(m.logView.rawLines) == 0 {
 		t.Fatal("precondition: rawLines must be non-empty for this test to be meaningful")
 	}
-	mdl, _ := m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ := m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	got := mdl.(Model)
 	if got.mode != modeLogs {
 		t.Fatalf("mode after esc = %v, want modeLogs", got.mode)
@@ -138,7 +138,7 @@ func TestLogTopDrill_DescendAndReturn(t *testing.T) {
 	m.logTop.cursor = multiIdx
 
 	// Press enter -> drill into /multi.
-	mdl, _ := m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ := m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 
 	if len(m.logTop.drillStack) != 1 {
@@ -164,7 +164,7 @@ func TestLogTopDrill_DescendAndReturn(t *testing.T) {
 	}
 
 	// Press esc -> pop frame and restore.
-	mdl, _ = m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ = m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 
 	if len(m.logTop.drillStack) != 0 {
@@ -182,7 +182,7 @@ func TestLogTopDrill_DescendAndReturn(t *testing.T) {
 	}
 
 	// Press esc again -> return to log viewer.
-	mdl, _ = m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ = m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 	if m.mode != modeLogs {
 		t.Errorf("mode after second esc = %v, want modeLogs", m.mode)
@@ -219,7 +219,7 @@ func TestLogTopDrill_NextDimensionSkipsPinned(t *testing.T) {
 
 	// Drill 1: from groupBy=[method,path] into any row.
 	m.logTop.cursor = 0
-	mdl, _ := m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ := m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 
 	if len(m.logTop.drillStack) != 1 {
@@ -239,7 +239,7 @@ func TestLogTopDrill_NextDimensionSkipsPinned(t *testing.T) {
 		t.Fatal("no rows after drill 1 to drill into")
 	}
 	m.logTop.cursor = 0
-	mdl, _ = m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ = m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 
 	if len(m.logTop.drillStack) != 2 {
@@ -422,7 +422,7 @@ func TestLogTopFilter_EscClears(t *testing.T) {
 	}
 
 	// Press esc.
-	mdl, _ := m.handleLogTopFilterKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ := m.handleLogTopFilterKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 
 	if m.logTop.filterActive {
@@ -594,7 +594,7 @@ func TestLogTopDrillTarget_TabCycles(t *testing.T) {
 
 	// drillTarget resets after drill-in.
 	m.logTop.cursor = 0
-	mdl, _ = m.handleLogTopKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ = m.handleLogTopKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 	if m.logTop.drillTarget != "" {
 		t.Errorf("drillTarget should be reset after drill-in, got %q", m.logTop.drillTarget)

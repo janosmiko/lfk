@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,9 +45,6 @@ func TestRenderOverlayConfirm(t *testing.T) {
 	t.Run("ChoiceWarn styles the value differently from the safe default", func(t *testing.T) {
 		// Styles collapse to bare text without a color profile, which would
 		// make this assertion vacuous.
-		origProfile := lipgloss.DefaultRenderer().ColorProfile()
-		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 
 		plain := RenderOverlayConfirm(OverlayConfirmConfig{
 			Title:       "Confirm Delete",

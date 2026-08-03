@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // PadToHeight ensures a string has exactly `height` newline-separated lines,
@@ -32,13 +32,13 @@ func ViewTitle(width int, text string) string {
 // It applies the theme's primary border color, base background, and
 // standard padding, sized to fill width x height.
 func FullscreenBorderStyle(width, height int) lipgloss.Style {
-	return lipgloss.NewStyle().
+	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ColorPrimary)).
 		BorderBackground(BaseBg).
 		Background(BaseBg).
-		Padding(0, 1).
-		Width(width - 2).
-		Height(height).
-		MaxHeight(height + 2)
+		Padding(0, 1)
+	// -2 reserves the left/right border columns; BoxWidth/BoxHeight add them
+	// back, since lipgloss v2 counts the border inside Width/Height.
+	return BoxHeight(BoxWidth(style, width-2), height).MaxHeight(height + 2)
 }

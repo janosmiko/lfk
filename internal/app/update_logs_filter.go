@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // handleLogKeyFilter opens the live text-filter input, seeding it with the
@@ -17,7 +17,7 @@ func (m Model) handleLogKeyFilter() (Model, tea.Cmd) { //nolint:unparam // tea.C
 
 // handleLogFilterKey processes a key while the log filter input is open. The
 // filter applies live: every edit re-projects the view via rebuildLogView.
-func (m Model) handleLogFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		// Keep the current filter; just close the input.
@@ -50,9 +50,8 @@ func (m Model) handleLogFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logView.filterInput.Right()
 		return m, nil
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.logView.filterInput.Insert(key)
+		if msg.Text != "" {
+			m.logView.filterInput.Insert(msg.Text)
 		} else {
 			return m, nil
 		}

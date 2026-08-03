@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.lastInputAt = time.Now()
 	// Dismiss startup tip on any keypress.
 	if m.statusMessageTip {
@@ -78,7 +78,7 @@ func (m *Model) inputActive() bool {
 }
 
 // handleTabSwitchKey handles tab switching keys (next/prev/new tab).
-func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleTabSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	if m.inputActive() {
 		return m, nil, false
@@ -197,7 +197,7 @@ func (m Model) postTabSwitchCmd() tea.Cmd {
 }
 
 // handleModeKey dispatches to the appropriate mode-specific handler.
-func (m Model) handleModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.mode {
 	case modeExec:
 		mdl, cmd := m.handleExecKey(msg)

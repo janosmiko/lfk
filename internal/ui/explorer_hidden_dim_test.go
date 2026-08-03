@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,16 +33,13 @@ func rowContaining(t *testing.T, out, name string) string {
 // package globals other theme tests reassign; without pinning this test's
 // result would depend on execution order.
 func TestRenderColumn_HiddenRowDimNotBrokenByInnerReset(t *testing.T) {
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origDim := DimStyle
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 		DimStyle = origDim
 	})
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 	DimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
-	openSGR := strings.TrimSuffix(DimStyle.Render("X"), "X\x1b[0m")
+	openSGR := strings.TrimSuffix(DimStyle.Render("X"), "X\x1b[m")
 	require.NotEmpty(t, openSGR, "DimStyle must emit an opening SGR under this setup")
 
 	items := []model.Item{
@@ -70,7 +66,7 @@ func TestRenderColumn_HiddenRowDimNotBrokenByInnerReset(t *testing.T) {
 				assert.True(t, strings.HasPrefix(row, openSGR), "dimmed row must open with the dim style")
 				// One uniform dim span: a single reset, none interior. The buggy
 				// per-fragment path produced a reset between the icon and the name.
-				assert.Equal(t, 1, strings.Count(row, "\x1b[0m"),
+				assert.Equal(t, 1, strings.Count(row, "\x1b[m"),
 					"dim must not be broken by interior resets from per-fragment styling")
 			})
 		}

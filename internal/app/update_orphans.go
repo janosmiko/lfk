@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -132,7 +132,7 @@ func (m Model) orphansClampCursor() Model {
 
 // handleOrphansKey routes one key press inside the orphan overlay.
 // Returns the new model and any tea.Cmd (e.g. for refresh).
-func (m Model) handleOrphansKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleOrphansKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.orphans.filterActive {
 		return m.handleOrphansFilterInput(msg)
 	}
@@ -193,7 +193,7 @@ func (m Model) handleOrphansKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 // handleOrphansFilterInput handles keys while the overlay is in /-filter
 // input mode. Esc cancels (clears filter), Enter accepts (exits input
 // mode but keeps the filter applied).
-func (m Model) handleOrphansFilterInput(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleOrphansFilterInput(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	key := msg.String()
 	switch key {
 	case "esc":
@@ -208,8 +208,10 @@ func (m Model) handleOrphansFilterInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.orphansResetCursor(), nil
 	default:
 		// Accept printable single-rune keys.
-		if msg.Type == tea.KeyRunes && len(msg.Runes) == 1 {
-			m.orphans.filter.Insert(string(msg.Runes[0]))
+		if len([]rune(msg.Text)) == 1 {
+			// Insert the character produced, not the key pressed: shift+a
+			// reports Code 'a' but Text "A".
+			m.orphans.filter.Insert(msg.Text)
 			return m.orphansResetCursor(), nil
 		}
 		return m, nil

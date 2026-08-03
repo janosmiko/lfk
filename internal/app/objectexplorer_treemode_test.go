@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -136,7 +136,7 @@ func TestObjectExplorerTree_ViewRendersGuides(t *testing.T) {
 	assert.Contains(t, view, "tree")
 }
 
-func spaceKey() tea.KeyMsg { return tea.KeyMsg{Type: tea.KeySpace} }
+func spaceKey() tea.KeyPressMsg { return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "} }
 
 func TestObjectExplorerTree_SpaceCollapsesAndExpands(t *testing.T) {
 	m := openTreeModeExplorer(t)

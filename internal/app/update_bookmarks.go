@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -434,7 +434,7 @@ func (m *Model) bookmarkDeleteAll() tea.Cmd {
 }
 
 // handleBookmarkOverlayKey handles key events in the bookmark overlay.
-func (m Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBookmarkOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	filtered := m.filteredBookmarks()
 
 	switch m.bookmarkSearchMode {
@@ -450,7 +450,7 @@ func (m Model) handleBookmarkOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleBookmarkNormalMode handles keys when the bookmark overlay is in normal navigation mode.
-func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmark) (tea.Model, tea.Cmd) {
+func (m Model) handleBookmarkNormalMode(msg tea.KeyPressMsg, filtered []model.Bookmark) (tea.Model, tea.Cmd) {
 	// Handle navigation/scroll keys.
 	if ret, ok := m.handleBookmarkNavKey(msg, filtered); ok {
 		return ret, nil
@@ -514,7 +514,7 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 }
 
 // handleBookmarkNavKey handles cursor navigation keys in the bookmark overlay.
-func (m Model) handleBookmarkNavKey(msg tea.KeyMsg, filtered []model.Bookmark) (Model, bool) {
+func (m Model) handleBookmarkNavKey(msg tea.KeyPressMsg, filtered []model.Bookmark) (Model, bool) {
 	maxIdx := len(filtered) - 1
 	switch msg.String() {
 	case "j", "down", "ctrl+n":
@@ -563,20 +563,20 @@ func (m Model) handleBookmarkNavKey(msg tea.KeyMsg, filtered []model.Bookmark) (
 }
 
 // handleBookmarkFilterMode handles keys when the bookmark overlay is in filter input mode.
-func (m Model) handleBookmarkFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBookmarkFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		switch handlePastedText(&m.bookmarkFilter, msg.Runes) {
+	if isPaste(msg) {
+		switch handlePastedText(&m.bookmarkFilter, []rune(msg.Text)) {
 		case filterContinue:
 			m.overlayCursor = 0
 			return m, nil
 		case filterPasteMultiline:
-			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), pasteTargetBookmarkFilter)
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetBookmarkFilter)
 			return m, nil
 		}
 		return m, nil
 	}
-	switch handleFilterKey(&m.bookmarkFilter, msg.String()) {
+	switch handleFilterKey(&m.bookmarkFilter, msg) {
 	case filterEscape:
 		m.bookmarkSearchMode = bookmarkModeNormal
 		m.bookmarkFilter.Clear()
@@ -595,7 +595,7 @@ func (m Model) handleBookmarkFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleBookmarkConfirmDelete handles Enter/y / Esc/n confirmation for single bookmark deletion.
-func (m Model) handleBookmarkConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBookmarkConfirmDelete(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.bookmarkSearchMode = bookmarkModeNormal
 	switch msg.String() {
 	case "enter", "y", "Y":
@@ -608,7 +608,7 @@ func (m Model) handleBookmarkConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 // handleBookmarkConfirmDeleteAll handles Enter/y / Esc/n confirmation for deleting all bookmarks.
-func (m Model) handleBookmarkConfirmDeleteAll(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBookmarkConfirmDeleteAll(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.bookmarkSearchMode = bookmarkModeNormal
 	switch msg.String() {
 	case "enter", "y", "Y":

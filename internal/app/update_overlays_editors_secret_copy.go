@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -35,7 +35,7 @@ func (m Model) handleSecretEditorKeyS() (tea.Model, tea.Cmd) {
 // the picker); Esc cancels. Apply target = the keys in
 // editorSearch.selected, falling back to the cursor row when no
 // selection is active.
-func (m Model) handleSecretFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSecretFormatPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.editorFormatCancel()

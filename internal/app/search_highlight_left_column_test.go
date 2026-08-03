@@ -3,8 +3,6 @@ package app
 import (
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -18,17 +16,13 @@ import (
 // Restored on test cleanup. Same trick the ui package's help tests use.
 func forceANSIRenderer(t *testing.T) {
 	t.Helper()
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ui.ConfigNoColor
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ui.ConfigNoColor = originalNoColor
 		ui.ApplyTheme(ui.DefaultTheme())
 	})
 	ui.ConfigNoColor = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 	ui.ApplyTheme(ui.DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 }
 
 // TestSearchHighlightDoesNotBleedIntoLeftColumn is the regression test
@@ -92,7 +86,7 @@ func TestSearchHighlightDoesNotBleedIntoLeftColumn(t *testing.T) {
 		selectedNamespaces: make(map[string]bool),
 	}
 
-	rendered := m.View()
+	rendered := m.View().Content
 	highlighted := ui.SearchHighlightStyle.Render(query)
 
 	assert.NotContains(t, rendered, highlighted,
@@ -149,7 +143,7 @@ func TestSearchHighlightStillAppliesToMiddleColumn(t *testing.T) {
 		selectedNamespaces: make(map[string]bool),
 	}
 
-	rendered := m.View()
+	rendered := m.View().Content
 	highlighted := ui.SearchHighlightStyle.Render(query)
 
 	assert.Contains(t, rendered, highlighted,

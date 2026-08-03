@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -562,17 +561,13 @@ func TestBuildBody_CursorHighlightActivePane(t *testing.T) {
 	// profile and lipgloss drops the foreground/background codes that
 	// make the highlight visible. Force the renderer to ANSI mode so
 	// activeRowStyle().Render(...) emits real escape sequences.
-	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(original)
 		ConfigNoColor = originalNoColor
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 	ApplyTheme(DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 
 	entry := SyncWaveTimelineEntry{
 		Phases: []SyncWavePhaseEntry{

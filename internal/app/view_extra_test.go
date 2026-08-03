@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -26,12 +25,9 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 	// lipgloss downgrades to the Ascii profile without a TTY (emits no ANSI),
 	// which would make FillLinesBg a no-op. Force a color profile so the
 	// background sequences are actually rendered.
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origTheme := ui.ActiveTheme
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ui.ApplyTheme(ui.DefaultTheme())
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 		ui.ApplyTheme(origTheme)
 	})
 
@@ -59,7 +55,7 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 		selectedNamespaces: make(map[string]bool),
 	}
 
-	out := m.View()
+	out := m.View().Content
 
 	// Guard against a vacuous pass: with the forced TrueColor profile the view
 	// must contain ANSI styling, otherwise there are no resets to assert on.
@@ -97,12 +93,9 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 // follows a wrapped sub-line renders with the terminal default (a black "tear")
 // — the artifact reported in the cluster events preview.
 func TestViewExplorerDashboardTwoColWrappedEventsFillBackground(t *testing.T) {
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origTheme := ui.ActiveTheme
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ui.ApplyTheme(ui.DefaultTheme())
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 		ui.ApplyTheme(origTheme)
 	})
 
@@ -133,7 +126,7 @@ func TestViewExplorerDashboardTwoColWrappedEventsFillBackground(t *testing.T) {
 		selectedNamespaces: make(map[string]bool),
 	}
 
-	out := m.View()
+	out := m.View().Content
 
 	assert.Contains(t, out, "\x1b[", "forced color profile must emit ANSI sequences")
 	// Guard against a vacuous pass: confirm a wrap boundary actually emitted the
@@ -216,7 +209,7 @@ func TestViewYAMLModeWithVisualMode(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "VISUAL LINE")
 }
@@ -239,7 +232,7 @@ func TestViewYAMLModeCharVisual(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "VISUAL]")
 }
@@ -262,7 +255,7 @@ func TestViewYAMLModeBlockVisual(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "VISUAL BLOCK")
 }
@@ -285,7 +278,7 @@ func TestViewYAMLModeSearchActive(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "/")
 }
@@ -309,7 +302,7 @@ func TestViewYAMLModeSearchResultsShown(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "1/2")
 }
@@ -332,7 +325,7 @@ func TestViewYAMLModeSearchNoMatches(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "no matches")
 	// n/N has no matches to navigate, so the nav suffix must not appear.
@@ -358,7 +351,7 @@ func TestViewYAMLModeDefaultHintsListGotoAndOmitSearchNav(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "123G")
 	assert.Contains(t, stripped, "goto")
@@ -385,7 +378,7 @@ func TestViewYAMLModeSearchResultsShowNavHint(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "1/2")
 	assert.Contains(t, stripped, "n/N")
@@ -406,7 +399,7 @@ func TestViewYAMLModeSmallHeight(t *testing.T) {
 		},
 		tabs: []TabState{{}},
 	}
-	output := m.View()
+	output := m.View().Content
 	assert.NotEmpty(t, output)
 }
 
@@ -437,7 +430,7 @@ func TestViewExplorerFullscreenMiddle(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -466,7 +459,7 @@ func TestViewExplorerWithError(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -495,7 +488,7 @@ func TestViewExplorerWithOverlay(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -524,7 +517,7 @@ func TestViewExplorerWithErrorLogOverlay(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -645,7 +638,7 @@ func TestViewExplorerColumnView(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	stripped := stripANSI(view)
 	assert.Contains(t, stripped, "cluster-1")
 }
@@ -676,7 +669,7 @@ func TestViewExplorerTableView(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -706,7 +699,7 @@ func TestViewExplorerFullscreenDashboard(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -734,7 +727,7 @@ func TestViewExplorerFullscreenDashboardMonitoring(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -767,7 +760,7 @@ func TestViewExplorerFullscreenDashboardWithScroll(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -801,7 +794,7 @@ func TestViewExplorerWithMultipleTabs(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }
 
@@ -833,6 +826,6 @@ func TestViewExplorerCollapsedGroups(t *testing.T) {
 		},
 		selectedNamespaces: make(map[string]bool),
 	}
-	view := m.View()
+	view := m.View().Content
 	assert.NotEmpty(t, view)
 }

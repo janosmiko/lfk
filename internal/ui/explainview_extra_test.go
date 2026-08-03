@@ -150,7 +150,7 @@ func TestRenderFieldDescription(t *testing.T) {
 		}
 		lines := renderFieldDescription(fields, 0, "", 60, 10)
 		found := strings.Join(lines, "\n")
-		assert.Contains(t, found, "spec")
+		assert.Contains(t, stripANSI(found), "spec")
 		assert.Contains(t, found, "TYPE: <Object>")
 		assert.Contains(t, found, "Spec of the resource.")
 	})

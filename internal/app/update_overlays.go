@@ -3,11 +3,11 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Toggle: pressing the same hotkey that opened an overlay closes it.
 	// Route through closeCurrentOverlay so toggle-close gets the same
 	// cleanup as Esc/Ctrl+C — parent restoration, filter-state reset, and
@@ -105,7 +105,7 @@ func (m Model) isOverlayToggleKey(key string) bool {
 
 // handleOverlayKeyPrimary dispatches overlay keys for core overlays
 // (selectors, confirmations, editors).
-func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleOverlayKeyPrimary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.overlay {
 	case overlayNamespace:
 		mdl, cmd := m.handleNamespaceOverlayKey(msg)
@@ -182,7 +182,7 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 
 // handleOverlayKeySecondary dispatches overlay keys for secondary overlays
 // (viewers, monitoring, info panels).
-func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleOverlayKeySecondary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	switch m.overlay {
 	case overlayCrashInvestigator:
 		mdl, cmd := m.handleCrashInvestigatorOverlayKey(msg)
@@ -253,7 +253,7 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 		mdl, cmd := m.handlePasteConfirmKey(msg)
 		return mdl, cmd, true
 	case overlayClusterColor:
-		mdl, cmd := m.handleClusterColorOverlayKey(msg.String())
+		mdl, cmd := m.handleClusterColorOverlayKey(msg)
 		return mdl, cmd, true
 	case overlayLocalClusters:
 		mdl, cmd, _ := m.updateLocalClusterKey(msg)
@@ -275,7 +275,7 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 }
 
 // handlePasteConfirmKey handles the Enter/y / Esc/n confirmation for multiline paste.
-func (m Model) handlePasteConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePasteConfirmKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter", "y", "Y":
 		m.overlay = overlayNone

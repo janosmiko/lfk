@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +18,7 @@ func TestCovColumnToggleOpenClose(t *testing.T) {
 	}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 	assert.Nil(t, r.(Model).columnToggleItems)
 }
@@ -29,7 +29,7 @@ func TestCovColumnToggleCloseWithFilter(t *testing.T) {
 	m.columnToggleFilter = "IP"
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	// First esc clears filter.
 	assert.Empty(t, r.(Model).columnToggleFilter)
 	assert.Equal(t, overlayColumnToggle, r.(Model).overlay)
@@ -44,11 +44,11 @@ func TestCovColumnToggleNav(t *testing.T) {
 	}
 	m.columnToggleCursor = 0
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 1, r.(Model).columnToggleCursor)
 
 	m2 := r.(Model)
-	r, _ = m2.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	r, _ = m2.handleColumnToggleKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 0, r.(Model).columnToggleCursor)
 }
 
@@ -60,19 +60,19 @@ func TestCovColumnTogglePageScroll(t *testing.T) {
 	m := baseModelCov()
 	m.columnToggleItems = items
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.Greater(t, r.(Model).columnToggleCursor, 0)
 
 	m.columnToggleCursor = 20
-	r, _ = m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	r, _ = m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	assert.Less(t, r.(Model).columnToggleCursor, 20)
 
 	m.columnToggleCursor = 0
-	r, _ = m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	r, _ = m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	assert.Greater(t, r.(Model).columnToggleCursor, 0)
 
 	m.columnToggleCursor = 25
-	r, _ = m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	r, _ = m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	assert.Less(t, r.(Model).columnToggleCursor, 25)
 }
 
@@ -89,7 +89,7 @@ func TestCovColumnToggleClearWithCHotkey(t *testing.T) {
 	}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayColumnToggle, rm.overlay, "overlay must stay open after clear")
@@ -106,7 +106,7 @@ func TestCovColumnToggleSpace(t *testing.T) {
 	}
 	m.columnToggleCursor = 0
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: ' ', Text: " "})
 	// Toggle visibility of first item, cursor advances.
 	assert.False(t, r.(Model).columnToggleItems[0].visible)
 	assert.Equal(t, 1, r.(Model).columnToggleCursor)
@@ -121,13 +121,13 @@ func TestCovColumnToggleMoveUpDown(t *testing.T) {
 	}
 
 	m.columnToggleCursor = 0
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'J', Text: "J"})
 	assert.Equal(t, "b", r.(Model).columnToggleItems[0].key)
 	assert.Equal(t, "a", r.(Model).columnToggleItems[1].key)
 
 	m2 := r.(Model)
 	m2.columnToggleCursor = 2
-	r, _ = m2.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'K'}})
+	r, _ = m2.handleColumnToggleKey(tea.KeyPressMsg{Code: 'K', Text: "K"})
 	assert.Equal(t, 1, r.(Model).columnToggleCursor)
 }
 
@@ -137,7 +137,7 @@ func TestCovColumnToggleMoveWithFilter(t *testing.T) {
 	m.columnToggleFilter = "active"
 
 	// Move operations are no-op when filtering.
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'J', Text: "J"})
 	assert.Equal(t, m.columnToggleItems, r.(Model).columnToggleItems)
 }
 
@@ -150,7 +150,7 @@ func TestCovColumnToggleEnter(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 	assert.Equal(t, []string{"IP"}, r.(Model).sessionColumns[colKey("pod")])
 }
@@ -163,7 +163,7 @@ func TestCovColumnToggleEnterAllHidden(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.sessionColumns = map[string][]string{colKey("pod"): {"old"}}
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	_, exists := r.(Model).sessionColumns[colKey("pod")]
 	assert.False(t, exists)
 }
@@ -171,7 +171,7 @@ func TestCovColumnToggleEnterAllHidden(t *testing.T) {
 func TestCovColumnToggleSlash(t *testing.T) {
 	m := baseModelCov()
 	m.columnToggleItems = []columnToggleEntry{{key: "a"}}
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	assert.True(t, r.(Model).columnToggleFilterActive)
 }
 
@@ -181,7 +181,7 @@ func TestCovColumnToggleReset(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.columnToggleItems = []columnToggleEntry{{key: "IP"}}
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 	_, exists := r.(Model).sessionColumns[colKey("pod")]
 	assert.False(t, exists)
@@ -193,32 +193,32 @@ func TestCovColumnToggleFilterKey(t *testing.T) {
 	m.columnToggleFilter = ""
 
 	// Type a character.
-	r, _ := m.handleColumnToggleFilterKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	r, _ := m.handleColumnToggleFilterKey(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	assert.Equal(t, "a", r.(Model).columnToggleFilter)
 
 	// Backspace.
 	m2 := r.(Model)
-	r, _ = m2.handleColumnToggleFilterKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ = m2.handleColumnToggleFilterKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Empty(t, r.(Model).columnToggleFilter)
 
 	// Enter.
 	m.columnToggleFilterActive = true
-	r, _ = m.handleColumnToggleFilterKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ = m.handleColumnToggleFilterKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, r.(Model).columnToggleFilterActive)
 
 	// Esc with filter text: clears.
 	m.columnToggleFilter = "text"
-	r, _ = m.handleColumnToggleFilterKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleColumnToggleFilterKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Empty(t, r.(Model).columnToggleFilter)
 
 	// Esc without filter text: exits filter mode.
 	m.columnToggleFilter = ""
-	r, _ = m.handleColumnToggleFilterKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleColumnToggleFilterKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.False(t, r.(Model).columnToggleFilterActive)
 
 	// Ctrl+W.
 	m.columnToggleFilter = "hello world"
-	r, _ = m.handleColumnToggleFilterKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ = m.handleColumnToggleFilterKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Equal(t, "hello ", r.(Model).columnToggleFilter)
 }
 
@@ -425,7 +425,7 @@ func TestCovColumnToggleEnterSavesBuiltinsAndExtras(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -575,7 +575,7 @@ func TestCovColumnToggleDoesNotLeakBetweenPodAndContainer(t *testing.T) {
 	}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 
 	// The pod configuration should be saved under "pod".
@@ -609,7 +609,7 @@ func TestCovColumnToggleEnterBuiltinsOnlyPersistsEmptyExtras(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 
 	sess, exists := rm.sessionColumns[colKey("pod")]
@@ -638,7 +638,7 @@ func TestCovColumnToggleEnterAllUnselectedResetsToDefault(t *testing.T) {
 	m.hiddenBuiltinColumns = map[string][]string{colKey("pod"): {"Ready"}}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -658,7 +658,7 @@ func TestCovColumnToggleResetClearsBothMaps(t *testing.T) {
 	m.columnToggleItems = []columnToggleEntry{{key: "IP"}}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -682,7 +682,7 @@ func TestCovColumnToggleEnterSavesColumnOrder(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -751,7 +751,7 @@ func TestCovColumnToggleResetClearsColumnOrder(t *testing.T) {
 	m.columnToggleItems = []columnToggleEntry{{key: "IP"}}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -776,7 +776,7 @@ func TestCovColumnToggleEnterAllUnselectedClearsColumnOrder(t *testing.T) {
 	m.columnOrder = map[string][]string{colKey("pod"): {"IP", "Namespace"}}
 	m.overlay = overlayColumnToggle
 
-	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleColumnToggleKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 
 	_, exists := rm.columnOrder[colKey("pod")]

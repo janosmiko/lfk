@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,11 +44,11 @@ func objectExplorerModel(t *testing.T) Model {
 	return m
 }
 
-func key(s string) tea.KeyMsg { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)} }
+func key(s string) tea.KeyPressMsg { return keyPressText(s) }
 
 // pressTree dispatches a key to the Object Explorer handler and returns the
 // updated Model, discarding the command.
-func pressTree(m Model, msg tea.KeyMsg) Model {
+func pressTree(m Model, msg tea.KeyPressMsg) Model {
 	mdl, _ := m.handleObjectExplorerKey(msg)
 	return mdl.(Model)
 }
@@ -137,12 +137,12 @@ func TestObjectExplorer_EscClosesAtRootButBacksOutWhenDeep(t *testing.T) {
 	require.Len(t, m.objectExplorerView.path, 1)
 
 	// Esc when deep -> back to root, still open.
-	m = pressTree(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = pressTree(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, modeObjectExplorer, m.mode)
 	assert.Empty(t, m.objectExplorerView.path)
 
 	// Esc at root -> close.
-	m = pressTree(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = pressTree(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, modeExplorer, m.mode)
 }
 
@@ -235,12 +235,12 @@ func TestObjectExplorer_Filter(t *testing.T) {
 	assert.Equal(t, "metadata", vis[0].Key)
 
 	// Enter exits typing but keeps the filter.
-	m = pressTree(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = pressTree(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, m.objectExplorerView.filterActive)
 	assert.Equal(t, "meta", m.objectExplorerView.filter)
 
 	// Esc clears the filter; all keys visible again.
-	m = pressTree(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = pressTree(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, "", m.objectExplorerView.filter)
 	assert.Len(t, m.objectExplorerView.visible(), 4)
 }
@@ -270,7 +270,7 @@ func TestObjectExplorer_FullYAMLHandoff(t *testing.T) {
 	assert.NotNil(t, cmd) // loadYAML
 
 	// Closing the YAML viewer returns to the Object Explorer, not the explorer.
-	mdl, _ = m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ = m.handleYAMLKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
 	assert.Equal(t, modeExplorer, m.yamlReturnMode) // reset for the next open

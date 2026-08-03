@@ -2,11 +2,12 @@ package app
 
 import (
 	"fmt"
+	"image/color"
 	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/hinshun/vt10x"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -658,14 +659,16 @@ func (m Model) viewExecTerminal() string {
 		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Padding(0, 0).
-		Width(m.width).
-		Height(viewH)
-	bordered := borderStyle.Render(termContent)
+		Width(m.width)
+	// viewH counts content rows only; BoxHeight adds the top/bottom rules back,
+	// since lipgloss v2 counts the border inside Height(). Width needs no such
+	// adjustment here — this border has no left/right edges.
+	bordered := ui.BoxHeight(borderStyle, viewH).Render(termContent)
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, bordered, hintLine)
 }
 
 // vt10xColorToLipgloss converts a vt10x color to a lipgloss terminal color.
-func vt10xColorToLipgloss(c vt10x.Color) lipgloss.TerminalColor {
+func vt10xColorToLipgloss(c vt10x.Color) color.Color {
 	return lipgloss.Color(fmt.Sprintf("%d", int(c)))
 }

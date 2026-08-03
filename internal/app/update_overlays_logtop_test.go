@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/logagg"
 )
@@ -31,7 +31,7 @@ func TestLogTopGroupBy_TogglesAndApplies(t *testing.T) {
 		}
 	}
 	// Apply with enter closes the overlay and rebuilds rows.
-	mdl, _ := m.handleLogTopGroupByKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ := m.handleLogTopGroupByKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 	if m.overlay != overlayNone {
 		t.Errorf("overlay after enter = %v, want overlayNone", m.overlay)

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -36,8 +36,8 @@ func TestShiftDownAliasesCtrlDInExplorerList(t *testing.T) {
 		return m
 	}
 
-	realRet, _, _ := build().handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlD})
-	aliasRet, _, handled := build().handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyShiftDown})
+	realRet, _, _ := build().handleExplorerActionKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	aliasRet, _, handled := build().handleExplorerActionKey(tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift})
 	assert.True(t, handled, "shift+down must be handled as half-page down")
 	realM, aliasM := realRet.(Model), aliasRet.(Model)
 	assert.Greater(t, aliasM.cursor(), 0)
@@ -56,8 +56,8 @@ func TestShiftUpAliasesCtrlUInExplorerList(t *testing.T) {
 		return m
 	}
 
-	realRet, _, _ := build().handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyCtrlU})
-	aliasRet, _, handled := build().handleExplorerActionKey(tea.KeyMsg{Type: tea.KeyShiftUp})
+	realRet, _, _ := build().handleExplorerActionKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	aliasRet, _, handled := build().handleExplorerActionKey(tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift})
 	assert.True(t, handled, "shift+up must be handled as half-page up")
 	realM, aliasM := realRet.(Model), aliasRet.(Model)
 	assert.Less(t, aliasM.cursor(), 40)

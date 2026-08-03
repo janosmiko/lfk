@@ -13,8 +13,8 @@ import (
 func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("empty data shows add hint", func(t *testing.T) {
 		result := renderLabelEditorTable(nil, nil, 0, false, "", 0, "", 0, 0, nil, 60, 20)
-		assert.Contains(t, result, "KEY")
-		assert.Contains(t, result, "VALUE")
+		assert.Contains(t, stripANSI(result), "KEY")
+		assert.Contains(t, stripANSI(result), "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add)")
 	})
 

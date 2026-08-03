@@ -4,9 +4,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,12 +20,9 @@ func themeA() ui.Theme { t := ui.DefaultTheme(); t.Base = "#101010"; return t }
 func themeB() ui.Theme { t := ui.DefaultTheme(); t.Base = "#fa00fa"; return t }
 
 func withTrueColor(t *testing.T) {
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origTheme := ui.ActiveTheme
 	origSchemeName := ui.ActiveSchemeName
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 		ui.ApplyTheme(origTheme)
 		ui.ActiveSchemeName = origSchemeName
 	})

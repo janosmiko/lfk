@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s/localcluster"
 	"github.com/janosmiko/lfk/internal/model"
@@ -243,7 +243,7 @@ func (m Model) updateLocalClusterCreated(msg localClusterCreatedMsg) (Model, tea
 
 // updateLocalClusterKey is the key dispatcher for the overlay.
 // Returns (model, cmd, true) when the key was consumed.
-func (m Model) updateLocalClusterKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
+func (m Model) updateLocalClusterKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	if m.overlay != overlayLocalClusters {
 		return m, nil, false
 	}
@@ -268,8 +268,8 @@ func (m Model) updateLocalClusterKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-func (m Model) updateLocalClusterListKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateLocalClusterListKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.overlay = overlayNone
 		return m, nil, true
@@ -345,8 +345,8 @@ func (m Model) updateLocalClusterListKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) 
 // Esc cancels back to the list, Backspace edits the buffer, uppercase
 // runes append, and Enter only dispatches when the buffer matches the
 // literal string "DELETE".
-func (m Model) updateDeleteConfirmKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
-	switch msg.Type {
+func (m Model) updateDeleteConfirmKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
+	switch msg.Code {
 	case tea.KeyEsc:
 		m.localClusterState.deleteBuf = ""
 		m.localClusterState.screen = localClusterScreenList
@@ -384,15 +384,16 @@ func (m Model) updateDeleteConfirmKey(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
 			m.localClusterState.deleteBuf = m.localClusterState.deleteBuf[:n-1]
 		}
 		return m, nil, true
-	case tea.KeyRunes:
-		for _, r := range msg.Runes {
+	default:
+		// Printable input. msg.Text is empty for non-text keys, so the loop
+		// below is a no-op for them and the switch stays exhaustive.
+		for _, r := range msg.Text {
 			if r >= 'A' && r <= 'Z' {
 				m.localClusterState.deleteBuf += string(r)
 			}
 		}
 		return m, nil, true
 	}
-	return m, nil, true
 }
 
 // handleListMutate is shared by s (stop) and S (start). It validates

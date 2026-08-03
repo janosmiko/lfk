@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 )
@@ -15,7 +15,7 @@ import (
 // The dispatcher only mutates the offset; the renderer is responsible
 // for clamping it to the active viewport, so writing 999999 here is
 // sufficient to mean "jump to bottom".
-func (m Model) handleCrashInvestigatorOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCrashInvestigatorOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.overlay = overlayNone

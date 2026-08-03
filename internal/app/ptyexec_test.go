@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,107 +45,107 @@ func TestPTYStartErrorForOS(t *testing.T) {
 func TestKeyToBytes(t *testing.T) {
 	tests := []struct {
 		name     string
-		msg      tea.KeyMsg
+		msg      tea.KeyPressMsg
 		expected []byte
 	}{
 		{
 			name:     "runes",
-			msg:      tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}},
+			msg:      tea.KeyPressMsg{Code: 'a', Text: "a"},
 			expected: []byte("a"),
 		},
 		{
 			name:     "enter",
-			msg:      tea.KeyMsg{Type: tea.KeyEnter},
+			msg:      tea.KeyPressMsg{Code: tea.KeyEnter},
 			expected: []byte{'\r'},
 		},
 		{
 			name:     "tab",
-			msg:      tea.KeyMsg{Type: tea.KeyTab},
+			msg:      tea.KeyPressMsg{Code: tea.KeyTab},
 			expected: []byte{'\t'},
 		},
 		{
 			name:     "backspace",
-			msg:      tea.KeyMsg{Type: tea.KeyBackspace},
+			msg:      tea.KeyPressMsg{Code: tea.KeyBackspace},
 			expected: []byte{'\x7f'},
 		},
 		{
 			name:     "delete",
-			msg:      tea.KeyMsg{Type: tea.KeyDelete},
+			msg:      tea.KeyPressMsg{Code: tea.KeyDelete},
 			expected: []byte{'\x1b', '[', '3', '~'},
 		},
 		{
 			name:     "space",
-			msg:      tea.KeyMsg{Type: tea.KeySpace},
+			msg:      tea.KeyPressMsg{Code: tea.KeySpace, Text: " "},
 			expected: []byte{' '},
 		},
 		{
 			name:     "escape",
-			msg:      tea.KeyMsg{Type: tea.KeyEscape},
+			msg:      tea.KeyPressMsg{Code: tea.KeyEscape},
 			expected: []byte{'\x1b'},
 		},
 		{
 			name:     "up arrow",
-			msg:      tea.KeyMsg{Type: tea.KeyUp},
+			msg:      tea.KeyPressMsg{Code: tea.KeyUp},
 			expected: []byte{'\x1b', '[', 'A'},
 		},
 		{
 			name:     "down arrow",
-			msg:      tea.KeyMsg{Type: tea.KeyDown},
+			msg:      tea.KeyPressMsg{Code: tea.KeyDown},
 			expected: []byte{'\x1b', '[', 'B'},
 		},
 		{
 			name:     "right arrow",
-			msg:      tea.KeyMsg{Type: tea.KeyRight},
+			msg:      tea.KeyPressMsg{Code: tea.KeyRight},
 			expected: []byte{'\x1b', '[', 'C'},
 		},
 		{
 			name:     "left arrow",
-			msg:      tea.KeyMsg{Type: tea.KeyLeft},
+			msg:      tea.KeyPressMsg{Code: tea.KeyLeft},
 			expected: []byte{'\x1b', '[', 'D'},
 		},
 		{
 			name:     "home",
-			msg:      tea.KeyMsg{Type: tea.KeyHome},
+			msg:      tea.KeyPressMsg{Code: tea.KeyHome},
 			expected: []byte{'\x1b', '[', 'H'},
 		},
 		{
 			name:     "end",
-			msg:      tea.KeyMsg{Type: tea.KeyEnd},
+			msg:      tea.KeyPressMsg{Code: tea.KeyEnd},
 			expected: []byte{'\x1b', '[', 'F'},
 		},
 		{
 			name:     "page up",
-			msg:      tea.KeyMsg{Type: tea.KeyPgUp},
+			msg:      tea.KeyPressMsg{Code: tea.KeyPgUp},
 			expected: []byte{'\x1b', '[', '5', '~'},
 		},
 		{
 			name:     "page down",
-			msg:      tea.KeyMsg{Type: tea.KeyPgDown},
+			msg:      tea.KeyPressMsg{Code: tea.KeyPgDown},
 			expected: []byte{'\x1b', '[', '6', '~'},
 		},
 		{
 			name:     "ctrl+c",
-			msg:      tea.KeyMsg{Type: tea.KeyCtrlC},
+			msg:      tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl},
 			expected: []byte{'\x03'},
 		},
 		{
 			name:     "ctrl+d",
-			msg:      tea.KeyMsg{Type: tea.KeyCtrlD},
+			msg:      tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl},
 			expected: []byte{'\x04'},
 		},
 		{
 			name:     "ctrl+z",
-			msg:      tea.KeyMsg{Type: tea.KeyCtrlZ},
+			msg:      tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl},
 			expected: []byte{'\x1a'},
 		},
 		{
 			name:     "ctrl+a",
-			msg:      tea.KeyMsg{Type: tea.KeyCtrlA},
+			msg:      tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl},
 			expected: []byte{'\x01'},
 		},
 		{
 			name:     "ctrl+l",
-			msg:      tea.KeyMsg{Type: tea.KeyCtrlL},
+			msg:      tea.KeyPressMsg{Code: 'l', Mod: tea.ModCtrl},
 			expected: []byte{'\x0c'},
 		},
 	}
@@ -160,13 +160,13 @@ func TestKeyToBytes(t *testing.T) {
 func TestKeyToBytesAppCursorMode(t *testing.T) {
 	tests := []struct {
 		name     string
-		msg      tea.KeyMsg
+		msg      tea.KeyPressMsg
 		expected []byte
 	}{
-		{name: "up", msg: tea.KeyMsg{Type: tea.KeyUp}, expected: []byte{'\x1b', 'O', 'A'}},
-		{name: "down", msg: tea.KeyMsg{Type: tea.KeyDown}, expected: []byte{'\x1b', 'O', 'B'}},
-		{name: "right", msg: tea.KeyMsg{Type: tea.KeyRight}, expected: []byte{'\x1b', 'O', 'C'}},
-		{name: "left", msg: tea.KeyMsg{Type: tea.KeyLeft}, expected: []byte{'\x1b', 'O', 'D'}},
+		{name: "up", msg: tea.KeyPressMsg{Code: tea.KeyUp}, expected: []byte{'\x1b', 'O', 'A'}},
+		{name: "down", msg: tea.KeyPressMsg{Code: tea.KeyDown}, expected: []byte{'\x1b', 'O', 'B'}},
+		{name: "right", msg: tea.KeyPressMsg{Code: tea.KeyRight}, expected: []byte{'\x1b', 'O', 'C'}},
+		{name: "left", msg: tea.KeyPressMsg{Code: tea.KeyLeft}, expected: []byte{'\x1b', 'O', 'D'}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -182,18 +182,18 @@ func TestKeyToBytesAppCursorMode(t *testing.T) {
 func TestKeyToBytesAppCursorFallthrough(t *testing.T) {
 	tests := []struct {
 		name     string
-		msg      tea.KeyMsg
+		msg      tea.KeyPressMsg
 		expected []byte
 	}{
-		{name: "runes unchanged", msg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}, expected: []byte("a")},
-		{name: "enter unchanged", msg: tea.KeyMsg{Type: tea.KeyEnter}, expected: []byte{'\r'}},
-		{name: "tab unchanged", msg: tea.KeyMsg{Type: tea.KeyTab}, expected: []byte{'\t'}},
-		{name: "home unchanged", msg: tea.KeyMsg{Type: tea.KeyHome}, expected: []byte{'\x1b', '[', 'H'}},
-		{name: "end unchanged", msg: tea.KeyMsg{Type: tea.KeyEnd}, expected: []byte{'\x1b', '[', 'F'}},
-		{name: "pgup unchanged", msg: tea.KeyMsg{Type: tea.KeyPgUp}, expected: []byte{'\x1b', '[', '5', '~'}},
-		{name: "pgdown unchanged", msg: tea.KeyMsg{Type: tea.KeyPgDown}, expected: []byte{'\x1b', '[', '6', '~'}},
-		{name: "delete unchanged", msg: tea.KeyMsg{Type: tea.KeyDelete}, expected: []byte{'\x1b', '[', '3', '~'}},
-		{name: "ctrl+c unchanged", msg: tea.KeyMsg{Type: tea.KeyCtrlC}, expected: []byte{'\x03'}},
+		{name: "runes unchanged", msg: tea.KeyPressMsg{Code: 'a', Text: "a"}, expected: []byte("a")},
+		{name: "enter unchanged", msg: tea.KeyPressMsg{Code: tea.KeyEnter}, expected: []byte{'\r'}},
+		{name: "tab unchanged", msg: tea.KeyPressMsg{Code: tea.KeyTab}, expected: []byte{'\t'}},
+		{name: "home unchanged", msg: tea.KeyPressMsg{Code: tea.KeyHome}, expected: []byte{'\x1b', '[', 'H'}},
+		{name: "end unchanged", msg: tea.KeyPressMsg{Code: tea.KeyEnd}, expected: []byte{'\x1b', '[', 'F'}},
+		{name: "pgup unchanged", msg: tea.KeyPressMsg{Code: tea.KeyPgUp}, expected: []byte{'\x1b', '[', '5', '~'}},
+		{name: "pgdown unchanged", msg: tea.KeyPressMsg{Code: tea.KeyPgDown}, expected: []byte{'\x1b', '[', '6', '~'}},
+		{name: "delete unchanged", msg: tea.KeyPressMsg{Code: tea.KeyDelete}, expected: []byte{'\x1b', '[', '3', '~'}},
+		{name: "ctrl+c unchanged", msg: tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}, expected: []byte{'\x03'}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

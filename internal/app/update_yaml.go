@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -23,7 +23,7 @@ func (m Model) yamlViewportLines() int {
 	return lines
 }
 
-func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleYAMLKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// When in search input mode, handle text input.
 	if m.yamlView.searchMode {
 		return m.handleYAMLSearchInput(msg)
@@ -44,7 +44,7 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // the query matches anything. Enter still ends search-input mode and
 // scrolls to the first match -- it's the "commit" action; typing only
 // drives the live highlight overlay.
-func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleYAMLSearchInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	viewportLines := m.yamlViewportLines()
 
 	switch msg.String() {
@@ -90,8 +90,8 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.yamlView.matchLines = nil
 		return m, nil
 	default:
-		if len(msg.String()) == 1 || msg.String() == " " {
-			m.yamlView.searchText.Insert(msg.String())
+		if msg.Text != "" {
+			m.yamlView.searchText.Insert(msg.Text)
 			m.updateYAMLSearchMatches()
 		}
 		return m, nil
@@ -161,7 +161,7 @@ func (m Model) yamlMaxScroll(totalVisible int) int {
 // handleYAMLNormalKey handles key events in normal YAML viewing mode.
 //
 //nolint:gocyclo // flat key dispatcher: complexity is "number of keys we route", not branching depth
-func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleYAMLNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	viewportLines := m.yamlViewportLines()
 	maxScroll := m.yamlMaxScroll(totalVisible)

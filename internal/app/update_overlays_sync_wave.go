@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"math"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // handleSyncWaveOverlayKey routes overlay keys for the Sync Wave Timeline:
 // pane-agnostic keys (close, refresh, Tab) first, then dispatches to the
 // per-pane handler based on activePane.
-func (m Model) handleSyncWaveOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSyncWaveOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		// Rotate the session token first so any in-flight skeleton/full
@@ -63,7 +63,7 @@ func (m Model) handleSyncWaveOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // j/k move sidebarCursor (with wraparound) and reset the body cursor +
 // scroll for the new phase. g/G jump to the first/last phase. Enter and
 // Space toggle collapse on the focused phase.
-func (m Model) handleSyncWaveSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSyncWaveSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.syncWave.data == nil {
 		return m, nil
 	}
@@ -126,7 +126,7 @@ func togglePhaseCollapse(s *syncWaveState) {
 // j/k advance/retreat through the sequence, g/G jump to ends,
 // Ctrl+D/U/F/B half/full page scroll, Enter toggles wave or phase
 // collapse depending on the cursor row kind.
-func (m Model) handleSyncWaveBodyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSyncWaveBodyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.syncWave.data == nil || m.syncWave.sidebarCursor < 0 || m.syncWave.sidebarCursor >= len(m.syncWave.data.Phases) {
 		return m, nil
 	}

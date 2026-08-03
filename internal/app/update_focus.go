@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // updateBlur handles tea.BlurMsg. It flips the focus flag so the next watch

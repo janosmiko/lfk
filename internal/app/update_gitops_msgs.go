@@ -3,7 +3,7 @@ package app
 import (
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) updateAutoSyncLoaded(msg autoSyncLoadedMsg) (tea.Model, tea.Cmd) {

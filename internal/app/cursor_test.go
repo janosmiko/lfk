@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1964,7 +1964,7 @@ func TestCov80HandleMouseWheelUpInExplorer(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeExplorer
 	m.setCursor(2)
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp}
 	result, _ := m.handleMouse(msg)
 	rm := result.(Model)
 	assert.LessOrEqual(t, rm.cursor(), 2)
@@ -1974,7 +1974,7 @@ func TestCov80HandleMouseWheelDownInExplorer(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeExplorer
 	m.setCursor(0)
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelDown}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelDown}
 	result, _ := m.handleMouse(msg)
 	_ = result.(Model)
 }
@@ -2125,7 +2125,7 @@ func TestCovMouseScrollUpExplorer(t *testing.T) {
 		m.middleItems[i] = model.Item{Name: "item"}
 	}
 	m.setCursor(10)
-	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	result, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	rm := result.(Model)
 	assert.Less(t, rm.cursor(), 10)
 }
@@ -2138,7 +2138,7 @@ func TestCovMouseScrollDownExplorer(t *testing.T) {
 		m.middleItems[i] = model.Item{Name: "item"}
 	}
 	m.setCursor(0)
-	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	result, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	rm := result.(Model)
 	assert.Greater(t, rm.cursor(), 0)
 }
@@ -2671,7 +2671,7 @@ func TestCovUpdateMouseMsg(t *testing.T) {
 		m.middleItems[i] = model.Item{Name: "item"}
 	}
 	m.setCursor(5)
-	result, _ := m.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	result, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	rm := result.(Model)
 	assert.Less(t, rm.cursor(), 5)
 }
@@ -2719,7 +2719,7 @@ func TestCovHandleKeyExplorerDown(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeExplorer
 	m.setCursor(0)
-	result, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyDown})
+	result, _ := m.handleKey(tea.KeyPressMsg{Code: tea.KeyDown})
 	rm := result.(Model)
 	assert.Equal(t, 1, rm.cursor())
 }

@@ -4,11 +4,11 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDescribeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle search input mode first.
 	if m.describeView.searchActive {
 		return m.handleDescribeSearchKey(msg)
@@ -25,7 +25,7 @@ func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleDescribeNormalKey handles key events in normal describe view mode.
 //
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
-func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDescribeNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	lines := strings.Split(m.describeView.content, "\n")
 	maxIdx := max(len(lines)-1, 0)
 	key := msg.String()
@@ -256,7 +256,7 @@ func (m Model) describeEnterVisual(mode byte) (tea.Model, tea.Cmd) {
 }
 
 // handleDescribeVisualKey handles keys while visual mode is active in the describe view.
-func (m Model) handleDescribeVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDescribeVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	lines := strings.Split(m.describeView.content, "\n")
 	maxIdx := max(len(lines)-1, 0)
 	key := msg.String()
@@ -381,7 +381,7 @@ func (m Model) describeVisualCopy(lines []string) (tea.Model, tea.Cmd) {
 }
 
 // handleDescribeSearchKey handles keyboard input during describe search.
-func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleDescribeSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.describeView.searchActive = false
@@ -410,9 +410,8 @@ func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.describeView.searchInput.Insert(key)
+		if msg.Text != "" {
+			m.describeView.searchInput.Insert(msg.Text)
 			// Live-update the highlight query so matches paint as the
 			// user types instead of waiting for Enter to commit.
 			m.describeView.searchQuery = m.describeView.searchInput.Value

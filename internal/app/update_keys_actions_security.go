@@ -5,7 +5,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -18,7 +18,7 @@ import (
 // applies to the Logs key at the cluster picker. Off a security view it
 // returns handled=false with the model untouched, so the key keeps its normal
 // global meaning everywhere else.
-func (m Model) handleExplorerSecurityViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerSecurityViewKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	if !onSecurityView(&m) {
 		return m, nil, false
 	}

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +18,7 @@ import (
 // user navigates away.
 
 func wheel(m Model, button tea.MouseButton, x int) Model {
-	mdl, _ := m.handleMouse(tea.MouseMsg{Button: button, X: x})
+	mdl, _ := m.handleMouse(tea.MouseClickMsg{Button: button, X: x})
 	return mdl.(Model)
 }
 
@@ -42,13 +42,13 @@ func TestWheelMomentumDoesNotLeakAcrossPanes(t *testing.T) {
 	m.previewScroll = 10
 
 	// Burst tick 1 over the right pane (X=100 >= middleEnd=75) scrolls preview.
-	m = wheel(m, tea.MouseButtonWheelUp, 100)
+	m = wheel(m, tea.MouseWheelUp, 100)
 	require.Less(t, m.previewScroll, 10, "wheel over the right pane scrolls the preview")
 	cursorBefore := m.cursor()
 
 	// Same burst, pointer now over the middle list: the momentum tail must be
 	// dropped, not moved onto the list cursor.
-	m = wheel(m, tea.MouseButtonWheelDown, 30)
+	m = wheel(m, tea.MouseWheelDown, 30)
 	assert.Equal(t, cursorBefore, m.cursor(),
 		"momentum from the preview pane must not scroll the list once the pointer moves")
 }
@@ -59,7 +59,7 @@ func TestWheelMomentumStopsAtListBottom(t *testing.T) {
 
 	// Fling down through the whole list within a single burst.
 	for range 10 {
-		m = wheel(m, tea.MouseButtonWheelDown, 30)
+		m = wheel(m, tea.MouseWheelDown, 30)
 	}
 	require.Equal(t, len(m.middleItems)-1, m.cursor(), "cursor reaches the last item")
 	assert.True(t, m.wheel.dead, "reaching the list bottom empties the momentum queue")
@@ -71,7 +71,7 @@ func TestWheelMomentumStopsAtListTop(t *testing.T) {
 	m.setCursor(1)
 
 	for range 5 {
-		m = wheel(m, tea.MouseButtonWheelUp, 30)
+		m = wheel(m, tea.MouseWheelUp, 30)
 	}
 	require.Equal(t, 0, m.cursor(), "cursor reaches the first item")
 	assert.True(t, m.wheel.dead, "reaching the list top empties the momentum queue")
@@ -81,7 +81,7 @@ func TestWheelMomentumStopsAtListTop(t *testing.T) {
 // not scroll the list it returns to (user rule 2, the reporter's repro).
 func TestNavigateLeftEmptiesWheelQueue(t *testing.T) {
 	m := longListModel(30)
-	m = wheel(m, tea.MouseButtonWheelDown, 30) // start a burst on the middle list
+	m = wheel(m, tea.MouseWheelDown, 30) // start a burst on the middle list
 	require.False(t, m.wheel.dead)
 
 	mdl, _ := m.navigateParent()
@@ -126,7 +126,7 @@ func TestWheelMomentumTailAfterNavStaysDropped(t *testing.T) {
 	m.wheel.lastAt = time.Now().Add(-200 * time.Millisecond)
 
 	before := m.cursor()
-	m = wheel(m, tea.MouseButtonWheelUp, 30)
+	m = wheel(m, tea.MouseWheelUp, 30)
 	assert.Equal(t, before, m.cursor(),
 		"a sparse momentum tail after navigation must not scroll the list")
 }
@@ -140,6 +140,6 @@ func TestNewWheelBurstScrollsAfterPause(t *testing.T) {
 	m.wheel.target = "ex-cursor"
 	m.wheel.lastAt = time.Now().Add(-time.Second) // long pause -> new burst
 
-	m = wheel(m, tea.MouseButtonWheelDown, 30)
+	m = wheel(m, tea.MouseWheelDown, 30)
 	assert.Greater(t, m.cursor(), 5, "a fresh burst after a pause scrolls normally")
 }

@@ -4,15 +4,15 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		text := strings.TrimRight(string(msg.Runes), "\n")
+	if isPaste(msg) {
+		text := strings.TrimRight(msg.Text, "\n")
 		if strings.Contains(text, "\n") {
 			m.triggerPasteConfirm(text, pasteTargetSearch)
 			return m, nil
@@ -106,9 +106,8 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.searchInput.Insert(key)
+		if msg.Text != "" {
+			m.searchInput.Insert(msg.Text)
 			m.jumpToSearchMatch(0)
 			m.queryHistory.leaveBrowse()
 		}

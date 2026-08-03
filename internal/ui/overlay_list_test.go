@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -158,7 +158,7 @@ func TestRenderOverlayList(t *testing.T) {
 		}
 		out := RenderOverlayList(items, OverlayListConfig{ShowActiveMarker: true}, w)
 		assert.Contains(t, out, "✓", "default marker still used for items without an override")
-		assert.Contains(t, out, "! B", "overridden item renders its custom marker")
+		assert.Contains(t, stripANSI(out), "! B", "overridden item renders its custom marker")
 	})
 
 	t.Run("active-marker column collapses when no item is active", func(t *testing.T) {

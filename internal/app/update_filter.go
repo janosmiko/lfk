@@ -3,13 +3,13 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
-	if msg.Paste {
-		text := strings.TrimRight(string(msg.Runes), "\n")
+	if isPaste(msg) {
+		text := strings.TrimRight(msg.Text, "\n")
 		if strings.Contains(text, "\n") {
 			m.triggerPasteConfirm(text, pasteTargetFilter)
 			return m, nil
@@ -117,9 +117,8 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.filterInput.Insert(key)
+		if msg.Text != "" {
+			m.filterInput.Insert(msg.Text)
 			m.filterText = m.filterInput.Value
 			m.setCursor(0)
 			m.clampCursor()

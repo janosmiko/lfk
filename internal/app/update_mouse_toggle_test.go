@@ -3,15 +3,15 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // mouseToggleKey is the default MouseToggle binding, Ctrl+Option+Y, which
-// Bubble Tea reports as "alt+ctrl+y" (Alt prefix from the Option/Meta key).
-var mouseToggleKey = tea.KeyMsg{Type: tea.KeyCtrlY, Alt: true}
+// Bubble Tea reports as "ctrl+alt+y" (modifiers print in a fixed order).
+var mouseToggleKey = tea.KeyPressMsg{Code: 'y', Mod: tea.ModCtrl | tea.ModAlt}
 
 func TestMouseToggleSuspendsAndResumesCapture(t *testing.T) {
 	m := baseExplorerModel()

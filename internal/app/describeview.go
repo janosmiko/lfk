@@ -1,6 +1,6 @@
 package app
 
-import tea "github.com/charmbracelet/bubbletea"
+import tea "charm.land/bubbletea/v2"
 
 // describeViewState holds all state for the full-screen describe viewer (the
 // `kubectl describe`-style output view). It groups the previously flat

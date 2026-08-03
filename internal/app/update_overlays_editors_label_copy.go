@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -32,7 +32,7 @@ func (m Model) handleLabelEditorKeyS() (tea.Model, tea.Cmd) {
 // handleLabelFormatPickerKey services the Shift+Y format picker.
 // Apply target = selected keys (within the active tab), falling back
 // to the cursor row.
-func (m Model) handleLabelFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLabelFormatPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.editorFormatCancel()

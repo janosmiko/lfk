@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
@@ -167,7 +167,7 @@ func TestDescribeKeyCtrlDHalfPageDown(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleDescribeKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	// describeContentHeight() = (40 - 4) = 36, half = 18
 	assert.Equal(t, 18, result.describeView.cursor)
@@ -185,7 +185,7 @@ func TestDescribeKeyCtrlUHalfPageUp(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleDescribeKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 12, result.describeView.cursor) // 30 - 18 = 12
 }
@@ -202,7 +202,7 @@ func TestDescribeKeyCtrlUClampsToZero(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleDescribeKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.describeView.cursor)
 }
@@ -219,7 +219,7 @@ func TestDescribeKeyCtrlFFullPageDown(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _ := m.handleDescribeKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 36, result.describeView.cursor) // describeContentHeight() = 36
 }
@@ -236,7 +236,7 @@ func TestDescribeKeyCtrlBFullPageUp(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _ := m.handleDescribeKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 24, result.describeView.cursor) // 60 - 36 = 24
 }
@@ -445,7 +445,7 @@ func TestDiffKeyHashTogglesLineNumbers(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleDiffKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'#'}})
+	ret, _ := m.handleDiffKey(tea.KeyPressMsg{Code: '#', Text: "#"})
 	result := ret.(Model)
 	assert.True(t, result.diffView.lineNumbers)
 }

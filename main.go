@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
@@ -226,10 +226,10 @@ func runTUI(opts app.StartupOptions) error {
 	m := app.NewModel(client, opts)
 	m.SetVersion(version.Short())
 	m.SetStderrChan(stderrCapture.MsgChan)
-	progOpts := []tea.ProgramOption{tea.WithAltScreen(), tea.WithReportFocus()}
-	if !opts.NoMouse && ui.ConfigMouse {
-		progOpts = append(progOpts, tea.WithMouseCellMotion())
-	}
+	// Alt-screen, focus reporting and mouse capture are no longer program
+	// options in Bubble Tea v2 — the model declares them on every render from
+	// Model.View. The startup mouse decision lives in NewModel, which mirrors
+	// this same --no-mouse / config check.
 	if ui.ColorModeEnabled() {
 		defer ui.DisableColorModeNotifications()
 	}
@@ -246,7 +246,7 @@ func runTUI(opts app.StartupOptions) error {
 		func() { p.Kill(); p.Wait() },
 		func() { os.Exit(0) },
 	))
-	p = tea.NewProgram(m, progOpts...)
+	p = tea.NewProgram(m)
 
 	// ErrProgramKilled is expected when the watchdog force-quits; treat it
 	// as a clean exit rather than surfacing it as a startup failure.

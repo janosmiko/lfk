@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
 )
@@ -146,7 +146,7 @@ func TestPortForwardOverlayCancelClearsIntent(t *testing.T) {
 	m.pfOpenInBrowserAfterStart = true
 	m.overlay = overlayPortForward
 
-	ret, _ := m.handlePortForwardOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret, _ := m.handlePortForwardOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	result := ret.(Model)
 
 	assert.Equal(t, overlayNone, result.overlay)

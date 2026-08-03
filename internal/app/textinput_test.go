@@ -454,7 +454,7 @@ func TestTextInput_DeleteLine(t *testing.T) {
 
 func TestHandleFilterKeyCtrlU(t *testing.T) {
 	ti := &TextInput{Value: "hello world", Cursor: 5}
-	action := handleFilterKey(ti, "ctrl+u")
+	action := handleFilterKey(ti, keyMsg("ctrl+u"))
 	assert.Equal(t, filterContinue, action)
 	assert.Equal(t, " world", ti.Value)
 	assert.Equal(t, 0, ti.Cursor)

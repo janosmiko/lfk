@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -117,7 +115,7 @@ func TestRenderSecretEditorOverlay_SearchFiltersKeys(t *testing.T) {
 	assert.Contains(t, out, "API_TOKEN", "filter API matches API_TOKEN")
 	assert.NotContains(t, out, "DB_PASSWORD", "DB_PASSWORD doesn't contain 'API' — must be filtered out")
 	assert.NotContains(t, out, "AWS_KEY", "AWS_KEY doesn't contain 'API' — must be filtered out")
-	assert.Contains(t, out, "/ API", "search bar must show the active query so the user sees what's filtering")
+	assert.Contains(t, stripANSI(out), "/ API", "search bar must show the active query so the user sees what's filtering")
 }
 
 // TestRenderSecretEditorOverlay_InnerPanelMatchesOuterBg pins the
@@ -132,22 +130,18 @@ func TestRenderSecretEditorOverlay_SearchFiltersKeys(t *testing.T) {
 // the rendered overlay (one per row, plus borders). This is a
 // structural assertion that catches a regression to fg-only styling.
 func TestRenderSecretEditorOverlay_InnerPanelMatchesOuterBg(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	originalTransparent := ConfigTransparentBg
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ConfigNoColor = originalNoColor
 		ConfigTransparentBg = originalTransparent
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
 	ConfigTransparentBg = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
 	// ApplyTheme restores originalColorProfile (theme.go:109-110), so
 	// re-force TrueColor for the SGR-counting check to be observable.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	secret := &model.SecretData{
 		Keys: []string{"DB_PASSWORD"},
@@ -175,20 +169,16 @@ func TestRenderSecretEditorOverlay_InnerPanelMatchesOuterBg(t *testing.T) {
 // editing mode, no SGR-tail signature (";\d+;\d+;\d+m" or similar)
 // remains in the visible text.
 func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	originalTransparent := ConfigTransparentBg
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
 		ConfigNoColor = originalNoColor
 		ConfigTransparentBg = originalTransparent
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
 	ConfigTransparentBg = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	secret := &model.SecretData{
 		Keys: []string{"DB_PASSWORD"},
@@ -516,8 +506,8 @@ func TestRenderSecretEditorTable(t *testing.T) {
 		result := renderSecretEditorTable(secret, 0, nil, false, false, "", 0, "", 0, 0, nil, 60, 20)
 		// Headers stay visible above the placeholder; lipgloss/table
 		// renders them uppercase.
-		assert.Contains(t, result, "KEY")
-		assert.Contains(t, result, "VALUE")
+		assert.Contains(t, stripANSI(result), "KEY")
+		assert.Contains(t, stripANSI(result), "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add a key)")
 	})
 

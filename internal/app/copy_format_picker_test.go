@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -316,7 +316,7 @@ func TestCopyFormatPicker_EscClosesViaRouter(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "a"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
-	mdl, _ := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	r := mdl.(Model)
 	assert.False(t, r.copyFormatPicker.active, "esc cancels picker")
 }
@@ -327,7 +327,7 @@ func TestCopyFormatPicker_DownKeyAdvancesCursor(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "a"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
-	mdl, _ := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	mdl, _ := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	r := mdl.(Model)
 	assert.Equal(t, 1, r.copyFormatPicker.cursor, "j moves cursor down")
 }
@@ -339,7 +339,7 @@ func TestCopyFormatPicker_UpKeyMovesCursor(t *testing.T) {
 	m.setCursor(0)
 	m.openCopyFormatPicker()
 	m.copyFormatPicker.cursor = 2
-	mdl, _ := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	mdl, _ := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	r := mdl.(Model)
 	assert.Equal(t, 1, r.copyFormatPicker.cursor, "k moves cursor up")
 }
@@ -350,7 +350,7 @@ func TestCopyFormatPicker_TShortcutAppliesTable(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "a"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
-	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 't', Text: "t"})
 	r := mdl.(Model)
 	assert.False(t, r.copyFormatPicker.active, "t applies Table and closes picker")
 	require.NotNil(t, cmd, "table dispatch returns non-nil cmd")
@@ -364,7 +364,7 @@ func TestCopyFormatPicker_YShortcutAppliesYAML(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "a", Kind: "Pod"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
-	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	r := mdl.(Model)
 	assert.False(t, r.copyFormatPicker.active, "y applies YAML and closes picker")
 	require.NotNil(t, cmd, "yaml dispatch returns non-nil cmd")
@@ -381,7 +381,7 @@ func TestCopyFormatPicker_JShortcutAppliesJSON(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "a", Kind: "Pod"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
-	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 'J', Text: "J"})
 	r := mdl.(Model)
 	assert.False(t, r.copyFormatPicker.active, "J applies JSON and closes picker")
 	require.NotNil(t, cmd, "json dispatch returns non-nil cmd")
@@ -400,7 +400,7 @@ func TestCopyFormatPicker_EnterAppliesCursorRow(t *testing.T) {
 			break
 		}
 	}
-	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	r := mdl.(Model)
 	assert.False(t, r.copyFormatPicker.active, "enter applies and closes picker")
 	require.NotNil(t, cmd)
@@ -415,7 +415,7 @@ func TestCopyFormatPicker_UnhandledKeyIsNoOp(t *testing.T) {
 	m.setCursor(0)
 	m.openCopyFormatPicker()
 	cursorBefore := m.copyFormatPicker.cursor
-	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("z")})
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 'z', Text: "z"})
 	r := mdl.(Model)
 	assert.True(t, r.copyFormatPicker.active, "unhandled key leaves picker open")
 	assert.Equal(t, cursorBefore, r.copyFormatPicker.cursor, "unhandled key doesn't move cursor")

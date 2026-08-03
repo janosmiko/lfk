@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -453,7 +453,7 @@ func renderAutoSyncOverlay(m Model) string {
 		CursorHighlightWidth: labelW,
 		Height:               contentH,
 	}, innerW)
-	return ui.OverlayStyle.Width(boxW).Render(content)
+	return ui.BoxWidth(ui.OverlayStyle, boxW).Render(content)
 }
 
 // renderHelmHistoryOverlay maps the Helm release-history viewer onto
@@ -472,11 +472,11 @@ func renderHelmHistoryOverlay(m Model) string {
 	)
 	if m.helmRevisionsLoading {
 		boxW := max(m.width*80/100, 60)
-		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
+		return ui.BoxWidth(ui.OverlayStyle, boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
 	}
 	if len(m.helmHistoryRevisions) == 0 {
 		boxW := max(m.width*80/100, 60)
-		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+		return ui.BoxWidth(ui.OverlayStyle, boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
 	}
 
 	boxW := max(m.width*80/100, 60)
@@ -509,7 +509,7 @@ func renderHelmHistoryOverlay(m Model) string {
 		MaxVisible: maxVisible,
 		Height:     contentH,
 	}, innerW)
-	return ui.OverlayStyle.Width(boxW).Render(content)
+	return ui.BoxWidth(ui.OverlayStyle, boxW).Render(content)
 }
 
 // renderHelmRollbackOverlay mirrors renderHelmHistoryOverlay for the
@@ -525,11 +525,11 @@ func renderHelmRollbackOverlay(m Model) string {
 	)
 	if m.helmRevisionsLoading {
 		boxW := max(m.width*80/100, 60)
-		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
+		return ui.BoxWidth(ui.OverlayStyle, boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
 	}
 	if len(m.helmRollbackRevisions) == 0 {
 		boxW := max(m.width*80/100, 60)
-		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+		return ui.BoxWidth(ui.OverlayStyle, boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
 	}
 
 	boxW := max(m.width*80/100, 60)
@@ -560,7 +560,7 @@ func renderHelmRollbackOverlay(m Model) string {
 		MaxVisible: maxVisible,
 		Height:     contentH,
 	}, innerW)
-	return ui.OverlayStyle.Width(boxW).Render(content)
+	return ui.BoxWidth(ui.OverlayStyle, boxW).Render(content)
 }
 
 // renderRollbackOverlay maps the Deployment rollback picker onto
@@ -574,7 +574,7 @@ func renderRollbackOverlay(m Model) string {
 	)
 	if len(m.rollbackRevisions) == 0 {
 		boxW := max(m.width*70/100, 50)
-		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+		return ui.BoxWidth(ui.OverlayStyle, boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
 	}
 
 	boxW := max(m.width*70/100, 50)
@@ -610,7 +610,7 @@ func renderRollbackOverlay(m Model) string {
 		MaxVisible: maxVisible,
 		Height:     contentH,
 	}, innerW)
-	return ui.OverlayStyle.Width(boxW).Render(content)
+	return ui.BoxWidth(ui.OverlayStyle, boxW).Render(content)
 }
 
 // renderClusterColorOverlay maps the cluster-color picker (with its

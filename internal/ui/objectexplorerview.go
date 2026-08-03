@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -71,13 +71,13 @@ func renderObjectExplorerLayout(d objectExplorerColumnDims, middleHeader string,
 	leftCol := leftHeader + "\n" + leftBody
 	leftCol = PadToHeight(leftCol, d.contentHeight)
 	leftCol = FillLinesBg(leftCol, d.leftInner, BaseBg)
-	left := InactiveColumnStyle.Width(d.leftW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(leftCol)
+	left := BoxHeight(BoxWidth(InactiveColumnStyle, d.leftW), d.contentHeight).MaxHeight(d.contentHeight + 2).Render(leftCol)
 
 	// Middle column: field list with inline values (active).
 	middleContent := middleHeader + "\n" + strings.Join(fieldLines, "\n")
 	middleContent = PadToHeight(middleContent, d.contentHeight)
 	middleContent = FillLinesBg(middleContent, d.middleInner, BaseBg)
-	middle := ActiveColumnStyle.Width(d.middleW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(middleContent)
+	middle := BoxHeight(BoxWidth(ActiveColumnStyle, d.middleW), d.contentHeight).MaxHeight(d.contentHeight + 2).Render(middleContent)
 
 	// Right column: YAML preview of the selected node's subtree (inactive),
 	// scrolled by previewScroll.
@@ -91,7 +91,7 @@ func renderObjectExplorerLayout(d objectExplorerColumnDims, middleHeader string,
 	rightContent := rightHeader + "\n" + previewBody
 	rightContent = PadToHeight(rightContent, d.contentHeight)
 	rightContent = FillLinesBg(rightContent, d.rightInner, BaseBg)
-	right := InactiveColumnStyle.Width(d.rightW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(rightContent)
+	right := BoxHeight(BoxWidth(InactiveColumnStyle, d.rightW), d.contentHeight).MaxHeight(d.contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 	framed := explorerFrameStyle().Render(columns)

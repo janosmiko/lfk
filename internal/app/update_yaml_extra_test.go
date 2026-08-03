@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,7 +122,7 @@ func TestYAMLKeyCtrlDU(t *testing.T) {
 	t.Run("ctrl+d moves down half page", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.cursor = 0
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, m.yamlViewportLines()/2, result.yamlView.cursor)
 		assert.Equal(t, 17, result.yamlView.cursor)
@@ -131,7 +131,7 @@ func TestYAMLKeyCtrlDU(t *testing.T) {
 	t.Run("ctrl+u moves up half page", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.cursor = 30
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 30-m.yamlViewportLines()/2, result.yamlView.cursor)
 		assert.Equal(t, 13, result.yamlView.cursor)
@@ -140,7 +140,7 @@ func TestYAMLKeyCtrlDU(t *testing.T) {
 	t.Run("ctrl+u clamps at zero", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.cursor = 5
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 0, result.yamlView.cursor)
 	})
@@ -152,7 +152,7 @@ func TestYAMLKeyCtrlFB(t *testing.T) {
 	t.Run("ctrl+f moves down full page", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.cursor = 0
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, m.yamlViewportLines(), result.yamlView.cursor)
 		assert.Equal(t, 35, result.yamlView.cursor)
@@ -161,7 +161,7 @@ func TestYAMLKeyCtrlFB(t *testing.T) {
 	t.Run("ctrl+b moves up full page", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.cursor = 45
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 45-m.yamlViewportLines(), result.yamlView.cursor)
 		assert.Equal(t, 10, result.yamlView.cursor)
@@ -265,7 +265,7 @@ func TestYAMLKeyVEntersVisualMode(t *testing.T) {
 	t.Run("ctrl+v enters block visual", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.cursor = 1
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.True(t, result.yamlView.visualMode)
 		assert.Equal(t, rune('B'), result.yamlView.visualType)
@@ -338,7 +338,7 @@ func TestYAMLSearchModeCtrlW(t *testing.T) {
 	m := baseYAMLModel()
 	m.yamlView.searchMode = true
 	m.yamlView.searchText = TextInput{Value: "hello world", Cursor: 11}
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.yamlView.searchText.Value)
 }
@@ -401,7 +401,7 @@ func TestYAMLVisualModeCtrlVToggle(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.visualMode = true
 		m.yamlView.visualType = 'B'
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.False(t, result.yamlView.visualMode)
 	})
@@ -410,7 +410,7 @@ func TestYAMLVisualModeCtrlVToggle(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlView.visualMode = true
 		m.yamlView.visualType = 'v'
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.True(t, result.yamlView.visualMode)
 		assert.Equal(t, rune('B'), result.yamlView.visualType)
@@ -507,7 +507,7 @@ func TestYAMLVisualModeCtrlDU(t *testing.T) {
 		m.yamlView.visualMode = true
 		m.yamlView.visualType = 'V'
 		m.yamlView.cursor = 0
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, m.yamlViewportLines()/2, result.yamlView.cursor)
 	})
@@ -517,7 +517,7 @@ func TestYAMLVisualModeCtrlDU(t *testing.T) {
 		m.yamlView.visualMode = true
 		m.yamlView.visualType = 'V'
 		m.yamlView.cursor = 30
-		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+		ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 30-m.yamlViewportLines()/2, result.yamlView.cursor)
 	})
@@ -566,7 +566,7 @@ func TestYAMLKeyCtrlC(t *testing.T) {
 	m := baseYAMLModel()
 	m.yamlView.scroll = 10
 	m.yamlView.cursor = 5
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlC})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, modeExplorer, result.mode)
 	assert.Equal(t, 0, result.yamlView.scroll)
@@ -578,7 +578,7 @@ func TestYAMLVisualModeCtrlCExits(t *testing.T) {
 	m.yamlView.visualMode = true
 	m.yamlView.visualType = 'V'
 	m.yamlView.cursor = 5
-	ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlC})
+	ret, _ := m.handleYAMLKey(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.False(t, result.yamlView.visualMode)
 	assert.Equal(t, modeExplorer, result.mode)

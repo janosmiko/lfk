@@ -3,8 +3,8 @@ package ui
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -68,9 +68,10 @@ func kvFieldBox(label, content string, active bool, outerW, contentH int) string
 		Border(lipgloss.RoundedBorder()).
 		BorderBackground(BaseBg).
 		Background(BaseBg).
-		Padding(0, 1).
-		Width(outerW - 2). // -2 for left/right borders
-		Height(contentH)
+		Padding(0, 1)
+	// -2 for the left/right borders; BoxWidth/BoxHeight add them back, since
+	// lipgloss v2 counts the border inside Width/Height.
+	border = BoxHeight(BoxWidth(border, outerW-2), contentH)
 
 	if active {
 		border = border.BorderForeground(lipgloss.Color(ColorPrimary))

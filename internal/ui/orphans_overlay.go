@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 )
@@ -113,7 +113,7 @@ func OrphanChipLines(counts OrphanCounts, width int) int {
 // RenderOrphansOverlay produces the cluster-wide orphan overlay content,
 // padded to exactly `height-2` lines so the OverlayStyle frame stays a
 // fixed size regardless of how many rows are in the report. Caller wraps
-// the result in `OverlayStyle.Width(width).Height(height).Render(...)`.
+// the result in `BoxHeight(BoxWidth(OverlayStyle, width), height).Render(...)`.
 //
 // `activeChip` is 0=All, 1=Pod, 2=Secret, 3=ConfigMap, 4=Service.
 // `scroll` is the first visible row index — caller maintains it via

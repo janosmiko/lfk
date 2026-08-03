@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -15,7 +15,7 @@ import (
 // resource actions, and configurable direct-action keybindings.
 // Returns (model, cmd, handled) where handled indicates whether the key
 // was consumed. If not handled, the caller should fall through.
-func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	// Security-view-scoped keys take precedence so they can shadow global
 	// action keys that are meaningless on a security view (e.g. the
 	// show-ignored toggle reuses LabelEditor's key on finding rows).
@@ -35,7 +35,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 }
 
 // handleExplorerNavKeys handles navigation and scroll keybindings.
-func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerNavKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case kb.AllNamespaces:
@@ -81,7 +81,7 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 }
 
 // handleExplorerToolKeys handles tool/editor keybindings.
-func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerToolKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case kb.OpenBrowser:
@@ -200,7 +200,7 @@ func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 }
 
 // handleExplorerDirectActionKeys handles configurable direct action keybindings.
-func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerDirectActionKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	key := msg.String()
 	switch key {

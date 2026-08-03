@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +44,7 @@ func copyFieldOpenPicker(t *testing.T, m Model) Model {
 // tabToFields switches the picker into fields mode.
 func tabToFields(t *testing.T, m Model) Model {
 	t.Helper()
-	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyTab})
+	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	res, ok := mdl.(Model)
 	require.True(t, ok)
 	require.Equal(t, copyFieldModeFields, res.copyFieldPicker.mode)
@@ -78,7 +78,7 @@ func TestCopyFieldPicker_TabTogglesToSemanticFields(t *testing.T) {
 	assert.NotNil(t, findCopyFieldEntry(vis, "status.addresses[ExternalIP].address"))
 
 	// Tab back returns to columns.
-	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyTab})
+	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	m = mdl.(Model)
 	assert.Equal(t, copyFieldModeColumns, m.copyFieldPicker.mode)
 	assert.NotNil(t, findCopyFieldEntry(m.visibleCopyFieldEntries(), "NAME"))
@@ -223,11 +223,11 @@ func TestCopyFieldPickerKeys_FilterTypingAndEscape(t *testing.T) {
 	m := copyFieldOpenPicker(t, copyFieldTestModel(t))
 	m = tabToFields(t, m)
 
-	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = mdl.(Model)
 	assert.True(t, m.copyFieldPicker.filterActive)
 
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("kubelet")})
+	mdl, _ = m.handleCopyFieldPickerKey(keyPressText("kubelet"))
 	m = mdl.(Model)
 	assert.Equal(t, "kubelet", m.copyFieldPicker.filter)
 	for _, e := range m.visibleCopyFieldEntries() {
@@ -236,18 +236,18 @@ func TestCopyFieldPickerKeys_FilterTypingAndEscape(t *testing.T) {
 	}
 
 	// Enter leaves filter-typing mode but keeps the filter.
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyEnter})
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = mdl.(Model)
 	assert.False(t, m.copyFieldPicker.filterActive)
 	assert.Equal(t, "kubelet", m.copyFieldPicker.filter)
 
 	// Esc with a filter set clears it; second esc closes.
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 	assert.Equal(t, "", m.copyFieldPicker.filter)
 	assert.True(t, m.copyFieldPicker.active)
 
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mdl.(Model)
 	assert.False(t, m.copyFieldPicker.active)
 	assert.Equal(t, overlayNone, m.overlay)
@@ -263,14 +263,14 @@ func TestCopyFieldPicker_TabResetsFilter(t *testing.T) {
 
 func TestCopyFieldPickerFilter_BackspaceIsRuneSafe(t *testing.T) {
 	m := copyFieldOpenPicker(t, copyFieldTestModel(t))
-	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	mdl, _ := m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	m = mdl.(Model)
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("naïve")})
+	mdl, _ = m.handleCopyFieldPickerKey(keyPressText("naïve"))
 	m = mdl.(Model)
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	m = mdl.(Model)
 	assert.Equal(t, "naïv", m.copyFieldPicker.filter, "backspace removes one rune, not one byte")
-	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	mdl, _ = m.handleCopyFieldPickerKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	m = mdl.(Model)
 	assert.Equal(t, "naï", m.copyFieldPicker.filter, "multibyte rune removed intact")
 }

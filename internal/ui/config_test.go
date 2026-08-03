@@ -17,7 +17,7 @@ func TestDefaultKeybindings_CriticalDefaults(t *testing.T) {
 	assert.Equal(t, "v", kb.Describe)
 	assert.Equal(t, "D", kb.Delete)
 	assert.Equal(t, "ctrl+g", kb.FinalizerSearch)
-	assert.Equal(t, " ", kb.ToggleSelect)
+	assert.Equal(t, "space", kb.ToggleSelect)
 	assert.Equal(t, "t", kb.NewTab)
 	assert.Equal(t, "m", kb.SetMark)
 	// Move-tab keys mirror the switch keys (shift+] / shift+[).

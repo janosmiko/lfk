@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -191,9 +191,10 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ColorPrimary)).
-		Padding(0, 1).
-		Width(width - 2).
-		Height(maxLines + 2). // +2 for header + separator lines
+		Padding(0, 1)
+	// +2 rows for the header + separator lines. BoxWidth/BoxHeight add the
+	// border back on top, since lipgloss v2 counts it inside Width/Height.
+	borderStyle = BoxHeight(BoxWidth(borderStyle, width-2), maxLines+2).
 		MaxHeight(maxLines + 4)
 	body := borderStyle.Render(bodyContent)
 

@@ -2,8 +2,7 @@ package app
 
 import (
 	"fmt"
-
-	"github.com/charmbracelet/lipgloss"
+	"image/color"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -106,7 +105,7 @@ func renderMutationProgress(spinnerFrame string, snapshot []scheduler.Task) stri
 // indicator matches the rest of the bar instead of leaking the default
 // barBg through. See renderTasksIndicator for the finished/mutation
 // filter rationale — kept identical here.
-func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg lipgloss.TerminalColor) string {
+func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg color.Color) string {
 	n := 0
 	for _, t := range snapshot {
 		if t.IsFinished() {
@@ -127,7 +126,7 @@ func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []scheduler.Ta
 // background colour swapped to bg. See renderTasksIndicatorOverrideBg.
 // The finished-task filter mirrors renderMutationProgress so a tinted
 // title bar behaves identically.
-func renderMutationProgressOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg lipgloss.TerminalColor) string {
+func renderMutationProgressOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg color.Color) string {
 	for _, t := range snapshot {
 		if t.IsFinished() {
 			continue

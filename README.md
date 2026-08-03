@@ -148,7 +148,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Runtime theme switching**: Press `T` to preview and switch themes without restarting
 - **Auto dark/light mode**: configure a dark and a light scheme; lfk switches automatically when the OS appearance changes (requires CSI 996/2031 terminal support: Ghostty, kitty, Contour, …)
 - **Custom color themes** via config file (Tokyonight theme by default)
-- **Configurable keybindings** for direct actions
+- **Configurable keybindings** for direct actions, including `Ctrl+Shift` chords that stay distinct from plain `Ctrl` (requires Kitty keyboard protocol or xterm `modifyOtherKeys`: Ghostty, kitty, WezTerm, foot, xterm — not macOS Terminal.app; see [Ctrl+Shift chords](docs/keybindings.md#ctrlshift-chords))
 - **Configurable search abbreviations**
 - **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
 - **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable.

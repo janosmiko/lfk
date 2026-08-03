@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,17 +12,17 @@ func TestKonamiSequence(t *testing.T) {
 	m := baseModelCov()
 
 	// Send the full Konami Code sequence.
-	keys := []tea.KeyMsg{
-		{Type: tea.KeyUp},
-		{Type: tea.KeyUp},
-		{Type: tea.KeyDown},
-		{Type: tea.KeyDown},
-		{Type: tea.KeyLeft},
-		{Type: tea.KeyRight},
-		{Type: tea.KeyLeft},
-		{Type: tea.KeyRight},
-		{Type: tea.KeyRunes, Runes: []rune{'b'}},
-		{Type: tea.KeyRunes, Runes: []rune{'a'}},
+	keys := []tea.KeyPressMsg{
+		{Code: tea.KeyUp},
+		{Code: tea.KeyUp},
+		{Code: tea.KeyDown},
+		{Code: tea.KeyDown},
+		{Code: tea.KeyLeft},
+		{Code: tea.KeyRight},
+		{Code: tea.KeyLeft},
+		{Code: tea.KeyRight},
+		{Code: 'b', Text: "b"},
+		{Code: 'a', Text: "a"},
 	}
 
 	for _, key := range keys {
@@ -38,13 +38,13 @@ func TestKonamiResetOnWrongKey(t *testing.T) {
 	m := baseModelCov()
 
 	// Send partial sequence then a wrong key.
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyUp})
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyUp})
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyDown})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyUp})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyUp})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyDown})
 	assert.Equal(t, 3, m.konamiProgress)
 
 	// Wrong key resets progress.
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = m.checkKonami(tea.KeyPressMsg{Code: 'x', Text: "x"})
 	assert.Equal(t, 0, m.konamiProgress)
 	assert.False(t, m.konamiActive)
 }
@@ -53,11 +53,11 @@ func TestKonamiResetOnWrongKeyRestartsIfMatchesFirst(t *testing.T) {
 	m := baseModelCov()
 
 	// Send partial sequence, then "up" which is wrong at position 2 but matches position 0.
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyUp})
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyUp})
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyDown})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyUp})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyUp})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyDown})
 	// Now expecting "down" at position 3, but send "up" instead.
-	m = m.checkKonami(tea.KeyMsg{Type: tea.KeyUp})
+	m = m.checkKonami(tea.KeyPressMsg{Code: tea.KeyUp})
 	// Should restart at 1 because "up" matches konamiSequence[0].
 	assert.Equal(t, 1, m.konamiProgress)
 }

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -61,7 +61,7 @@ func TestDeleteBookmark_ValueReceiverChain_PersistsToDisk(t *testing.T) {
 	}
 
 	// Simulate the full value-receiver chain: handleBookmarkOverlayKey -> handleBookmarkConfirmDelete -> bookmarkDeleteCurrent.
-	yesKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}
+	yesKey := tea.KeyPressMsg{Code: 'y', Text: "y"}
 	result, _ := m.handleBookmarkOverlayKey(yesKey)
 	resultModel := result.(Model)
 
@@ -97,7 +97,7 @@ func TestDeleteAllBookmarks_ValueReceiverChain_PersistsToDisk(t *testing.T) {
 		tabs:               []TabState{{}},
 	}
 
-	yesKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}
+	yesKey := tea.KeyPressMsg{Code: 'y', Text: "y"}
 	result, _ := m.handleBookmarkOverlayKey(yesKey)
 	resultModel := result.(Model)
 
@@ -260,7 +260,7 @@ func TestDeleteThenSave_NoCrossContamination(t *testing.T) {
 	}
 
 	// Delete bravo.
-	yesKey := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}
+	yesKey := tea.KeyPressMsg{Code: 'y', Text: "y"}
 	result, _ := m.handleBookmarkOverlayKey(yesKey)
 	m = result.(Model)
 	require.Len(t, m.bookmarks, 2)

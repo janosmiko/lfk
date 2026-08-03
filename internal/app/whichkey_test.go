@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -73,7 +73,7 @@ func TestGotoResourceType_TypeNotServedErrors(t *testing.T) {
 func TestHandleGotoChord_NavigatesOnMatch(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true
-	out, _, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	out, _, handled := m.handleGotoChord(tea.KeyPressMsg{Code: 'p', Text: "p"})
 	if !handled {
 		t.Fatal("gp should be handled as a goto chord")
 	}
@@ -95,7 +95,7 @@ func TestHandleGotoChord_PreviousNamespace(t *testing.T) {
 	m.selectedNamespaces = map[string]bool{"kube-system": true}
 	m.previousNsScope = &nsScope{namespace: "default", selectedNamespaces: map[string]bool{"default": true}}
 	m.pendingG = true
-	out, _, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\\'}})
+	out, _, handled := m.handleGotoChord(tea.KeyPressMsg{Code: '\\', Text: "\\"})
 	if !handled {
 		t.Fatal(`g\ should be handled`)
 	}
@@ -121,7 +121,7 @@ func TestHandleGotoChord_PreviousNamespaceUnbound(t *testing.T) {
 	m.namespace = "kube-system"
 	m.previousNsScope = &nsScope{namespace: "default"}
 	m.pendingG = true
-	out, _, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\\'}})
+	out, _, handled := m.handleGotoChord(tea.KeyPressMsg{Code: '\\', Text: "\\"})
 	if !handled {
 		t.Fatal(`g\ should still be consumed as an unmapped chord`)
 	}
@@ -133,7 +133,7 @@ func TestHandleGotoChord_PreviousNamespaceUnbound(t *testing.T) {
 func TestHandleGotoChord_GPassesThroughToJumpTop(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true
-	_, _, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	_, _, handled := m.handleGotoChord(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	if handled {
 		t.Fatal("second g must NOT be consumed by goto; it belongs to jump-top")
 	}
@@ -148,7 +148,7 @@ func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true
 	m.whichKeyShown = true
-	out, cmd, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	out, cmd, handled := m.handleGotoChord(tea.KeyPressMsg{Code: 'P', Text: "P"})
 	if !handled {
 		t.Fatal("unregistered second key must be consumed (handled=true)")
 	}
@@ -177,7 +177,7 @@ func TestHandleGotoChord_EscClosesPopup(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true
 	m.whichKeyShown = true
-	out, cmd, handled := m.handleGotoChord(tea.KeyMsg{Type: tea.KeyEsc})
+	out, cmd, handled := m.handleGotoChord(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if !handled || cmd != nil {
 		t.Fatal("esc must be consumed as a noop while the prefix is armed")
 	}

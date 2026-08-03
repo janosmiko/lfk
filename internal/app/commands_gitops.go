@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"

@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -254,9 +254,9 @@ func TestJumpBackKeyIgnoredDuringTextEntry(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 
 	kb := ui.ActiveKeybindings
-	jumpBackMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(kb.JumpBack)}
+	jumpBackMsg := keyPressText(kb.JumpBack)
 	if kb.JumpBack == "backspace" {
-		jumpBackMsg = tea.KeyMsg{Type: tea.KeyBackspace}
+		jumpBackMsg = tea.KeyPressMsg{Code: tea.KeyBackspace}
 	}
 
 	t.Run("not handled while filter active", func(t *testing.T) {

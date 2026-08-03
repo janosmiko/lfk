@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -35,7 +35,7 @@ func TestDashboardWheelScrollsContentNotCursor(t *testing.T) {
 	m := dashboardModel(strings.Repeat("dashboard line\n", 200))
 	startCursor := m.cursor()
 
-	mdl, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 60})
+	mdl, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 60})
 	m = mdl.(Model)
 
 	assert.Equal(t, startCursor, m.cursor(), "wheel in the fullscreen dashboard must not move the middle cursor")
@@ -49,7 +49,7 @@ func TestDashboardWheelUpClampsAtTop(t *testing.T) {
 	startCursor := m.cursor()
 
 	for range 5 {
-		mdl, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 60})
+		mdl, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: 60})
 		m = mdl.(Model)
 	}
 
@@ -64,7 +64,7 @@ func TestMonitoringDashboardWheelScrolls(t *testing.T) {
 	m.middleItems[0] = model.Item{Name: "Monitoring", Kind: "__dashboard__", Extra: "__monitoring__"}
 	m.monitoringPreview = strings.Repeat("metric line\n", 200)
 
-	mdl, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 60})
+	mdl, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 60})
 	m = mdl.(Model)
 
 	assert.Positive(t, m.previewScroll, "wheel down in the monitoring dashboard must scroll the content")
@@ -91,7 +91,7 @@ func TestServiceDetailsScrollNoParentJump(t *testing.T) {
 	leftBefore := ui.ActiveLeftScroll
 
 	for range 5 {
-		mdl, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 110})
+		mdl, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 110})
 		m = mdl.(Model)
 		_ = m.View()
 	}

@@ -6,7 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,13 +18,13 @@ import (
 func TestRenderKV(t *testing.T) {
 	t.Run("short value fits", func(t *testing.T) {
 		result := renderKV("Node", "worker-1", 60)
-		assert.Contains(t, result, "Node:")
+		assert.Contains(t, stripANSI(result), "Node:")
 		assert.Contains(t, result, "worker-1")
 	})
 
 	t.Run("long value truncated with ellipsis", func(t *testing.T) {
 		result := renderKV("Labels", "this-is-a-very-long-label-value-that-exceeds-the-width", 30)
-		assert.Contains(t, result, "Labels:")
+		assert.Contains(t, stripANSI(result), "Labels:")
 		assert.Contains(t, result, "...")
 	})
 }
@@ -35,14 +35,14 @@ func TestRenderDataKV(t *testing.T) {
 	t.Run("single line value", func(t *testing.T) {
 		lines := renderDataKV("config.yaml", "value=123", 60)
 		assert.Len(t, lines, 1)
-		assert.Contains(t, lines[0], "config.yaml:")
+		assert.Contains(t, stripANSI(lines[0]), "config.yaml:")
 		assert.Contains(t, lines[0], "value=123")
 	})
 
 	t.Run("multiline value returns multiple lines", func(t *testing.T) {
 		lines := renderDataKV("config", "line1\nline2\nline3", 60)
 		assert.Greater(t, len(lines), 1)
-		assert.Contains(t, lines[0], "config:")
+		assert.Contains(t, stripANSI(lines[0]), "config:")
 	})
 
 	t.Run("escaped newlines are expanded", func(t *testing.T) {
@@ -385,7 +385,7 @@ func TestRenderResourceSummary(t *testing.T) {
 		}
 		result := RenderResourceSummary(item, "", 80, 30)
 		assert.Contains(t, result, "DATA")
-		assert.Contains(t, result, "config.yaml")
+		assert.Contains(t, stripANSI(result), "config.yaml")
 	})
 
 	t.Run("DATA count counts keys not visual lines (regression: flipped on reveal of multi-line value)", func(t *testing.T) {

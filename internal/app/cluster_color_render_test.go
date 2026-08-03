@@ -4,25 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
-
-// forceANSIRendering switches lipgloss to the ANSI colour profile so
-// styled strings actually emit colour SGR codes during the test —
-// otherwise lipgloss strips colour when stdout isn't a TTY (the
-// `go test` default), which makes it impossible to distinguish a
-// tinted from an untinted render by string comparison.
-func forceANSIRendering(t *testing.T) {
-	t.Helper()
-	r := lipgloss.DefaultRenderer()
-	prev := r.ColorProfile()
-	r.SetColorProfile(termenv.ANSI)
-	t.Cleanup(func() { r.SetColorProfile(prev) })
-}
 
 func TestClusterColorForActiveContext_ReturnsAssignedColor(t *testing.T) {
 	m := Model{
@@ -56,7 +41,6 @@ func TestRenderTitleBar_TintedWhenContextHasColor(t *testing.T) {
 	// ANSI profile here the tinted and untinted renders would produce
 	// identical plain-text strings and the NotEqual would be a
 	// tautology even with the test fix CodeRabbit suggested.
-	forceANSIRendering(t)
 
 	// Both variants use the SAME context so any difference in output is
 	// attributable to the cluster-color tint rather than incidental

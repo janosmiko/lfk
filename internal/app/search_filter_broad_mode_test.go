@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -89,12 +89,12 @@ func TestVisibleMiddleItems_BroadModeMatchesColumns(t *testing.T) {
 
 func TestHandleFilterKeyTabTogglesBroadMode(t *testing.T) {
 	m := Model{filterActive: true}
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyTab})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm := r.(Model)
 	assert.True(t, rm.filterBroadMode, "Tab inside filter must enter broad mode")
 
 	// Toggle back.
-	r2, _ := rm.handleFilterKey(tea.KeyMsg{Type: tea.KeyTab})
+	r2, _ := rm.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm2 := r2.(Model)
 	assert.False(t, rm2.filterBroadMode, "second Tab must return to name-only")
 }
@@ -107,7 +107,7 @@ func TestHandleFilterKeyEnterPreservesBroadMode(t *testing.T) {
 	m := baseModelCov()
 	m.filterActive = true
 	m.filterBroadMode = true
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 	assert.True(t, rm.filterBroadMode,
 		"Enter must keep broad mode on so the applied filterText keeps matching column values")
@@ -127,7 +127,7 @@ func TestHandleFilterKeyEscResetsBroadMode(t *testing.T) {
 	m := baseModelCov()
 	m.filterActive = true
 	m.filterBroadMode = true
-	r, _ := m.handleFilterKey(tea.KeyMsg{Type: tea.KeyEsc})
+	r, _ := m.handleFilterKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := r.(Model)
 	assert.False(t, rm.filterBroadMode, "Esc must reset broad mode for the next session")
 }
@@ -136,11 +136,11 @@ func TestHandleFilterKeyEscResetsBroadMode(t *testing.T) {
 
 func TestHandleSearchKeyTabTogglesBroadMode(t *testing.T) {
 	m := Model{searchActive: true}
-	r, _ := m.handleSearchKey(tea.KeyMsg{Type: tea.KeyTab})
+	r, _ := m.handleSearchKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm := r.(Model)
 	assert.True(t, rm.searchBroadMode, "Tab inside search must enter broad mode")
 
-	r2, _ := rm.handleSearchKey(tea.KeyMsg{Type: tea.KeyTab})
+	r2, _ := rm.handleSearchKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	rm2 := r2.(Model)
 	assert.False(t, rm2.searchBroadMode)
 }
@@ -155,7 +155,7 @@ func TestHandleSearchKeyEnterPreservesQueryForHighlight(t *testing.T) {
 	m := baseModelCov()
 	m.searchActive = true
 	m.searchInput.Value = "nginx"
-	r, _ := m.handleSearchKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleSearchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 	assert.False(t, rm.searchActive, "Enter exits the input")
 	assert.Equal(t, "nginx", rm.searchInput.Value,
@@ -170,7 +170,7 @@ func TestHandleSearchKeyEnterPreservesBroadMode(t *testing.T) {
 	m := baseModelCov()
 	m.searchActive = true
 	m.searchBroadMode = true
-	r, _ := m.handleSearchKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleSearchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	rm := r.(Model)
 	assert.True(t, rm.searchBroadMode,
 		"Enter must keep broad mode on so n/N keep matching column values")
@@ -188,7 +188,7 @@ func TestHandleSearchKeyEscResetsBroadMode(t *testing.T) {
 	m := baseModelCov()
 	m.searchActive = true
 	m.searchBroadMode = true
-	r, _ := m.handleSearchKey(tea.KeyMsg{Type: tea.KeyEsc})
+	r, _ := m.handleSearchKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	rm := r.(Model)
 	assert.False(t, rm.searchBroadMode)
 }

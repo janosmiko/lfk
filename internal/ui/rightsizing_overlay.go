@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -447,6 +447,5 @@ func formatPct(pct float64) string {
 
 func centerInPanel(text string, width, height int) string {
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, text,
-		lipgloss.WithWhitespaceBackground(BaseBg),
-		lipgloss.WithWhitespaceForeground(BaseBg))
+		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Background(BaseBg).Foreground(BaseBg)))
 }

@@ -3,8 +3,8 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -27,6 +27,7 @@ import (
 // screen so "outside" has no meaning, and their internal layouts are too
 // varied to map to clicks without per-overlay code.
 func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
 	box, ok := m.centeredOverlayBox()
 	if !ok {
 		// The network policy visualizer is custom-rendered but plain
@@ -34,7 +35,7 @@ func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		// Clicks are still swallowed below like the other fullscreen /
 		// custom-rendered overlays.
 		if m.overlay == overlayNetworkPolicy &&
-			(msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) {
+			(mouse.Button == tea.MouseWheelUp || mouse.Button == tea.MouseWheelDown) {
 			return m.handleNetpolWheel(msg), nil
 		}
 		// Fullscreen / custom-rendered overlay: swallow every mouse
@@ -51,15 +52,15 @@ func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// here. In filter / text-input modes, arrow keys are no-ops in the
 	// shared handleFilterKey, so wheel ticks won't pollute the filter
 	// text.
-	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
-		return m.dispatchOverlayWheel(msg.Button)
+	if mouse.Button == tea.MouseWheelUp || mouse.Button == tea.MouseWheelDown {
+		return m.dispatchOverlayWheel(mouse.Button)
 	}
 
 	// Only react to button presses for clicks.
-	if msg.Action != tea.MouseActionPress {
+	if !isMousePress(msg) {
 		return m, nil
 	}
-	if msg.Button != tea.MouseButtonLeft && msg.Button != tea.MouseButtonRight {
+	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
 
@@ -69,14 +70,14 @@ func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// stay in one place). Esc is the safe universal cancel for confirm
 	// dialogs, text-input prompts, list selectors, and read-only info
 	// panels alike.
-	if msg.X < box.x || msg.X >= box.x+box.w ||
-		msg.Y < box.y || msg.Y >= box.y+box.h {
-		return m.handleOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	if mouse.X < box.x || mouse.X >= box.x+box.w ||
+		mouse.Y < box.y || mouse.Y >= box.y+box.h {
+		return m.handleOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	}
 
 	// Click inside the box. Per-overlay activation:
-	if msg.Button == tea.MouseButtonLeft {
-		innerY := msg.Y - (box.y + 2) // -1 border, -1 top padding
+	if mouse.Button == tea.MouseLeft {
+		innerY := mouse.Y - (box.y + 2) // -1 border, -1 top padding
 		if mdl, cmd, handled := m.activateOverlayItemAt(innerY); handled {
 			return mdl, cmd
 		}
@@ -97,12 +98,12 @@ func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 func (m Model) dispatchOverlayWheel(button tea.MouseButton) (tea.Model, tea.Cmd) {
 	const wheelStep = 3
 	keyType := tea.KeyDown
-	if button == tea.MouseButtonWheelUp {
+	if button == tea.MouseWheelUp {
 		keyType = tea.KeyUp
 	}
 	var lastCmd tea.Cmd
 	for range wheelStep {
-		mdl, cmd := m.handleOverlayKey(tea.KeyMsg{Type: keyType})
+		mdl, cmd := m.handleOverlayKey(tea.KeyPressMsg{Code: keyType})
 		m = mdl.(Model)
 		if cmd != nil {
 			lastCmd = cmd
@@ -150,7 +151,7 @@ func (m Model) activateOverlayItemAt(innerY int) (tea.Model, tea.Cmd, bool) {
 		m.overlayCursor = idx
 		// Hand off to the overlay's normal Enter handler so the same
 		// "apply selection and close" path runs as keyboard activation.
-		mdl, cmd := m.handleOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+		mdl, cmd := m.handleOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 		return mdl, cmd, true
 	}
 

@@ -3,8 +3,8 @@ package app
 import (
 	"slices"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -14,7 +14,7 @@ import (
 // picker as one feature. The dispatchers they hang off (handleOverlayKeySecondary,
 // renderOverlayContentExtended) sit at the gocyclo cap, so the two overlays
 // share one case there and split here instead.
-func (m Model) handleTaintOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTaintOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.overlay == overlayTaintPresets {
 		return m.handleTaintPresetKey(msg)
 	}
@@ -51,7 +51,7 @@ func (m Model) taintPresetsMaxVisible() int {
 
 // handleTaintPresetKey drives the common-taint picker: vim navigation, Enter
 // to adopt the highlighted preset, Esc to back out.
-func (m Model) handleTaintPresetKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTaintPresetKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	p := &m.taintEditor
 	n := len(model.CommonTaints)
 	visible := m.taintPresetsMaxVisible()

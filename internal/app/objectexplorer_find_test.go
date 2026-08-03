@@ -3,13 +3,13 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // pressFind dispatches a key to the find overlay handler.
-func pressFind(m Model, msg tea.KeyMsg) Model {
+func pressFind(m Model, msg tea.KeyPressMsg) Model {
 	mdl, _ := m.handleObjectExplorerFindKey(msg)
 	return mdl.(Model)
 }
@@ -53,8 +53,8 @@ func TestObjectExplorerFind_JumpNavigatesTree(t *testing.T) {
 	require.NotEmpty(t, m.objectExplorerView.findResults)
 	first := m.objectExplorerView.findResults[0].Segs
 
-	m = pressFind(m, tea.KeyMsg{Type: tea.KeyEnter}) // exit filter focus
-	m = pressFind(m, tea.KeyMsg{Type: tea.KeyEnter}) // jump
+	m = pressFind(m, tea.KeyPressMsg{Code: tea.KeyEnter}) // exit filter focus
+	m = pressFind(m, tea.KeyPressMsg{Code: tea.KeyEnter}) // jump
 
 	assert.Equal(t, overlayNone, m.overlay)
 	assert.Equal(t, first[:len(first)-1], m.objectExplorerView.path)
@@ -65,7 +65,7 @@ func TestObjectExplorerFind_JumpNavigatesTree(t *testing.T) {
 
 func TestObjectExplorerFind_EscClosesOverlay(t *testing.T) {
 	m := openFind(t)
-	m = pressFind(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = pressFind(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, overlayNone, m.overlay)
 	assert.Equal(t, modeObjectExplorer, m.mode)
 	assert.Nil(t, m.objectExplorerView.findResults)
@@ -74,7 +74,7 @@ func TestObjectExplorerFind_EscClosesOverlay(t *testing.T) {
 func TestObjectExplorerFind_EscFromFilterKeepsOverlay(t *testing.T) {
 	m := openFind(t)
 	m = pressFind(m, key("/"))
-	m = pressFind(m, tea.KeyMsg{Type: tea.KeyEsc}) // leaves filter, not overlay
+	m = pressFind(m, tea.KeyPressMsg{Code: tea.KeyEsc}) // leaves filter, not overlay
 	assert.False(t, m.objectExplorerView.findFilterActive)
 	assert.Equal(t, overlayObjectExplorerFind, m.overlay)
 }

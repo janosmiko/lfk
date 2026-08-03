@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -36,7 +36,7 @@ func (m Model) errorLogVisibleCount() (visibleCount, maxVisible, maxScroll int) 
 // Returns handled=false for non-matching keys so the regular overlay key
 // dispatch can run. Visual mode disables the forwarding so 't' / 'T' inside
 // a selection stay local.
-func (m Model) errorLogForwardGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) errorLogForwardGlobalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	if m.errorLogVisualMode != 0 {
 		return m, nil, false
 	}
@@ -52,7 +52,7 @@ func (m Model) errorLogForwardGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 	return m, nil, false
 }
 
-func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleErrorLogOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	visibleCount, maxVisible, maxScroll := m.errorLogVisibleCount()
 	maxCursor := max(visibleCount-1, 0)
 

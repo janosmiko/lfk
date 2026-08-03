@@ -53,7 +53,7 @@ func TestRenderObjectExplorerView_TopLevelParentEmpty(t *testing.T) {
 		sampleObjectFields(), 0, 0, "Object Explorer: x", nil, 0,
 		"a: 1\n", 0, "", "hint", 120, 30,
 	)
-	assert.Contains(t, out, "(top level)")
+	assert.Contains(t, stripANSI(out), "(top level)")
 }
 
 func TestRenderObjectExplorerView_EmptyPreview(t *testing.T) {

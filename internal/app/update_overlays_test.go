@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -109,7 +109,7 @@ func TestEventTimelineOverlayKeyNavigation(t *testing.T) {
 	lines := makeEventLines(20)
 	tests := []struct {
 		name           string
-		key            tea.KeyMsg
+		key            tea.KeyPressMsg
 		startCursor    int
 		expectedCursor int
 	}{
@@ -173,7 +173,7 @@ func TestEventTimelineCtrlDScrollsHalfPage(t *testing.T) {
 		width:               80,
 		height:              40,
 	}
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	// Cursor moves by half the content height (overlay height ~26, content ~22, half ~11).
 	assert.Greater(t, result.eventTimelineCursor, 5)
@@ -191,7 +191,7 @@ func TestEventTimelineCtrlUScrollsUp(t *testing.T) {
 		width:               80,
 		height:              40,
 	}
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Less(t, result.eventTimelineCursor, 15)
 }
@@ -208,7 +208,7 @@ func TestEventTimelineCtrlUClampsToZero(t *testing.T) {
 		width:               80,
 		height:              40,
 	}
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.eventTimelineCursor)
 }
@@ -225,7 +225,7 @@ func TestEventTimelineCtrlFScrollsFullPage(t *testing.T) {
 		width:               80,
 		height:              40,
 	}
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Greater(t, result.eventTimelineCursor, 0)
 }
@@ -242,7 +242,7 @@ func TestEventTimelineCtrlBScrollsBackFullPage(t *testing.T) {
 		width:               80,
 		height:              40,
 	}
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Less(t, result.eventTimelineCursor, 30)
 }
@@ -255,7 +255,7 @@ func TestNetworkPolicyOverlayKeyNavigation(t *testing.T) {
 	// content taller than every expected position.
 	tests := []struct {
 		name           string
-		key            tea.KeyMsg
+		key            tea.KeyPressMsg
 		startScroll    int
 		height         int
 		expectedScroll int
@@ -267,12 +267,12 @@ func TestNetworkPolicyOverlayKeyNavigation(t *testing.T) {
 		{name: "k scrolls up", key: runeKey('k'), startScroll: 5, height: 40, expectedScroll: 4},
 		{name: "k at zero stays", key: runeKey('k'), startScroll: 0, height: 40, expectedScroll: 0},
 		{name: "G jumps to bottom", key: runeKey('G'), startScroll: 0, height: 40, expectedScroll: -1},
-		{name: "ctrl+d half page down", key: tea.KeyMsg{Type: tea.KeyCtrlD}, startScroll: 0, height: 40, expectedScroll: 20},
-		{name: "ctrl+u half page up", key: tea.KeyMsg{Type: tea.KeyCtrlU}, startScroll: 30, height: 40, expectedScroll: 10},
-		{name: "ctrl+u clamps to zero", key: tea.KeyMsg{Type: tea.KeyCtrlU}, startScroll: 5, height: 40, expectedScroll: 0},
-		{name: "ctrl+f full page down", key: tea.KeyMsg{Type: tea.KeyCtrlF}, startScroll: 0, height: 40, expectedScroll: 40},
-		{name: "ctrl+b full page up", key: tea.KeyMsg{Type: tea.KeyCtrlB}, startScroll: 50, height: 40, expectedScroll: 10},
-		{name: "ctrl+b clamps to zero", key: tea.KeyMsg{Type: tea.KeyCtrlB}, startScroll: 10, height: 40, expectedScroll: 0},
+		{name: "ctrl+d half page down", key: tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, startScroll: 0, height: 40, expectedScroll: 20},
+		{name: "ctrl+u half page up", key: tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, startScroll: 30, height: 40, expectedScroll: 10},
+		{name: "ctrl+u clamps to zero", key: tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, startScroll: 5, height: 40, expectedScroll: 0},
+		{name: "ctrl+f full page down", key: tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl}, startScroll: 0, height: 40, expectedScroll: 40},
+		{name: "ctrl+b full page up", key: tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl}, startScroll: 50, height: 40, expectedScroll: 10},
+		{name: "ctrl+b clamps to zero", key: tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl}, startScroll: 10, height: 40, expectedScroll: 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -726,7 +726,7 @@ func TestActionOverlayKeyNavigation(t *testing.T) {
 			width:         80,
 			height:        40,
 		}
-		ret, _ := m.handleActionOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlP})
+		ret, _ := m.handleActionOverlayKey(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 0, result.overlayCursor)
 	})
@@ -740,7 +740,7 @@ func TestActionOverlayKeyNavigation(t *testing.T) {
 			width:         80,
 			height:        40,
 		}
-		ret, _ := m.handleActionOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlN})
+		ret, _ := m.handleActionOverlayKey(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 1, result.overlayCursor)
 	})
@@ -784,7 +784,7 @@ func TestPasteConfirmEscCancels(t *testing.T) {
 func TestConfirmOverlayKeyDeclines(t *testing.T) {
 	tests := []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{name: "n declines", key: runeKey('n')},
 		{name: "N declines", key: runeKey('N')},
@@ -815,7 +815,7 @@ func TestConfirmOverlayKeyConfirms(t *testing.T) {
 	// confirmable input. y/Y kept as silent muscle-memory aliases.
 	tests := []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{name: "Enter confirms", key: specialKey(tea.KeyEnter)},
 		{name: "y confirms", key: runeKey('y')},
@@ -920,7 +920,7 @@ func TestConfirmTypeOverlayCtrlW(t *testing.T) {
 		width:            80,
 		height:           40,
 	}
-	ret, _ := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ := m.handleConfirmTypeOverlayKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Empty(t, result.confirmTypeInput.Value)
 }
@@ -933,7 +933,7 @@ func TestConfirmTypeOverlayCtrlU(t *testing.T) {
 		width:            80,
 		height:           40,
 	}
-	ret, _ := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	ret, _ := m.handleConfirmTypeOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Empty(t, result.confirmTypeInput.Value)
 }
@@ -1056,12 +1056,12 @@ func TestScaleOverlayInputNavigation(t *testing.T) {
 	}
 
 	// ctrl+a moves home
-	ret, _ := m.handleScaleOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	ret, _ := m.handleScaleOverlayKey(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, "123", result.scaleInput.Value)
 
 	// ctrl+e moves end
-	ret, _ = result.handleScaleOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	ret, _ = result.handleScaleOverlayKey(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.Equal(t, "123", result.scaleInput.Value)
 }
@@ -1156,7 +1156,7 @@ func TestPortForwardOverlayColonKeepsPortSelected(t *testing.T) {
 	}
 	// Typing ':' switches to manual local:remote entry but must keep the
 	// list selection, so removing the ':' can restore it.
-	ret, _ := m.handlePortForwardOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{':'}})
+	ret, _ := m.handlePortForwardOverlayKey(tea.KeyPressMsg{Code: ':', Text: ":"})
 	result := ret.(Model)
 	assert.Equal(t, "8080:", result.portForwardInput.Value)
 	assert.Equal(t, 1, result.pfPortCursor)
@@ -1246,7 +1246,7 @@ func TestContainerSelectOverlayKeyNavigation(t *testing.T) {
 			width:         80,
 			height:        40,
 		}
-		ret, _ := m.handleContainerSelectOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlP})
+		ret, _ := m.handleContainerSelectOverlayKey(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 0, result.overlayCursor)
 	})
@@ -1260,7 +1260,7 @@ func TestContainerSelectOverlayKeyNavigation(t *testing.T) {
 			width:         80,
 			height:        40,
 		}
-		ret, _ := m.handleContainerSelectOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlN})
+		ret, _ := m.handleContainerSelectOverlayKey(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 1, result.overlayCursor)
 	})
@@ -1271,7 +1271,7 @@ func TestContainerSelectOverlayKeyNavigation(t *testing.T) {
 func TestQuitConfirmOverlayDeclines(t *testing.T) {
 	tests := []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{name: "n declines", key: runeKey('n')},
 		{name: "N declines", key: runeKey('N')},
@@ -1299,7 +1299,7 @@ func TestQuitConfirmOverlayConfirms(t *testing.T) {
 	// (filter Enter, search Enter, scale apply, etc.). y/Y kept as aliases.
 	tests := []struct {
 		name string
-		key  tea.KeyMsg
+		key  tea.KeyPressMsg
 	}{
 		{name: "Enter confirms", key: specialKey(tea.KeyEnter)},
 		{name: "y confirms", key: runeKey('y')},
@@ -1503,7 +1503,7 @@ func TestAlertsOverlayKeyNavigation(t *testing.T) {
 			width:        80,
 			height:       40,
 		}
-		ret, _ := m.handleAlertsOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		ret, _ := m.handleAlertsOverlayKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 10, result.alertsScroll)
 	})
@@ -1517,7 +1517,7 @@ func TestAlertsOverlayKeyNavigation(t *testing.T) {
 			width:        80,
 			height:       40,
 		}
-		ret, _ := m.handleAlertsOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+		ret, _ := m.handleAlertsOverlayKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		result := ret.(Model)
 		assert.Equal(t, 0, result.alertsScroll)
 	})
@@ -1651,7 +1651,7 @@ func TestBatchLabelOverlayInputNavigation(t *testing.T) {
 	assert.Equal(t, "key=value", result.batchLabelInput.Value)
 
 	// ctrl+w deletes word
-	ret, _ = result.handleBatchLabelOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	ret, _ = result.handleBatchLabelOverlayKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	result = ret.(Model)
 	assert.NotEqual(t, "key=value", result.batchLabelInput.Value)
 }

@@ -3,12 +3,12 @@ package app
 import (
 	"slices"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+func (m Model) handleLogTopKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
 	if m.logTop.searchActive {
 		return m.handleLogTopSearchKey(msg)
 	}
@@ -153,7 +153,7 @@ func (m Model) handleLogTopKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:u
 // handleLogTopFilterKey processes a key while the Log Top filter input is open.
 // The filter applies live: every edit calls logTopRefreshRows which re-applies
 // the query to the current aggregation rows.
-func (m Model) handleLogTopFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the handler convention
+func (m Model) handleLogTopFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the handler convention
 	switch msg.String() {
 	case "enter":
 		m.logTop.filterActive = false
@@ -202,7 +202,7 @@ func (m Model) handleLogTopFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //no
 // handleLogTopSearchKey processes a key while the Log Top search input is open.
 // Search jumps the cursor to matching rows (it does not hide rows — that is
 // what the f filter does).
-func (m Model) handleLogTopSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the handler convention
+func (m Model) handleLogTopSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the handler convention
 	switch msg.String() {
 	case "enter":
 		m.logTop.searchActive = false

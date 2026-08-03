@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,7 +38,7 @@ func TestLogWheel_PreviewPaneScrollsPreview(t *testing.T) {
 	logW, previewW := splitLogPreviewWidth(m.width)
 	assert.Greater(t, previewW, 0, "preview panel must be visible at this width")
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: logW + 2})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: logW + 2})
 	rm := ret.(Model)
 	assert.Greater(t, rm.logView.previewScroll, 0,
 		"wheel down over the preview panel must scroll the preview")
@@ -51,7 +51,7 @@ func TestLogWheel_PreviewPaneClampsAtTop(t *testing.T) {
 	m.logView.previewScroll = 2
 	logW, _ := splitLogPreviewWidth(m.width)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: logW + 2})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: logW + 2})
 	rm := ret.(Model)
 	assert.Equal(t, 0, rm.logView.previewScroll,
 		"wheel up must clamp the preview scroll at the top")
@@ -61,7 +61,7 @@ func TestLogWheel_LogPaneScrollsLog(t *testing.T) {
 	m := logPreviewWheelModel()
 	logW, _ := splitLogPreviewWidth(m.width)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: logW - 10})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: logW - 10})
 	rm := ret.(Model)
 	assert.False(t, rm.logView.follow,
 		"wheel over the log stream must take the main-log path (disables follow)")
@@ -78,7 +78,7 @@ func TestLogWheel_PreviewHiddenScrollsLog(t *testing.T) {
 
 	// Even with the pointer where the panel would be, a hidden panel means
 	// the wheel scrolls the log.
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: logW + 2})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: logW + 2})
 	rm := ret.(Model)
 	assert.False(t, rm.logView.follow, "hidden preview: wheel must scroll the log")
 	assert.Greater(t, rm.logView.scroll, 0, "hidden preview: wheel must advance the log scroll")

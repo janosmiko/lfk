@@ -1387,7 +1387,7 @@ func TestPush3ViewWithStatusMessage(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeExplorer
 	m.setStatusMessage("test message", false)
-	result := m.View()
+	result := m.View().Content
 	assert.NotEmpty(t, result)
 }
 

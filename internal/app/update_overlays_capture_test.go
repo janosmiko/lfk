@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
 )
 
@@ -15,7 +15,7 @@ func TestUpdateOverlaysCapture_EndpointPick_JKNavigates(t *testing.T) {
 		{PodName: "p1"}, {PodName: "p2"}, {PodName: "p3"},
 	}
 
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	mm := out.(Model)
 	if mm.captureOverlay.endpointCursor != 1 {
 		t.Errorf("after j: cursor = %d, want 1", mm.captureOverlay.endpointCursor)
@@ -28,7 +28,7 @@ func TestUpdateOverlaysCapture_EndpointPick_EnterAdvancesToConfig(t *testing.T) 
 	m.captureOverlay.phase = capturePhaseEndpointPick
 	m.captureOverlay.endpoints = []captureEndpoint{{PodName: "p1"}}
 
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEnter})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEnter})
 	mm := out.(Model)
 	if mm.captureOverlay.phase != capturePhaseConfig {
 		t.Errorf("phase = %v, want capturePhaseConfig", mm.captureOverlay.phase)
@@ -50,7 +50,7 @@ func TestUpdateOverlaysCapture_Config_RightCyclesAvailableBackendsWhenFocused(t 
 	m.captureOverlay.selectedBackend = k8s.BackendKubectlDebug
 
 	// With only one available backend, cycling right should stay on kubectl-debug.
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRight})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyRight})
 	mm := out.(Model)
 	if mm.captureOverlay.selectedBackend != k8s.BackendKubectlDebug {
 		t.Errorf("after Right (only available backend): backend = %v, want kubectl-debug", mm.captureOverlay.selectedBackend)
@@ -66,14 +66,14 @@ func TestUpdateOverlaysCapture_Config_TabCyclesFocus(t *testing.T) {
 	if m.captureOverlay.configFocus != captureFocusFilter {
 		t.Fatalf("default focus = %v, want captureFocusFilter", m.captureOverlay.configFocus)
 	}
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyTab})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyTab})
 	mm := out.(Model)
 	if mm.captureOverlay.configFocus != captureFocusPreset {
 		t.Errorf("after Tab: focus = %v, want captureFocusPreset (next visual row after Filter)", mm.captureOverlay.configFocus)
 	}
 	// Three more Tabs cycle back to Filter (Preset → Backend → Interface → Filter).
 	for range 3 {
-		out, _ = mm.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyTab})
+		out, _ = mm.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyTab})
 		mm = out.(Model)
 	}
 	if mm.captureOverlay.configFocus != captureFocusFilter {
@@ -95,21 +95,21 @@ func TestUpdateOverlaysCapture_Config_VimNavigation(t *testing.T) {
 	m.captureOverlay.selectedBackend = k8s.BackendKubectlDebug
 
 	// `l` should cycle backend forward.
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: 'l', Text: "l"})
 	mm := out.(Model)
 	if mm.captureOverlay.selectedBackend != k8s.BackendKubeshark {
 		t.Errorf("after l on Backend focus: backend = %v, want kubeshark", mm.captureOverlay.selectedBackend)
 	}
 
 	// `j` should advance focus from Backend to Interface (next visual row).
-	out, _ = mm.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	out, _ = mm.updateOverlayCapture(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	mm = out.(Model)
 	if mm.captureOverlay.configFocus != captureFocusInterface {
 		t.Errorf("after j on Backend: focus = %v, want captureFocusInterface", mm.captureOverlay.configFocus)
 	}
 
 	// `k` should rewind focus to Backend.
-	out, _ = mm.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	out, _ = mm.updateOverlayCapture(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	mm = out.(Model)
 	if mm.captureOverlay.configFocus != captureFocusBackend {
 		t.Errorf("after k on Interface: focus = %v, want captureFocusBackend", mm.captureOverlay.configFocus)
@@ -118,9 +118,9 @@ func TestUpdateOverlaysCapture_Config_VimNavigation(t *testing.T) {
 	// On Filter focus, `j` and `h` should both type into the filter (NOT navigate).
 	mm.captureOverlay.configFocus = captureFocusFilter
 	mm.captureOverlay.filterValue = ""
-	out, _ = mm.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	out, _ = mm.updateOverlayCapture(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	mm = out.(Model)
-	out, _ = mm.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	out, _ = mm.updateOverlayCapture(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	mm = out.(Model)
 	if mm.captureOverlay.filterValue != "jh" {
 		t.Errorf("on Filter focus, j/h should type into filter; got filterValue = %q, want %q", mm.captureOverlay.filterValue, "jh")
@@ -137,7 +137,7 @@ func TestUpdateOverlaysCapture_Config_FilterFocusedTakesAllChars(t *testing.T) {
 	// configFocus defaults to captureFocusFilter; type letters that previously
 	// triggered backend/iface cycling and verify they go into the filter.
 	for _, r := range []rune{'b', 'i', 't', 'c', 'p'} {
-		out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		out, _ := m.updateOverlayCapture(keyPressRunes([]rune{r}))
 		m = out.(Model)
 	}
 	if m.captureOverlay.filterValue != "bitcp" {
@@ -151,7 +151,7 @@ func TestUpdateOverlaysCapture_Config_PresetFocus_RightCyclesPresets(t *testing.
 	m.captureOverlay.phase = capturePhaseConfig
 	m.captureOverlay.configFocus = captureFocusPreset
 
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRight})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyRight})
 	mm := out.(Model)
 	if mm.captureOverlay.presetCursor != 1 {
 		t.Errorf("presetCursor = %d, want 1", mm.captureOverlay.presetCursor)
@@ -167,7 +167,7 @@ func TestUpdateOverlaysCapture_Live_TTogglesStatusOnly(t *testing.T) {
 	m.overlay = overlayTrafficCapture
 	m.captureOverlay.phase = capturePhaseLive
 
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: 't', Text: "t"})
 	mm := out.(Model)
 	if !mm.captureOverlay.showStatusOnly {
 		t.Errorf("showStatusOnly = false, want true")
@@ -188,7 +188,7 @@ func TestUpdateOverlaysCapture_Live_EscStopsButStaysOpen(t *testing.T) {
 	m.captureOverlay.phase = capturePhaseLive
 	m.captureOverlay.captureID = 42
 
-	out, cmd := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEsc})
+	out, cmd := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEsc})
 	mm := out.(Model)
 	if mm.overlay != overlayTrafficCapture {
 		t.Errorf("overlay = %v, want overlayTrafficCapture (overlay stays open after first Esc)", mm.overlay)
@@ -214,7 +214,7 @@ func TestUpdateOverlaysCapture_Stopped_EnterRestarts(t *testing.T) {
 	m.captureOverlay.targetNS = "ns"
 	m.actionCtx = actionContext{context: "ctx", namespace: "ns", name: "pod1", kind: "Pod"}
 
-	_, cmd := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on stopped should dispatch start cmd")
 	}
@@ -234,7 +234,7 @@ func TestUpdateOverlaysCapture_Stopped_EscClearsUnsavedID(t *testing.T) {
 	m.captureOverlay.captureID = 7
 	m.captureOverlay.unsavedCaptureID = 7
 
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEsc})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEsc})
 	mm := out.(Model)
 	if mm.overlay != overlayNone {
 		t.Errorf("overlay = %v, want overlayNone after Esc in stopped phase", mm.overlay)
@@ -286,26 +286,26 @@ func TestUpdateOverlaysCapture_Live_PageScrollKeys(t *testing.T) {
 	}
 }
 
-// keyMsgFromString builds a tea.KeyMsg whose String() yields the supplied
-// shortcut. Bubbletea's tea.KeyMsg has typed Key constants for ctrl/pg
+// keyMsgFromString builds a tea.KeyPressMsg whose String() yields the supplied
+// shortcut. Bubbletea's tea.KeyPressMsg has typed Key constants for ctrl/pg
 // shortcuts; we build them by Type rather than by Runes so msg.String()
 // matches what the production code switches on.
-func keyMsgFromString(s string) tea.KeyMsg {
+func keyMsgFromString(s string) tea.KeyPressMsg {
 	switch s {
 	case "ctrl+u":
-		return tea.KeyMsg{Type: tea.KeyCtrlU}
+		return tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}
 	case "ctrl+d":
-		return tea.KeyMsg{Type: tea.KeyCtrlD}
+		return tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}
 	case "ctrl+f":
-		return tea.KeyMsg{Type: tea.KeyCtrlF}
+		return tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl}
 	case "ctrl+b":
-		return tea.KeyMsg{Type: tea.KeyCtrlB}
+		return tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl}
 	case "pgup":
-		return tea.KeyMsg{Type: tea.KeyPgUp}
+		return tea.KeyPressMsg{Code: tea.KeyPgUp}
 	case "pgdown":
-		return tea.KeyMsg{Type: tea.KeyPgDown}
+		return tea.KeyPressMsg{Code: tea.KeyPgDown}
 	}
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	return keyPressText(s)
 }
 
 // TestExecuteActionCaptureTraffic_KubectlDebugAvailableSynchronously guards
@@ -351,7 +351,7 @@ func TestY_NoActiveCaptureKeepsUnsavedFlag(t *testing.T) {
 	m.captureOverlay.captureID = 9
 	m.captureOverlay.unsavedCaptureID = 9
 
-	out, cmd := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	out, cmd := m.updateOverlayCapture(tea.KeyPressMsg{Code: 'Y', Text: "Y"})
 	mm := out.(Model)
 	if cmd != nil {
 		t.Errorf("Y with no active capture file must not dispatch a cmd; got %v", cmd)
@@ -376,7 +376,7 @@ func TestUpdateOverlaysCapture_Stopped_EOpensConfigForFilterEdit(t *testing.T) {
 	m.captureOverlay.phase = capturePhaseStopped
 	m.captureOverlay.filterValue = "port 443"
 
-	out, _ := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	out, _ := m.updateOverlayCapture(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	mm := out.(Model)
 	if mm.captureOverlay.phase != capturePhaseConfig {
 		t.Errorf("phase = %v, want capturePhaseConfig after `e`", mm.captureOverlay.phase)
@@ -400,7 +400,7 @@ func TestUpdateOverlaysCapture_Live_YCopiesPathToClipboard(t *testing.T) {
 	m.captureOverlay.phase = capturePhaseLive
 	m.captureOverlay.captureID = 0 // no active capture, so Y should report "no active capture file"
 
-	out, cmd := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	out, cmd := m.updateOverlayCapture(tea.KeyPressMsg{Code: 'Y', Text: "Y"})
 	mm := out.(Model)
 	if cmd != nil {
 		t.Errorf("Y with no active capture must not dispatch a cmd; got %v", cmd)
@@ -447,7 +447,7 @@ func TestUpdateOverlaysCapture_Stopped_ReadOnly_BlocksRestart(t *testing.T) {
 	m.captureOverlay.targetNS = "ns"
 	m.actionCtx = actionContext{context: "ctx", namespace: "ns", name: "pod1", kind: "Pod"}
 
-	out, cmd := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEnter})
+	out, cmd := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		msg := cmd()
 		if _, ok := msg.(captureStartedMsg); ok {
@@ -473,7 +473,7 @@ func TestUpdateOverlaysCapture_ReadOnly_BlocksKubectlDebug_AllowsKubeshark(t *te
 
 	// Streaming backend: Enter should NOT dispatch a start cmd.
 	m.captureOverlay.selectedBackend = k8s.BackendKubectlDebug
-	out, cmd := m.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEnter})
+	out, cmd := m.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
 		// If the impl returns a cmd, make sure it's not a start.
 		msg := cmd()
@@ -494,7 +494,7 @@ func TestUpdateOverlaysCapture_ReadOnly_BlocksKubectlDebug_AllowsKubeshark(t *te
 	mm.captureOverlay.targetNS = "ns"
 	mm.actionCtx = actionContext{context: "ctx", namespace: "ns", name: "pod1", kind: "Pod"}
 
-	_, cmd2 := mm.updateOverlayCapture(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd2 := mm.updateOverlayCapture(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd2 == nil {
 		t.Error("kubeshark hand-off should be allowed under read-only; got nil cmd")
 	}

@@ -1,7 +1,7 @@
 package app
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -29,7 +29,7 @@ const tasksOverlayJumpEnd = 1_000_000
 // with many up presses before the viewport actually moves.
 //
 //nolint:unparam // consistent overlay handler signature
-func (m Model) handleBackgroundTasksOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBackgroundTasksOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
 		m.overlay = overlayNone

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,13 +26,12 @@ func TestIsValidClusterColor(t *testing.T) {
 }
 
 func TestClusterColorTitleBarStyle_KnownColorSetsBg(t *testing.T) {
-	// Inspect style attributes directly — lipgloss strips ANSI escapes
-	// when stdout isn't a TTY (e.g. during `go test`), so we cannot
-	// rely on the rendered output here.
+	// Inspect style attributes directly rather than the rendered output, so
+	// the assertion does not depend on how a colour is encoded as SGR.
 	style := ClusterColorTitleBarStyle("red")
-	bg, ok := style.GetBackground().(lipgloss.Color)
-	assert.True(t, ok, "known color must set a concrete lipgloss.Color background, not NoColor")
-	assert.NotEmpty(t, string(bg), "background color must be non-empty")
+	bg := style.GetBackground()
+	assert.NotNil(t, bg, "known color must set a background")
+	assert.NotEqual(t, lipgloss.NoColor{}, bg, "known color must set a concrete background, not NoColor")
 	assert.True(t, style.GetBold(), "title bar tint should be bold so badges stay legible against bright backgrounds")
 }
 
@@ -44,11 +43,8 @@ func TestClusterColorBg_ThemeMappedColorsFollowTheme(t *testing.T) {
 	t.Cleanup(func() { ActiveTheme.Error = prev })
 
 	ActiveTheme.Error = "#abcdef"
-	bg, ok := clusterColorBg("red").(lipgloss.Color)
-	if assert.True(t, ok, "red must resolve to a concrete lipgloss.Color") {
-		assert.Equal(t, "#abcdef", string(bg),
-			"red must read the *current* ActiveTheme.Error so theme switches propagate")
-	}
+	assert.Equal(t, lipgloss.Color("#abcdef"), clusterColorBg("red"),
+		"red must read the *current* ActiveTheme.Error so theme switches propagate")
 }
 
 func TestClusterColorBg_AnsiMappedColorsAreFixed(t *testing.T) {
@@ -61,9 +57,9 @@ func TestClusterColorBg_AnsiMappedColorsAreFixed(t *testing.T) {
 
 	ActiveTheme.Error = "#abcdef"
 	for _, name := range []string{"magenta", "cyan", "white", "gray"} {
-		bg, ok := clusterColorBg(name).(lipgloss.Color)
-		if assert.True(t, ok, "%s must resolve to a concrete lipgloss.Color", name) {
-			assert.NotEqual(t, "#abcdef", string(bg),
+		bg := clusterColorBg(name)
+		if assert.NotNil(t, bg, "%s must resolve to a concrete colour", name) {
+			assert.NotEqual(t, lipgloss.Color("#abcdef"), bg,
 				"%s must NOT pick up theme.Error — palette-relative colours stay independent", name)
 		}
 	}
@@ -76,11 +72,11 @@ func TestClusterColorBg_UnknownNameReturnsNil(t *testing.T) {
 
 func TestClusterColorTitleBarStyle_UnknownColorIsZeroStyle(t *testing.T) {
 	style := ClusterColorTitleBarStyle("chartreuse")
-	// Zero style: GetBackground() returns NoColor{} for an unset background,
-	// not a lipgloss.Color — that distinction is what tells the renderer to
-	// pass through unchanged.
-	_, isColor := style.GetBackground().(lipgloss.Color)
-	assert.False(t, isColor, "unknown color must yield the zero style (NoColor background) so callers can compose unconditionally")
+	// Zero style: GetBackground() returns NoColor{} for an unset background
+	// rather than a real colour — that distinction is what tells the renderer
+	// to pass through unchanged.
+	assert.Equal(t, lipgloss.NoColor{}, style.GetBackground(),
+		"unknown color must yield the zero style (NoColor background) so callers can compose unconditionally")
 }
 
 func TestClusterColorSwatch_KnownColorRendersBlock(t *testing.T) {

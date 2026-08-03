@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -27,21 +27,21 @@ func TestMouseWheelInExecModeScrollsScrollback(t *testing.T) {
 	}
 
 	t.Run("wheel up scrolls 1 line into history", func(t *testing.T) {
-		ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+		ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 		assert.Equal(t, 1, ret.(Model).execScrollOffset)
 	})
 
 	t.Run("wheel down clamps at live", func(t *testing.T) {
 		m := m
 		m.execScrollOffset = 1
-		ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+		ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 		assert.Equal(t, 0, ret.(Model).execScrollOffset, "wheel down past live clamps to 0")
 	})
 
 	t.Run("wheel up clamps so a full viewport stays visible", func(t *testing.T) {
 		m := m
 		m.execScrollOffset = 81
-		ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+		ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 		assert.Equal(t, 81, ret.(Model).execScrollOffset, "max offset = Len - viewH so the oldest line still fits at the top")
 	})
 
@@ -52,7 +52,7 @@ func TestMouseWheelInExecModeScrollsScrollback(t *testing.T) {
 		}
 		// Len=5, viewH=19 -> maxOffset=0; no scrolling possible.
 		mm := Model{mode: modeExec, height: 24, tabs: []TabState{{}}, execScrollback: smallSB}
-		ret, _ := mm.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+		ret, _ := mm.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 		assert.Equal(t, 0, ret.(Model).execScrollOffset)
 	})
 }
@@ -63,7 +63,7 @@ func TestMouseWheelUpMovesUp(t *testing.T) {
 	m := baseExplorerModel()
 	m.setCursor(2)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	result := ret.(Model)
 	assert.Less(t, result.cursor(), 2)
 }
@@ -77,7 +77,7 @@ func TestMouseWheelDownMovesDown(t *testing.T) {
 	m.middleItems = items
 	m.setCursor(0)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	result := ret.(Model)
 	assert.Greater(t, result.cursor(), 0)
 }
@@ -93,7 +93,7 @@ func TestMouseWheelOverRightPaneScrollsPreview(t *testing.T) {
 	m.previewScroll = 10
 
 	// X=100 is the right pane (>= middleEnd).
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 100})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: 100})
 	result := ret.(Model)
 	assert.Equal(t, 2, result.cursor(), "wheel over right pane must not move the row cursor")
 	assert.Equal(t, 7, result.previewScroll, "wheel up over right pane scrolls the preview up by 3")
@@ -114,14 +114,14 @@ func TestMouseWheelOverLogPreviewScrolls(t *testing.T) {
 	m.previewLog.fromBottom = 0
 
 	// Wheel up over the right pane (X=100) scrolls into older lines.
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 100})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: 100})
 	m = ret.(Model)
 	assert.Greater(t, m.previewLog.fromBottom, 0, "wheel up scrolls the log preview back into older lines")
 	assert.Equal(t, 0, m.previewScroll, "log preview wheel must not touch the YAML previewScroll")
 
 	// Wheel down returns toward the newest (floors at 0).
 	up := m.previewLog.fromBottom
-	ret, _ = m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 100})
+	ret, _ = m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 100})
 	m = ret.(Model)
 	assert.Less(t, m.previewLog.fromBottom, up, "wheel down scrolls the log preview toward the newest")
 }
@@ -131,7 +131,7 @@ func TestMouseWheelDownOverRightPaneKeepsCursor(t *testing.T) {
 	m.setCursor(2)
 	m.previewScroll = 0
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 100})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 100})
 	result := ret.(Model)
 	assert.Equal(t, 2, result.cursor(), "wheel down over right pane must not move the row cursor")
 }
@@ -141,7 +141,7 @@ func TestMouseWheelOverRightPaneFloorsAtZero(t *testing.T) {
 	m := baseExplorerModel()
 	m.previewScroll = 1
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 100})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp, X: 100})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.previewScroll, "preview scroll floors at 0")
 }
@@ -157,7 +157,7 @@ func TestMouseWheelOverMiddlePaneMovesCursor(t *testing.T) {
 	m.setCursor(0)
 
 	// X=30 is the middle pane (leftEnd=15 <= 30 < middleEnd=75).
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 30})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown, X: 30})
 	result := ret.(Model)
 	assert.Greater(t, result.cursor(), 0, "wheel over middle pane moves the cursor")
 	assert.Equal(t, 0, result.previewScroll, "wheel over middle pane does not touch preview scroll")
@@ -178,7 +178,7 @@ func TestMouseWheelUpInLogMode(t *testing.T) {
 		tabs:   []TabState{{}},
 	}
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	result := ret.(Model)
 	assert.False(t, result.logView.follow)
 	assert.Less(t, result.logView.scroll, 50)
@@ -197,7 +197,7 @@ func TestMouseWheelDownInLogMode(t *testing.T) {
 		tabs:   []TabState{{}},
 	}
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	result := ret.(Model)
 	assert.False(t, result.logView.follow)
 	assert.Greater(t, result.logView.scroll, 5)
@@ -215,7 +215,7 @@ func TestMouseWheelUpInLogModeAtZero(t *testing.T) {
 		tabs:   []TabState{{}},
 	}
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.logView.scroll)
 }
@@ -227,7 +227,7 @@ func TestMouseIgnoredInOverlayMode(t *testing.T) {
 	m.overlay = overlayNamespace
 	m.setCursor(0)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.cursor())
 }
@@ -237,7 +237,7 @@ func TestMouseIgnoredInNonExplorerMode(t *testing.T) {
 	m.mode = modeYAML
 	m.setCursor(0)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	ret, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	result := ret.(Model)
 	assert.Equal(t, 0, result.cursor())
 }
@@ -264,9 +264,8 @@ func TestMouseLeftClickMiddleColumnSelectsRow(t *testing.T) {
 	m.setCursor(0)
 	withMiddleLineMap(t, []int{0, 1, 2})
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      30, // middle pane
 		Y:      4,  // table row 1
 	})
@@ -280,9 +279,8 @@ func TestMouseLeftClickAlreadyCursoredRowDrills(t *testing.T) {
 	m.setCursor(1) // pre-position cursor on pod-b
 	withMiddleLineMap(t, []int{0, 1, 2})
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      30,
 		Y:      4, // same row the cursor is on
 	})
@@ -316,9 +314,8 @@ func TestMouseLeftClickHeaderRowSorts(t *testing.T) {
 	withMiddleLineMap(t, []int{0, 1, 2})
 
 	// y=2 is the table header row (itemY = 2 - 2 - 1 = -1).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      30,
 		Y:      2,
 	})
@@ -334,9 +331,8 @@ func TestMouseRightClickMiddleColumnOpensActionMenu(t *testing.T) {
 	m.setCursor(0)
 	withMiddleLineMap(t, []int{0, 1, 2})
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      30,
 		Y:      4, // row 1
 	})
@@ -350,9 +346,8 @@ func TestMouseRightClickRightColumnOpensActionMenuWithoutMovingCursor(t *testing
 	m.setCursor(2)
 	withMiddleLineMap(t, []int{0, 1, 2})
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      100, // right pane (>= middleEnd=79)
 		Y:      4,
 	})
@@ -365,9 +360,8 @@ func TestMouseRightClickLeftColumnIsNoOp(t *testing.T) {
 	m := baseExplorerModel()
 	m.setCursor(1)
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      5, // left pane (< leftEnd=17)
 		Y:      4,
 	})
@@ -387,9 +381,8 @@ func TestMouseRightClickWhileOverlayOpenDoesNotReachExplorer(t *testing.T) {
 	m.overlay = overlayNamespace
 	m.overlayItems = []model.Item{{Name: "default"}}
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      30,
 		Y:      4, // outside the namespace overlay box (above it)
 	})
@@ -403,9 +396,8 @@ func TestMouseRightClickReleaseIgnored(t *testing.T) {
 	m.setCursor(0)
 	withMiddleLineMap(t, []int{0, 1, 2})
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionRelease,
+	ret, _ := m.handleMouse(tea.MouseReleaseMsg{
+		Button: tea.MouseRight,
 		X:      30,
 		Y:      4,
 	})
@@ -420,9 +412,8 @@ func TestMouseRightClickMiddleSeparatorIsNoOp(t *testing.T) {
 	// Line map with a separator at index 1 (-1 means non-clickable).
 	withMiddleLineMap(t, []int{0, -1, 1, 2})
 
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      30,
 		Y:      4, // itemY=1 -> separator
 	})
@@ -446,9 +437,8 @@ func TestMouseTabBarClickBlockedByOverlay(t *testing.T) {
 
 	// Click coordinates that would otherwise hit tab 1: row 1, x in the
 	// second tab's region (tab labels are short, so far-right is safe).
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      40,
 		Y:      1,
 	})
@@ -477,9 +467,8 @@ func TestColumnBoundariesMatchViewExplorerLayout(t *testing.T) {
 	// x = leftEnd: click should be middle (selects, not navigates parent).
 	m1 := baseExplorerModel()
 	m1.setCursor(0)
-	ret1, _ := m1.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret1, _ := m1.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      leftEnd,
 		Y:      4,
 	})
@@ -504,9 +493,8 @@ func TestColumnBoundariesRespectsHideLeftPane(t *testing.T) {
 	withMiddleLineMap(t, []int{0, 1, 2})
 	m.setCursor(0)
 	startLevel := m.nav.Level
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      2,
 		Y:      4,
 	})
@@ -525,9 +513,8 @@ func TestMouseRightClickRespectsFullscreenLayout(t *testing.T) {
 	// x=100 (which would land in the right pane in normal layout) must
 	// still resolve to the middle column's action menu rather than
 	// falling through to the right-pane branch.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonRight,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseRight,
 		X:      100,
 		Y:      4,
 	})
@@ -539,9 +526,8 @@ func TestMouseRightClickRespectsFullscreenLayout(t *testing.T) {
 func TestMouseLeftClickRightColumn(t *testing.T) {
 	m := baseExplorerModel()
 	// Click far right (right column area) should navigate child.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      110, // right column
 		Y:      5,
 	})
@@ -553,9 +539,8 @@ func TestMouseLeftClickRightColumn(t *testing.T) {
 func TestMouseLeftClickLeftColumn(t *testing.T) {
 	m := baseExplorerModel()
 	// Click far left (left column area) should navigate parent.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	ret, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      5,
 		Y:      5,
 	})
@@ -569,9 +554,8 @@ func TestMouseLeftClickNotPress(t *testing.T) {
 	m.setCursor(0)
 
 	// Non-press action should be no-op.
-	ret, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	ret, _ := m.handleMouse(tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      60,
 		Y:      5,
 	})
@@ -729,7 +713,7 @@ func TestCov80HandleMouseWheelUpInLogs(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeLogs
 	m.logView.scroll = 10
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp}
 	result, _ := m.handleMouse(msg)
 	rm := result.(Model)
 	assert.Less(t, rm.logView.scroll, 10)
@@ -739,7 +723,7 @@ func TestCov80HandleMouseWheelDownInLogs(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeLogs
 	m.logView.scroll = 0
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelDown}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelDown}
 	result, _ := m.handleMouse(msg)
 	rm := result.(Model)
 	assert.GreaterOrEqual(t, rm.logView.scroll, 0)
@@ -749,7 +733,7 @@ func TestCov80HandleMouseInOverlay(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeExplorer
 	m.overlay = overlayAction
-	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
+	msg := tea.MouseWheelMsg{Button: tea.MouseWheelUp}
 	result, cmd := m.handleMouse(msg)
 	_ = result
 	assert.Nil(t, cmd)
@@ -758,7 +742,7 @@ func TestCov80HandleMouseInOverlay(t *testing.T) {
 func TestCov80HandleMouseLeftClickNotPress(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeExplorer
-	msg := tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionRelease}
+	msg := tea.MouseReleaseMsg{Button: tea.MouseLeft}
 	result, cmd := m.handleMouse(msg)
 	_ = result
 	assert.Nil(t, cmd)
@@ -791,7 +775,7 @@ func TestCovMouseScrollUpInLogs(t *testing.T) {
 	m.mode = modeLogs
 	m.logView.scroll = 5
 	m.logView.lines = make([]string, 20)
-	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	result, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	rm := result.(Model)
 	assert.Less(t, rm.logView.scroll, 5)
 	assert.False(t, rm.logView.follow)
@@ -802,7 +786,7 @@ func TestCovMouseScrollDownInLogs(t *testing.T) {
 	m.mode = modeLogs
 	m.logView.scroll = 0
 	m.logView.lines = make([]string, 20)
-	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	result, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 	rm := result.(Model)
 	assert.GreaterOrEqual(t, rm.logView.scroll, 0)
 }
@@ -811,14 +795,14 @@ func TestCovMouseInOverlay(t *testing.T) {
 	m := baseModelActions()
 	m.mode = modeExplorer
 	m.overlay = overlayAction
-	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	result, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	_ = result.(Model)
 }
 
 func TestCovMouseInHelp(t *testing.T) {
 	m := baseModelActions()
 	m.mode = modeHelp
-	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	result, _ := m.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	_ = result.(Model)
 }
 
@@ -827,9 +811,8 @@ func TestCovMouseLeftClickInMiddle(t *testing.T) {
 	m.mode = modeExplorer
 	m.middleItems = []model.Item{{Name: "item-1"}}
 	// middleEnd should be around 45-50 area
-	result, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionPress,
+	result, _ := m.handleMouse(tea.MouseClickMsg{
+		Button: tea.MouseLeft,
 		X:      30,
 		Y:      5,
 	})
@@ -840,9 +823,8 @@ func TestCovMouseLeftClickRelease(t *testing.T) {
 	m := baseModelActions()
 	m.mode = modeExplorer
 	// Should be ignored (release, not press)
-	result, _ := m.handleMouse(tea.MouseMsg{
-		Button: tea.MouseButtonLeft,
-		Action: tea.MouseActionRelease,
+	result, _ := m.handleMouse(tea.MouseReleaseMsg{
+		Button: tea.MouseLeft,
 		X:      30,
 		Y:      5,
 	})

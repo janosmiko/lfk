@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -113,7 +113,7 @@ func TestConfirmOverlay_CancelClearsTitleOverride(t *testing.T) {
 	require.Equal(t, "Confirm Evict Replicas", m.confirmTitle)
 
 	// Cancel the overlay.
-	ret, _ = m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret, _ = m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = ret.(Model)
 	assert.Empty(t, m.confirmTitle, "title override must be cleared on cancel")
 	assert.Empty(t, m.confirmQuestion, "question override must be cleared on cancel")

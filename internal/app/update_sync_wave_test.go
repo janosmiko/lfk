@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -269,7 +269,7 @@ func TestSyncWaveOverlayKey_EscClosesAndClears(t *testing.T) {
 	m.syncWave.data = &k8s.SyncWaveTimeline{AppName: "x"}
 	m.loading = true
 
-	got, cmd := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	got, cmd := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	gotM := got.(Model)
 	assert.Equal(t, overlayNone, gotM.overlay)
 	assert.Nil(t, gotM.syncWave.data)
@@ -286,9 +286,9 @@ func TestSyncWaveOverlayKey_TabTogglesPane(t *testing.T) {
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
 	m.syncWave.activePane = paneSidebar
-	got, _ := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	got, _ := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	assert.Equal(t, paneBody, got.(Model).syncWave.activePane)
-	got, _ = got.(Model).handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	got, _ = got.(Model).handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	assert.Equal(t, paneSidebar, got.(Model).syncWave.activePane)
 }
 
@@ -302,11 +302,11 @@ func TestSyncWaveOverlayKey_TabNoOpInSinglePaneMode(t *testing.T) {
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
 	m.syncWave.activePane = paneSidebar
-	got, _ := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	got, _ := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	assert.Equal(t, paneBody, got.(Model).syncWave.activePane,
 		"Tab in single-pane mode must force focus on the body")
 	// Pressing Tab again still keeps focus on the body (no toggle).
-	got, _ = got.(Model).handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	got, _ = got.(Model).handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	assert.Equal(t, paneBody, got.(Model).syncWave.activePane,
 		"Tab in single-pane mode must remain a no-op on second press")
 }
@@ -318,7 +318,7 @@ func TestSyncWaveOverlayKey_TabPreservesCursors(t *testing.T) {
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 2}
-	got, _ := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	got, _ := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	gotM := got.(Model)
 	assert.Equal(t, 0, gotM.syncWave.sidebarCursor)
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 0, resourceIdx: 2}, gotM.syncWave.bodyCursor)
@@ -328,7 +328,7 @@ func TestSyncWaveOverlayKey_RTriggersRefresh(t *testing.T) {
 	m := Model{}
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{}
-	got, cmd := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	got, cmd := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	gotM := got.(Model)
 	assert.True(t, gotM.loading)
 	require.NotNil(t, cmd)
@@ -339,7 +339,7 @@ func TestSyncWaveOverlayKey_RefreshKeyWorksFromBodyPane(t *testing.T) {
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{}
 	m.syncWave.activePane = paneBody
-	_, cmd := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	_, cmd := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	require.NotNil(t, cmd)
 }
 
@@ -348,7 +348,7 @@ func TestSyncWaveOverlayKey_EscClosesFromBodyPane(t *testing.T) {
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{}
 	m.syncWave.activePane = paneBody
-	got, _ := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	got, _ := m.handleSyncWaveOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, overlayNone, got.(Model).overlay)
 }
 
@@ -466,7 +466,7 @@ func TestSidebarKey_JMovesCursorAndResetsBody(t *testing.T) {
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyScroll = 7
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 3}
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	gotM := got.(Model)
 	assert.Equal(t, 1, gotM.syncWave.sidebarCursor)
 	assert.Equal(t, 0, gotM.syncWave.bodyScroll)
@@ -478,7 +478,7 @@ func TestSidebarKey_JWrapsAtEnd(t *testing.T) {
 	m.syncWave.activePane = paneSidebar
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "A"}, {Name: "B"}}}
 	m.syncWave.sidebarCursor = 1
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 0, got.(Model).syncWave.sidebarCursor)
 }
 
@@ -487,7 +487,7 @@ func TestSidebarKey_KMovesUp(t *testing.T) {
 	m.syncWave.activePane = paneSidebar
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "A"}, {Name: "B"}}}
 	m.syncWave.sidebarCursor = 1
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 0, got.(Model).syncWave.sidebarCursor)
 }
 
@@ -496,7 +496,7 @@ func TestSidebarKey_KWrapsAtTop(t *testing.T) {
 	m.syncWave.activePane = paneSidebar
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "A"}, {Name: "B"}}}
 	m.syncWave.sidebarCursor = 0
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 1, got.(Model).syncWave.sidebarCursor)
 }
 
@@ -505,9 +505,9 @@ func TestSidebarKey_EnterTogglesPhaseCollapse(t *testing.T) {
 	m.syncWave.activePane = paneSidebar
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
 	m.syncWave.collapsed = map[string]bool{}
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.True(t, got.(Model).syncWave.collapsed["Sync"])
-	got, _ = got.(Model).handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got, _ = got.(Model).handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, got.(Model).syncWave.collapsed["Sync"])
 }
 
@@ -516,7 +516,7 @@ func TestSidebarKey_GJumpsToFirstPhase(t *testing.T) {
 	m.syncWave.activePane = paneSidebar
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "A"}, {Name: "B"}, {Name: "C"}}}
 	m.syncWave.sidebarCursor = 2
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	assert.Equal(t, 0, got.(Model).syncWave.sidebarCursor)
 }
 
@@ -524,7 +524,7 @@ func TestSidebarKey_BigGJumpsToLastPhase(t *testing.T) {
 	m := Model{}
 	m.syncWave.activePane = paneSidebar
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "A"}, {Name: "B"}, {Name: "C"}}}
-	got, _ := m.handleSyncWaveSidebarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	got, _ := m.handleSyncWaveSidebarKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, 2, got.(Model).syncWave.sidebarCursor)
 }
 
@@ -540,9 +540,9 @@ func TestBodyKey_JMovesThroughRows(t *testing.T) {
 	}}
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: -1}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0}, got.(Model).syncWave.bodyCursor)
-	got, _ = got.(Model).handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got, _ = got.(Model).handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 0, resourceIdx: 1}, got.(Model).syncWave.bodyCursor)
 }
 
@@ -556,7 +556,7 @@ func TestBodyKey_JStopsAtEnd(t *testing.T) {
 	}}
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0}, got.(Model).syncWave.bodyCursor)
 }
 
@@ -572,7 +572,7 @@ func TestBodyKey_JSkipsCollapsedWaveResources(t *testing.T) {
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: -1}
 	m.syncWave.collapsed = map[string]bool{"Sync/wave 0": true}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 1, resourceIdx: -1}, got.(Model).syncWave.bodyCursor)
 }
 
@@ -586,7 +586,7 @@ func TestBodyKey_KMovesUp(t *testing.T) {
 	}}
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 0, resourceIdx: -1}, got.(Model).syncWave.bodyCursor)
 }
 
@@ -609,7 +609,7 @@ func TestBodyKey_JScrollsBodyWhenCursorLeavesViewport(t *testing.T) {
 
 	// Press j enough times to exceed the viewport.
 	for range 30 {
-		got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+		got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 		m = got.(Model)
 	}
 
@@ -637,7 +637,7 @@ func TestBodyKey_KScrollsBodyUpWhenCursorAboveViewport(t *testing.T) {
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0} // first resource (flat index 1)
 	m.syncWave.bodyScroll = 15                                             // cursor far above
 
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	gotM := got.(Model)
 	// k moves cursor to wave header (flat index 0); bodyScroll must drop
 	// to 0 so the wave header is visible.
@@ -656,7 +656,7 @@ func TestBodyKey_EnterOnWaveHeaderTogglesWaveCollapse(t *testing.T) {
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: -1}
 	m.syncWave.collapsed = map[string]bool{}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.True(t, got.(Model).syncWave.collapsed["Sync/wave 0"])
 }
 
@@ -667,7 +667,7 @@ func TestBodyKey_EnterOnPlaceholderTogglesPhaseCollapse(t *testing.T) {
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: -1, resourceIdx: -1}
 	m.syncWave.collapsed = map[string]bool{}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.True(t, got.(Model).syncWave.collapsed["Sync"])
 }
 
@@ -682,6 +682,6 @@ func TestBodyKey_EnterOnResourceIsNoOp(t *testing.T) {
 	m.syncWave.sidebarCursor = 0
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0}
 	m.syncWave.collapsed = map[string]bool{}
-	got, _ := m.handleSyncWaveBodyKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got, _ := m.handleSyncWaveBodyKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Empty(t, got.(Model).syncWave.collapsed)
 }

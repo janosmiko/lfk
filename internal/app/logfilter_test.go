@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -184,7 +184,7 @@ func TestFilterInput_LiveNarrows(t *testing.T) {
 		t.Fatal("filterActive should be true after opening")
 	}
 	for _, r := range "alph" {
-		mm, _ := m.handleLogFilterKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		mm, _ := m.handleLogFilterKey(keyPressRunes([]rune{r}))
 		m = mm.(Model)
 	}
 	if m.logView.filterQuery != "alph" {
@@ -193,7 +193,7 @@ func TestFilterInput_LiveNarrows(t *testing.T) {
 	if len(m.logView.lines) != 2 {
 		t.Fatalf("live filter should show 2 (alpha, alphabet), got %d: %v", len(m.logView.lines), m.logView.lines)
 	}
-	mm, _ := m.handleLogFilterKey(tea.KeyMsg{Type: tea.KeyEsc})
+	mm, _ := m.handleLogFilterKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = mm.(Model)
 	if m.logView.filterActive || m.logView.filterQuery != "" {
 		t.Fatal("esc should cancel and clear the filter")
@@ -269,7 +269,7 @@ func TestLogView_FilterAndSeverityIndicators(t *testing.T) {
 	m.logView.filterQuery = "boomtoken"
 	m.logView.sevThreshold = ui.LogWarn
 	m.rebuildLogView()
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	if !strings.Contains(out, "[F:boomtoken]") {
 		t.Errorf("expected [F:boomtoken] filter indicator in title, got:\n%s", out)
 	}
@@ -287,7 +287,7 @@ func TestLogView_FilterPromptWhenActive(t *testing.T) {
 	m.logView.filterInput.Set("alph")
 	m.logView.filterQuery = "alph"
 	m.rebuildLogView()
-	out := stripANSI(m.View())
+	out := stripANSI(m.View().Content)
 	if !strings.Contains(out, "esc:clear") {
 		t.Errorf("expected filter prompt footer (esc:clear), got:\n%s", out)
 	}

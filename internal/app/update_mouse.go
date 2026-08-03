@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -11,7 +11,7 @@ import (
 // handleMouseToggleKey intercepts the configured mouse-capture toggle key.
 // Returns handled=false when the key doesn't match or a viewer text-input
 // sub-mode owns the keystroke, so the keystroke falls through unchanged.
-func (m Model) handleMouseToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleMouseToggleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	if kb.MouseToggle == "" || msg.String() != kb.MouseToggle {
 		return m, nil, false
@@ -39,21 +39,30 @@ func (m Model) toggleMouseCapture() (tea.Model, tea.Cmd) {
 	m.mouseCaptured = !m.mouseCaptured
 	if m.mouseCaptured {
 		m.setStatusMessage("Mouse capture ON", false)
-		return m, tea.Batch(tea.EnableMouseCellMotion, scheduleStatusClear())
+		return m, scheduleStatusClear()
 	}
 	m.setStatusMessage("Mouse capture OFF — select text natively; press "+
 		ui.ActiveKeybindings.MouseToggle+" to re-enable", false)
-	return m, tea.Batch(tea.DisableMouse, scheduleStatusClear())
+	return m, scheduleStatusClear()
+}
+
+// isMousePress reports whether msg is a button press. Bubble Tea v2 encodes
+// the action in the message type rather than in a MouseMsg.Action field, so
+// press/release is a type check now.
+func isMousePress(msg tea.MouseMsg) bool {
+	_, ok := msg.(tea.MouseClickMsg)
+	return ok
 }
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
 	// Trackpad momentum keeps emitting wheel ticks after the physical gesture
 	// ends. Drop the tail once the burst is no longer productive (a boundary
 	// was reached, the pointer moved to another pane, or a left/right
 	// navigation happened) so the queued ticks don't "play out" on whatever
 	// list is now under the pointer (#524).
-	if msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown {
-		next, drop := m.beginWheelTick(msg.X)
+	if mouse.Button == tea.MouseWheelUp || mouse.Button == tea.MouseWheelDown {
+		next, drop := m.beginWheelTick(mouse.X)
 		if drop {
 			return next, nil
 		}
@@ -66,10 +75,10 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// wheel — clicks and other mouse input fall through so tab-bar
 	// clicks and host-terminal selection (shift+drag) keep working.
 	if m.mode == modeExec {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
+		switch mouse.Button {
+		case tea.MouseWheelUp:
 			return m.execScrollBy(-1), nil
-		case tea.MouseButtonWheelDown:
+		case tea.MouseWheelDown:
 			return m.execScrollBy(1), nil
 		}
 		// Fall through for non-wheel mouse events (tab-bar clicks etc.)
@@ -86,11 +95,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// per-pane wheel routing (#379). Non-wheel mouse falls through so
 	// tab-bar clicks keep working.
 	if m.mode == modeObjectExplorer {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			return m.handleObjectExplorerWheel(msg.X, -1)
-		case tea.MouseButtonWheelDown:
-			return m.handleObjectExplorerWheel(msg.X, 1)
+		switch mouse.Button {
+		case tea.MouseWheelUp:
+			return m.handleObjectExplorerWheel(mouse.X, -1)
+		case tea.MouseWheelDown:
+			return m.handleObjectExplorerWheel(mouse.X, 1)
 		}
 	}
 
@@ -100,10 +109,10 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// clamps, page-X tracking, sub-mode dispatch — runs unchanged.
 	// Other mouse buttons fall through so tab-bar clicks still work.
 	if isViewerMode(m.mode) {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
+		switch mouse.Button {
+		case tea.MouseWheelUp:
 			return m.dispatchWheelKey("k")
-		case tea.MouseButtonWheelDown:
+		case tea.MouseWheelDown:
 			return m.dispatchWheelKey("j")
 		}
 	}
@@ -112,8 +121,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// overlay is open. A modal overlay covers the rest of the screen
 	// and owns mouse input; without this guard a click on row 1 would
 	// switch tabs underneath the modal.
-	if m.overlay == overlayNone && len(m.tabs) > 1 && msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress && msg.Y == 1 {
-		if tab := m.tabAtX(msg.X); tab >= 0 && tab != m.activeTab {
+	if m.overlay == overlayNone && len(m.tabs) > 1 && mouse.Button == tea.MouseLeft && isMousePress(msg) && mouse.Y == 1 {
+		if tab := m.tabAtX(mouse.X); tab >= 0 && tab != m.activeTab {
 			return m.switchToTab(tab)
 		}
 		return m, nil
@@ -132,21 +141,21 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.handleOverlayMouse(msg)
 	}
 
-	switch msg.Button {
-	case tea.MouseButtonWheelUp:
-		return m.handleExplorerWheel(msg.X, -3)
-	case tea.MouseButtonWheelDown:
-		return m.handleExplorerWheel(msg.X, 3)
-	case tea.MouseButtonLeft:
-		if msg.Action != tea.MouseActionPress {
+	switch mouse.Button {
+	case tea.MouseWheelUp:
+		return m.handleExplorerWheel(mouse.X, -3)
+	case tea.MouseWheelDown:
+		return m.handleExplorerWheel(mouse.X, 3)
+	case tea.MouseLeft:
+		if !isMousePress(msg) {
 			return m, nil
 		}
-		return m.handleMouseClick(msg.X, msg.Y)
-	case tea.MouseButtonRight:
-		if msg.Action != tea.MouseActionPress {
+		return m.handleMouseClick(mouse.X, mouse.Y)
+	case tea.MouseRight:
+		if !isMousePress(msg) {
 			return m, nil
 		}
-		return m.handleMouseRightClick(msg.X, msg.Y)
+		return m.handleMouseRightClick(mouse.X, mouse.Y)
 	}
 	return m, nil
 }
@@ -339,16 +348,17 @@ func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 // the log — the same per-pane routing as the explorers (#379). Non-wheel
 // mouse is a no-op.
 func (m Model) handleLogsMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if logW, previewW := splitLogPreviewWidth(m.width); m.logView.previewVisible && previewW > 0 && msg.X >= logW {
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
+	mouse := msg.Mouse()
+	if logW, previewW := splitLogPreviewWidth(m.width); m.logView.previewVisible && previewW > 0 && mouse.X >= logW {
+		switch mouse.Button {
+		case tea.MouseWheelUp:
 			return m.scrollLogPreviewWheel(-1), nil
-		case tea.MouseButtonWheelDown:
+		case tea.MouseWheelDown:
 			return m.scrollLogPreviewWheel(1), nil
 		}
 	}
-	switch msg.Button {
-	case tea.MouseButtonWheelUp:
+	switch mouse.Button {
+	case tea.MouseWheelUp:
 		m.logView.follow = false
 		if m.logView.scroll > 0 {
 			m.logView.scroll -= 3
@@ -357,7 +367,7 @@ func (m Model) handleLogsMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, m.maybeLoadMoreHistory()
-	case tea.MouseButtonWheelDown:
+	case tea.MouseWheelDown:
 		m.logView.follow = false
 		m.logView.scroll += 3
 		m.clampLogScroll()
@@ -662,7 +672,7 @@ func (m Model) dispatchWheelKey(key string) (tea.Model, tea.Cmd) {
 	var lastCmd tea.Cmd
 	runes := []rune(key)
 	for range wheelStep {
-		mdl, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: runes})
+		mdl, cmd := m.handleKey(keyPressRunes(runes))
 		m = mdl.(Model)
 		if cmd != nil {
 			lastCmd = cmd

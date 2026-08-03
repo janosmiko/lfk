@@ -3,7 +3,7 @@ package app
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -98,12 +98,12 @@ func (m Model) handleKeyClusterColorPicker() (tea.Model, tea.Cmd) {
 // and normal mode (navigation / selection). The hint bar sits on the
 // status bar via overlayHintBarSelector — no inline hints in the
 // overlay box itself.
-func (m Model) handleClusterColorOverlayKey(key string) (tea.Model, tea.Cmd) {
+func (m Model) handleClusterColorOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.clusterColorFilterMode {
-		return m.handleClusterColorOverlayFilterKey(key), nil
+		return m.handleClusterColorOverlayFilterKey(msg), nil
 	}
 	rows := m.clusterColorOverlayRowCount()
-	switch key {
+	switch msg.String() {
 	case "down", "j", "ctrl+n":
 		if rows > 0 {
 			m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor + 1) % rows
@@ -172,8 +172,21 @@ func (m Model) handleClusterColorOverlayKey(key string) (tea.Model, tea.Cmd) {
 // user is typing into the / filter input. Enter / Esc exit the filter
 // mode (Enter keeps the current filter, Esc clears it); other keys
 // edit the buffer via the shared FilterInput helper.
-func (m Model) handleClusterColorOverlayFilterKey(key string) Model {
-	action := handleFilterKey(&m.clusterColorFilter, key)
+func (m Model) handleClusterColorOverlayFilterKey(msg tea.KeyPressMsg) Model {
+	// Paste routes through the confirm flow for multi-line content, matching
+	// every other filter overlay. pasteTargetClusterColorFilter already
+	// resolves to this input; before v2 the handler took a plain key string,
+	// so paste could never reach it.
+	if isPaste(msg) {
+		switch handlePastedText(&m.clusterColorFilter, []rune(msg.Text)) {
+		case filterContinue:
+			m.clusterColorOverlayCursor = 0
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(msg.Text, "\n"), pasteTargetClusterColorFilter)
+		}
+		return m
+	}
+	action := handleFilterKey(&m.clusterColorFilter, msg)
 	switch action {
 	case filterContinue, filterNavigate:
 		// Reset cursor to the first row of the new filtered view so the

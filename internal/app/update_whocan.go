@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -93,7 +93,7 @@ func (m Model) whoCanVisibleResources() []string {
 // handleWhoCanKey services key events while the overlay is in
 // reverse-RBAC mode. Filter mode (typing into the resource picker)
 // gets its own sub-handler.
-func (m Model) handleWhoCanKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleWhoCanKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.whoCan.resourceFilterActive {
 		return m.handleWhoCanFilterKey(msg)
 	}
@@ -269,8 +269,8 @@ func (m Model) refreshWhoCanForCursor(visible []string) (tea.Model, tea.Cmd) {
 // As keystrokes land the visible list narrows and the cursor snaps to
 // the top of the new list (with a query fire so the right pane keeps
 // up). Enter accepts the filter and exits filter mode; Esc clears it.
-func (m Model) handleWhoCanFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	action := handleFilterKey(&m.whoCan.resourceFilter, msg.String())
+func (m Model) handleWhoCanFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	action := handleFilterKey(&m.whoCan.resourceFilter, msg)
 	switch action {
 	case filterAccept:
 		m.whoCan.resourceFilterActive = false

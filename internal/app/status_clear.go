@@ -3,7 +3,7 @@ package app
 import (
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -30,7 +30,7 @@ func (m *Model) clearTransientStatus() {
 // fresh message for the same key (e.g. JumpOwner reporting "no owner", or
 // NewTab rejected in union mode) still overwrites the cleared state and wins.
 // Returns m unchanged for any other key.
-func (m Model) clearStatusOnNavigationKey(msg tea.KeyMsg) Model {
+func (m Model) clearStatusOnNavigationKey(msg tea.KeyPressMsg) Model {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case kb.Down, "down", kb.Up, "up", kb.Left, "left", kb.Right, "right",

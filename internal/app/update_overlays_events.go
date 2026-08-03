@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -112,7 +112,7 @@ func (m *Model) findNextEventMatch(forward bool) {
 
 // handleEventViewerModeKey handles keys for the fullscreen event viewer mode.
 // It wraps the overlay key handler but overrides q/esc/f for mode transitions.
-func (m Model) handleEventViewerModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEventViewerModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	kb := ui.ActiveKeybindings
 	switch key {
@@ -146,7 +146,7 @@ func (m Model) handleEventViewerModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleEventTimelineOverlayKey handles keyboard input for the event timeline overlay.
-func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEventTimelineOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Handle search input mode first.
 	if m.eventTimelineSearchActive {
 		return m.handleEventTimelineSearchKey(msg)
@@ -205,7 +205,7 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 }
 
 // handleEventTimelineMovementKey handles cursor/scroll movement keys.
-func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
+func (m Model) handleEventTimelineMovementKey(msg tea.KeyPressMsg) (Model, bool) {
 	key := msg.String()
 	maxIdx := max(len(m.eventTimelineLines)-1, 0)
 	switch key {
@@ -289,7 +289,7 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 
 // handleEventTimelineVisualKey handles keys while visual mode is active
 // in the event timeline overlay.
-func (m Model) handleEventTimelineVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEventTimelineVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	maxIdx := max(len(m.eventTimelineLines)-1, 0)
 
@@ -422,7 +422,7 @@ func (m *Model) eventTimelineCurrentLine() string {
 }
 
 // handleEventTimelineSearchKey handles keyboard input during event timeline search.
-func (m Model) handleEventTimelineSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEventTimelineSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.eventTimelineSearchActive = false
@@ -448,9 +448,8 @@ func (m Model) handleEventTimelineSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.eventTimelineSearchInput.Insert(key)
+		if msg.Text != "" {
+			m.eventTimelineSearchInput.Insert(msg.Text)
 		}
 	}
 	return m, nil

@@ -4,9 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,19 +78,15 @@ func TestRenderHelpScreen_CurrentMatchStyledDifferently(t *testing.T) {
 	// re-apply state defensively at start because Go test ordering
 	// inside a package isn't guaranteed and a prior test may have left
 	// styles blank.
-	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(original)
 		ConfigNoColor = originalNoColor
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 	ApplyTheme(DefaultTheme())
 	// ApplyTheme can re-detect/restore the color profile from
 	// originalColorProfile, so re-force ANSI right after.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 
 	withoutCurrent := RenderHelpScreen(120, 200, 0, "", "filter", "", -1)
 
@@ -121,15 +116,12 @@ func TestRenderHelpScreen_CurrentMatchStyledDifferently(t *testing.T) {
 // visible characters whether the user typed a digit query or no
 // query at all. Search adds highlight color but never visible chars.
 func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
-	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(original)
 		ConfigNoColor = originalNoColor
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
 	// ApplyTheme can re-detect/restore the color profile from
 	// originalColorProfile (theme.go:109-110), so re-force TrueColor
@@ -137,7 +129,6 @@ func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
 	// stripped profile, lipgloss emits no SGR digits, and the
 	// regression we're guarding against — digit-query corruption
 	// inside SGR sequences — could not occur in the first place.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	plain := RenderHelpScreen(120, 200, 0, "", "", "", -1)
 
@@ -283,17 +274,13 @@ func TestWrapHelpText_BreaksLongSlashTokenAtSlashes(t *testing.T) {
 }
 
 func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
-	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
 	t.Cleanup(func() {
-		lipgloss.DefaultRenderer().SetColorProfile(original)
 		ConfigNoColor = originalNoColor
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	lines := BuildHelpLines("", "", 120)
 	for i, line := range lines {

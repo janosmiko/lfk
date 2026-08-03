@@ -4,9 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -255,15 +254,11 @@ func TestHighlightFuzzy(t *testing.T) {
 // in isolation, even if the help-overlay caller ever stops feeding
 // them plain text again.
 func TestHighlightHelpers_StyledInputDoesNotLeakSGRFragments(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-
 	// Force a real color profile so styled output actually contains
 	// SGR escape sequences with digit parameters — the surface that
 	// the old highlighters' byte-indexed slicing corrupted. Without
 	// this, lipgloss runs in the test harness's stripped profile and
 	// renders plain text, so the test would pass vacuously.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 
 	// Use Reverse() for the highlight so the output contains visible
 	// SGR codes regardless of color profile decisions.

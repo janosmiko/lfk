@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
 	mdl "github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +71,7 @@ func TestOrphansOverlay_ResumeCursorAfterReopen(t *testing.T) {
 	m, _ = m.openOrphansOverlay()
 	m.orphans.visibleKind = orphanKindPod
 	for range 5 {
-		m, _ = m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m, _ = m.handleOrphansKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	}
 	require.Equal(t, 5, m.orphans.cursor, "fixture sanity")
 
@@ -140,7 +140,7 @@ func TestOrphansOverlay_QClosesOverlay(t *testing.T) {
 	m.overlay = overlayOrphans
 	m.orphans.cursor = 5
 
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: 'q', Text: "q"})
 
 	assert.Equal(t, overlayNone, updated.overlay, "q must close the overlay")
 }
@@ -152,7 +152,7 @@ func TestOrphansOverlay_TabCyclesKind(t *testing.T) {
 	m.orphans.cursor = 5
 	m.orphans.scroll = 3
 
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyTab})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	assert.Equal(t, orphanKindPod, updated.orphans.visibleKind)
 	assert.Equal(t, 0, updated.orphans.cursor, "kind switch resets cursor")
 	assert.Equal(t, 0, updated.orphans.scroll)
@@ -161,7 +161,7 @@ func TestOrphansOverlay_TabCyclesKind(t *testing.T) {
 	// sentinel after the last real kind, so the cycle length is
 	// orphanKindMax (= number of real kinds + 1 for All).
 	for range int(orphanKindMax) - 1 {
-		updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyTab})
+		updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: tea.KeyTab})
 	}
 	assert.Equal(t, orphanKindAll, updated.orphans.visibleKind, "Tab wraps back to All")
 }
@@ -174,12 +174,12 @@ func TestOrphansOverlay_JKMovesCursor(t *testing.T) {
 	}}
 	m.orphans.visibleKind = orphanKindPod
 
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 1, updated.orphans.cursor)
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")}) // clamps at len-1
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: 'j', Text: "j"}) // clamps at len-1
 	assert.Equal(t, 2, updated.orphans.cursor)
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 1, updated.orphans.cursor)
 }
 
@@ -193,19 +193,19 @@ func TestOrphansOverlay_FilterShrinksList(t *testing.T) {
 	m.orphans.visibleKind = orphanKindAll
 
 	// Press / to enter filter mode.
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: '/', Text: "/"})
 	assert.True(t, updated.orphans.filterActive)
 
 	// Type "kube" -- should narrow to debug.
 	for _, r := range "kube" {
-		updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		updated, _ = updated.handleOrphansKey(keyPressRunes([]rune{r}))
 	}
 	visible := updated.orphans.visibleItems()
 	require.Len(t, visible, 1)
 	assert.Equal(t, "debug", visible[0].Name)
 
 	// Esc cancels the filter, clears query, exits filter mode.
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyEsc})
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.False(t, updated.orphans.filterActive)
 	assert.Equal(t, "", updated.orphans.filter.Value)
 }
@@ -234,7 +234,7 @@ func TestOrphansOverlay_EnterJumpsToResource(t *testing.T) {
 	m.middleItems = []mdl.Item{{Name: "Pods", Extra: podRT.ResourceRef()}}
 	m.nav.Level = mdl.LevelResourceTypes
 
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	assert.Equal(t, overlayNone, updated.overlay, "overlay should close on jump")
 	assert.Equal(t, "kube-system", updated.namespace)
@@ -257,7 +257,7 @@ func TestOrphansOverlay_EnterShowsErrorWhenDiscoveryCold(t *testing.T) {
 	m.nav.Context = "test"
 	// discoveredResources intentionally empty.
 
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	assert.Equal(t, overlayOrphans, updated.overlay,
 		"overlay should stay open so the user can retry after discovery completes")
@@ -290,14 +290,14 @@ func TestOrphansOverlay_StrictToggle(t *testing.T) {
 		"chip count must reflect strict-mode visibility")
 
 	// Press s → toggle to lenient.
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: 's', Text: "s"})
 	assert.False(t, updated.orphans.strict)
 	visible = updated.orphans.visibleItems()
 	assert.Len(t, visible, 3, "lenient mode shows strict + lenient-only items")
 	assert.Equal(t, 3, updated.orphans.orphanKindCount(orphanKindSecret))
 
 	// Press s again → back to strict.
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: 's', Text: "s"})
 	assert.True(t, updated.orphans.strict)
 	visible = updated.orphans.visibleItems()
 	assert.Len(t, visible, 1)
@@ -322,7 +322,7 @@ func TestOrphansOverlay_StrictToggleClampsCursor(t *testing.T) {
 	m.orphans.visibleKind = orphanKindSecret
 	m.orphans.cursor = 2 // on the second lenient-only item
 
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: 's', Text: "s"})
 
 	assert.True(t, updated.orphans.strict)
 	assert.Equal(t, 0, updated.orphans.cursor,
@@ -336,7 +336,7 @@ func TestOrphansOverlay_RefreshInvalidatesCache(t *testing.T) {
 	key := orphanCacheKey{kubeContext: "test", namespace: ""}
 	m.orphanCache[key] = &k8s.OrphanReport{Pods: []k8s.OrphanItem{{Name: "a"}}}
 
-	updated, cmd := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	updated, cmd := m.handleOrphansKey(tea.KeyPressMsg{Code: 'R', Text: "R"})
 
 	assert.NotContains(t, updated.orphanCache, key, "R clears cluster-wide cache")
 	assert.True(t, updated.orphans.loading)
@@ -364,18 +364,18 @@ func TestOrphansOverlay_ScrollFollowsCursor(t *testing.T) {
 	require.Less(t, bodyH, len(pods), "test fixture must have more rows than fit")
 
 	// G jumps to last item; scroll must follow so cursor is visible.
-	updated, _ := m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	updated, _ := m.handleOrphansKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, len(pods)-1, updated.orphans.cursor, "G jumps to last")
 	assert.GreaterOrEqual(t, updated.orphans.cursor, updated.orphans.scroll, "cursor at or below scroll top")
 	assert.Less(t, updated.orphans.cursor, updated.orphans.scroll+bodyH, "cursor within viewport")
 
 	// g jumps to first; scroll resets.
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	assert.Equal(t, 0, updated.orphans.cursor)
 	assert.Equal(t, 0, updated.orphans.scroll)
 
 	// Ctrl+d advances by half-viewport; cursor must remain visible.
-	updated, _ = updated.handleOrphansKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	updated, _ = updated.handleOrphansKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.GreaterOrEqual(t, updated.orphans.cursor, updated.orphans.scroll)
 	assert.Less(t, updated.orphans.cursor, updated.orphans.scroll+bodyH)
 }
@@ -434,6 +434,25 @@ func TestOrphansOverlay_LastVisibleRowNotClipped(t *testing.T) {
 		want := fmt.Sprintf("pod-%03d", i)
 		assert.Contains(t, body, want,
 			"cursor=%d (bodyH=%d): expected row %q to be visible", i, bodyH, want)
-		m, _ = m.handleOrphansKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m, _ = m.handleOrphansKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	}
+}
+
+// The filter must insert the character the terminal produced, not the key
+// that was pressed: shift+a reports Code 'a' but Text "A", so keying off
+// Code silently lowercased every capital letter typed into the filter.
+func TestOrphansFilterInsertsShiftedCharacter(t *testing.T) {
+	m := newTestModel()
+	m.orphans.filterActive = true
+
+	for _, k := range []tea.KeyPressMsg{
+		{Code: 'n', Text: "n"},
+		{Code: 'g', Text: "G", Mod: tea.ModShift, ShiftedCode: 'G'},
+		{Code: 'x', Text: "X", Mod: tea.ModShift, ShiftedCode: 'X'},
+	} {
+		m, _ = m.handleOrphansFilterInput(k)
+	}
+
+	assert.Equal(t, "nGX", m.orphans.filter.Value,
+		"filter must record the produced characters, preserving case")
 }

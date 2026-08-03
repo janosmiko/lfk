@@ -3,12 +3,12 @@ package app
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	wasKonami := m.konamiActive
 	m = m.checkKonami(msg)
 	if m.konamiActive && !wasKonami {
@@ -78,7 +78,7 @@ func withLazySecurityProbe(mdl tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	return mm, cmd
 }
 
-func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 
 	if m.scheduler != nil && m.scheduler.HasActiveMutations() {
@@ -183,7 +183,7 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-func (m Model) handleExplorerJumpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerJumpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case "home":
@@ -303,7 +303,7 @@ func (m Model) handleExplorerHome() (tea.Model, tea.Cmd) {
 	return m, m.loadPreview()
 }
 
-func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerUIKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case kb.ThemeSelector:

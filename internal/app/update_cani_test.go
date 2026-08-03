@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -188,24 +188,24 @@ func TestCanIVisibleLines(t *testing.T) {
 func TestCovHandleCanIKeyHelp(t *testing.T) {
 	m := baseModelCov()
 	m.canIGroups = []model.CanIGroup{{Name: "core"}}
-	r, _ := m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	r, _ := m.handleCanIKey(tea.KeyPressMsg{Code: '?', Text: "?"})
 	assert.Equal(t, modeHelp, r.(Model).mode)
 }
 
 func TestCovHandleCanIKeyToggleAllowed(t *testing.T) {
 	m := baseModelCov()
-	r, _ := m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	r, _ := m.handleCanIKey(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	assert.True(t, r.(Model).canIAllowedOnly)
 }
 
 func TestCovHandleCanIKeyQuit(t *testing.T) {
 	m := baseModelCov()
 	m.canISearchQuery = "apps"
-	r, _ := m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	r, _ := m.handleCanIKey(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	assert.Empty(t, r.(Model).canISearchQuery)
 
 	m.canISearchQuery = ""
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'q', Text: "q"})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
 }
 
@@ -213,20 +213,20 @@ func TestCovHandleCanIKeyNavigation(t *testing.T) {
 	m := baseModelCov()
 	m.canIGroups = []model.CanIGroup{{Name: "a"}, {Name: "b"}, {Name: "c"}}
 
-	r, _ := m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	r, _ := m.handleCanIKey(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 1, r.(Model).canIGroupCursor)
 
 	m.canIGroupCursor = 2
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 1, r.(Model).canIGroupCursor)
 
 	m.canIGroupCursor = 0
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
 	assert.Equal(t, 2, r.(Model).canIGroupCursor)
 
 	m.canIGroupCursor = 2
 	m.pendingG = true
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'g', Text: "g"})
 	assert.Equal(t, 0, r.(Model).canIGroupCursor)
 }
 
@@ -236,11 +236,11 @@ func TestCovHandleCanIKeyScrollResource(t *testing.T) {
 		Name:      "core",
 		Resources: make([]model.CanIResource, 20),
 	}}
-	r, _ := m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}})
+	r, _ := m.handleCanIKey(tea.KeyPressMsg{Code: 'J', Text: "J"})
 	assert.GreaterOrEqual(t, r.(Model).canIResourceScroll, 0)
 
 	m.canIResourceScroll = 1
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'K'}})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'K', Text: "K"})
 	assert.Equal(t, 0, r.(Model).canIResourceScroll)
 }
 
@@ -252,19 +252,19 @@ func TestCovHandleCanIKeyPages(t *testing.T) {
 	m := baseModelCov()
 	m.canIGroups = groups
 
-	r, _ := m.handleCanIKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	r, _ := m.handleCanIKey(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.Greater(t, r.(Model).canIGroupCursor, 0)
 
 	m.canIGroupCursor = 25
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyCtrlU})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	assert.Less(t, r.(Model).canIGroupCursor, 25)
 
 	m.canIGroupCursor = 0
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	assert.Greater(t, r.(Model).canIGroupCursor, 0)
 
 	m.canIGroupCursor = 40
-	r, _ = m.handleCanIKey(tea.KeyMsg{Type: tea.KeyCtrlB})
+	r, _ = m.handleCanIKey(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	assert.Less(t, r.(Model).canIGroupCursor, 40)
 }
 
@@ -272,24 +272,24 @@ func TestCovHandleCanISearchKey(t *testing.T) {
 	m := baseModelCov()
 	m.canISearchActive = true
 	m.canISearchInput = TextInput{Value: "core"}
-	r, _ := m.handleCanISearchKey(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleCanISearchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.Equal(t, "core", r.(Model).canISearchQuery)
 
 	m.canISearchActive = true
-	r, _ = m.handleCanISearchKey(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleCanISearchKey(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.False(t, r.(Model).canISearchActive)
 
 	m.canISearchActive = true
 	m.canISearchInput = TextInput{Value: "co", Cursor: 2}
-	r, _ = m.handleCanISearchKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ = m.handleCanISearchKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "c", r.(Model).canISearchInput.Value)
 
 	m.canISearchInput = TextInput{Value: "hello", Cursor: 5}
-	r, _ = m.handleCanISearchKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ = m.handleCanISearchKey(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Empty(t, r.(Model).canISearchInput.Value)
 
 	m.canISearchInput = TextInput{}
-	r, _ = m.handleCanISearchKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	r, _ = m.handleCanISearchKey(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	assert.Equal(t, "a", r.(Model).canISearchInput.Value)
 }
 
@@ -358,36 +358,36 @@ func TestCovCanISubjectNormalMode(t *testing.T) {
 	m := baseModelCov()
 	m.overlayItems = []model.Item{{Name: "sa1"}, {Name: "sa2"}}
 
-	r, _ := m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	r, _ := m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	assert.Equal(t, 1, r.(Model).overlayCursor)
 
 	m.overlayCursor = 1
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	assert.Equal(t, 0, r.(Model).overlayCursor)
 
 	m.overlay = overlayCanISubject
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Equal(t, overlayCanI, r.(Model).overlay)
 
 	m.overlayFilter = TextInput{Value: "admin"}
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Empty(t, r.(Model).overlayFilter.Value)
 
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: '/', Text: "/"})
 	assert.True(t, r.(Model).canISubjectFilterMode)
 
 	// Reset filter so filteredOverlayItems returns all items for page scroll tests.
 	m.overlayFilter = TextInput{}
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyCtrlD})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
 
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyCtrlU})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
 
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyCtrlF})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
 
-	r, _ = m.handleCanISubjectNormalMode(tea.KeyMsg{Type: tea.KeyCtrlB})
+	r, _ = m.handleCanISubjectNormalMode(tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl})
 	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
 }
 
@@ -395,23 +395,23 @@ func TestCovCanISubjectFilterMode(t *testing.T) {
 	m := baseModelCov()
 	m.canISubjectFilterMode = true
 
-	r, _ := m.handleCanISubjectFilterMode(tea.KeyMsg{Type: tea.KeyEnter})
+	r, _ := m.handleCanISubjectFilterMode(tea.KeyPressMsg{Code: tea.KeyEnter})
 	assert.False(t, r.(Model).canISubjectFilterMode)
 
 	m.overlayFilter = TextInput{Value: "admin"}
-	r, _ = m.handleCanISubjectFilterMode(tea.KeyMsg{Type: tea.KeyEscape})
+	r, _ = m.handleCanISubjectFilterMode(tea.KeyPressMsg{Code: tea.KeyEscape})
 	assert.Empty(t, r.(Model).overlayFilter.Value)
 
 	m.overlayFilter = TextInput{}
-	r, _ = m.handleCanISubjectFilterMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	r, _ = m.handleCanISubjectFilterMode(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	assert.Equal(t, "a", r.(Model).overlayFilter.Value)
 
 	m.overlayFilter = TextInput{Value: "ab", Cursor: 2}
-	r, _ = m.handleCanISubjectFilterMode(tea.KeyMsg{Type: tea.KeyBackspace})
+	r, _ = m.handleCanISubjectFilterMode(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	assert.Equal(t, "a", r.(Model).overlayFilter.Value)
 
 	m.overlayFilter = TextInput{Value: "hello", Cursor: 5}
-	r, _ = m.handleCanISubjectFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	r, _ = m.handleCanISubjectFilterMode(tea.KeyPressMsg{Code: 'w', Mod: tea.ModCtrl})
 	assert.Empty(t, r.(Model).overlayFilter.Value)
 }
 

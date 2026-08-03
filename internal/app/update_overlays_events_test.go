@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -77,7 +77,7 @@ func TestEventTimelineVisualModeToggle(t *testing.T) {
 	assert.Equal(t, 0, result.eventTimelineVisualStart)
 
 	// Cancel with esc.
-	ret2, _ := result.handleEventTimelineVisualKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret2, _ := result.handleEventTimelineVisualKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	result2 := ret2.(Model)
 	assert.Equal(t, byte(0), result2.eventTimelineVisualMode)
 }
@@ -93,7 +93,7 @@ func TestEventTimelineLineVisualMode(t *testing.T) {
 func TestEventTimelineBlockVisualMode(t *testing.T) {
 	m := newEventModel(10)
 
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
 	result := ret.(Model)
 	assert.Equal(t, byte('B'), result.eventTimelineVisualMode)
 }
@@ -152,7 +152,7 @@ func TestEventTimelineSearchMode(t *testing.T) {
 	assert.Equal(t, "e", result2.eventTimelineSearchInput.Value)
 
 	// Press enter to apply.
-	ret3, _ := result2.handleEventTimelineSearchKey(tea.KeyMsg{Type: tea.KeyEnter})
+	ret3, _ := result2.handleEventTimelineSearchKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 	result3 := ret3.(Model)
 	assert.False(t, result3.eventTimelineSearchActive)
 	assert.Equal(t, "e", result3.eventTimelineSearchQuery)
@@ -163,7 +163,7 @@ func TestEventTimelineSearchEsc(t *testing.T) {
 	m.eventTimelineSearchActive = true
 	m.eventTimelineSearchInput.Insert("test")
 
-	ret, _ := m.handleEventTimelineSearchKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret, _ := m.handleEventTimelineSearchKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	result := ret.(Model)
 	assert.False(t, result.eventTimelineSearchActive)
 }
@@ -173,7 +173,7 @@ func TestEventTimelineSearchBackspace(t *testing.T) {
 	m.eventTimelineSearchActive = true
 	m.eventTimelineSearchInput.Insert("abc")
 
-	ret, _ := m.handleEventTimelineSearchKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	ret, _ := m.handleEventTimelineSearchKey(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	result := ret.(Model)
 	assert.Equal(t, "ab", result.eventTimelineSearchInput.Value)
 }
@@ -271,7 +271,7 @@ func TestEventTimelineEscClearsSearchFirst(t *testing.T) {
 	m := newEventModel(10)
 	m.eventTimelineSearchQuery = "test"
 
-	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	ret, _ := m.handleEventTimelineOverlayKey(tea.KeyPressMsg{Code: tea.KeyEsc})
 	result := ret.(Model)
 	assert.Equal(t, "", result.eventTimelineSearchQuery)
 	assert.Equal(t, overlayEventTimeline, result.overlay, "should not close overlay yet")

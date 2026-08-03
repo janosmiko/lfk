@@ -3,7 +3,7 @@ package app
 import (
 	"slices"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -12,7 +12,7 @@ import (
 // handleTaintEditorKey routes key events to the taint editor,
 // delegating to the add-row sub-handler while an input field is
 // focused.
-func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTaintEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.taintEditor.focus != taintFocusList {
 		return m.handleTaintEditorAddKey(msg)
 	}
@@ -30,7 +30,7 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "p":
 		return m.openTaintPresets()
-	case " ":
+	case "space":
 		if p.cursor < 0 || p.cursor >= n {
 			return m, nil
 		}
@@ -70,7 +70,7 @@ func (m Model) handleTaintEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleTaintEditorAddKey handles typing in the add-row inputs: key,
 // Tab, optional value, Tab, effect cycled with left/right. Enter
 // validates and stages the taint; Esc abandons the input row.
-func (m Model) handleTaintEditorAddKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTaintEditorAddKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	p := &m.taintEditor
 	switch msg.String() {
 	case "esc":
@@ -109,12 +109,12 @@ func (m Model) handleTaintEditorAddKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if msg.Type == tea.KeyRunes {
+	if msg.Text != "" {
 		switch p.focus {
 		case taintFocusKey:
-			p.addKey += string(msg.Runes)
+			p.addKey += msg.Text
 		case taintFocusValue:
-			p.addVal += string(msg.Runes)
+			p.addVal += msg.Text
 		}
 	}
 	return m, nil

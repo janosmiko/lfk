@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -106,7 +106,10 @@ func TestRenderLogPreviewPreservesAnsiWhenEnabled(t *testing.T) {
 	// With ANSI disabled, SGR sequences must be stripped.
 	ConfigLogRenderAnsi = false
 	out2 := RenderLogPreview([]string{line}, "", 40, 5, "ns/pod", 0)
-	assert.False(t, strings.Contains(out2, "\x1b["), "SGR sequence must be stripped when ConfigLogRenderAnsi=false")
+	// The renderer always styles its own chrome, so assert the log line's own
+	// SGR is gone rather than that the output carries no escapes at all.
+	assert.False(t, strings.Contains(out2, "\x1b[31m"), "the log line's SGR must be stripped when ConfigLogRenderAnsi=false")
+	assert.Contains(t, stripANSI(out2), "red", "the text itself survives stripping")
 }
 
 // --- Fix A: formatPreviewLogLine ---

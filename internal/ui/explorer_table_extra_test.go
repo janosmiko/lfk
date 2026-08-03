@@ -4,9 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -26,10 +24,6 @@ func stripANSI(s string) string {
 // ClusterColorTileBgOver, which re-asserts the selection style after the
 // reset.
 func TestRenderTable_UnionCursorRowKeepsHighlightPastColorTile(t *testing.T) {
-	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
-
 	origNoColor, origQuery, origScroll := ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll
 	origSel, origLayout, origCache, origNyan := ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode
 	t.Cleanup(func() {
@@ -58,7 +52,8 @@ func TestRenderTable_UnionCursorRowKeepsHighlightPastColorTile(t *testing.T) {
 	// The colored tile ends with an SGR reset immediately before the row
 	// text. Between that reset and the text the selection style must be
 	// re-asserted, or the cursor highlight dies for the rest of the row.
-	const reset = "\x1b[0m"
+	// lipgloss v2 closes a styled run with the parameterless reset.
+	const reset = "\x1b[m"
 	beforeName := out[:nameIdx]
 	tileReset := strings.LastIndex(beforeName, reset)
 	if !assert.GreaterOrEqual(t, tileReset, 0, "the colored tile must emit an SGR reset before the row text") {

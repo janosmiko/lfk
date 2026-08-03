@@ -4,23 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 )
 
-// setTestColorProfile forces the lipgloss renderer to emit ANSI256 color codes
-// so style comparisons in tests are meaningful.
-func setTestColorProfile(t *testing.T) {
-	t.Helper()
-	r := lipgloss.DefaultRenderer()
-	orig := r.ColorProfile()
-	r.SetColorProfile(termenv.ANSI256)
-	t.Cleanup(func() { r.SetColorProfile(orig) })
-}
-
 func TestHighlightMatchCurrentAtCol(t *testing.T) {
-	setTestColorProfile(t)
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "aXaXa" // three 'a' at visual cols 0,2,4
@@ -42,7 +30,6 @@ func TestHighlightMatchCurrentAtCol(t *testing.T) {
 }
 
 func TestHighlightMatchCurrentAtCol_NoCurrentWhenColMissing(t *testing.T) {
-	setTestColorProfile(t)
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "abc abc"
@@ -53,7 +40,6 @@ func TestHighlightMatchCurrentAtCol_NoCurrentWhenColMissing(t *testing.T) {
 }
 
 func TestHighlightMatchCurrentAtCol_EmptyQuery(t *testing.T) {
-	setTestColorProfile(t)
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "hello world"
@@ -64,7 +50,6 @@ func TestHighlightMatchCurrentAtCol_EmptyQuery(t *testing.T) {
 }
 
 func TestHighlightMatchCurrentAtCol_NegativeCol(t *testing.T) {
-	setTestColorProfile(t)
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "abc abc"
@@ -75,7 +60,6 @@ func TestHighlightMatchCurrentAtCol_NegativeCol(t *testing.T) {
 }
 
 func TestHighlightMatchCurrentAtCol_FuzzyFallback(t *testing.T) {
-	setTestColorProfile(t)
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "hello world"
@@ -88,7 +72,6 @@ func TestHighlightMatchCurrentAtCol_FuzzyFallback(t *testing.T) {
 }
 
 func TestHighlightMatchCurrentAtCol_RegexCurrentCol(t *testing.T) {
-	setTestColorProfile(t)
 	normal := lipgloss.NewStyle().Background(lipgloss.Color("3"))
 	current := lipgloss.NewStyle().Background(lipgloss.Color("5"))
 	line := "foo bar foo"

@@ -1,9 +1,10 @@
 package ui
 
 import (
+	"image/color"
 	"slices"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // ClusterColorNames lists every colour name accepted by saveClusterColors and
@@ -56,7 +57,7 @@ func IsValidClusterColor(name string) bool {
 // The rest map to ANSI bright codes that follow the terminal palette.
 // ThemeColor wraps both paths with the no-color check, so this also
 // no-ops automatically when ConfigNoColor is set.
-func clusterColorBg(name string) lipgloss.TerminalColor {
+func clusterColorBg(name string) color.Color {
 	switch name {
 	case "red":
 		return ThemeColor(ActiveTheme.Error)
@@ -77,7 +78,7 @@ func clusterColorBg(name string) lipgloss.TerminalColor {
 // Theme-mapped names get ActiveTheme.SelectedFg (designed to contrast
 // with the theme's accent backgrounds); ANSI-mapped names get ANSI
 // black, which is universally legible on every bright ANSI background.
-func clusterColorFg(name string) lipgloss.TerminalColor {
+func clusterColorFg(name string) color.Color {
 	switch name {
 	case "red", "yellow", "green", "blue":
 		return ThemeColor(ActiveTheme.SelectedFg)

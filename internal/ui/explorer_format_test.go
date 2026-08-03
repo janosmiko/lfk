@@ -5,9 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -195,10 +194,6 @@ func TestResourceColumnStyle(t *testing.T) {
 // with low-cardinality values (State: Active/Inactive, Established: True/False)
 // are colored semantically instead of always rendering dim.
 func TestResourceColumnStyle_ValueBased(t *testing.T) {
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
-	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
-
 	fgKey := func(s lipgloss.Style) string {
 		fg := s.GetForeground()
 		r, g, b, a := fg.RGBA()
@@ -547,18 +542,15 @@ func TestRenderStyledHeader_ActiveColumnAccented(t *testing.T) {
 	// afterwards. ConfigNoColor is pinned because a prior test may have left
 	// it set, which would route ApplyTheme through the no-color path and drop
 	// the profile back to Ascii.
-	origProfile := lipgloss.DefaultRenderer().ColorProfile()
 	origNoColor := ConfigNoColor
 	t.Cleanup(func() {
 		ConfigNoColor = origNoColor
-		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
 		ApplyTheme(DefaultTheme())
 	})
 	ConfigNoColor = false
 	ApplyTheme(DefaultTheme())
 	// ApplyTheme restores the saved (Ascii, under test) profile, so force the
 	// profile last; styles carry color specs that resolve at render time.
-	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
 
 	prev := ActiveSortColumnName
 	t.Cleanup(func() { ActiveSortColumnName = prev })
