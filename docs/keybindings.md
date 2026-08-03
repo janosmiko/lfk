@@ -1262,7 +1262,7 @@ keybindings:
 
   # Multi-selection
   toggle_select: "space" # Toggle selection (space bar)
-  select_range: "ctrl+@" # Select range (Ctrl+Space)
+  select_range: "ctrl+space" # Select range (legacy "ctrl+@" still accepted)
   select_all: "ctrl+a"   # Select all
 
   # Tabs

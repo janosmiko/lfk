@@ -230,7 +230,12 @@ func DefaultKeybindings() Keybindings {
 		PasteApply: "ctrl+p", Diff: "d",
 
 		// Multi-selection
-		ToggleSelect: "space", SelectRange: "ctrl+@", SelectAll: "ctrl+a",
+		// "ctrl+space", not "ctrl+@": a terminal sends the chord as NUL (0x00),
+		// which Bubble Tea v2 decodes to {Code: KeySpace, Mod: ModCtrl} unless
+		// the app opts into LegacyKeyEncoding.CtrlAt — lfk never does, so the
+		// "ctrl+@" spelling no real keypress can produce. Existing configs that
+		// still say "ctrl+@" keep working via ctrlSpaceAlias in the dispatcher.
+		ToggleSelect: "space", SelectRange: "ctrl+space", SelectAll: "ctrl+a",
 
 		// Tabs. Move keys mirror the switch keys: "}" (shift+]) moves the
 		// active tab one slot right, "{" (shift+[) one slot left.

@@ -92,6 +92,26 @@ func withLazySecurityProbe(mdl tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	return mm, cmd
 }
 
+// ctrlSpaceAlias returns the other spelling of the ctrl+space chord so a
+// dispatcher can accept both, and returns any other binding unchanged (a
+// harmless duplicate switch case).
+//
+// A terminal sends ctrl+space as NUL (0x00), which Bubble Tea v2 decodes to
+// {Code: KeySpace, Mod: ModCtrl} — printed "ctrl+space". The older "ctrl+@"
+// spelling is emitted only under LegacyKeyEncoding.CtrlAt, which lfk never
+// enables, so a config that still says "ctrl+@" would otherwise be dead. Both
+// are accepted rather than only swapping the default, because the stale
+// spelling is already written into existing user configs.
+func ctrlSpaceAlias(binding string) string {
+	switch binding {
+	case "ctrl+@":
+		return "ctrl+space"
+	case "ctrl+space":
+		return "ctrl+@"
+	}
+	return binding
+}
+
 func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 
@@ -140,7 +160,7 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
 		return mdl, cmd, true
-	case kb.SelectRange:
+	case kb.SelectRange, ctrlSpaceAlias(kb.SelectRange):
 		mdl := m.handleKeySelectRange()
 		return mdl, nil, true
 	case kb.ToggleSelect:
