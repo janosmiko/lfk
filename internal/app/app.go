@@ -202,7 +202,7 @@ type Model struct {
 	// pendingTargetNamespace narrows pendingTarget to one ns (empty = name-only).
 	pendingTargetNamespace string
 
-	// pendingG: vim 'gg' -> next 'g' jumps to top; whichKey: popup + space-leader state.
+	// pendingG: vim 'gg' -> next 'g' jumps to top; whichKey: popup + leader-panel state.
 	pendingG bool
 	whichKey whichKeyState
 

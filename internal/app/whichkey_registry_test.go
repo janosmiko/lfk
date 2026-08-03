@@ -625,6 +625,7 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Create from template", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Scale", "Deployment", "", []model.Level{model.LevelResources, model.LevelOwned}},
 
+		{"Toggle selection", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Select/deselect all", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Select range", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 

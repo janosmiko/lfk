@@ -418,6 +418,8 @@ keybindings:
   security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
   move_tab_left: "{" # Move the current tab one slot left (default: { = shift+[)
   move_tab_right: "}" # Move the current tab one slot right (default: } = shift+])
+  which_key_leader: "?" # Open the which-key action panel (default: ?; explorer only, F1 opens help there)
+  select_range: "ctrl+space" # Select range from anchor to cursor (default: ctrl+space; legacy "ctrl+@" still accepted)
   previous_namespace: "g\\" # Jump to previous namespace, swapping the scope back and forth (default: g\)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
@@ -565,8 +567,8 @@ filter_presets:
 # which_key_enabled: true
 # which_key_delay_ms: 0
 
-# Delay before the space-leader which-key panel appears (ms, 0-2000).
-# which_key_leader_delay_ms: 300
+# Delay before the which-key action panel (leader "?") appears (ms, 0-2000).
+# which_key_leader_delay_ms: 0
 
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories

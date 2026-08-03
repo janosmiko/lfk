@@ -83,6 +83,7 @@ abbreviations:
   zz: pod
 keybindings:
   refresh: ctrl+f5
+  which_key_leader: ctrl+k
 resource_columns:
   Pod: [IP, Node]
 views:
@@ -196,6 +197,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, "dracula", ActiveSchemeName, "colorscheme")
 	assert.Equal(t, "/tmp/lfk-wiring-test.log", ConfigLogPath, "log_path")
 	assert.Equal(t, "ctrl+f5", ActiveKeybindings.Refresh, "keybindings")
+	assert.Equal(t, "ctrl+k", ActiveKeybindings.WhichKeyLeader, "keybindings.which_key_leader")
 	assert.Equal(t, "pod", SearchAbbreviations["zz"], "abbreviations")
 
 	// Scalar settings (applyConfigOptions).

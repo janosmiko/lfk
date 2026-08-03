@@ -406,22 +406,30 @@ func (m Model) statusBar() string {
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
-// leaderOrExplorerHints returns the space-leader's own hints while its panel
-// is visible, and the normal explorer keymap otherwise. Only the LEFT half of
-// the bar swaps: space is simultaneously the pager and the selection toggle,
-// so every page advance changes the selected count, and suppressing the chip
-// group here (as an early return once did) hid the only indicator of it while
-// the user was actively changing it.
+// leaderOrExplorerHints returns the leader's own hints while its panel is
+// visible, and the normal explorer keymap otherwise. Only the LEFT half of the
+// bar swaps, so the chip group (sort, selected count, position, filter preset)
+// keeps rendering underneath the panel — the panel covers rows, not the bar.
 //
-// Gated on armed AND shown. shown alone is also set by the g-prefix goto
-// popup, which shares whichKeyState but swallows space as an unregistered
-// chord — advertising "space: more" there promises paging that cannot happen.
-// armed alone is true for the whole delay window on every ordinary
-// multi-select press, when the panel is still invisible.
+// Gated on armed AND shown, not on shown alone: the g-prefix goto popup shares
+// whichKeyState and swallows the leader key as an unregistered chord, so
+// advertising "?: more" there would promise paging that cannot happen.
+// explorerHelpHintKey names the key the explorer hint bar advertises as "help".
+// While the which-key leader is armed-able it claims that slot: pressing it
+// opens the contextual action panel, which itself lists the full help screen's
+// key. With the panel disabled the leader key does nothing, so the bar points
+// at whatever actually opens help.
+func explorerHelpHintKey(kb ui.Keybindings) string {
+	if ui.ConfigWhichKeyEnabled && kb.WhichKeyLeader != "" {
+		return kb.WhichKeyLeader
+	}
+	return kb.Help
+}
+
 func (m Model) leaderOrExplorerHints() []ui.HintEntry {
 	if m.whichKey.armed && m.whichKey.shown {
 		return []ui.HintEntry{
-			{Key: "space", Desc: "more"},
+			{Key: ui.ActiveKeybindings.WhichKeyLeader, Desc: "more"},
 			{Key: "esc", Desc: "close"},
 		}
 	}
@@ -495,7 +503,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.NewTab, Desc: "new tab"},
-			{Key: kb.Help, Desc: "help"},
+			{Key: explorerHelpHintKey(kb), Desc: "help"},
 			{Key: "q", Desc: "quit"},
 		}
 	}
@@ -564,7 +572,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	hintEntries = append(hintEntries, ui.HintEntry{Key: ui.ActiveKeybindings.JumpTop, Desc: "goto"})
 	hintEntries = append(hintEntries,
-		ui.HintEntry{Key: kb.Help, Desc: "help"},
+		ui.HintEntry{Key: explorerHelpHintKey(kb), Desc: "help"},
 		ui.HintEntry{Key: "q", Desc: "quit"},
 	)
 	return m.appendEventsHintEntries(hintEntries)

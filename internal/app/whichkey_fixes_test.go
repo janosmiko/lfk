@@ -12,8 +12,8 @@ import (
 
 // TestStatusBar_GotoPopupKeepsExplorerHints pins the hint bar to the leader,
 // not to the shared whichKeyState. The g-prefix goto popup sets shown too, but
-// handleGotoChord swallows space as an unregistered chord, so advertising
-// "space: more" there promises paging that cannot happen.
+// handleGotoChord swallows the leader key as an unregistered chord, so
+// advertising "?: more" there promises paging that cannot happen.
 func TestStatusBar_GotoPopupKeepsExplorerHints(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -24,7 +24,7 @@ func TestStatusBar_GotoPopupKeepsExplorerHints(t *testing.T) {
 	m.whichKey = whichKeyState{shown: true}
 
 	bar := stripANSI(m.statusBar())
-	if strings.Contains(bar, "space: more") {
+	if strings.Contains(bar, ui.ActiveKeybindings.WhichKeyLeader+": more") {
 		t.Fatalf("goto popup must not show the leader hints; got %q", bar)
 	}
 	if !strings.Contains(bar, "namespace") {
@@ -33,8 +33,9 @@ func TestStatusBar_GotoPopupKeepsExplorerHints(t *testing.T) {
 }
 
 // TestStatusBar_LeaderPanelKeepsSelectedCountChip guards the one indicator the
-// user needs most while the panel is open: space is simultaneously the pager
-// and the selection toggle, so every page advance changes the count.
+// user still needs while the panel is open: the panel covers list rows, not
+// the status bar, so suppressing the chip group (as an early return once did)
+// hides the selected count for no reason.
 func TestStatusBar_LeaderPanelKeepsSelectedCountChip(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -53,25 +54,24 @@ func TestStatusBar_LeaderPanelKeepsSelectedCountChip(t *testing.T) {
 		m.selectedItems[selectionKey(it)] = true
 	}
 
-	// Each page advance deselects the row under the cursor and steps down, so
-	// the count really does change under the user while the panel is open.
+	leaderHint := ui.ActiveKeybindings.WhichKeyLeader + ": more"
 	for press := 1; press <= 3; press++ {
-		out, _ := m.handleExplorerKey(spaceKey())
+		out, _ := m.handleExplorerKey(leaderKey())
 		m = out.(Model)
 		if !m.whichKey.shown {
 			t.Fatal("panel must be shown at a zero delay")
 		}
-		if want := 5 - press; len(m.selectedItems) != want {
-			t.Fatalf("press %d: selection count = %d, want %d", press, len(m.selectedItems), want)
-		}
 		bar := stripANSI(m.statusBar())
-		if !strings.Contains(bar, "space: more") {
+		if !strings.Contains(bar, leaderHint) {
 			t.Fatalf("press %d: leader hints must still render; got %q", press, bar)
 		}
 		chip := fmt.Sprintf("%d selected", len(m.selectedItems))
 		if !strings.Contains(bar, chip) {
 			t.Fatalf("press %d: status bar must keep the %q chip while the panel is shown; got %q", press, chip, bar)
 		}
+	}
+	if len(m.selectedItems) != 5 {
+		t.Fatalf("paging must not change the selection; got %d, want 5", len(m.selectedItems))
 	}
 }
 
@@ -100,23 +100,25 @@ func TestAvailableWhichKeyActions_UnionReadOnlySourceHidesDestructive(t *testing
 	}
 }
 
-// TestSpaceThenEsc_BeforeTickStillClearsSelection pins esc's normal explorer
-// job during the delay window. The panel is not drawn yet, so consuming esc
-// there steals it with no on-screen feedback.
-func TestSpaceThenEsc_BeforeTickStillClearsSelection(t *testing.T) {
+// TestLeaderThenEsc_BeforeTickStillClearsSelection pins esc's normal explorer
+// job during a configured delay window. The panel is not drawn yet, so
+// consuming esc there steals it with no on-screen feedback.
+func TestLeaderThenEsc_BeforeTickStillClearsSelection(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 300
 
 	m := whichKeyTestModel()
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(spaceKey()) // something for esc to clear
+	m = out.(Model)
+	if !m.hasSelection() {
+		t.Fatal("precondition: space must have selected the row")
+	}
+	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if !m.whichKey.armed || m.whichKey.shown {
-		t.Fatalf("space must arm without showing at a 300ms delay; armed=%v shown=%v", m.whichKey.armed, m.whichKey.shown)
-	}
-	if !m.hasSelection() {
-		t.Fatal("space must have selected the row")
+		t.Fatalf("the leader must arm without showing at a 300ms delay; armed=%v shown=%v", m.whichKey.armed, m.whichKey.shown)
 	}
 
 	out, _ = m.handleExplorerKey(keyMsg("esc"))
@@ -129,17 +131,19 @@ func TestSpaceThenEsc_BeforeTickStillClearsSelection(t *testing.T) {
 	}
 }
 
-// TestSpaceThenEsc_ClosesVisiblePanelOnly is the other half of the gate: once
+// TestLeaderThenEsc_ClosesVisiblePanelOnly is the other half of the gate: once
 // the panel is actually on screen, esc closing it is the visible effect and
 // must not also run the explorer's own esc action.
-func TestSpaceThenEsc_ClosesVisiblePanelOnly(t *testing.T) {
+func TestLeaderThenEsc_ClosesVisiblePanelOnly(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 
 	m := whichKeyTestModel()
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(spaceKey()) // something esc could wrongly clear
+	m = out.(Model)
+	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if !m.whichKey.shown {
 		t.Fatal("a zero delay must reveal the panel immediately")

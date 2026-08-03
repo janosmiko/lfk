@@ -34,9 +34,9 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `custom_actions` | map[string]list | `{}` | User-defined actions per resource type. |
 | `filter_presets` | map[string]list | `{}` | User-defined quick filter presets per resource type. |
 | `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`); value = `{kind, group, name}`. Overrides built-ins on collision. |
-| `which_key_enabled` | bool | `true` | Show the which-key popup while the `g` prefix is pending, and the space-leader action panel while `space` is armed. |
-| `which_key_delay_ms` | int | `0` | Delay before the popup appears (ms, 0-2000). |
-| `which_key_leader_delay_ms` | int | `300` | Delay before the space-leader which-key panel appears (ms, 0-2000). |
+| `which_key_enabled` | bool | `true` | Show the goto popup while the `g` prefix is pending, and the action panel while the which-key leader (`?`) is armed. |
+| `which_key_delay_ms` | int | `0` | Delay before the goto popup appears (ms, 0-2000). |
+| `which_key_leader_delay_ms` | int | `0` | Delay before the which-key action panel appears (ms, 0-2000). |
 | `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context and per-union-set in `~/.local/state/lfk/pinned.yaml`). |
 | `pinned_summaries` | list[string] | *(built-in defaults)* | Resource types (`group/resource` pin keys) whose status summaries show on the cluster dashboard. Unset shows built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates); `[]` disables them. Also manageable in-app via the action menu (`x`) at the resource types level (stored per-context and per-union-set in `~/.local/state/lfk/pinned_summaries.yaml`). Max 10 per scope. |

@@ -221,12 +221,15 @@ func TestLayoutWhichKey(t *testing.T) {
 		return s
 	}
 
-	// 15 entries -> 4 columns, ceil(15/4)=4 rows; stretched to the target width
-	// with the slack in the gaps and no trailing space past the last column
-	// (inner == sum(colW) + sum(gaps)).
+	// 15 entries -> whichKeyMaxCols columns, ceil(15/cols) rows; stretched to
+	// the target width with the slack in the gaps and no trailing space past
+	// the last column (inner == sum(colW) + sum(gaps)). Expressed against the
+	// constant rather than a literal so a geometry re-tune does not silently
+	// turn this into a test of the old shape.
+	cols := whichKeyMaxCols
 	lay := layoutWhichKey(mk(15), 100, 200)
-	if len(lay.colW) != 4 || lay.rows != 4 {
-		t.Fatalf("15 entries: want 4 cols / 4 rows, got %d cols / %d rows", len(lay.colW), lay.rows)
+	if wantRows := (15 + cols - 1) / cols; len(lay.colW) != cols || lay.rows != wantRows {
+		t.Fatalf("15 entries: want %d cols / %d rows, got %d cols / %d rows", cols, wantRows, len(lay.colW), lay.rows)
 	}
 	if lay.inner != 100 {
 		t.Fatalf("grid must stretch to target inner 100, got %d", lay.inner)
@@ -235,10 +238,10 @@ func TestLayoutWhichKey(t *testing.T) {
 		t.Fatalf("no-trailing-gap invariant broken: cols=%v gaps=%v inner=%d", lay.colW, lay.gaps, lay.inner)
 	}
 
-	// Adding entries keeps 4 columns and grows rows (expand vertically).
+	// Adding entries keeps the column count and grows rows (expand vertically).
 	lay2 := layoutWhichKey(mk(23), 100, 200)
-	if len(lay2.colW) != 4 || lay2.rows != 6 { // ceil(23/4)=6
-		t.Fatalf("23 entries: want 4 cols / 6 rows, got %d cols / %d rows", len(lay2.colW), lay2.rows)
+	if wantRows := (23 + cols - 1) / cols; len(lay2.colW) != cols || lay2.rows != wantRows {
+		t.Fatalf("23 entries: want %d cols / %d rows, got %d cols / %d rows", cols, wantRows, len(lay2.colW), lay2.rows)
 	}
 
 	// Each column is sized to its own widest entry. 4 entries, 4 columns, 1 row.

@@ -10,33 +10,33 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func TestSpace_TogglesSelectionAndArms(t *testing.T) {
+// TestWhichKeyLeader_ConfiguredDelayHidesUntilTick keeps the delay knob
+// covered even though it now defaults to 0: a user who sets
+// which_key_leader_delay_ms must still get a hidden panel until the tick.
+func TestWhichKeyLeader_ConfiguredDelayHidesUntilTick(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 300
 	m := whichKeyTestModel()
 
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(leaderKey())
 	got := out.(Model)
-	if len(got.selectedItems) != 1 {
-		t.Fatalf("space must still toggle selection; selected=%d", len(got.selectedItems))
-	}
 	if !got.whichKey.armed {
-		t.Fatal("space must arm the which-key leader")
+		t.Fatal("the leader key must arm the which-key panel")
 	}
 	if got.whichKey.shown {
 		t.Fatal("panel must stay hidden until the delay elapses")
 	}
 }
 
-func TestSpace_ZeroDelayShowsImmediately(t *testing.T) {
+func TestWhichKeyLeader_ZeroDelayShowsImmediately(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 	m := whichKeyTestModel()
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(leaderKey())
 	if !out.(Model).whichKey.shown {
 		t.Fatal("a zero delay must reveal the panel immediately")
 	}
@@ -74,7 +74,7 @@ func TestWhichKeyLeader_EscDisarmsAndIsConsumed(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 	m := whichKeyTestModel()
-	armed, _ := m.handleExplorerKey(spaceKey())
+	armed, _ := m.handleExplorerKey(leaderKey())
 	before := len(armed.(Model).selectedItems)
 
 	out, _ := armed.(Model).handleExplorerKey(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -98,12 +98,14 @@ func TestWhichKeyLeader_OtherKeyDisarmsAndStillActs(t *testing.T) {
 		{Name: "p1", Kind: "Pod", Namespace: "default"},
 		{Name: "p2", Kind: "Pod", Namespace: "default"},
 	})
-	m.setCursor(0)
+	// Start on the second row so the "up" key below has somewhere to go: the
+	// leader no longer moves the cursor itself.
+	m.setCursor(1)
 
-	armedOut, _ := m.handleExplorerKey(spaceKey())
+	armedOut, _ := m.handleExplorerKey(leaderKey())
 	armed := armedOut.(Model)
 	if !armed.whichKey.armed {
-		t.Fatal("precondition: space must arm")
+		t.Fatal("precondition: the leader key must arm")
 	}
 	cursorBefore := armed.cursor()
 	out, _ := armed.handleExplorerKey(tea.KeyPressMsg{Code: rune(kb.Up[0]), Text: kb.Up})
@@ -149,24 +151,23 @@ func TestWhichKeyLeaderGroups_AreOrderedAndNonEmpty(t *testing.T) {
 	}
 }
 
-func TestSpace_DoesNotArmWhileFiltering(t *testing.T) {
+func TestWhichKeyLeader_DoesNotArmWhileFiltering(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 	m := whichKeyTestModel()
 	m.filterActive = true
-	out, _ := m.Update(spaceKey())
+	out, _ := m.Update(leaderKey())
 	if out.(Model).whichKey.armed {
-		t.Fatal("typing a space into the filter must not arm the leader")
+		t.Fatal("typing the leader key into the filter must not arm the leader")
 	}
 }
 
 // TestWhichKeyLeader_PageAdvancesAndWraps pins the USER DECISION paging
-// behavior: repeated space (while already armed) pages forward, and wraps
-// back to page 0 after the last page — using the real catalog at 80x24, the
-// size the design was validated against (only ~24 of ~49 entries fit on one
-// page, so multiple pages are expected here, not a contrived fixture).
+// behavior: a repeated leader press (while already armed) pages forward, and
+// wraps back to page 0 after the last page — using the real catalog at 80x24,
+// the size the design was validated against.
 func TestWhichKeyLeader_PageAdvancesAndWraps(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -175,7 +176,7 @@ func TestWhichKeyLeader_PageAdvancesAndWraps(t *testing.T) {
 	m := whichKeyTestModel()
 	m.width, m.height = 80, 24
 
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	_, idx0, count := m.whichKeyLeaderPage()
 	if idx0 != 0 {
@@ -186,7 +187,7 @@ func TestWhichKeyLeader_PageAdvancesAndWraps(t *testing.T) {
 	}
 
 	for i := 1; i < count+2; i++ {
-		out, _ = m.handleExplorerKey(spaceKey())
+		out, _ = m.handleExplorerKey(leaderKey())
 		m = out.(Model)
 		_, idx, c := m.whichKeyLeaderPage()
 		if c != count {
@@ -216,7 +217,7 @@ func TestWhichKeyLeader_PageAdvanceDoesNotReHideAtDefaultDelay(t *testing.T) {
 	m.width, m.height = 80, 24
 
 	// Fresh arm: must not show immediately at a nonzero delay.
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if m.whichKey.shown {
 		t.Fatal("precondition: fresh arm must not show immediately at 300ms delay")
@@ -231,7 +232,7 @@ func TestWhichKeyLeader_PageAdvanceDoesNotReHideAtDefaultDelay(t *testing.T) {
 
 	// Page-advance press: the panel is already shown and must stay shown —
 	// not blink off for another 300ms before the next page appears.
-	out, _ = m.handleExplorerKey(spaceKey())
+	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if !m.whichKey.shown {
 		t.Fatal("CRITICAL-1: a page-advance press must not hide an already-shown panel")
@@ -253,9 +254,9 @@ func TestWhichKeyLeader_PageResetsOnDisarmAndRearm(t *testing.T) {
 	m := whichKeyTestModel()
 	m.width, m.height = 80, 24
 
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
-	out, _ = m.handleExplorerKey(spaceKey()) // second press: advance off page 0
+	out, _ = m.handleExplorerKey(leaderKey()) // second press: advance off page 0
 	m = out.(Model)
 	if m.whichKey.page == 0 {
 		t.Fatal("precondition: a second press while armed should have advanced the page")
@@ -267,7 +268,7 @@ func TestWhichKeyLeader_PageResetsOnDisarmAndRearm(t *testing.T) {
 		t.Fatalf("disarm (esc) must reset the stored page to 0, got %d", m.whichKey.page)
 	}
 
-	out, _ = m.handleExplorerKey(spaceKey())
+	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	_, idx, _ := m.whichKeyLeaderPage()
 	if idx != 0 {
@@ -275,10 +276,9 @@ func TestWhichKeyLeader_PageResetsOnDisarmAndRearm(t *testing.T) {
 	}
 }
 
-// TestSpace_TogglesSelectionOnEveryPageAdvancingPress guards the load-bearing
-// requirement: pressing space to page through the panel must never skip a
-// selection toggle, even though the same press also advances the page.
-func TestSpace_TogglesSelectionOnEveryPageAdvancingPress(t *testing.T) {
+// TestWhichKeyLeader_StaysArmedAcrossRepeatedPresses: paging must not drop the
+// arming, or the second press would re-open on page 0 forever.
+func TestWhichKeyLeader_StaysArmedAcrossRepeatedPresses(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -293,23 +293,23 @@ func TestSpace_TogglesSelectionOnEveryPageAdvancingPress(t *testing.T) {
 	m.setCursor(0)
 
 	for i := 1; i <= 3; i++ {
-		out, _ := m.handleExplorerKey(spaceKey())
+		out, _ := m.handleExplorerKey(leaderKey())
 		m = out.(Model)
-		if len(m.selectedItems) != i {
-			t.Fatalf("press %d: selected=%d, want %d — space must toggle selection on every press, including page-advancing ones", i, len(m.selectedItems), i)
-		}
 		if !m.whichKey.armed {
-			t.Fatalf("press %d: the leader must stay armed across repeated space presses", i)
+			t.Fatalf("press %d: the leader must stay armed across repeated presses", i)
+		}
+		if m.whichKey.page != i-1 {
+			t.Fatalf("press %d: page = %d, want %d", i, m.whichKey.page, i-1)
 		}
 	}
 }
 
-// TestSpace_JNavigationMultiSelectsWithoutFlashingPanelAtDefaultDelay is the
-// scenario the whole design rests on: "space j space j" must still
-// multi-select two rows, and at the 300ms default delay the panel must never
-// appear, because j is not the leader key and disarms it (via
-// disarmWhichKeyLeader) well before any scheduled reveal tick could fire.
-func TestSpace_JNavigationMultiSelectsWithoutFlashingPanelAtDefaultDelay(t *testing.T) {
+// TestSpace_MultiSelectNeverArmsTheLeader replaces the old "space j space j
+// must not flash the panel" scenario: the leader has moved off space, so the
+// multi-select burst can no longer arm anything at all — a stronger property
+// than the delay-based avoidance it supersedes. Runs at a nonzero delay so a
+// stray arming would still be caught before its reveal tick.
+func TestSpace_MultiSelectNeverArmsTheLeader(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()
 	ui.ActiveKeybindings = kb
@@ -327,14 +327,11 @@ func TestSpace_JNavigationMultiSelectsWithoutFlashingPanelAtDefaultDelay(t *test
 	for range 2 {
 		out, _ := m.handleExplorerKey(spaceKey())
 		m = out.(Model)
-		if m.whichKey.shown {
-			t.Fatal("panel must not appear before the 300ms delay elapses")
+		if m.whichKey.armed || m.whichKey.shown {
+			t.Fatal("space must never arm the which-key leader")
 		}
 		out, _ = m.handleExplorerKey(downKey)
 		m = out.(Model)
-		if m.whichKey.armed || m.whichKey.shown {
-			t.Fatal("j must disarm the leader immediately, before any delayed reveal")
-		}
 	}
 	if len(m.selectedItems) != 2 {
 		t.Fatalf("space j space j must multi-select exactly two rows; selected=%d", len(m.selectedItems))
@@ -440,10 +437,9 @@ func TestWhichKeyLeaderPage_AllEntriesReachableViaPaging(t *testing.T) {
 // TestWhichKeyLeader_HintBarGatesOnShownNotArmed is IMPORTANT-4 from review
 // round 1: the hint bar used to switch to the leader's "space: more / esc:
 // close" hints as soon as the leader armed, not once the panel actually
-// appeared. At the shipped default delay (300ms) that meant EVERY ordinary
-// multi-select press replaced the whole status bar — including the selected
-// count, sort indicator, and position counter — for the length of the delay,
-// even though the panel itself was invisible the entire time.
+// appeared. With a configured delay that meant the whole status bar — the
+// selected count, sort indicator, and position counter included — was replaced
+// for the length of the delay, even though the panel was invisible throughout.
 func TestWhichKeyLeader_HintBarGatesOnShownNotArmed(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -452,12 +448,13 @@ func TestWhichKeyLeader_HintBarGatesOnShownNotArmed(t *testing.T) {
 	m := whichKeyTestModel()
 	m.width, m.height = 80, 24
 
-	out, _ := m.handleExplorerKey(spaceKey())
+	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if m.whichKey.shown {
 		t.Fatal("precondition: fresh arm must not be shown yet at 300ms delay")
 	}
-	if hint := stripANSI(m.statusBar()); strings.Contains(hint, "space: more") {
+	leaderHint := ui.ActiveKeybindings.WhichKeyLeader + ": more"
+	if hint := stripANSI(m.statusBar()); strings.Contains(hint, leaderHint) {
 		t.Fatalf("IMPORTANT-4: hint bar switched to leader hints before the panel is shown:\n%s", hint)
 	}
 
@@ -466,7 +463,7 @@ func TestWhichKeyLeader_HintBarGatesOnShownNotArmed(t *testing.T) {
 	if !m.whichKey.shown {
 		t.Fatal("precondition: the tick must reveal the panel")
 	}
-	if hint := stripANSI(m.statusBar()); !strings.Contains(hint, "space: more") {
+	if hint := stripANSI(m.statusBar()); !strings.Contains(hint, leaderHint) {
 		t.Fatalf("hint bar must show leader hints once the panel is actually visible:\n%s", hint)
 	}
 }
@@ -488,7 +485,7 @@ func TestWhichKeyLeader_MouseToggleKeyDisarms(t *testing.T) {
 	m := whichKeyTestModel()
 	m.mouseAvailable = true
 
-	armedOut, _ := m.handleExplorerKey(spaceKey())
+	armedOut, _ := m.handleExplorerKey(leaderKey())
 	armed := armedOut.(Model)
 	if !armed.whichKey.armed {
 		t.Fatal("precondition: space must arm the leader")
@@ -512,7 +509,7 @@ func TestWhichKeyLeader_MouseInputDisarms(t *testing.T) {
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 	m := whichKeyTestModel()
 
-	armedOut, _ := m.handleExplorerKey(spaceKey())
+	armedOut, _ := m.handleExplorerKey(leaderKey())
 	armed := armedOut.(Model)
 	if !armed.whichKey.armed {
 		t.Fatal("precondition: space must arm the leader")
@@ -561,14 +558,22 @@ func TestWhichKeyLeaderPage_NoIndicatorOnSinglePage(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
+	// The strip is capped at whichKeyMaxBodyRows regardless of terminal size,
+	// so the real catalog never fits one page. Clear every binding but two:
+	// availableWhichKeyActions drops entries whose key the user cleared.
+	kb := ui.Keybindings{}
+	kb.Refresh = "R"
+	kb.CopyName = "y"
+	ui.ActiveKeybindings = kb
+
 	m := whichKeyTestModel()
-	m.width, m.height = 220, 220 // plenty of room for the whole catalog on one page
+	m.width, m.height = 120, 40
 	m.whichKey.armed = true
 	m.whichKey.shown = true
 
 	_, _, count := m.whichKeyLeaderPage()
 	if count != 1 {
-		t.Fatalf("test assumes a single page at 220x220; got %d", count)
+		t.Fatalf("test assumes a single page for a two-entry catalog; got %d", count)
 	}
 	bg := strings.Repeat("\n", m.height)
 	out := stripANSI(m.renderWhichKeyLeader(bg))

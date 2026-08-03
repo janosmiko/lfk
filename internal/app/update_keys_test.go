@@ -354,12 +354,13 @@ func TestHandleKeyEnterFullView(t *testing.T) {
 	assert.Equal(t, modeYAML, result.mode)
 }
 
-// --- handleKey: ? opens help ---
+// --- handleKey: f1 opens help ---
+// "?" is the which-key leader in the explorer, so f1 is the help key there.
 
-func TestHandleKeyQuestionMarkOpensHelp(t *testing.T) {
+func TestHandleKeyF1OpensHelp(t *testing.T) {
 	m := baseExplorerModel()
 
-	ret, _ := m.handleKey(runeKey('?'))
+	ret, _ := m.handleKey(keyMsg("f1"))
 	result := ret.(Model)
 	assert.Equal(t, modeHelp, result.mode)
 	assert.Equal(t, 0, result.helpScroll)
@@ -663,16 +664,18 @@ func TestPush2HandleKeyExplorerModeColon(t *testing.T) {
 	assert.True(t, rm.commandBarActive)
 }
 
+// In the explorer "?" arms the which-key leader rather than opening help.
 func TestPush2HandleKeyExplorerModeQuestion(t *testing.T) {
 	m := basePush80v2Model()
 	result, _ := m.handleKey(keyMsg("?"))
 	rm := result.(Model)
-	assert.Equal(t, modeHelp, rm.mode)
+	assert.NotEqual(t, modeHelp, rm.mode)
+	assert.True(t, rm.whichKey.armed)
 }
 
 func TestPush3HandleKeyHelp(t *testing.T) {
 	m := basePush80v3Model()
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }
@@ -1306,7 +1309,7 @@ func TestPush4HandleKeyPageUp(t *testing.T) {
 
 func TestPush4HandleKeyHelp(t *testing.T) {
 	m := basePush4Model()
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }

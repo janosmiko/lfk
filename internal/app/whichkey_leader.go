@@ -9,28 +9,26 @@ import (
 )
 
 // whichKeyState holds the which-key popup state, shared by the g prefix and the
-// space leader. seq is a generation counter: a delayed reveal carries the seq it
+// leader panel. seq is a generation counter: a delayed reveal carries the seq it
 // was scheduled with, so a tick from a superseded arming is dropped instead of
 // flashing a stale panel. page is the leader's raw page counter — it only ever
 // increases while armed and is read back modulo the current page count, so it
 // never needs to know that count itself to wrap correctly.
 type whichKeyState struct {
-	armed bool // space pressed, waiting for the next key
+	armed bool // leader pressed, waiting for the next key
 	shown bool // delay elapsed, panel drawn
 	seq   int
 	page  int
 }
 
-// whichKeyLeaderTickMsg reveals the space-leader panel once the delay elapses.
+// whichKeyLeaderTickMsg reveals the leader panel once the delay elapses.
 type whichKeyLeaderTickMsg struct{ seq int }
 
-// armWhichKeyLeader is called every time space fires the toggle-select handler,
-// whether that is a fresh arming or a repeat press while already armed. A fresh
-// arming resets to page 1; a repeat press while still armed advances the page
-// instead, so "space space space" pages through the panel while each press
-// keeps toggling selection. With no delay the panel shows at once; otherwise a
-// tick reveals it, so a fast space-j-space multi-select never flashes the
-// panel.
+// armWhichKeyLeader is called on every leader keypress, whether that is a fresh
+// arming or a repeat press while already armed. A fresh arming resets to page 1;
+// a repeat press while still armed advances the page instead, so "? ? ?" pages
+// through the panel. With the default zero delay the panel shows at once;
+// which_key_leader_delay_ms instead schedules a reveal tick.
 func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 	if !ui.ConfigWhichKeyEnabled {
 		m.whichKey = whichKeyState{}
@@ -88,7 +86,7 @@ func (m Model) whichKeyLeaderGroups() []whichKeyGroupCells {
 	return out
 }
 
-// whichKeyLeaderPage returns the groups for the space leader's current page,
+// whichKeyLeaderPage returns the groups for the leader's current page,
 // the page index, and the page count. Pagination reuses the renderer's own
 // geometry (whichKeyPanelGeometry) and per-cell layout (layoutWhichKey, via
 // paginateWhichKeyGroups) rather than re-deriving row-fitting arithmetic, so
@@ -113,7 +111,7 @@ func (m Model) whichKeyLeaderPage() ([]whichKeyGroupCells, int, int) {
 	return pages[idx], idx, len(pages)
 }
 
-// renderWhichKeyLeader draws the space-leader panel when it is armed and
+// renderWhichKeyLeader draws the leader panel when it is armed and
 // visible. The page indicator is the panel's only in-box footer — the
 // "space: more / esc: close" hotkey hint lives in the bottom hint bar
 // (statusBar), matching every other overlay in this app.

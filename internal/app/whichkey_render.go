@@ -14,11 +14,11 @@ type whichKeyCell struct {
 	desc string
 }
 
-// which-key grid geometry. The grid grows vertically (more rows) as entries
-// are added, keeping a stable column count; the count drops only when the
-// terminal is too narrow to fit them.
+// which-key grid geometry. The panel is a short, full-width bottom strip, so
+// it grows sideways before it grows down: the column count is the preferred
+// shape and drops only when the terminal is too narrow to fit them.
 const (
-	whichKeyMaxCols = 4 // preferred column count
+	whichKeyMaxCols = 6 // preferred column count
 	whichKeyMinGap  = 3 // minimum spaces between columns
 )
 
@@ -90,13 +90,22 @@ type whichKeyGroupCells struct {
 	Cells []whichKeyCell
 }
 
-// Panel geometry.
+// Panel geometry. The panel is a compact strip pinned to the bottom of the
+// screen rather than a box that grows to fill the terminal.
 const (
-	whichKeyPadV      = 1  // rows of padding above and below
-	whichKeyPadH      = 2  // columns of padding left and right
-	whichKeyWidthPct  = 60 // panel spans this percent of the screen width
-	whichKeyBottomGap = 5  // rows between the panel and the screen bottom
-	whichKeyMinWidth  = 20
+	whichKeyPadV = 1 // rows of padding above and below
+	whichKeyPadH = 2 // columns of padding left and right
+	// whichKeyWidthPct spans the full width: a short strip needs the columns.
+	whichKeyWidthPct = 100
+	// whichKeyBottomGap leaves exactly the status-bar row uncovered, so the
+	// strip sits directly on top of it.
+	whichKeyBottomGap = 1
+	// whichKeyMaxBodyRows caps the body REGARDLESS of terminal height, so a
+	// tall terminal gets a strip rather than a wall. Six rows fit a group
+	// title plus a few rows of its entries; anything that doesn't fit pages
+	// (paginateWhichKeyGroups), so the cap costs reachability nothing.
+	whichKeyMaxBodyRows = 6
+	whichKeyMinWidth    = 20
 	// whichKeyMinHeight is the real floor for at least one content row: border
 	// (2) + vertical padding (2*whichKeyPadV) + the bottom gap + 1 body row.
 	// Computed from the other constants rather than hand-picked so it can't
@@ -135,8 +144,9 @@ func (m Model) whichKeyPanelGeometry() (targetInner, maxInner, maxBodyRows int, 
 	maxInner = max(m.width-chrome, 1)
 	targetInner = max(m.width*whichKeyWidthPct/100-chrome, 1)
 	// Border + vertical padding + the bottom gap all eat into the rows the body
-	// may occupy.
-	maxBodyRows = m.height - (2 + 2*whichKeyPadV + whichKeyBottomGap)
+	// may occupy, and whichKeyMaxBodyRows caps what is left so the strip stays
+	// short on a tall terminal instead of growing to fill it.
+	maxBodyRows = min(m.height-(2+2*whichKeyPadV+whichKeyBottomGap), whichKeyMaxBodyRows)
 	if maxBodyRows < 1 {
 		return 0, 0, 0, false
 	}
@@ -203,7 +213,9 @@ func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCell
 		hidden := total - shown
 		// Width is measured on the plain string: lipgloss.Width on a styled
 		// string would count the ANSI escapes.
-		plainFooter := fmt.Sprintf("+%d more (%s for help)", hidden, ui.ActiveKeybindings.Help)
+		// whichKeyHelpKey, not kb.Help: the leader owns "?" in the explorer, so
+		// naming kb.Help here would point at a key that opens this panel again.
+		plainFooter := fmt.Sprintf("+%d more (%s for help)", hidden, whichKeyHelpKey(ui.ActiveKeybindings))
 		body = append(body, descStyle.Render(plainFooter))
 		inner = max(inner, lipgloss.Width(plainFooter))
 	case footer != "":
@@ -219,10 +231,11 @@ func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCell
 		Padding(whichKeyPadV, whichKeyPadH).
 		Render(content)
 
+	// No DimBackground here, unlike the modal overlays: both which-key panels
+	// (the leader strip and the g-prefix goto popup) are transient hints read
+	// alongside the list they annotate, not modes that take over the screen.
+	// ConfigDimOverlay still dims every other overlay.
 	bg := ui.PadToHeight(background, m.height)
-	if ui.ConfigDimOverlay {
-		bg = ui.DimBackground(bg, 1)
-	}
 	return ui.PlaceOverlayBottom(m.width, m.height, whichKeyBottomGap, box, bg)
 }
 
@@ -236,7 +249,7 @@ type whichKeyRenderedGroup struct {
 
 // renderWhichKeyGroups renders every non-empty group once, up front, so a
 // caller sizing multiple candidate layouts (fitWhichKeyGroups's own budget
-// pass, and the space leader's pagination) shares exactly the block each
+// pass, and the leader's pagination) shares exactly the block each
 // group produces instead of re-deriving row counts separately.
 func renderWhichKeyGroups(groups []whichKeyGroupCells, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) []whichKeyRenderedGroup {
 	rendered := make([]whichKeyRenderedGroup, 0, len(groups))
@@ -258,7 +271,7 @@ func renderWhichKeyGroups(groups []whichKeyGroupCells, targetInner, maxInner int
 // current page is split — as many cells as fit go on this page (with the
 // group's title, so a continuation page still says what it's continuing),
 // and the rest carry over to the next page(s). This is what makes every
-// catalog entry reachable via repeated space presses regardless of terminal
+// catalog entry reachable via repeated leader presses regardless of terminal
 // height (IMPORTANT fix, review round 1 — a solo oversized page used to hand
 // the renderer more than it could show, and the excess fell into "+N more"
 // with no way to page to it).

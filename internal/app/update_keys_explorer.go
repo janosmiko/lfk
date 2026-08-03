@@ -23,13 +23,13 @@ func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// The space leader is a pure overlay: esc closes it, and every other key
+	// The which-key leader is a pure overlay: esc closes it, and every other key
 	// closes it and then runs its normal action. Because every listed action
 	// already has a bare binding here, "run the listed action" and "fall
 	// through" are the same thing — one dispatch path, so the panel can never
 	// disagree with what the key actually does. esc is consumed only while the
 	// panel is actually shown — see the same guard in handleKey.
-	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.ToggleSelect {
+	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.WhichKeyLeader {
 		shown := m.whichKey.shown
 		m = m.disarmWhichKeyLeader()
 		if shown && msg.String() == "esc" {
@@ -112,6 +112,31 @@ func ctrlSpaceAlias(binding string) string {
 	return binding
 }
 
+// handleExplorerSelectionKey dispatches the multi-selection keys and the
+// which-key leader. Split out of handleExplorerNavKey to keep that function
+// under the gocyclo budget; it must stay ahead of handleExplorerUIKey in the
+// chain so the leader wins the "?" it shares with kb.Help.
+func (m Model) handleExplorerSelectionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case kb.SelectRange, ctrlSpaceAlias(kb.SelectRange):
+		return m.handleKeySelectRange(), nil, true
+	case kb.ToggleSelect:
+		return m.handleKeyToggleSelect(), nil, true
+	case kb.SelectAll:
+		return m.handleKeySelectAll(), nil, true
+	case kb.WhichKeyLeader:
+		// With the panel disabled the leader key opens nothing, so let it fall
+		// through to whatever else claims it (kb.Help, by default).
+		if !ui.ConfigWhichKeyEnabled {
+			return m, nil, false
+		}
+		mdl, cmd := m.armWhichKeyLeader()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
 func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 
@@ -124,6 +149,9 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	}
 
 	if mdl, cmd, handled := m.handleExplorerJumpKey(msg); handled {
+		return mdl, cmd, true
+	}
+	if mdl, cmd, handled := m.handleExplorerSelectionKey(msg); handled {
 		return mdl, cmd, true
 	}
 
@@ -160,17 +188,6 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
 		return mdl, cmd, true
-	case kb.SelectRange, ctrlSpaceAlias(kb.SelectRange):
-		mdl := m.handleKeySelectRange()
-		return mdl, nil, true
-	case kb.ToggleSelect:
-		// Space keeps toggling selection and additionally arms the which-key
-		// leader; the delay keeps rapid multi-select from flashing the panel.
-		mdl, cmd := m.handleKeyToggleSelect().armWhichKeyLeader()
-		return mdl, cmd, true
-	case kb.SelectAll:
-		mdl := m.handleKeySelectAll()
-		return mdl, nil, true
 	case kb.Left, "left":
 		if m.fullscreenDashboard {
 			m.fullscreenDashboard = false

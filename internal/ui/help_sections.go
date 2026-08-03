@@ -52,7 +52,8 @@ func helpSections() []helpSection {
 		{
 			title: "Views & Tools",
 			bindings: []helpEntry{
-				{kb.Help + " / F1", "Toggle help screen"},
+				{"F1", "Toggle help screen (" + kb.Help + " too, outside the explorer)"},
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable right now (press again to page, Esc to close)"},
 				{kb.TogglePreview, "Toggle between details and YAML preview"},
 				{"", "Details pane shows labels, finalizers, annotations, and metadata"},
 				{"", "Details view shows deletion timestamp for resources being deleted"},
@@ -84,7 +85,7 @@ func helpSections() []helpSection {
 		{
 			title: "Multi-Selection",
 			bindings: []helpEntry{
-				{"Space", "Toggle selection on current item; also opens the which-key action panel"},
+				{"Space", "Toggle selection on current item"},
 				{"Ctrl+Space", "Select range from anchor to cursor"},
 				{helpKeyDisplay(kb.SelectAll), "Select/deselect all visible items"},
 				{"Esc", "Clear selection"},

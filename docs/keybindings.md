@@ -26,7 +26,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 
 ## Goto Navigation
 
-Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
+Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the goto which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
 
 | Key | Resource |
 |---|---|
@@ -63,7 +63,8 @@ All built-in chords are rebindable under `keybindings`.
 
 | Key | Action |
 |---|---|
-| `?` | Toggle help screen |
+| `F1` | Toggle help screen (`?` too, outside the explorer) |
+| `?` | Which-key action panel -- see [Which-Key Panel](#which-key-panel) |
 | `P` | Toggle between details summary and YAML preview |
 | | Details pane shows labels, finalizers, annotation count, and resource metadata |
 | | Details view shows deletion timestamp (with warning highlight) for resources being deleted |
@@ -248,13 +249,25 @@ When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and
 | Key | Action |
 |---|---|
 | `Space` | Toggle selection on current item (sets anchor) |
-| `Ctrl+Space` | Select range from anchor to cursor |
+| `Ctrl+Space` | Select range from anchor to cursor (legacy `ctrl+@` spelling still accepted) |
 | `Ctrl+A` | Select / deselect all visible items |
 | `Esc` | Clear selection |
 
 When items are selected, press `x` to open the bulk action menu (delete, force delete, scale, restart, diff).
 
-`Space` also arms the space-leader which-key panel: a context-aware action panel appears after a short delay (configurable via `which_key_enabled` and `which_key_leader_delay_ms`), grouped by Actions / Views / Filter / Selection / Sort / Settings. Press `Space` again to page through it (wraps at the last page), `Esc` closes it once it is visible, and any other key or mouse input closes it and still runs normally. Before the delay elapses the panel is not yet on screen, so `Esc` keeps its normal job (clear selection, search, or filter).
+See [Which-Key Panel](#which-key-panel) for the `?` action panel.
+
+## Which-Key Panel
+
+`?` opens a compact strip above the status bar listing the hotkeys actionable on the current row, grouped Actions / Views / Filter / Selection / Sort / Settings.
+
+| Key | Action |
+|---|---|
+| `?` | Open the panel / page to the next page (wraps) |
+| `Esc` | Close |
+| any other key | Close, and still run normally |
+
+`?` is the leader only in the explorer; every fullscreen viewer keeps `?` as help. `F1` opens the help screen from the explorer. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal.
 
 ## Bookmarks
 
@@ -1261,6 +1274,7 @@ keybindings:
   diff: "d"              # Diff resources
 
   # Multi-selection
+  which_key_leader: "?"  # Open the which-key action panel (explorer only)
   toggle_select: "space" # Toggle selection (space bar)
   select_range: "ctrl+space" # Select range (legacy "ctrl+@" still accepted)
   select_all: "ctrl+a"   # Select all

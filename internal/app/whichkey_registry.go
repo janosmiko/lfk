@@ -8,7 +8,7 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// whichKeyGroup labels one section of the space-leader panel.
+// whichKeyGroup labels one section of the leader panel.
 type whichKeyGroup string
 
 const (
@@ -20,7 +20,7 @@ const (
 	wkSettings  whichKeyGroup = "Settings"
 )
 
-// whichKeyGroupOrder is the fixed render order — also the space leader's
+// whichKeyGroupOrder is the fixed render order — also the leader's
 // page-1-first order (Task 5): Actions and Views are what a user reaches for
 // most (mutate/inspect the highlighted row, switch what pane is showing), so
 // they lead and land on page 1 at common terminal sizes. Filter, Selection,
@@ -33,7 +33,7 @@ func whichKeyGroupOrder() []whichKeyGroup {
 	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
 }
 
-// whichKeyAction is one row of the space-leader panel. Key is a function so a
+// whichKeyAction is one row of the leader panel. Key is a function so a
 // rebind is picked up at render time rather than baked in at package init.
 // Avail is nil for entries that always apply in the explorer; it must be cheap
 // and side-effect free because it runs on every render.
@@ -507,6 +507,7 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	// m.selectedItems (survives filtering) and visibleMiddleItems() directly,
 	// so wkOnRow's "sel != nil" would wrongly hide it when a selection exists
 	// but the filter has narrowed the visible list to zero rows.
+	{Key: func(kb ui.Keybindings) string { return kb.ToggleSelect }, Label: "Toggle selection", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.Diff }, Label: "Diff two selected", Group: wkSelection, Avail: wkDiffAvailable},
@@ -556,7 +557,18 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.SecurityBadgeToggle }, Label: "Security badge", Group: wkSettings},
 	{Key: func(kb ui.Keybindings) string { return kb.SecurityIgnoreToggle }, Label: "Show ignored findings", Group: wkSettings, Avail: wkOnSecurityView},
 	{Key: func(kb ui.Keybindings) string { return kb.ClusterColorPicker }, Label: "Cluster color", Group: wkSettings, Avail: wkClusterRowSelected},
-	{Key: func(kb ui.Keybindings) string { return kb.Help }, Label: "Full help", Group: wkSettings},
+	{Key: whichKeyHelpKey, Label: "Full help", Group: wkSettings},
+}
+
+// whichKeyHelpKey reports the key that actually opens the help screen from the
+// explorer. The leader is dispatched ahead of kb.Help, so when the two collide
+// (both default to "?") only the hardcoded f1 alias still reaches help, and
+// advertising "?" there would be a lie.
+func whichKeyHelpKey(kb ui.Keybindings) string {
+	if kb.Help == kb.WhichKeyLeader {
+		return "f1"
+	}
+	return kb.Help
 }
 
 // whichKeyExplorerActions returns a copy of the shared explorer catalog, so a
@@ -591,7 +603,7 @@ func (m *Model) availableWhichKeyActions() []whichKeyAction {
 }
 
 // whichKeyExcludedBindings lists the ui.Keybindings fields that deliberately do
-// not appear in the space-leader panel, keyed by Go field name. Navigation and
+// not appear in the leader panel, keyed by Go field name. Navigation and
 // viewer-local keys are excluded because the panel is a discovery aid for
 // actions, not a full keymap. TestWhichKeyRegistry_CoversEveryBinding fails when
 // a new binding is neither registered nor listed here.
@@ -623,8 +635,10 @@ func whichKeyExcludedBindings() map[string]string {
 		// views" reason).
 		"SeverityUp": "viewer-local", "SeverityDown": "viewer-local",
 
-		// The leader itself.
-		"ToggleSelect": "the leader key itself",
+		// The leader itself: pressing it opens the panel rather than running a
+		// listed action, so listing it would advertise the panel from inside
+		// the panel.
+		"WhichKeyLeader": "the leader key itself",
 		// SetMark ("m") arms m.pendingMark and waits for the bookmark-slot
 		// key (update_keys_explorer.go:26-33,330-332); unlike the g-prefix
 		// (armWhichKey/renderWhichKey), nothing renders while pendingMark is
@@ -637,7 +651,7 @@ func whichKeyExcludedBindings() map[string]string {
 
 		// Goto chords (whichkey.go): each is a full "g<x>" chord dispatched by
 		// handleGotoChord while the g prefix is armed, and already has its own
-		// which-key-style popup (renderWhichKey) distinct from the space-leader
+		// which-key-style popup (renderWhichKey) distinct from the leader
 		// panel this registry drives.
 		"GotoPods": "goto chord, has its own popup", "GotoDeployments": "goto chord, has its own popup",
 		"GotoServices": "goto chord, has its own popup", "GotoNodes": "goto chord, has its own popup",

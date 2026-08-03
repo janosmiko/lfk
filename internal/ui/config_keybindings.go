@@ -110,6 +110,12 @@ type Keybindings struct {
 	MoveTabLeft  string `json:"move_tab_left" yaml:"move_tab_left"`
 	MoveTabRight string `json:"move_tab_right" yaml:"move_tab_right"`
 
+	// WhichKeyLeader arms the context-aware which-key panel in the explorer,
+	// which lists the hotkeys actionable on the current row. Dispatched ahead
+	// of Help, so while the two share the default "?" the explorer's help
+	// screen is reached with f1; every fullscreen viewer keeps "?" as help.
+	WhichKeyLeader string `json:"which_key_leader" yaml:"which_key_leader"`
+
 	// Bookmarks
 	SetMark   string `json:"set_mark" yaml:"set_mark"`
 	OpenMarks string `json:"open_marks" yaml:"open_marks"`
@@ -241,6 +247,10 @@ func DefaultKeybindings() Keybindings {
 		// active tab one slot right, "{" (shift+[) one slot left.
 		NewTab: "t", NextTab: "]", PrevTab: "[",
 		MoveTabLeft: "{", MoveTabRight: "}",
+
+		// Which-key leader. "?" has no side effect of its own, unlike the
+		// space it replaced, and help stays reachable via f1 in the explorer.
+		WhichKeyLeader: "?",
 
 		// Bookmarks
 		SetMark: "m", OpenMarks: "'",

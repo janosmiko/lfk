@@ -17,7 +17,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.statusMessageTip = false
 	}
 
-	// The space leader must close on any key other than its own, before ANY
+	// The which-key leader must close on any key other than its own, before ANY
 	// other handler gets a chance to claim it — mouse-toggle, tab-switch,
 	// and mode-specific handlers below all run ahead of handleExplorerKey's
 	// own copy of this guard (kept there too, for callers that invoke it
@@ -27,11 +27,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// other key still falls through to whatever it would normally do.
 	//
 	// esc is consumed only while the panel is actually SHOWN, so closing it is
-	// a visible effect. During the delay window the panel is not drawn yet,
-	// and swallowing esc there stole it from handleExplorerEsc (clear
+	// a visible effect. The default delay is 0, but a user who configures
+	// which_key_leader_delay_ms has a window where the panel is not drawn yet,
+	// and swallowing esc there steals it from handleExplorerEsc (clear
 	// selection / search / filter / preset, exit fullscreen, close tab) with
 	// no on-screen feedback at all.
-	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.ToggleSelect {
+	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.WhichKeyLeader {
 		shown := m.whichKey.shown
 		m = m.disarmWhichKeyLeader()
 		if shown && msg.String() == "esc" {

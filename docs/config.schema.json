@@ -100,7 +100,7 @@
     },
     "which_key_enabled": {
       "type": "boolean",
-      "description": "Show the which-key popup while a chord prefix (g) is pending, and the space-leader action panel while space is armed. Both still work when false.",
+      "description": "Show the which-key popup while a chord prefix (g) is pending, and the leader action panel while the which-key leader (?) is armed. Both still work when false.",
       "default": true
     },
     "which_key_delay_ms": {
@@ -114,8 +114,8 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 2000,
-      "description": "Delay before the space-leader which-key panel appears, in milliseconds (0 = immediate).",
-      "default": 300
+      "description": "Delay before the leader which-key panel appears, in milliseconds (0 = immediate).",
+      "default": 0
     },
     "terminal": {
       "type": "string",
@@ -476,6 +476,7 @@
         "prev_tab": { "type": "string" },
         "move_tab_left": { "type": "string" },
         "move_tab_right": { "type": "string" },
+        "which_key_leader": { "type": "string" },
         "set_mark": { "type": "string" },
         "open_marks": { "type": "string" },
         "terminal_toggle": { "type": "string" },

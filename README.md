@@ -238,7 +238,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 ## Keybindings
 
-> For the complete keybinding reference (YAML view, log viewer, describe, diff, exec mode, and all sub-modes), see [docs/keybindings.md](docs/keybindings.md). Press `?` or `F1` in-app for the built-in help screen.
+> For the complete keybinding reference (YAML view, log viewer, describe, diff, exec mode, and all sub-modes), see [docs/keybindings.md](docs/keybindings.md). Press `F1` in-app for the built-in help screen, `?` for the which-key action panel.
 
 ### Navigation
 
@@ -267,7 +267,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 | Key | Action |
 |---|---|
-| `?` | Toggle help screen |
+| `F1` | Toggle help screen (`?` too, outside the explorer) |
 | `f` | Filter items in current view |
 | `/` | Search and jump to match |
 | `n` / `N` | Next / previous search match |
@@ -306,7 +306,8 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `D` / `X` | Delete / force delete |
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
 | `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
-| `Space` | Toggle multi-selection (bulk actions via `x`); also opens a which-key action panel (page: `Space`, close: `esc`) |
+| `Space` | Toggle multi-selection (bulk actions via `x`) |
+| `?` | Which-key action panel: hotkeys actionable right now (page: `?`, close: `esc`). `F1` opens full help |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 | `}` / `{` | Move current tab right / left |
