@@ -89,7 +89,11 @@ const (
 	whichKeyWidthPct  = 60 // panel spans this percent of the screen width
 	whichKeyBottomGap = 5  // rows between the panel and the screen bottom
 	whichKeyMinWidth  = 20
-	whichKeyMinHeight = 6
+	// whichKeyMinHeight is the real floor for at least one content row: border
+	// (2) + vertical padding (2*whichKeyPadV) + the bottom gap + 1 body row.
+	// Computed from the other constants rather than hand-picked so it can't
+	// drift out of sync with maxBodyRows's own arithmetic below.
+	whichKeyMinHeight = 2 + 2*whichKeyPadV + whichKeyBottomGap + 1
 )
 
 // renderWhichKey draws the goto cheatsheet while the g prefix is armed and
@@ -213,6 +217,12 @@ func fitWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInner, ma
 			inner = max(inner, w)
 			shown += k
 		}
+		// Deliberately stop here rather than trying a later, smaller group in
+		// the same leftover rows: groups render in caller-given priority order,
+		// and skipping ahead would show a lower-priority group while hiding a
+		// higher-priority one that just missed the cutoff. Costs at most a row
+		// or two of unused space in the rare case where remaining-titleRows is
+		// 0 (the title itself doesn't fit).
 		break
 	}
 	return body, shown, inner
@@ -227,7 +237,8 @@ func fitPartialGroupCells(cells []whichKeyCell, dataRows, targetInner, maxInner 
 	}
 	plain := make([]string, len(cells))
 	for i, c := range cells {
-		plain[i] = c.key + " " + c.desc
+		key, desc := fitCellText(c.key, c.desc, maxInner)
+		plain[i] = joinCellText(key, desc)
 	}
 	best := 0
 	for k := 1; k <= len(cells); k++ {
@@ -238,14 +249,48 @@ func fitPartialGroupCells(cells []whichKeyCell, dataRows, targetInner, maxInner 
 	return best
 }
 
+// fitCellText ellipsizes desc (never key) so the rendered "key desc" text
+// never exceeds maxInner columns. Real catalog labels ("Copy as
+// (YAML/JSON/table)") can otherwise be wider than a narrow terminal, which
+// blows the whole panel out past m.width — layoutWhichKey sizes columns to
+// their widest cell with no independent width cap of its own, so the cap has
+// to be applied to the text before it ever reaches layout. The key is kept
+// fully visible since a which-key panel is useless if the shortcut itself is
+// cut off; only if the key alone doesn't fit is it truncated as a last
+// resort.
+func fitCellText(key, desc string, maxInner int) (string, string) {
+	if lipgloss.Width(joinCellText(key, desc)) <= maxInner {
+		return key, desc
+	}
+	budget := maxInner - lipgloss.Width(key) - 1 // -1 for the separating space
+	if budget < 1 {
+		return ui.Truncate(key, maxInner), ""
+	}
+	return key, ui.Truncate(desc, budget)
+}
+
+// joinCellText renders a key/desc pair the way every cell is laid out: space-
+// joined, or bare when desc was truncated away entirely.
+func joinCellText(key, desc string) string {
+	if desc == "" {
+		return key
+	}
+	return key + " " + desc
+}
+
 // renderWhichKeyGroup lays one group out as rows, returning the rendered lines
 // and the inner width they occupy. A non-empty title becomes a header row.
 func renderWhichKeyGroup(g whichKeyGroupCells, keyStyle, descStyle, titleStyle lipgloss.Style, targetInner, maxInner int) ([]string, int) {
 	plain := make([]string, len(g.Cells))
 	styled := make([]string, len(g.Cells))
 	for i, c := range g.Cells {
-		plain[i] = c.key + " " + c.desc
-		styled[i] = keyStyle.Render(c.key) + " " + descStyle.Render(c.desc)
+		key, desc := fitCellText(c.key, c.desc, maxInner)
+		plain[i] = joinCellText(key, desc)
+		if desc == "" {
+			styled[i] = keyStyle.Render(key)
+		} else {
+			styled[i] = keyStyle.Render(key) + " " + descStyle.Render(desc)
+		}
 	}
 	lay := layoutWhichKey(plain, targetInner, maxInner)
 	cols := len(lay.colW)

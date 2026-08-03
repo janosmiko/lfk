@@ -2,9 +2,12 @@ package app
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -128,5 +131,50 @@ func TestRenderWhichKeyPanel_OverflowShowsMoreFooter(t *testing.T) {
 	}
 	if lines := strings.Split(out, "\n"); len(lines) > m.height+1 {
 		t.Fatalf("panel overflowed the screen: %d lines for height %d", len(lines), m.height)
+	}
+
+	// The footer count must match ground truth exactly, not just be present:
+	// derive "actually shown" independently by counting visible cell labels
+	// (each contains "action", none of the titles do) rather than trusting
+	// the footer's own arithmetic.
+	total := 6 * 8
+	actualShown := strings.Count(out, "action")
+	wantHidden := total - actualShown
+	match := regexp.MustCompile(`\+(\d+) more`).FindStringSubmatch(out)
+	if match == nil {
+		t.Fatalf("footer missing a parseable '+N more' count:\n%s", out)
+	}
+	gotHidden, err := strconv.Atoi(match[1])
+	if err != nil {
+		t.Fatalf("footer count %q not a number: %v", match[1], err)
+	}
+	if gotHidden != wantHidden {
+		t.Fatalf("footer says +%d more but %d of %d cells are actually visible (want +%d more)",
+			gotHidden, actualShown, total, wantHidden)
+	}
+}
+
+// TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth guards against a
+// panel wider than the terminal: a single cell whose "key desc" text alone
+// exceeds the available inner width must be ellipsized, not left to blow out
+// the box. Uses a real catalog label ("Copy as (YAML/JSON/table)", 27 chars)
+// at widths that pass whichKeyMinWidth but are still narrower than the label.
+func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := gotoTestModel()
+	m.height = 20
+	groups := []whichKeyGroupCells{
+		{Cells: []whichKeyCell{{"Y", "Copy as (YAML/JSON/table)"}}},
+	}
+	for _, w := range []int{20, 25, 34} {
+		m.width = w
+		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups))
+		for line := range strings.SplitSeq(out, "\n") {
+			if got := lipgloss.Width(line); got > w {
+				t.Fatalf("width %d: rendered line %q is %d columns wide", w, line, got)
+			}
+		}
 	}
 }
