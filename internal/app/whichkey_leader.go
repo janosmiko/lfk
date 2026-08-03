@@ -36,10 +36,11 @@ func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 		m.whichKey = whichKeyState{}
 		return m, nil
 	}
-	if m.whichKey.armed {
-		m.whichKey.page++
-	} else {
+	freshArm := !m.whichKey.armed
+	if freshArm {
 		m.whichKey.page = 0
+	} else {
+		m.whichKey.page++
 	}
 	m.whichKey.seq++
 	m.whichKey.armed = true
@@ -47,7 +48,13 @@ func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 		m.whichKey.shown = true
 		return m, nil
 	}
-	m.whichKey.shown = false
+	// CRITICAL-1 (review round 1): only a fresh arm hides the panel for the
+	// delay. A repeat press while already armed only advances the page —
+	// forcing shown=false here too re-hid an already-visible panel on every
+	// single page advance, blinking it off for another full delay each time.
+	if freshArm {
+		m.whichKey.shown = false
+	}
 	seq := m.whichKey.seq
 	d := time.Duration(ui.ConfigWhichKeyLeaderDelayMs) * time.Millisecond
 	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyLeaderTickMsg{seq: seq} })
@@ -83,9 +90,9 @@ func (m Model) whichKeyLeaderGroups() []whichKeyGroupCells {
 
 // whichKeyLeaderPage returns the groups for the space leader's current page,
 // the page index, and the page count. Pagination reuses the renderer's own
-// geometry (whichKeyPanelGeometry) and per-group layout (renderWhichKeyGroups,
-// via paginateWhichKeyGroups) rather than re-deriving row-fitting arithmetic,
-// so the count this reports can never disagree with what renderWhichKeyLeader
+// geometry (whichKeyPanelGeometry) and per-cell layout (layoutWhichKey, via
+// paginateWhichKeyGroups) rather than re-deriving row-fitting arithmetic, so
+// the count this reports can never disagree with what renderWhichKeyLeader
 // actually draws. One row is always reserved for the page-indicator footer,
 // matching renderWhichKeyPanel's own reservation when footer != "".
 func (m Model) whichKeyLeaderPage() ([]whichKeyGroupCells, int, int) {
@@ -98,9 +105,7 @@ func (m Model) whichKeyLeaderPage() ([]whichKeyGroupCells, int, int) {
 	if maxBodyRows < 1 {
 		return nil, 0, 0
 	}
-	keyStyle, descStyle, titleStyle := whichKeyStyles()
-	rendered := renderWhichKeyGroups(groups, targetInner, maxInner, keyStyle, descStyle, titleStyle)
-	pages := paginateWhichKeyGroups(rendered, maxBodyRows)
+	pages := paginateWhichKeyGroups(groups, maxBodyRows, targetInner, maxInner)
 	if len(pages) == 0 {
 		return nil, 0, 0
 	}
@@ -120,6 +125,14 @@ func (m Model) renderWhichKeyLeader(background string) string {
 	if len(groups) == 0 {
 		return background
 	}
-	footer := fmt.Sprintf("(%d/%d)", idx+1, count)
+	// A single-page panel has nothing to page to — showing "(1/1)" would
+	// promise "more" that doesn't exist (review round 1, minor). Leaving the
+	// footer empty also lets renderWhichKeyPanel skip its footer-row
+	// reservation for the common small-catalog case, showing one extra row
+	// of real content instead.
+	var footer string
+	if count > 1 {
+		footer = fmt.Sprintf("(%d/%d)", idx+1, count)
+	}
 	return m.renderWhichKeyPanel(background, groups, footer)
 }

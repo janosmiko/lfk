@@ -84,7 +84,7 @@ func helpSections() []helpSection {
 		{
 			title: "Multi-Selection",
 			bindings: []helpEntry{
-				{"Space", "Toggle selection on current item"},
+				{"Space", "Toggle selection on current item; also opens the which-key action panel"},
 				{"Ctrl+Space", "Select range from anchor to cursor"},
 				{helpKeyDisplay(kb.SelectAll), "Select/deselect all visible items"},
 				{"Esc", "Clear selection"},

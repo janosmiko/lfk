@@ -145,8 +145,10 @@ func (m Model) whichKeyPanelGeometry() (targetInner, maxInner, maxBodyRows int, 
 // entries were cut, unless the caller supplies its own footer (e.g. the space
 // leader's page indicator) — footer then takes that row instead, and only
 // yields back to "+N more" if the supplied groups still don't fit even a
-// single page. Returns background unchanged when there is nothing to show or
-// the terminal is too small.
+// single page. Returns background unchanged when there is nothing to show, the
+// terminal is too small, or nothing actually fits (a box containing only a
+// footer line and no real content is worse than no panel — CRITICAL fix,
+// review round 1).
 func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCells, footer string) string {
 	total := 0
 	for _, g := range groups {
@@ -155,20 +157,39 @@ func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCell
 	if total == 0 {
 		return background
 	}
-	targetInner, maxInner, maxBodyRows, ok := m.whichKeyPanelGeometry()
+	targetInner, maxInner, rawBodyRows, ok := m.whichKeyPanelGeometry()
 	if !ok {
 		return background
 	}
-	if footer != "" {
-		maxBodyRows-- // reserve the row the caller-supplied footer occupies
+
+	keyStyle, descStyle, titleStyle := whichKeyStyles()
+	rendered := renderWhichKeyGroups(groups, targetInner, maxInner, keyStyle, descStyle, titleStyle)
+	totalNeeded := 0
+	for _, r := range rendered {
+		totalNeeded += len(r.block)
+	}
+
+	// A footer row — the caller's own (e.g. the leader's page indicator) or
+	// the "+N more" overflow disclosure below — is reserved exactly once,
+	// here, against the true row budget. Reserving it again inside
+	// fitWhichKeyGroups on top of this, or a third time in the leader's own
+	// pagination pass, previously starved a titled group down to zero
+	// visible cells at realistic short terminal heights (80x11, 80x12).
+	maxBodyRows := rawBodyRows
+	if footer != "" || totalNeeded > rawBodyRows {
+		maxBodyRows--
 	}
 	if maxBodyRows < 1 {
 		return background
 	}
 
-	keyStyle, descStyle, titleStyle := whichKeyStyles()
-
-	body, shown, inner := fitWhichKeyGroups(groups, maxBodyRows, targetInner, maxInner, keyStyle, descStyle, titleStyle)
+	body, shown, inner := fitWhichKeyGroups(rendered, maxBodyRows, targetInner, maxInner, keyStyle, descStyle, titleStyle)
+	if len(body) == 0 {
+		// Nothing fit even after reserving room for a footer: a box with
+		// only a footer line and no real content tells the user nothing
+		// useful, so skip rendering entirely instead.
+		return background
+	}
 	switch {
 	case total-shown > 0:
 		hidden := total - shown
@@ -180,9 +201,6 @@ func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCell
 	case footer != "":
 		body = append(body, descStyle.Render(footer))
 		inner = max(inner, lipgloss.Width(footer))
-	}
-	if len(body) == 0 {
-		return background
 	}
 
 	content := ui.FillLinesBg(strings.Join(body, "\n"), min(inner, maxInner), ui.BaseBg)
@@ -224,29 +242,58 @@ func renderWhichKeyGroups(groups []whichKeyGroupCells, targetInner, maxInner int
 	return rendered
 }
 
-// paginateWhichKeyGroups bins pre-rendered groups into pages that each fit
-// within maxBodyRows, in caller-given order, without splitting one group's
-// cells across two pages — a page break falls between groups, never inside
-// one. A group whose own block is taller than a whole page gets a dedicated
-// (possibly still-overflowing) page of its own rather than blocking
-// pagination; renderWhichKeyPanel's "+N more" footer is the fallback that
-// discloses the rest of that oversized group's cells when it actually renders.
-func paginateWhichKeyGroups(rendered []whichKeyRenderedGroup, maxBodyRows int) [][]whichKeyGroupCells {
+// paginateWhichKeyGroups bins groups into pages that each fit within
+// maxBodyRows, in caller-given order. Unlike renderWhichKeyPanel's own
+// single-page "+N more" overflow disclosure (used by the goto popup, and as
+// the leader's own fallback if a single cell can't fit at all), pagination
+// never drops an entry: a group whose cells don't fit the room left on the
+// current page is split — as many cells as fit go on this page (with the
+// group's title, so a continuation page still says what it's continuing),
+// and the rest carry over to the next page(s). This is what makes every
+// catalog entry reachable via repeated space presses regardless of terminal
+// height (IMPORTANT fix, review round 1 — a solo oversized page used to hand
+// the renderer more than it could show, and the excess fell into "+N more"
+// with no way to page to it).
+func paginateWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInner, maxInner int) [][]whichKeyGroupCells {
 	if maxBodyRows < 1 {
 		return nil
 	}
 	var pages [][]whichKeyGroupCells
 	var page []whichKeyGroupCells
 	used := 0
-	for _, r := range rendered {
-		cost := len(r.block)
-		if len(page) > 0 && used+cost > maxBodyRows {
-			pages = append(pages, page)
-			page = nil
-			used = 0
+
+	for _, g := range groups {
+		if len(g.Cells) == 0 {
+			continue
 		}
-		page = append(page, r.group)
-		used += cost
+		titleRows := 0
+		if g.Title != "" {
+			titleRows = 1
+		}
+		remaining := g.Cells
+		for len(remaining) > 0 {
+			budget := maxBodyRows - used
+			k, rows := fitPartialGroupCellsRows(remaining, budget-titleRows, targetInner, maxInner)
+			if k == 0 {
+				if len(page) == 0 {
+					// Not even one cell of this group fits an empty page —
+					// the terminal is too small for any content at all.
+					// renderWhichKeyPanel's own guards render nothing in
+					// that case; stop rather than loop forever.
+					if len(pages) == 0 {
+						return nil
+					}
+					return pages
+				}
+				pages = append(pages, page)
+				page = nil
+				used = 0
+				continue
+			}
+			page = append(page, whichKeyGroupCells{Title: g.Title, Cells: remaining[:k]})
+			used += titleRows + rows
+			remaining = remaining[k:]
+		}
 	}
 	if len(page) > 0 {
 		pages = append(pages, page)
@@ -254,26 +301,17 @@ func paginateWhichKeyGroups(rendered []whichKeyRenderedGroup, maxBodyRows int) [
 	return pages
 }
 
-// fitWhichKeyGroups lays out as many groups as fit within maxBodyRows, in
-// order. A row is reserved for the "+N more" footer up front whenever the full
-// catalog would overflow, so the caller never has to retroactively make room
-// for it. The first group that doesn't fully fit is truncated to as many of
-// its own cells as remain — every group after it is fully hidden.
-func fitWhichKeyGroups(groups []whichKeyGroupCells, maxBodyRows, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) (body []string, shown, inner int) {
-	rendered := renderWhichKeyGroups(groups, targetInner, maxInner, keyStyle, descStyle, titleStyle)
-	totalNeeded := 0
-	for _, r := range rendered {
-		totalNeeded += len(r.block)
-	}
-
-	budget := maxBodyRows
-	if totalNeeded > maxBodyRows {
-		budget-- // reserve the footer row
-	}
-
+// fitWhichKeyGroups lays out as many pre-rendered groups as fit within
+// maxBodyRows, in order. maxBodyRows must already account for any footer row
+// the caller needs — renderWhichKeyPanel computes that reservation exactly
+// once; a second reservation here on top of it previously starved content at
+// short terminal heights (CRITICAL fix, review round 1). The first group
+// that doesn't fully fit is truncated to as many of its own cells as remain
+// — every group after it is fully hidden.
+func fitWhichKeyGroups(rendered []whichKeyRenderedGroup, maxBodyRows, targetInner, maxInner int, keyStyle, descStyle, titleStyle lipgloss.Style) (body []string, shown, inner int) {
 	inner = 1
 	for _, r := range rendered {
-		remaining := budget - len(body)
+		remaining := maxBodyRows - len(body)
 		if remaining <= 0 {
 			break
 		}
@@ -324,6 +362,23 @@ func fitPartialGroupCells(cells []whichKeyCell, dataRows, targetInner, maxInner 
 		}
 	}
 	return best
+}
+
+// fitPartialGroupCellsRows is fitPartialGroupCells plus the row count the
+// chosen prefix actually lays out to, so a caller packing multiple chunks
+// onto a page (pagination) doesn't need a second layout pass to find out how
+// much of its budget the chunk consumed.
+func fitPartialGroupCellsRows(cells []whichKeyCell, dataRows, targetInner, maxInner int) (k, rows int) {
+	k = fitPartialGroupCells(cells, dataRows, targetInner, maxInner)
+	if k == 0 {
+		return 0, 0
+	}
+	plain := make([]string, k)
+	for i, c := range cells[:k] {
+		key, desc := fitCellText(c.key, c.desc, maxInner)
+		plain[i] = joinCellText(key, desc)
+	}
+	return k, layoutWhichKey(plain, targetInner, maxInner).rows
 }
 
 // fitCellText ellipsizes desc (never key) so the rendered "key desc" text

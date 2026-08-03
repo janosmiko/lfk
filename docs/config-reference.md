@@ -34,7 +34,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `custom_actions` | map[string]list | `{}` | User-defined actions per resource type. |
 | `filter_presets` | map[string]list | `{}` | User-defined quick filter presets per resource type. |
 | `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`); value = `{kind, group, name}`. Overrides built-ins on collision. |
-| `which_key_enabled` | bool | `true` | Show the which-key popup while the `g` prefix is pending. |
+| `which_key_enabled` | bool | `true` | Show the which-key popup while the `g` prefix is pending, and the space-leader action panel while `space` is armed. |
 | `which_key_delay_ms` | int | `0` | Delay before the popup appears (ms, 0-2000). |
 | `which_key_leader_delay_ms` | int | `300` | Delay before the space-leader which-key panel appears (ms, 0-2000). |
 | `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |

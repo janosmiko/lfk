@@ -17,6 +17,21 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.statusMessageTip = false
 	}
 
+	// The space leader must close on any key other than its own, before ANY
+	// other handler gets a chance to claim it — mouse-toggle, tab-switch,
+	// and mode-specific handlers below all run ahead of handleExplorerKey's
+	// own copy of this guard (kept there too, for callers that invoke it
+	// directly), and previously left the leader armed indefinitely after,
+	// e.g., the mouse-capture toggle key (IMPORTANT-5, review round 1). esc
+	// is consumed outright (closes the leader, does nothing else); every
+	// other key still falls through to whatever it would normally do.
+	if m.whichKey.armed && msg.String() != ui.ActiveKeybindings.ToggleSelect {
+		m = m.disarmWhichKeyLeader()
+		if msg.String() == "esc" {
+			return m, nil
+		}
+	}
+
 	// Handle regular overlays first so when an overlay (e.g. the theme
 	// selector) is opened on top of the error log, its own keys —
 	// including j/k navigation and Esc — reach handleOverlayKey instead

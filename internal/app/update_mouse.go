@@ -55,6 +55,13 @@ func isMousePress(msg tea.MouseMsg) bool {
 }
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Any mouse input closes the space leader (IMPORTANT-5, review round 1):
+	// scrolling or clicking while armed previously left the panel open and
+	// stuck overlaid, since mouse messages never reached the key-only disarm
+	// guards in handleKey/handleExplorerKey.
+	if m.whichKey.armed {
+		m = m.disarmWhichKeyLeader()
+	}
 	mouse := msg.Mouse()
 	// Trackpad momentum keeps emitting wheel ticks after the physical gesture
 	// ends. Drop the tail once the burst is no longer productive (a boundary

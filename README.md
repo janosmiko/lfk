@@ -306,7 +306,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `D` / `X` | Delete / force delete |
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
 | `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
-| `Space` | Toggle multi-selection (bulk actions via `x`); also opens a which-key action panel after a short delay — press again to page through it, `esc` to close |
+| `Space` | Toggle multi-selection (bulk actions via `x`); also opens a which-key action panel (page: `Space`, close: `esc`) |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 | `}` / `{` | Move current tab right / left |

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -198,6 +199,48 @@ func TestWhichKeyLeader_PageAdvancesAndWraps(t *testing.T) {
 	}
 }
 
+// TestWhichKeyLeader_PageAdvanceDoesNotReHideAtDefaultDelay is CRITICAL-1
+// from review round 1: at the shipped default delay (300ms), a page-advance
+// press must not re-hide an already-revealed panel. armWhichKeyLeader used
+// to unconditionally set shown=false whenever the delay was > 0, including
+// on a repeat press — so every page advance blinked the panel off for
+// another full delay before it reappeared. Only a FRESH arm (not already
+// armed) may hide the panel; a repeat press while already armed and shown
+// must leave shown alone.
+func TestWhichKeyLeader_PageAdvanceDoesNotReHideAtDefaultDelay(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 300
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 24
+
+	// Fresh arm: must not show immediately at a nonzero delay.
+	out, _ := m.handleExplorerKey(spaceKey())
+	m = out.(Model)
+	if m.whichKey.shown {
+		t.Fatal("precondition: fresh arm must not show immediately at 300ms delay")
+	}
+
+	// Simulate the delay elapsing: the scheduled tick fires for this seq.
+	out, _, _ = m.updateEasterEggMsg(whichKeyLeaderTickMsg{seq: m.whichKey.seq})
+	m = out.(Model)
+	if !m.whichKey.shown {
+		t.Fatal("precondition: the tick must reveal the panel")
+	}
+
+	// Page-advance press: the panel is already shown and must stay shown —
+	// not blink off for another 300ms before the next page appears.
+	out, _ = m.handleExplorerKey(spaceKey())
+	m = out.(Model)
+	if !m.whichKey.shown {
+		t.Fatal("CRITICAL-1: a page-advance press must not hide an already-shown panel")
+	}
+	if m.whichKey.page != 1 {
+		t.Fatalf("the press must still advance the page: got %d, want 1", m.whichKey.page)
+	}
+}
+
 // TestWhichKeyLeader_PageResetsOnDisarmAndRearm covers both halves of "page
 // lives on whichKeyState and resets whenever the leader disarms": disarming
 // (via esc) zeroes the stored page, and arming fresh afterward starts back on
@@ -319,5 +362,217 @@ func TestWhichKeyLeaderPage_Page1HighestPriorityAt80x24(t *testing.T) {
 	}
 	if count < 2 {
 		t.Fatalf("expected the full catalog to need multiple pages at 80x24, got %d", count)
+	}
+}
+
+// TestWhichKeyLeaderPage_NeverEmptyBoxAtShortHeights is CRITICAL-2 from
+// review round 1: at realistic short terminal heights (80x11, 80x12 — a
+// routine tmux split-pane size), the panel rendered a box containing only
+// "+N more (? for help)" and no real content — a triple footer reservation
+// (leader pagination, renderWhichKeyPanel, and fitWhichKeyGroups each
+// reserving their own row) starved the cell budget to zero, and the
+// len(body)==0 empty-content guard couldn't fire because the footer line was
+// appended before that check ran. The panel must now either show real
+// entries or not render at all — never a box with nothing actionable in it.
+func TestWhichKeyLeaderPage_NeverEmptyBoxAtShortHeights(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	for _, h := range []int{11, 12} {
+		m := whichKeyTestModel()
+		m.width, m.height = 80, h
+		m.whichKey.armed = true
+		m.whichKey.shown = true
+		bg := strings.Repeat("\n", m.height)
+		out := stripANSI(m.renderWhichKeyLeader(bg))
+		if out == bg {
+			continue // nothing rendered at all — acceptable per spec
+		}
+		if !strings.Contains(out, "Actions") {
+			t.Errorf("CRITICAL-2: h=%d rendered a box with no real content (empty except chrome/footer):\n%s", h, out)
+		}
+	}
+}
+
+// TestWhichKeyLeaderPage_AllEntriesReachableViaPaging is IMPORTANT-3 from
+// review round 1: paginateWhichKeyGroups used to give an oversized group its
+// own solo page without ever fitting it, so renderWhichKeyPanel's "+N more"
+// fallback silently swallowed the rest of that group at RENDER time — and
+// because paging only ever moved between groups (never split one), those
+// entries were permanently unreachable by any number of space presses, even
+// though whichKeyLeaderPage's own returned (unfit) groups still technically
+// contained them. This asserts reachability the way a user experiences it:
+// by scanning the actual rendered text of every page, not the raw group
+// data the renderer hasn't yet truncated.
+func TestWhichKeyLeaderPage_AllEntriesReachableViaPaging(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 14
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	want := map[string]bool{}
+	for _, a := range m.availableWhichKeyActions() {
+		want[a.Label] = true
+	}
+
+	_, _, count := m.whichKeyLeaderPage()
+	if count < 2 {
+		t.Fatalf("test assumes the full catalog needs multiple pages at 80x14; got %d", count)
+	}
+	var allRendered strings.Builder
+	for p := range count {
+		m.whichKey.page = p
+		bg := strings.Repeat("\n", m.height)
+		allRendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
+		allRendered.WriteString("\n")
+	}
+	rendered := allRendered.String()
+	for label := range want {
+		if !strings.Contains(rendered, label) {
+			t.Errorf("IMPORTANT-3: %q never appears in any of the %d rendered pages — unreachable via paging", label, count)
+		}
+	}
+}
+
+// TestWhichKeyLeader_HintBarGatesOnShownNotArmed is IMPORTANT-4 from review
+// round 1: the hint bar used to switch to the leader's "space: more / esc:
+// close" hints as soon as the leader armed, not once the panel actually
+// appeared. At the shipped default delay (300ms) that meant EVERY ordinary
+// multi-select press replaced the whole status bar — including the selected
+// count, sort indicator, and position counter — for the length of the delay,
+// even though the panel itself was invisible the entire time.
+func TestWhichKeyLeader_HintBarGatesOnShownNotArmed(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 300
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 24
+
+	out, _ := m.handleExplorerKey(spaceKey())
+	m = out.(Model)
+	if m.whichKey.shown {
+		t.Fatal("precondition: fresh arm must not be shown yet at 300ms delay")
+	}
+	if hint := stripANSI(m.statusBar()); strings.Contains(hint, "space: more") {
+		t.Fatalf("IMPORTANT-4: hint bar switched to leader hints before the panel is shown:\n%s", hint)
+	}
+
+	out, _, _ = m.updateEasterEggMsg(whichKeyLeaderTickMsg{seq: m.whichKey.seq})
+	m = out.(Model)
+	if !m.whichKey.shown {
+		t.Fatal("precondition: the tick must reveal the panel")
+	}
+	if hint := stripANSI(m.statusBar()); !strings.Contains(hint, "space: more") {
+		t.Fatalf("hint bar must show leader hints once the panel is actually visible:\n%s", hint)
+	}
+}
+
+// TestWhichKeyLeader_MouseToggleKeyDisarms is IMPORTANT-5 from review round
+// 1: handleMouseToggleKey (and handleTabSwitchKey, handleModeKey) all run
+// before handleExplorerKey in handleKey's dispatch chain, so the only disarm
+// guard living inside handleExplorerKey never saw keys those handlers
+// claimed first — ctrl+alt+y (the default mouse-capture toggle, itself an
+// entry the panel's own Settings group advertises) left the leader armed and
+// visually stuck open. Routes through handleKey (via mouseToggleKey, the
+// shared fixture in update_mouse_toggle_test.go) so the real dispatch order
+// is exercised, not just handleExplorerKey in isolation.
+func TestWhichKeyLeader_MouseToggleKeyDisarms(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+	m := whichKeyTestModel()
+	m.mouseAvailable = true
+
+	armedOut, _ := m.handleExplorerKey(spaceKey())
+	armed := armedOut.(Model)
+	if !armed.whichKey.armed {
+		t.Fatal("precondition: space must arm the leader")
+	}
+
+	out, _ := armed.handleKey(mouseToggleKey)
+	got := out.(Model)
+	if got.whichKey.armed || got.whichKey.shown {
+		t.Fatal("IMPORTANT-5: the mouse-capture toggle key must close the leader")
+	}
+}
+
+// TestWhichKeyLeader_MouseInputDisarms is the other half of IMPORTANT-5:
+// actual mouse events (clicks, scroll) never reach any key-based disarm
+// guard at all, since they arrive as tea.MouseMsg, not tea.KeyPressMsg — the
+// leader stayed armed and overlaid while the user scrolled or clicked.
+func TestWhichKeyLeader_MouseInputDisarms(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+	m := whichKeyTestModel()
+
+	armedOut, _ := m.handleExplorerKey(spaceKey())
+	armed := armedOut.(Model)
+	if !armed.whichKey.armed {
+		t.Fatal("precondition: space must arm the leader")
+	}
+
+	out, _ := armed.handleMouse(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	got := out.(Model)
+	if got.whichKey.armed || got.whichKey.shown {
+		t.Fatal("IMPORTANT-5: mouse input must close the leader")
+	}
+}
+
+// TestWhichKeyLeaderPage_IndicatorAlwaysShownWhenMultiplePages guards the
+// other half of IMPORTANT-3: once entries are reachable via splitting
+// (rather than dropped into "+N more"), every page of a multi-page panel
+// must show its page indicator — the whole point of paging is defeated if
+// the user can't tell there's more to see.
+func TestWhichKeyLeaderPage_IndicatorAlwaysShownWhenMultiplePages(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 14
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	_, _, count := m.whichKeyLeaderPage()
+	if count < 2 {
+		t.Fatalf("test assumes multiple pages at 80x14; got %d", count)
+	}
+	for p := range count {
+		m.whichKey.page = p
+		bg := strings.Repeat("\n", m.height)
+		out := stripANSI(m.renderWhichKeyLeader(bg))
+		want := fmt.Sprintf("(%d/%d)", p+1, count)
+		if !strings.Contains(out, want) {
+			t.Errorf("IMPORTANT-3: page %d/%d missing its indicator %q:\n%s", p+1, count, want, out)
+		}
+	}
+}
+
+// TestWhichKeyLeaderPage_NoIndicatorOnSinglePage is a review round 1 minor:
+// a single-page panel has nothing to page to, so "(1/1)" would falsely
+// promise more content than exists.
+func TestWhichKeyLeaderPage_NoIndicatorOnSinglePage(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := whichKeyTestModel()
+	m.width, m.height = 220, 220 // plenty of room for the whole catalog on one page
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	_, _, count := m.whichKeyLeaderPage()
+	if count != 1 {
+		t.Fatalf("test assumes a single page at 220x220; got %d", count)
+	}
+	bg := strings.Repeat("\n", m.height)
+	out := stripANSI(m.renderWhichKeyLeader(bg))
+	if strings.Contains(out, "(1/1)") {
+		t.Fatalf("a single page must not show a page indicator:\n%s", out)
 	}
 }

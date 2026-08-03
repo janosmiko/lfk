@@ -100,7 +100,7 @@
     },
     "which_key_enabled": {
       "type": "boolean",
-      "description": "Show the which-key popup while a chord prefix (g) is pending. Chords still work when false.",
+      "description": "Show the which-key popup while a chord prefix (g) is pending, and the space-leader action panel while space is armed. Both still work when false.",
       "default": true
     },
     "which_key_delay_ms": {

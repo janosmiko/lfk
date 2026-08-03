@@ -384,10 +384,15 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
 	}
 
-	// While the space leader is armed, its hotkeys replace the normal explorer
-	// hints — CLAUDE.md's convention keeps hotkey text in the hint bar, never
-	// inside the panel box, so the panel itself only shows the page indicator.
-	if m.whichKey.armed {
+	// While the space-leader panel is actually visible, its hotkeys replace
+	// the normal explorer hints — CLAUDE.md's convention keeps hotkey text in
+	// the hint bar, never inside the panel box, so the panel itself only
+	// shows the page indicator. Gated on shown, not armed (IMPORTANT-4,
+	// review round 1): armed alone is true for the whole delay window on
+	// every ordinary multi-select press, and gating on it replaced the
+	// selected-count/sort/position chips for that entire window even though
+	// the panel itself was still invisible.
+	if m.whichKey.shown {
 		hint := m.renderHints([]ui.HintEntry{
 			{Key: "space", Desc: "more"},
 			{Key: "esc", Desc: "close"},
