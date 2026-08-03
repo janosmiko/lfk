@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"charm.land/bubbles/v2/textinput"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -569,4 +570,51 @@ func TestRenderRightColumnSplitPreviewWithEvents(t *testing.T) {
 	}
 	result := m.renderRightColumn(80, 30)
 	assert.NotEmpty(t, result)
+}
+
+// The exec pane must fill the terminal exactly: the hint bar is the last line,
+// with no blank row under it. lipgloss v2 counts the border rows inside
+// Height(), so the pre-v2 arithmetic left the pane two rows short.
+func TestViewExecFillsTerminalHeight(t *testing.T) {
+	for _, tc := range []struct{ w, h, tabs int }{
+		{80, 30, 1}, {120, 40, 1}, {100, 24, 1}, {80, 30, 2},
+	} {
+		t.Run(fmt.Sprintf("%dx%d_%dtabs", tc.w, tc.h, tc.tabs), func(t *testing.T) {
+			m := Model{
+				width: tc.w, height: tc.h, mode: modeExec,
+				execTitle: "Exec: my-pod", tabs: make([]TabState, tc.tabs),
+			}
+			out := m.View().Content
+			assert.Equal(t, tc.h, lipgloss.Height(out),
+				"exec view must fill the terminal exactly")
+
+			lines := strings.Split(out, "\n")
+			assert.NotEmpty(t, strings.TrimSpace(stripANSI(lines[len(lines)-1])),
+				"the last line must be the hint bar, not a blank row")
+		})
+	}
+}
+
+// Every fullscreen mode must fill the terminal exactly. This guards the whole
+// family against the lipgloss v2 Width/Height semantics change, where the
+// border is counted inside the requested size rather than added around it.
+func TestFullscreenModesFillTerminalHeight(t *testing.T) {
+	modes := map[string]viewMode{
+		"exec": modeExec, "yaml": modeYAML, "logs": modeLogs,
+		"describe": modeDescribe, "diff": modeDiff, "explain": modeExplain,
+		"eventViewer": modeEventViewer, "objectExplorer": modeObjectExplorer,
+		"logTop": modeLogTop,
+	}
+	for name, mode := range modes {
+		t.Run(name, func(t *testing.T) {
+			for _, tc := range []struct{ w, h int }{{100, 30}, {80, 24}} {
+				m := Model{
+					width: tc.w, height: tc.h, mode: mode,
+					execTitle: "x", tabs: []TabState{{}},
+				}
+				assert.Equal(t, tc.h, lipgloss.Height(m.View().Content),
+					"%s at %dx%d must fill the terminal height", name, tc.w, tc.h)
+			}
+		})
+	}
 }
