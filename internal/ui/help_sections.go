@@ -14,6 +14,33 @@ func helpSections() []helpSection {
 	return append(sections, viewerHelpSections(kb)...)
 }
 
+// HelpRow is one rendered help row reduced to the two facts a cross-surface
+// consistency check needs: the section that drew it and the raw key string
+// the row advertises.
+type HelpRow struct {
+	Section string
+	Key     string
+}
+
+// ExplorerHelpRows returns every context-free (explorer) help row, in catalog
+// order. Exported for the app layer's group-alignment guard: the which-key
+// registry lives in package app and cannot reach into this package's
+// unexported catalog, so the two surfaces would otherwise have no way to be
+// compared in a test. Per-view sections are omitted — they carry a context
+// and have no which-key counterpart by design.
+func ExplorerHelpRows() []HelpRow {
+	var rows []HelpRow
+	for _, s := range helpSections() {
+		if s.context != "" {
+			continue
+		}
+		for _, b := range s.bindings {
+			rows = append(rows, HelpRow{Section: s.title, Key: b.key})
+		}
+	}
+	return rows
+}
+
 // explorerHelpSections lists the sections shown in the explorer (main)
 // view — the ones with an empty context — plus the context-free tail
 // (tabs, mouse, help, general).
