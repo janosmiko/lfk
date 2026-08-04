@@ -54,27 +54,66 @@ func BuildHelpLines(filter, contextMode string, screenWidth int) []string {
 	return out
 }
 
+// Overlay box geometry. The percentages and the 50x20 floors are the
+// long-standing sizing; the clamps against the terminal are what stop that
+// floor from producing an overlay LARGER than the screen it sits in.
+const (
+	helpBoxPctW   = 70 // percent of the terminal width
+	helpBoxPctH   = 80 // percent of the terminal height
+	helpBoxFloorW = 50 // smallest comfortable box, when the terminal allows it
+	helpBoxFloorH = 20
+	helpBoxFrame  = 2 // border; lipgloss counts it inside Width()/Height()
+	// helpBoxHardW / helpBoxHardH are the irreducible box: 22 columns is what
+	// the widest fixed string in the chrome ("  ↓ more below") needs before it
+	// wraps and starts adding rows, and 9 rows is the chrome plus a single
+	// help line. A terminal smaller than these plus the border cannot be
+	// satisfied by any clamp.
+	helpBoxHardW   = 22
+	helpBoxHardH   = 9
+	helpBoxChromeW = 8 // per row: inner border + both padding pairs
+	// helpBoxChromeH is every row of the box that never holds a help line:
+	// the outer vertical padding (2), the title, the inner panel's border
+	// (2), the two scroll-indicator rows, and one row of slack the box keeps
+	// so filtering to a short result set doesn't collapse it.
+	helpBoxChromeH = 8
+)
+
+// helpBoxWidth returns the overlay box width for a terminal this wide: the
+// usual percentage-with-a-floor, clamped so the box (plus its border) can
+// never be wider than the terminal. The clamp is a no-op at any normal size —
+// the percentage is always under screenWidth-2, so only the 50-column floor
+// can overflow, and only below ~52 columns.
+func helpBoxWidth(screenWidth int) int {
+	w := max(screenWidth*helpBoxPctW/100, helpBoxFloorW)
+	return max(min(w, screenWidth-helpBoxFrame), helpBoxHardW)
+}
+
+// helpBoxHeight is helpBoxWidth's vertical counterpart; its floor overflows
+// below ~22 rows.
+func helpBoxHeight(screenHeight int) int {
+	h := max(screenHeight*helpBoxPctH/100, helpBoxFloorH)
+	return max(min(h, screenHeight-helpBoxFrame), helpBoxHardH)
+}
+
 // helpInnerWidth returns the content width (in cells) available for a
 // single help row at the given screen width. Mirrors the boxW / contentW
 // arithmetic in RenderHelpScreen so buildHelpSpecs wraps descriptions to
 // the exact width the renderer will display — keeping the wrapped row set
 // (and therefore the search-match indices) identical on both paths.
 func helpInnerWidth(screenWidth int) int {
-	boxW := max(screenWidth*70/100, 50)
-	contentW := boxW - 6 // border + padding
-	return max(contentW-2, 10)
+	return max(helpBoxWidth(screenWidth)-helpBoxChromeW, 10)
 }
 
 // HelpVisibleLines returns the number of help-content rows that fit
 // inside the overlay box for a given screen height. Mirrors the same
-// boxH / maxLines / visibleLines arithmetic RenderHelpScreen uses, so
-// callers (clamp helpers, scroll-to-match positioning) compute the
-// same maxScroll the renderer enforces.
+// boxH arithmetic RenderHelpScreen uses, so callers (clamp helpers,
+// scroll-to-match positioning) compute the same maxScroll the renderer
+// enforces.
+//
+// The row budget follows the CLAMPED box, so a short terminal shrinks the
+// visible window instead of drawing a box taller than the screen.
 func HelpVisibleLines(screenHeight int) int {
-	boxH := max(screenHeight*80/100, 20)
-	maxLines := max(boxH-6, 5)
-	visibleLines := max(maxLines-2, 1)
-	return visibleLines
+	return max(helpBoxHeight(screenHeight)-helpBoxChromeH, 1)
 }
 
 // helpLineKind labels each logical row in the help screen so the
@@ -470,12 +509,12 @@ func helpSpecStyled(s helpLineSpec, search string, isCurrent bool) string {
 // there's no active navigation. contextMode limits sections to the
 // current view (empty = explorer).
 func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, contextMode string, currentMatchLine int) string {
-	boxW := max(screenWidth*70/100, 50)
+	boxW := helpBoxWidth(screenWidth)
 	// Mirror HelpVisibleLines so outer height stays in sync with the
 	// inner row budget — lipgloss pads short content to this height,
 	// stopping the box from shrinking when filter narrows results or
 	// from growing when long lines wrap.
-	boxH := max(screenHeight*80/100, 20)
+	boxH := helpBoxHeight(screenHeight)
 
 	contentW := boxW - 6 // account for border + padding
 

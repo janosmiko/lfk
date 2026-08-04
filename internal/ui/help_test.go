@@ -575,21 +575,54 @@ func TestHelpKeySymbols_MouseProseStaysTextual(t *testing.T) {
 // A search for a named key's word must still find its row even though the
 // key column now draws an icon: the search index (keyText) stays textual
 // while only the rendered key column (key) draws the symbol.
+//
+// Every key the active icon table substitutes is queried, driven off the
+// table itself rather than a hardcoded list — a hardcoded {backspace, tab,
+// left} left "space", "enter", "esc" and three of the four arrows unguarded,
+// and would not have covered a newly added glyph at all. A named key with no
+// row in the catalog is skipped (verified against the textual baseline, so
+// the skip can never hide a genuine icon-mode regression).
 func TestBuildHelpLines_NamedKeyQueryMatchesIconRenderedRows(t *testing.T) {
 	originalIcons := IconMode
 	t.Cleanup(func() { IconMode = originalIcons })
 
+	countMatches := func(query string) int {
+		n := 0
+		for _, line := range BuildHelpLines("", "", 160) {
+			if MatchLine(line, query) {
+				n++
+			}
+		}
+		return n
+	}
+
+	// Baseline: the same queries against the textual (non-icon) rendering.
+	IconMode = "simple"
+	baseline := map[string]int{}
+	for _, names := range []map[string]string{nerdKeyGlyphs, unicodeKeyGlyphs} {
+		for name := range names {
+			baseline[name] = countMatches(name)
+		}
+	}
+	covered := 0
+	for _, n := range baseline {
+		if n > 0 {
+			covered++
+		}
+	}
+	assert.GreaterOrEqual(t, covered, 7,
+		"precondition: most substituted key names must appear in the catalog, else this test guards nothing")
+
 	for _, icons := range []string{"nerdfont", "unicode"} {
 		IconMode = icons
-		for _, query := range []string{"backspace", "tab", "left"} {
-			t.Run(icons+"/"+query, func(t *testing.T) {
-				var matched []string
-				for _, line := range BuildHelpLines("", "", 160) {
-					if MatchLine(line, query) {
-						matched = append(matched, line)
-					}
-				}
-				assert.NotEmptyf(t, matched, "a %q search must still find its row in %s mode", query, icons)
+		_, names, _ := keyGlyphs()
+		for name := range names {
+			if baseline[name] == 0 {
+				continue // no catalog row uses this key at all
+			}
+			t.Run(icons+"/"+name, func(t *testing.T) {
+				assert.Equalf(t, baseline[name], countMatches(name),
+					"a %q search must find the same rows in %s mode as in textual mode", name, icons)
 			})
 		}
 	}
@@ -790,4 +823,55 @@ func TestHelpKeySymbols_DottedSeparatorSurvivesNoColor(t *testing.T) {
 	IconMode = "unicode"
 
 	assert.Equal(t, "h · Left", helpKeySymbols("h/Left"))
+}
+
+// TestRenderHelpScreen_NeverExceedsTheTerminal is the help screen's mirror of
+// the which-key geometry sweep. The box is 70%/80% of the terminal with 50x20
+// floors, and those floors used to be unclamped: any terminal under ~52
+// columns or ~22 rows got a help overlay LARGER than the terminal it was
+// drawn into. Sweeps small widths and heights and asserts the rendered
+// overlay fits.
+//
+// helpBoxHardW/helpBoxHardH are the irreducible box (title, two scroll
+// indicators, two borders, two padding pairs, one help line), so terminals
+// below 14 columns or 10 rows cannot be satisfied by any clamp and are
+// excluded rather than pretended about.
+func TestRenderHelpScreen_NeverExceedsTheTerminal(t *testing.T) {
+	for w := helpBoxHardW + helpBoxFrame; w <= 90; w += 3 {
+		for h := helpBoxHardH + helpBoxFrame; h <= 40; h += 3 {
+			out := RenderHelpScreen(w, h, 0, "", "", "", -1)
+			gotW := lipgloss.Width(out)
+			gotH := len(strings.Split(out, "\n"))
+			assert.LessOrEqualf(t, gotW, w, "help overlay is %d columns wide in a %dx%d terminal", gotW, w, h)
+			assert.LessOrEqualf(t, gotH, h, "help overlay is %d rows tall in a %dx%d terminal", gotH, w, h)
+		}
+	}
+}
+
+// The clamp must not change the help screen at the sizes people actually use:
+// these are the exact dimensions the overlay rendered at before it was added.
+func TestRenderHelpScreen_SizeUnchangedAtNormalTerminals(t *testing.T) {
+	cases := []struct{ termW, termH, wantW, wantH int }{
+		{80, 24, 58, 22},
+		{100, 30, 72, 26},
+		{120, 40, 86, 34},
+		{200, 50, 142, 42},
+	}
+	for _, tc := range cases {
+		out := RenderHelpScreen(tc.termW, tc.termH, 0, "", "", "", -1)
+		assert.Equalf(t, tc.wantW, lipgloss.Width(out), "help overlay width at %dx%d", tc.termW, tc.termH)
+		assert.Equalf(t, tc.wantH, len(strings.Split(out, "\n")), "help overlay height at %dx%d", tc.termW, tc.termH)
+	}
+}
+
+// HelpVisibleLines drives the app-layer scroll clamps, so it must agree with
+// the box the renderer actually draws — including once the terminal clamp
+// starts biting.
+func TestHelpVisibleLines_MatchesTheRenderedBox(t *testing.T) {
+	for h := helpBoxHardH + helpBoxFrame; h <= 45; h++ {
+		out := RenderHelpScreen(80, h, 0, "", "", "", -1)
+		gotH := len(strings.Split(out, "\n"))
+		assert.Equalf(t, HelpVisibleLines(h)+helpBoxChromeH+helpBoxFrame, gotH,
+			"visible-line budget and rendered height disagree at height %d", h)
+	}
 }
