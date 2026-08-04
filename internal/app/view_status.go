@@ -406,14 +406,18 @@ func (m Model) statusBar() string {
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
-// leaderOrExplorerHints returns the leader's own hints while its panel is
-// visible, and the normal explorer keymap otherwise. Only the LEFT half of the
-// bar swaps, so the chip group (sort, selected count, position, filter preset)
-// keeps rendering underneath the panel — the panel covers rows, not the bar.
+// leaderOrExplorerHints returns whichever which-key popup's own hints while
+// it is visible, and the normal explorer keymap otherwise. Only the LEFT half
+// of the bar swaps, so the chip group (sort, selected count, position, filter
+// preset) keeps rendering underneath the panel — the panel covers rows, not
+// the bar.
 //
-// Gated on armed AND shown, not on shown alone: the g-prefix goto popup shares
-// whichKeyState and swallows the leader key as an unregistered chord, so
-// advertising "?: more" there would promise paging that cannot happen.
+// Two popups share whichKeyState (armed/shown) but are otherwise independent:
+// the leader panel (m.whichKey.armed) and the g-prefix goto popup
+// (m.pendingG, which never sets armed). Each is gated on its own arm flag AND
+// shown, not on shown alone — with a configured reveal delay the popup isn't
+// drawn yet, and flipping the bar for an invisible popup would drop the
+// chip group and the real keymap for nothing on screen to show for it.
 // explorerHelpHintKey names the key the explorer hint bar advertises as "help".
 // While the which-key leader is armed-able it claims that slot: pressing it
 // opens the contextual action panel, which itself lists the full help screen's
@@ -426,15 +430,26 @@ func explorerHelpHintKey(kb ui.Keybindings) string {
 	return kb.Help
 }
 
-// The scroll hint appears only when the panel actually overflows, the way
-// which-key.nvim conditions its own "<c-d>/<c-u> scroll" help entry
-// (view.lua:447-449).
 func (m Model) leaderOrExplorerHints() []ui.HintEntry {
-	if !m.whichKey.armed || !m.whichKey.shown {
+	switch {
+	case m.pendingG && m.whichKey.shown:
+		return m.whichKeyPopupHints(m.whichKeyCells())
+	case m.whichKey.armed && m.whichKey.shown:
+		return m.whichKeyPopupHints(m.whichKeyLeaderCells())
+	default:
 		return m.explorerHintEntries()
 	}
+}
+
+// whichKeyPopupHints builds the hint pair a which-key-style popup actually
+// honours while shown: the scroll keys, but only when cells overflow the
+// viewport (the way which-key.nvim conditions its own "<c-d>/<c-u> scroll"
+// help entry, view.lua:447-449), and esc to close. Shared by the leader panel
+// and the g-prefix goto popup — both close the same way via
+// disarmWhichKeyLeader/handleGotoChord and neither pages beyond this.
+func (m Model) whichKeyPopupHints(cells []whichKeyCell) []ui.HintEntry {
 	hints := make([]ui.HintEntry, 0, 2)
-	if lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells()); ok && lay.maxScroll > 0 {
+	if lay, ok := m.whichKeyLayoutFor(cells); ok && lay.maxScroll > 0 {
 		kb := ui.ActiveKeybindings
 		hints = append(hints, ui.HintEntry{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"})
 	}
