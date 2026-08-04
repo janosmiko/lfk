@@ -48,8 +48,32 @@ func fillWhichKeyDisplay(cells []whichKeyCell) {
 // layout.width = {min = 20}, layout.spacing = 3, win.padding = {1, 2},
 // win.height = {min = 4, max = 25}.
 const (
-	whichKeySpacing = 3  // Config.layout.spacing
-	whichKeyMinColW = 20 // Config.layout.width.min
+	whichKeySpacing = 3 // Config.layout.spacing
+	// whichKeyMinColW is Config.layout.width.min, recalibrated for lfk's own
+	// catalog rather than left at neovim's literal 20. In which-key.nvim the
+	// min never actually binds: its labels ("Paste before from system
+	// clipboard to previous line") run to ~50 columns, so content width alone
+	// keeps column counts low. lfk's labels are terse ("Refresh view",
+	// "Delete") - the widest entry in the explorer catalog is ~25 columns -
+	// so the same min=20 never bound here either, and the grid packed as many
+	// narrow columns as the terminal allowed (9 at 250 columns, vs neovim's
+	// 4). 30 is set above that ~25-column ceiling so it actually drives
+	// box_width the way neovim's min conceptually does, while still leaving
+	// 2 columns at an 80-wide terminal (see whichKeyMaxCols for the wide end,
+	// where even 30 alone still packs more columns than neovim's proportions
+	// - verified empirically against real terminal widths, not guessed).
+	whichKeyMinColW = 30
+	// whichKeyMaxCols ceilings the column count on wide terminals. The width-
+	// driven formula alone (box_count = container / (box_width + spacing))
+	// keeps adding columns as the container grows, since lfk's boosted
+	// whichKeyMinColW is still narrow enough that a 250-column terminal fits
+	// 7+ of them. Neither which-key.nvim nor its config exposes an
+	// equivalent knob - its long labels make one unnecessary - but lfk's
+	// short ones need it to stop the panel from going wide-and-flat instead
+	// of tall-and-narrow. 4 was chosen empirically: it matches neovim's
+	// observed ~4-column layout at ~250 columns while leaving whichKeyMinColW
+	// as the sole driver (never binding) at 160 columns and below.
+	whichKeyMaxCols = 4
 	whichKeyMinRows = 4  // Config.win.height.min
 	whichKeyMaxRows = 25 // Config.win.height.max
 	whichKeyPadV    = 1  // Config.win.padding[1]
@@ -95,6 +119,12 @@ type whichKeyGrid struct {
 // which-key.nvim's extra `max(box_height, 2)` floor is deliberately dropped:
 // there it keeps the popup window from being a single line tall, a job
 // whichKeyMinRows already does here.
+//
+// One clamp is added that neovim's own arithmetic doesn't have:
+// whichKeyMaxCols, applied to box_count right after it is derived from the
+// container and before box_width is recomputed. See whichKeyMaxCols for why -
+// short-label content defeats the width-driven column limit at wide
+// terminals in a way neovim's own long-label catalog never triggers.
 func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	maxRow := 0
 	for _, c := range cells {
@@ -102,6 +132,7 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	}
 	boxW := min(max(maxRow, whichKeyMinColW), max(container, 1))
 	boxN := max(container/(boxW+whichKeySpacing), 1)
+	boxN = min(boxN, whichKeyMaxCols)
 	boxW = max(container/boxN, 1)
 
 	g := whichKeyGrid{boxW: boxW, boxN: boxN}

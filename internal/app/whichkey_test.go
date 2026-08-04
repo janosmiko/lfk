@@ -222,14 +222,14 @@ func wkGridCells(n, descLen int) []whichKeyCell {
 // widest sizing plus gap-spreading is what read as ragged.
 func TestWhichKeyGridFor(t *testing.T) {
 	// max_row_width = 1 (key) + 1 (the single gap) + 20 = 22.
-	// box_width = clamp(22, 20, 100) = 22; box_count = floor(100/(22+3)) = 4;
-	// box_width = floor(100/4) = 25.
+	// box_width = clamp(22, 30, 100) = 30; box_count = floor(100/(30+3)) = 3;
+	// box_width = floor(100/3) = 33.
 	g := whichKeyGridFor(wkGridCells(15, 20), 100)
-	if g.boxN != 4 || g.boxW != 25 {
-		t.Fatalf("container 100: got box_count=%d box_width=%d, want 4 and 25", g.boxN, g.boxW)
+	if g.boxN != 3 || g.boxW != 33 {
+		t.Fatalf("container 100: got box_count=%d box_width=%d, want 3 and 33", g.boxN, g.boxW)
 	}
-	if g.rowN != 4 {
-		t.Fatalf("15 entries over 4 columns must be 4 rows, got %d", g.rowN)
+	if g.rowN != 5 {
+		t.Fatalf("15 entries over 3 columns must be 5 rows, got %d", g.rowN)
 	}
 
 	// Even division: the columns fill the container with less than one column
@@ -246,8 +246,8 @@ func TestWhichKeyGridFor(t *testing.T) {
 
 	// layout.width.min floors the column width, so tiny entries still get
 	// readable columns rather than a dozen sliver ones.
-	if g := whichKeyGridFor(wkGridCells(15, 1), 100); g.boxN != 4 {
-		t.Fatalf("min column width must cap the column count at 4, got %d (box_width=%d)", g.boxN, g.boxW)
+	if g := whichKeyGridFor(wkGridCells(15, 1), 100); g.boxN != 3 {
+		t.Fatalf("min column width must cap the column count at 3, got %d (box_width=%d)", g.boxN, g.boxW)
 	}
 
 	// A container narrower than one column collapses to a single column
@@ -258,6 +258,24 @@ func TestWhichKeyGridFor(t *testing.T) {
 	}
 	if g.descW[0] < 0 || g.keyW[0] < 1 {
 		t.Fatalf("narrow container produced an unusable cell: keyW=%d descW=%d", g.keyW[0], g.descW[0])
+	}
+}
+
+// TestWhichKeyGridFor_MaxColsCapsWideContainers pins whichKeyMaxCols: with
+// entries well under whichKeyMinColW, the width-driven formula alone would
+// still pack a lot of columns into a very wide container (e.g. 7 at a
+// 244-column container, the container a 250-column terminal produces) -
+// exactly the "9 narrow columns, 5 rows" regression this task fixes. The
+// ceiling caps it at whichKeyMaxCols regardless of how much width is left
+// over, and the leftover width goes to widening the columns rather than
+// adding more of them.
+func TestWhichKeyGridFor_MaxColsCapsWideContainers(t *testing.T) {
+	g := whichKeyGridFor(wkGridCells(50, 20), 244)
+	if g.boxN != whichKeyMaxCols {
+		t.Fatalf("wide container: got box_count=%d, want the max-cols ceiling %d", g.boxN, whichKeyMaxCols)
+	}
+	if want := 244 / whichKeyMaxCols; g.boxW != want {
+		t.Fatalf("wide container: got box_width=%d, want %d (container/max-cols)", g.boxW, want)
 	}
 }
 
@@ -274,15 +292,18 @@ func TestWhichKeyGridFor_KeyFieldIsPerColumn(t *testing.T) {
 		t.Run(icons, func(t *testing.T) {
 			restoreWhichKeyGlobals(t)
 			ui.IconMode = icons
-			// container 60 -> box_width 30, box_count 2, so 4 entries fill 2 rows
-			// x 2 columns column-major: d/e in column 0, ctrl+alt+y/x in column 1.
+			// container 70 -> box_width clamps to whichKeyMinColW (30) in both
+			// icon modes (the widest entry, "ctrl+alt+y Mouse capture", stays
+			// under 30 columns even spelled out), box_count 2, so 4 entries
+			// fill 2 rows x 2 columns column-major: d/e in column 0,
+			// ctrl+alt+y/x in column 1.
 			cells := []whichKeyCell{
 				{key: "d", desc: "Delete"},
 				{key: "e", desc: "Edit"},
 				{key: "ctrl+alt+y", desc: "Mouse capture"},
 				{key: "x", desc: "Exec"},
 			}
-			g := whichKeyGridFor(cells, 60)
+			g := whichKeyGridFor(cells, 70)
 			if g.boxN != 2 || g.rowN != 2 {
 				t.Fatalf("precondition: want a 2x2 grid, got box_count=%d rows=%d", g.boxN, g.rowN)
 			}

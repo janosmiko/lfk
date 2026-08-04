@@ -272,7 +272,7 @@ func TestRenderWhichKeyPanel_SymbolsNeverExceedTerminalWidth(t *testing.T) {
 
 	for _, icons := range []string{"unicode", "nerdfont", "simple", "none"} {
 		ui.IconMode = icons
-		for _, size := range [][2]int{{20, 12}, {40, 16}, {80, 24}, {120, 40}} {
+		for _, size := range [][2]int{{20, 12}, {40, 16}, {80, 24}, {120, 40}, {200, 40}, {250, 40}} {
 			m := whichKeyTestModel()
 			m.width, m.height = size[0], size[1]
 			cells := m.whichKeyLeaderCells()
