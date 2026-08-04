@@ -945,6 +945,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `[` | Previous tab |
 | `}` | Move current tab right (shift+]) |
 | `{` | Move current tab left (shift+[) |
+| `Ctrl+C` | Close current tab (quit if last tab) |
 
 ## Read-Only Mode
 
@@ -1100,7 +1101,6 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 | `T` | Switch color scheme |
 | `q` | Quit application (with confirmation) |
 | `Esc` | Go back one level / close overlay / quit |
-| `Ctrl+C` | Close current tab (quit if last tab) |
 
 ## Action Menu Items
 

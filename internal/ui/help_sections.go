@@ -211,6 +211,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.NextTab, "Next tab"},
 				{kb.MoveTabLeft, "Move tab left"},
 				{kb.MoveTabRight, "Move tab right"},
+				{"ctrl+c", "Close tab (quit if last)"},
 			},
 		},
 		{
@@ -244,7 +245,6 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 			bindings: []helpEntry{
 				{"q", "Quit (with confirmation)"},
 				{"esc", "Go back / quit"},
-				{"ctrl+c", "Close tab (quit if last)"},
 			},
 		},
 	}
