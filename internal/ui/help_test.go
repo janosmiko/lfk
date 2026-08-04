@@ -305,6 +305,19 @@ func TestHelpSections_EveryEntryHasAKey(t *testing.T) {
 	}
 }
 
+// A description must not restate where the user already is. The Bookmarks
+// section once carried "(in overlay)" on six consecutive rows — the section
+// IS the overlay, so the parenthetical cost six rows of width and told the
+// reader nothing. The help screen is scanned for one row, not read as prose.
+func TestHelpSections_DescriptionsDoNotRestateTheirSection(t *testing.T) {
+	for _, section := range helpSections() {
+		for _, b := range section.bindings {
+			assert.NotContainsf(t, b.desc, "(in overlay)",
+				"section %q: %q restates the section's own scope", section.title, b.desc)
+		}
+	}
+}
+
 // --- right-aligned key column ---
 
 // Every entry row shares one key-column width, and the key sits flush
