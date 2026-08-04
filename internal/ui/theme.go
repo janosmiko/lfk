@@ -334,25 +334,28 @@ func ApplyTheme(t Theme) {
 		Bold(true).
 		Background(barBg)
 
-	// Which-key group accents. Five track the theme; Cyan has no Theme field
-	// (same special-purpose constant the age column uses), so it is the one
-	// that can sit badly on an unusually light Base — run it through the same
-	// contrast floor the theme colors got above when the user asked for one.
-	wkCyan := ColorCyan
+	// Which-key group accents, which tint the DESCRIPTION (the key keeps one
+	// accent throughout). Four track the theme; Cyan and Orange have no Theme
+	// field (the same special-purpose constants the age and usage columns use),
+	// so they are the ones that can sit badly on an unusually light Base — run
+	// them through the same contrast floor the theme colors got above when the
+	// user asked for one.
+	wkCyan, wkOrange := ColorCyan, ColorOrange
 	if ConfigMinContrastRatio > 0 {
 		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
+		wkOrange = EnforceMinContrast(wkOrange, t.Base, ConfigMinContrastRatio)
 	}
 	// No Background here (nor in theme_nocolor.go): the panel paints its own
 	// background per render from BaseBg, which also tracks the transparency
 	// setting, so baking one in would double-set it.
 	WhichKeyKeyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
 	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
-	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
-	WhichKeyViewsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Bold(true)
-	WhichKeyFilterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkCyan)).Bold(true)
-	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple)).Bold(true)
-	WhichKeySortStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning)).Bold(true)
-	WhichKeySettingsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true)
+	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary))
+	WhichKeyViewsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary))
+	WhichKeyFilterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkCyan))
+	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple))
+	WhichKeySortStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning))
+	WhichKeySettingsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkOrange))
 
 	ErrorStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Error)).

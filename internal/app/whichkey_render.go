@@ -11,18 +11,18 @@ import (
 type whichKeyCell struct {
 	key  string // continuation after the prefix, e.g. "p" for "gp"
 	desc string
-	// group tints the key so the flat, header-less list still says which
-	// family an entry belongs to. Empty for the g-prefix goto popup, whose
-	// entries are all the same kind of thing.
+	// group tints the description so the flat, header-less list still says
+	// which family an entry belongs to. Empty for the g-prefix goto popup,
+	// whose entries are all the same kind of thing.
 	group whichKeyGroup
 	// disp is the key as drawn, resolved once per build by fillWhichKeyDisplay.
 	disp string
 }
 
-// keyText is the key as drawn: modifier chords become symbols ("ctrl+d" ->
-// "⌃D") when the icon mode allows glyphs, and stay verbatim otherwise. Every
-// width measurement and every write goes through this, so the grid arithmetic
-// sees exactly what lands on screen.
+// keyText is the key as drawn: chords and unprintable keys become glyphs
+// ("ctrl+d" -> "⌃D", "space" -> "␣") when the icon mode allows them, and stay
+// verbatim otherwise. Every width measurement and every write goes through
+// this, so the grid arithmetic sees exactly what lands on screen.
 func (c whichKeyCell) keyText() string {
 	if c.disp != "" {
 		return c.disp
@@ -149,12 +149,12 @@ func wkPad(n int) string {
 	}
 }
 
-// whichKeyCellStyles are the per-render constants a cell needs: the shared
-// description style, the ungrouped key style, and one key style per registry
-// group. Resolved once per render rather than per cell.
+// whichKeyCellStyles are the per-render constants a cell needs: the shared key
+// style, the ungrouped description style, and one description style per
+// registry group. Resolved once per render rather than per cell.
 type whichKeyCellStyles struct {
-	key   lipgloss.Style // ungrouped fallback; the whole goto popup uses it
-	desc  lipgloss.Style
+	key   lipgloss.Style // uniform across every entry
+	desc  lipgloss.Style // ungrouped fallback; the whole goto popup uses it
 	group map[whichKeyGroup]lipgloss.Style
 }
 
@@ -163,14 +163,14 @@ func newWhichKeyCellStyles() whichKeyCellStyles {
 	return whichKeyCellStyles{key: key, desc: desc, group: whichKeyGroupStyles()}
 }
 
-// keyStyle picks the accent for a cell. An unknown or empty group falls back
+// descStyle picks the accent for a cell. An unknown or empty group falls back
 // to the ungrouped style, which is what keeps the g-prefix goto popup looking
 // exactly as it did before groups were colored.
-func (st whichKeyCellStyles) keyStyle(g whichKeyGroup) lipgloss.Style {
+func (st whichKeyCellStyles) descStyle(g whichKeyGroup) lipgloss.Style {
 	if s, ok := st.group[g]; ok {
 		return s
 	}
-	return st.key
+	return st.desc
 }
 
 // writeWhichKeyCell lays one entry out as which-key.nvim's two-column mini
@@ -184,7 +184,7 @@ func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, col
 	keyW, descW := g.keyW[col], g.descW[col]
 	key := ui.Truncate(c.keyText(), keyW)
 	sb.WriteString(wkPad(g.lead + max(keyW-lipgloss.Width(key), 0)))
-	sb.WriteString(st.keyStyle(c.group).Render(key))
+	sb.WriteString(st.key.Render(key))
 	if descW == 0 {
 		// No room for a label: the key alone is still worth showing.
 		sb.WriteString(wkPad(g.boxW - whichKeySpacing - keyW))
@@ -192,7 +192,7 @@ func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, col
 	}
 	desc := ui.Truncate(c.desc, descW)
 	sb.WriteString(wkPad(whichKeyGap))
-	sb.WriteString(st.desc.Render(desc))
+	sb.WriteString(st.descStyle(c.group).Render(desc))
 	sb.WriteString(wkPad(descW - lipgloss.Width(desc)))
 }
 
@@ -203,9 +203,10 @@ func whichKeyStyles() (key, desc lipgloss.Style) {
 	return ui.WhichKeyKeyStyle.Background(ui.BaseBg), ui.WhichKeyDescStyle.Background(ui.BaseBg)
 }
 
-// whichKeyGroupStyles maps each registry group to its key accent. Built per
-// render because the theme globals it reads are rebuilt by ApplyTheme, and a
-// package-level copy would freeze the panel at the startup theme.
+// whichKeyGroupStyles maps each registry group to its description accent.
+// Built per render because the theme globals it reads are rebuilt by
+// ApplyTheme, and a package-level copy would freeze the panel at the startup
+// theme.
 func whichKeyGroupStyles() map[whichKeyGroup]lipgloss.Style {
 	bg := ui.BaseBg
 	return map[whichKeyGroup]lipgloss.Style{

@@ -264,22 +264,27 @@ var (
 			Bold(true)
 
 	// Which-key panel. The panel draws one flat list with no section
-	// headers, so the key's color is the only thing left that says which
-	// family an entry belongs to. Red is deliberately unused: it is the
-	// app's failure/destructive signal, and the panel's most destructive
-	// entries (Delete, Force delete) live in the Actions group, where a red
-	// key would read as "this row failed" rather than "this is an action".
+	// headers, so the description's color is the only thing left that says
+	// which family an entry belongs to; the key keeps one accent throughout.
+	// Red is deliberately unused: it is the app's failure/destructive signal,
+	// and a red description reads as an error message rather than as a
+	// category — a risk the panel's most destructive entries (Delete, Force
+	// delete) would run head-first into.
 	//
-	// WhichKeyKeyStyle is the ungrouped default: the g-prefix goto popup has
-	// no groups and renders entirely through it.
+	// The group styles are not bold: bold is what marks the key, and six bold
+	// colored sentences per panel is noise, not emphasis.
+	//
+	// WhichKeyDescStyle is the ungrouped default: the g-prefix goto popup has
+	// no groups and renders entirely through it. No group may reuse its color,
+	// or that group loses its cue (TestWhichKeyGroupStyles_NeverMatchThePlainDescription).
 	WhichKeyKeyStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 	WhichKeyDescStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
-	WhichKeyActionsStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
-	WhichKeyViewsStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true)
-	WhichKeyFilterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorCyan)).Bold(true)
-	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Bold(true)
-	WhichKeySortStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning)).Bold(true)
-	WhichKeySettingsStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true)
+	WhichKeyActionsStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary))
+	WhichKeyViewsStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
+	WhichKeyFilterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorCyan))
+	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
+	WhichKeySortStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
+	WhichKeySettingsStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorOrange))
 
 	// Error style.
 	ErrorStyle = lipgloss.NewStyle().

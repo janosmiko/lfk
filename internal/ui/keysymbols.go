@@ -6,12 +6,10 @@ import (
 	"unicode/utf8"
 )
 
-// modifierSymbols are the glyphs a modifier is drawn as when the terminal is
-// expected to handle non-ASCII. Plain Unicode on purpose: neovim's which-key
-// defaults sit in the Nerd Font private-use area (U+F0634 and friends), which
-// renders as tofu for anyone without a patched font, while these codepoints
-// ship with every modern font and measure one cell wide
-// (TestKeyChordDisplay_SymbolsAreSingleWidth).
+// modifierSymbols are the glyphs a modifier is drawn as in the icon modes that
+// promise non-ASCII but not a patched font. Plain Unicode on purpose: these
+// codepoints ship with every modern font, where the Nerd Font keycaps below
+// render as tofu without one.
 //
 // "hyper" is deliberately absent: it has no settled symbol, and KeyChordDisplay
 // falls back to the textual chord rather than invent one.
@@ -21,6 +19,56 @@ var modifierSymbols = map[string]string{
 	"alt":   "⌥", // OPTION KEY
 	"meta":  "⌘", // PLACE OF INTEREST SIGN
 	"super": "⌘",
+}
+
+// nerdModifierGlyphs are which-key.nvim's own modifier glyphs (its
+// icons.keys C/S/M/D entries): Nerd Font Material Design Icons drawn as full
+// keycaps rather than the small arrowheads above. Reachable only in "nerdfont"
+// icon mode, which is exactly the mode that promises a patched font.
+var nerdModifierGlyphs = map[string]string{
+	"ctrl":  "\U000F0634", // md-apple-keyboard-control
+	"shift": "\U000F0636", // md-apple-keyboard-shift
+	"alt":   "\U000F0635", // md-apple-keyboard-option
+	"meta":  "\U000F0633", // md-apple-keyboard-command
+	"super": "\U000F0633",
+}
+
+// nerdKeyGlyphs replaces the spelled-out name of a key that prints nothing with
+// which-key.nvim's keycap for it. Keys whose name already reads as a key
+// ("left", "pgup", "f1") stay textual: a glyph there trades a legible word for
+// a lookup.
+var nerdKeyGlyphs = map[string]string{
+	"space":     "\U000F1050", // md-keyboard-space
+	"tab":       "\U000F0312", // md-keyboard-tab
+	"enter":     "\U000F0311", // md-keyboard-return
+	"esc":       "\U000F12B7", // md-keyboard-esc
+	"backspace": "\U000F006E", // md-backspace
+}
+
+// unicodeKeyGlyphs is the same substitution for the fonts that have no keycaps.
+// Only space qualifies: OPEN BOX is unmistakable, whereas ⇥ / ⏎ / ⎋ are small,
+// easily confused with each other, and lose to the words "tab", "enter", "esc".
+var unicodeKeyGlyphs = map[string]string{
+	"space": "␣", // OPEN BOX
+}
+
+// nerdGlyphPad separates a Nerd Font glyph from whatever the chord writes after
+// it. go-runewidth measures these private-use codepoints as one cell
+// (TestKeyGlyphs_AreSingleCell pins that), but the proportional Nerd Font
+// variants draw them wider than one cell, so the next character gets painted
+// over. which-key.nvim pads the same glyphs for the same reason. A glyph that
+// ENDS the chord is left unpadded: the panel already puts a space between a key
+// and its label, which is the same protection.
+const nerdGlyphPad = " "
+
+// keyGlyphs returns the substitution tables and the glyph padding for the
+// active icon mode. Splitting them here keeps KeyChordDisplay free of mode
+// branching in its loop.
+func keyGlyphs() (mods, names map[string]string, pad string) {
+	if IconMode == "nerdfont" {
+		return nerdModifierGlyphs, nerdKeyGlyphs, nerdGlyphPad
+	}
+	return modifierSymbols, unicodeKeyGlyphs, ""
 }
 
 // iconModeDrawsSymbols reports whether the active icon mode promises a terminal
@@ -63,33 +111,46 @@ func titleKeyName(last string) string {
 }
 
 // KeyChordDisplay renders a keybinding the way the which-key panel draws it:
-// "ctrl+shift+x" becomes "⌃⇧X" when the icon mode allows glyphs, and stays the
-// verbatim binding otherwise. Unmodified bindings ("d", "?", "f1") are returned
-// unchanged in every mode.
+// "ctrl+shift+x" becomes "󰘴 󰘶 X" in nerdfont mode and "⌃⇧X" in unicode mode,
+// "space" becomes the space keycap, and everything stays the verbatim binding
+// in the modes that promise only ASCII. Bindings with no glyph form ("d", "?",
+// "f1") are returned unchanged in every mode.
 //
 // No-color mode also keeps the textual form: it is the "this terminal is
 // minimal" switch users reach for, and a symbol carries no meaning at all in a
 // terminal that cannot draw it.
-// The which-key panel calls this for every entry on every frame, so the
+// The which-key panel calls this for every entry on every build, so the
 // overwhelmingly common unmodified binding must not even reach strings.Split
 // (which allocates a slice header per call), and the chord path writes straight
 // into one builder rather than through intermediate strings.
 func KeyChordDisplay(key string) string {
-	if strings.IndexByte(key, '+') < 0 || ConfigNoColor || !iconModeDrawsSymbols() {
+	if ConfigNoColor || !iconModeDrawsSymbols() {
 		return key
 	}
-	mods, last, ok := splitModifierChord(key)
+	mods, names, pad := keyGlyphs()
+	if strings.IndexByte(key, '+') < 0 {
+		if g, isNamed := names[key]; isNamed {
+			return g
+		}
+		return key
+	}
+	chord, last, ok := splitModifierChord(key)
 	if !ok {
 		return key
 	}
 	var sb strings.Builder
-	sb.Grow(len(mods)*3 + len(last))
-	for _, m := range mods {
-		sym, has := modifierSymbols[m]
+	sb.Grow(len(chord)*(4+len(pad)) + len(last))
+	for _, m := range chord {
+		sym, has := mods[m]
 		if !has {
 			return key
 		}
 		sb.WriteString(sym)
+		sb.WriteString(pad)
+	}
+	if g, isNamed := names[last]; isNamed {
+		sb.WriteString(g)
+		return sb.String()
 	}
 	r, size := utf8.DecodeRuneInString(last)
 	sb.WriteRune(unicode.ToUpper(r))

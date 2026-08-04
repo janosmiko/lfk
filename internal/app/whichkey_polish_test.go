@@ -23,7 +23,7 @@ func TestWhichKeyGroupStyles_EveryGroupHasADistinctAccent(t *testing.T) {
 	for _, g := range whichKeyGroupOrder() {
 		st, ok := styles[g]
 		if !ok {
-			t.Fatalf("group %q has no key style; whichKeyGroupStyles must cover whichKeyGroupOrder", g)
+			t.Fatalf("group %q has no description style; whichKeyGroupStyles must cover whichKeyGroupOrder", g)
 		}
 		fg := st.GetForeground()
 		if fg == nil {
@@ -37,8 +37,9 @@ func TestWhichKeyGroupStyles_EveryGroupHasADistinctAccent(t *testing.T) {
 	}
 }
 
-// Red is the app's failure/destructive signal and the panel's most destructive
-// entries sit in Actions, so no group may claim it.
+// Red is the app's failure/destructive signal, and the accent now sits on the
+// DESCRIPTION — a whole red sentence reads as an error message, not as a
+// category — so no group may claim it.
 func TestWhichKeyGroupStyles_NeverUseTheErrorColor(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ApplyTheme(ui.DefaultTheme())
@@ -46,6 +47,26 @@ func TestWhichKeyGroupStyles_NeverUseTheErrorColor(t *testing.T) {
 	for g, st := range whichKeyGroupStyles() {
 		if st.GetForeground() == bad {
 			t.Errorf("group %q uses the error color; red must stay reserved for failures", g)
+		}
+	}
+}
+
+// The ungrouped description style is the baseline every cell without a group
+// draws in, so a group that reuses its color has no cue at all — the exact
+// failure mode the accent moved onto the description to avoid (Settings used to
+// be the plain text color, which was distinct only while the accent sat on the
+// key). This is what keeps the goto-popup fallback below a real assertion
+// rather than a tautology.
+func TestWhichKeyGroupStyles_NeverMatchThePlainDescription(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ApplyTheme(ui.DefaultTheme())
+	plain := newWhichKeyCellStyles().desc.GetForeground()
+	if plain == nil {
+		t.Fatal("precondition: the ungrouped description must have a foreground to compare against")
+	}
+	for g, st := range whichKeyGroupStyles() {
+		if st.GetForeground() == plain {
+			t.Errorf("group %q renders in the ungrouped description color %v; it has no category cue", g, plain)
 		}
 	}
 }
@@ -64,9 +85,15 @@ func TestWhichKeyLeaderCells_CarryTheCatalogGroup(t *testing.T) {
 		byKey[a.Key(kb)] = a.Group
 	}
 	groups := map[whichKeyGroup]bool{}
+	st := newWhichKeyCellStyles()
 	for _, c := range m.whichKeyLeaderCells() {
 		if c.group == "" {
 			t.Errorf("leader entry %q (%s) lost its group", c.key, c.desc)
+		}
+		// The key is uniform now, so the group must reach the DESCRIPTION or it
+		// reaches nothing.
+		if st.descStyle(c.group).Render(c.desc) == st.desc.Render(c.desc) {
+			t.Errorf("leader entry %q (%s) draws its description in the ungrouped style", c.key, c.desc)
 		}
 		groups[c.group] = true
 	}
@@ -76,11 +103,12 @@ func TestWhichKeyLeaderCells_CarryTheCatalogGroup(t *testing.T) {
 }
 
 // The g-prefix goto popup has no groups and must keep the styling it always
-// had: every key on the ungrouped accent, nothing tinted per entry.
+// had: every description on the plain style, nothing tinted per entry.
 func TestWhichKeyCells_GotoPopupStaysUngrouped(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
+	ui.ApplyTheme(ui.DefaultTheme())
 	m := gotoTestModel()
 
 	st := newWhichKeyCellStyles()
@@ -88,9 +116,14 @@ func TestWhichKeyCells_GotoPopupStaysUngrouped(t *testing.T) {
 		if c.group != "" {
 			t.Fatalf("goto entry %q carries group %q; the popup must stay ungrouped", c.key, c.group)
 		}
-		if got, want := st.keyStyle(c.group).Render(c.key), st.key.Render(c.key); got != want {
+		if got, want := st.descStyle(c.group).Render(c.desc), st.desc.Render(c.desc); got != want {
 			t.Fatalf("goto entry %q renders %q, want the ungrouped %q", c.key, got, want)
 		}
+	}
+	// The fallback only means something while a real group renders differently.
+	grouped := st.descStyle(whichKeyGroupOrder()[0])
+	if grouped.Render("Delete") == st.desc.Render("Delete") {
+		t.Fatal("every group renders like the ungrouped style; the fallback assertion above proves nothing")
 	}
 }
 
@@ -125,65 +158,107 @@ func TestWhichKeyGroupStyles_NoColorCollapsesButStillRenders(t *testing.T) {
 
 // --- Change 2: modifier symbols -----------------------------------------
 
-// whichKeySymbolCells is a grid whose second column is all modifier chords, so
-// the symbol form and the textual form differ in width by a lot.
+// whichKeySymbolCells is a grid whose second column is all modifier chords and
+// unprintable keys, so the glyph form and the textual form differ in width by a
+// lot.
 func whichKeySymbolCells() []whichKeyCell {
-	return []whichKeyCell{
+	cells := []whichKeyCell{
 		{key: "d", desc: "Delete"},
 		{key: "e", desc: "Edit in $EDITOR"},
 		{key: "ctrl+shift+x", desc: "Mouse capture"},
-		{key: "ctrl+d", desc: "Scroll down"},
+		{key: "ctrl+space", desc: "Select range"},
+	}
+	fillWhichKeyDisplay(cells)
+	return cells
+}
+
+// A glyph-rendered chord must land in the key field exactly like a plain key:
+// right-aligned, one space, and the column widths sized from the drawn form.
+// Both glyph modes are checked because the nerdfont form carries a pad cell
+// after every modifier, so its drawn width is not the unicode form's.
+func TestRenderWhichKeyPanel_SymbolChordStillAligns(t *testing.T) {
+	modes := map[string]string{"unicode": "⌃⇧X", "nerdfont": "\U000F0634 \U000F0636 X"}
+	for icons, wantChord := range modes {
+		t.Run(icons, func(t *testing.T) {
+			restoreWhichKeyGlobals(t)
+			ui.ActiveKeybindings = ui.DefaultKeybindings()
+			ui.ConfigWhichKeyEnabled = true
+			ui.IconMode = icons
+
+			m := gotoTestModel()
+			m.width, m.height = 80, 20
+			cells := whichKeySymbolCells()
+			lay, ok := m.whichKeyLayoutFor(cells)
+			if !ok {
+				t.Fatal("precondition: the panel must lay out at 80x20")
+			}
+			if lay.grid.boxN < 2 {
+				t.Fatalf("precondition: want at least 2 columns, got %d", lay.grid.boxN)
+			}
+			if got := cells[2].keyText(); got != wantChord {
+				t.Fatalf("precondition: chord must render as glyphs, got %q", got)
+			}
+			// The key field is sized from the GLYPHS, not from "ctrl+shift+x".
+			if want := lipgloss.Width(wantChord); lay.grid.keyW[1] != want {
+				t.Errorf("column 1 key field = %d, want %d (the drawn width)", lay.grid.keyW[1], want)
+			}
+
+			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+			rows := whichKeyContentRows(t, out, lay.container)
+			g := lay.grid
+			for r, row := range rows {
+				if r >= g.rowN {
+					break // whichKeyMinRows padding: bordered, but no grid on it
+				}
+				runes := []rune(row)
+				for b := range g.boxN {
+					idx := b*g.rowN + r
+					if idx >= len(cells) {
+						break
+					}
+					start := b*g.boxW + g.lead
+					field := string(runes[start : start+g.keyW[b]])
+					if strings.TrimLeft(field, " ") != cells[idx].keyText() {
+						t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, cells[idx].keyText())
+					}
+					if runes[start+g.keyW[b]] != ' ' {
+						t.Fatalf("row %d col %d: want a single space after the key", r, b)
+					}
+				}
+			}
+		})
 	}
 }
 
-// A symbol-rendered chord must land in the key field exactly like a plain key:
-// right-aligned, one space, and the column widths sized from the drawn form.
-func TestRenderWhichKeyPanel_SymbolChordStillAligns(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	ui.IconMode = "unicode"
+// The word "space" must never reach the panel in a glyph mode — it is the one
+// binding whose name is longer than its whole cell deserves, and the change
+// that replaced it is invisible to the width sweep (both forms fit).
+func TestRenderWhichKeyPanel_SpaceDrawsAsAKeycap(t *testing.T) {
+	tests := []struct{ icons, want string }{
+		{"nerdfont", "\U000F1050"},
+		{"unicode", "␣"},
+		{"simple", "space"},
+		{"none", "space"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.icons, func(t *testing.T) {
+			restoreWhichKeyGlobals(t)
+			ui.ActiveKeybindings = ui.DefaultKeybindings()
+			ui.ConfigWhichKeyEnabled = true
+			ui.IconMode = tt.icons
 
-	m := gotoTestModel()
-	m.width, m.height = 80, 20
-	cells := whichKeySymbolCells()
-	lay, ok := m.whichKeyLayoutFor(cells)
-	if !ok {
-		t.Fatal("precondition: the panel must lay out at 80x20")
-	}
-	if lay.grid.boxN < 2 {
-		t.Fatalf("precondition: want at least 2 columns, got %d", lay.grid.boxN)
-	}
-	if got := cells[2].keyText(); got != "⌃⇧X" {
-		t.Fatalf("precondition: chord must render as symbols, got %q", got)
-	}
-	// The key field is sized from the SYMBOLS, not from "ctrl+shift+x".
-	if want := lipgloss.Width("⌃⇧X"); lay.grid.keyW[1] != want {
-		t.Errorf("column 1 key field = %d, want %d (the drawn width)", lay.grid.keyW[1], want)
-	}
-
-	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
-	rows := whichKeyContentRows(t, out, lay.container)
-	g := lay.grid
-	for r, row := range rows {
-		if r >= g.rowN {
-			break // whichKeyMinRows padding: bordered, but no grid on it
-		}
-		runes := []rune(row)
-		for b := range g.boxN {
-			idx := b*g.rowN + r
-			if idx >= len(cells) {
-				break
+			m := gotoTestModel()
+			m.width, m.height = 80, 20
+			cells := []whichKeyCell{{key: "space", desc: "Toggle selection"}}
+			fillWhichKeyDisplay(cells)
+			if got := cells[0].keyText(); got != tt.want {
+				t.Fatalf("space drawn as %q, want %q", got, tt.want)
 			}
-			start := b*g.boxW + g.lead
-			field := string(runes[start : start+g.keyW[b]])
-			if strings.TrimLeft(field, " ") != cells[idx].keyText() {
-				t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, cells[idx].keyText())
+			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+			if !strings.Contains(out, tt.want+" Toggle selection") {
+				t.Errorf("panel is missing %q:\n%s", tt.want+" Toggle selection", out)
 			}
-			if runes[start+g.keyW[b]] != ' ' {
-				t.Fatalf("row %d col %d: want a single space after the key", r, b)
-			}
-		}
+		})
 	}
 }
 
