@@ -88,7 +88,28 @@ const (
 	// whichKeyBottomGap leaves exactly the status-bar row uncovered, so the
 	// panel sits directly on top of it.
 	whichKeyBottomGap = 1
-	whichKeyMinWidth  = 20
+	// whichKeyOuterMargin insets the bordered box this many columns from each
+	// side of the terminal, once whichKeyOuterMarginMinWidth is met, so the
+	// panel reads as a floating box - the way neovim's own popup never
+	// touches the editor edge - rather than a strip glued to the terminal
+	// border. A fixed column count is used rather than a percentage: at a
+	// 250-column terminal a percentage margin would balloon into double
+	// digits per side for no visual gain, while a flat margin reads as the
+	// same amount of "terminal visible outside the box" at every size that
+	// gets one, which is what an inset is actually for. 4 is chosen to read
+	// clearly against the border (twice whichKeyPadH's own inside-the-box
+	// padding) while costing less width than a single grid column
+	// (whichKeyMinColW + whichKeySpacing = 33), so applying it never forces
+	// boxN down by itself.
+	whichKeyOuterMargin = 4
+	// whichKeyOuterMarginMinWidth is the terminal width below which the
+	// outer margin collapses to zero instead of applying. Below it the grid
+	// is already fighting for its first columns (see whichKeyGridFor), so
+	// spending 2*whichKeyOuterMargin columns on a gutter would cost a column
+	// the box could otherwise keep - full width is the better degrade than a
+	// barely-there margin squeezing an already-cramped box.
+	whichKeyOuterMarginMinWidth = 80
+	whichKeyMinWidth            = 20
 	// whichKeyMinHeight is the real floor for at least one content row: border
 	// (2) + vertical padding (2*whichKeyPadV) + the bottom gap + 1 body row.
 	whichKeyMinHeight = 2 + 2*whichKeyPadV + whichKeyBottomGap + 1
@@ -263,7 +284,11 @@ func (m Model) whichKeyPanelGeometry() (container, availRows int, ok bool) {
 	if m.width < whichKeyMinWidth || m.height < whichKeyMinHeight {
 		return 0, 0, false
 	}
-	container = max(m.width-(2*whichKeyPadH+2), 1)
+	margin := 0
+	if m.width >= whichKeyOuterMarginMinWidth {
+		margin = whichKeyOuterMargin
+	}
+	container = max(m.width-2*margin-(2*whichKeyPadH+2), 1)
 	availRows = m.height - (2 + 2*whichKeyPadV + whichKeyBottomGap)
 	if availRows < 1 {
 		return 0, 0, false

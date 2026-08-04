@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -181,15 +182,30 @@ func TestRenderWhichKeyPanel_ScrollClampsToTheEnd(t *testing.T) {
 // bottom border, with the vertical padding gap sitting above it rather than
 // below, so the padding to drop is no longer symmetric top/bottom whenever a
 // legend is present — it must be excised from the middle instead.
+//
+// The box no longer starts at column 0: whichKeyOuterMargin insets it from
+// the terminal edge, so a body row reads as background padding, then '│',
+// then content, then '│', then more background padding. The border is
+// located by its first and last '│' rather than assumed at the line's own
+// first and last rune.
 func whichKeyContentRows(t *testing.T, out string, container, legendRows int) []string {
 	t.Helper()
 	var rows []string
 	for line := range strings.SplitSeq(out, "\n") {
 		r := []rune(line)
-		if len(r) < 2 || r[0] != '│' || r[len(r)-1] != '│' {
-			continue // border row or untouched background
+		first, last := -1, -1
+		for i, ch := range r {
+			if ch == '│' {
+				if first == -1 {
+					first = i
+				}
+				last = i
+			}
 		}
-		body := r[1 : len(r)-1]
+		if first == -1 || first == last {
+			continue // border row (no vertical bars) or untouched background
+		}
+		body := r[first+1 : last]
 		if len(body) < whichKeyPadH+container {
 			t.Fatalf("body row is %d wide, want at least %d", len(body), whichKeyPadH+container)
 		}
@@ -295,13 +311,16 @@ func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
 
 // TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes sweeps every width
 // from whichKeyMinWidth to 250 and every height from whichKeyMinHeight to 40.
-// This panel's height/width maths has broken three times in its history, and
-// both whichKeyMaxCols and the lead-spacing rule changed together, so the
-// sweep checks the properties that must survive at every size rather than a
-// handful of sampled points: no rendered line exceeds the terminal width, the
-// box never exceeds the terminal height, the column count never goes to
-// zero, and the box itself stays a well-formed rectangle (exactly one top and
-// one bottom border, every body row the same width).
+// This panel's height/width maths has broken four times in its history, and
+// whichKeyMaxCols, the lead-spacing rule, and the outer margin all changed
+// independently, so the sweep checks the properties that must survive at
+// every size rather than a handful of sampled points: no rendered line
+// exceeds the terminal width, the box never exceeds the terminal height, the
+// column count never goes to zero, the box itself stays a well-formed
+// rectangle (exactly one top and one bottom border, every body row the same
+// width), and the box is inset from both edges by exactly
+// whichKeyOuterMargin once the terminal is wide enough to afford it, or
+// touches both edges (no inset) below that.
 func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -309,6 +328,7 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 
 	m := whichKeyTestModel()
 	cells := m.whichKeyLeaderCells()
+	fifthColAt := -1
 
 	for w := whichKeyMinWidth; w <= 250; w++ {
 		for h := whichKeyMinHeight; h <= 40; h++ {
@@ -319,6 +339,9 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 			}
 			if lay.grid.boxN < 1 {
 				t.Fatalf("%dx%d: column count is %d, must never be zero", w, h, lay.grid.boxN)
+			}
+			if lay.grid.boxN == 5 && (fifthColAt == -1 || w < fifthColAt) {
+				fifthColAt = w
 			}
 			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", h), cells, 0))
 			lines := strings.Split(out, "\n")
@@ -333,6 +356,14 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 				switch {
 				case strings.Contains(line, "╭") && strings.Contains(line, "╮"):
 					topN++
+					left, right := whichKeyLineGaps(line, '╭', '╮')
+					wantMargin := 0
+					if w >= whichKeyOuterMarginMinWidth {
+						wantMargin = whichKeyOuterMargin
+					}
+					if left != wantMargin || right != wantMargin {
+						t.Fatalf("%dx%d: box gaps are %d/%d, want %d/%d (margin %d)", w, h, left, right, wantMargin, wantMargin, wantMargin)
+					}
 				case strings.Contains(line, "╰") && strings.Contains(line, "╯"):
 					bottomN++
 				case strings.Contains(line, "│"):
@@ -348,6 +379,31 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 			}
 		}
 	}
+	t.Logf("5th column first appears at width %d", fifthColAt)
+}
+
+// whichKeyLineGaps reports the number of columns before the first occurrence
+// of left and after the last occurrence of right on line — the visible
+// terminal margin on each side of the box border, used to confirm the panel
+// is actually inset rather than just narrower than the terminal for some
+// unrelated reason.
+func whichKeyLineGaps(line string, left, right rune) (int, int) {
+	r := []rune(line)
+	li := -1
+	for i, ch := range r {
+		if ch == left {
+			li = i
+			break
+		}
+	}
+	ri := -1
+	for i, c := range slices.Backward(r) {
+		if c == right {
+			ri = i
+			break
+		}
+	}
+	return li, len(r) - ri - 1
 }
 
 // whichKeyRenderBenchModel is a full-catalog leader panel at the given size,

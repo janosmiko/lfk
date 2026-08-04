@@ -211,10 +211,21 @@ func TestWhichKeyLegend_SitsOnLastLineCentered(t *testing.T) {
 	// the row directly above it, hugging the border with nothing in between.
 	last := borderLast - 1
 	r := []rune(lines[last])
-	if len(r) < 2 || r[0] != '│' || r[len(r)-1] != '│' {
+	// The box is inset from the terminal edge (whichKeyOuterMargin), so the
+	// border sits at the first/last '│', not the line's own first/last rune.
+	first, lastBar := -1, -1
+	for i, ch := range r {
+		if ch == '│' {
+			if first == -1 {
+				first = i
+			}
+			lastBar = i
+		}
+	}
+	if first == -1 || first == lastBar {
 		t.Fatalf("panel's last content row is not a body row: %q", lines[last])
 	}
-	body := string(r[1 : len(r)-1])
+	body := string(r[first+1 : lastBar])
 	if len(body) < whichKeyPadH+lay.container {
 		t.Fatalf("last body row is %d wide, want at least %d", len(body), whichKeyPadH+lay.container)
 	}
