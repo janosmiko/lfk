@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -129,25 +130,35 @@ func TestWhichKeyLeader_HiddenWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestWhichKeyLeaderGroups_AreOrderedAndNonEmpty(t *testing.T) {
+// TestWhichKeyLeaderCells_AreOneSortedListAcrossGroups replaces the old
+// "groups come out in whichKeyGroupOrder" assertion. The panel is a single flat
+// list now, so the property that matters is that the whole list is in
+// which-key order end to end — including across entries that belong to
+// different catalog groups, which the per-group layout used to keep apart.
+func TestWhichKeyLeaderCells_AreOneSortedListAcrossGroups(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	groups := whichKeyTestModel().whichKeyLeaderGroups()
-	if len(groups) == 0 {
-		t.Fatal("a resource row must yield at least one group")
+	m := whichKeyTestModel()
+	cells := m.whichKeyLeaderCells()
+	if len(cells) == 0 {
+		t.Fatal("a resource row must yield at least one entry")
 	}
-	order := whichKeyGroupOrder()
-	pos := 0
-	for _, g := range groups {
-		if len(g.Cells) == 0 {
-			t.Fatalf("group %q must not be emitted with no cells", g.Title)
-		}
-		for pos < len(order) && string(order[pos]) != g.Title {
-			pos++
-		}
-		if pos == len(order) {
-			t.Fatalf("group %q is out of the declared order", g.Title)
-		}
+	if got, want := len(cells), len(m.availableWhichKeyActions()); got != want {
+		t.Fatalf("the flat list holds %d entries, want every available action (%d)", got, want)
+	}
+	sorted := slices.Clone(cells)
+	sortWhichKeyCells(sorted)
+	if !slices.Equal(cells, sorted) {
+		t.Fatalf("the flat list is not in which-key order:\n got %v\nwant %v", cells, sorted)
+	}
+	// Entries from different catalog groups must interleave; if they didn't,
+	// the panel would still be grouped, just without the headers.
+	groups := map[whichKeyGroup]bool{}
+	for _, a := range m.availableWhichKeyActions() {
+		groups[a.Group] = true
+	}
+	if len(groups) < 2 {
+		t.Fatalf("precondition: the fixture must span several catalog groups, got %d", len(groups))
 	}
 }
 
@@ -182,7 +193,7 @@ func TestWhichKeyLeader_RepeatPressTogglesClosed(t *testing.T) {
 		t.Fatal("the first press must open the panel")
 	}
 
-	m = m.scrollWhichKey(m.whichKeyLeaderGroups(), true)
+	m = m.scrollWhichKey(m.whichKeyLeaderCells(), true)
 	if m.whichKey.scroll == 0 {
 		t.Fatal("precondition: the full catalog must be scrollable at 80x24")
 	}
@@ -215,7 +226,7 @@ func TestWhichKeyLeader_ScrollKeysMoveTheViewport(t *testing.T) {
 
 	out, _ := m.handleExplorerKey(leaderKey())
 	m = out.(Model)
-	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
 	if !ok || lay.maxScroll == 0 {
 		t.Fatalf("precondition: the full catalog must overflow at 80x24; maxScroll=%d", lay.maxScroll)
 	}
@@ -364,10 +375,12 @@ func TestSpace_MultiSelectNeverArmsTheLeader(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeader_OpensOnHighestPriorityGroupAt80x24 pins the USER DECISION
-// group order at the terminal size it was validated against: the unscrolled
-// panel must open on Actions, the highest-priority group in whichKeyGroupOrder.
-func TestWhichKeyLeader_OpensOnHighestPriorityGroupAt80x24(t *testing.T) {
+// TestWhichKeyLeader_OpensOnTheFirstSortedEntriesAt80x24 replaces the old
+// "opens on the Actions group" assertion, which pinned a header the panel no
+// longer draws. With one flat list the equivalent property is that an
+// unscrolled panel starts at the top of that list — the first entry of every
+// column's first row is on screen.
+func TestWhichKeyLeader_OpensOnTheFirstSortedEntriesAt80x24(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -376,20 +389,24 @@ func TestWhichKeyLeader_OpensOnHighestPriorityGroupAt80x24(t *testing.T) {
 	m.whichKey.armed = true
 	m.whichKey.shown = true
 
-	groups := m.whichKeyLeaderGroups()
-	if len(groups) == 0 {
+	cells := m.whichKeyLeaderCells()
+	if len(cells) == 0 {
 		t.Fatal("the panel must not be empty at 80x24")
 	}
-	if groups[0].Title != string(wkActions) {
-		t.Fatalf("the first group must be %q (highest priority), got %q", wkActions, groups[0].Title)
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok {
+		t.Fatal("the panel must lay out at 80x24")
 	}
-	out := stripANSI(m.renderWhichKeyLeader(strings.Repeat("\n", m.height)))
-	if !strings.Contains(out, string(wkActions)) {
-		t.Fatalf("the unscrolled panel must open on %q:\n%s", wkActions, out)
-	}
-	lay, _ := m.whichKeyLayoutFor(groups)
 	if lay.maxScroll == 0 {
 		t.Fatal("expected the full catalog to overflow at 80x24")
+	}
+	out := stripANSI(m.renderWhichKeyLeader(strings.Repeat("\n", m.height)))
+	for b := range lay.grid.boxN {
+		first := cells[b*lay.grid.rowN]
+		want := first.key + " " + ui.Truncate(first.desc, lay.grid.descW[b])
+		if !strings.Contains(out, want) {
+			t.Fatalf("the unscrolled panel must open on column %d's first entry %q:\n%s", b, want, out)
+		}
 	}
 }
 
@@ -416,8 +433,17 @@ func TestWhichKeyLeader_NeverEmptyBoxAtShortHeights(t *testing.T) {
 		if out == bg {
 			continue // nothing rendered at all — acceptable per spec
 		}
-		if !strings.Contains(out, "Actions") {
-			t.Errorf("CRITICAL-2: h=%d rendered a box with no real content (empty except chrome/footer):\n%s", h, out)
+		// Headers are gone, so "has real content" now means the first entry of
+		// the flat list is actually drawn.
+		cells := m.whichKeyLeaderCells()
+		lay, ok := m.whichKeyLayoutFor(cells)
+		if !ok {
+			t.Errorf("h=%d: a rendered panel must lay out", h)
+			continue
+		}
+		want := cells[0].key + " " + ui.Truncate(cells[0].desc, lay.grid.descW[0])
+		if !strings.Contains(out, want) {
+			t.Errorf("CRITICAL-2: h=%d rendered a box with no real content (missing %q):\n%s", h, want, out)
 		}
 	}
 }
@@ -446,9 +472,14 @@ func TestWhichKeyLeader_AllEntriesReachableViaScrolling(t *testing.T) {
 
 		out, _ := m.handleExplorerKey(leaderKey())
 		m = out.(Model)
-		lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+		cells := m.whichKeyLeaderCells()
+		lay, ok := m.whichKeyLayoutFor(cells)
 		if !ok {
 			t.Fatalf("%dx%d: the panel must lay out", size[0], size[1])
+		}
+		if len(cells) != len(want) {
+			t.Fatalf("%dx%d: the flat list holds %d entries, want every available action (%d)",
+				size[0], size[1], len(cells), len(want))
 		}
 
 		bg := strings.Repeat("\n", m.height)
@@ -463,11 +494,15 @@ func TestWhichKeyLeader_AllEntriesReachableViaScrolling(t *testing.T) {
 			rendered.WriteString("\n")
 			rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
 		}
-		// A label wider than the description field is ellipsized, so match the
-		// text the panel is actually supposed to draw rather than the raw label.
-		for label := range want {
-			if !strings.Contains(rendered.String(), ui.Truncate(label, lay.grid.descW)) {
-				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], label)
+		// A label wider than its column's description field is ellipsized, so
+		// match the text the panel is actually supposed to draw rather than the
+		// raw label. Column-major fill puts entry i in column i/rowN, and each
+		// column has its own key/description widths.
+		for i, c := range cells {
+			col := i / lay.grid.rowN
+			drawn := c.key + " " + ui.Truncate(c.desc, lay.grid.descW[col])
+			if !strings.Contains(rendered.String(), drawn) {
+				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], drawn)
 			}
 		}
 	}
@@ -580,7 +615,7 @@ func TestWhichKeyLeader_ScrollHintOnlyWhenOverflowing(t *testing.T) {
 		m.width, m.height = 80, 14
 		m.whichKey.armed = true
 		m.whichKey.shown = true
-		if lay, _ := m.whichKeyLayoutFor(m.whichKeyLeaderGroups()); lay.maxScroll == 0 {
+		if lay, _ := m.whichKeyLayoutFor(m.whichKeyLeaderCells()); lay.maxScroll == 0 {
 			t.Fatal("precondition: the full catalog must overflow at 80x14")
 		}
 		if bar := stripANSI(m.statusBar()); !strings.Contains(bar, scrollHint) {
@@ -602,7 +637,7 @@ func TestWhichKeyLeader_ScrollHintOnlyWhenOverflowing(t *testing.T) {
 		m.width, m.height = 120, 40
 		m.whichKey.armed = true
 		m.whichKey.shown = true
-		if lay, _ := m.whichKeyLayoutFor(m.whichKeyLeaderGroups()); lay.maxScroll != 0 {
+		if lay, _ := m.whichKeyLayoutFor(m.whichKeyLeaderCells()); lay.maxScroll != 0 {
 			t.Fatal("precondition: a two-entry catalog must fit at 120x40")
 		}
 		if bar := stripANSI(m.statusBar()); strings.Contains(bar, scrollHint) {

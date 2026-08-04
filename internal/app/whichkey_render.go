@@ -13,17 +13,9 @@ type whichKeyCell struct {
 	desc string
 }
 
-// whichKeyGroupCells is one titled section of the panel. An empty Title renders
-// the section without a header, which is what the goto popup uses.
-type whichKeyGroupCells struct {
-	Title string
-	Cells []whichKeyCell
-}
-
 // Panel geometry, ported from neovim's which-key.nvim so the grid reads the
-// same way: every column is the SAME width and the columns divide the container
-// evenly, instead of each column being sized to its own widest entry with the
-// leftover space dumped into the gaps.
+// same way: one flat list of entries flowing column-major, every column the
+// SAME width, and the columns dividing the container evenly.
 //
 // Constants mirror which-key.nvim's defaults (lua/which-key/config.lua):
 // layout.width = {min = 20}, layout.spacing = 3, win.padding = {1, 2},
@@ -35,11 +27,11 @@ const (
 	whichKeyMaxRows = 25 // Config.win.height.max
 	whichKeyPadV    = 1  // Config.win.padding[1]
 	whichKeyPadH    = 2  // Config.win.padding[2]
-	// whichKeySep sits between a key and its label. which-key.nvim uses "➜";
-	// an ASCII arrow is used instead because that glyph is East-Asian-ambiguous
-	// (double width in CJK-configured terminals), which would desync every
-	// column measurement from what the terminal actually draws.
-	whichKeySep = "->"
+	// whichKeyGap is the whole separation between a key and its label. neovim
+	// draws Config.icons.separator between them, which is empty in the
+	// reference config, leaving only the table's own one-column spacing
+	// (layout.lua:70-72) — so a single space, no glyph.
+	whichKeyGap = 1
 	// whichKeyBottomGap leaves exactly the status-bar row uncovered, so the
 	// panel sits directly on top of it.
 	whichKeyBottomGap = 1
@@ -49,15 +41,17 @@ const (
 	whichKeyMinHeight = 2 + 2*whichKeyPadV + whichKeyBottomGap + 1
 )
 
-// whichKeyGrid is the uniform cell geometry shared by every group in one panel.
-// One grid for the whole panel — not one per group — is what makes the keys
-// line up in a single vertical edge across group boundaries.
+// whichKeyGrid is the cell geometry for one panel. Columns are uniformly wide,
+// but the key field inside each is sized to that column's own widest key —
+// otherwise one "ctrl+space" would indent every single-character key in the
+// panel by ten columns.
 type whichKeyGrid struct {
-	boxW  int // column width, spacing included
-	boxN  int // column count
-	lead  int // spaces before each column (0 for a single column)
-	keyW  int // right-aligned key field
-	descW int // description field; 0 drops the description entirely
+	boxW  int   // column width, spacing included
+	boxN  int   // column count
+	rowN  int   // grid rows; entries fill column-major
+	lead  int   // spaces before each column (0 for a single column)
+	keyW  []int // per column: right-aligned key field
+	descW []int // per column: description field; 0 drops the description
 }
 
 // whichKeyGridFor ports which-key.nvim's box arithmetic (view.lua:340-344):
@@ -66,52 +60,51 @@ type whichKeyGrid struct {
 //	box_width     = clamp(max_row_width, layout.width.min, container)
 //	box_count     = max(floor(container / (box_width + spacing)), 1)
 //	box_width     = floor(container / box_count)   <- columns divide evenly
+//	box_height    = ceil(#items / box_count)
 //
-// The key field is measured across all items too, so the right-aligned keys
-// share one edge no matter which group a row belongs to.
-func whichKeyGridFor(groups []whichKeyGroupCells, container int) whichKeyGrid {
-	// Two separating spaces, one on each side of the separator — the same
-	// per-column spacing which-key.nvim's table applies (layout.lua:70-72).
-	overhead := lipgloss.Width(whichKeySep) + 2
-	maxRow, keyW := 0, 0
-	for _, g := range groups {
-		for _, c := range g.Cells {
-			kw := lipgloss.Width(c.key)
-			keyW = max(keyW, kw)
-			maxRow = max(maxRow, kw+overhead+lipgloss.Width(c.desc))
-		}
+// The key and description fields are then measured per column, the way
+// which-key.nvim's table accumulates a width per column (layout.lua:74).
+//
+// which-key.nvim's extra `max(box_height, 2)` floor is deliberately dropped:
+// there it keeps the popup window from being a single line tall, a job
+// whichKeyMinRows already does here.
+func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
+	maxRow := 0
+	for _, c := range cells {
+		maxRow = max(maxRow, lipgloss.Width(c.key)+whichKeyGap+lipgloss.Width(c.desc))
 	}
 	boxW := min(max(maxRow, whichKeyMinColW), max(container, 1))
 	boxN := max(container/(boxW+whichKeySpacing), 1)
 	boxW = max(container/boxN, 1)
 
-	g := whichKeyGrid{boxW: boxW, boxN: boxN, keyW: keyW}
+	g := whichKeyGrid{boxW: boxW, boxN: boxN}
 	if boxN > 1 {
+		// which-key.nvim lays each box out at box_width - spacing regardless of
+		// the column count (view.lua:346), and only prefixes the spacing when
+		// there is more than one column (view.lua:358).
 		g.lead = whichKeySpacing
 	}
-	// which-key.nvim lays each box out at box_width - spacing regardless of the
-	// column count (view.lua:346), and only prefixes the spacing when there is
-	// more than one column (view.lua:358).
+	if len(cells) == 0 {
+		return g
+	}
+	g.rowN = (len(cells) + boxN - 1) / boxN
 	contentW := max(boxW-whichKeySpacing, 1)
-	// A key wider than the cell would starve the label; clamp it so at least
-	// one column of description survives, and let writeWhichKeyCell truncate.
-	if g.keyW+overhead+1 > contentW {
-		g.keyW = max(contentW-overhead-1, 1)
+	g.keyW = make([]int, boxN)
+	g.descW = make([]int, boxN)
+	for b := range boxN {
+		w := 0
+		for i := b * g.rowN; i < (b+1)*g.rowN && i < len(cells); i++ {
+			w = max(w, lipgloss.Width(cells[i].key))
+		}
+		// A key wider than the cell would starve the label; clamp it so at least
+		// one column of description survives, and let writeWhichKeyCell truncate.
+		if w+whichKeyGap+1 > contentW {
+			w = max(contentW-whichKeyGap-1, 1)
+		}
+		g.keyW[b] = w
+		g.descW[b] = max(contentW-w-whichKeyGap, 0)
 	}
-	g.descW = max(contentW-g.keyW-overhead, 0)
 	return g
-}
-
-// rows returns the row count one group of n cells occupies in this grid,
-// ceil(n / box_count) per view.lua:344. which-key.nvim's extra `max(..., 2)`
-// floor is deliberately dropped: there it keeps the popup window from being a
-// single line tall, a job whichKeyMinRows already does here, and applying it
-// per group would append a blank row after every one-row section.
-func (g whichKeyGrid) rows(n int) int {
-	if n <= 0 || g.boxN <= 0 {
-		return 0
-	}
-	return (n + g.boxN - 1) / g.boxN
 }
 
 // wkSpaces backs wkPad, which hands out padding without allocating at the
@@ -129,48 +122,45 @@ func wkPad(n int) string {
 	}
 }
 
-// whichKeyCellStyles are the per-render constants a cell needs. The separator
-// arrives pre-styled: it never changes, so styling it per entry was a Render
-// call per row of the panel for nothing.
+// whichKeyCellStyles are the per-render constants a cell needs.
 type whichKeyCellStyles struct {
-	key   lipgloss.Style
-	desc  lipgloss.Style
-	sep   string
-	title lipgloss.Style
+	key  lipgloss.Style
+	desc lipgloss.Style
 }
 
 func newWhichKeyCellStyles() whichKeyCellStyles {
-	key, desc, title := whichKeyStyles()
-	return whichKeyCellStyles{key: key, desc: desc, sep: desc.Render(" " + whichKeySep + " "), title: title}
+	key, desc := whichKeyStyles()
+	return whichKeyCellStyles{key: key, desc: desc}
 }
 
-// writeWhichKeyCell lays one entry out as which-key.nvim's three-column mini
-// table (view.lua:323-331): the key right-aligned, the separator, then the
-// label filling the rest of the cell, padded to the full column width so the
-// next column starts at a fixed offset. Writes straight into the row's builder
-// rather than returning a string — the panel re-renders every frame, and a
-// per-cell buffer is an allocation per entry for nothing.
-func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, st whichKeyCellStyles) {
-	key := ui.Truncate(c.key, g.keyW)
-	sb.WriteString(wkPad(g.lead + max(g.keyW-lipgloss.Width(key), 0)))
+// writeWhichKeyCell lays one entry out as which-key.nvim's two-column mini
+// table (view.lua:323-331 with an empty separator): the key right-aligned in
+// its column's key field, one space, then the label filling the rest of the
+// cell, padded to the full column width so the next column starts at a fixed
+// offset. Writes straight into the row's builder rather than returning a
+// string — the panel re-renders every frame, and a per-cell buffer is an
+// allocation per entry for nothing.
+func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, col int, st whichKeyCellStyles) {
+	keyW, descW := g.keyW[col], g.descW[col]
+	key := ui.Truncate(c.key, keyW)
+	sb.WriteString(wkPad(g.lead + max(keyW-lipgloss.Width(key), 0)))
 	sb.WriteString(st.key.Render(key))
-	if g.descW == 0 {
+	if descW == 0 {
 		// No room for a label: the key alone is still worth showing.
-		sb.WriteString(wkPad(g.boxW - whichKeySpacing - g.keyW))
+		sb.WriteString(wkPad(g.boxW - whichKeySpacing - keyW))
 		return
 	}
-	desc := ui.Truncate(c.desc, g.descW)
-	sb.WriteString(st.sep)
+	desc := ui.Truncate(c.desc, descW)
+	sb.WriteString(wkPad(whichKeyGap))
 	sb.WriteString(st.desc.Render(desc))
-	sb.WriteString(wkPad(g.descW - lipgloss.Width(desc)))
+	sb.WriteString(wkPad(descW - lipgloss.Width(desc)))
 }
 
-// whichKeyStyles are the three styles every which-key panel path renders with.
-func whichKeyStyles() (key, desc, title lipgloss.Style) {
+// whichKeyStyles are the two styles every which-key panel path renders with.
+func whichKeyStyles() (key, desc lipgloss.Style) {
 	key = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
 	desc = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
-	title = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorPrimary)).Bold(true).Background(ui.BaseBg)
-	return key, desc, title
+	return key, desc
 }
 
 // whichKeyPanelGeometry derives the container width and the on-screen row
@@ -189,8 +179,7 @@ func (m Model) whichKeyPanelGeometry() (container, availRows int, ok bool) {
 }
 
 // whichKeyPanelLayout is everything a panel render (or a scroll-bounds query)
-// needs, derived once: the shared grid plus how the content sits in the
-// viewport.
+// needs, derived once: the grid plus how the content sits in the viewport.
 type whichKeyPanelLayout struct {
 	grid      whichKeyGrid
 	container int
@@ -199,28 +188,19 @@ type whichKeyPanelLayout struct {
 	maxScroll int // largest row offset; 0 when everything fits
 }
 
-// whichKeyLayoutFor reports how the given groups fit on screen. The viewport is
+// whichKeyLayoutFor reports how the given entries fit on screen. The viewport is
 // the content height clamped to which-key.nvim's win.height {min = 4, max = 25}
 // and then to what the terminal has left.
 //
 // Counts rows without styling anything, so the key handler and the hint bar can
 // ask about overflow without paying for a full render.
-func (m Model) whichKeyLayoutFor(groups []whichKeyGroupCells) (whichKeyPanelLayout, bool) {
+func (m Model) whichKeyLayoutFor(cells []whichKeyCell) (whichKeyPanelLayout, bool) {
 	container, availRows, ok := m.whichKeyPanelGeometry()
 	if !ok {
 		return whichKeyPanelLayout{}, false
 	}
-	lay := whichKeyPanelLayout{grid: whichKeyGridFor(groups, container), container: container}
-	for _, g := range groups {
-		rows := lay.grid.rows(len(g.Cells))
-		if rows == 0 {
-			continue
-		}
-		if g.Title != "" {
-			lay.bodyRows++
-		}
-		lay.bodyRows += rows
-	}
+	lay := whichKeyPanelLayout{grid: whichKeyGridFor(cells, container), container: container}
+	lay.bodyRows = lay.grid.rowN
 	if lay.bodyRows == 0 {
 		return whichKeyPanelLayout{}, false
 	}
@@ -235,27 +215,24 @@ func (m Model) renderWhichKey(background string) string {
 	if !m.pendingG || !m.whichKey.shown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	return m.renderWhichKeyPanel(background, m.gotoWhichKeyGroups(), m.whichKey.scroll)
+	return m.renderWhichKeyPanel(background, m.whichKeyCells(), m.whichKey.scroll)
 }
 
-// renderWhichKeyPanel draws the given groups as a bordered, bottom-anchored
-// panel spanning the full width, styled after neovim's which-key. Groups render
-// in slice order, all sharing one uniform column grid. The panel grows to fit
-// its content up to whichKeyMaxRows and whatever the terminal allows; anything
-// past that scrolls (scroll is a row offset, clamped here). Returns background
-// unchanged when there is nothing to show or the terminal is too small.
-func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCells, scroll int) string {
-	lay, ok := m.whichKeyLayoutFor(groups)
+// renderWhichKeyPanel draws the given entries as a bordered, bottom-anchored
+// panel spanning the full width, styled after neovim's which-key: one flat
+// list, no section headers, flowing column-major through a uniform grid. The
+// panel grows to fit its content up to whichKeyMaxRows and whatever the
+// terminal allows; anything past that scrolls (scroll is a row offset, clamped
+// here). Returns background unchanged when there is nothing to show or the
+// terminal is too small.
+func (m Model) renderWhichKeyPanel(background string, cells []whichKeyCell, scroll int) string {
+	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok {
 		return background
 	}
 	st := newWhichKeyCellStyles()
 	off := min(max(scroll, 0), lay.maxScroll)
-	visible := make([]string, 0, lay.viewRows)
-	row := 0
-	for _, g := range groups {
-		visible, row = appendWhichKeyRows(visible, g, lay.grid, row, off, off+lay.viewRows, st)
-	}
+	visible := whichKeyRows(lay.grid, cells, off, off+lay.viewRows, st)
 	if pad := lay.viewRows - len(visible); pad > 0 {
 		// whichKeyMinRows can ask for more rows than the content has.
 		visible = append(visible, make([]string, pad)...)
@@ -276,43 +253,30 @@ func (m Model) renderWhichKeyPanel(background string, groups []whichKeyGroupCell
 	return ui.PlaceOverlayBottom(m.width, m.height, whichKeyBottomGap, box, bg)
 }
 
-// appendWhichKeyRows appends the group's header and grid rows whose absolute
-// row index falls inside [lo, hi), and returns the absolute index just past the
-// group. Only the visible window is styled, so a scrolling panel costs a
-// viewport per frame rather than the whole catalog.
+// whichKeyRows renders grid rows [lo, hi). Only the visible window is styled,
+// so a scrolling panel costs a viewport per frame rather than the whole
+// catalog.
 //
 // Fill is column-major — entries run down each column before moving right —
 // matching view.lua:355 (i = (b-1) * box_height + l).
-func appendWhichKeyRows(out []string, g whichKeyGroupCells, grid whichKeyGrid, row, lo, hi int, st whichKeyCellStyles) ([]string, int) {
-	rows := grid.rows(len(g.Cells))
-	if rows == 0 {
-		return out, row
+func whichKeyRows(grid whichKeyGrid, cells []whichKeyCell, lo, hi int, st whichKeyCellStyles) []string {
+	lo = max(lo, 0)
+	hi = min(hi, grid.rowN)
+	if hi <= lo {
+		return nil
 	}
-	if g.Title != "" {
-		if row >= lo && row < hi {
-			out = append(out, st.title.Render(g.Title))
-		}
-		row++
-	}
-	for r := range rows {
-		if row >= hi {
-			return out, row + (rows - r)
-		}
-		if row < lo {
-			row++
-			continue
-		}
+	out := make([]string, 0, hi-lo)
+	for r := lo; r < hi; r++ {
 		var sb strings.Builder
 		sb.Grow(grid.boxW*grid.boxN + 64)
 		for c := range grid.boxN {
-			idx := c*rows + r
-			if idx >= len(g.Cells) {
+			idx := c*grid.rowN + r
+			if idx >= len(cells) {
 				break // nothing to the right of the last entry on this row
 			}
-			grid.writeWhichKeyCell(&sb, g.Cells[idx], st)
+			grid.writeWhichKeyCell(&sb, cells[idx], c, st)
 		}
 		out = append(out, sb.String())
-		row++
 	}
-	return out, row
+	return out
 }

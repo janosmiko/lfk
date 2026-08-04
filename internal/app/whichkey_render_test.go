@@ -63,37 +63,41 @@ func TestRenderWhichKey_HiddenWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestRenderWhichKeyPanel_ShowsGroupHeaders(t *testing.T) {
+// TestRenderWhichKeyPanel_RendersAFlatListWithNoHeaders replaces the old
+// group-header assertion. neovim's which-key has no section headers at all —
+// every entry is one row of a single list — so a panel that draws a bare label
+// with no key next to it is drawing something neovim never would.
+func TestRenderWhichKeyPanel_RendersAFlatListWithNoHeaders(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
-	groups := []whichKeyGroupCells{
-		{Title: "Actions", Cells: []whichKeyCell{{"d", "Delete"}, {"e", "Edit"}}},
-		{Title: "Sort", Cells: []whichKeyCell{{"s", "Sort next column"}}},
-	}
-	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, 0))
-	for _, want := range []string{"Actions", "Delete", "Edit", "Sort", "Sort next column"} {
+	cells := []whichKeyCell{{"d", "Delete"}, {"e", "Edit"}, {"s", "Sort next column"}}
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+	for _, want := range []string{"d Delete", "e Edit", "s Sort next column"} {
 		if !strings.Contains(out, want) {
-			t.Fatalf("panel missing %q:\n%s", want, out)
+			t.Fatalf("panel missing %q (key, one space, label):\n%s", want, out)
 		}
 	}
-	if strings.Index(out, "Actions") > strings.Index(out, "Sort next column") {
-		t.Fatal("groups must render in the given order")
+	// The former group titles were rendered as their own row. Nothing may put a
+	// section name on screen any more.
+	for _, banned := range []string{"Actions", "Views", "Selection", "Settings", "Filter", "->"} {
+		if strings.Contains(out, banned) {
+			t.Fatalf("flat panel must not render %q:\n%s", banned, out)
+		}
 	}
 }
 
-func TestRenderWhichKeyPanel_EmptyGroupsRenderNothing(t *testing.T) {
+func TestRenderWhichKeyPanel_EmptyCellsRenderNothing(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
 	bg := strings.Repeat("\n", m.height)
 	if got := m.renderWhichKeyPanel(bg, nil, 0); got != bg {
-		t.Fatal("an empty group list must render nothing, not an empty box")
+		t.Fatal("an empty entry list must render nothing, not an empty box")
 	}
-	empty := []whichKeyGroupCells{{Title: "Actions", Cells: nil}}
-	if got := m.renderWhichKeyPanel(bg, empty, 0); got != bg {
-		t.Fatal("groups with no cells must render nothing")
+	if got := m.renderWhichKeyPanel(bg, []whichKeyCell{}, 0); got != bg {
+		t.Fatal("a zero-length entry list must render nothing")
 	}
 }
 
@@ -103,8 +107,8 @@ func TestRenderWhichKeyPanel_TinyTerminalRendersNothing(t *testing.T) {
 	m := gotoTestModel()
 	m.width, m.height = 10, 4
 	bg := strings.Repeat("\n", m.height)
-	groups := []whichKeyGroupCells{{Title: "Actions", Cells: []whichKeyCell{{"d", "Delete"}}}}
-	if got := m.renderWhichKeyPanel(bg, groups, 0); got != bg {
+	cells := []whichKeyCell{{"d", "Delete"}}
+	if got := m.renderWhichKeyPanel(bg, cells, 0); got != bg {
 		t.Fatal("panel must be skipped when the terminal is too small")
 	}
 }
@@ -119,23 +123,19 @@ func TestRenderWhichKeyPanel_OverflowScrollsInsteadOfDropping(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
 	m.height = 12 // deliberately short
-	groups := make([]whichKeyGroupCells, 0, 6)
-	for g := range 6 {
-		cells := make([]whichKeyCell, 0, 8)
-		for i := range 8 {
-			cells = append(cells, whichKeyCell{string(rune('a' + i)), fmt.Sprintf("group %d action %d", g, i)})
-		}
-		groups = append(groups, whichKeyGroupCells{Title: fmt.Sprintf("G%d", g), Cells: cells})
+	cells := make([]whichKeyCell, 0, 48)
+	for i := range 48 {
+		cells = append(cells, whichKeyCell{string(rune('a' + i%8)), fmt.Sprintf("entry %02d", i)})
 	}
 
-	lay, ok := m.whichKeyLayoutFor(groups)
+	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok || lay.maxScroll == 0 {
 		t.Fatalf("precondition: 48 cells at height %d must overflow; maxScroll=%d", m.height, lay.maxScroll)
 	}
 
 	var seen strings.Builder
 	for scroll := 0; scroll <= lay.maxScroll; scroll++ {
-		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, scroll))
+		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, scroll))
 		if lines := strings.Split(out, "\n"); len(lines) > m.height+1 {
 			t.Fatalf("scroll %d: panel overflowed the screen: %d lines for height %d", scroll, len(lines), m.height)
 		}
@@ -143,12 +143,10 @@ func TestRenderWhichKeyPanel_OverflowScrollsInsteadOfDropping(t *testing.T) {
 		seen.WriteString("\n")
 	}
 	rendered := seen.String()
-	for g := range 6 {
-		for i := range 8 {
-			want := fmt.Sprintf("group %d action %d", g, i)
-			if !strings.Contains(rendered, want) {
-				t.Errorf("%q never appears at any scroll offset — unreachable", want)
-			}
+	for i := range 48 {
+		want := fmt.Sprintf("entry %02d", i)
+		if !strings.Contains(rendered, want) {
+			t.Errorf("%q never appears at any scroll offset — unreachable", want)
 		}
 	}
 }
@@ -162,60 +160,96 @@ func TestRenderWhichKeyPanel_ScrollClampsToTheEnd(t *testing.T) {
 	m := whichKeyTestModel()
 	m.width, m.height = 80, 24
 
-	groups := m.whichKeyLeaderGroups()
-	lay, ok := m.whichKeyLayoutFor(groups)
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok || lay.maxScroll == 0 {
 		t.Fatalf("precondition: the full catalog must overflow at 80x24; maxScroll=%d", lay.maxScroll)
 	}
 	bg := strings.Repeat("\n", m.height)
-	atEnd := m.renderWhichKeyPanel(bg, groups, lay.maxScroll)
-	if beyond := m.renderWhichKeyPanel(bg, groups, lay.maxScroll+50); beyond != atEnd {
+	atEnd := m.renderWhichKeyPanel(bg, cells, lay.maxScroll)
+	if beyond := m.renderWhichKeyPanel(bg, cells, lay.maxScroll+50); beyond != atEnd {
 		t.Fatal("an offset past the end must clamp to the last screen")
 	}
-	if before := m.renderWhichKeyPanel(bg, groups, -5); before != m.renderWhichKeyPanel(bg, groups, 0) {
+	if before := m.renderWhichKeyPanel(bg, cells, -5); before != m.renderWhichKeyPanel(bg, cells, 0) {
 		t.Fatal("a negative offset must clamp to the top")
 	}
 }
 
-// TestRenderWhichKeyPanel_ColumnsAreUniformAndAligned is the visual property the
-// neovim port exists for: every column is the same width, so the keys line up
-// in one vertical edge across group boundaries.
-func TestRenderWhichKeyPanel_ColumnsAreUniformAndAligned(t *testing.T) {
+// whichKeyContentRows returns the panel's body rows with the border and the
+// horizontal padding stripped, so a test can index straight into the grid.
+func whichKeyContentRows(t *testing.T, out string, container int) []string {
+	t.Helper()
+	var rows []string
+	for line := range strings.SplitSeq(out, "\n") {
+		r := []rune(line)
+		if len(r) < 2 || r[0] != '│' || r[len(r)-1] != '│' {
+			continue // border row or untouched background
+		}
+		body := r[1 : len(r)-1]
+		if len(body) < whichKeyPadH+container {
+			t.Fatalf("body row is %d wide, want at least %d", len(body), whichKeyPadH+container)
+		}
+		rows = append(rows, string(body[whichKeyPadH:whichKeyPadH+container]))
+	}
+	// Drop the box's vertical padding rows; they are bordered but hold no grid.
+	if len(rows) < 2*whichKeyPadV {
+		t.Fatalf("panel has %d bordered rows, fewer than its own padding", len(rows))
+	}
+	return rows[whichKeyPadV : len(rows)-whichKeyPadV]
+}
+
+// TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned is the visual
+// property the neovim port exists for: every column is the same width, and
+// inside each column the key is right-aligned against a field sized to THAT
+// column, followed by exactly one space. A global key field (the bug this
+// replaces) shows up here as a column-0 field far wider than its own keys.
+func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	m := whichKeyTestModel()
 	m.width, m.height = 120, 40
 
-	groups := m.whichKeyLeaderGroups()
-	lay, ok := m.whichKeyLayoutFor(groups)
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok {
 		t.Fatal("precondition: the panel must lay out at 120x40")
 	}
-	if lay.grid.boxN < 2 {
-		t.Fatalf("precondition: 120 columns must fit at least 2 grid columns, got %d", lay.grid.boxN)
+	g := lay.grid
+	if g.boxN < 2 {
+		t.Fatalf("precondition: 120 columns must fit at least 2 grid columns, got %d", g.boxN)
 	}
 
-	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, 0))
-	sepCols := map[int]bool{}
-	for line := range strings.SplitSeq(out, "\n") {
-		body, ok := strings.CutPrefix(strings.TrimSuffix(line, "│"), "│")
-		if !ok {
-			continue
-		}
-		for idx := 0; ; {
-			i := strings.Index(body[idx:], whichKeySep)
-			if i < 0 {
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+	rows := whichKeyContentRows(t, out, lay.container)
+	if len(rows) != lay.viewRows {
+		t.Fatalf("panel drew %d body rows, want %d", len(rows), lay.viewRows)
+	}
+	widest := make([]int, g.boxN)
+	for r, row := range rows {
+		runes := []rune(row)
+		for b := range g.boxN {
+			idx := b*g.rowN + r
+			if idx >= len(cells) {
 				break
 			}
-			sepCols[idx+i] = true
-			idx += i + len(whichKeySep)
+			widest[b] = max(widest[b], lipgloss.Width(cells[idx].key))
+			start := b * g.boxW
+			field := string(runes[start+g.lead : start+g.lead+g.keyW[b]])
+			if strings.TrimLeft(field, " ") != cells[idx].key {
+				t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, cells[idx].key)
+			}
+			if got := runes[start+g.lead+g.keyW[b]]; got != ' ' {
+				t.Fatalf("row %d col %d: want a single space after the key, got %q", r, b, got)
+			}
 		}
 	}
-	// One separator column per grid column, at a fixed offset each.
-	if len(sepCols) != lay.grid.boxN {
-		t.Fatalf("separators sit at %d distinct columns, want exactly %d (one per grid column): %v",
-			len(sepCols), lay.grid.boxN, sepCols)
+	// Each column's field is sized to its OWN widest key. A global field (the
+	// bug this replaces) makes column 0 wider than anything it actually holds.
+	for b, w := range widest {
+		if w > 0 && g.keyW[b] != w {
+			t.Errorf("column %d key field is %d wide but its widest key is %d", b, g.keyW[b], w)
+		}
 	}
 }
 
@@ -230,12 +264,10 @@ func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
 	m.height = 20
-	groups := []whichKeyGroupCells{
-		{Cells: []whichKeyCell{{"Y", "Copy as (YAML/JSON/table)"}}},
-	}
+	cells := []whichKeyCell{{"Y", "Copy as (YAML/JSON/table)"}}
 	for _, w := range []int{20, 25, 34} {
 		m.width = w
-		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), groups, 0))
+		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
 		for line := range strings.SplitSeq(out, "\n") {
 			if got := lipgloss.Width(line); got > w {
 				t.Fatalf("width %d: rendered line %q is %d columns wide", w, line, got)
@@ -274,7 +306,7 @@ func BenchmarkWhichKeyLeaderRender(b *testing.B) {
 		b.Run(s.name+"/Layout", func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+				_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderCells())
 			}
 		})
 		b.Run(s.name+"/Full", func(b *testing.B) {
@@ -304,7 +336,7 @@ func TestWhichKeyLeaderRender_AllocationCeiling(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 
 	m := whichKeyRenderBenchModel(80, 24)
-	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
 	if !ok {
 		t.Fatal("precondition: the panel must lay out at 80x24")
 	}
@@ -337,7 +369,7 @@ func TestWhichKeyLeaderLayout_AllocationCeiling(t *testing.T) {
 	res := testing.Benchmark(func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
-			_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+			_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderCells())
 		}
 	})
 	allocs := float64(res.MemAllocs) / float64(res.N)

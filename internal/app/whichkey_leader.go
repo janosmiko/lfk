@@ -58,32 +58,28 @@ func (m Model) disarmWhichKeyLeader() Model {
 	return m
 }
 
-// whichKeyLeaderGroups turns the currently-available actions into render groups,
-// in the declared group order. Groups with no available action are omitted, and
-// each group's entries are ordered by sortWhichKeyCells rather than by their
-// position in the catalog.
-func (m Model) whichKeyLeaderGroups() []whichKeyGroupCells {
+// whichKeyLeaderCells turns the currently-available actions into the panel's
+// single flat entry list, ordered by sortWhichKeyCells rather than by position
+// in the catalog. neovim's which-key draws no section headers, so the catalog's
+// Group is organisational metadata for the registry and never reaches the
+// screen — one uninterrupted list is what lets the entries flow column-major
+// across the whole panel instead of restarting per section.
+func (m Model) whichKeyLeaderCells() []whichKeyCell {
 	acts := m.availableWhichKeyActions()
 	kb := ui.ActiveKeybindings
-	byGroup := map[whichKeyGroup][]whichKeyCell{}
+	cells := make([]whichKeyCell, 0, len(acts))
 	for _, a := range acts {
-		byGroup[a.Group] = append(byGroup[a.Group], whichKeyCell{key: a.Key(kb), desc: a.Label})
+		cells = append(cells, whichKeyCell{key: a.Key(kb), desc: a.Label})
 	}
-	out := make([]whichKeyGroupCells, 0, len(byGroup))
-	for _, g := range whichKeyGroupOrder() {
-		if cells := byGroup[g]; len(cells) > 0 {
-			sortWhichKeyCells(cells)
-			out = append(out, whichKeyGroupCells{Title: string(g), Cells: cells})
-		}
-	}
-	return out
+	sortWhichKeyCells(cells)
+	return cells
 }
 
 // scrollWhichKey moves the panel viewport by half a page, the same half-page
 // step ctrl+d/ctrl+u take everywhere else in the app. A no-op when everything
 // already fits.
-func (m Model) scrollWhichKey(groups []whichKeyGroupCells, down bool) Model {
-	lay, ok := m.whichKeyLayoutFor(groups)
+func (m Model) scrollWhichKey(cells []whichKeyCell, down bool) Model {
+	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok || lay.maxScroll == 0 {
 		return m
 	}
@@ -99,13 +95,13 @@ func (m Model) scrollWhichKey(groups []whichKeyGroupCells, down bool) Model {
 // handleWhichKeyScrollKey consumes the half-page scroll keys for a visible
 // panel. Callers MUST gate this on whichKey.shown so ctrl+d/ctrl+u keep their
 // normal explorer action whenever no panel is on screen.
-func (m Model) handleWhichKeyScrollKey(msg tea.KeyPressMsg, groups []whichKeyGroupCells) (Model, bool) {
+func (m Model) handleWhichKeyScrollKey(msg tea.KeyPressMsg, cells []whichKeyCell) (Model, bool) {
 	kb := ui.ActiveKeybindings
 	switch key := msg.String(); {
 	case kb.PageDown != "" && key == kb.PageDown:
-		return m.scrollWhichKey(groups, true), true
+		return m.scrollWhichKey(cells, true), true
 	case kb.PageUp != "" && key == kb.PageUp:
-		return m.scrollWhichKey(groups, false), true
+		return m.scrollWhichKey(cells, false), true
 	}
 	return m, false
 }
@@ -126,7 +122,7 @@ func (m Model) whichKeyLeaderIntercept(msg tea.KeyPressMsg) (Model, bool) {
 		return m, false
 	}
 	if m.whichKey.shown {
-		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.whichKeyLeaderGroups()); scrolled {
+		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.whichKeyLeaderCells()); scrolled {
 			return out, true
 		}
 	}
@@ -142,5 +138,5 @@ func (m Model) renderWhichKeyLeader(background string) string {
 	if !m.whichKey.armed || !m.whichKey.shown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	return m.renderWhichKeyPanel(background, m.whichKeyLeaderGroups(), m.whichKey.scroll)
+	return m.renderWhichKeyPanel(background, m.whichKeyLeaderCells(), m.whichKey.scroll)
 }

@@ -8,7 +8,9 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// whichKeyGroup labels one section of the leader panel.
+// whichKeyGroup classifies a catalog entry. It organises this file only — the
+// panel renders one flat list with no section headers, the way neovim's
+// which-key does, so a group name never reaches the screen.
 type whichKeyGroup string
 
 const (
@@ -20,15 +22,11 @@ const (
 	wkSettings  whichKeyGroup = "Settings"
 )
 
-// whichKeyGroupOrder is the fixed render order — also the leader's
-// page-1-first order (Task 5): Actions and Views are what a user reaches for
-// most (mutate/inspect the highlighted row, switch what pane is showing), so
-// they lead and land on page 1 at common terminal sizes. Filter, Selection,
-// Sort, and Settings follow in that order: filtering/namespace scoping is
-// still a frequent reach, multi-select and sort are situational, and Settings
-// (theme, mouse, watch mode) is configuration a user sets once and rarely
-// revisits. Later groups are the first to be dropped when a single page still
-// doesn't fit (the goto popup's fallback path).
+// whichKeyGroupOrder is the declared set of catalog groups, listed
+// most-reached-for first. It no longer drives the panel — that is one flat
+// list sorted by key — so this is now the allowlist
+// TestWhichKeyRegistry_EveryEntryHasADeclaredGroup checks every entry against,
+// and the reading order for the catalog below.
 func whichKeyGroupOrder() []whichKeyGroup {
 	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
 }
@@ -469,9 +467,9 @@ func wkDiffAvailable(c *wkCtx) bool {
 // unlikely to remember, not for h/j/k/l.
 //
 // The section comments below group entries for reading only; they are NOT the
-// render order. Each entry's Group field decides its section, and
-// whichKeyGroupOrder() decides the order those sections are drawn in — adding
-// an entry under a section comment does not place it on screen there.
+// render order. The panel is one flat list sorted by key (whichKeyLeaderCells),
+// with no section headers at all, so neither the comments nor an entry's Group
+// field affect where it lands on screen.
 //
 // Built once at package init rather than per call: the panel re-filters on
 // every render, and rebuilding the catalog would re-run every wkKindIn /

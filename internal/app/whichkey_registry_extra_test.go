@@ -62,6 +62,33 @@ func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 	}
 }
 
+// TestWhichKeyRegistry_EveryEntryHasADeclaredGroup is the guard that kept the
+// Group field honest once the panel stopped rendering section headers. Group no
+// longer reaches the screen, so nothing else would notice an entry carrying a
+// typo'd or zero-value group; whichKeyGroupOrder is the declared set it must
+// belong to.
+func TestWhichKeyRegistry_EveryEntryHasADeclaredGroup(t *testing.T) {
+	declared := map[whichKeyGroup]bool{}
+	for _, g := range whichKeyGroupOrder() {
+		if g == "" {
+			t.Fatal("whichKeyGroupOrder must not contain the zero group")
+		}
+		declared[g] = true
+	}
+	seen := map[whichKeyGroup]bool{}
+	for _, a := range whichKeyExplorerActions() {
+		if !declared[a.Group] {
+			t.Errorf("catalog entry %q carries group %q, which whichKeyGroupOrder does not declare", a.Label, a.Group)
+		}
+		seen[a.Group] = true
+	}
+	for g := range declared {
+		if !seen[g] {
+			t.Errorf("group %q is declared but no catalog entry uses it; drop it or use it", g)
+		}
+	}
+}
+
 // TestAvailableWhichKeyActions_LevelScopingTableIsComplete is the forcing
 // function the level-scoping table's "add a row here" comment used to only
 // request: every catalog entry must have a table row or a documented

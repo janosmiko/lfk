@@ -434,7 +434,7 @@ func (m Model) leaderOrExplorerHints() []ui.HintEntry {
 		return m.explorerHintEntries()
 	}
 	hints := make([]ui.HintEntry, 0, 2)
-	if lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups()); ok && lay.maxScroll > 0 {
+	if lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells()); ok && lay.maxScroll > 0 {
 		kb := ui.ActiveKeybindings
 		hints = append(hints, ui.HintEntry{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"})
 	}

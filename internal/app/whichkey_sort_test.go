@@ -79,30 +79,30 @@ func TestSortWhichKeyCells_IsDeterministic(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeaderGroups_EntriesAreSorted: the panel's own groups must come
-// out sorted, not in catalog declaration order, which is what made the old
-// panel look arbitrary.
-func TestWhichKeyLeaderGroups_EntriesAreSorted(t *testing.T) {
+// TestWhichKeyLeaderCells_AreSorted: the panel's entries must come out sorted,
+// not in catalog declaration order, which is what made the old panel look
+// arbitrary. With the group headers gone this now covers the WHOLE list rather
+// than each section separately.
+func TestWhichKeyLeaderCells_AreSorted(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	for _, g := range whichKeyTestModel().whichKeyLeaderGroups() {
-		want := slices.Clone(g.Cells)
-		sortWhichKeyCells(want)
-		if !slices.Equal(g.Cells, want) {
-			t.Errorf("group %q is not sorted:\n got %v\nwant %v", g.Title, g.Cells, want)
+	cells := whichKeyTestModel().whichKeyLeaderCells()
+	want := slices.Clone(cells)
+	sortWhichKeyCells(want)
+	if !slices.Equal(cells, want) {
+		t.Errorf("the panel list is not sorted:\n got %v\nwant %v", cells, want)
+	}
+	// Spot-check the property directly rather than only against the helper:
+	// no punctuation-only key may precede an alphanumeric one.
+	seenPunct := ""
+	for _, c := range cells {
+		if wkAlphanumRank(c.key) == 1 && seenPunct == "" {
+			seenPunct = c.key
+			continue
 		}
-		// Spot-check the property directly rather than only against the helper:
-		// no punctuation-only key may precede an alphanumeric one.
-		seenPunct := ""
-		for _, c := range g.Cells {
-			if wkAlphanumRank(c.key) == 1 && seenPunct == "" {
-				seenPunct = c.key
-				continue
-			}
-			if seenPunct != "" && wkAlphanumRank(c.key) == 0 {
-				t.Errorf("group %q: alphanumeric key %q sorts after punctuation key %q", g.Title, c.key, seenPunct)
-			}
+		if seenPunct != "" && wkAlphanumRank(c.key) == 0 {
+			t.Errorf("alphanumeric key %q sorts after punctuation key %q", c.key, seenPunct)
 		}
 	}
 }

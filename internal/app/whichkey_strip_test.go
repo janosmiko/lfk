@@ -46,7 +46,7 @@ func TestWhichKeyStrip_HeightGrowsToFitAndCapsAt25(t *testing.T) {
 		m.whichKey.armed = true
 		m.whichKey.shown = true
 
-		lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+		lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
 		if !ok {
 			t.Fatalf("height=%d: the panel must lay out", h)
 		}
@@ -80,7 +80,7 @@ func TestWhichKeyStrip_ShortContentStillMeetsTheMinimumHeight(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ConfigWhichKeyEnabled = true
 	// availableWhichKeyActions drops entries whose key the user cleared, so a
-	// single binding leaves one group: a title row plus one grid row.
+	// single binding leaves a one-row list — no header row to pad it out.
 	kb := ui.Keybindings{}
 	kb.Refresh = "R"
 	kb.WhichKeyLeader = "?" // so whichKeyHelpKey resolves to the (cleared) kb.Help
@@ -91,7 +91,7 @@ func TestWhichKeyStrip_ShortContentStillMeetsTheMinimumHeight(t *testing.T) {
 	m.whichKey.armed = true
 	m.whichKey.shown = true
 
-	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderGroups())
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
 	if !ok {
 		t.Fatal("precondition: a two-entry catalog must still lay out")
 	}

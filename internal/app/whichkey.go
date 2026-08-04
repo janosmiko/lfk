@@ -193,7 +193,7 @@ func (m Model) handleGotoChord(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	// The popup shares the leader panel's scrolling viewport, so the scroll
 	// keys must move it rather than be swallowed as an unregistered chord.
 	if m.whichKey.shown {
-		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.gotoWhichKeyGroups()); scrolled {
+		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.whichKeyCells()); scrolled {
 			return out, nil, true
 		}
 	}
@@ -246,10 +246,4 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	}
 	sortWhichKeyCells(cells)
 	return cells
-}
-
-// gotoWhichKeyGroups wraps the goto entries as the single untitled group the
-// shared panel renderer takes.
-func (m Model) gotoWhichKeyGroups() []whichKeyGroupCells {
-	return []whichKeyGroupCells{{Cells: m.whichKeyCells()}}
 }
