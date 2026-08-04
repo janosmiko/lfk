@@ -63,10 +63,11 @@ func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 }
 
 // TestWhichKeyRegistry_EveryEntryHasADeclaredGroup is the guard that kept the
-// Group field honest once the panel stopped rendering section headers. Group no
-// longer reaches the screen, so nothing else would notice an entry carrying a
-// typo'd or zero-value group; whichKeyGroupOrder is the declared set it must
-// belong to.
+// Group field honest once the panel stopped rendering section headers. Group
+// no longer reaches the screen as text — it drives sort clustering and the
+// description color instead — so nothing else would notice an entry carrying
+// a typo'd or zero-value group; whichKeyGroupOrder is the declared set it
+// must belong to.
 func TestWhichKeyRegistry_EveryEntryHasADeclaredGroup(t *testing.T) {
 	declared := map[whichKeyGroup]bool{}
 	for _, g := range whichKeyGroupOrder() {

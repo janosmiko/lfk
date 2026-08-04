@@ -60,11 +60,11 @@ func (m Model) disarmWhichKeyLeader() Model {
 
 // whichKeyLeaderCells turns the currently-available actions into the panel's
 // single flat entry list, ordered by sortWhichKeyCells rather than by position
-// in the catalog. neovim's which-key draws no section headers, so the Group
-// never decides where an entry LANDS — one uninterrupted list is what lets the
-// entries flow column-major across the whole panel instead of restarting per
-// section. It is carried onto the cell only to tint the key, which is what
-// replaced the headers as the category cue.
+// in the catalog. neovim's which-key draws no section headers, but
+// sortWhichKeyCells clusters by Group before its within-group key sort, so
+// each group still lands as one contiguous run — the entries flow column-major
+// across the whole panel rather than restarting per section, and the group's
+// color (not a header) is what reads as the category cue.
 func (m Model) whichKeyLeaderCells() []whichKeyCell {
 	acts := m.availableWhichKeyActions()
 	kb := ui.ActiveKeybindings

@@ -93,16 +93,91 @@ func TestWhichKeyLeaderCells_AreSorted(t *testing.T) {
 	if !slices.Equal(cells, want) {
 		t.Errorf("the panel list is not sorted:\n got %v\nwant %v", cells, want)
 	}
-	// Spot-check the property directly rather than only against the helper:
-	// no punctuation-only key may precede an alphanumeric one.
+	// Spot-check the property directly rather than only against the helper,
+	// scoped to one group's run: within a group, no punctuation-only key may
+	// precede an alphanumeric one. This no longer holds ACROSS groups — group
+	// clustering means an early group's punctuation (e.g. Actions' "ctrl+l")
+	// now legitimately sorts ahead of a later group's letter key (e.g. Views'
+	// "P") — see TestSortWhichKeyCells_ClustersByGroupThenKey for that
+	// boundary case and TestWhichKeyLeaderCells_GroupsFormContiguousRuns for
+	// the clustering property itself.
+	var curGroup whichKeyGroup
 	seenPunct := ""
-	for _, c := range cells {
+	for i, c := range cells {
+		if i == 0 || c.group != curGroup {
+			curGroup = c.group
+			seenPunct = ""
+		}
 		if wkAlphanumRank(c.key) == 1 && seenPunct == "" {
 			seenPunct = c.key
 			continue
 		}
 		if seenPunct != "" && wkAlphanumRank(c.key) == 0 {
-			t.Errorf("alphanumeric key %q sorts after punctuation key %q", c.key, seenPunct)
+			t.Errorf("within group %q, alphanumeric key %q sorts after punctuation key %q", c.group, c.key, seenPunct)
+		}
+	}
+}
+
+// TestSortWhichKeyCells_ClustersByGroupThenKey is the grouping invariant the
+// task calls for: each group's entries land as one contiguous run, the runs
+// appear in whichKeyGroupOrder order, and the within-group order still
+// follows the plain key sort (TestSortWhichKeyCells_PortsNeovimOrdering).
+// Input is deliberately shuffled and interleaved across groups — including a
+// group whose only entry is punctuation-ranked (Sort, all of ">"/"<"/"="/"-")
+// sitting ahead of a later group's alphanumeric keys, the exact boundary case
+// TestWhichKeyLeaderCells_AreSorted's old whole-list spot-check would have
+// flagged — to prove the group pass, not incoming order, decides adjacency.
+func TestSortWhichKeyCells_ClustersByGroupThenKey(t *testing.T) {
+	cells := []whichKeyCell{
+		{key: "-", desc: "Reset sort", group: wkSort},
+		{key: "y", desc: "Copy name", group: wkActions},
+		{key: "ctrl+d", desc: "Diff", group: wkSelection},
+		{key: "f", desc: "Filter", group: wkFilter},
+		{key: ">", desc: "Sort next", group: wkSort},
+		{key: "P", desc: "Preview", group: wkViews},
+		{key: "ctrl+l", desc: "Logs", group: wkActions},
+		{key: "w", desc: "Watch", group: wkSettings},
+		{key: "a", desc: "Toggle select", group: wkSelection},
+		{key: "T", desc: "Theme", group: wkSettings},
+	}
+	sortWhichKeyCells(cells)
+
+	// Runs must be contiguous and appear in whichKeyGroupOrder order.
+	order := whichKeyGroupOrder()
+	rankOf := func(g whichKeyGroup) int {
+		for i, og := range order {
+			if og == g {
+				return i
+			}
+		}
+		t.Fatalf("fixture group %q is not declared in whichKeyGroupOrder", g)
+		return -1
+	}
+	seenGroups := []whichKeyGroup{}
+	for i, c := range cells {
+		if i == 0 || cells[i-1].group != c.group {
+			if len(seenGroups) > 0 && seenGroups[len(seenGroups)-1] == c.group {
+				t.Fatalf("group %q appears in two separate runs: %v", c.group, cells)
+			}
+			seenGroups = append(seenGroups, c.group)
+		}
+	}
+	for i := 1; i < len(seenGroups); i++ {
+		if rankOf(seenGroups[i-1]) >= rankOf(seenGroups[i]) {
+			t.Fatalf("group runs are not in whichKeyGroupOrder order: %v", seenGroups)
+		}
+	}
+
+	// Within each run, the order matches the plain key sort of that subset.
+	byGroup := map[whichKeyGroup][]whichKeyCell{}
+	for _, c := range cells {
+		byGroup[c.group] = append(byGroup[c.group], c)
+	}
+	for g, got := range byGroup {
+		want := slices.Clone(got)
+		sortWhichKeyCells(want)
+		if !slices.Equal(got, want) {
+			t.Errorf("group %q run is not key-sorted:\n got %v\nwant %v", g, got, want)
 		}
 	}
 }

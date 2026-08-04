@@ -133,8 +133,17 @@ func TestWhichKeyLeader_HiddenWhenDisabled(t *testing.T) {
 // TestWhichKeyLeaderCells_AreOneSortedListAcrossGroups replaces the old
 // "groups come out in whichKeyGroupOrder" assertion. The panel is a single flat
 // list now, so the property that matters is that the whole list is in
-// which-key order end to end — including across entries that belong to
-// different catalog groups, which the per-group layout used to keep apart.
+// which-key order end to end, INCLUDING the group clustering pass —
+// sortWhichKeyCells is the single source of truth for the list's order, not
+// just its within-group tail.
+//
+// This used to assert the opposite — that entries from different catalog
+// groups interleave — back when the sort was pure-key with no group pass. That
+// was deliberately the point being tested before: a flat list without even a
+// group-based clustering. Grouping was added specifically so each group's
+// color would form a contiguous, readable run instead of scattering across the
+// grid, which requires entries to NOT interleave across groups; see
+// TestWhichKeyLeaderCells_GroupsFormContiguousRuns for that property.
 func TestWhichKeyLeaderCells_AreOneSortedListAcrossGroups(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -151,14 +160,49 @@ func TestWhichKeyLeaderCells_AreOneSortedListAcrossGroups(t *testing.T) {
 	if !slices.Equal(cells, sorted) {
 		t.Fatalf("the flat list is not in which-key order:\n got %v\nwant %v", cells, sorted)
 	}
-	// Entries from different catalog groups must interleave; if they didn't,
-	// the panel would still be grouped, just without the headers.
 	groups := map[whichKeyGroup]bool{}
 	for _, a := range m.availableWhichKeyActions() {
 		groups[a.Group] = true
 	}
 	if len(groups) < 2 {
 		t.Fatalf("precondition: the fixture must span several catalog groups, got %d", len(groups))
+	}
+}
+
+// TestWhichKeyLeaderCells_GroupsFormContiguousRuns is the end-to-end version
+// of TestSortWhichKeyCells_ClustersByGroupThenKey, run against the real
+// catalog rather than a synthetic fixture: with the full set of available
+// actions, each group's description color must land as one unbroken run, in
+// whichKeyGroupOrder order, so the panel's color reads as structure instead
+// of noise.
+func TestWhichKeyLeaderCells_GroupsFormContiguousRuns(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	cells := m.whichKeyLeaderCells()
+
+	order := whichKeyGroupOrder()
+	rankOf := map[whichKeyGroup]int{}
+	for i, g := range order {
+		rankOf[g] = i
+	}
+
+	seenGroups := []whichKeyGroup{}
+	for i, c := range cells {
+		if i == 0 || cells[i-1].group != c.group {
+			if len(seenGroups) > 0 && seenGroups[len(seenGroups)-1] == c.group {
+				t.Fatalf("group %q appears in two separate runs, not one contiguous block", c.group)
+			}
+			seenGroups = append(seenGroups, c.group)
+		}
+	}
+	if len(seenGroups) < 2 {
+		t.Fatalf("precondition: the fixture must span several catalog groups, got %v", seenGroups)
+	}
+	for i := 1; i < len(seenGroups); i++ {
+		if rankOf[seenGroups[i-1]] >= rankOf[seenGroups[i]] {
+			t.Fatalf("group runs are not in whichKeyGroupOrder order: %v", seenGroups)
+		}
 	}
 }
 

@@ -24,10 +24,11 @@ const (
 )
 
 // whichKeyGroupOrder is the declared set of catalog groups, listed
-// most-reached-for first. It no longer drives the panel — that is one flat
-// list sorted by key — so this is now the allowlist
-// TestWhichKeyRegistry_EveryEntryHasADeclaredGroup checks every entry against,
-// and the reading order for the catalog below.
+// most-reached-for first. It drives two things: the cluster order
+// sortWhichKeyCells sorts by (each group's entries form one contiguous run in
+// this order, so its color reads as a structural cue rather than noise), and
+// the allowlist TestWhichKeyRegistry_EveryEntryHasADeclaredGroup checks every
+// entry against. It is also the reading order for the catalog below.
 func whichKeyGroupOrder() []whichKeyGroup {
 	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
 }
@@ -467,10 +468,10 @@ func wkDiffAvailable(c *wkCtx) bool {
 // bindings are absent by construction — the panel is for actions the user is
 // unlikely to remember, not for h/j/k/l.
 //
-// The section comments below group entries for reading only; they are NOT the
-// render order. The panel is one flat list sorted by key (whichKeyLeaderCells),
-// with no section headers at all, so neither the comments nor an entry's Group
-// field affect where it lands on screen.
+// The section comments below match the render order now: the panel is one
+// flat list, no section headers, but sortWhichKeyCells clusters entries by
+// Group (whichKeyGroupOrder) before its within-group key sort, so each
+// section below lands as one contiguous, one-colored run on screen.
 //
 // Built once at package init rather than per call: the panel re-filters on
 // every render, and rebuilding the catalog would re-run every wkKindIn /
