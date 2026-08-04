@@ -9,9 +9,11 @@ import (
 )
 
 // whichKeyGroup classifies a catalog entry. The panel renders one flat list
-// with no section headers, the way neovim's which-key does, so a group NAME
-// never reaches the screen — but its color does: each group tints its entries'
-// keys (whichKeyGroupStyles), which is the category cue the headers used to be.
+// with no section headers, the way neovim's which-key does; the category cue
+// the headers used to be is the color each group tints its entries'
+// DESCRIPTIONS with (whichKeyGroupStyles - the keys keep one shared accent).
+// The group name reaches the screen only in the legend row at the foot of the
+// panel (whichKeyLegendLine), drawn in that same color.
 type whichKeyGroup string
 
 const (
@@ -510,12 +512,12 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.Scale }, Label: "Scale", Group: wkActions, Avail: wkSingleCluster(wkWritableKindIn("Deployment", "StatefulSet", "ReplicaSet", "HorizontalPodAutoscaler"))},
 
 	// Selection
+	{Key: func(kb ui.Keybindings) string { return kb.ToggleSelect }, Label: "Toggle selection", Group: wkSelection, Avail: wkOnRow},
 	// SelectAll's gate is level-only (handleKeySelectAll, update_keys.go):
 	// unlike SelectRange, it never reads the cursor row, only
 	// m.selectedItems (survives filtering) and visibleMiddleItems() directly,
 	// so wkOnRow's "sel != nil" would wrongly hide it when a selection exists
 	// but the filter has narrowed the visible list to zero rows.
-	{Key: func(kb ui.Keybindings) string { return kb.ToggleSelect }, Label: "Toggle selection", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.Diff }, Label: "Diff two selected", Group: wkSelection, Avail: wkDiffAvailable},

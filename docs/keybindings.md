@@ -259,7 +259,7 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 
 ## Which-Key Panel
 
-`?` opens a panel above the status bar listing the hotkeys actionable on the current row as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category the way neovim does: letters and digits first, then modifier chords, then punctuation. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
+`?` opens a panel above the status bar listing the hotkeys actionable on the current row as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first (letters and digits, then punctuation), then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
 
 | Key | Action |
 |---|---|
