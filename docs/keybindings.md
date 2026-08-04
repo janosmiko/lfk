@@ -279,16 +279,19 @@ Descriptions are colored by category, since there are no headers to say it. Keys
 | Sort | amber | Sort next/previous, Flip, Reset |
 | Settings | orange | Watch mode, Read-only, Color scheme |
 
-Keys render as glyphs when `icons` allows them; `simple`, `none`, and `no_color` keep the textual form.
+Keys render as glyphs when `icons` allows them; `simple`, `none`, and `no_color` keep the textual form. The help screen's (`F1`) key column uses this same substitution.
 
 | Binding | `nerdfont` | `unicode` / `emoji` | `simple` / `none` |
 |---|---|---|---|
 | `ctrl+d` | `󰘴 D` | `⌃D` | `ctrl+d` |
 | `ctrl+shift+x` | `󰘴 󰘶 X` | `⌃⇧X` | `ctrl+shift+x` |
 | `space` | `󱁐` | `␣` | `space` |
-| `tab` / `enter` / `esc` | `󰌒` / `󰌑` / `󱊷` | `tab` / `enter` / `esc` | `tab` / `enter` / `esc` |
+| `tab` | `󰌒` | `⇥` | `tab` |
+| `backspace` | `󰁮` | `⌫` | `backspace` |
+| `left` / `right` / `up` / `down` | `󰁍` / `󰁔` / `󰁝` / `󰁅` | `←` / `→` / `↑` / `↓` | `left` / `right` / `up` / `down` |
+| `enter` / `esc` | `󰌑` / `󱊷` | `enter` / `esc` | `enter` / `esc` |
 
-`nerdfont` uses which-key.nvim's keycap glyphs and pads each modifier with a space, since the proportional Nerd Font variants draw a keycap wider than one cell. `unicode` keeps `tab`/`enter`/`esc` as words: `⇥`/`⏎`/`⎋` are easily confused at one cell. The goto popup (`g`) has no categories and keeps a single description color.
+`nerdfont` uses which-key.nvim's keycap glyphs (plain arrow keycaps for `left`/`right`/`up`/`down` — Material Design Icons has no dedicated keyboard-arrow set) and pads each modifier with a space, since the proportional Nerd Font variants draw a keycap wider than one cell. `unicode` keeps `enter`/`esc` as words: `⏎`/`⎋` are easily confused at one cell; `tab`/`backspace`/the arrows each have one unambiguous glyph, so those switch. The goto popup (`g`) has no categories and keeps a single description color.
 
 `?` is the leader only in the explorer; every fullscreen viewer keeps `?` as help. `F1` opens the help screen from the explorer. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal.
 

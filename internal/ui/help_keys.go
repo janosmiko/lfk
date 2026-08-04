@@ -131,19 +131,40 @@ func chordText(tok string) string {
 
 // helpKeySymbols formats a keybinding the way the key column draws it:
 // modifier chords become the same glyphs the which-key panel uses
-// ("ctrl+d" -> "⌃D"), everything else stays textual. Falls back to
-// helpKeyDisplay whenever the icon mode cannot promise non-ASCII, so
-// plain and no-color terminals still read "Ctrl+D".
+// ("ctrl+d" -> "⌃D"), and a bare named key becomes the which-key panel's
+// keycap for it ("tab" -> "⇥"). Everything else stays textual. Falls back
+// to helpKeyDisplay whenever the icon mode cannot promise non-ASCII, so
+// plain and no-color terminals still read "Ctrl+D" / "Tab".
+//
+// The bare-key lookup goes through the same keyGlyphs() table
+// KeyChordDisplay uses rather than calling KeyChordDisplay itself: that
+// function's own bare-key fallback returns the lowercased key, which would
+// silently downcase a catalog label like "Left" to "left" whenever it has
+// no glyph. Falling back to tok (the original token) keeps that case intact.
+//
+// bareKeyEligible guards the substitution against the catalog's prose
+// entries ("Click left pane", "Right-click"): every real list of
+// alternative bindings in this catalog joins with "/" ("h/Backspace/Left"),
+// never a space or hyphen, so a raw key containing either is a description,
+// not a binding, and must keep "left"/"right" as the words they are — a
+// mouse pane or button, not the arrow key.
 func helpKeySymbols(key string) string {
 	if ConfigNoColor || !iconModeDrawsSymbols() {
 		return helpKeyDisplayDotted(key)
 	}
+	_, names, _ := keyGlyphs()
+	bareKeyEligible := !strings.ContainsAny(key, " -")
 	symbols := mapChordTokens(key, func(tok string) string {
 		lower := strings.ToLower(tok)
-		if _, _, ok := splitModifierChord(lower); !ok {
-			return tok
+		if _, _, ok := splitModifierChord(lower); ok {
+			return KeyChordDisplay(lower)
 		}
-		return KeyChordDisplay(lower)
+		if bareKeyEligible {
+			if g, isNamed := names[lower]; isNamed {
+				return g
+			}
+		}
+		return tok
 	})
 	return applyKeySeparatorDots(symbols)
 }

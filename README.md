@@ -151,7 +151,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Configurable keybindings** for direct actions, including `Ctrl+Shift` chords that stay distinct from plain `Ctrl` (requires Kitty keyboard protocol or xterm `modifyOtherKeys`: Ghostty, kitty, WezTerm, foot, xterm — not macOS Terminal.app; see [Ctrl+Shift chords](docs/keybindings.md#ctrlshift-chords))
 - **Configurable search abbreviations**
 - **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
-- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable. Also decides how the which-key panel draws keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
+- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable. Also decides how the which-key panel and help screen draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
 - **Configurable table columns** (global, per-resource-type, and per-cluster)
 - **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)

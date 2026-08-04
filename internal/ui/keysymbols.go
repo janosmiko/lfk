@@ -33,23 +33,40 @@ var nerdModifierGlyphs = map[string]string{
 	"super": "\U000F0633",
 }
 
-// nerdKeyGlyphs replaces the spelled-out name of a key that prints nothing with
-// which-key.nvim's keycap for it. Keys whose name already reads as a key
-// ("left", "pgup", "f1") stay textual: a glyph there trades a legible word for
-// a lookup.
+// nerdKeyGlyphs replaces the spelled-out name of a key that prints nothing
+// (or, for the arrows, prints a name a large keycap reads faster than) with
+// which-key.nvim's keycap for it. There is no dedicated keyboard-arrow icon
+// in Material Design Icons, so the arrows below reuse its plain arrow
+// glyphs — the same choice the reference which-key config makes. Keys with
+// no settled keycap ("pgup", "f1") stay textual: a glyph there would have to
+// be invented rather than looked up.
 var nerdKeyGlyphs = map[string]string{
 	"space":     "\U000F1050", // md-keyboard-space
 	"tab":       "\U000F0312", // md-keyboard-tab
 	"enter":     "\U000F0311", // md-keyboard-return
 	"esc":       "\U000F12B7", // md-keyboard-esc
 	"backspace": "\U000F006E", // md-backspace
+	"left":      "\U000F004D", // md-arrow-left
+	"right":     "\U000F0054", // md-arrow-right
+	"up":        "\U000F005D", // md-arrow-up
+	"down":      "\U000F0045", // md-arrow-down
 }
 
-// unicodeKeyGlyphs is the same substitution for the fonts that have no keycaps.
-// Only space qualifies: OPEN BOX is unmistakable, whereas ⇥ / ⏎ / ⎋ are small,
-// easily confused with each other, and lose to the words "tab", "enter", "esc".
+// unicodeKeyGlyphs is the same substitution for the fonts that have no
+// keycaps. "enter" and "esc" are deliberately absent: ⏎ / ⎋ are small,
+// easily confused with each other, and lose to the words "enter" and "esc"
+// — that call still stands for unicode mode even though nerdfont mode's
+// large keycaps settled it the other way for those two. Space, tab,
+// backspace and the arrows all have a single glyph with no such
+// ambiguity, so they make the cut.
 var unicodeKeyGlyphs = map[string]string{
-	"space": "␣", // OPEN BOX
+	"space":     "␣", // OPEN BOX
+	"tab":       "⇥", // RIGHTWARDS ARROW TO BAR
+	"backspace": "⌫", // ERASE TO THE LEFT
+	"left":      "←", // LEFTWARDS ARROW
+	"right":     "→", // RIGHTWARDS ARROW
+	"up":        "↑", // UPWARDS ARROW
+	"down":      "↓", // DOWNWARDS ARROW
 }
 
 // nerdGlyphPad separates a Nerd Font glyph from whatever the chord writes after

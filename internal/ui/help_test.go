@@ -479,8 +479,9 @@ func TestHelpKeySymbols_ByIconMode(t *testing.T) {
 	ConfigNoColor = false
 	IconMode = "unicode"
 	assert.Equal(t, "⌃D · ⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
-	assert.Equal(t, "tab · ⇧Tab", helpKeySymbols("tab/shift+tab"))
+	assert.Equal(t, "⇥ · ⇧⇥", helpKeySymbols("tab/shift+tab"))
 	assert.Equal(t, "m<a-z/0-9>", helpKeySymbols("m<a-z/0-9>"))
+	assert.Equal(t, "h · ←", helpKeySymbols("h/Left"))
 
 	// Terminals that promise only ASCII keep the readable textual chord,
 	// dotted the same way.
@@ -489,6 +490,180 @@ func TestHelpKeySymbols_ByIconMode(t *testing.T) {
 	IconMode = "unicode"
 	ConfigNoColor = true
 	assert.Equal(t, "Ctrl+D · Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+}
+
+// helpKeySymbols must apply the same bare-named-key substitution
+// KeyChordDisplay uses for the which-key panel, including inside a
+// slash-joined alternative list ("h/Backspace/Left" -> "h · <backspace> ·
+// <left>") — the panel and the help screen must never disagree on how a
+// named key draws.
+func TestHelpKeySymbols_NamedKeyIcons(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	ConfigNoColor = false
+
+	tests := []struct {
+		icons, given, want string
+	}{
+		{"nerdfont", "tab", "\U000F0312"},
+		{"nerdfont", "space", "\U000F1050"},
+		{"nerdfont", "backspace", "\U000F006E"},
+		{"nerdfont", "Left", "\U000F004D"}, // catalog labels are capitalized
+		{"nerdfont", "Right", "\U000F0054"},
+		{"nerdfont", "Up", "\U000F005D"},
+		{"nerdfont", "Down", "\U000F0045"},
+		{"nerdfont", "h/Backspace/Left", "h · \U000F006E · \U000F004D"},
+		{"nerdfont", "space/Right", "\U000F1050 · \U000F0054"},
+		{"unicode", "tab", "⇥"},
+		{"unicode", "space", "␣"},
+		{"unicode", "backspace", "⌫"},
+		{"unicode", "Left", "←"},
+		{"unicode", "Right", "→"},
+		{"unicode", "Up", "↑"},
+		{"unicode", "Down", "↓"},
+		{"unicode", "h/Backspace/Left", "h · ⌫ · ←"},
+		{"unicode", "space/Right", "␣ · →"},
+		// enter/esc keep the earlier, narrower decision: nerdfont's large
+		// keycaps already resolved them (pre-existing glyphs), unicode's
+		// small ⏎/⎋ never did and this change does not revisit that.
+		{"nerdfont", "enter", "\U000F0311"},
+		{"nerdfont", "esc", "\U000F12B7"},
+		{"unicode", "enter", "enter"},
+		{"unicode", "esc", "esc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.icons+"/"+tt.given, func(t *testing.T) {
+			IconMode = tt.icons
+			assert.Equal(t, tt.want, helpKeySymbols(tt.given))
+		})
+	}
+}
+
+// The catalog's Mouse section describes mouse actions, not keybindings, and
+// happens to use the words "left"/"right" for panes and a button ("Click
+// left pane", "Right-click"). Those must never draw an arrow key icon: every
+// genuine list of alternative bindings in this catalog joins with "/"
+// ("h/Backspace/Left"), never a space or hyphen, so helpKeySymbols uses that
+// as the signal to leave prose alone. Without this guard "Right-click"
+// would render as "→-click", telling the user to press an arrow key for a
+// mouse action.
+func TestHelpKeySymbols_MouseProseStaysTextual(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	ConfigNoColor = false
+
+	prose := []string{"Right-click", "Click left pane", "Click right pane"}
+	for _, icons := range []string{"nerdfont", "unicode"} {
+		IconMode = icons
+		for _, key := range prose {
+			t.Run(icons+"/"+key, func(t *testing.T) {
+				assert.Equal(t, key, helpKeySymbols(key),
+					"a mouse-action label must never be read as a keyboard chord")
+			})
+		}
+	}
+}
+
+// A search for a named key's word must still find its row even though the
+// key column now draws an icon: the search index (keyText) stays textual
+// while only the rendered key column (key) draws the symbol.
+func TestBuildHelpLines_NamedKeyQueryMatchesIconRenderedRows(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+
+	for _, icons := range []string{"nerdfont", "unicode"} {
+		IconMode = icons
+		for _, query := range []string{"backspace", "tab", "left"} {
+			t.Run(icons+"/"+query, func(t *testing.T) {
+				var matched []string
+				for _, line := range BuildHelpLines("", "", 160) {
+					if MatchLine(line, query) {
+						matched = append(matched, line)
+					}
+				}
+				assert.NotEmptyf(t, matched, "a %q search must still find its row in %s mode", query, icons)
+			})
+		}
+	}
+}
+
+// The f filter runs over the same textual search index, so filtering by a
+// named key's word must narrow to its row instead of "No matching
+// keybindings" — mirroring TestBuildHelpSpecs_FilterMatchesTextualChord for
+// the new icon-drawn keys.
+func TestBuildHelpSpecs_FilterMatchesNamedKeyWord(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+	IconMode = "nerdfont"
+
+	specs := buildHelpSpecs("backspace", "", helpInnerWidth(160))
+	assert.NotEmpty(t, specs)
+	found := false
+	for _, s := range specs {
+		if s.kind == helpLineEntry && strings.Contains(strings.ToLower(s.keyText), "backspace") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, `filtering by "backspace" must keep the icon-rendered row`)
+}
+
+// Icons mostly narrow the key column ("backspace" 9 cols -> 1). The column
+// is sized from lipgloss.Width and shared across every section (see
+// helpKeyColumnWidth), so this checks every entry's key column against the
+// real computed width at the icon modes and terminal sizes this change
+// touches — a byte-counted width would have passed for the old ASCII words
+// but silently misaligned once "Backspace" (9 cells) became one glyph.
+//
+// A row is allowed to exceed keyWidth (never to fall short of it): that is
+// helpKeyColumnWidth's documented cap-overflow case (a key past innerW/3
+// overflows its own cell rather than shrinking every description), already
+// exercised by "Click middle pane" — 17 cells wide, uncapped — at width 80
+// regardless of icon mode, since neither word is a named key.
+func TestBuildHelpSpecs_KeysAlignWithinSection_IconModesAndSizes(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	ConfigNoColor = false
+
+	for _, icons := range []string{"nerdfont", "unicode"} {
+		for _, screenWidth := range []int{80, 160} {
+			t.Run(icons+"/", func(t *testing.T) {
+				IconMode = icons
+				innerW := helpInnerWidth(screenWidth)
+				groups := collectHelpGroups("", "")
+				keyWidth := helpKeyColumnWidth(groups, innerW)
+				specs := buildHelpSpecs("", "", innerW)
+
+				exact := 0
+				for _, s := range specs {
+					if s.kind != helpLineEntry {
+						continue
+					}
+					w := lipgloss.Width(s.key)
+					assert.GreaterOrEqualf(t, w, keyWidth,
+						"icons=%s width=%d: key %q (width %d) padded shorter than the column width %d",
+						icons, screenWidth, s.key, w, keyWidth)
+					if w == keyWidth {
+						exact++
+					}
+				}
+				assert.Positive(t, exact,
+					"the column-width padding path must be exercised by at least one row")
+			})
+		}
+	}
 }
 
 // --- separator dots ---

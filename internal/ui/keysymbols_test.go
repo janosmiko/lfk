@@ -79,30 +79,40 @@ func TestKeyChordDisplay_SymbolModes(t *testing.T) {
 		{"unicode", "ctrl+d", "⌃D"},
 		{"emoji", "ctrl+d", "⌃D"},
 		{"unicode", "ctrl+shift+x", "⌃⇧X"},
-		{"unicode", "alt+left", "⌥Left"},
+		{"unicode", "alt+left", "⌥←"},
 		{"unicode", "meta+k", "⌘K"},
 		{"unicode", "super+k", "⌘K"},
 		// nerdfont draws which-key.nvim's keycaps, each modifier followed by the
 		// pad cell that keeps a proportional font off the next character.
 		{"nerdfont", "ctrl+d", "\U000F0634 D"},
 		{"nerdfont", "ctrl+shift+x", "\U000F0634 \U000F0636 X"},
-		{"nerdfont", "alt+left", "\U000F0635 Left"},
+		{"nerdfont", "alt+left", "\U000F0635 \U000F004D"},
 		{"nerdfont", "meta+k", "\U000F0633 K"},
-		// Keys that print nothing become a keycap instead of their name.
+		// Keys that print nothing (or, for the arrows, print a name a keycap
+		// reads faster than) become a keycap instead of their name.
 		{"nerdfont", "space", "\U000F1050"},
 		{"nerdfont", "ctrl+space", "\U000F0634 \U000F1050"},
 		{"nerdfont", "tab", "\U000F0312"},
 		{"nerdfont", "enter", "\U000F0311"},
 		{"nerdfont", "esc", "\U000F12B7"},
 		{"nerdfont", "backspace", "\U000F006E"},
+		{"nerdfont", "right", "\U000F0054"},
+		{"nerdfont", "up", "\U000F005D"},
+		{"nerdfont", "down", "\U000F0045"},
 		{"nerdfont", "shift+tab", "\U000F0636 \U000F0312"},
-		// Unicode has no legible keycap for anything but space.
+		// Unicode has a legible glyph for space, tab, backspace and the
+		// arrows — one unmistakable symbol apiece. Enter and Esc stay
+		// textual: ⏎ / ⎋ are small and easily confused with each other.
 		{"unicode", "space", "␣"},
 		{"unicode", "ctrl+space", "⌃␣"},
-		{"unicode", "tab", "tab"},
+		{"unicode", "tab", "⇥"},
+		{"unicode", "backspace", "⌫"},
+		{"unicode", "right", "→"},
+		{"unicode", "up", "↑"},
+		{"unicode", "down", "↓"},
 		{"unicode", "enter", "enter"},
 		{"unicode", "esc", "esc"},
-		{"unicode", "shift+tab", "⇧Tab"},
+		{"unicode", "shift+tab", "⇧⇥"},
 		// No settled symbol for hyper, so the whole chord stays textual rather
 		// than mixing a glyph and a word.
 		{"unicode", "hyper+k", "hyper+k"},
