@@ -316,7 +316,7 @@ func (m Model) handleExplorerJumpTop() (tea.Model, tea.Cmd) {
 	}
 	if m.pendingG {
 		m.pendingG = false
-		m.whichKey.shown = false
+		m.hideWhichKeyPopup()
 		m.setCursor(0)
 		m.clampCursor()
 		m.syncExpandedGroup()

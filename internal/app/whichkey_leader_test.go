@@ -237,8 +237,8 @@ func TestWhichKeyLeader_RepeatPressTogglesClosed(t *testing.T) {
 		t.Fatal("the first press must open the panel")
 	}
 
-	m = m.scrollWhichKey(m.whichKeyLeaderCells(), true)
-	if m.whichKey.scroll == 0 {
+	m, scrolled := m.scrollWhichKey(m.whichKeyLeaderCells(), true)
+	if !scrolled || m.whichKey.scroll == 0 {
 		t.Fatal("precondition: the full catalog must be scrollable at 80x24")
 	}
 
@@ -691,4 +691,155 @@ func TestWhichKeyLeader_ScrollHintOnlyWhenOverflowing(t *testing.T) {
 			t.Fatalf("the close hint must always render while the panel is up; got %q", bar)
 		}
 	})
+}
+
+// TestWhichKeyLeader_ScrollKeyFallsThroughWhenNothingToScroll: at a size where
+// the whole catalog is on screen there is nowhere to scroll to, so ctrl+d must
+// NOT be swallowed. It used to be consumed regardless, which lost the key's
+// normal half-page list scroll for no visible effect — and contradicted both
+// the hint bar (which already omits the scroll hint in that state) and
+// docs/keybindings.md ("any other key: close, and still run normally").
+func TestWhichKeyLeader_ScrollKeyFallsThroughWhenNothingToScroll(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+
+	m := whichKeyTestModel()
+	m.width, m.height = 200, 40
+	rows := make([]model.Item, 60)
+	for i := range rows {
+		rows[i] = model.Item{Name: fmt.Sprintf("p%02d", i), Kind: "Pod", Namespace: "default"}
+	}
+	m.setMiddleItems(rows)
+	m.setCursor(0)
+
+	out, _ := m.handleExplorerKey(leaderKey())
+	m = out.(Model)
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
+	if !ok || lay.maxScroll != 0 {
+		t.Fatalf("precondition: the panel must fit whole at 200x40 (ok=%v maxScroll=%d)", ok, lay.maxScroll)
+	}
+	for _, h := range m.whichKeyPopupHints(m.whichKeyLeaderCells()) {
+		if h.Desc == "scroll" {
+			t.Fatal("precondition: the hint bar must not advertise scrolling when nothing scrolls")
+		}
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+	got := out.(Model)
+	if got.whichKey.armed || got.whichKey.shown {
+		t.Fatal("an unscrollable panel must close on ctrl+d like any other key")
+	}
+	if got.cursor() == 0 {
+		t.Fatal("ctrl+d must still page the list when the panel has nothing to scroll")
+	}
+}
+
+// TestWhichKeyLeader_ScrollRewindsAfterTheTerminalWidens: the renderer clamps
+// the offset on a local copy only, so widening the terminal while scrolled to
+// the bottom left a stale, too-large offset on the model and the first ctrl+u
+// was visually dead — it only walked the offset back to what was already on
+// screen. The scroll handler now re-clamps against the current layout first.
+func TestWhichKeyLeader_ScrollRewindsAfterTheTerminalWidens(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 14
+	out, _ := m.handleExplorerKey(leaderKey())
+	m = out.(Model)
+
+	narrow, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
+	if !ok || narrow.maxScroll == 0 {
+		t.Fatalf("precondition: the panel must overflow at 80x14 (ok=%v maxScroll=%d)", ok, narrow.maxScroll)
+	}
+	// Scroll to the very bottom, then widen so far fewer rows are needed.
+	for m.whichKey.scroll < narrow.maxScroll {
+		out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+		m = out.(Model)
+	}
+	stale := m.whichKey.scroll
+	m.width, m.height = 160, 16
+
+	wide, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
+	if !ok || wide.maxScroll == 0 || wide.maxScroll >= stale {
+		t.Fatalf("precondition: widening must shrink maxScroll below the stale offset but keep scrolling (stale=%d, new maxScroll=%d)", stale, wide.maxScroll)
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageUp))
+	got := out.(Model).whichKey.scroll
+	if want := max(wide.maxScroll-max(wide.viewRows/2, 1), 0); got != want {
+		t.Fatalf("ctrl+u after a widen must step back from the clamped bottom (%d), got scroll=%d want %d", wide.maxScroll, got, want)
+	}
+}
+
+// TestWhichKeyPanel_CellsBuiltOncePerFrame: the panel and the hint bar both
+// need the same entries, and each build runs the whole availability catalog.
+// renderView primes a one-frame cache; both consumers must read it rather than
+// rebuild.
+func TestWhichKeyPanel_CellsBuiltOncePerFrame(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 24
+
+	if primed := m.primeWhichKeyCells(); primed.whichKey.cells != nil {
+		t.Fatal("no panel on screen: nothing to cache")
+	}
+
+	out, _ := m.handleExplorerKey(leaderKey())
+	m = out.(Model)
+	primed := m.primeWhichKeyCells()
+	if len(primed.whichKey.cells) == 0 {
+		t.Fatal("a shown leader panel must prime the frame cache")
+	}
+
+	// A sentinel the real catalog can never produce: if either consumer
+	// rebuilt instead of reading the cache, it would not see this.
+	sentinel := []whichKeyCell{{key: "Z", desc: "sentinel-only-entry"}}
+	fillWhichKeyDisplay(sentinel)
+	m.whichKey.cells = sentinel
+
+	bg := strings.Repeat("\n", m.height)
+	if out := stripANSI(m.renderWhichKeyLeader(bg)); !strings.Contains(out, "sentinel-only-entry") {
+		t.Errorf("the panel must render the frame cache:\n%s", out)
+	}
+	// One cell never overflows, so the hint bar must drop the scroll hint —
+	// which it can only know from the cached cells, not from the real catalog.
+	for _, h := range m.leaderOrExplorerHints() {
+		if h.Desc == "scroll" {
+			t.Error("the hint bar must read the frame cache, not rebuild the catalog")
+		}
+	}
+}
+
+// TestArmWhichKeyLeader_DisabledPathNeverRewindsSeq: seq is a generation
+// counter whose whole job is never to repeat, so an in-flight reveal tick can
+// be matched to the arming that scheduled it. The disabled branch used to zero
+// the entire state — the one place that walked seq backwards. It is
+// unreachable in production (handleExplorerSelectionKey returns first), but it
+// must not be a trap if that ever changes.
+func TestArmWhichKeyLeader_DisabledPathNeverRewindsSeq(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = false
+
+	m := whichKeyTestModel()
+	m.whichKey = whichKeyState{armed: true, shown: true, seq: 7}
+	got, cmd := m.armWhichKeyLeader()
+	if cmd != nil {
+		t.Fatal("a disabled panel must not schedule a reveal")
+	}
+	if got.whichKey.armed || got.whichKey.shown {
+		t.Fatal("a disabled panel must not stay armed or shown")
+	}
+	if got.whichKey.seq <= 7 {
+		t.Fatalf("seq must keep counting up, got %d after 7", got.whichKey.seq)
+	}
 }

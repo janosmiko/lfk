@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -125,6 +126,12 @@ func TestViewers_QuestionMarkStillOpensHelp(t *testing.T) {
 // TestWhichKeyLeader_RebindingLeaderGivesQuestionMarkBackToHelp pins the
 // collision rule: the leader is dispatched ahead of kb.Help, so "?" only stops
 // opening help while the leader is actually bound to it.
+//
+// The hint bar is asserted alongside the dispatch, because the two used to
+// disagree: the bar handed its "help" slot to the leader key unconditionally,
+// so a rebound leader ("z") was advertised as help while "z" opened the panel
+// and "?" opened help — the bar named a key that did something else AND hid
+// the key that did the job.
 func TestWhichKeyLeader_RebindingLeaderGivesQuestionMarkBackToHelp(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()
@@ -142,6 +149,76 @@ func TestWhichKeyLeader_RebindingLeaderGivesQuestionMarkBackToHelp(t *testing.T)
 	out2, _ := m2.handleExplorerKey(keyMsg("ctrl+k"))
 	if !out2.(Model).whichKey.armed {
 		t.Fatal("the rebound leader key must arm the panel")
+	}
+
+	if got := explorerHelpHintKey(kb); got != "?" {
+		t.Fatalf("hint bar advertises %q as help; with the leader rebound the key that opens help is %q", got, "?")
+	}
+}
+
+// TestExplorerHelpHintKey_MatchesTheKeyThatOpensHelp is the bar's half of the
+// collision rule: it must name whichever key actually reaches the help screen,
+// which is exactly whichKeyHelpKey's answer (the panel's own "Full help" row
+// renders from that function, and the two sat one row apart contradicting each
+// other).
+func TestExplorerHelpHintKey_MatchesTheKeyThatOpensHelp(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+
+	cases := []struct {
+		name    string
+		leader  string
+		help    string
+		enabled bool
+		want    string
+	}{
+		// Defaults collide on "?", so f1 is the only key left that opens help.
+		{"default collision", "?", "?", true, "f1"},
+		// Rebound leader: "?" reaches help again, and the bar must say so.
+		{"leader rebound", "z", "?", true, "?"},
+		// Help rebound off the leader: same story from the other side.
+		{"help rebound", "?", "f2", true, "f2"},
+		// Panel disabled: the leader key does nothing, help keeps "?".
+		{"panel disabled", "?", "?", false, "?"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kb := ui.DefaultKeybindings()
+			kb.WhichKeyLeader = tc.leader
+			kb.Help = tc.help
+			ui.ActiveKeybindings = kb
+			ui.ConfigWhichKeyEnabled = tc.enabled
+
+			if got := explorerHelpHintKey(kb); got != tc.want {
+				t.Errorf("explorerHelpHintKey = %q, want %q", got, tc.want)
+			}
+			if tc.enabled {
+				if got := whichKeyHelpKey(kb); got != tc.want {
+					t.Errorf("whichKeyHelpKey = %q, want %q (the bar and the panel must agree)", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestExplorerHintBar_AdvertisesTheWorkingHelpKey drives the assertion through
+// the rendered bar rather than the helper, so a future caller that bypasses
+// explorerHelpHintKey is still caught.
+func TestExplorerHintBar_AdvertisesTheWorkingHelpKey(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	kb := ui.DefaultKeybindings()
+	kb.WhichKeyLeader = "z"
+	kb.Help = "?"
+	ui.ActiveKeybindings = kb
+	ui.ConfigWhichKeyEnabled = true
+
+	m := whichKeyTestModel()
+	m.width, m.height = 200, 24
+	bar := stripANSI(m.statusBar())
+	if !strings.Contains(bar, "?: help") {
+		t.Errorf("hint bar must advertise the key that opens help (%q):\n%s", "?: help", bar)
+	}
+	if strings.Contains(bar, "z: help") {
+		t.Errorf("hint bar must not label the leader key as help:\n%s", bar)
 	}
 }
 

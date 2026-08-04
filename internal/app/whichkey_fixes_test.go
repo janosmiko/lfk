@@ -146,6 +146,10 @@ func TestStatusBar_LeaderPanelKeepsSelectedCountChip(t *testing.T) {
 
 	m := basePush80Model()
 	m.nav.Level = model.LevelResources
+	// 80x24 so the catalog actually overflows: ctrl+d only stays with the
+	// panel while there is somewhere to scroll to (handleWhichKeyScrollKey),
+	// and this test scrolls three times.
+	m.width, m.height = 80, 24
 	items := make([]model.Item, 5)
 	for i := range items {
 		items[i] = model.Item{Name: fmt.Sprintf("p%d", i), Kind: "Pod", Namespace: "default"}
@@ -160,6 +164,9 @@ func TestStatusBar_LeaderPanelKeepsSelectedCountChip(t *testing.T) {
 	m = out.(Model)
 	if !m.whichKey.shown {
 		t.Fatal("panel must be shown at a zero delay")
+	}
+	if lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells()); !ok || lay.maxScroll == 0 {
+		t.Fatalf("precondition: the panel must be scrollable at 80x24 (ok=%v maxScroll=%d)", ok, lay.maxScroll)
 	}
 	for step := 1; step <= 3; step++ {
 		bar := stripANSI(m.statusBar())

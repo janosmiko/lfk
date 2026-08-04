@@ -507,10 +507,11 @@ func BenchmarkWhichKeyLeaderRender(b *testing.B) {
 // Normalised per row on purpose: the panel is now as tall as its content, so a
 // flat per-call ceiling would move every time the catalog or the default
 // terminal size changes, and would say nothing about whether the layout itself
-// got more expensive. Measured at 61 allocs/row for the uniform-column grid,
-// against 162/row for the per-column-widest + gap-spreading layout it replaced
-// — that old layout would fail this guard, which is the point. The threshold
-// sits ~2x above the measurement so CI hardware variance can't flake it, while
+// got more expensive. Measured at 78 allocs/row for the uniform-column grid
+// (61 before the group colors and the legend row landed), against 162/row for
+// the per-column-widest + gap-spreading layout it replaced — that old layout
+// would fail this guard, which is the point. The threshold still sits well
+// above the measurement so CI hardware variance can't flake it, while
 // a reintroduced per-cell re-measure or a whole-catalog render (instead of just
 // the viewport) still trips it.
 const wkLeaderRenderAllocPerRow = 140
@@ -541,8 +542,12 @@ func TestWhichKeyLeaderRender_AllocationCeiling(t *testing.T) {
 }
 
 // wkLeaderLayoutAllocThreshold caps the layout-only pass, which the hint bar
-// runs on every frame in ADDITION to the render above just to decide whether to
-// advertise the scroll keys. Measured at 61 allocs/op.
+// runs on every frame in ADDITION to the render above just to decide whether
+// to advertise the scroll keys. (The cells themselves are built once per frame
+// now — see primeWhichKeyCells — but the layout is still derived twice.)
+// Measured at 117 allocs/op, up from 61 before the group colors and the legend
+// row landed. The benchmark below builds the cells too, so the measurement
+// covers the worst case, not the cached one.
 const wkLeaderLayoutAllocThreshold = 200
 
 func TestWhichKeyLeaderLayout_AllocationCeiling(t *testing.T) {
@@ -562,4 +567,160 @@ func TestWhichKeyLeaderLayout_AllocationCeiling(t *testing.T) {
 		t.Fatalf("whichKeyLayoutFor allocates %.0f times per call (threshold %d); it must stay a plain row count, never a styled render", allocs, wkLeaderLayoutAllocThreshold)
 	}
 	t.Logf("whichKeyLayoutFor: %.0f allocs/op (threshold %d)", allocs, wkLeaderLayoutAllocThreshold)
+}
+
+// wkBoxGeometry measures a rendered panel's bordered box: the column its left
+// edge sits at and its width in columns. Reads the border runes rather than
+// recomputing the layout, so it measures what actually landed on screen.
+func wkBoxGeometry(t *testing.T, out string) (left, width int) {
+	t.Helper()
+	for line := range strings.SplitSeq(out, "\n") {
+		r := []rune(line)
+		first, last := -1, -1
+		for i, ch := range r {
+			if ch == '│' {
+				if first == -1 {
+					first = i
+				}
+				last = i
+			}
+		}
+		if first >= 0 && first != last {
+			return first, last - first + 1
+		}
+	}
+	t.Fatalf("no bordered box found in:\n%s", out)
+	return 0, 0
+}
+
+// TestWhichKeyPanel_GeometryIsScrollInvariantUnderTransparentBg pins the panel
+// box to one width and one left edge at every scroll offset, with
+// transparent_bg on.
+//
+// FillLinesBg deliberately no-ops when the background is NoColor{} — exactly
+// what ui.BaseBg is in transparent mode — and the panel was relying on it to
+// pad every row out to lay.container. With the padding gone, lipgloss
+// auto-sized the box to the widest VISIBLE line, and because the column-major
+// fill exposes a different number of populated columns at different offsets,
+// the box resized and re-centred as the user scrolled (measured at 200x10:
+// width 181 -> 146, left edge 9 -> 27) while the legend stayed centred against
+// a width the box never rendered at.
+func TestWhichKeyPanel_GeometryIsScrollInvariantUnderTransparentBg(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	transparent := ui.ConfigTransparentBg
+	theme := ui.ActiveTheme
+	t.Cleanup(func() {
+		ui.ConfigTransparentBg = transparent
+		ui.ApplyTheme(theme)
+	})
+	ui.ConfigTransparentBg = true
+	ui.ApplyTheme(ui.DefaultTheme())
+
+	for _, size := range [][2]int{{200, 10}, {120, 20}, {80, 14}} {
+		m := whichKeyTestModel()
+		m.width, m.height = size[0], size[1]
+		m.whichKey.armed = true
+		m.whichKey.shown = true
+
+		cells := m.whichKeyLeaderCells()
+		lay, ok := m.whichKeyLayoutFor(cells)
+		if !ok {
+			t.Fatalf("%dx%d: the panel must lay out", size[0], size[1])
+		}
+		if lay.maxScroll == 0 {
+			t.Fatalf("%dx%d: this size must overflow, otherwise scrolling proves nothing", size[0], size[1])
+		}
+
+		bg := strings.Repeat("\n", m.height)
+		wantLeft, wantWidth := -1, -1
+		for off := 0; off <= lay.maxScroll; off++ {
+			out := stripANSI(m.renderWhichKeyPanel(bg, cells, off))
+			left, width := wkBoxGeometry(t, out)
+			if off == 0 {
+				wantLeft, wantWidth = left, width
+				continue
+			}
+			if width != wantWidth {
+				t.Errorf("%dx%d: box width changed with scroll: %d at offset 0, %d at offset %d",
+					size[0], size[1], wantWidth, width, off)
+			}
+			if left != wantLeft {
+				t.Errorf("%dx%d: box left edge moved with scroll: column %d at offset 0, %d at offset %d",
+					size[0], size[1], wantLeft, left, off)
+			}
+		}
+
+		// The box must also be the width the legend is centred against:
+		// container + horizontal padding + the two border columns.
+		if want := lay.container + 2*whichKeyPadH + 2; wantWidth != want {
+			t.Errorf("%dx%d: box is %d columns wide, but the legend is centred against %d",
+				size[0], size[1], wantWidth, want)
+		}
+	}
+}
+
+// TestWhichKeyLegend_StaysCentredUnderTransparentBg is the visible symptom of
+// the geometry bug: a box narrower than lay.container leaves the legend, which
+// is centred against lay.container, off-centre by up to half the difference.
+func TestWhichKeyLegend_StaysCentredUnderTransparentBg(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	transparent := ui.ConfigTransparentBg
+	theme := ui.ActiveTheme
+	t.Cleanup(func() {
+		ui.ConfigTransparentBg = transparent
+		ui.ApplyTheme(theme)
+	})
+	ui.ConfigTransparentBg = true
+	ui.ApplyTheme(ui.DefaultTheme())
+
+	m := whichKeyTestModel()
+	m.width, m.height = 200, 10
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok || lay.legendRows == 0 || lay.maxScroll == 0 {
+		t.Fatalf("precondition: need a scrollable panel with a legend (ok=%v legendRows=%d maxScroll=%d)",
+			ok, lay.legendRows, lay.maxScroll)
+	}
+
+	bg := strings.Repeat("\n", m.height)
+	for off := 0; off <= lay.maxScroll; off++ {
+		out := stripANSI(m.renderWhichKeyPanel(bg, cells, off))
+		lines := strings.Split(out, "\n")
+		borderLast := -1
+		for i, l := range lines {
+			if strings.ContainsAny(l, "╭╮╰╯│") {
+				borderLast = i
+			}
+		}
+		r := []rune(lines[borderLast-1])
+		first, lastBar := -1, -1
+		for i, ch := range r {
+			if ch == '│' {
+				if first == -1 {
+					first = i
+				}
+				lastBar = i
+			}
+		}
+		inner := string(r[first+1+whichKeyPadH : lastBar-whichKeyPadH])
+		trimmed := strings.TrimSpace(inner)
+		if trimmed == "" {
+			t.Fatalf("offset %d: the legend row is blank: %q", off, inner)
+		}
+		lead := strings.Index(inner, trimmed)
+		trail := len([]rune(inner)) - lead - len([]rune(trimmed))
+		if diff := lead - trail; diff < -1 || diff > 1 {
+			t.Errorf("offset %d: legend not centred: %d leading vs %d trailing columns, row=%q",
+				off, lead, trail, inner)
+		}
+	}
 }

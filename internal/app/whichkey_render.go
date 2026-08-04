@@ -75,10 +75,14 @@ const (
 	// equivalent knob - its long labels make one unnecessary - but lfk's
 	// short ones need it to stop the panel from going wide-and-flat instead
 	// of tall-and-narrow. 5 leaves whichKeyMinColW as the sole driver (never
-	// binding) up to a 170-column terminal; the cap first binds at 171
-	// columns, where it still leaves whichKeyMinColW's own 30-wide floor
-	// exactly (33-wide columns, 30 of content once whichKeySpacing is
-	// subtracted) rather than squeezing narrower.
+	// binding) up to a 227-column terminal; the cap first binds at 228
+	// columns (container 198, which the width-driven formula would split into
+	// 6 columns), and the even redivision that follows leaves 39-wide columns
+	// - 36 of content once whichKeySpacing is subtracted - comfortably above
+	// whichKeyMinColW's own 30-wide floor rather than squeezing narrower.
+	// The tiered outer margin below is what moved this threshold: it shrinks
+	// the container, so the cap binds later than it did when the margin was
+	// a flat 4.
 	whichKeyMaxCols = 5
 	whichKeyMinRows = 4  // Config.win.height.min
 	whichKeyMaxRows = 25 // Config.win.height.max
@@ -228,6 +232,26 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 // wkSpaces backs wkPad, which hands out padding without allocating at the
 // widths a real panel uses.
 const wkSpaces = "                                                                "
+
+// wkPadToWidth right-pads every row to width in place, so the bordered box
+// always measures the same whatever the current scroll offset happens to
+// expose.
+//
+// Not left to ui.FillLinesBg: that deliberately no-ops when the background is
+// NoColor{}, which is exactly what ui.BaseBg is under transparent_bg. Without
+// its padding lipgloss auto-sized the box to the widest VISIBLE line, and the
+// column-major fill leaves a different number of populated columns at
+// different offsets — so the panel resized and re-centred while scrolling, and
+// the legend (centred against lay.container) sat off-centre against a width
+// the box never rendered at. Padding here is background-independent;
+// FillLinesBg still runs afterwards for its reset-repair work.
+func wkPadToWidth(rows []string, width int) {
+	for i, r := range rows {
+		if pad := width - lipgloss.Width(r); pad > 0 {
+			rows[i] = r + wkPad(pad)
+		}
+	}
+}
 
 func wkPad(n int) string {
 	switch {
@@ -469,7 +493,7 @@ func (m Model) renderWhichKey(background string) string {
 	if !m.pendingG || !m.whichKey.shown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	return m.renderWhichKeyPanel(background, m.whichKeyCells(), m.whichKey.scroll)
+	return m.renderWhichKeyPanel(background, m.frameWhichKeyCells(m.whichKeyCells), m.whichKey.scroll)
 }
 
 // renderWhichKeyPanel draws the given entries as a bordered, bottom-anchored
@@ -505,6 +529,7 @@ func (m Model) renderWhichKeyPanel(background string, cells []whichKeyCell, scro
 		visible = append(visible, whichKeyLegendLine(whichKeyPresentGroups(cells), st, lay.container))
 	}
 
+	wkPadToWidth(visible, lay.container)
 	content := ui.FillLinesBg(strings.Join(visible, "\n"), lay.container, ui.BaseBg)
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

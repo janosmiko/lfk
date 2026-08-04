@@ -17,6 +17,12 @@ type whichKeyState struct {
 	shown  bool // delay elapsed, panel drawn
 	seq    int
 	scroll int
+	// cells caches the visible panel's entries for the duration of ONE
+	// render. The panel and the hint bar both need them, and each build runs
+	// the whole availability catalog. Only primeWhichKeyCells writes it, and
+	// only from renderView's throwaway Model copy, so nothing persists into a
+	// tab snapshot or the session.
+	cells []whichKeyCell
 }
 
 // whichKeyLeaderTickMsg reveals the leader panel once the delay elapses.
@@ -29,8 +35,11 @@ type whichKeyLeaderTickMsg struct{ seq int }
 // reveal tick.
 func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 	if !ui.ConfigWhichKeyEnabled {
-		m.whichKey = whichKeyState{}
-		return m, nil
+		// Defensive only: handleExplorerSelectionKey never dispatches here
+		// with the panel off. Goes through disarm rather than zeroing the
+		// struct so seq keeps counting up — rewinding it could let an
+		// in-flight reveal tick match a later arming.
+		return m.disarmWhichKeyLeader(), nil
 	}
 	if m.whichKey.armed {
 		return m.disarmWhichKeyLeader(), nil
@@ -78,34 +87,72 @@ func (m Model) whichKeyLeaderCells() []whichKeyCell {
 }
 
 // scrollWhichKey moves the panel viewport by half a page, the same half-page
-// step ctrl+d/ctrl+u take everywhere else in the app. A no-op when everything
-// already fits.
-func (m Model) scrollWhichKey(cells []whichKeyCell, down bool) Model {
+// step ctrl+d/ctrl+u take everywhere else in the app. Reports whether it moved
+// anything: false when the terminal shows the whole list, so the caller can
+// leave the key to its normal action instead of swallowing it.
+//
+// The starting offset is re-clamped against the CURRENT maxScroll. Only the
+// renderer clamped before, and it clamps a local copy — so widening the
+// terminal while scrolled to the bottom left a stale, too-large offset behind
+// and the first ctrl+u had to burn a press catching up to what was already
+// on screen.
+func (m Model) scrollWhichKey(cells []whichKeyCell, down bool) (Model, bool) {
 	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok || lay.maxScroll == 0 {
-		return m
+		return m, false
 	}
+	cur := min(max(m.whichKey.scroll, 0), lay.maxScroll)
 	step := max(lay.viewRows/2, 1)
 	if down {
-		m.whichKey.scroll = min(m.whichKey.scroll+step, lay.maxScroll)
+		m.whichKey.scroll = min(cur+step, lay.maxScroll)
 	} else {
-		m.whichKey.scroll = max(m.whichKey.scroll-step, 0)
+		m.whichKey.scroll = max(cur-step, 0)
 	}
-	return m
+	return m, true
 }
 
 // handleWhichKeyScrollKey consumes the half-page scroll keys for a visible
 // panel. Callers MUST gate this on whichKey.shown so ctrl+d/ctrl+u keep their
 // normal explorer action whenever no panel is on screen.
+//
+// A scroll key at a size where the panel cannot scroll is NOT consumed: the
+// hint bar already omits the scroll hint there (whichKeyPopupHints), and
+// swallowing the key would lose its half-page list scroll for no visible
+// effect.
 func (m Model) handleWhichKeyScrollKey(msg tea.KeyPressMsg, cells []whichKeyCell) (Model, bool) {
 	kb := ui.ActiveKeybindings
 	switch key := msg.String(); {
 	case kb.PageDown != "" && key == kb.PageDown:
-		return m.scrollWhichKey(cells, true), true
+		return m.scrollWhichKey(cells, true)
 	case kb.PageUp != "" && key == kb.PageUp:
-		return m.scrollWhichKey(cells, false), true
+		return m.scrollWhichKey(cells, false)
 	}
 	return m, false
+}
+
+// primeWhichKeyCells fills the one-frame cell cache when a which-key panel is
+// actually on screen. Call once per render, ahead of anything that reads it.
+func (m Model) primeWhichKeyCells() Model {
+	if !ui.ConfigWhichKeyEnabled || !m.whichKey.shown {
+		return m
+	}
+	switch {
+	case m.pendingG:
+		m.whichKey.cells = m.whichKeyCells()
+	case m.whichKey.armed:
+		m.whichKey.cells = m.whichKeyLeaderCells()
+	}
+	return m
+}
+
+// frameWhichKeyCells returns the frame cache when primeWhichKeyCells filled it,
+// and builds via build otherwise — so every path outside a render (key
+// handlers, tests) behaves exactly as before.
+func (m Model) frameWhichKeyCells(build func() []whichKeyCell) []whichKeyCell {
+	if m.whichKey.cells != nil {
+		return m.whichKey.cells
+	}
+	return build()
 }
 
 // whichKeyLeaderIntercept applies the leader panel's "any key but the leader
@@ -124,7 +171,7 @@ func (m Model) whichKeyLeaderIntercept(msg tea.KeyPressMsg) (Model, bool) {
 		return m, false
 	}
 	if m.whichKey.shown {
-		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.whichKeyLeaderCells()); scrolled {
+		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.frameWhichKeyCells(m.whichKeyLeaderCells)); scrolled {
 			return out, true
 		}
 	}
@@ -140,5 +187,5 @@ func (m Model) renderWhichKeyLeader(background string) string {
 	if !m.whichKey.armed || !m.whichKey.shown || !ui.ConfigWhichKeyEnabled {
 		return background
 	}
-	return m.renderWhichKeyPanel(background, m.whichKeyLeaderCells(), m.whichKey.scroll)
+	return m.renderWhichKeyPanel(background, m.frameWhichKeyCells(m.whichKeyLeaderCells), m.whichKey.scroll)
 }

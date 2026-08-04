@@ -406,6 +406,22 @@ func (m Model) statusBar() string {
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
+// explorerHelpHintKey names the key the explorer hint bar advertises as
+// "help": whichever key actually reaches the help screen. Defers to
+// whichKeyHelpKey — the same rule the panel's own "Full help" row renders
+// with, so the bar and the panel one row above it can never disagree.
+//
+// The extra gate is the disabled case whichKeyHelpKey doesn't model: with the
+// panel off, the leader key falls through to kb.Help instead of claiming it
+// (handleExplorerSelectionKey), so the collision the f1 fallback exists for
+// never happens.
+func explorerHelpHintKey(kb ui.Keybindings) string {
+	if !ui.ConfigWhichKeyEnabled || kb.WhichKeyLeader == "" {
+		return kb.Help
+	}
+	return whichKeyHelpKey(kb)
+}
+
 // leaderOrExplorerHints returns whichever which-key popup's own hints while
 // it is visible, and the normal explorer keymap otherwise. Only the LEFT half
 // of the bar swaps, so the chip group (sort, selected count, position, filter
@@ -418,24 +434,12 @@ func (m Model) statusBar() string {
 // shown, not on shown alone — with a configured reveal delay the popup isn't
 // drawn yet, and flipping the bar for an invisible popup would drop the
 // chip group and the real keymap for nothing on screen to show for it.
-// explorerHelpHintKey names the key the explorer hint bar advertises as "help".
-// While the which-key leader is armed-able it claims that slot: pressing it
-// opens the contextual action panel, which itself lists the full help screen's
-// key. With the panel disabled the leader key does nothing, so the bar points
-// at whatever actually opens help.
-func explorerHelpHintKey(kb ui.Keybindings) string {
-	if ui.ConfigWhichKeyEnabled && kb.WhichKeyLeader != "" {
-		return kb.WhichKeyLeader
-	}
-	return kb.Help
-}
-
 func (m Model) leaderOrExplorerHints() []ui.HintEntry {
 	switch {
 	case m.pendingG && m.whichKey.shown:
-		return m.whichKeyPopupHints(m.whichKeyCells())
+		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyCells))
 	case m.whichKey.armed && m.whichKey.shown:
-		return m.whichKeyPopupHints(m.whichKeyLeaderCells())
+		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells))
 	default:
 		return m.explorerHintEntries()
 	}

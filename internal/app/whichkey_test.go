@@ -486,3 +486,116 @@ func TestGotoResourceType_BackNavLandsOnJumpedType(t *testing.T) {
 		t.Fatalf("cursor landed on %q (%s), want Deployment (%s)", got.Name, got.Extra, want.ResourceRef())
 	}
 }
+
+// TestWhichKeyGoto_ScrollResetsOnCloseAndReopen is the goto popup's mirror of
+// TestWhichKeyLeader_ScrollResetsOnDisarmAndRearm. The offset lives on
+// whichKeyState, which BOTH popups share, but only the leader used to rewind
+// it: scrolling the goto popup, dismissing it, then pressing g again reopened
+// it scrolled to its tail with the first entries off screen — it read as if
+// the popup had lost half its list.
+func TestWhichKeyGoto_ScrollResetsOnCloseAndReopen(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyDelayMs = 0
+	m := gotoTestModel()
+	m.width, m.height = 80, 12
+
+	out, _ := m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+	m = out.(Model)
+	if !m.pendingG || !m.whichKey.shown {
+		t.Fatalf("precondition: g must arm and show the popup (pendingG=%v shown=%v)", m.pendingG, m.whichKey.shown)
+	}
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyCells())
+	if !ok || lay.maxScroll == 0 {
+		t.Fatalf("precondition: the goto popup must overflow at 80x12 (ok=%v maxScroll=%d)", ok, lay.maxScroll)
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+	m = out.(Model)
+	if m.whichKey.scroll == 0 {
+		t.Fatal("precondition: ctrl+d should have scrolled the goto popup")
+	}
+
+	// Dismiss with an unmapped continuation ("gP" is no goto target).
+	out, _ = m.handleExplorerKey(keyMsg("P"))
+	m = out.(Model)
+	if m.whichKey.shown {
+		t.Fatal("an unmapped continuation must close the popup")
+	}
+	if m.whichKey.scroll != 0 {
+		t.Fatalf("closing the goto popup must rewind its viewport, got scroll=%d", m.whichKey.scroll)
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+	if got := out.(Model).whichKey.scroll; got != 0 {
+		t.Fatalf("reopening the goto popup must start at the top, got scroll=%d", got)
+	}
+}
+
+// TestWhichKeyGoto_ScrollSurvivesALeaderPanelOffset is the other half of the
+// shared-state bug: the leader panel and the goto popup write the same scroll
+// field, so an offset left by one must never open the other mid-list.
+func TestWhichKeyGoto_ScrollSurvivesALeaderPanelOffset(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyDelayMs = 0
+	m := gotoTestModel()
+	m.width, m.height = 80, 12
+	m.whichKey.scroll = 99 // as if the leader panel had been scrolled
+
+	out, _ := m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+	if got := out.(Model).whichKey.scroll; got != 0 {
+		t.Fatalf("arming the goto popup must start at the top, got scroll=%d", got)
+	}
+}
+
+// TestWhichKeyGoto_AllEntriesReachableViaScrolling is the goto popup's mirror
+// of TestWhichKeyLeader_AllEntriesReachableViaScrolling. The popup shares
+// whichKeyLayoutFor and the scroll code with the leader panel but had no
+// reachability sweep of its own, so an off-by-one in maxScroll would have been
+// caught on one surface and missed on the other. Sizes are chosen so the goto
+// cells actually overflow.
+func TestWhichKeyGoto_AllEntriesReachableViaScrolling(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyDelayMs = 0
+
+	for _, size := range [][2]int{{80, 12}, {80, 14}, {100, 13}} {
+		m := gotoTestModel()
+		m.width, m.height = size[0], size[1]
+
+		out, _ := m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+		m = out.(Model)
+		cells := m.whichKeyCells()
+		lay, ok := m.whichKeyLayoutFor(cells)
+		if !ok {
+			t.Fatalf("%dx%d: the goto popup must lay out", size[0], size[1])
+		}
+		if lay.maxScroll == 0 {
+			t.Fatalf("%dx%d: this size must overflow, otherwise it proves nothing", size[0], size[1])
+		}
+
+		bg := strings.Repeat("\n", m.height)
+		var rendered strings.Builder
+		rendered.WriteString(stripANSI(m.renderWhichKey(bg)))
+		for step := 0; m.whichKey.scroll < lay.maxScroll; step++ {
+			if step > lay.bodyRows {
+				t.Fatalf("%dx%d: ctrl+d never reached the end (%d of %d)", size[0], size[1], m.whichKey.scroll, lay.maxScroll)
+			}
+			out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+			m = out.(Model)
+			rendered.WriteString("\n")
+			rendered.WriteString(stripANSI(m.renderWhichKey(bg)))
+		}
+		for i, c := range cells {
+			col := i / lay.grid.rowN
+			drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW[col])
+			if !strings.Contains(rendered.String(), drawn) {
+				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], drawn)
+			}
+		}
+	}
+}

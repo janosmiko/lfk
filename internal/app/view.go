@@ -181,6 +181,11 @@ func (m Model) renderView() string {
 		return m.viewKubetris()
 	}
 
+	// Build the visible which-key panel's entries once for this frame: the
+	// status bar (inside viewExplorer) and the panel itself both need them,
+	// and each build runs the whole availability catalog.
+	m = m.primeWhichKeyCells()
+
 	view := m.viewExplorer()
 
 	// Render overlay on top if active.

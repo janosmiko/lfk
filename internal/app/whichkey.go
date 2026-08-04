@@ -193,12 +193,12 @@ func (m Model) handleGotoChord(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	// The popup shares the leader panel's scrolling viewport, so the scroll
 	// keys must move it rather than be swallowed as an unregistered chord.
 	if m.whichKey.shown {
-		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.whichKeyCells()); scrolled {
+		if out, scrolled := m.handleWhichKeyScrollKey(msg, m.frameWhichKeyCells(m.whichKeyCells)); scrolled {
 			return out, nil, true
 		}
 	}
 	m.pendingG = false
-	m.whichKey.shown = false
+	m.hideWhichKeyPopup()
 	chord := ui.ActiveKeybindings.JumpTop + key
 	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" && chord == pn {
 		out, cmd := m.jumpToPreviousNamespace()
@@ -216,7 +216,13 @@ type whichKeyTickMsg struct{}
 
 // armWhichKey is called when the g prefix arms. With no delay it shows the
 // popup immediately; otherwise it schedules a reveal tick.
+//
+// The scroll offset is rewound here because it lives on whichKeyState, shared
+// with the leader panel: without this an offset left over from an earlier
+// popup reopened this one scrolled into its tail, with the first entries off
+// screen.
 func (m Model) armWhichKey() (Model, tea.Cmd) {
+	m.whichKey.scroll = 0
 	if !ui.ConfigWhichKeyEnabled {
 		m.whichKey.shown = false
 		return m, nil
@@ -228,6 +234,14 @@ func (m Model) armWhichKey() (Model, tea.Cmd) {
 	m.whichKey.shown = false
 	d := time.Duration(ui.ConfigWhichKeyDelayMs) * time.Millisecond
 	return m, tea.Tick(d, func(time.Time) tea.Msg { return whichKeyTickMsg{} })
+}
+
+// hideWhichKeyPopup closes the g-prefix popup and rewinds its viewport. The
+// scroll offset is shared with the leader panel (whichKeyState), so leaving it
+// behind is what let a dismissed popup reopen mid-list.
+func (m *Model) hideWhichKeyPopup() {
+	m.whichKey.shown = false
+	m.whichKey.scroll = 0
 }
 
 // whichKeyCells builds the continuation entries for the g prefix: gg (list top)
