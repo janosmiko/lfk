@@ -390,6 +390,34 @@ func helpKeyMatchesSearch(s helpLineSpec, search string) bool {
 		!MatchLine(s.key, search) && MatchLine(s.keyText, search)
 }
 
+// styleHelpKeyCell renders a help row's key cell, splitting it on
+// helpKeySeparator (the " · " between alternative bindings, e.g.
+// "h · Left") so the separator draws in OverlayDimStyle — the same dim
+// style descriptions use — while the bindings on either side keep
+// keyStyle. Without the split, one style covered the whole cell and the
+// separator competed for attention with the keys it sits between.
+//
+// Search highlighting still runs per segment (not once over the whole
+// cell) so a query matching inside one alternative highlights just that
+// alternative, not the separator around it.
+func styleHelpKeyCell(key, search string, hl, keyStyle lipgloss.Style) string {
+	segs := strings.Split(key, helpKeySeparator)
+	if len(segs) == 1 {
+		return HighlightMatchStyledOver(key, search, hl, keyStyle)
+	}
+	sepStyle := OverlayDimStyle
+	var sb strings.Builder
+	for i, seg := range segs {
+		if i > 0 {
+			sepInner := HighlightMatchStyledOver(helpKeySeparator, search, hl, sepStyle)
+			sb.WriteString(RenderOverPrestyled(sepInner, sepStyle))
+		}
+		segInner := HighlightMatchStyledOver(seg, search, hl, keyStyle)
+		sb.WriteString(RenderOverPrestyled(segInner, keyStyle))
+	}
+	return sb.String()
+}
+
 // helpSpecStyled renders a help-line spec to its final styled form.
 // When search is non-empty the inline highlight is applied to plain
 // key/desc/text first via HighlightMatchStyledOver, then wrapped with
@@ -414,10 +442,11 @@ func helpSpecStyled(s helpLineSpec, search string, isCurrent bool) string {
 	case helpLineEntry:
 		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
 		descStyle := OverlayDimStyle
-		keyInner := HighlightMatchStyledOver(s.key, search, hl, keyStyle)
+		keyInner := styleHelpKeyCell(s.key, search, hl, keyStyle)
 		if helpKeyMatchesSearch(s, search) {
 			// Query matched "Ctrl+D" but the cell draws "⌃D" — highlight
-			// the whole chord so the hit is visible where the user looks.
+			// the whole chord (separator included) so the hit is visible
+			// where the user looks.
 			keyInner = padKeyLeft(hl.Render(strings.TrimLeft(s.key, " ")), lipgloss.Width(s.key))
 		}
 		descInner := HighlightMatchStyledOver(s.desc, search, hl, descStyle)

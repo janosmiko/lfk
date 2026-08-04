@@ -462,6 +462,12 @@ func TestHelpKeyDisplay_CompositeKeys(t *testing.T) {
 	}
 }
 
+// helpKeySymbols draws " · " between alternative bindings instead of the
+// raw "/" (spaced and dimmed at render time — see styleHelpKeyCell), so
+// this test's expectations moved from "/" to " · " for every case where
+// "/" joins two real alternatives. "m<a-z/0-9>" is the deliberate
+// exception: its "/" is inside "<...>", part of one placeholder token
+// (any letter or digit after m), not a separator — it must stay literal.
 func TestHelpKeySymbols_ByIconMode(t *testing.T) {
 	originalIcons := IconMode
 	originalNoColor := ConfigNoColor
@@ -472,14 +478,141 @@ func TestHelpKeySymbols_ByIconMode(t *testing.T) {
 
 	ConfigNoColor = false
 	IconMode = "unicode"
-	assert.Equal(t, "⌃D/⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
-	assert.Equal(t, "tab/⇧Tab", helpKeySymbols("tab/shift+tab"))
+	assert.Equal(t, "⌃D · ⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "tab · ⇧Tab", helpKeySymbols("tab/shift+tab"))
 	assert.Equal(t, "m<a-z/0-9>", helpKeySymbols("m<a-z/0-9>"))
 
-	// Terminals that promise only ASCII keep the readable textual chord.
+	// Terminals that promise only ASCII keep the readable textual chord,
+	// dotted the same way.
 	IconMode = "none"
-	assert.Equal(t, "Ctrl+D/Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "Ctrl+D · Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
 	IconMode = "unicode"
 	ConfigNoColor = true
-	assert.Equal(t, "Ctrl+D/Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "Ctrl+D · Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+}
+
+// --- separator dots ---
+
+// applyKeySeparatorDots must convert a "/" only where it genuinely
+// separates two alternative bindings, and leave it alone everywhere else.
+// This table enumerates every shape of "/" found in the live help catalog
+// (help_sections.go) plus the bracket-guarded placeholder case, so a future
+// catalog entry that adds a new shape has a home to extend.
+func TestApplyKeySeparatorDots_Enumeration(t *testing.T) {
+	tests := []struct {
+		name, given, want string
+	}{
+		{"bare Search key: nothing on either side, not a separator", "/", "/"},
+		{"two full alternatives", "h/Left", "h · Left"},
+		{"doubled-chord alternative", "gg/Home", "gg · Home"},
+		{"three alternatives", "0/1/2", "0 · 1 · 2"},
+		{"two single-char alternatives", ">/<", "> · <"},
+		{"two chord alternatives (post chord-mapping)", "⌃D/⌃U", "⌃D · ⌃U"},
+		{"bracket-guarded range placeholder: leave alone", "m<a-z/0-9>", "m<a-z/0-9>"},
+		{"unbracketed range list: three real alternatives", "a-z/A-Z/0-9", "a-z · A-Z · 0-9"},
+		{"single key, no slash at all", "d", "d"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, applyKeySeparatorDots(tt.given))
+		})
+	}
+}
+
+// The dotted separator is display-only: the search index (BuildHelpLines)
+// must keep "/" so a user who searches for "/" itself, or for a substring
+// straddling where "/" used to sit, is unaffected — and so the two forms
+// stay easy to tell apart in the source.
+func TestBuildHelpLines_SearchIndexKeepsSlashNotDot(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	IconMode = "unicode"
+	ConfigNoColor = false
+
+	joined := strings.Join(BuildHelpLines("", "", 160), "\n")
+	assert.Contains(t, joined, "Home", "search index must still carry the textual alternative")
+	assert.NotContains(t, joined, "·", "search index must not carry the display-only dot")
+
+	rendered := ansi.Strip(RenderHelpScreen(160, 200, 0, "", "", "", -1))
+	assert.Contains(t, rendered, "gg · Home", "the rendered key column must draw the dotted separator")
+}
+
+// A user searching for one alternative among several ("Home" inside the
+// row drawn as "gg · Home") must still find and highlight the row — the
+// separator becoming a dot must not break the search a user already
+// relies on to locate a key.
+func TestRenderHelpScreen_SearchFindsRowWithDottedAlternativeKey(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
+	lines := BuildHelpLines("", "", 160)
+	found := false
+	for _, l := range lines {
+		if MatchLine(l, "Home") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, `search for "Home" must find the row rendered as "gg · Home"`)
+
+	plain := RenderHelpScreen(160, 200, 0, "", "", "", -1)
+	searched := RenderHelpScreen(160, 200, 0, "", "Home", "", -1)
+	assert.NotEqual(t, plain, searched, `a "Home" search must visibly highlight the row`)
+	assert.Contains(t, ansi.Strip(searched), "gg · Home",
+		"search highlighting must not change the visible characters")
+}
+
+// The separator must draw dimmer than the keys around it — the whole
+// point of the change — not merely spaced. Confirms the key segments and
+// the separator segment open with different SGR codes.
+func TestStyleHelpKeyCell_SeparatorStyledDifferentlyFromKeys(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
+	rendered := styleHelpKeyCell("h"+helpKeySeparator+"Left", "", SearchHighlightStyle, keyStyle)
+
+	keyOpen := styleOpenCodes(keyStyle)
+	sepOpen := styleOpenCodes(OverlayDimStyle)
+	assert.NotEmpty(t, keyOpen)
+	assert.NotEmpty(t, sepOpen)
+	assert.NotEqual(t, keyOpen, sepOpen,
+		"key style and separator style must emit different SGR codes")
+	assert.Contains(t, rendered, keyOpen, "rendered cell must open with the key style")
+	assert.Contains(t, rendered, sepOpen, "rendered cell must switch to the dim style for the separator")
+
+	// A single-binding key (no separator) must render identically to the
+	// pre-split path — no separator segment, no extra codes.
+	single := styleHelpKeyCell("d", "", SearchHighlightStyle, keyStyle)
+	assert.Equal(t, HighlightMatchStyledOver("d", "", SearchHighlightStyle, keyStyle), single)
+}
+
+// In no-color mode the separator has no distinct foreground, but it must
+// still draw as literal " · " with spaces either side — the visual gap
+// the user asked for does not depend on color being available.
+func TestHelpKeySymbols_DottedSeparatorSurvivesNoColor(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	originalIcons := IconMode
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		IconMode = originalIcons
+	})
+	ConfigNoColor = true
+	IconMode = "unicode"
+
+	assert.Equal(t, "h · Left", helpKeySymbols("h/Left"))
 }

@@ -149,3 +149,14 @@ func TestHelpKeyDisplay_UnaffectedBySymbolMode(t *testing.T) {
 		assert.Equal(t, "d", helpKeyDisplay("d"), "icons=%s", icons)
 	}
 }
+
+// TestHelpKeySeparator_IsSingleCell pins the middot's drawn width the same
+// way TestKeyGlyphs_AreSingleCell pins the modifier glyphs. "·" (U+00B7) is
+// East_Asian_Width=Ambiguous, same category as the modifier arrowheads
+// above — a runewidth table change that started measuring it as 2 would
+// silently widen every multi-key help row and shift every description one
+// column right of where padKeyLeft expects it.
+func TestHelpKeySeparator_IsSingleCell(t *testing.T) {
+	assert.Equal(t, 1, lipgloss.Width("·"), `"·" must measure one cell`)
+	assert.Equal(t, 3, lipgloss.Width(helpKeySeparator), "helpKeySeparator (space + dot + space) must measure three cells")
+}

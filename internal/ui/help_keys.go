@@ -56,9 +56,63 @@ func mapChordTokens(key string, f func(string) string) string {
 // that is not a chord displays verbatim.
 //
 // This is also the form the help screen's search index is built from, so a
-// query of "ctrl" still finds a row whose key column draws "⌃D".
+// query of "ctrl" still finds a row whose key column draws "⌃D". The
+// search index keeps the plain "/" between alternatives (not the dimmed
+// "·" the rendered column draws — see helpKeySeparator) since it is never
+// shown to the user, only matched against.
 func helpKeyDisplay(key string) string {
 	return mapChordTokens(key, chordText)
+}
+
+// helpKeySeparator is the display-only form of "/" between alternative
+// bindings for one action ("h/Left" -> "h · Left"). Spaced on both sides
+// so it reads as a gap rather than competing with the keys; styled dimmer
+// than the keys at render time (see styleHelpKeyCell in help.go) so it
+// stops drawing the eye like a third keybinding.
+const helpKeySeparator = " · "
+
+// applyKeySeparatorDots rewrites every top-level "/" in an already
+// chord-mapped display key into helpKeySeparator. Two shapes are left
+// untouched:
+//
+//   - A "/" with nothing on one side is not a separator at all, it IS the
+//     binding (the bare Search key "/").
+//   - A "/" inside "<...>" is part of one placeholder token describing a
+//     range of keys ("m<a-z/0-9>" — press m, then any letter or digit),
+//     not a separator between two alternative bindings.
+//
+// Anywhere else "/" joins two real alternatives ("0/1/2", "gg/Home",
+// "ctrl+d/ctrl+u", even the bracket-free range list "a-z/A-Z/0-9") and
+// becomes a dot.
+func applyKeySeparatorDots(s string) string {
+	runes := []rune(s)
+	var sb strings.Builder
+	sb.Grow(len(s) + 4)
+	depth := 0
+	for i, r := range runes {
+		switch r {
+		case '<':
+			depth++
+		case '>':
+			if depth > 0 {
+				depth--
+			}
+		case '/':
+			if depth == 0 && i > 0 && i < len(runes)-1 {
+				sb.WriteString(helpKeySeparator)
+				continue
+			}
+		}
+		sb.WriteRune(r)
+	}
+	return sb.String()
+}
+
+// helpKeyDisplayDotted is helpKeyDisplay with display-only separator dots
+// applied. Used as helpKeySymbols' fallback for terminals that cannot draw
+// icon-mode symbols, so the dimmed separator still shows even without them.
+func helpKeyDisplayDotted(key string) string {
+	return applyKeySeparatorDots(helpKeyDisplay(key))
 }
 
 // chordText is helpKeyDisplay's per-token worker.
@@ -82,15 +136,16 @@ func chordText(tok string) string {
 // plain and no-color terminals still read "Ctrl+D".
 func helpKeySymbols(key string) string {
 	if ConfigNoColor || !iconModeDrawsSymbols() {
-		return helpKeyDisplay(key)
+		return helpKeyDisplayDotted(key)
 	}
-	return mapChordTokens(key, func(tok string) string {
+	symbols := mapChordTokens(key, func(tok string) string {
 		lower := strings.ToLower(tok)
 		if _, _, ok := splitModifierChord(lower); !ok {
 			return tok
 		}
 		return KeyChordDisplay(lower)
 	})
+	return applyKeySeparatorDots(symbols)
 }
 
 // padKeyLeft right-aligns s in a cell of width w. Padding is measured with
