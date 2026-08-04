@@ -70,10 +70,12 @@ const (
 	// 7+ of them. Neither which-key.nvim nor its config exposes an
 	// equivalent knob - its long labels make one unnecessary - but lfk's
 	// short ones need it to stop the panel from going wide-and-flat instead
-	// of tall-and-narrow. 4 was chosen empirically: it matches neovim's
-	// observed ~4-column layout at ~250 columns while leaving whichKeyMinColW
-	// as the sole driver (never binding) at 160 columns and below.
-	whichKeyMaxCols = 4
+	// of tall-and-narrow. 5 leaves whichKeyMinColW as the sole driver (never
+	// binding) up to a 170-column terminal; the cap first binds at 171
+	// columns, where it still leaves whichKeyMinColW's own 30-wide floor
+	// exactly (33-wide columns, 30 of content once whichKeySpacing is
+	// subtracted) rather than squeezing narrower.
+	whichKeyMaxCols = 5
 	whichKeyMinRows = 4  // Config.win.height.min
 	whichKeyMaxRows = 25 // Config.win.height.max
 	whichKeyPadV    = 1  // Config.win.padding[1]
@@ -100,7 +102,7 @@ type whichKeyGrid struct {
 	boxW  int   // column width, spacing included
 	boxN  int   // column count
 	rowN  int   // grid rows; entries fill column-major
-	lead  int   // spaces before each column (0 for a single column)
+	lead  int   // spaces before each column, always whichKeySpacing
 	keyW  []int // per column: right-aligned key field
 	descW []int // per column: description field; 0 drops the description
 }
@@ -135,13 +137,17 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	boxN = min(boxN, whichKeyMaxCols)
 	boxW = max(container/boxN, 1)
 
-	g := whichKeyGrid{boxW: boxW, boxN: boxN}
-	if boxN > 1 {
-		// which-key.nvim lays each box out at box_width - spacing regardless of
-		// the column count (view.lua:346), and only prefixes the spacing when
-		// there is more than one column (view.lua:358).
-		g.lead = whichKeySpacing
-	}
+	// which-key.nvim lays each box out at box_width - spacing (view.lua:346)
+	// and prepends that spacing before every box, including the first, once
+	// there is more than one column (view.lua:358) - so win.padding[2] alone
+	// (whichKeyPadH) is not neovim's real left margin; padding[2] + spacing
+	// is (2+3=5 here). lfk applies that same lead unconditionally, even at a
+	// single column, which is where it deliberately parts from neovim: a
+	// which-key.nvim popup shrink-wraps to its content there, so the reserved
+	// spacing simply isn't part of its layout, but lfk's panel always draws
+	// full width, so without a lead that budget would otherwise surface as an
+	// accidental gap stranded on the right rather than a margin on the left.
+	g := whichKeyGrid{boxW: boxW, boxN: boxN, lead: whichKeySpacing}
 	if len(cells) == 0 {
 		return g
 	}

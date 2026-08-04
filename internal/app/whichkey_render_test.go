@@ -293,6 +293,63 @@ func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
 	}
 }
 
+// TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes sweeps every width
+// from whichKeyMinWidth to 250 and every height from whichKeyMinHeight to 40.
+// This panel's height/width maths has broken three times in its history, and
+// both whichKeyMaxCols and the lead-spacing rule changed together, so the
+// sweep checks the properties that must survive at every size rather than a
+// handful of sampled points: no rendered line exceeds the terminal width, the
+// box never exceeds the terminal height, the column count never goes to
+// zero, and the box itself stays a well-formed rectangle (exactly one top and
+// one bottom border, every body row the same width).
+func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	m := whichKeyTestModel()
+	cells := m.whichKeyLeaderCells()
+
+	for w := whichKeyMinWidth; w <= 250; w++ {
+		for h := whichKeyMinHeight; h <= 40; h++ {
+			m.width, m.height = w, h
+			lay, ok := m.whichKeyLayoutFor(cells)
+			if !ok {
+				continue // below the real floor whichKeyPanelGeometry enforces
+			}
+			if lay.grid.boxN < 1 {
+				t.Fatalf("%dx%d: column count is %d, must never be zero", w, h, lay.grid.boxN)
+			}
+			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", h), cells, 0))
+			lines := strings.Split(out, "\n")
+			if len(lines) > h {
+				t.Fatalf("%dx%d: panel is %d lines tall, terminal has %d", w, h, len(lines), h)
+			}
+			topN, bottomN, bodyWidth := 0, 0, -1
+			for _, line := range lines {
+				if got := lipgloss.Width(line); got > w {
+					t.Fatalf("%dx%d: line %q is %d columns wide, exceeds terminal width", w, h, line, got)
+				}
+				switch {
+				case strings.Contains(line, "╭") && strings.Contains(line, "╮"):
+					topN++
+				case strings.Contains(line, "╰") && strings.Contains(line, "╯"):
+					bottomN++
+				case strings.Contains(line, "│"):
+					if bodyWidth == -1 {
+						bodyWidth = lipgloss.Width(line)
+					} else if got := lipgloss.Width(line); got != bodyWidth {
+						t.Fatalf("%dx%d: ragged box, body row width %d, want %d", w, h, got, bodyWidth)
+					}
+				}
+			}
+			if topN != 1 || bottomN != 1 {
+				t.Fatalf("%dx%d: malformed box, saw %d top corners and %d bottom corners", w, h, topN, bottomN)
+			}
+		}
+	}
+}
+
 // whichKeyRenderBenchModel is a full-catalog leader panel at the given size,
 // armed and shown, i.e. exactly what View() renders on every frame while the
 // user is paging.

@@ -261,6 +261,29 @@ func TestWhichKeyGridFor(t *testing.T) {
 	}
 }
 
+// TestWhichKeyGridFor_LeadAppliesEvenAtSingleColumn pins the panel's outer
+// left margin at whichKeyPadH+whichKeySpacing (2+3=5) regardless of column
+// count. which-key.nvim only prepends layout.spacing when box_count > 1
+// because its popup shrink-wraps to content at one column; lfk's panel always
+// draws full width, so without the same lead there the reserved spacing
+// budget would land as a stray gap on the right (whatever FillLinesBg pads
+// the short row out with) instead of a margin on the left. See whichKeyGridFor
+// for the full rationale.
+func TestWhichKeyGridFor_LeadAppliesEvenAtSingleColumn(t *testing.T) {
+	g := whichKeyGridFor(wkGridCells(15, 20), 14)
+	if g.boxN != 1 {
+		t.Fatalf("precondition: want a single column, got %d", g.boxN)
+	}
+	if g.lead != whichKeySpacing {
+		t.Fatalf("single column: lead=%d, want whichKeySpacing (%d)", g.lead, whichKeySpacing)
+	}
+	// lead + key field + gap + desc field must still land exactly on boxW, so
+	// the content the row writes fills the column with no unaccounted slack.
+	if got := g.lead + g.keyW[0] + whichKeyGap + g.descW[0]; got != g.boxW {
+		t.Fatalf("single column: lead+keyW+gap+descW=%d, want boxW=%d", got, g.boxW)
+	}
+}
+
 // TestWhichKeyGridFor_MaxColsCapsWideContainers pins whichKeyMaxCols: with
 // entries well under whichKeyMinColW, the width-driven formula alone would
 // still pack a lot of columns into a very wide container (e.g. 7 at a
