@@ -151,7 +151,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Configurable keybindings** for direct actions, including `Ctrl+Shift` chords that stay distinct from plain `Ctrl` (requires Kitty keyboard protocol or xterm `modifyOtherKeys`: Ghostty, kitty, WezTerm, foot, xterm — not macOS Terminal.app; see [Ctrl+Shift chords](docs/keybindings.md#ctrlshift-chords))
 - **Configurable search abbreviations**
 - **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
-- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable.
+- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable. Also decides whether the which-key panel draws modifier symbols (`⌃D`) or names (`ctrl+d`).
 - **Configurable table columns** (global, per-resource-type, and per-cluster)
 - **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
@@ -307,7 +307,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
 | `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
-| `?` | Which-key action panel: hotkeys actionable right now (scroll: `Ctrl+D`/`Ctrl+U`, close: `?` or `esc`). `F1` opens full help |
+| `?` | Which-key action panel: hotkeys actionable right now, keys colored by category (scroll: `Ctrl+D`/`Ctrl+U`, close: `?` or `esc`). `F1` opens full help |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 | `}` / `{` | Move current tab right / left |

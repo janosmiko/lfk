@@ -39,30 +39,16 @@ var helpKeyDisplayModifiers = map[string]string{
 // ("ctrl+shift+x" -> "Ctrl+Shift+X", "shift+tab" -> "Shift+Tab"); an
 // unmodified binding displays verbatim.
 func helpKeyDisplay(key string) string {
-	parts := strings.Split(key, "+")
-	if len(parts) < 2 {
+	mods, last, ok := splitModifierChord(key)
+	if !ok {
 		return key
 	}
-	// Every leading segment must be a modifier, otherwise this is a plain
-	// binding that happens to contain "+" (e.g. the literal "+" key).
-	for _, p := range parts[:len(parts)-1] {
-		if _, ok := helpKeyDisplayModifiers[p]; !ok {
-			return key
-		}
-	}
-	last := parts[len(parts)-1]
-	if last == "" {
-		// The key itself is "+", e.g. "ctrl++" — leave it verbatim.
-		return key
-	}
-	// Build a separate slice rather than mutating parts in place, and title
-	// the key rune-wise so a multibyte key is not split mid-rune.
-	display := make([]string, 0, len(parts))
-	for _, p := range parts[:len(parts)-1] {
+	// Build a separate slice rather than mutating the split in place.
+	display := make([]string, 0, len(mods)+1)
+	for _, p := range mods {
 		display = append(display, helpKeyDisplayModifiers[p])
 	}
-	r := []rune(last)
-	display = append(display, strings.ToUpper(string(r[0]))+string(r[1:]))
+	display = append(display, titleKeyName(last))
 	return strings.Join(display, "+")
 }
 

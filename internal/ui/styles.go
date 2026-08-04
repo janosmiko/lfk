@@ -263,6 +263,24 @@ var (
 			Foreground(lipgloss.Color(ColorSecondary)).
 			Bold(true)
 
+	// Which-key panel. The panel draws one flat list with no section
+	// headers, so the key's color is the only thing left that says which
+	// family an entry belongs to. Red is deliberately unused: it is the
+	// app's failure/destructive signal, and the panel's most destructive
+	// entries (Delete, Force delete) live in the Actions group, where a red
+	// key would read as "this row failed" rather than "this is an action".
+	//
+	// WhichKeyKeyStyle is the ungrouped default: the g-prefix goto popup has
+	// no groups and renders entirely through it.
+	WhichKeyKeyStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
+	WhichKeyDescStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
+	WhichKeyActionsStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
+	WhichKeyViewsStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true)
+	WhichKeyFilterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorCyan)).Bold(true)
+	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple)).Bold(true)
+	WhichKeySortStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning)).Bold(true)
+	WhichKeySettingsStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true)
+
 	// Error style.
 	ErrorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorError)).

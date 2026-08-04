@@ -11,6 +11,33 @@ import (
 type whichKeyCell struct {
 	key  string // continuation after the prefix, e.g. "p" for "gp"
 	desc string
+	// group tints the key so the flat, header-less list still says which
+	// family an entry belongs to. Empty for the g-prefix goto popup, whose
+	// entries are all the same kind of thing.
+	group whichKeyGroup
+	// disp is the key as drawn, resolved once per build by fillWhichKeyDisplay.
+	disp string
+}
+
+// keyText is the key as drawn: modifier chords become symbols ("ctrl+d" ->
+// "⌃D") when the icon mode allows glyphs, and stay verbatim otherwise. Every
+// width measurement and every write goes through this, so the grid arithmetic
+// sees exactly what lands on screen.
+func (c whichKeyCell) keyText() string {
+	if c.disp != "" {
+		return c.disp
+	}
+	return ui.KeyChordDisplay(c.key)
+}
+
+// fillWhichKeyDisplay resolves each cell's drawn key once per build. The grid
+// measures the key twice (panel width, then per-column field) and the renderer
+// writes it a third time; parsing the chord at each of those points is three
+// passes per frame for the same answer.
+func fillWhichKeyDisplay(cells []whichKeyCell) {
+	for i := range cells {
+		cells[i].disp = ui.KeyChordDisplay(cells[i].key)
+	}
 }
 
 // Panel geometry, ported from neovim's which-key.nvim so the grid reads the
@@ -71,7 +98,7 @@ type whichKeyGrid struct {
 func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	maxRow := 0
 	for _, c := range cells {
-		maxRow = max(maxRow, lipgloss.Width(c.key)+whichKeyGap+lipgloss.Width(c.desc))
+		maxRow = max(maxRow, lipgloss.Width(c.keyText())+whichKeyGap+lipgloss.Width(c.desc))
 	}
 	boxW := min(max(maxRow, whichKeyMinColW), max(container, 1))
 	boxN := max(container/(boxW+whichKeySpacing), 1)
@@ -94,7 +121,7 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	for b := range boxN {
 		w := 0
 		for i := b * g.rowN; i < (b+1)*g.rowN && i < len(cells); i++ {
-			w = max(w, lipgloss.Width(cells[i].key))
+			w = max(w, lipgloss.Width(cells[i].keyText()))
 		}
 		// A key wider than the cell would starve the label; clamp it so at least
 		// one column of description survives, and let writeWhichKeyCell truncate.
@@ -122,15 +149,28 @@ func wkPad(n int) string {
 	}
 }
 
-// whichKeyCellStyles are the per-render constants a cell needs.
+// whichKeyCellStyles are the per-render constants a cell needs: the shared
+// description style, the ungrouped key style, and one key style per registry
+// group. Resolved once per render rather than per cell.
 type whichKeyCellStyles struct {
-	key  lipgloss.Style
-	desc lipgloss.Style
+	key   lipgloss.Style // ungrouped fallback; the whole goto popup uses it
+	desc  lipgloss.Style
+	group map[whichKeyGroup]lipgloss.Style
 }
 
 func newWhichKeyCellStyles() whichKeyCellStyles {
 	key, desc := whichKeyStyles()
-	return whichKeyCellStyles{key: key, desc: desc}
+	return whichKeyCellStyles{key: key, desc: desc, group: whichKeyGroupStyles()}
+}
+
+// keyStyle picks the accent for a cell. An unknown or empty group falls back
+// to the ungrouped style, which is what keeps the g-prefix goto popup looking
+// exactly as it did before groups were colored.
+func (st whichKeyCellStyles) keyStyle(g whichKeyGroup) lipgloss.Style {
+	if s, ok := st.group[g]; ok {
+		return s
+	}
+	return st.key
 }
 
 // writeWhichKeyCell lays one entry out as which-key.nvim's two-column mini
@@ -142,9 +182,9 @@ func newWhichKeyCellStyles() whichKeyCellStyles {
 // allocation per entry for nothing.
 func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, col int, st whichKeyCellStyles) {
 	keyW, descW := g.keyW[col], g.descW[col]
-	key := ui.Truncate(c.key, keyW)
+	key := ui.Truncate(c.keyText(), keyW)
 	sb.WriteString(wkPad(g.lead + max(keyW-lipgloss.Width(key), 0)))
-	sb.WriteString(st.key.Render(key))
+	sb.WriteString(st.keyStyle(c.group).Render(key))
 	if descW == 0 {
 		// No room for a label: the key alone is still worth showing.
 		sb.WriteString(wkPad(g.boxW - whichKeySpacing - keyW))
@@ -157,10 +197,25 @@ func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, col
 }
 
 // whichKeyStyles are the two styles every which-key panel path renders with.
+// The background is applied here rather than baked into the theme globals so
+// the panel keeps tracking ui.BaseBg (and with it the transparency setting).
 func whichKeyStyles() (key, desc lipgloss.Style) {
-	key = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.BaseBg)
-	desc = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).Background(ui.BaseBg)
-	return key, desc
+	return ui.WhichKeyKeyStyle.Background(ui.BaseBg), ui.WhichKeyDescStyle.Background(ui.BaseBg)
+}
+
+// whichKeyGroupStyles maps each registry group to its key accent. Built per
+// render because the theme globals it reads are rebuilt by ApplyTheme, and a
+// package-level copy would freeze the panel at the startup theme.
+func whichKeyGroupStyles() map[whichKeyGroup]lipgloss.Style {
+	bg := ui.BaseBg
+	return map[whichKeyGroup]lipgloss.Style{
+		wkActions:   ui.WhichKeyActionsStyle.Background(bg),
+		wkViews:     ui.WhichKeyViewsStyle.Background(bg),
+		wkFilter:    ui.WhichKeyFilterStyle.Background(bg),
+		wkSelection: ui.WhichKeySelectionStyle.Background(bg),
+		wkSort:      ui.WhichKeySortStyle.Background(bg),
+		wkSettings:  ui.WhichKeySettingsStyle.Background(bg),
+	}
 }
 
 // whichKeyPanelGeometry derives the container width and the on-screen row

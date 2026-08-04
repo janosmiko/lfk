@@ -268,6 +268,19 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 | `Esc` | Close |
 | any other key | Close, and still run normally |
 
+Keys are colored by category, since there are no headers to say it:
+
+| Category | Color | Examples |
+|---|---|---|
+| Actions | green | Delete, Edit, Logs, Copy |
+| Views | blue | Resource map, RBAC browser, Task queue |
+| Filter | cyan | Filter, Search, Namespace selector |
+| Selection | purple | Toggle selection, Select range, Diff |
+| Sort | amber | Sort next/previous, Flip, Reset |
+| Settings | neutral | Watch mode, Read-only, Color scheme |
+
+Modifier chords render as symbols (`⌃D`, `⌃⇧X`, `⌥K`, `⌘K`) when `icons` resolves to `unicode`, `nerdfont`, or `emoji`; `simple`, `none`, and `no_color` keep the textual form (`ctrl+d`). The goto popup (`g`) has no categories and keeps a single key color.
+
 `?` is the leader only in the explorer; every fullscreen viewer keeps `?` as help. `F1` opens the help screen from the explorer. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal.
 
 ## Bookmarks

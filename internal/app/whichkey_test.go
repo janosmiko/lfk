@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -18,12 +19,14 @@ func restoreWhichKeyGlobals(t *testing.T) {
 	delay := ui.ConfigWhichKeyDelayMs
 	leaderDelay := ui.ConfigWhichKeyLeaderDelayMs
 	dim := ui.ConfigDimOverlay
+	icons := ui.IconMode
 	t.Cleanup(func() {
 		ui.ActiveKeybindings = kb
 		ui.ConfigWhichKeyEnabled = enabled
 		ui.ConfigWhichKeyDelayMs = delay
 		ui.ConfigWhichKeyLeaderDelayMs = leaderDelay
 		ui.ConfigDimOverlay = dim
+		ui.IconMode = icons
 	})
 }
 
@@ -263,27 +266,37 @@ func TestWhichKeyGridFor(t *testing.T) {
 // which-key.nvim accumulates a width per table column (layout.lua:74). Sizing
 // it from the widest key in the panel instead indents every single-character
 // key by the width of the one "ctrl+alt+y" that lives four columns over.
+// Run under both icon modes: the symbol form is three columns wide where the
+// textual one is ten, so a grid that measured the BINDING rather than the drawn
+// key would reserve seven dead columns in symbol mode.
 func TestWhichKeyGridFor_KeyFieldIsPerColumn(t *testing.T) {
-	// container 60 -> box_width 30, box_count 2, so 4 entries fill 2 rows x 2
-	// columns column-major: d/e in column 0, ctrl+alt+y/x in column 1.
-	cells := []whichKeyCell{
-		{"d", "Delete"},
-		{"e", "Edit"},
-		{"ctrl+alt+y", "Mouse capture"},
-		{"x", "Exec"},
-	}
-	g := whichKeyGridFor(cells, 60)
-	if g.boxN != 2 || g.rowN != 2 {
-		t.Fatalf("precondition: want a 2x2 grid, got box_count=%d rows=%d", g.boxN, g.rowN)
-	}
-	if g.keyW[0] != 1 {
-		t.Errorf("column 0 holds only 1-char keys; key field = %d, want 1", g.keyW[0])
-	}
-	if want := len("ctrl+alt+y"); g.keyW[1] != want {
-		t.Errorf("column 1 key field = %d, want %d (its own widest key)", g.keyW[1], want)
-	}
-	if g.descW[0] <= g.descW[1] {
-		t.Errorf("a narrower key field must leave a wider label field: descW=%v", g.descW)
+	for _, icons := range []string{"simple", "unicode"} {
+		t.Run(icons, func(t *testing.T) {
+			restoreWhichKeyGlobals(t)
+			ui.IconMode = icons
+			// container 60 -> box_width 30, box_count 2, so 4 entries fill 2 rows
+			// x 2 columns column-major: d/e in column 0, ctrl+alt+y/x in column 1.
+			cells := []whichKeyCell{
+				{key: "d", desc: "Delete"},
+				{key: "e", desc: "Edit"},
+				{key: "ctrl+alt+y", desc: "Mouse capture"},
+				{key: "x", desc: "Exec"},
+			}
+			g := whichKeyGridFor(cells, 60)
+			if g.boxN != 2 || g.rowN != 2 {
+				t.Fatalf("precondition: want a 2x2 grid, got box_count=%d rows=%d", g.boxN, g.rowN)
+			}
+			if g.keyW[0] != 1 {
+				t.Errorf("column 0 holds only 1-char keys; key field = %d, want 1", g.keyW[0])
+			}
+			want := lipgloss.Width(cells[2].keyText())
+			if g.keyW[1] != want {
+				t.Errorf("column 1 key field = %d, want %d (its own widest key as drawn)", g.keyW[1], want)
+			}
+			if g.descW[0] <= g.descW[1] {
+				t.Errorf("a narrower key field must leave a wider label field: descW=%v", g.descW)
+			}
+		})
 	}
 }
 

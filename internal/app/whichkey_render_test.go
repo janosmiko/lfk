@@ -72,7 +72,7 @@ func TestRenderWhichKeyPanel_RendersAFlatListWithNoHeaders(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
-	cells := []whichKeyCell{{"d", "Delete"}, {"e", "Edit"}, {"s", "Sort next column"}}
+	cells := []whichKeyCell{{key: "d", desc: "Delete"}, {key: "e", desc: "Edit"}, {key: "s", desc: "Sort next column"}}
 	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
 	for _, want := range []string{"d Delete", "e Edit", "s Sort next column"} {
 		if !strings.Contains(out, want) {
@@ -107,7 +107,7 @@ func TestRenderWhichKeyPanel_TinyTerminalRendersNothing(t *testing.T) {
 	m := gotoTestModel()
 	m.width, m.height = 10, 4
 	bg := strings.Repeat("\n", m.height)
-	cells := []whichKeyCell{{"d", "Delete"}}
+	cells := []whichKeyCell{{key: "d", desc: "Delete"}}
 	if got := m.renderWhichKeyPanel(bg, cells, 0); got != bg {
 		t.Fatal("panel must be skipped when the terminal is too small")
 	}
@@ -125,7 +125,7 @@ func TestRenderWhichKeyPanel_OverflowScrollsInsteadOfDropping(t *testing.T) {
 	m.height = 12 // deliberately short
 	cells := make([]whichKeyCell, 0, 48)
 	for i := range 48 {
-		cells = append(cells, whichKeyCell{string(rune('a' + i%8)), fmt.Sprintf("entry %02d", i)})
+		cells = append(cells, whichKeyCell{key: string(rune('a' + i%8)), desc: fmt.Sprintf("entry %02d", i)})
 	}
 
 	lay, ok := m.whichKeyLayoutFor(cells)
@@ -233,11 +233,15 @@ func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) 
 			if idx >= len(cells) {
 				break
 			}
-			widest[b] = max(widest[b], lipgloss.Width(cells[idx].key))
+			// Measure the key AS DRAWN: a symbol-rendered chord ("⌃D") is
+			// narrower than its binding ("ctrl+d"), and the grid is sized
+			// from the drawn form.
+			key := cells[idx].keyText()
+			widest[b] = max(widest[b], lipgloss.Width(key))
 			start := b * g.boxW
 			field := string(runes[start+g.lead : start+g.lead+g.keyW[b]])
-			if strings.TrimLeft(field, " ") != cells[idx].key {
-				t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, cells[idx].key)
+			if strings.TrimLeft(field, " ") != key {
+				t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, key)
 			}
 			if got := runes[start+g.lead+g.keyW[b]]; got != ' ' {
 				t.Fatalf("row %d col %d: want a single space after the key, got %q", r, b, got)
@@ -264,7 +268,7 @@ func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	m := gotoTestModel()
 	m.height = 20
-	cells := []whichKeyCell{{"Y", "Copy as (YAML/JSON/table)"}}
+	cells := []whichKeyCell{{key: "Y", desc: "Copy as (YAML/JSON/table)"}}
 	for _, w := range []int{20, 25, 34} {
 		m.width = w
 		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))

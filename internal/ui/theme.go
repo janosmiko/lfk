@@ -334,6 +334,26 @@ func ApplyTheme(t Theme) {
 		Bold(true).
 		Background(barBg)
 
+	// Which-key group accents. Five track the theme; Cyan has no Theme field
+	// (same special-purpose constant the age column uses), so it is the one
+	// that can sit badly on an unusually light Base — run it through the same
+	// contrast floor the theme colors got above when the user asked for one.
+	wkCyan := ColorCyan
+	if ConfigMinContrastRatio > 0 {
+		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
+	}
+	// No Background here (nor in theme_nocolor.go): the panel paints its own
+	// background per render from BaseBg, which also tracks the transparency
+	// setting, so baking one in would double-set it.
+	WhichKeyKeyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
+	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
+	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
+	WhichKeyViewsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Bold(true)
+	WhichKeyFilterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkCyan)).Bold(true)
+	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple)).Bold(true)
+	WhichKeySortStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning)).Bold(true)
+	WhichKeySettingsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true)
+
 	ErrorStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Error)).
 		Background(baseBg).

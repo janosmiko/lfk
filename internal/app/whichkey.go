@@ -237,13 +237,16 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	prefix := ui.ActiveKeybindings.JumpTop
 	targets := m.gotoTargets()
 	cells := make([]whichKeyCell, 0, len(targets)+2)
-	cells = append(cells, whichKeyCell{prefix, "list top"})
+	// No group on any of these: the popup lists one kind of thing (jump
+	// there), so every key keeps the ungrouped accent.
+	cells = append(cells, whichKeyCell{key: prefix, desc: "list top"})
 	for _, gt := range targets {
-		cells = append(cells, whichKeyCell{strings.TrimPrefix(gt.Chord, prefix), gt.Label})
+		cells = append(cells, whichKeyCell{key: strings.TrimPrefix(gt.Chord, prefix), desc: gt.Label})
 	}
 	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" {
-		cells = append(cells, whichKeyCell{strings.TrimPrefix(pn, prefix), "Previous namespace"})
+		cells = append(cells, whichKeyCell{key: strings.TrimPrefix(pn, prefix), desc: "Previous namespace"})
 	}
 	sortWhichKeyCells(cells)
+	fillWhichKeyDisplay(cells)
 	return cells
 }

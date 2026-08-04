@@ -8,9 +8,10 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// whichKeyGroup classifies a catalog entry. It organises this file only — the
-// panel renders one flat list with no section headers, the way neovim's
-// which-key does, so a group name never reaches the screen.
+// whichKeyGroup classifies a catalog entry. The panel renders one flat list
+// with no section headers, the way neovim's which-key does, so a group NAME
+// never reaches the screen — but its color does: each group tints its entries'
+// keys (whichKeyGroupStyles), which is the category cue the headers used to be.
 type whichKeyGroup string
 
 const (
