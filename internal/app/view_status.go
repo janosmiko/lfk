@@ -406,16 +406,16 @@ func (m Model) statusBar() string {
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
-// explorerHelpHintKey names the key the explorer hint bar advertises as
-// "help": whichever key actually reaches the help screen. Defers to
-// whichKeyHelpKey — the same rule the panel's own "Full help" row renders
-// with, so the bar and the panel one row above it can never disagree.
+// helpHintKey names the key a hint bar advertises as "help": whichever key
+// actually reaches the help screen. Defers to whichKeyHelpKey — the same rule
+// the panel's own "Full help" row renders with, so the bar and the panel one
+// row above it can never disagree.
 //
 // The extra gate is the disabled case whichKeyHelpKey doesn't model: with the
 // panel off, the leader key falls through to kb.Help instead of claiming it
-// (handleExplorerSelectionKey), so the collision the f1 fallback exists for
-// never happens.
-func explorerHelpHintKey(kb ui.Keybindings) string {
+// (handleExplorerSelectionKey, handleViewerWhichKeyLeader), so the collision
+// the f1 fallback exists for never happens.
+func helpHintKey(kb ui.Keybindings) string {
 	if !ui.ConfigWhichKeyEnabled || kb.WhichKeyLeader == "" {
 		return kb.Help
 	}
@@ -458,6 +458,17 @@ func (m Model) whichKeyPopupHints(cells []whichKeyCell) []ui.HintEntry {
 		hints = append(hints, ui.HintEntry{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"})
 	}
 	return append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
+}
+
+// whichKeyLeaderHintBar renders the leader panel's own hints as a full-width
+// status line. The fullscreen viewers draw their hint bar inside their own
+// content instead of going through statusBar(), so the swap
+// leaderOrExplorerHints performs for the explorer has to be done there by
+// replacing the rendered line.
+func (m Model) whichKeyLeaderHintBar() string {
+	hints := m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells))
+	content := ui.FormatHintPartsFit(hints, max(m.width-2, 10))
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
 // explorerStatusChips composes the right-anchored chip group for the
@@ -527,7 +538,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.NewTab, Desc: "new tab"},
-			{Key: explorerHelpHintKey(kb), Desc: "help"},
+			{Key: helpHintKey(kb), Desc: "help"},
 			{Key: "q", Desc: "quit"},
 		}
 	}
@@ -596,7 +607,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	hintEntries = append(hintEntries, ui.HintEntry{Key: ui.ActiveKeybindings.JumpTop, Desc: "goto"})
 	hintEntries = append(hintEntries,
-		ui.HintEntry{Key: explorerHelpHintKey(kb), Desc: "help"},
+		ui.HintEntry{Key: helpHintKey(kb), Desc: "help"},
 		ui.HintEntry{Key: "q", Desc: "quit"},
 	)
 	return m.appendEventsHintEntries(hintEntries)

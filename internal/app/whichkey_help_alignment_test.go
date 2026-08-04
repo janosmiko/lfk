@@ -238,16 +238,22 @@ func whichKeyRegistryGroupsByField(t *testing.T) map[string]whichKeyGroup {
 		fieldForSentinel[sentinel] = f.Name
 	}
 
+	// Swept across every catalog, not just the explorer's: a binding shared by
+	// two modes (kb.Search, kb.Refresh, kb.TogglePreview, ...) must sit in the
+	// same group in both, or the panel's legend means one thing in the
+	// explorer and another in a viewer.
 	out := map[string]whichKeyGroup{}
-	for _, a := range whichKeyExplorerActions() {
-		field, ok := fieldForSentinel[a.Key(kb)]
-		if !ok {
-			continue // computed key (whichKeyHelpKey) — no single source field
+	for _, mc := range whichKeyCatalogList {
+		for _, e := range mc.catalog.entries() {
+			field, ok := fieldForSentinel[e.Key(kb)]
+			if !ok {
+				continue // literal key (wkLiteralKey) — no source field
+			}
+			if prev, dup := out[field]; dup && prev != e.Group {
+				t.Errorf("binding %s is registered under two groups (%q and %q); %s disagrees", field, prev, e.Group, mc.name)
+			}
+			out[field] = e.Group
 		}
-		if prev, dup := out[field]; dup && prev != a.Group {
-			t.Errorf("binding %s is registered under two groups (%q and %q)", field, prev, a.Group)
-		}
-		out[field] = a.Group
 	}
 	return out
 }

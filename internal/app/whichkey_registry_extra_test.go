@@ -11,9 +11,14 @@ import (
 )
 
 // TestWhichKeyRegistry_CoversEveryBinding is a forcing function: every
-// ui.Keybindings field must either appear in the explorer registry or be listed
+// ui.Keybindings field must either appear in SOME mode's catalog or be listed
 // in whichKeyExcludedBindings with a reason. A new hotkey added later therefore
-// fails CI until someone decides whether it belongs in the panel.
+// fails CI until someone decides whether it belongs in a panel.
+//
+// The sweep is registry-wide rather than explorer-only: a key that only
+// dispatches inside a fullscreen viewer is now registered there, so scoping
+// this to the explorer would force every one of them back into the exclusion
+// map under a reason that is no longer true.
 func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 
@@ -33,9 +38,11 @@ func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 	}
 
 	registered := map[string]bool{}
-	for _, a := range whichKeyExplorerActions() {
-		if name, ok := fieldForValue[a.Key(kb)]; ok {
-			registered[name] = true
+	for _, mc := range whichKeyCatalogList {
+		for _, e := range mc.catalog.entries() {
+			if name, ok := fieldForValue[e.Key(kb)]; ok {
+				registered[name] = true
+			}
 		}
 	}
 
@@ -76,16 +83,25 @@ func TestWhichKeyRegistry_EveryEntryHasADeclaredGroup(t *testing.T) {
 		}
 		declared[g] = true
 	}
+	// Every entry in EVERY catalog must carry a declared group; the panel is
+	// one shared renderer and the legend explains one shared color mapping.
+	for _, mc := range whichKeyCatalogList {
+		for _, e := range mc.catalog.entries() {
+			if !declared[e.Group] {
+				t.Errorf("%s catalog entry %q carries group %q, which whichKeyGroupOrder does not declare", mc.name, e.Label, e.Group)
+			}
+		}
+	}
+	// The reverse check stays explorer-scoped: it is the one catalog broad
+	// enough to use all six groups, and a viewer with no sortable columns
+	// legitimately never touches wkSort.
 	seen := map[whichKeyGroup]bool{}
 	for _, a := range whichKeyExplorerActions() {
-		if !declared[a.Group] {
-			t.Errorf("catalog entry %q carries group %q, which whichKeyGroupOrder does not declare", a.Label, a.Group)
-		}
 		seen[a.Group] = true
 	}
 	for g := range declared {
 		if !seen[g] {
-			t.Errorf("group %q is declared but no catalog entry uses it; drop it or use it", g)
+			t.Errorf("group %q is declared but no explorer catalog entry uses it; drop it or use it", g)
 		}
 	}
 }

@@ -136,13 +136,37 @@ func (m Model) primeWhichKeyCells() Model {
 	if !ui.ConfigWhichKeyEnabled || !m.whichKey.shown {
 		return m
 	}
+	// The leader is tested first because the two flags are only mutually
+	// exclusive in the explorer, where handleGotoChord swallows the leader key
+	// while the g prefix is armed. A viewer never disarms pendingG on an
+	// unrecognised key (handleYAMLNormalKey's default only clears lineInput),
+	// so a stale "g" there would otherwise hand the leader panel the goto
+	// popup's cells.
 	switch {
-	case m.pendingG:
-		m.whichKey.cells = m.whichKeyCells()
 	case m.whichKey.armed:
 		m.whichKey.cells = m.whichKeyLeaderCells()
+	case m.pendingG:
+		m.whichKey.cells = m.whichKeyCells()
 	}
 	return m
+}
+
+// handleViewerWhichKeyLeader arms the leader panel from a fullscreen viewer.
+// The explorer is deliberately excluded: its own arming
+// (handleExplorerSelectionKey) sits BEHIND the g-prefix chord handler, so an
+// armed "g" still swallows the next key there. Moving the explorer onto this
+// earlier hook would turn "g?" into a panel instead of the silent no-op
+// handleGotoChord makes it.
+func (m Model) handleViewerWhichKeyLeader(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	if m.mode == modeExplorer {
+		return m, nil, false
+	}
+	leader := ui.ActiveKeybindings.WhichKeyLeader
+	if leader == "" || msg.String() != leader || !m.whichKeyLeaderArmable() {
+		return m, nil, false
+	}
+	mdl, cmd := m.armWhichKeyLeader()
+	return mdl, cmd, true
 }
 
 // frameWhichKeyCells returns the frame cache when primeWhichKeyCells filled it,

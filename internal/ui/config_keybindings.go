@@ -110,10 +110,11 @@ type Keybindings struct {
 	MoveTabLeft  string `json:"move_tab_left" yaml:"move_tab_left"`
 	MoveTabRight string `json:"move_tab_right" yaml:"move_tab_right"`
 
-	// WhichKeyLeader arms the context-aware which-key panel in the explorer,
-	// which lists the hotkeys actionable on the current row. Dispatched ahead
-	// of Help, so while the two share the default "?" the explorer's help
-	// screen is reached with f1; every fullscreen viewer keeps "?" as help.
+	// WhichKeyLeader arms the context-aware which-key panel, which lists the
+	// hotkeys actionable right now — on the explorer's current row, or in the
+	// fullscreen viewer's current state. Dispatched ahead of Help, so while
+	// the two share the default "?" the help screen is reached with f1
+	// everywhere (see HelpScreenKey).
 	WhichKeyLeader string `json:"which_key_leader" yaml:"which_key_leader"`
 
 	// Bookmarks
@@ -192,14 +193,15 @@ type Keybindings struct {
 	PreviousNamespace string `json:"previous_namespace" yaml:"previous_namespace"`
 }
 
-// ExplorerHelpKey reports the key that actually opens the help screen from the
-// explorer. WhichKeyLeader is dispatched ahead of Help, so while the two share
-// a binding the help screen is only reachable with f1.
+// HelpScreenKey reports the key that actually opens the help screen.
+// WhichKeyLeader is dispatched ahead of Help in every mode that has a
+// which-key catalog — the explorer and the fullscreen viewers alike — so while
+// the two share a binding the help screen is only reachable with f1.
 //
 // Lives on Keybindings because both the help catalog (internal/ui) and the
 // app's hint bar need the same answer. Two copies of this rule have already
 // drifted apart once and advertised a key that did not open help.
-func (k Keybindings) ExplorerHelpKey() string {
+func (k Keybindings) HelpScreenKey() string {
 	if k.Help == k.WhichKeyLeader {
 		return "f1"
 	}

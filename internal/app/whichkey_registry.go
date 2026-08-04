@@ -35,24 +35,10 @@ func whichKeyGroupOrder() []whichKeyGroup {
 	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
 }
 
-// whichKeyAction is one row of the leader panel. Key is a function so a
-// rebind is picked up at render time rather than baked in at package init.
-// Avail is nil for entries that always apply in the explorer; it must be cheap
-// and side-effect free because it runs on every render.
-type whichKeyAction struct {
-	Key   func(kb ui.Keybindings) string
-	Label string
-	Group whichKeyGroup
-	Avail func(c *wkCtx) bool
-	// Order is an optional explicit sort override, applied as a tiebreak
-	// after the group and modifier-tier passes but before the plain key
-	// sort (sortWhichKeyCells). Zero means "unspecified" and falls through
-	// to the normal sort — mirrors neovim's which-key `order` sorter
-	// (view.lua's M.fields.order), which is the escape hatch for a pair
-	// like "<"/">" that a plain ASCII compare would otherwise split apart.
-	// Leave unset unless an entry needs a specific position within its group.
-	Order int
-}
+// whichKeyAction is one row of the explorer's leader panel: a catalog entry
+// whose predicates read explorer row state (wkCtx). Every other mode binds
+// wkAction to its own context type — see whichkey_catalog.go.
+type whichKeyAction = wkAction[*wkCtx]
 
 // wkCtx carries the row state every predicate needs, resolved once per call.
 // Predicates used to each call selectedMiddleItem() -> visibleMiddleItems(),
@@ -474,7 +460,7 @@ func wkDiffAvailable(c *wkCtx) bool {
 	return c.level >= model.LevelResources && len(c.m.selectedItems) == 2
 }
 
-// whichKeyExplorerCatalog is the full catalog for explorer mode. Navigation
+// whichKeyExplorerActionList is the full catalog for explorer mode. Navigation
 // bindings are absent by construction — the panel is for actions the user is
 // unlikely to remember, not for h/j/k/l.
 //
@@ -488,7 +474,7 @@ func wkDiffAvailable(c *wkCtx) bool {
 // wkLevelIn / wkExcludeKind constructor and so reallocate their lookup sets
 // each frame. Only the Key indirection stays dynamic, so a runtime rebind is
 // still picked up.
-var whichKeyExplorerCatalog = []whichKeyAction{
+var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.ActionMenu }, Label: "Action menu", Group: wkActions, Avail: wkActionMenuAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.Logs }, Label: "Logs (fullscreen)", Group: wkActions, Avail: wkKindIn("Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob")},
 	{Key: func(kb ui.Keybindings) string { return kb.Describe }, Label: "Describe", Group: wkActions, Avail: wkRealKind(wkOnRow)},
@@ -578,50 +564,36 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: whichKeyHelpKey, Label: "Full help", Group: wkViews},
 }
 
-// whichKeyHelpKey reports the key that actually opens the help screen from the
-// explorer. The leader is dispatched ahead of kb.Help, so when the two collide
-// (both default to "?") only the hardcoded f1 alias still reaches help, and
-// advertising "?" there would be a lie.
+// whichKeyExplorerCatalog is the explorer's registry entry. The explorer's own
+// text-input modes (filter, search, command bar) are claimed by handleKey
+// before the leader dispatch ever runs, so it declares no input hook.
+var whichKeyExplorerCatalog = wkCatalog[*wkCtx]{
+	resolve: newWKCtx,
+	actions: whichKeyExplorerActionList,
+}
+
+// whichKeyHelpKey reports the key that actually opens the help screen. The
+// leader is dispatched ahead of kb.Help in every mode that has a catalog, so
+// when the two collide (both default to "?") only the hardcoded f1 alias still
+// reaches help, and advertising "?" there would be a lie.
 func whichKeyHelpKey(kb ui.Keybindings) string {
-	return kb.ExplorerHelpKey()
+	return kb.HelpScreenKey()
 }
 
 // whichKeyExplorerActions returns a copy of the shared explorer catalog, so a
 // caller cannot reorder or overwrite the package slice through it. Only tests
-// call this; the render path reads whichKeyExplorerCatalog directly, so the
+// call this; the render path reads whichKeyExplorerActionList directly, so the
 // clone costs nothing per frame.
 func whichKeyExplorerActions() []whichKeyAction {
-	return slices.Clone(whichKeyExplorerCatalog)
-}
-
-// availableWhichKeyActions filters the explorer catalog to what applies right
-// now, dropping entries whose binding the user cleared.
-//
-// Pointer receiver on purpose: Model is ~18 KB, and taking its address for the
-// predicates makes a value receiver's copy escape to the heap on every render.
-// Safe because every predicate is required to be read-only.
-func (m *Model) availableWhichKeyActions() []whichKeyAction {
-	kb := ui.ActiveKeybindings
-	all := whichKeyExplorerCatalog
-	c := newWKCtx(m)
-	out := make([]whichKeyAction, 0, len(all))
-	for _, a := range all {
-		if a.Key(kb) == "" {
-			continue
-		}
-		if a.Avail != nil && !a.Avail(c) {
-			continue
-		}
-		out = append(out, a)
-	}
-	return out
+	return slices.Clone(whichKeyExplorerActionList)
 }
 
 // whichKeyExcludedBindings lists the ui.Keybindings fields that deliberately do
-// not appear in the leader panel, keyed by Go field name. Navigation and
-// viewer-local keys are excluded because the panel is a discovery aid for
-// actions, not a full keymap. TestWhichKeyRegistry_CoversEveryBinding fails when
-// a new binding is neither registered nor listed here.
+// not appear in ANY mode's leader panel, keyed by Go field name. Navigation is
+// excluded because the panel is a discovery aid for actions, not a full keymap;
+// the remaining viewer-local keys belong to viewers that have no catalog yet.
+// TestWhichKeyRegistry_CoversEveryBinding fails when a new binding is neither
+// registered in some catalog nor listed here.
 func whichKeyExcludedBindings() map[string]string {
 	return map[string]string{
 		// Navigation — excluded by design.
@@ -633,22 +605,13 @@ func whichKeyExcludedBindings() map[string]string {
 		"JumpOwner": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
 		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
 
-		// Viewer-local: only meaningful inside a fullscreen viewer, which the
-		// v1 panel does not cover.
-		"ToggleWrap": "viewer-local", "ToggleLineNumbers": "viewer-local",
-		"ToggleFold": "viewer-local", "ToggleFoldAll": "viewer-local",
-		"ToggleFollow": "viewer-local", "ToggleTimestamps": "viewer-local",
-		"TogglePrefixes": "viewer-local", "ToggleUnified": "viewer-local",
-		"TreeView": "viewer-local",
-		// LogTop (openLogTopFromViewer, update_logs.go) only dispatches from
-		// inside the open fullscreen log viewer's key handler.
-		"LogTop": "viewer-local",
-		// SeverityUp/SeverityDown (severityStep, update_logs.go:137-140) only
-		// dispatch inside handleLogKey, the open fullscreen log viewer's key
-		// handler — a severity-filter step, not a security-view concept
-		// (corrected from an earlier, wrong "navigation within security
-		// views" reason).
-		"SeverityUp": "viewer-local", "SeverityDown": "viewer-local",
+		// Viewer-local, in a viewer that has no catalog yet: ToggleUnified is
+		// the diff viewer's unified/side-by-side switch (update_diff.go) and
+		// TreeView the Object/API Explorer's subtree toggle
+		// (update_objectexplorer.go, update_explain.go). Both become registry
+		// entries when their viewer gets a catalog.
+		"ToggleUnified": "viewer-local, diff viewer has no catalog yet",
+		"TreeView":      "viewer-local, object/API explorer has no catalog yet",
 
 		// The leader itself: pressing it opens the panel rather than running a
 		// listed action, so listing it would advertise the panel from inside

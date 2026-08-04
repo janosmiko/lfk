@@ -41,6 +41,23 @@ func ExplorerHelpRows() []HelpRow {
 	return rows
 }
 
+// ViewerHelpRows returns every help row carrying the given per-view context,
+// in catalog order. Exported for the app layer's which-key cross-check: a
+// viewer catalog must not advertise a key the view's own help section never
+// documents, and package app cannot reach this package's unexported catalog.
+func ViewerHelpRows(context string) []HelpRow {
+	var rows []HelpRow
+	for _, s := range helpSections() {
+		if s.context != context {
+			continue
+		}
+		for _, b := range s.bindings {
+			rows = append(rows, HelpRow{Section: s.title, Key: b.key})
+		}
+	}
+	return rows
+}
+
 // explorerHelpSections lists the sections shown in the explorer (main)
 // view — the ones with an empty context — plus the context-free tail
 // (tabs, mouse, help, general).
@@ -90,7 +107,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Views & Tools",
 			bindings: []helpEntry{
-				{kb.ExplorerHelpKey(), "Toggle help screen (" + kb.Help + " outside the explorer)"},
+				{kb.HelpScreenKey(), "Toggle help screen"},
 				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{kb.TogglePreview, "Toggle details / YAML preview"},
 				{kb.TogglePreviewLogs, "Toggle live-log preview pane"},
@@ -269,6 +286,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "YAML View", context: "YAML View",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{kb.ToggleFold, "Toggle fold on section under cursor"},
 				{kb.ToggleFoldAll, "Toggle all folds"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
@@ -282,6 +300,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Describe View", context: "Describe View",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
 				{"q/esc", "Back to explorer"},
 			}...),
@@ -362,6 +381,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Log Viewer", context: "Log Viewer",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{kb.ToggleFollow, "Toggle follow mode (auto-scroll)"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
 				{kb.ToggleLineNumbers, "Toggle line numbers"},

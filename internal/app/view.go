@@ -38,6 +38,17 @@ func (m Model) explorerColumnWidths() (leftW, middleW, rightW int) {
 	}
 }
 
+// replaceLastLine swaps the final line of a rendered view, which is where every
+// fullscreen mode draws its hint bar. Returns view unchanged when it is empty.
+func replaceLastLine(view, line string) string {
+	lines := strings.Split(view, "\n")
+	if len(lines) == 0 {
+		return view
+	}
+	lines[len(lines)-1] = line
+	return strings.Join(lines, "\n")
+}
+
 // isFullscreenRenderMode reports whether a mode renders as a fullscreen view
 // (with its own title/tab/hint bars) rather than the three-pane explorer.
 func isFullscreenRenderMode(mode viewMode) bool {
@@ -143,12 +154,20 @@ func (m Model) renderView() string {
 			// Replace the last line with the overlay hint bar.
 			hintBar := m.overlayHintBar()
 			if hintBar != "" {
-				viewLines := strings.Split(view, "\n")
-				if len(viewLines) > 0 {
-					viewLines[len(viewLines)-1] = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hintBar)
-				}
-				view = strings.Join(viewLines, "\n")
+				view = replaceLastLine(view, ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hintBar))
 			}
+		}
+
+		// Which-key panel. The leader arms in every mode with a catalog, so a
+		// fullscreen viewer draws the same bottom-anchored panel the explorer
+		// does. The viewer's own hint bar is swapped for the panel's
+		// scroll/close hints via the same last-line replacement the overlay
+		// branch above uses — the panel covers content rows, not the bar.
+		if m.whichKey.armed && m.whichKey.shown {
+			m.height = fullHeight
+			m = m.primeWhichKeyCells()
+			view = replaceLastLine(view, m.whichKeyLeaderHintBar())
+			view = m.renderWhichKeyLeader(view)
 		}
 
 		// Render help screen as overlay on top of the fullscreen view.

@@ -78,46 +78,109 @@ func TestExplorer_F1StillOpensHelp(t *testing.T) {
 	}
 }
 
-// TestViewers_QuestionMarkStillOpensHelp scopes the leader to the explorer:
-// every fullscreen viewer keeps "?" as help, exactly as before.
-func TestViewers_QuestionMarkStillOpensHelp(t *testing.T) {
+// TestViewers_LeaderArmsThePanelAndF1OpensHelp is the phase-1 inversion of the
+// old "viewers keep ? as help" rule. The leader now claims "?" in every mode
+// that has a catalog, so the collision resolves the way the explorer already
+// resolved it — f1 is the help key everywhere. Routed through handleKey so the
+// real dispatch order (handleViewerWhichKeyLeader ahead of handleModeKey) is
+// what is under test, not a per-viewer handler in isolation.
+func TestViewers_LeaderArmsThePanelAndF1OpensHelp(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	help := keyMsg("?")
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyLeaderDelayMs = 0
+
+	for _, mode := range []viewMode{modeYAML, modeLogs, modeDescribe} {
+		t.Run(whichKeyModeNames[mode], func(t *testing.T) {
+			m := whichKeyTestModel()
+			m.mode = mode
+
+			out, _ := m.handleKey(leaderKey())
+			armed := out.(Model)
+			if !armed.whichKey.armed || !armed.whichKey.shown {
+				t.Fatalf("the leader key must arm the panel in %s", whichKeyModeNames[mode])
+			}
+			if armed.mode == modeHelp {
+				t.Fatalf("the leader key must not open help in %s", whichKeyModeNames[mode])
+			}
+
+			helped, _ := m.handleKey(keyMsg("f1"))
+			if helped.(Model).mode != modeHelp {
+				t.Fatalf("f1 must open the help screen from %s", whichKeyModeNames[mode])
+			}
+		})
+	}
+}
+
+// TestViewers_QuestionMarkOpensHelpWithTheLeaderRebound is the other half of
+// the collision rule inside a viewer: with the leader moved off "?", the key
+// reaches the viewer's own kb.Help case again.
+func TestViewers_QuestionMarkOpensHelpWithTheLeaderRebound(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	kb := ui.DefaultKeybindings()
+	kb.WhichKeyLeader = "ctrl+k"
+	ui.ActiveKeybindings = kb
+	ui.ConfigWhichKeyEnabled = true
+
+	for _, mode := range []viewMode{modeYAML, modeLogs, modeDescribe, modeDiff} {
+		name := whichKeyModeNames[mode]
+		if name == "" {
+			name = "diff"
+		}
+		t.Run(name, func(t *testing.T) {
+			m := whichKeyTestModel()
+			m.mode = mode
+			out, _ := m.handleKey(keyMsg("?"))
+			if out.(Model).mode != modeHelp {
+				t.Fatalf("%s: with the leader rebound, ? must open help", name)
+			}
+		})
+	}
+}
+
+// TestViewers_LeaderIsLiteralWhileATextInputIsFocused: inside a search or
+// filter prompt "?" is a character the user is typing. Each catalog declares
+// its own input hook (wkCatalog.input) rather than a switch in the dispatcher,
+// so a phase-2 viewer cannot forget the gate and still be wired up.
+func TestViewers_LeaderIsLiteralWhileATextInputIsFocused(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
 
 	cases := []struct {
-		name string
-		run  func() Model
+		name  string
+		build func() Model
 	}{
-		{"describe", func() Model {
-			m := whichKeyTestModel()
-			m.mode = modeDescribe
-			out, _ := m.handleDescribeKey(help)
-			return out.(Model)
-		}},
-		{"logs", func() Model {
-			m := whichKeyTestModel()
-			m.mode = modeLogs
-			out, _ := m.handleLogKey(help)
-			return out.(Model)
-		}},
-		{"yaml", func() Model {
+		{"yaml search", func() Model {
 			m := whichKeyTestModel()
 			m.mode = modeYAML
-			out, _ := m.handleYAMLKey(help)
-			return out.(Model)
+			m.yamlView.searchMode = true
+			return m
 		}},
-		{"diff", func() Model {
+		{"log search", func() Model {
 			m := whichKeyTestModel()
-			m.mode = modeDiff
-			out, _ := m.handleDiffKey(help)
-			return out.(Model)
+			m.mode = modeLogs
+			m.logView.searchActive = true
+			return m
+		}},
+		{"log filter", func() Model {
+			m := whichKeyTestModel()
+			m.mode = modeLogs
+			m.logView.filterActive = true
+			return m
+		}},
+		{"describe search", func() Model {
+			m := whichKeyTestModel()
+			m.mode = modeDescribe
+			m.describeView.searchActive = true
+			return m
 		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.run(); got.mode != modeHelp {
-				t.Fatalf("%s viewer: ? must still open help, got mode %v", tc.name, got.mode)
+			out, _ := tc.build().handleKey(leaderKey())
+			if got := out.(Model); got.whichKey.armed {
+				t.Fatalf("%s: the leader must stay a literal character while the input is focused", tc.name)
 			}
 		})
 	}
@@ -151,7 +214,7 @@ func TestWhichKeyLeader_RebindingLeaderGivesQuestionMarkBackToHelp(t *testing.T)
 		t.Fatal("the rebound leader key must arm the panel")
 	}
 
-	if got := explorerHelpHintKey(kb); got != "?" {
+	if got := helpHintKey(kb); got != "?" {
 		t.Fatalf("hint bar advertises %q as help; with the leader rebound the key that opens help is %q", got, "?")
 	}
 }
@@ -188,8 +251,8 @@ func TestExplorerHelpHintKey_MatchesTheKeyThatOpensHelp(t *testing.T) {
 			ui.ActiveKeybindings = kb
 			ui.ConfigWhichKeyEnabled = tc.enabled
 
-			if got := explorerHelpHintKey(kb); got != tc.want {
-				t.Errorf("explorerHelpHintKey = %q, want %q", got, tc.want)
+			if got := helpHintKey(kb); got != tc.want {
+				t.Errorf("helpHintKey = %q, want %q", got, tc.want)
 			}
 			if tc.enabled {
 				if got := whichKeyHelpKey(kb); got != tc.want {
@@ -202,7 +265,7 @@ func TestExplorerHelpHintKey_MatchesTheKeyThatOpensHelp(t *testing.T) {
 
 // TestExplorerHintBar_AdvertisesTheWorkingHelpKey drives the assertion through
 // the rendered bar rather than the helper, so a future caller that bypasses
-// explorerHelpHintKey is still caught.
+// helpHintKey is still caught.
 func TestExplorerHintBar_AdvertisesTheWorkingHelpKey(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()

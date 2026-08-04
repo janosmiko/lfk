@@ -858,10 +858,13 @@ func TestP4LogKeyNumber(t *testing.T) {
 	assert.True(t, rm.logView.lineNumbers)
 }
 
+// f1, not "?": the which-key leader claims "?" in every mode that has a
+// catalog, so the log viewer resolves the collision the same way the explorer
+// does (ui.Keybindings.HelpScreenKey).
 func TestP4LogKeyHelp(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }

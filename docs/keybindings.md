@@ -61,7 +61,7 @@ All built-in chords are rebindable under `keybindings`.
 
 | Key | Action |
 |---|---|
-| `F1` | Toggle help screen (`?` too, outside the explorer) |
+| `F1` | Toggle help screen |
 | `?` | Which-key action panel -- see [Which-Key Panel](#which-key-panel) |
 | `P` | Toggle between details summary and YAML preview |
 | | Details pane shows labels, finalizers, annotation count, and resource metadata |
@@ -259,7 +259,17 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 
 ## Which-Key Panel
 
-`?` opens a panel above the status bar listing the hotkeys actionable on the current row as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first (letters and digits, then punctuation), then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
+`?` opens a panel above the status bar listing the hotkeys actionable right now as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first (letters and digits, then punctuation), then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
+
+The panel is context-aware per view. In the explorer it lists what the current row supports; in a fullscreen viewer it lists what that viewer supports in its current state -- visual mode swaps the yank and hides the normal-mode keys, an armed count prefix relabels `y`, and the log viewer's follow, severity, and `--previous` toggles read their current direction.
+
+| View | Panel |
+|---|---|
+| Explorer | Yes |
+| YAML view | Yes |
+| Log viewer | Yes |
+| Describe view | Yes |
+| Other viewers | Not yet -- `?` still opens help there |
 
 | Key | Action |
 |---|---|
@@ -293,7 +303,7 @@ Keys render as glyphs when `icons` allows them; `simple`, `none`, and `no_color`
 
 `nerdfont` uses which-key.nvim's keycap glyphs (plain arrow keycaps for `left`/`right`/`up`/`down` — Material Design Icons has no dedicated keyboard-arrow set) and pads each modifier with a space, since the proportional Nerd Font variants draw a keycap wider than one cell. `unicode` keeps `enter`/`esc` as words: `⏎`/`⎋` are easily confused at one cell; `tab`/`backspace`/the arrows each have one unambiguous glyph, so those switch. The goto popup (`g`) has no categories and keeps a single description color.
 
-`?` is the leader only in the explorer; every fullscreen viewer keeps `?` as help. `F1` opens the help screen from the explorer. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal.
+`?` is the leader in every view that has a panel, so `F1` is the help key there. Inside a search or filter prompt `?` stays a literal character. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal.
 
 ## Bookmarks
 
@@ -344,7 +354,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 
 ## YAML View
 
-> Search (`/`), help (`?`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed.
+> Search (`/`), help (`F1`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed.
 
 | Key | Action |
 |---|---|
@@ -383,6 +393,8 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
 The top breadcrumb shows the resource name and the attribute path under the cursor (e.g. `lfk > ctx > Pods > my-pod > spec.containers[0].image`), like the Object Explorer location.
@@ -437,6 +449,8 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
 ## Log Viewer
@@ -485,6 +499,8 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Close log viewer |
 
 The log viewer's `/` keeps its own persistent history at `$XDG_STATE_HOME/lfk/log-search-history` (default `~/.local/state/lfk/log-search-history`), separate from the explorer's `query-history`. Log search matches raw log lines (substring/regex over arbitrary text) rather than resource names, so pooling the two would surface irrelevant entries on Up/Down in either context.
@@ -1302,7 +1318,7 @@ keybindings:
   diff: "d"              # Diff resources
 
   # Multi-selection
-  which_key_leader: "?"  # Open the which-key action panel (explorer only)
+  which_key_leader: "?"  # Open the which-key action panel
   toggle_select: "space" # Toggle selection (space bar)
   select_range: "ctrl+space" # Select range (legacy "ctrl+@" still accepted)
   select_all: "ctrl+a"   # Select all
