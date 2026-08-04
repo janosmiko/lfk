@@ -462,9 +462,9 @@ func TestHelpKeyDisplay_CompositeKeys(t *testing.T) {
 	}
 }
 
-// helpKeySymbols draws " · " between alternative bindings instead of the
+// helpKeySymbols draws " / " between alternative bindings instead of the
 // raw "/" (spaced and dimmed at render time — see styleHelpKeyCell), so
-// this test's expectations moved from "/" to " · " for every case where
+// this test's expectations gain the surrounding spaces for every case where
 // "/" joins two real alternatives. "m<a-z/0-9>" is the deliberate
 // exception: its "/" is inside "<...>", part of one placeholder token
 // (any letter or digit after m), not a separator — it must stay literal.
@@ -478,23 +478,23 @@ func TestHelpKeySymbols_ByIconMode(t *testing.T) {
 
 	ConfigNoColor = false
 	IconMode = "unicode"
-	assert.Equal(t, "⌃D · ⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
-	assert.Equal(t, "⇥ · ⇧⇥", helpKeySymbols("tab/shift+tab"))
+	assert.Equal(t, "⌃D / ⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "⇥ / ⇧⇥", helpKeySymbols("tab/shift+tab"))
 	assert.Equal(t, "m<a-z/0-9>", helpKeySymbols("m<a-z/0-9>"))
-	assert.Equal(t, "h · ←", helpKeySymbols("h/Left"))
+	assert.Equal(t, "h / ←", helpKeySymbols("h/Left"))
 
 	// Terminals that promise only ASCII keep the readable textual chord,
-	// dotted the same way.
+	// spaced the same way.
 	IconMode = "none"
-	assert.Equal(t, "Ctrl+D · Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "Ctrl+D / Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
 	IconMode = "unicode"
 	ConfigNoColor = true
-	assert.Equal(t, "Ctrl+D · Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "Ctrl+D / Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
 }
 
 // helpKeySymbols must apply the same bare-named-key substitution
 // KeyChordDisplay uses for the which-key panel, including inside a
-// slash-joined alternative list ("h/Backspace/Left" -> "h · <backspace> ·
+// slash-joined alternative list ("h/Backspace/Left" -> "h / <backspace> /
 // <left>") — the panel and the help screen must never disagree on how a
 // named key draws.
 func TestHelpKeySymbols_NamedKeyIcons(t *testing.T) {
@@ -516,8 +516,8 @@ func TestHelpKeySymbols_NamedKeyIcons(t *testing.T) {
 		{"nerdfont", "Right", "\U000F0054"},
 		{"nerdfont", "Up", "\U000F005D"},
 		{"nerdfont", "Down", "\U000F0045"},
-		{"nerdfont", "h/Backspace/Left", "h · \U000F006E · \U000F004D"},
-		{"nerdfont", "space/Right", "\U000F1050 · \U000F0054"},
+		{"nerdfont", "h/Backspace/Left", "h / \U000F006E / \U000F004D"},
+		{"nerdfont", "space/Right", "\U000F1050 / \U000F0054"},
 		{"unicode", "tab", "⇥"},
 		{"unicode", "space", "␣"},
 		{"unicode", "backspace", "⌫"},
@@ -525,8 +525,8 @@ func TestHelpKeySymbols_NamedKeyIcons(t *testing.T) {
 		{"unicode", "Right", "→"},
 		{"unicode", "Up", "↑"},
 		{"unicode", "Down", "↓"},
-		{"unicode", "h/Backspace/Left", "h · ⌫ · ←"},
-		{"unicode", "space/Right", "␣ · →"},
+		{"unicode", "h/Backspace/Left", "h / ⌫ / ←"},
+		{"unicode", "space/Right", "␣ / →"},
 		// enter/esc keep the earlier, narrower decision: nerdfont's large
 		// keycaps already resolved them (pre-existing glyphs), unicode's
 		// small ⏎/⎋ never did and this change does not revisit that.
@@ -699,39 +699,45 @@ func TestBuildHelpSpecs_KeysAlignWithinSection_IconModesAndSizes(t *testing.T) {
 	}
 }
 
-// --- separator dots ---
+// --- separator spacing ---
 
-// applyKeySeparatorDots must convert a "/" only where it genuinely
-// separates two alternative bindings, and leave it alone everywhere else.
+// applyKeySeparator must space a "/" only where it genuinely separates two
+// alternative bindings, and leave it alone everywhere else. Separator and
+// binding are now the same character, so the "leave alone" rows are the
+// load-bearing ones: they are what keeps an unspaced literal "/" tellable
+// apart from a spaced separator downstream (styleHelpKeyCell splits on the
+// spaced form).
+//
 // This table enumerates every shape of "/" found in the live help catalog
 // (help_sections.go) plus the bracket-guarded placeholder case, so a future
 // catalog entry that adds a new shape has a home to extend.
-func TestApplyKeySeparatorDots_Enumeration(t *testing.T) {
+func TestApplyKeySeparator_Enumeration(t *testing.T) {
 	tests := []struct {
 		name, given, want string
 	}{
 		{"bare Search key: nothing on either side, not a separator", "/", "/"},
-		{"two full alternatives", "h/Left", "h · Left"},
-		{"doubled-chord alternative", "gg/Home", "gg · Home"},
-		{"three alternatives", "0/1/2", "0 · 1 · 2"},
-		{"two single-char alternatives", ">/<", "> · <"},
-		{"two chord alternatives (post chord-mapping)", "⌃D/⌃U", "⌃D · ⌃U"},
+		{"two full alternatives", "h/Left", "h / Left"},
+		{"doubled-chord alternative", "gg/Home", "gg / Home"},
+		{"three alternatives", "0/1/2", "0 / 1 / 2"},
+		{"two single-char alternatives", ">/<", "> / <"},
+		{"two chord alternatives (post chord-mapping)", "⌃D/⌃U", "⌃D / ⌃U"},
 		{"bracket-guarded range placeholder: leave alone", "m<a-z/0-9>", "m<a-z/0-9>"},
-		{"unbracketed range list: three real alternatives", "a-z/A-Z/0-9", "a-z · A-Z · 0-9"},
+		{"unbracketed range list: three real alternatives", "a-z/A-Z/0-9", "a-z / A-Z / 0-9"},
 		{"single key, no slash at all", "d", "d"},
+		{"vim-style placeholder chord: braces are not separators", "g{key}", "g{key}"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, applyKeySeparatorDots(tt.given))
+			assert.Equal(t, tt.want, applyKeySeparator(tt.given))
 		})
 	}
 }
 
-// The dotted separator is display-only: the search index (BuildHelpLines)
-// must keep "/" so a user who searches for "/" itself, or for a substring
-// straddling where "/" used to sit, is unaffected — and so the two forms
-// stay easy to tell apart in the source.
-func TestBuildHelpLines_SearchIndexKeepsSlashNotDot(t *testing.T) {
+// The spacing is display-only: the search index (BuildHelpLines) must keep
+// the tight "/" so a user who searches for a substring straddling the
+// separator is unaffected — and so the two forms stay easy to tell apart
+// in the source now that they share a character.
+func TestBuildHelpLines_SearchIndexKeepsTightSlash(t *testing.T) {
 	originalIcons := IconMode
 	originalNoColor := ConfigNoColor
 	t.Cleanup(func() {
@@ -742,18 +748,18 @@ func TestBuildHelpLines_SearchIndexKeepsSlashNotDot(t *testing.T) {
 	ConfigNoColor = false
 
 	joined := strings.Join(BuildHelpLines("", "", 160), "\n")
-	assert.Contains(t, joined, "Home", "search index must still carry the textual alternative")
-	assert.NotContains(t, joined, "·", "search index must not carry the display-only dot")
+	assert.Contains(t, joined, "gg/Home", "search index must carry the tight textual alternative")
+	assert.NotContains(t, joined, "gg / Home", "search index must not carry the display-only spacing")
 
 	rendered := ansi.Strip(RenderHelpScreen(160, 200, 0, "", "", "", -1))
-	assert.Contains(t, rendered, "gg · Home", "the rendered key column must draw the dotted separator")
+	assert.Contains(t, rendered, "gg / Home", "the rendered key column must draw the spaced separator")
 }
 
 // A user searching for one alternative among several ("Home" inside the
-// row drawn as "gg · Home") must still find and highlight the row — the
-// separator becoming a dot must not break the search a user already
+// row drawn as "gg / Home") must still find and highlight the row — the
+// separator gaining spaces must not break the search a user already
 // relies on to locate a key.
-func TestRenderHelpScreen_SearchFindsRowWithDottedAlternativeKey(t *testing.T) {
+func TestRenderHelpScreen_SearchFindsRowWithSpacedAlternativeKey(t *testing.T) {
 	originalNoColor := ConfigNoColor
 	t.Cleanup(func() {
 		ConfigNoColor = originalNoColor
@@ -770,12 +776,12 @@ func TestRenderHelpScreen_SearchFindsRowWithDottedAlternativeKey(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, found, `search for "Home" must find the row rendered as "gg · Home"`)
+	assert.True(t, found, `search for "Home" must find the row rendered as "gg / Home"`)
 
 	plain := RenderHelpScreen(160, 200, 0, "", "", "", -1)
 	searched := RenderHelpScreen(160, 200, 0, "", "Home", "", -1)
 	assert.NotEqual(t, plain, searched, `a "Home" search must visibly highlight the row`)
-	assert.Contains(t, ansi.Strip(searched), "gg · Home",
+	assert.Contains(t, ansi.Strip(searched), "gg / Home",
 		"search highlighting must not change the visible characters")
 }
 
@@ -810,9 +816,9 @@ func TestStyleHelpKeyCell_SeparatorStyledDifferentlyFromKeys(t *testing.T) {
 }
 
 // In no-color mode the separator has no distinct foreground, but it must
-// still draw as literal " · " with spaces either side — the visual gap
+// still draw as literal " / " with spaces either side — the visual gap
 // the user asked for does not depend on color being available.
-func TestHelpKeySymbols_DottedSeparatorSurvivesNoColor(t *testing.T) {
+func TestHelpKeySymbols_SpacedSeparatorSurvivesNoColor(t *testing.T) {
 	originalNoColor := ConfigNoColor
 	originalIcons := IconMode
 	t.Cleanup(func() {
@@ -822,7 +828,51 @@ func TestHelpKeySymbols_DottedSeparatorSurvivesNoColor(t *testing.T) {
 	ConfigNoColor = true
 	IconMode = "unicode"
 
-	assert.Equal(t, "h · Left", helpKeySymbols("h/Left"))
+	assert.Equal(t, "h / Left", helpKeySymbols("h/Left"))
+}
+
+// Separator and binding are now the same character, so the bare Search key
+// "/" is the one row that could be mistaken for a separator and dimmed into
+// invisibility. It must render entirely in keyStyle: one segment, no
+// OverlayDimStyle anywhere in the cell.
+func TestStyleHelpKeyCell_BareSlashSearchKeyIsNotDimmed(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
+
+	// The cell the renderer actually hands to styleHelpKeyCell: the catalog
+	// key resolved to its drawn form, then right-aligned in the column.
+	drawn := helpKeySymbols("/")
+	assert.Equal(t, "/", drawn, "the Search binding must stay an unspaced slash")
+	cell := padKeyLeft(drawn, helpKeyColumnMinWidth)
+
+	rendered := styleHelpKeyCell(cell, "", SearchHighlightStyle, keyStyle)
+	assert.NotContains(t, rendered, styleOpenCodes(OverlayDimStyle),
+		"a slash that IS the binding must never pick up the dim separator style")
+	assert.Equal(t, HighlightMatchStyledOver(cell, "", SearchHighlightStyle, keyStyle), rendered,
+		"the bare Search key must take the single-segment path, identical to any other one-binding key")
+}
+
+// End-to-end counterpart: the catalog's "/" rows must reach the renderer as
+// a one-binding cell. If applyKeySeparator ever spaced them, styleHelpKeyCell
+// would split the cell and dim the only character the row has.
+func TestBuildHelpSpecs_BareSlashRowsStayOneSegment(t *testing.T) {
+	seen := 0
+	for _, s := range buildHelpSpecs("", "", helpInnerWidth(160)) {
+		if s.kind != helpLineEntry || strings.TrimSpace(s.key) != "/" {
+			continue
+		}
+		seen++
+		assert.NotContains(t, s.key, helpKeySeparator,
+			"the bare Search/filter key cell must not contain a separator: %q", s.key)
+	}
+	assert.Positive(t, seen, `expected at least one catalog row bound to a bare "/"`)
 }
 
 // TestRenderHelpScreen_NeverExceedsTheTerminal is the help screen's mirror of

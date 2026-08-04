@@ -430,11 +430,16 @@ func helpKeyMatchesSearch(s helpLineSpec, search string) bool {
 }
 
 // styleHelpKeyCell renders a help row's key cell, splitting it on
-// helpKeySeparator (the " · " between alternative bindings, e.g.
-// "h · Left") so the separator draws in OverlayDimStyle — the same dim
+// helpKeySeparator (the " / " between alternative bindings, e.g.
+// "h / Left") so the separator draws in OverlayDimStyle — the same dim
 // style descriptions use — while the bindings on either side keep
 // keyStyle. Without the split, one style covered the whole cell and the
 // separator competed for attention with the keys it sits between.
+//
+// The split is on the spaced form, so a "/" that IS a binding (the bare
+// Search key, drawn unspaced and right-aligned in its cell) yields a
+// single segment and keeps keyStyle throughout — it never picks up the
+// dim separator styling.
 //
 // Search highlighting still runs per segment (not once over the whole
 // cell) so a query matching inside one alternative highlights just that
