@@ -40,11 +40,13 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.JumpBack, "Jump back through teleport history"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
 				{kb.ExpandCollapse, "Expand/collapse all groups"},
-				{kb.PinGroup, "Pin/unpin resource type"},
-				{kb.ToggleRare, "Toggle rare + hidden resource types"},
 			},
 		},
 		{
+			// Namespace scope lives here, not under Actions: selecting a
+			// namespace narrows what the list shows, the same way a filter
+			// does. Matches the which-key panel, which groups all three
+			// under Filter (whichkey_registry.go).
 			title: "Search & Filter",
 			bindings: []helpEntry{
 				{kb.Filter, "Filter items (~fuzzy, regex auto, \\literal)"},
@@ -53,6 +55,9 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.PrevMatch, "Previous search match"},
 				{kb.FilterPresets, "Quick filter presets"},
 				{"Up/Down", "Recall previous query (in filter or search)"},
+				{kb.NamespaceSelector, "Select namespace"},
+				{kb.AllNamespaces, "Toggle all-namespaces mode"},
+				{kb.PreviousNamespace, "Jump to previous namespace"},
 			},
 		},
 		{
@@ -61,10 +66,12 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{"f1", "Toggle help screen (" + kb.Help + " outside the explorer)"},
 				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{kb.TogglePreview, "Toggle details / YAML preview"},
+				{kb.TogglePreviewLogs, "Toggle live-log preview pane"},
 				{kb.Fullscreen, "Cycle layout: sidebar, fullscreen, restore"},
 				{kb.ResourceMap, "Toggle resource relationship map"},
 				{kb.ColumnToggle, "Show/hide and reorder columns"},
-				{kb.SecretToggle, "Toggle secret value visibility"},
+				{kb.PinGroup, "Pin/unpin resource type"},
+				{kb.ToggleRare, "Toggle rare + hidden resource types"},
 				{kb.APIExplorer, "API Explorer (resource structure)"},
 				{kb.ObjectExplorer, "Object Explorer (live object tree)"},
 				{kb.RBACBrowser, "RBAC permissions browser (can-i)"},
@@ -101,10 +108,6 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 			title: "Actions",
 			bindings: []helpEntry{
 				{kb.ActionMenu, "Action menu: logs, exec, debug, edit, scale, ..."},
-				{kb.NamespaceSelector, "Select namespace"},
-				{kb.AllNamespaces, "Toggle all-namespaces mode"},
-				{kb.PreviousNamespace, "Jump to previous namespace"},
-				{kb.TogglePreviewLogs, "Toggle live-log preview pane"},
 				{kb.Logs, "Open fullscreen log viewer"},
 				{kb.Describe, "Describe selected resource"},
 				{kb.Edit, "Edit in $KUBE_EDITOR or $EDITOR"},
@@ -129,6 +132,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.ClusterColorPicker, "Cluster color picker (cluster picker only)"},
 				{kb.ThemeSelector, "Switch color scheme"},
 				{kb.TerminalToggle, "Cycle terminal mode (pty / exec / mux)"},
+				{kb.SecretToggle, "Toggle secret value visibility"},
 				{kb.SecurityBadgeToggle, "Show/hide the SEC severity badge"},
 				{kb.SecurityIgnoreToggle, "Show/hide ignored security findings"},
 			},

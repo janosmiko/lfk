@@ -16,9 +16,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
-| `p` | Pin/unpin resource type (at resource types level) |
 | `x` | At resource types level: pin/unpin or hide/show the selected resource type, or pin/unpin its dashboard summary, via the action menu (saved per cluster context / union set) |
-| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the Object Explorer for it |
@@ -68,10 +66,12 @@ All built-in chords are rebindable under `keybindings`.
 | `P` | Toggle between details summary and YAML preview |
 | | Details pane shows labels, finalizers, annotation count, and resource metadata |
 | | Details view shows deletion timestamp (with warning highlight) for resources being deleted |
+| `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) |
 | `F` | Cycle layout: hide sidebar -> fullscreen -> restore (dashboards toggle fullscreen) |
 | `M` | Toggle resource relationship map view |
 | `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
-| `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
+| `p` | Pin/unpin resource type (at resource types level) |
+| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
 | `I` | API Explorer (browse resource structure interactively) |
 | `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
 | `U` | RBAC permissions browser (can-i) |
@@ -103,6 +103,7 @@ Your chosen sort is remembered per resource kind and per cluster context, and pe
 | `Ctrl+R` | Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab) |
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
+| `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `B` | Show/hide the per-resource SEC severity badge on explorer rows |
 | `i` | Show/hide ignored security findings (security view only — shadows the Label Editor there, which is a no-op on synthetic finding rows) |
 
@@ -154,16 +155,19 @@ Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason 
 
 ## Search and Filter
 
-| Key | Action |
-|---|---|
-| `f` | Start filter mode (filter items in current view) |
-| `/` | Start search mode (search and jump to match) |
-| `.` | Quick filter presets |
-| `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. |
-| `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). |
-| `n` | Jump to next search match |
-| `N` | Jump to previous search match |
-| `Esc` | Clear filter / cancel search |
+| Key | Action | Config key |
+|---|---|---|
+| `f` | Start filter mode (filter items in current view) | `filter` |
+| `/` | Start search mode (search and jump to match) | `search` |
+| `.` | Quick filter presets | `filter_presets` |
+| `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. | |
+| `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). | |
+| `n` | Jump to next search match | `next_match` |
+| `N` | Jump to previous search match | `prev_match` |
+| `Esc` | Clear filter / cancel search | |
+| `\` | Open namespace selector (then `.` to filter to current item's namespace) | `namespace_selector` |
+| `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
+| `g\` | Jump to previous namespace (swaps the scope back and forth) | `previous_namespace` |
 
 Each list remembers its `f` filter per tab: drilling into a resource (logs, containers, owned objects) and navigating back keeps the filter applied. A different list starts unfiltered; press `Esc` to clear a list's filter.
 
@@ -176,10 +180,6 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | Key | Action | Config key |
 |---|---|---|
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
-| `\` | Open namespace selector (then `.` to filter to current item's namespace) | `namespace_selector` |
-| `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
-| `g\` | Jump to previous namespace (swaps the scope back and forth) | `previous_namespace` |
-| `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
 | `Ctrl+L` | Open fullscreen log viewer for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |
