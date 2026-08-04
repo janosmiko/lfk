@@ -103,6 +103,14 @@ func splitModifierChord(key string) (mods []string, last string, ok bool) {
 	return parts[:len(parts)-1], last, true
 }
 
+// SplitModifierChord exposes splitModifierChord to other packages that need
+// the raw modifier set behind a binding — e.g. the which-key panel's sort,
+// which groups entries by modifier tier and must not grow a second chord
+// parser next to this one.
+func SplitModifierChord(key string) (mods []string, last string, ok bool) {
+	return splitModifierChord(key)
+}
+
 // titleKeyName uppercases a chord's key rune-wise, so a multibyte key is never
 // split mid-rune ("ctrl+é" -> "É", "shift+tab" -> "Tab").
 func titleKeyName(last string) string {

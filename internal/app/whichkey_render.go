@@ -15,6 +15,10 @@ type whichKeyCell struct {
 	// which family an entry belongs to. Empty for the g-prefix goto popup,
 	// whose entries are all the same kind of thing.
 	group whichKeyGroup
+	// order mirrors whichKeyAction.Order (whichkey_registry.go): an opt-in
+	// sort override, zero (unset) for every cell that doesn't need one,
+	// including every g-prefix goto popup cell.
+	order int
 	// disp is the key as drawn, resolved once per build by fillWhichKeyDisplay.
 	disp string
 }

@@ -1,8 +1,11 @@
 package app
 
 import (
+	"math"
 	"sort"
 	"strings"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // wkNaturalDigits matches which-key.nvim's ("%09d") zero padding, which is what
@@ -10,16 +13,21 @@ import (
 const wkNaturalDigits = 9
 
 // sortWhichKeyCells clusters entries by catalog group (whichKeyGroupOrder),
-// then orders each group's run the way neovim's which-key does: its
-// configured sorters (config.lua `sort`) with `natural` and `case` appended
-// (view.lua:77-93). The two neovim-only sorters are dropped — `local` ranks
-// buffer-local keymaps, `order` is a manual override hook, and lfk has neither.
+// then by modifier tier (USER DECISION: plain keys, then ctrl chords, then alt
+// chords, then ctrl+alt chords), then by an opt-in explicit order
+// (whichKeyAction.Order, mirroring neovim's `order` sorter), then by the rest
+// of neovim's which-key chain: its configured sorters (config.lua `sort`)
+// with `natural` and `case` appended (view.lua:77-93). The `local` sorter is
+// dropped — it ranks buffer-local keymaps, which lfk has none of.
 //
-// 0. group    — declared catalog group (whichKeyGroupOrder), ungrouped last
-// 1. alphanum — plain letter/digit keys ahead of everything else
-// 2. mod      — modifier chords ahead of the remaining punctuation
-// 3. natural  — digit runs compared numerically, case-insensitively
-// 4. case     — lowercase ahead of uppercase, so "d" precedes "D"
+//  0. group    — declared catalog group (whichKeyGroupOrder), ungrouped last
+//  1. modTier  — no modifier, then ctrl, then alt, then ctrl+alt, then any
+//     other modifier combination (see wkModTier below)
+//  2. order    — explicit per-entry override (whichKeyAction.Order); entries
+//     that don't set one fall through unchanged
+//  3. alphanum — plain letter/digit keys ahead of everything else
+//  4. natural  — digit runs compared numerically, case-insensitively
+//  5. case     — lowercase ahead of uppercase, so "d" precedes "D"
 //
 // The group pass is what turns the panel's per-group description color into a
 // readable cue: without it the colors were scattered across the whole grid in
@@ -35,17 +43,18 @@ func sortWhichKeyCells(cells []whichKeyCell) {
 	}
 	groupRank := wkGroupRanks()
 	type ranked struct {
-		cell                        whichKeyCell
-		group, alphanum, mod, upper int
-		natural                     string
+		cell                                   whichKeyCell
+		group, modTier, order, alphanum, upper int
+		natural                                string
 	}
 	rs := make([]ranked, len(cells))
 	for i, c := range cells {
 		rs[i] = ranked{
 			cell:     c,
 			group:    wkGroupRank(groupRank, c.group),
+			modTier:  wkModTier(c.key),
+			order:    wkOrderRank(c.order),
 			alphanum: wkAlphanumRank(c.key),
-			mod:      wkModRank(c.key),
 			upper:    wkCaseRank(c.key),
 			natural:  wkNaturalKey(c.key),
 		}
@@ -55,10 +64,12 @@ func sortWhichKeyCells(cells []whichKeyCell) {
 		switch {
 		case a.group != b.group:
 			return a.group < b.group
+		case a.modTier != b.modTier:
+			return a.modTier < b.modTier
+		case a.order != b.order:
+			return a.order < b.order
 		case a.alphanum != b.alphanum:
 			return a.alphanum < b.alphanum
-		case a.mod != b.mod:
-			return a.mod < b.mod
 		case a.natural != b.natural:
 			return a.natural < b.natural
 		case a.upper != b.upper:
@@ -109,16 +120,62 @@ func wkAlphanumRank(key string) int {
 	return 0
 }
 
-// wkModRank is which-key.nvim's `mod` sorter (view.lua:39-41). neovim spots a
-// special key by its "<...>" notation; lfk spells chords as "ctrl+x" / "alt+y",
-// so the "+" is the equivalent marker. Named keys without a modifier ("esc",
-// "tab", "f1") are plain alphanumerics here and rank with the letters instead,
-// which is the one place this ordering diverges from neovim's.
-func wkModRank(key string) int {
-	if strings.Contains(key, "+") {
+// wkModTier is the USER-REQUESTED primary ordering within a group: plain keys
+// first, then ctrl-only chords, then alt-only chords, then ctrl+alt chords
+// together. Reuses ui.SplitModifierChord (extracted from the same parser
+// helpKeyDisplay uses) rather than a second hand-rolled chord splitter.
+//
+// The user named exactly four tiers. Everything else that carries a modifier
+// — shift alone, meta/super/cmd, hyper, or any combination that mixes one of
+// those in (including ctrl+shift or shift+alt+ctrl) — has no requested slot,
+// so it is treated simply as "modified, but not one of the four" and sorted
+// into a fifth, catch-all tier after ctrl+alt. That keeps the rule flat and
+// predictable instead of inventing a deeper hierarchy the user never asked
+// for, and it still degrades safely: an exotic chord always sorts after every
+// plain key and after every ctrl/alt/ctrl+alt chord, never in between them.
+//
+// Named keys without a modifier ("esc", "tab", "f1", "space") are plain
+// bindings to SplitModifierChord (no "+"), so they land in tier 0 with the
+// letters — the same divergence from neovim's own `mod` sorter that the
+// removed wkModRank used to document.
+func wkModTier(key string) int {
+	mods, _, ok := ui.SplitModifierChord(key)
+	if !ok {
 		return 0
 	}
-	return 1
+	var hasCtrl, hasAlt, hasOther bool
+	for _, m := range mods {
+		switch m {
+		case "ctrl":
+			hasCtrl = true
+		case "alt":
+			hasAlt = true
+		default:
+			hasOther = true
+		}
+	}
+	switch {
+	case hasOther:
+		return 4
+	case hasCtrl && hasAlt:
+		return 3
+	case hasAlt:
+		return 2
+	default: // hasCtrl
+		return 1
+	}
+}
+
+// wkOrderRank turns whichKeyAction.Order into a comparable rank: the unset
+// default (0) maps to the largest possible int so an entry that didn't opt in
+// always sorts after every entry that did, then falls through to the next
+// comparator on a tie — mirroring neovim's own `order` sorter, which defaults
+// every item's order to 1000 (view.lua's M.fields.order) for the same reason.
+func wkOrderRank(order int) int {
+	if order == 0 {
+		return math.MaxInt
+	}
+	return order
 }
 
 // wkCaseRank is which-key.nvim's `case` sorter (view.lua:42-44).

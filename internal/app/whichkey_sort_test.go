@@ -24,6 +24,20 @@ func wkSortedKeys(keys ...string) []string {
 // TestSortWhichKeyCells_PortsNeovimOrdering covers each sorter in the ported
 // chain (view.lua:20-51 with config.lua's `sort`, plus the appended natural and
 // case sorters) in isolation and then together.
+//
+// Two cases below changed from their pre-modifier-tier expectations, BY
+// DESIGN, now that the modifier tier (wkModTier) outranks alphanum/natural/
+// case: a modifier chord no longer competes with plain-key punctuation on
+// alphanum/mod footing — it is simply a later tier, full stop.
+//   - "alphanum before everything else": "ctrl+a" used to sort ahead of the
+//     bare punctuation "!" and "/" (the old `mod` sorter ranked any chord
+//     ahead of plain punctuation). It is tier 1 now, so it sorts after every
+//     tier-0 (unmodified) entry, punctuation included.
+//   - "all four together": same reason — "ctrl+a"/"ctrl+space" now trail
+//     every unmodified entry, including "."  and "?".
+//
+// TestSortWhichKeyCells_ModifierTierOrdering below is the dedicated coverage
+// for the new tier itself; this table keeps covering alphanum/natural/case.
 func TestSortWhichKeyCells_PortsNeovimOrdering(t *testing.T) {
 	tests := []struct {
 		name string
@@ -31,14 +45,14 @@ func TestSortWhichKeyCells_PortsNeovimOrdering(t *testing.T) {
 		want []string
 	}{
 		{
-			"alphanum before everything else",
+			"alphanum before punctuation, within the same modifier tier",
 			[]string{"/", "y", "ctrl+a", "!", "b"},
-			[]string{"b", "y", "ctrl+a", "!", "/"},
+			[]string{"b", "y", "!", "/", "ctrl+a"},
 		},
 		{
-			"modifier chords before other punctuation",
+			"unmodified punctuation still sorts ahead of any modifier tier",
 			[]string{"@", "ctrl+y", "\\", "alt+b"},
-			[]string{"alt+b", "ctrl+y", "@", "\\"},
+			[]string{"@", "\\", "ctrl+y", "alt+b"},
 		},
 		{
 			"digit runs compare numerically",
@@ -53,7 +67,7 @@ func TestSortWhichKeyCells_PortsNeovimOrdering(t *testing.T) {
 		{
 			"all four together",
 			[]string{"Y", "ctrl+space", ".", "y", "f1", "a", "ctrl+a", "?"},
-			[]string{"a", "f1", "y", "Y", "ctrl+a", "ctrl+space", ".", "?"},
+			[]string{"a", "f1", "y", "Y", ".", "?", "ctrl+a", "ctrl+space"},
 		},
 	}
 	for _, tc := range tests {
@@ -62,6 +76,89 @@ func TestSortWhichKeyCells_PortsNeovimOrdering(t *testing.T) {
 				t.Fatalf("got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestSortWhichKeyCells_ModifierTierOrdering is the dedicated coverage for
+// CHANGE 1 (USER DECISION): within a group, plain keys sort first, then
+// ctrl-only chords, then alt-only chords, then ctrl+alt chords together, then
+// everything else that carries a modifier the user didn't name a tier for
+// (shift alone, meta/super, ctrl+shift, shift+alt+ctrl, ...) as a catch-all
+// tier after ctrl+alt.
+func TestSortWhichKeyCells_ModifierTierOrdering(t *testing.T) {
+	in := []string{
+		"ctrl+alt+y", "shift+x", "b", "alt+z", "ctrl+shift+x",
+		"ctrl+b", "meta+k", "?", "alt+ctrl+q", "super+k",
+	}
+	// tier0: b, ? (alphanum before punctuation)
+	// tier1 (ctrl only): ctrl+b
+	// tier2 (alt only): alt+z
+	// tier3 (ctrl+alt, either spelling): natural-key compares the raw string,
+	// so "alt+ctrl+q" (starts 'a') sorts ahead of "ctrl+alt+y" (starts 'c')
+	// tier4 (catch-all), same natural-key raw-string compare:
+	// "ctrl+shift+x" ('c') < "meta+k" ('m') < "shift+x" ('sh') < "super+k" ('su')
+	want := []string{
+		"b", "?",
+		"ctrl+b",
+		"alt+z",
+		"alt+ctrl+q", "ctrl+alt+y",
+		"ctrl+shift+x", "meta+k", "shift+x", "super+k",
+	}
+	if got := wkSortedKeys(in...); !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// TestWkModTier_ClassifiesEveryCombination pins wkModTier directly against
+// the tier boundaries the sort now uses, independent of the other sorters.
+func TestWkModTier_ClassifiesEveryCombination(t *testing.T) {
+	tests := []struct {
+		key  string
+		tier int
+	}{
+		{"d", 0},
+		{"?", 0},
+		{"f1", 0},
+		{"space", 0},
+		{"ctrl++", 0}, // literal "+" chord
+		{"ctrl+a", 1},
+		{"ctrl+space", 1},
+		{"alt+b", 2},
+		{"ctrl+alt+y", 3},
+		{"alt+ctrl+y", 3},
+		{"shift+x", 4},
+		{"meta+k", 4},
+		{"super+k", 4},
+		{"hyper+k", 4},
+		{"ctrl+shift+x", 4},
+		{"shift+alt+ctrl+y", 4},
+	}
+	for _, tc := range tests {
+		if got := wkModTier(tc.key); got != tc.tier {
+			t.Errorf("wkModTier(%q) = %d, want %d", tc.key, got, tc.tier)
+		}
+	}
+}
+
+// TestSortWhichKeyCells_OrderIsIconModeIndependent pins that the sort reads
+// whichKeyCell.key (the raw binding) and never whichKeyCell.disp (the
+// rendered form fillWhichKeyDisplay fills in afterwards) — the panel must
+// order identically whether icons draw "⌃L" or "ctrl+l" verbatim.
+func TestSortWhichKeyCells_OrderIsIconModeIndependent(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	keys := []string{"y", "ctrl+l", "alt+x", "ctrl+alt+y", "shift+tab", "?", "space", "D", "d"}
+
+	var baseline []string
+	for _, mode := range []string{"ascii", "unicode", "nerdfont", "emoji"} {
+		ui.IconMode = mode
+		got := wkSortedKeys(keys...)
+		if baseline == nil {
+			baseline = got
+			continue
+		}
+		if !slices.Equal(got, baseline) {
+			t.Fatalf("icon mode %q changed the sort order: got %v, want %v (from the baseline mode)", mode, got, baseline)
+		}
 	}
 }
 
@@ -198,5 +295,102 @@ func TestWhichKeyCells_GotoPopupUsesTheSameOrdering(t *testing.T) {
 	// letter chord.
 	if last := cells[len(cells)-1].key; !strings.Contains(last, "\\") {
 		t.Fatalf("the punctuation chord must sort last, got %q", last)
+	}
+}
+
+// TestSortWhichKeyCells_ExplicitOrderOverridesTheKeySort is CHANGE 2's core
+// case (USER DECISION): "<" then ">" then "=", with "-" after both — the
+// exact pair-splitting complaint a plain ASCII/natural compare produces
+// (natural key: "-" < "<" < "=" < ">"). Order 1/2/3 are given directly on the
+// cells here rather than via the registry, so this pins the sort's own
+// behavior independent of the catalog's specific values (whichkey_registry.go
+// covers wiring those into the Sort group).
+func TestSortWhichKeyCells_ExplicitOrderOverridesTheKeySort(t *testing.T) {
+	cells := []whichKeyCell{
+		{key: "=", desc: "Flip sort direction", group: wkSort, order: 3},
+		{key: "-", desc: "Reset sort", group: wkSort}, // unset: falls through
+		{key: ">", desc: "Sort next column", group: wkSort, order: 2},
+		{key: "<", desc: "Sort previous column", group: wkSort, order: 1},
+	}
+	sortWhichKeyCells(cells)
+	want := []string{"<", ">", "=", "-"}
+	got := make([]string, len(cells))
+	for i, c := range cells {
+		got[i] = c.key
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// TestSortWhichKeyCells_ExplicitOrderDoesNotLeakAcrossGroups: Order is a
+// per-cell field, not a global rank — a group that sets it (Sort) must not
+// perturb a group that never opted in. The Actions cells below carry no
+// order and must keep sorting by the plain key chain exactly as if the Sort
+// group's cells weren't in the same slice at all.
+func TestSortWhichKeyCells_ExplicitOrderDoesNotLeakAcrossGroups(t *testing.T) {
+	cells := []whichKeyCell{
+		{key: "=", desc: "Flip sort direction", group: wkSort, order: 3},
+		{key: "y", desc: "Copy name", group: wkActions},
+		{key: ">", desc: "Sort next column", group: wkSort, order: 2},
+		{key: "D", desc: "Delete", group: wkActions},
+		{key: "<", desc: "Sort previous column", group: wkSort, order: 1},
+		{key: "d", desc: "Diff", group: wkActions},
+	}
+	sortWhichKeyCells(cells)
+
+	var actionsGot []string
+	var sortGot []string
+	for _, c := range cells {
+		switch c.group {
+		case wkActions:
+			actionsGot = append(actionsGot, c.key)
+		case wkSort:
+			sortGot = append(sortGot, c.key)
+		}
+	}
+	// Actions has no explicit order on any entry: plain alphanum/natural/case
+	// sort applies, same as TestSortWhichKeyCells_PortsNeovimOrdering — "d"
+	// and "D" tie on the natural key and split by case (lower first), "y"
+	// sorts after both.
+	if want := []string{"d", "D", "y"}; !slices.Equal(actionsGot, want) {
+		t.Fatalf("Actions group leaked the Sort group's explicit order: got %v, want %v", actionsGot, want)
+	}
+	if want := []string{"<", ">", "="}; !slices.Equal(sortGot, want) {
+		t.Fatalf("Sort group's explicit order was not applied: got %v, want %v", sortGot, want)
+	}
+}
+
+// TestWkOrderRank_UnsetFallsThroughToTheLargestRank pins the sentinel
+// directly: order 0 (unset) must compare larger than any positive explicit
+// order, mirroring neovim's own `order` sorter defaulting unset items to
+// 1000 (view.lua's M.fields.order) so they fall through to the natural sort.
+func TestWkOrderRank_UnsetFallsThroughToTheLargestRank(t *testing.T) {
+	if got := wkOrderRank(0); got <= wkOrderRank(1) {
+		t.Fatalf("wkOrderRank(0) = %d must be greater than wkOrderRank(1) = %d", got, wkOrderRank(1))
+	}
+	if got, want := wkOrderRank(5), 5; got != want {
+		t.Fatalf("wkOrderRank(5) = %d, want %d (explicit values pass through unchanged)", got, want)
+	}
+}
+
+// TestWhichKeyRegistry_SortGroupOrderMatchesTheUserDecision is the end-to-end
+// version of TestSortWhichKeyCells_ExplicitOrderOverridesTheKeySort, run
+// against the real catalog: SortPrev/SortNext/SortFlip/SortReset must render
+// as "<", ">", "=", "-" in that order once wired through whichKeyLeaderCells.
+func TestWhichKeyRegistry_SortGroupOrderMatchesTheUserDecision(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	cells := whichKeyTestModel().whichKeyLeaderCells()
+	var sortKeys []string
+	for _, c := range cells {
+		if c.group == wkSort {
+			sortKeys = append(sortKeys, c.key)
+		}
+	}
+	want := []string{"<", ">", "=", "-"}
+	if !slices.Equal(sortKeys, want) {
+		t.Fatalf("Sort group order = %v, want %v", sortKeys, want)
 	}
 }

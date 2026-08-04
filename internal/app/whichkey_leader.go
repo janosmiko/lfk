@@ -70,7 +70,7 @@ func (m Model) whichKeyLeaderCells() []whichKeyCell {
 	kb := ui.ActiveKeybindings
 	cells := make([]whichKeyCell, 0, len(acts))
 	for _, a := range acts {
-		cells = append(cells, whichKeyCell{key: a.Key(kb), desc: a.Label, group: a.Group})
+		cells = append(cells, whichKeyCell{key: a.Key(kb), desc: a.Label, group: a.Group, order: a.Order})
 	}
 	sortWhichKeyCells(cells)
 	fillWhichKeyDisplay(cells)

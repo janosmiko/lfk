@@ -42,6 +42,14 @@ type whichKeyAction struct {
 	Label string
 	Group whichKeyGroup
 	Avail func(c *wkCtx) bool
+	// Order is an optional explicit sort override, applied as a tiebreak
+	// after the group and modifier-tier passes but before the plain key
+	// sort (sortWhichKeyCells). Zero means "unspecified" and falls through
+	// to the normal sort — mirrors neovim's which-key `order` sorter
+	// (view.lua's M.fields.order), which is the escape hatch for a pair
+	// like "<"/">" that a plain ASCII compare would otherwise split apart.
+	// Leave unset unless an entry needs a specific position within its group.
+	Order int
 }
 
 // wkCtx carries the row state every predicate needs, resolved once per call.
@@ -541,10 +549,15 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.AllNamespaces }, Label: "All namespaces", Group: wkFilter, Avail: wkAllNamespacesAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.CommandBar }, Label: "Command bar", Group: wkFilter},
 
-	// Sort
-	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Avail: wkSortApplies},
-	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Avail: wkSortApplies},
-	{Key: func(kb ui.Keybindings) string { return kb.SortFlip }, Label: "Flip sort direction", Group: wkSort, Avail: wkSortApplies},
+	// Sort. SortPrev/SortNext/SortFlip carry an explicit Order (USER DECISION:
+	// "<" then ">" then "="): they're punctuation that ties on every other
+	// comparator, so a plain ASCII compare split the "<"/">" pair apart with
+	// "=" in between. SortReset ("-") is left unordered on purpose — it isn't
+	// part of that pair, and the unset default (wkOrderRank) sorts it after
+	// all three regardless.
+	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Avail: wkSortApplies, Order: 1},
+	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Avail: wkSortApplies, Order: 2},
+	{Key: func(kb ui.Keybindings) string { return kb.SortFlip }, Label: "Flip sort direction", Group: wkSort, Avail: wkSortApplies, Order: 3},
 	{Key: func(kb ui.Keybindings) string { return kb.SortReset }, Label: "Reset sort", Group: wkSort, Avail: wkSortApplies},
 
 	// Settings
