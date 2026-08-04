@@ -177,7 +177,11 @@ func TestRenderWhichKeyPanel_ScrollClampsToTheEnd(t *testing.T) {
 
 // whichKeyContentRows returns the panel's body rows with the border and the
 // horizontal padding stripped, so a test can index straight into the grid.
-func whichKeyContentRows(t *testing.T, out string, container int) []string {
+// legendRows must match the layout's lay.legendRows: the legend now hugs the
+// bottom border, with the vertical padding gap sitting above it rather than
+// below, so the padding to drop is no longer symmetric top/bottom whenever a
+// legend is present — it must be excised from the middle instead.
+func whichKeyContentRows(t *testing.T, out string, container, legendRows int) []string {
 	t.Helper()
 	var rows []string
 	for line := range strings.SplitSeq(out, "\n") {
@@ -192,10 +196,14 @@ func whichKeyContentRows(t *testing.T, out string, container int) []string {
 		rows = append(rows, string(body[whichKeyPadH:whichKeyPadH+container]))
 	}
 	// Drop the box's vertical padding rows; they are bordered but hold no grid.
-	if len(rows) < 2*whichKeyPadV {
+	if len(rows) < 2*whichKeyPadV+legendRows {
 		t.Fatalf("panel has %d bordered rows, fewer than its own padding", len(rows))
 	}
-	return rows[whichKeyPadV : len(rows)-whichKeyPadV]
+	entries := append([]string{}, rows[whichKeyPadV:len(rows)-whichKeyPadV-legendRows]...)
+	if legendRows > 0 {
+		entries = append(entries, rows[len(rows)-legendRows:]...)
+	}
+	return entries
 }
 
 // TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned is the visual
@@ -221,7 +229,7 @@ func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) 
 	}
 
 	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
-	rows := whichKeyContentRows(t, out, lay.container)
+	rows := whichKeyContentRows(t, out, lay.container, lay.legendRows)
 	// The full catalog spans several groups at this size, so the legend
 	// footer adds one more content row beyond the entry viewport.
 	if want := lay.viewRows + lay.legendRows; len(rows) != want {

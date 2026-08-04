@@ -132,7 +132,7 @@ func TestWhichKeyLegend_OmittedInNoColorMode(t *testing.T) {
 	// count is the precise signal: no legend row means no extra content row
 	// beyond the entry viewport.
 	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
-	rows := whichKeyContentRows(t, out, lay.container)
+	rows := whichKeyContentRows(t, out, lay.container, lay.legendRows)
 	if len(rows) != lay.viewRows {
 		t.Errorf("NoColor panel drew %d content rows, want exactly the %d-row entry viewport with no legend footer", len(rows), lay.viewRows)
 	}
@@ -170,6 +170,69 @@ func TestWhichKeyLegend_ClusterLevelDropsUnavailableGroups(t *testing.T) {
 		if strings.Contains(out, absent) {
 			t.Errorf("LevelClusters legend must not name %q:\n%s", absent, out)
 		}
+	}
+}
+
+// TestWhichKeyLegend_SitsOnLastLineCentered pins the footer's corrected
+// position: it is the panel's true last content row, hugging the bottom
+// border with nothing beneath it, and it is horizontally centered within the
+// box's inner width. Centering is checked by leading-vs-trailing whitespace
+// on the stripped row, which is equivalent to comparing against the PLAIN
+// label widths (lipgloss.Width, not len()) without duplicating that
+// arithmetic here — the row itself is the ground truth.
+func TestWhichKeyLegend_SitsOnLastLineCentered(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := whichKeyTestModel()
+	m.width, m.height = 120, 40
+
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok {
+		t.Fatal("precondition: the panel must lay out at 120x40")
+	}
+	if lay.legendRows == 0 {
+		t.Fatal("precondition: this catalog must produce a legend at 120x40")
+	}
+
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+	lines := strings.Split(out, "\n")
+	borderLast := -1
+	for i, l := range lines {
+		if strings.ContainsAny(l, "╭╮╰╯│") {
+			borderLast = i
+		}
+	}
+	if borderLast < 0 {
+		t.Fatal("no panel rendered")
+	}
+	// borderLast is the bottom border row itself (╰──╯); the legend must be
+	// the row directly above it, hugging the border with nothing in between.
+	last := borderLast - 1
+	r := []rune(lines[last])
+	if len(r) < 2 || r[0] != '│' || r[len(r)-1] != '│' {
+		t.Fatalf("panel's last content row is not a body row: %q", lines[last])
+	}
+	body := string(r[1 : len(r)-1])
+	if len(body) < whichKeyPadH+lay.container {
+		t.Fatalf("last body row is %d wide, want at least %d", len(body), whichKeyPadH+lay.container)
+	}
+	inner := body[whichKeyPadH : whichKeyPadH+lay.container]
+	if strings.TrimSpace(inner) == "" {
+		t.Fatalf("panel's last content line is blank; the legend must hug the border, not a padding row: %q", inner)
+	}
+	for _, want := range whichKeyPresentGroups(cells) {
+		if !strings.Contains(inner, string(want)) {
+			t.Errorf("last line missing group %q: %q", want, inner)
+		}
+	}
+
+	trimmed := strings.TrimSpace(inner)
+	lead := strings.Index(inner, trimmed)
+	trail := len(inner) - lead - len(trimmed)
+	if diff := lead - trail; diff < -1 || diff > 1 {
+		t.Errorf("legend not centered: %d leading spaces vs %d trailing (want within 1 column), row=%q", lead, trail, inner)
 	}
 }
 

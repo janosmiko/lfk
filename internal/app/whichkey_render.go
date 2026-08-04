@@ -355,6 +355,12 @@ const whichKeyLegendSep = "  "
 // doesn't fit in the remaining width is dropped entirely rather than
 // character-truncated mid-word, the same policy ui.FormatHintPartsFit uses
 // for the hint bar — a half-cut "Sett…" would teach the wrong word.
+//
+// The result is centered in width, computed from the PLAIN label widths
+// (used), never the styled string — ANSI escapes would inflate lipgloss.Width
+// and throw the centering off. Centering is applied to whatever actually fit,
+// so a narrow terminal that dropped names centers the survivors, not the full
+// untruncated legend.
 func whichKeyLegendLine(groups []whichKeyGroup, st whichKeyCellStyles, width int) string {
 	var sb strings.Builder
 	used := 0
@@ -375,7 +381,10 @@ func whichKeyLegendLine(groups []whichKeyGroup, st whichKeyCellStyles, width int
 		used += add
 		first = false
 	}
-	return sb.String()
+	if used == 0 {
+		return ""
+	}
+	return wkPad(max((width-used)/2, 0)) + sb.String()
 }
 
 // renderWhichKey draws the goto cheatsheet while the g prefix is armed and
@@ -406,6 +415,14 @@ func (m Model) renderWhichKeyPanel(background string, cells []whichKeyCell, scro
 		// whichKeyMinRows can ask for more rows than the content has.
 		visible = append(visible, make([]string, pad)...)
 	}
+	// The bottom vertical padding is drawn into the content here, not left to
+	// the box style below, so the legend can be appended after it and land on
+	// the true last line, hugging the border, rather than floating above a
+	// blank gap. Without a legend this reproduces the same blank rows the box
+	// style would have added on its own.
+	for range whichKeyPadV {
+		visible = append(visible, "")
+	}
 	if lay.legendRows > 0 {
 		// The legend describes the whole catalog, not just the scrolled-in
 		// window, so it reads cells directly rather than the visible slice.
@@ -417,7 +434,9 @@ func (m Model) renderWhichKeyPanel(background string, cells []whichKeyCell, scro
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Background(ui.BaseBg).
-		Padding(whichKeyPadV, whichKeyPadH).
+		PaddingTop(whichKeyPadV).
+		PaddingLeft(whichKeyPadH).
+		PaddingRight(whichKeyPadH).
 		Render(content)
 
 	// No DimBackground here, unlike the modal overlays: both which-key panels

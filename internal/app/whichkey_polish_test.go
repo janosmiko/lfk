@@ -204,7 +204,7 @@ func TestRenderWhichKeyPanel_SymbolChordStillAligns(t *testing.T) {
 			}
 
 			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
-			rows := whichKeyContentRows(t, out, lay.container)
+			rows := whichKeyContentRows(t, out, lay.container, lay.legendRows)
 			g := lay.grid
 			for r, row := range rows {
 				if r >= g.rowN {
