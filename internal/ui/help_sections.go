@@ -28,7 +28,10 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.Up + "/Up", "Move up"},
 				{kb.JumpTop + kb.JumpTop + "/Home", "Jump to top"},
 				{kb.JumpBottom + "/End", "Jump to bottom"},
-				{kb.JumpTop + "+chord", "Goto resource type (which-key popup)"},
+				// "{key}" is vim's own notation for a required placeholder
+				// (":help g{char}"), and this is a vim-modeled TUI. A bare
+				// "g" would read as ambiguous next to the "gg" row above it.
+				{kb.JumpTop + "{key}", "Goto resource type"},
 				{kb.PageDown + "/" + kb.PageUp, "Scroll half page down/up"},
 				{kb.PageForward + "/" + kb.PageBack, "Scroll full page down/up"},
 				{kb.Enter, "Open YAML view / navigate into"},

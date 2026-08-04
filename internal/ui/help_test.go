@@ -699,6 +699,55 @@ func TestBuildHelpSpecs_KeysAlignWithinSection_IconModesAndSizes(t *testing.T) {
 	}
 }
 
+// --- goto chord notation ---
+
+// The goto row is written in vim's placeholder notation ("g{key}"), built
+// from the JumpTop binding so a rebind follows. Two ways it could break on
+// the way to the screen: the chord tokenizer could mangle the braces (they
+// are not chord runes, so "key" is a token of its own), or applyKeySeparator
+// could read something inside them as an alternative. Neither may happen —
+// the row must draw exactly as written, in every icon mode.
+func TestHelpSections_GotoChordNotation(t *testing.T) {
+	originalIcons := IconMode
+	originalKB := ActiveKeybindings
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ActiveKeybindings = originalKB
+	})
+
+	gotoKey := func() string {
+		for _, section := range helpSections() {
+			for _, b := range section.bindings {
+				if b.desc == "Goto resource type" {
+					return b.key
+				}
+			}
+		}
+		return ""
+	}
+
+	ActiveKeybindings = DefaultKeybindings()
+	assert.Equal(t, ActiveKeybindings.JumpTop+"{key}", gotoKey(),
+		"the goto row must be built from the JumpTop binding, not a hardcoded g")
+
+	// A rebind must carry through, otherwise the help lies about the chord.
+	rebound := DefaultKeybindings()
+	rebound.JumpTop = "t"
+	ActiveKeybindings = rebound
+	assert.Equal(t, "t{key}", gotoKey())
+
+	ActiveKeybindings = DefaultKeybindings()
+	for _, icons := range []string{"nerdfont", "unicode", "simple", "none"} {
+		t.Run(icons, func(t *testing.T) {
+			IconMode = icons
+			assert.Equal(t, "g{key}", helpKeySymbols("g{key}"),
+				"the placeholder braces must reach the key column untouched")
+			assert.NotContains(t, helpKeySymbols("g{key}"), helpKeySeparator,
+				"a placeholder chord is one binding, not two alternatives")
+		})
+	}
+}
+
 // --- separator spacing ---
 
 // applyKeySeparator must space a "/" only where it genuinely separates two
