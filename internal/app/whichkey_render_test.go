@@ -222,11 +222,16 @@ func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) 
 
 	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
 	rows := whichKeyContentRows(t, out, lay.container)
-	if len(rows) != lay.viewRows {
-		t.Fatalf("panel drew %d body rows, want %d", len(rows), lay.viewRows)
+	// The full catalog spans several groups at this size, so the legend
+	// footer adds one more content row beyond the entry viewport.
+	if want := lay.viewRows + lay.legendRows; len(rows) != want {
+		t.Fatalf("panel drew %d body rows, want %d", len(rows), want)
 	}
 	widest := make([]int, g.boxN)
-	for r, row := range rows {
+	// The legend footer (if any) is the last row and is not part of the grid
+	// — it must not be walked as if it were an entry row, or its own content
+	// gets measured against an unrelated column offset.
+	for r, row := range rows[:lay.viewRows] {
 		runes := []rune(row)
 		for b := range g.boxN {
 			idx := b*g.rowN + r

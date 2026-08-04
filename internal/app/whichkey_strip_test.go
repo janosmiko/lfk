@@ -57,9 +57,11 @@ func TestWhichKeyStrip_HeightGrowsToFitAndCapsAt25(t *testing.T) {
 				h, lay.viewRows, want, lay.bodyRows, whichKeyMinRows, whichKeyMaxRows, availRows)
 		}
 
+		// The full catalog spans several groups, so the box also carries the
+		// one-row legend footer on top of the entry viewport.
 		_, first, last := whichKeyStripBox(t, m)
-		if got := last - first + 1; got != lay.viewRows+chrome {
-			t.Errorf("height=%d: panel is %d rows, want %d", h, got, lay.viewRows+chrome)
+		if got, want := last-first+1, lay.viewRows+lay.legendRows+chrome; got != want {
+			t.Errorf("height=%d: panel is %d rows, want %d", h, got, want)
 		}
 	}
 
@@ -68,8 +70,12 @@ func TestWhichKeyStrip_HeightGrowsToFitAndCapsAt25(t *testing.T) {
 	tall.width, tall.height = 120, 120
 	tall.whichKey.armed = true
 	tall.whichKey.shown = true
-	if _, first, last := whichKeyStripBox(t, tall); last-first+1 > whichKeyMaxRows+chrome {
-		t.Errorf("a 120-row terminal must not grow the panel past %d content rows; got %d", whichKeyMaxRows, last-first+1-chrome)
+	tallLay, ok := tall.whichKeyLayoutFor(tall.whichKeyLeaderCells())
+	if !ok {
+		t.Fatal("precondition: the panel must lay out at 120x120")
+	}
+	if _, first, last := whichKeyStripBox(t, tall); last-first+1 > whichKeyMaxRows+tallLay.legendRows+chrome {
+		t.Errorf("a 120-row terminal must not grow the panel past %d content rows plus legend; got %d", whichKeyMaxRows, last-first+1-chrome)
 	}
 }
 

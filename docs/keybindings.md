@@ -268,7 +268,7 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 | `Esc` | Close |
 | any other key | Close, and still run normally |
 
-Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout.
+Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout. A legend row at the bottom of the panel names each color in that color, so the mapping doesn't have to be memorized -- only the categories actually offered on the current row appear in it, and it is omitted with `no_color`.
 
 | Category | Color | Examples |
 |---|---|---|

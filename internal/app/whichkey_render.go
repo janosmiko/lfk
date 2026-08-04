@@ -268,11 +268,12 @@ func (m Model) whichKeyPanelGeometry() (container, availRows int, ok bool) {
 // whichKeyPanelLayout is everything a panel render (or a scroll-bounds query)
 // needs, derived once: the grid plus how the content sits in the viewport.
 type whichKeyPanelLayout struct {
-	grid      whichKeyGrid
-	container int
-	bodyRows  int // rows the content needs
-	viewRows  int // rows the panel shows
-	maxScroll int // largest row offset; 0 when everything fits
+	grid       whichKeyGrid
+	container  int
+	bodyRows   int // rows the content needs
+	viewRows   int // rows the panel shows
+	maxScroll  int // largest row offset; 0 when everything fits
+	legendRows int // 1 when the group-color legend renders below the entries, else 0
 }
 
 // whichKeyLayoutFor reports how the given entries fit on screen. The viewport is
@@ -291,9 +292,90 @@ func (m Model) whichKeyLayoutFor(cells []whichKeyCell) (whichKeyPanelLayout, boo
 	if lay.bodyRows == 0 {
 		return whichKeyPanelLayout{}, false
 	}
+	// The legend is a fixed footer row, outside win.height's min/max clamp,
+	// the same way the border and padding sit outside it. It only claims a
+	// row when one is left over after reserving at least one for real
+	// entries — explaining the colors must never be what pushes the colors
+	// themselves off screen.
+	if availRows >= 2 && whichKeyWantsLegend(cells) {
+		lay.legendRows = 1
+		availRows--
+	}
 	lay.viewRows = min(min(max(lay.bodyRows, whichKeyMinRows), whichKeyMaxRows), availRows)
 	lay.maxScroll = max(lay.bodyRows-lay.viewRows, 0)
 	return lay, true
+}
+
+// whichKeyWantsLegend reports whether the panel should draw the group-color
+// legend: at least one cell carries a group, and NoColor mode hasn't
+// collapsed every group style to plain (whichKeyGroupStyles), which would
+// make a legend explain a color mapping that isn't actually on screen.
+// Allocation-free by design — whichKeyLayoutFor's own alloc ceiling covers
+// this path, and the actual group list is only built at render time.
+func whichKeyWantsLegend(cells []whichKeyCell) bool {
+	if ui.ConfigNoColor {
+		return false
+	}
+	for _, c := range cells {
+		if c.group != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// whichKeyPresentGroups returns the declared groups (whichKeyGroupOrder
+// order) that at least one cell in cells actually carries. The panel is
+// context-aware — at the cluster picker, most action groups have no
+// available entry — so the legend must reflect what today's cells contain,
+// never the full declared set: a color with nothing on screen to match it is
+// worse than no legend.
+func whichKeyPresentGroups(cells []whichKeyCell) []whichKeyGroup {
+	seen := make(map[whichKeyGroup]bool, len(whichKeyGroupOrder()))
+	for _, c := range cells {
+		if c.group != "" {
+			seen[c.group] = true
+		}
+	}
+	out := make([]whichKeyGroup, 0, len(seen))
+	for _, g := range whichKeyGroupOrder() {
+		if seen[g] {
+			out = append(out, g)
+		}
+	}
+	return out
+}
+
+// whichKeyLegendSep separates one legend entry from the next.
+const whichKeyLegendSep = "  "
+
+// whichKeyLegendLine draws each present group's name in that group's own
+// description accent, so the color-to-category mapping teaches itself
+// instead of staying tribal knowledge. Groups are whole units: one that
+// doesn't fit in the remaining width is dropped entirely rather than
+// character-truncated mid-word, the same policy ui.FormatHintPartsFit uses
+// for the hint bar — a half-cut "Sett…" would teach the wrong word.
+func whichKeyLegendLine(groups []whichKeyGroup, st whichKeyCellStyles, width int) string {
+	var sb strings.Builder
+	used := 0
+	first := true
+	for _, g := range groups {
+		label := string(g)
+		add := lipgloss.Width(label)
+		if !first {
+			add += lipgloss.Width(whichKeyLegendSep)
+		}
+		if used+add > width {
+			continue // a later, shorter name may still fit
+		}
+		if !first {
+			sb.WriteString(whichKeyLegendSep)
+		}
+		sb.WriteString(st.descStyle(g).Render(label))
+		used += add
+		first = false
+	}
+	return sb.String()
 }
 
 // renderWhichKey draws the goto cheatsheet while the g prefix is armed and
@@ -323,6 +405,11 @@ func (m Model) renderWhichKeyPanel(background string, cells []whichKeyCell, scro
 	if pad := lay.viewRows - len(visible); pad > 0 {
 		// whichKeyMinRows can ask for more rows than the content has.
 		visible = append(visible, make([]string, pad)...)
+	}
+	if lay.legendRows > 0 {
+		// The legend describes the whole catalog, not just the scrolled-in
+		// window, so it reads cells directly rather than the visible slice.
+		visible = append(visible, whichKeyLegendLine(whichKeyPresentGroups(cells), st, lay.container))
 	}
 
 	content := ui.FillLinesBg(strings.Join(visible, "\n"), lay.container, ui.BaseBg)
