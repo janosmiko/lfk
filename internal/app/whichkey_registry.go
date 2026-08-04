@@ -572,7 +572,10 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.SecurityBadgeToggle }, Label: "Security badge", Group: wkSettings},
 	{Key: func(kb ui.Keybindings) string { return kb.SecurityIgnoreToggle }, Label: "Show ignored findings", Group: wkSettings, Avail: wkOnSecurityView},
 	{Key: func(kb ui.Keybindings) string { return kb.ClusterColorPicker }, Label: "Cluster color", Group: wkSettings, Avail: wkClusterRowSelected},
-	{Key: whichKeyHelpKey, Label: "Full help", Group: wkSettings},
+	// Views, not Settings: this opens a screen, like every other entry in the
+	// group. It sat in Settings until the help catalog's own row stopped
+	// hardcoding f1 and the alignment guard could finally see the disagreement.
+	{Key: whichKeyHelpKey, Label: "Full help", Group: wkViews},
 }
 
 // whichKeyHelpKey reports the key that actually opens the help screen from the
@@ -580,10 +583,7 @@ var whichKeyExplorerCatalog = []whichKeyAction{
 // (both default to "?") only the hardcoded f1 alias still reaches help, and
 // advertising "?" there would be a lie.
 func whichKeyHelpKey(kb ui.Keybindings) string {
-	if kb.Help == kb.WhichKeyLeader {
-		return "f1"
-	}
-	return kb.Help
+	return kb.ExplorerHelpKey()
 }
 
 // whichKeyExplorerActions returns a copy of the shared explorer catalog, so a

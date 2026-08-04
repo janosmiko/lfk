@@ -192,6 +192,20 @@ type Keybindings struct {
 	PreviousNamespace string `json:"previous_namespace" yaml:"previous_namespace"`
 }
 
+// ExplorerHelpKey reports the key that actually opens the help screen from the
+// explorer. WhichKeyLeader is dispatched ahead of Help, so while the two share
+// a binding the help screen is only reachable with f1.
+//
+// Lives on Keybindings because both the help catalog (internal/ui) and the
+// app's hint bar need the same answer. Two copies of this rule have already
+// drifted apart once and advertised a key that did not open help.
+func (k Keybindings) ExplorerHelpKey() string {
+	if k.Help == k.WhichKeyLeader {
+		return "f1"
+	}
+	return k.Help
+}
+
 // DefaultKeybindings returns the default keybinding configuration.
 func DefaultKeybindings() Keybindings {
 	return Keybindings{

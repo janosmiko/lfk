@@ -90,7 +90,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Views & Tools",
 			bindings: []helpEntry{
-				{"f1", "Toggle help screen (" + kb.Help + " outside the explorer)"},
+				{kb.ExplorerHelpKey(), "Toggle help screen (" + kb.Help + " outside the explorer)"},
 				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{kb.TogglePreview, "Toggle details / YAML preview"},
 				{kb.TogglePreviewLogs, "Toggle live-log preview pane"},
@@ -123,8 +123,8 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Multi-Selection",
 			bindings: []helpEntry{
-				{"space", "Toggle selection on current item"},
-				{"ctrl+space", "Select range from anchor to cursor"},
+				{kb.ToggleSelect, "Toggle selection on current item"},
+				{kb.SelectRange, "Select range from anchor to cursor"},
 				{kb.SelectAll, "Select/deselect all visible items"},
 				{"esc", "Clear selection"},
 				{kb.ActionMenu, "Bulk action menu"},
