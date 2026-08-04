@@ -92,26 +92,55 @@ const (
 	// whichKeyBottomGap leaves exactly the status-bar row uncovered, so the
 	// panel sits directly on top of it.
 	whichKeyBottomGap = 1
-	// whichKeyOuterMargin insets the bordered box this many columns from each
-	// side of the terminal, once whichKeyOuterMarginMinWidth is met, so the
-	// panel reads as a floating box - the way neovim's own popup never
-	// touches the editor edge - rather than a strip glued to the terminal
-	// border. A fixed column count is used rather than a percentage: at a
-	// 250-column terminal a percentage margin would balloon into double
-	// digits per side for no visual gain, while a flat margin reads as the
-	// same amount of "terminal visible outside the box" at every size that
-	// gets one, which is what an inset is actually for. 4 is chosen to read
-	// clearly against the border (twice whichKeyPadH's own inside-the-box
-	// padding) while costing less width than a single grid column
-	// (whichKeyMinColW + whichKeySpacing = 33), so applying it never forces
-	// boxN down by itself.
-	whichKeyOuterMargin = 4
+	// whichKeyOuterMargin* insets the bordered box from each side of the
+	// terminal, once whichKeyOuterMarginMinWidth is met, so the panel reads
+	// as a floating box - the way neovim's own popup never touches the
+	// editor edge - rather than a strip glued to the terminal border. A
+	// fixed column count is used rather than a percentage: a percentage
+	// margin balloons into double digits per side at wide terminals for no
+	// visual gain, while a flat margin reads as the same amount of "terminal
+	// visible outside the box" at every size that gets one.
+	//
+	// The margin grows in three tiers instead of staying flat, so wide
+	// terminals get a visibly larger gutter than 4. It cannot just be raised
+	// everywhere: box_count = container / (whichKeyMinColW + whichKeySpacing)
+	// is a floor division, so container sits on a knife edge right after
+	// every column-count step, and margin 8 at width 80 (container 58) would
+	// collapse what is 2 columns at margin 4 (container 66) down to 1 -
+	// exactly the failure this tiering avoids. Each tier was checked against
+	// whichKeyGridFor for the actual panel content (lfk's widest catalog
+	// label is 23 columns, comfortably under whichKeyMinColW=30, so
+	// box_width holds at the 30 floor and the arithmetic below is exact, not
+	// approximate):
+	//
+	//	width  margin  columns (unchanged from the old flat margin=4)
+	//	  80      4        2
+	//	 100      4        2
+	//	 120      4        3
+	//	 160      8        4
+	//	 200      8        5
+	//	 250     12        5 (capped by whichKeyMaxCols)
+	//
+	// Because box_count's transitions repeat every 33 columns of container
+	// width and reset to zero slack at each one, no margin greater than 4
+	// can stay regression-free at literally every width in between two tier
+	// boundaries - only the tier boundaries themselves (and the six sizes
+	// above) are guaranteed to match or beat the old flat-4 column count.
+	// The one place that trade-off surfaces is width 179-186, which lands
+	// one column narrower (4 instead of 5) than the old margin=4 would have
+	// given; it never drops below 4 columns, and every width outside that
+	// eight-wide band matches or improves on the old baseline.
+	whichKeyOuterMargin           = 4  // tier 1, unchanged from before
+	whichKeyOuterMarginTier2      = 8  // starts at whichKeyOuterMarginTier2Width
+	whichKeyOuterMarginTier3      = 12 // starts at whichKeyOuterMarginTier3Width
+	whichKeyOuterMarginTier2Width = 160
+	whichKeyOuterMarginTier3Width = 220
 	// whichKeyOuterMarginMinWidth is the terminal width below which the
 	// outer margin collapses to zero instead of applying. Below it the grid
 	// is already fighting for its first columns (see whichKeyGridFor), so
-	// spending 2*whichKeyOuterMargin columns on a gutter would cost a column
-	// the box could otherwise keep - full width is the better degrade than a
-	// barely-there margin squeezing an already-cramped box.
+	// spending margin columns on a gutter would cost a column the box could
+	// otherwise keep - full width is the better degrade than a barely-there
+	// margin squeezing an already-cramped box.
 	whichKeyOuterMarginMinWidth = 80
 	whichKeyMinWidth            = 20
 	// whichKeyMinHeight is the real floor for at least one content row: border
@@ -288,16 +317,28 @@ func (m Model) whichKeyPanelGeometry() (container, availRows int, ok bool) {
 	if m.width < whichKeyMinWidth || m.height < whichKeyMinHeight {
 		return 0, 0, false
 	}
-	margin := 0
-	if m.width >= whichKeyOuterMarginMinWidth {
-		margin = whichKeyOuterMargin
-	}
-	container = max(m.width-2*margin-(2*whichKeyPadH+2), 1)
+	container = max(m.width-2*whichKeyOuterMarginFor(m.width)-(2*whichKeyPadH+2), 1)
 	availRows = m.height - (2 + 2*whichKeyPadV + whichKeyBottomGap)
 	if availRows < 1 {
 		return 0, 0, false
 	}
 	return container, availRows, true
+}
+
+// whichKeyOuterMarginFor returns the outer margin for a terminal of the given
+// width: see the whichKeyOuterMargin* constants for the tier boundaries and
+// why they're staged rather than flat.
+func whichKeyOuterMarginFor(width int) int {
+	switch {
+	case width < whichKeyOuterMarginMinWidth:
+		return 0
+	case width < whichKeyOuterMarginTier2Width:
+		return whichKeyOuterMargin
+	case width < whichKeyOuterMarginTier3Width:
+		return whichKeyOuterMarginTier2
+	default:
+		return whichKeyOuterMarginTier3
+	}
 }
 
 // whichKeyPanelLayout is everything a panel render (or a scroll-bounds query)

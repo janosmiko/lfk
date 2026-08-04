@@ -319,8 +319,10 @@ func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
 // column count never goes to zero, the box itself stays a well-formed
 // rectangle (exactly one top and one bottom border, every body row the same
 // width), and the box is inset from both edges by exactly
-// whichKeyOuterMargin once the terminal is wide enough to afford it, or
-// touches both edges (no inset) below that.
+// whichKeyOuterMarginFor(w) once the terminal is wide enough to afford a
+// margin at all, or touches both edges (no inset) below that. Calls the same
+// production function the renderer uses rather than re-deriving the tier
+// table here, so the two can never drift apart.
 func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -357,10 +359,7 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 				case strings.Contains(line, "╭") && strings.Contains(line, "╮"):
 					topN++
 					left, right := whichKeyLineGaps(line, '╭', '╮')
-					wantMargin := 0
-					if w >= whichKeyOuterMarginMinWidth {
-						wantMargin = whichKeyOuterMargin
-					}
+					wantMargin := whichKeyOuterMarginFor(w)
 					if left != wantMargin || right != wantMargin {
 						t.Fatalf("%dx%d: box gaps are %d/%d, want %d/%d (margin %d)", w, h, left, right, wantMargin, wantMargin, wantMargin)
 					}
@@ -380,6 +379,62 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 		}
 	}
 	t.Logf("5th column first appears at width %d", fifthColAt)
+}
+
+// TestWhichKeyOuterMarginFor_CheckpointsMatchOrBeatTheOldFlatMargin pins the
+// margin/column table documented on the whichKeyOuterMargin* constants: the
+// enlarged margin must be strictly larger than the old flat 4 at the wider
+// checkpoints, and every checkpoint's column count must match what the old
+// flat margin=4 policy gave (verified against the real leader catalog, not a
+// synthetic one, since box_width's 30-column floor only holds because lfk's
+// actual labels stay under it).
+func TestWhichKeyOuterMarginFor_CheckpointsMatchOrBeatTheOldFlatMargin(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	const oldFlatMargin = 4
+	cases := []struct {
+		width      int
+		wantMargin int
+		wantCols   int
+	}{
+		{80, 4, 2},
+		{100, 4, 2},
+		{120, 4, 3},
+		{160, 8, 4},
+		{200, 8, 5},
+		{250, 12, 5},
+	}
+
+	m := whichKeyTestModel()
+	m.height = 40
+	cells := m.whichKeyLeaderCells()
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("width=%d", tc.width), func(t *testing.T) {
+			if got := whichKeyOuterMarginFor(tc.width); got != tc.wantMargin {
+				t.Fatalf("whichKeyOuterMarginFor(%d) = %d, want %d", tc.width, got, tc.wantMargin)
+			}
+			if tc.wantMargin < oldFlatMargin {
+				t.Fatalf("checkpoint %d: margin %d must never be smaller than the old flat %d", tc.width, tc.wantMargin, oldFlatMargin)
+			}
+
+			m.width = tc.width
+			lay, ok := m.whichKeyLayoutFor(cells)
+			if !ok {
+				t.Fatalf("width %d: panel must lay out", tc.width)
+			}
+			if lay.grid.boxN != tc.wantCols {
+				t.Fatalf("width %d: got %d columns, want %d", tc.width, lay.grid.boxN, tc.wantCols)
+			}
+
+			oldContainer := max(tc.width-2*oldFlatMargin-(2*whichKeyPadH+2), 1)
+			oldGrid := whichKeyGridFor(cells, oldContainer)
+			if lay.grid.boxN < oldGrid.boxN {
+				t.Fatalf("width %d: new margin gives %d columns, old flat margin gave %d — regression", tc.width, lay.grid.boxN, oldGrid.boxN)
+			}
+		})
+	}
 }
 
 // whichKeyLineGaps reports the number of columns before the first occurrence
