@@ -441,7 +441,10 @@ func helpSpecStyled(s helpLineSpec, search string, isCurrent bool) string {
 		return "  " + RenderOverPrestyled(inner, headerStyle)
 	case helpLineEntry:
 		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
-		descStyle := OverlayDimStyle
+		// Descriptions carry the actual content of the screen, so they get the
+		// normal text colour. Dimming is reserved for chrome (the separator,
+		// the more-above/below markers), which should recede behind them.
+		descStyle := OverlayNormalStyle.Background(SurfaceBg)
 		keyInner := styleHelpKeyCell(s.key, search, hl, keyStyle)
 		if helpKeyMatchesSearch(s, search) {
 			// Query matched "Ctrl+D" but the cell draws "⌃D" — highlight
