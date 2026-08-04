@@ -211,3 +211,52 @@ func TestHelpEscCascadesSearchThenFilterThenClose(t *testing.T) {
 	rm3 := r3.(Model)
 	assert.NotEqual(t, modeHelp, rm3.mode, "third Esc closes help")
 }
+
+// The help key column draws modifier chords as symbols (⌃D), but the
+// search index keeps the textual form — so typing "ctrl" must still find
+// those rows and n/N must have somewhere to jump.
+func TestHelpSearchCtrlMatchesSymbolRenderedChords(t *testing.T) {
+	m := newHelpModel()
+	m.helpSearchQuery = "ctrl"
+	m.helpRecomputeMatches()
+
+	assert.NotEmpty(t, m.helpMatchLines,
+		`a "ctrl" search must match the rows whose key column draws "⌃D"`)
+
+	lines := ui.BuildHelpLines(m.helpFilter.Value, m.helpContextMode, m.width)
+	for _, idx := range m.helpMatchLines {
+		assert.True(t, ui.MatchLine(lines[idx], "ctrl"),
+			"match index %d must point at a line that really contains the query", idx)
+	}
+
+	// The rendered screen draws the symbol for the same rows.
+	out := stripANSI(ui.RenderHelpScreen(m.width, m.height-1, 0, "", "ctrl", "", -1))
+	assert.Contains(t, out, "⌃", "the key column must still draw the symbol chord")
+}
+
+// f + "ctrl" must narrow to the chord rows rather than reporting no match.
+func TestHelpFilterCtrlNarrowsToChordRows(t *testing.T) {
+	m := newHelpModel()
+	r, _ := m.handleHelpKey(keyMsg("f"))
+	rm := r.(Model)
+	for _, c := range []string{"c", "t", "r", "l"} {
+		r2, _ := rm.handleHelpKey(keyMsg(c))
+		rm = r2.(Model)
+	}
+	assert.Equal(t, "ctrl", rm.helpFilter.Value)
+
+	out := stripANSI(ui.RenderHelpScreen(rm.width, rm.height-1, rm.helpScroll, rm.helpFilter.Value, "", rm.helpContextMode, -1))
+	assert.NotContains(t, out, "No matching keybindings")
+	assert.Contains(t, out, "⌃", "filtering by ctrl must keep the chord rows")
+}
+
+// Search and filter are only useful if the user knows they exist: the
+// resting-state hint bar has to advertise both.
+func TestHelpHintBarAdvertisesSearchAndFilter(t *testing.T) {
+	m := newHelpModel()
+	bar := stripANSI(m.helpHintBar())
+	assert.Contains(t, bar, "search")
+	assert.Contains(t, bar, "filter")
+	assert.Contains(t, bar, "/")
+	assert.Contains(t, bar, "f")
+}

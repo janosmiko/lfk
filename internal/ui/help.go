@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -28,49 +27,29 @@ type helpSection struct {
 	bindings []helpEntry
 }
 
-// helpKeyDisplayModifiers is the display casing for each modifier name.
-var helpKeyDisplayModifiers = map[string]string{
-	"ctrl": "Ctrl", "alt": "Alt", "shift": "Shift",
-	"meta": "Meta", "hyper": "Hyper", "super": "Super",
-}
+// helpSections lives in help_sections.go; key formatting in help_keys.go.
 
-// helpKeyDisplay formats a keybinding value for display in the help screen.
-// A modified chord gets its modifiers capitalized and its key uppercased
-// ("ctrl+shift+x" -> "Ctrl+Shift+X", "shift+tab" -> "Shift+Tab"); an
-// unmodified binding displays verbatim.
-func helpKeyDisplay(key string) string {
-	mods, last, ok := splitModifierChord(key)
-	if !ok {
-		return key
-	}
-	// Build a separate slice rather than mutating the split in place.
-	display := make([]string, 0, len(mods)+1)
-	for _, p := range mods {
-		display = append(display, helpKeyDisplayModifiers[p])
-	}
-	display = append(display, titleKeyName(last))
-	return strings.Join(display, "+")
-}
-
-// helpSections lives in help_sections.go.
-
-// BuildHelpLines builds the formatted help lines, optionally filtering
+// BuildHelpLines builds the searchable help lines, optionally filtering
 // by a query string. contextMode limits sections to those matching the
 // current view (empty = explorer). Exported so the app layer can run
 // the same line-building pipeline to compute search match indices for
 // n/N navigation.
 //
-// Returns plain (un-styled) text in the same row order RenderHelpScreen
-// will display. Plain text is what app-layer search routines need:
-// running MatchLine / strings.Contains over a styled line lets a
-// digit query match bytes that live inside an SGR escape (e.g. the
-// "1" in "\x1b[33;1m"), inflating match counts and pointing n/N at
+// Returns plain (un-styled) text, one entry per row RenderHelpScreen
+// will display, in the same order. Plain text is what app-layer search
+// routines need: running MatchLine / strings.Contains over a styled line
+// lets a digit query match bytes that live inside an SGR escape (e.g.
+// the "1" in "\x1b[33;1m"), inflating match counts and pointing n/N at
 // rows with no visible match.
+//
+// The key column carries the TEXTUAL chord ("Ctrl+D") even when the
+// screen draws the symbol ("⌃D"), so a search for "ctrl" still finds the
+// row. RenderHelpScreen highlights the whole key cell for those rows.
 func BuildHelpLines(filter, contextMode string, screenWidth int) []string {
 	specs := buildHelpSpecs(filter, contextMode, helpInnerWidth(screenWidth))
 	out := make([]string, len(specs))
 	for i, s := range specs {
-		out[i] = helpSpecPlain(s)
+		out[i] = helpSpecSearchText(s)
 	}
 	return out
 }
@@ -120,18 +99,34 @@ type helpLineSpec struct {
 	kind helpLineKind
 	// text is the plain content for header and message rows.
 	text string
-	// key is the padded plain key column for entry rows.
+	// key is the right-aligned key column as drawn (symbols when the
+	// icon mode allows them).
 	key string
+	// keyText is the unpadded textual form of the same binding
+	// ("Ctrl+D" for a key column drawing "⌃D"). Search indexes this so a
+	// "ctrl" query still matches a symbol-rendered chord.
+	keyText string
 	// desc is the plain description column for entry rows.
 	desc string
 }
 
-// helpKeyColumnMinWidth is the minimum width of the key column. Sections
-// whose widest key is shorter still pad to this so the description column
-// has a comfortable left margin. Sections with longer keys widen the
-// column to fit, keeping descriptions vertically aligned within the
-// section.
+// helpKeyColumnMinWidth is the minimum width of the key column, so the
+// description column keeps a comfortable left margin even when every
+// visible key is a single character.
 const helpKeyColumnMinWidth = 14
+
+// helpKeyRow is one catalog entry resolved to its display and search forms.
+type helpKeyRow struct {
+	key     string // as drawn (symbols when available)
+	keyText string // textual chord, for the search index
+	desc    string
+}
+
+// helpGroup is a section that survived context and filter matching.
+type helpGroup struct {
+	title string
+	rows  []helpKeyRow
+}
 
 // buildHelpSpecs walks the help sections and produces structural
 // specs (un-styled) in the exact display order. Used by both
@@ -139,99 +134,124 @@ const helpKeyColumnMinWidth = 14
 // computed by the app layer line up 1:1 with the styled rows on
 // screen.
 func buildHelpSpecs(filter, contextMode string, innerW int) []helpLineSpec {
-	sections := helpSections()
+	groups := collectHelpGroups(filter, contextMode)
+	if len(groups) == 0 {
+		if filter != "" {
+			return []helpLineSpec{{kind: helpLineMessage, text: "No matching keybindings"}}
+		}
+		return nil
+	}
+
+	keyWidth := helpKeyColumnWidth(groups, innerW)
+	// rowOverhead is the fixed prefix helpSpecPlain puts before a
+	// description: 4 leading spaces + keyWidth + 2 spaces between the
+	// columns. descBudget is the exact room left; flooring at 1 keeps the
+	// wrapped row inside innerW so the renderer's Truncate never lops a
+	// character with a "~". The only residual overflow is a key wider than
+	// the capped column, which no description width could fix.
+	rowOverhead := 4 + keyWidth + 2
+	descBudget := max(innerW-rowOverhead, 1)
+	blankKey := strings.Repeat(" ", keyWidth)
+
 	specs := make([]helpLineSpec, 0, 64)
-	for _, section := range sections {
-		// Context filtering: when a context is active, show only sections
-		// that match that context. When no context (explorer), show only
-		// sections with empty context (explorer sections).
-		if contextMode == "" || contextMode == "Navigation" || contextMode == "Bookmarks" {
-			if section.context != "" {
-				continue
-			}
-		} else {
-			if section.context != contextMode {
-				continue
-			}
-		}
-
-		// First pass: collect bindings that pass the filter. Sizing the
-		// key column to filtered content (rather than the full section)
-		// keeps the column tight when a filter narrows the visible rows.
-		matched := make([]helpEntry, 0, len(section.bindings))
-		for _, b := range section.bindings {
-			if filter != "" {
-				if !MatchLine(b.key, filter) && !MatchLine(b.desc, filter) {
-					continue
-				}
-			}
-			matched = append(matched, b)
-		}
-
-		// Only include sections that have matching bindings.
-		if len(matched) == 0 {
-			continue
-		}
-
-		// Per-section column width: pad keys to the widest key in this
-		// section so descriptions align vertically. The fixed-14 column
-		// used previously broke alignment for sections containing long
-		// keys like "Ctrl+F / Ctrl+B / PgDn / PgUp" — those overflowed
-		// the column and shifted their descriptions right of the rest.
-		keyWidth := helpKeyColumnMinWidth
-		for _, b := range matched {
-			if w := lipgloss.Width(b.key); w > keyWidth {
-				keyWidth = w
-			}
-		}
-
-		// Word-wrap each description to the width left after the key column
-		// so long entries read in full instead of being truncated with a
-		// "~". Each wrapped chunk becomes its own entry spec, preserving the
-		// one-spec-per-rendered-row invariant the search/scroll machinery
-		// relies on: continuation rows carry a blank (but same-width) key so
-		// the wrapped text stays aligned under the original description.
-		// rowOverhead is the fixed prefix helpSpecPlain prepends to an entry
-		// row: 4 leading spaces + keyWidth + 2 spaces between key and desc.
-		// descBudget is the exact room left for the description; flooring at
-		// 1 (rather than a larger value) keeps the wrapped row within innerW
-		// so the renderer's Truncate never lops a character with a "~" — the
-		// only residual overflow is when a section's key column alone is
-		// wider than the panel, which no description width could fix.
-		rowOverhead := 4 + keyWidth + 2
-		descBudget := max(innerW-rowOverhead, 1)
-		blankKey := strings.Repeat(" ", keyWidth)
-		entries := make([]helpLineSpec, 0, len(matched))
-		for _, b := range matched {
-			chunks := wrapHelpText(b.desc, descBudget)
-			if len(chunks) == 0 {
-				chunks = []string{""}
-			}
-			for ci, chunk := range chunks {
-				key := blankKey
-				if ci == 0 {
-					key = fmt.Sprintf("%-*s", keyWidth, b.key)
-				}
-				entries = append(entries, helpLineSpec{
-					kind: helpLineEntry,
-					key:  key,
-					desc: chunk,
-				})
-			}
-		}
-
+	for _, g := range groups {
 		if len(specs) > 0 {
 			specs = append(specs, helpLineSpec{kind: helpLineBlank})
 		}
-		specs = append(specs, helpLineSpec{kind: helpLineSectionHeader, text: section.title})
-		specs = append(specs, entries...)
+		specs = append(specs, helpLineSpec{kind: helpLineSectionHeader, text: g.title})
+		specs = append(specs, helpEntrySpecs(g.rows, keyWidth, blankKey, descBudget)...)
 	}
-
-	if filter != "" && len(specs) == 0 {
-		specs = append(specs, helpLineSpec{kind: helpLineMessage, text: "No matching keybindings"})
-	}
-
 	return specs
+}
+
+// helpEntrySpecs turns one section's rows into rendered-row specs.
+//
+// Word-wrap keeps long descriptions readable instead of truncating them
+// with a "~". Each wrapped chunk becomes its own spec, preserving the
+// one-spec-per-rendered-row invariant the search/scroll machinery relies
+// on: continuation rows carry a blank (but same-width) key so the wrapped
+// text stays aligned under the original description.
+func helpEntrySpecs(rows []helpKeyRow, keyWidth int, blankKey string, descBudget int) []helpLineSpec {
+	out := make([]helpLineSpec, 0, len(rows))
+	for _, r := range rows {
+		chunks := wrapHelpText(r.desc, descBudget)
+		if len(chunks) == 0 {
+			chunks = []string{""}
+		}
+		for ci, chunk := range chunks {
+			spec := helpLineSpec{kind: helpLineEntry, key: blankKey, desc: chunk}
+			if ci == 0 {
+				spec.key = padKeyLeft(r.key, keyWidth)
+				spec.keyText = r.keyText
+			}
+			out = append(out, spec)
+		}
+	}
+	return out
+}
+
+// collectHelpGroups applies context and filter matching and resolves each
+// surviving entry's key to its display and search forms. Split from
+// buildHelpSpecs so the key column can be sized across every visible
+// section before any row is laid out.
+func collectHelpGroups(filter, contextMode string) []helpGroup {
+	groups := make([]helpGroup, 0, 16)
+	for _, section := range helpSections() {
+		if !helpSectionInContext(section, contextMode) {
+			continue
+		}
+		rows := make([]helpKeyRow, 0, len(section.bindings))
+		for _, b := range section.bindings {
+			row := helpKeyRow{
+				key:     helpKeySymbols(b.key),
+				keyText: helpKeyDisplay(b.key),
+				desc:    b.desc,
+			}
+			// Match the textual chord as well as the drawn one so an "f"
+			// filter for "ctrl" narrows to the rows drawn as "⌃D".
+			if filter != "" &&
+				!MatchLine(row.keyText, filter) &&
+				!MatchLine(row.key, filter) &&
+				!MatchLine(row.desc, filter) {
+				continue
+			}
+			rows = append(rows, row)
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		groups = append(groups, helpGroup{title: section.title, rows: rows})
+	}
+	return groups
+}
+
+// helpSectionInContext reports whether a section belongs to the view the
+// help screen was opened from. An empty (or explorer-level) context shows
+// only the explorer sections; any other context shows only its own.
+func helpSectionInContext(section helpSection, contextMode string) bool {
+	if contextMode == "" || contextMode == "Navigation" || contextMode == "Bookmarks" {
+		return section.context == ""
+	}
+	return section.context == contextMode
+}
+
+// helpKeyColumnWidth sizes the single key column shared by every visible
+// section, so all descriptions start at one vertical line rather than
+// stepping in and out per section.
+//
+// The cap stops one unusually long key from pushing every description off
+// a narrow screen; a key past the cap simply overflows its own cell.
+func helpKeyColumnWidth(groups []helpGroup, innerW int) int {
+	maxWidth := max(innerW/3, helpKeyColumnMinWidth)
+	width := helpKeyColumnMinWidth
+	for _, g := range groups {
+		for _, r := range g.rows {
+			if w := lipgloss.Width(r.key); w > width {
+				width = w
+			}
+		}
+	}
+	return min(width, maxWidth)
 }
 
 // wrapHelpText word-wraps desc to width on word boundaries. A space-free
@@ -349,6 +369,27 @@ func helpSpecPlain(s helpLineSpec) string {
 	return ""
 }
 
+// helpSpecSearchText returns the row's searchable form. Identical to
+// helpSpecPlain except that the key column carries the textual chord, so a
+// "ctrl" query matches a row whose key column draws "⌃D". Row order and
+// count are the same on both paths, keeping the app layer's n/N match
+// indices aligned with the rendered rows.
+func helpSpecSearchText(s helpLineSpec) string {
+	if s.kind != helpLineEntry || s.keyText == "" {
+		return helpSpecPlain(s)
+	}
+	return "    " + padKeyLeft(s.keyText, lipgloss.Width(s.key)) + "  " + s.desc
+}
+
+// helpKeyMatchesSearch reports whether the search query hits a row's key
+// via its textual form only. Those rows get their whole key cell
+// highlighted, because the drawn symbol shares no characters with the
+// query and an inline splice would show nothing.
+func helpKeyMatchesSearch(s helpLineSpec, search string) bool {
+	return search != "" && s.keyText != "" &&
+		!MatchLine(s.key, search) && MatchLine(s.keyText, search)
+}
+
 // helpSpecStyled renders a help-line spec to its final styled form.
 // When search is non-empty the inline highlight is applied to plain
 // key/desc/text first via HighlightMatchStyledOver, then wrapped with
@@ -374,6 +415,11 @@ func helpSpecStyled(s helpLineSpec, search string, isCurrent bool) string {
 		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
 		descStyle := OverlayDimStyle
 		keyInner := HighlightMatchStyledOver(s.key, search, hl, keyStyle)
+		if helpKeyMatchesSearch(s, search) {
+			// Query matched "Ctrl+D" but the cell draws "⌃D" — highlight
+			// the whole chord so the hit is visible where the user looks.
+			keyInner = padKeyLeft(hl.Render(strings.TrimLeft(s.key, " ")), lipgloss.Width(s.key))
+		}
 		descInner := HighlightMatchStyledOver(s.desc, search, hl, descStyle)
 		return "    " + RenderOverPrestyled(keyInner, keyStyle) + "  " + RenderOverPrestyled(descInner, descStyle)
 	case helpLineMessage:

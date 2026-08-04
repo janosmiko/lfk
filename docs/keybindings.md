@@ -323,6 +323,8 @@ suffix in their name.
 
 ## Help View
 
+The in-app screen is a quick reference: one binding per line, keys right-aligned, modifier chords drawn as symbols (`⌃D`, `⇧Tab`) when the terminal supports them. Search and filter match the textual chord, so typing `ctrl` finds a row drawn as `⌃D`. This document is the exhaustive reference.
+
 | Key | Action |
 |---|---|
 | `/` | Search — highlights matches inline without removing non-matching lines |

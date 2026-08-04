@@ -288,3 +288,198 @@ func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
 			"BuildHelpLines must return plain text (no ANSI escapes) — line %d: %q", i, line)
 	}
 }
+
+// --- one hotkey per line ---
+
+// The help screen renders one binding per row, so a catalog entry with an
+// empty key would draw as a prose-only line — exactly the wall of text the
+// screen was reworked to remove. Long explanations live in
+// docs/keybindings.md instead.
+func TestHelpSections_EveryEntryHasAKey(t *testing.T) {
+	for _, section := range helpSections() {
+		for i, b := range section.bindings {
+			assert.NotEmptyf(t, strings.TrimSpace(b.key),
+				"section %q entry %d (%q) has no key — prose-only rows are not allowed",
+				section.title, i, b.desc)
+		}
+	}
+}
+
+// --- right-aligned key column ---
+
+// Every entry row shares one key-column width, and the key sits flush
+// against its right edge, so all descriptions start at the same column.
+func TestBuildHelpSpecs_KeyColumnIsGloballyRightAligned(t *testing.T) {
+	specs := buildHelpSpecs("", "", helpInnerWidth(160))
+	width := -1
+	sawEntry := false
+	for _, s := range specs {
+		if s.kind != helpLineEntry {
+			continue
+		}
+		sawEntry = true
+		w := lipgloss.Width(s.key)
+		if width < 0 {
+			width = w
+		}
+		assert.Equalf(t, width, w,
+			"key column width must be identical on every row: %q", s.key)
+		if s.keyText == "" {
+			continue // wrapped continuation row: key cell is intentionally blank
+		}
+		assert.Falsef(t, strings.HasSuffix(s.key, " "),
+			"key must be right-aligned (no trailing pad): %q", s.key)
+	}
+	assert.True(t, sawEntry, "expected at least one entry row")
+}
+
+// The description column therefore starts at one fixed offset on every row.
+func TestHelpSpecPlain_DescriptionsStartAtOneColumn(t *testing.T) {
+	specs := buildHelpSpecs("", "", helpInnerWidth(160))
+	offsets := make(map[int]struct{})
+	for _, s := range specs {
+		if s.kind != helpLineEntry || s.desc == "" {
+			continue
+		}
+		line := helpSpecPlain(s)
+		offsets[lipgloss.Width(line)-lipgloss.Width(s.desc)] = struct{}{}
+	}
+	assert.Len(t, offsets, 1, "descriptions must all start at the same column, got offsets %v", offsets)
+}
+
+// --- symbol keys vs. the search index ---
+
+// The key column draws "⌃D" while the search index keeps "Ctrl+D", so a
+// user typing "ctrl" still finds the row. This is the whole reason
+// helpLineSpec carries both forms.
+func TestBuildHelpLines_SearchIndexKeepsTextualChord(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	IconMode = "unicode"
+	ConfigNoColor = false
+
+	joined := strings.Join(BuildHelpLines("", "", 160), "\n")
+	assert.Contains(t, joined, "Ctrl+D",
+		"the search index must carry the textual chord so a 'ctrl' query matches")
+	assert.NotContains(t, joined, "⌃",
+		"the search index must not carry the symbol form")
+
+	rendered := ansi.Strip(RenderHelpScreen(160, 200, 0, "", "", "", -1))
+	assert.Contains(t, rendered, "⌃D",
+		"the key column must draw the symbol form")
+
+	// The two paths must stay row-for-row aligned or n/N jumps to the
+	// wrong line.
+	assert.Len(t, BuildHelpLines("", "", 160), len(buildHelpSpecs("", "", helpInnerWidth(160))))
+}
+
+// A "ctrl" query must select the rows whose key column draws a symbol
+// chord — the search index is what MatchLine sees.
+func TestBuildHelpLines_CtrlQueryMatchesSymbolRenderedRows(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+	IconMode = "unicode"
+
+	var matched []string
+	for _, line := range BuildHelpLines("", "", 160) {
+		if MatchLine(line, "ctrl") {
+			matched = append(matched, line)
+		}
+	}
+	assert.NotEmpty(t, matched, `a "ctrl" search must match rows drawn as symbol chords`)
+	assert.Contains(t, strings.Join(matched, "\n"), "Ctrl+D")
+}
+
+// The f filter runs over the same textual form, so filtering by "ctrl"
+// narrows to the chord rows instead of returning "No matching keybindings".
+func TestBuildHelpSpecs_FilterMatchesTextualChord(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+	IconMode = "unicode"
+
+	specs := buildHelpSpecs("ctrl", "", helpInnerWidth(160))
+	assert.NotEmpty(t, specs)
+	for _, s := range specs {
+		assert.NotEqual(t, helpLineMessage, s.kind, "filter must find the chord rows")
+	}
+	found := false
+	for _, s := range specs {
+		if s.kind == helpLineEntry && strings.Contains(s.keyText, "Ctrl") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, `filtering by "ctrl" must keep symbol-rendered chord rows`)
+}
+
+// A row whose drawn key shares no characters with the query still shows
+// the hit: the whole key cell is highlighted instead of a substring.
+func TestRenderHelpScreen_SymbolChordRowShowsSearchHighlight(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	originalIcons := IconMode
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		IconMode = originalIcons
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	IconMode = "unicode"
+	ApplyTheme(DefaultTheme())
+
+	plain := RenderHelpScreen(160, 200, 0, "", "", "", -1)
+	searched := RenderHelpScreen(160, 200, 0, "", "ctrl", "", -1)
+
+	assert.NotEqual(t, plain, searched,
+		`a "ctrl" search must visibly highlight the symbol-rendered chord rows`)
+	assert.Equal(t, ansi.Strip(plain), ansi.Strip(searched),
+		"the highlight must add color only, never visible characters")
+}
+
+// --- chord tokenizer ---
+
+// Catalog keys are not always one binding. Formatting has to work
+// token-wise so composites keep their exact separators.
+func TestHelpKeyDisplay_CompositeKeys(t *testing.T) {
+	tests := []struct{ given, want string }{
+		{"ctrl+d/ctrl+u", "Ctrl+D/Ctrl+U"},
+		{"ctrl+] ctrl+u/ctrl+d", "Ctrl+] Ctrl+U/Ctrl+D"},
+		// A bare key is never a chord, so it keeps its verbatim spelling
+		// (same contract as helpKeyDisplay("space") == "space").
+		{"tab/shift+tab", "tab/Shift+Tab"},
+		{"m<a-z/0-9>", "m<a-z/0-9>"},
+		{"123<motion>", "123<motion>"},
+		{"Click ns badge", "Click ns badge"},
+		{"space/Right", "space/Right"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.given, func(t *testing.T) {
+			assert.Equal(t, tt.want, helpKeyDisplay(tt.given))
+		})
+	}
+}
+
+func TestHelpKeySymbols_ByIconMode(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+
+	ConfigNoColor = false
+	IconMode = "unicode"
+	assert.Equal(t, "⌃D/⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "tab/⇧Tab", helpKeySymbols("tab/shift+tab"))
+	assert.Equal(t, "m<a-z/0-9>", helpKeySymbols("m<a-z/0-9>"))
+
+	// Terminals that promise only ASCII keep the readable textual chord.
+	IconMode = "none"
+	assert.Equal(t, "Ctrl+D/Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+	IconMode = "unicode"
+	ConfigNoColor = true
+	assert.Equal(t, "Ctrl+D/Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+}

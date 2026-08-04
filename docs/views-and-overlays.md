@@ -183,5 +183,8 @@ and follow their own dismissal rules.
 5. For a fullscreen flag, plug it into `viewExplorerColumns`'s
    precedence switch in `internal/app/view.go`.
 6. Update this doc and [`docs/keybindings.md`](./keybindings.md).
-7. Surface the binding in the `?` help screen
-   ([`internal/ui/help.go`](../internal/ui/help.go)).
+7. Surface the binding in the help screen catalog
+   ([`internal/ui/help_sections.go`](../internal/ui/help_sections.go)). Every
+   entry needs a real key — the screen renders one binding per line, so a
+   key-less row would draw as prose. Put the longer explanation in
+   [`docs/keybindings.md`](./keybindings.md).
