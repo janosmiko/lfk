@@ -108,6 +108,7 @@ goto_targets:
 which_key_enabled: false
 which_key_delay_ms: 250
 which_key_leader_delay_ms: 450
+which_key_grouped: false
 monitoring:
   _global:
     node_metrics: prometheus
@@ -303,6 +304,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigWhichKeyEnabled, "which_key_enabled")
 	assert.Equal(t, 250, ConfigWhichKeyDelayMs, "which_key_delay_ms")
 	assert.Equal(t, 450, ConfigWhichKeyLeaderDelayMs, "which_key_leader_delay_ms")
+	assert.False(t, ConfigWhichKeyGrouped, "which_key_grouped")
 
 	// Per-cluster overrides (clusters.<ctx>.*).
 	assert.True(t, ConfigClusterReadOnly["ctx1"], "clusters.read_only")
@@ -420,6 +422,7 @@ var wiringCoveredFields = map[string]string{
 	"which_key_enabled":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
 	"which_key_delay_ms":        "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
 	"which_key_leader_delay_ms": "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyLeaderDelay*",
+	"which_key_grouped":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyGrouped",
 }
 
 // TestConfigFile_EveryFieldHasWiringCoverage is a forcing function: it fails if

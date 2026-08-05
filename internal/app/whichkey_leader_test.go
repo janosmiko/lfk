@@ -156,7 +156,7 @@ func TestWhichKeyLeaderCells_AreOneSortedListAcrossGroups(t *testing.T) {
 		t.Fatalf("the flat list holds %d entries, want every available action (%d)", got, want)
 	}
 	sorted := slices.Clone(cells)
-	sortWhichKeyCells(sorted)
+	sortWhichKeyCells(sorted, true)
 	if !slices.Equal(cells, sorted) {
 		t.Fatalf("the flat list is not in which-key order:\n got %v\nwant %v", cells, sorted)
 	}
@@ -219,11 +219,12 @@ func TestWhichKeyLeader_DoesNotArmWhileFiltering(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeader_RepeatPressTogglesClosed pins the USER DECISION that
-// replaced paging: with the panel scrolling there is nothing for a repeat press
-// to advance to, so the leader key toggles — press to open, press again to
-// close, press again to reopen at the top.
-func TestWhichKeyLeader_RepeatPressTogglesClosed(t *testing.T) {
+// TestWhichKeyLeader_RepeatPressTogglesTheGrouping pins the current USER
+// DECISION for the repeat press. With the panel scrolling there is nothing for
+// it to advance to; it used to close the panel, and now it toggles the entry
+// order between grouped-by-category and pure key order, indefinitely, leaving
+// the panel open. esc closes. The chosen order persists for the session.
+func TestWhichKeyLeader_RepeatPressTogglesTheGrouping(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -242,19 +243,42 @@ func TestWhichKeyLeader_RepeatPressTogglesClosed(t *testing.T) {
 		t.Fatal("precondition: the full catalog must be scrollable at 80x24")
 	}
 
+	// USER DECISION: a repeat press no longer closes the panel — it toggles the
+	// entry order and keeps it open, indefinitely. esc is the way out.
+	grouped := m.whichKeyGrouped()
 	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
-	if m.whichKey.armed || m.whichKey.shown {
-		t.Fatal("a repeat press must close the panel, not advance it")
+	if !m.whichKey.armed || !m.whichKey.shown {
+		t.Fatal("a repeat press must leave the panel open")
+	}
+	if m.whichKeyGrouped() == grouped {
+		t.Fatal("a repeat press must flip the entry order")
+	}
+	if m.whichKey.scroll != 0 {
+		t.Fatalf("the list reorders wholesale, so the offset must reset; got scroll=%d", m.whichKey.scroll)
 	}
 
 	out, _ = m.handleExplorerKey(leaderKey())
 	m = out.(Model)
 	if !m.whichKey.shown {
-		t.Fatal("a third press must reopen the panel")
+		t.Fatal("a third press must still leave the panel open")
 	}
-	if m.whichKey.scroll != 0 {
-		t.Fatalf("reopening must start at the top, got scroll=%d", m.whichKey.scroll)
+	if m.whichKeyGrouped() != grouped {
+		t.Fatal("a third press must flip the entry order back")
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg("esc"))
+	m = out.(Model)
+	if m.whichKey.armed || m.whichKey.shown {
+		t.Fatal("esc must close the panel")
+	}
+	// The mode is session state: reopening keeps whatever the last toggle left.
+	m = m.toggleWhichKeyGrouping()
+	want := m.whichKeyGrouped()
+	out, _ = m.handleExplorerKey(leaderKey())
+	m = out.(Model)
+	if m.whichKeyGrouped() != want {
+		t.Fatal("reopening must keep the entry order the last toggle chose")
 	}
 }
 
@@ -720,7 +744,7 @@ func TestWhichKeyLeader_ScrollKeyFallsThroughWhenNothingToScroll(t *testing.T) {
 	if !ok || lay.maxScroll != 0 {
 		t.Fatalf("precondition: the panel must fit whole at 200x40 (ok=%v maxScroll=%d)", ok, lay.maxScroll)
 	}
-	for _, h := range m.whichKeyPopupHints(m.whichKeyLeaderCells()) {
+	for _, h := range m.whichKeyPopupHints(m.whichKeyLeaderCells(), true) {
 		if h.Desc == "scroll" {
 			t.Fatal("precondition: the hint bar must not advertise scrolling when nothing scrolls")
 		}

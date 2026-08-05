@@ -13,7 +13,7 @@ func wkSortedKeys(keys ...string) []string {
 	for i, k := range keys {
 		cells[i] = whichKeyCell{key: k, desc: "d"}
 	}
-	sortWhichKeyCells(cells)
+	sortWhichKeyCells(cells, true)
 	out := make([]string, len(cells))
 	for i, c := range cells {
 		out[i] = c.key
@@ -186,7 +186,7 @@ func TestWhichKeyLeaderCells_AreSorted(t *testing.T) {
 
 	cells := whichKeyTestModel().whichKeyLeaderCells()
 	want := slices.Clone(cells)
-	sortWhichKeyCells(want)
+	sortWhichKeyCells(want, true)
 	if !slices.Equal(cells, want) {
 		t.Errorf("the panel list is not sorted:\n got %v\nwant %v", cells, want)
 	}
@@ -237,7 +237,7 @@ func TestSortWhichKeyCells_ClustersByGroupThenKey(t *testing.T) {
 		{key: "a", desc: "Toggle select", group: wkSelection},
 		{key: "T", desc: "Theme", group: wkSettings},
 	}
-	sortWhichKeyCells(cells)
+	sortWhichKeyCells(cells, true)
 
 	// Runs must be contiguous and appear in whichKeyGroupOrder order.
 	order := whichKeyGroupOrder()
@@ -272,7 +272,7 @@ func TestSortWhichKeyCells_ClustersByGroupThenKey(t *testing.T) {
 	}
 	for g, got := range byGroup {
 		want := slices.Clone(got)
-		sortWhichKeyCells(want)
+		sortWhichKeyCells(want, true)
 		if !slices.Equal(got, want) {
 			t.Errorf("group %q run is not key-sorted:\n got %v\nwant %v", g, got, want)
 		}
@@ -287,7 +287,7 @@ func TestWhichKeyCells_GotoPopupUsesTheSameOrdering(t *testing.T) {
 
 	cells := gotoTestModel().whichKeyCells()
 	want := slices.Clone(cells)
-	sortWhichKeyCells(want)
+	sortWhichKeyCells(want, true)
 	if !slices.Equal(cells, want) {
 		t.Fatalf("goto cells are not in which-key order:\n got %v\nwant %v", cells, want)
 	}
@@ -312,7 +312,7 @@ func TestSortWhichKeyCells_ExplicitOrderOverridesTheKeySort(t *testing.T) {
 		{key: ">", desc: "Sort next column", group: wkSort, order: 2},
 		{key: "<", desc: "Sort previous column", group: wkSort, order: 1},
 	}
-	sortWhichKeyCells(cells)
+	sortWhichKeyCells(cells, true)
 	want := []string{"<", ">", "=", "-"}
 	got := make([]string, len(cells))
 	for i, c := range cells {
@@ -337,7 +337,7 @@ func TestSortWhichKeyCells_ExplicitOrderDoesNotLeakAcrossGroups(t *testing.T) {
 		{key: "<", desc: "Sort previous column", group: wkSort, order: 1},
 		{key: "d", desc: "Diff", group: wkActions},
 	}
-	sortWhichKeyCells(cells)
+	sortWhichKeyCells(cells, true)
 
 	var actionsGot []string
 	var sortGot []string

@@ -34,14 +34,25 @@ const wkNaturalDigits = 9
 // whatever order the keys happened to sort to. No headers are drawn — cells
 // still carry their group only to tint the description (whichKeyCellStyles).
 //
+// grouped == false is the leader key's second state (USER DECISION): pure key
+// ordering. Passes 0 and 2 are BOTH dropped there, not just the group pass —
+// `order` exists to hold "<" ">" "=" together WITHIN the Sort group, and with
+// no groups left it would instead drag those three punctuation keys to the head
+// of the whole panel, which is not a key ordering by any reading. The colors
+// and the legend stay in both modes: order no longer says which category an
+// entry belongs to, so the color is the only thing left that does.
+//
 // Ranks are derived once per cell rather than inside the comparator: the panel
 // re-sorts on every render, and building the natural key per comparison would
 // be O(n log n) string builds instead of O(n).
-func sortWhichKeyCells(cells []whichKeyCell) {
+func sortWhichKeyCells(cells []whichKeyCell, grouped bool) {
 	if len(cells) < 2 {
 		return
 	}
-	groupRank := wkGroupRanks()
+	var groupRank map[whichKeyGroup]int
+	if grouped {
+		groupRank = wkGroupRanks()
+	}
 	type ranked struct {
 		cell                                   whichKeyCell
 		group, modTier, order, alphanum, upper int
@@ -51,12 +62,14 @@ func sortWhichKeyCells(cells []whichKeyCell) {
 	for i, c := range cells {
 		rs[i] = ranked{
 			cell:     c,
-			group:    wkGroupRank(groupRank, c.group),
 			modTier:  wkModTier(c.key),
-			order:    wkOrderRank(c.order),
 			alphanum: wkAlphanumRank(c.key),
 			upper:    wkCaseRank(c.key),
 			natural:  wkNaturalKey(c.key),
+		}
+		if grouped {
+			rs[i].group = wkGroupRank(groupRank, c.group)
+			rs[i].order = wkOrderRank(c.order)
 		}
 	}
 	sort.SliceStable(rs, func(i, j int) bool {

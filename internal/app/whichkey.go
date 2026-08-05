@@ -260,7 +260,7 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" {
 		cells = append(cells, whichKeyCell{key: strings.TrimPrefix(pn, prefix), desc: "Previous namespace"})
 	}
-	sortWhichKeyCells(cells)
+	sortWhichKeyCells(cells, m.whichKeyGrouped())
 	fillWhichKeyDisplay(cells)
 	return cells
 }

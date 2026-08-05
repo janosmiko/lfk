@@ -117,6 +117,11 @@
       "description": "Delay before the leader which-key panel appears, in milliseconds (0 = immediate).",
       "default": 0
     },
+    "which_key_grouped": {
+      "type": "boolean",
+      "description": "Startup order of the leader which-key panel: true clusters entries by category, false sorts purely by key. The leader key toggles it for the session.",
+      "default": true
+    },
     "terminal": {
       "type": "string",
       "description": "How exec/shell commands run: \"pty\" (embedded in the TUI), \"exec\" (takes over the terminal), or \"mux\" (open in a new tmux/zellij window or pane).",

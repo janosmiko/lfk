@@ -280,6 +280,10 @@ type configFile struct {
 	// WhichKeyLeaderDelayMs is the delay before the space-leader which-key
 	// panel appears, in milliseconds (0..2000).
 	WhichKeyLeaderDelayMs *int `json:"which_key_leader_delay_ms" yaml:"which_key_leader_delay_ms"`
+	// WhichKeyGrouped is the startup order of the leader panel: grouped by
+	// category (true) or purely by key (false). The leader key toggles it for
+	// the session; the toggle is not persisted back to the file.
+	WhichKeyGrouped *bool `json:"which_key_grouped" yaml:"which_key_grouped"`
 }
 
 // UnionSetsConfig accepts both supported top-level shapes:

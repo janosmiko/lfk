@@ -1,8 +1,11 @@
 package ui
 
-// applyWhichKey applies the which_key_enabled, which_key_delay_ms, and
-// which_key_leader_delay_ms settings.
+// applyWhichKey applies the which_key_enabled, which_key_delay_ms,
+// which_key_leader_delay_ms and which_key_grouped settings.
 func applyWhichKey(cfg configFile) {
+	if cfg.WhichKeyGrouped != nil {
+		ConfigWhichKeyGrouped = *cfg.WhichKeyGrouped
+	}
 	if cfg.WhichKeyEnabled != nil {
 		ConfigWhichKeyEnabled = *cfg.WhichKeyEnabled
 	}

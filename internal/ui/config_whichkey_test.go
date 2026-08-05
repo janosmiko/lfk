@@ -24,6 +24,34 @@ func TestLoadConfig_WhichKey(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_WhichKeyGrouped(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("which_key_grouped: false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ConfigWhichKeyGrouped = true })
+	ConfigWhichKeyGrouped = true
+	LoadConfig(path)
+	if ConfigWhichKeyGrouped {
+		t.Error("which_key_grouped=false not wired")
+	}
+}
+
+func TestLoadConfig_WhichKeyGroupedDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("which_key_enabled: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ConfigWhichKeyGrouped = true })
+	ConfigWhichKeyGrouped = true
+	LoadConfig(path)
+	if !ConfigWhichKeyGrouped {
+		t.Error("unset which_key_grouped must leave the grouped default alone")
+	}
+}
+
 func TestLoadConfig_WhichKeyLeaderDelay(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")

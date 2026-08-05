@@ -437,9 +437,9 @@ func helpHintKey(kb ui.Keybindings) string {
 func (m Model) leaderOrExplorerHints() []ui.HintEntry {
 	switch {
 	case m.pendingG && m.whichKey.shown:
-		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyCells))
+		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyCells), false)
 	case m.whichKey.armed && m.whichKey.shown:
-		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells))
+		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells), true)
 	default:
 		return m.explorerHintEntries()
 	}
@@ -451,13 +451,26 @@ func (m Model) leaderOrExplorerHints() []ui.HintEntry {
 // help entry, view.lua:447-449), and esc to close. Shared by the leader panel
 // and the g-prefix goto popup — both close the same way via
 // disarmWhichKeyLeader/handleGotoChord and neither pages beyond this.
-func (m Model) whichKeyPopupHints(cells []whichKeyCell) []ui.HintEntry {
-	hints := make([]ui.HintEntry, 0, 2)
+//
+// leader adds the entry-order toggle. It is the leader panel's only, and it has
+// to be advertised: the leader key used to close the panel and now reorders it
+// instead, so a user pressing it again to get out of the way needs to be told
+// that esc is the way out.
+func (m Model) whichKeyPopupHints(cells []whichKeyCell, leader bool) []ui.HintEntry {
+	hints := make([]ui.HintEntry, 0, 3)
 	if lay, ok := m.whichKeyLayoutFor(cells); ok && lay.maxScroll > 0 {
 		kb := ui.ActiveKeybindings
 		hints = append(hints, ui.HintEntry{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"})
 	}
-	return append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
+	hints = append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
+	// Last on purpose: FormatHintPartsFit drops from the end, and at 80 columns
+	// something has to go. "close" is the one a user stuck in the panel needs.
+	if leader {
+		if lk := ui.ActiveKeybindings.WhichKeyLeader; lk != "" {
+			hints = append(hints, ui.HintEntry{Key: lk, Desc: "group/key order"})
+		}
+	}
+	return hints
 }
 
 // whichKeyLeaderHintBar renders the leader panel's own hints as a full-width
@@ -466,7 +479,7 @@ func (m Model) whichKeyPopupHints(cells []whichKeyCell) []ui.HintEntry {
 // leaderOrExplorerHints performs for the explorer has to be done there by
 // replacing the rendered line.
 func (m Model) whichKeyLeaderHintBar() string {
-	hints := m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells))
+	hints := m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells), true)
 	content := ui.FormatHintPartsFit(hints, max(m.width-2, 10))
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }

@@ -18,6 +18,7 @@ func restoreWhichKeyGlobals(t *testing.T) {
 	enabled := ui.ConfigWhichKeyEnabled
 	delay := ui.ConfigWhichKeyDelayMs
 	leaderDelay := ui.ConfigWhichKeyLeaderDelayMs
+	grouped := ui.ConfigWhichKeyGrouped
 	dim := ui.ConfigDimOverlay
 	icons := ui.IconMode
 	t.Cleanup(func() {
@@ -25,6 +26,7 @@ func restoreWhichKeyGlobals(t *testing.T) {
 		ui.ConfigWhichKeyEnabled = enabled
 		ui.ConfigWhichKeyDelayMs = delay
 		ui.ConfigWhichKeyLeaderDelayMs = leaderDelay
+		ui.ConfigWhichKeyGrouped = grouped
 		ui.ConfigDimOverlay = dim
 		ui.IconMode = icons
 	})

@@ -17,6 +17,12 @@ type whichKeyState struct {
 	shown  bool // delay elapsed, panel drawn
 	seq    int
 	scroll int
+	// grouping is the panel's entry order for the rest of the session. The
+	// zero value follows ui.ConfigWhichKeyGrouped rather than copying it, so a
+	// zero-value Model reads the CONFIGURED default instead of a stale
+	// snapshot of it — the runtime toggle is session state and is never
+	// written back to the config file.
+	grouping wkGrouping
 	// cells caches the visible panel's entries for the duration of ONE
 	// render. The panel and the hint bar both need them, and each build runs
 	// the whole availability catalog. Only primeWhichKeyCells writes it, and
@@ -25,14 +31,50 @@ type whichKeyState struct {
 	cells []whichKeyCell
 }
 
+// wkGrouping is whichKeyState.grouping: unset (follow the config), or one of
+// the two states the leader key has toggled to.
+type wkGrouping uint8
+
+const (
+	wkGroupDefault wkGrouping = iota
+	wkGroupOn
+	wkGroupOff
+)
+
+// whichKeyGrouped reports whether the panel clusters entries by category right
+// now. Ungrouped is pure key order — see sortWhichKeyCells.
+func (m Model) whichKeyGrouped() bool {
+	switch m.whichKey.grouping {
+	case wkGroupOn:
+		return true
+	case wkGroupOff:
+		return false
+	default:
+		return ui.ConfigWhichKeyGrouped
+	}
+}
+
+// toggleWhichKeyGrouping flips the panel between grouped and pure key order and
+// pins the result for the session.
+func (m Model) toggleWhichKeyGrouping() Model {
+	if m.whichKeyGrouped() {
+		m.whichKey.grouping = wkGroupOff
+	} else {
+		m.whichKey.grouping = wkGroupOn
+	}
+	return m
+}
+
 // whichKeyLeaderTickMsg reveals the leader panel once the delay elapses.
 type whichKeyLeaderTickMsg struct{ seq int }
 
 // armWhichKeyLeader is called on every leader keypress. The panel scrolls
 // rather than pages, so a repeat press while already armed has nothing to
-// advance to and toggles the panel shut instead. With the default zero delay
-// the panel shows at once; which_key_leader_delay_ms instead schedules a
-// reveal tick.
+// advance to; USER DECISION: it toggles the entry order instead — grouped by
+// category or pure key order — indefinitely, and leaves the panel open. esc
+// closes it (whichKeyLeaderIntercept), as does pressing any action key. With
+// the default zero delay the panel shows at once; which_key_leader_delay_ms
+// instead schedules a reveal tick.
 func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 	if !ui.ConfigWhichKeyEnabled {
 		// Defensive only: handleExplorerSelectionKey never dispatches here
@@ -42,7 +84,10 @@ func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 		return m.disarmWhichKeyLeader(), nil
 	}
 	if m.whichKey.armed {
-		return m.disarmWhichKeyLeader(), nil
+		// The whole list reorders, so the old offset points at unrelated rows.
+		m = m.toggleWhichKeyGrouping()
+		m.whichKey.scroll = 0
+		return m, nil
 	}
 	m.whichKey.seq++
 	m.whichKey.armed = true
@@ -69,11 +114,13 @@ func (m Model) disarmWhichKeyLeader() Model {
 
 // whichKeyLeaderCells turns the currently-available actions into the panel's
 // single flat entry list, ordered by sortWhichKeyCells rather than by position
-// in the catalog. neovim's which-key draws no section headers, but
-// sortWhichKeyCells clusters by Group before its within-group key sort, so
-// each group still lands as one contiguous run — the entries flow column-major
+// in the catalog. neovim's which-key draws no section headers, but while
+// grouped sortWhichKeyCells clusters by Group before its within-group key sort,
+// so each group lands as one contiguous run — the entries flow column-major
 // across the whole panel rather than restarting per section, and the group's
-// color (not a header) is what reads as the category cue.
+// color (not a header) is what reads as the category cue. Ungrouped drops the
+// clustering; the colors and the legend stay, and carry the category on their
+// own.
 func (m Model) whichKeyLeaderCells() []whichKeyCell {
 	acts := m.availableWhichKeyActions()
 	kb := ui.ActiveKeybindings
@@ -81,7 +128,7 @@ func (m Model) whichKeyLeaderCells() []whichKeyCell {
 	for _, a := range acts {
 		cells = append(cells, whichKeyCell{key: a.Key(kb), desc: a.Label, group: a.Group, order: a.Order})
 	}
-	sortWhichKeyCells(cells)
+	sortWhichKeyCells(cells, m.whichKeyGrouped())
 	fillWhichKeyDisplay(cells)
 	return cells
 }

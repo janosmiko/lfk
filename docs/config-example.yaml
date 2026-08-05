@@ -570,6 +570,10 @@ filter_presets:
 # Delay before the which-key action panel (leader "?") appears (ms, 0-2000).
 # which_key_leader_delay_ms: 0
 
+# Startup order of the action panel: true groups by category, false sorts by
+# key. The leader key toggles it for the session.
+# which_key_grouped: true
+
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories
 # (Workloads, Networking, etc.) instead of being sorted alphabetically.

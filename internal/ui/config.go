@@ -665,6 +665,12 @@ var ConfigWhichKeyDelayMs = 0
 // burst of side-effect presses to keep it out of the way of.
 var ConfigWhichKeyLeaderDelayMs = 0
 
+// ConfigWhichKeyGrouped is the STARTUP default for the leader panel's entry
+// order: true clusters entries by category, false sorts purely by key. The
+// leader key toggles it at runtime for the rest of the session; the runtime
+// state is never written back here.
+var ConfigWhichKeyGrouped = true
+
 // ConfigShowRareTypes is the startup default for the "show rarely-used resource
 // types" toggle (the ToggleRare / H key). When true the sidebar surfaces the
 // rare and "Advanced" resource types from launch. The runtime H toggle

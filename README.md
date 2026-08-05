@@ -307,7 +307,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
 | `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
-| `?` | Which-key action panel: hotkeys actionable right now, descriptions colored by category with a color legend at the bottom (scroll: `Ctrl+D`/`Ctrl+U`, close: `?` or `esc`). Also in every fullscreen viewer except exec mode, where it lists what that viewer supports in its current state. `F1` opens full help |
+| `?` | Which-key action panel: hotkeys actionable right now, descriptions colored by category with a color legend at the bottom (scroll: `Ctrl+D`/`Ctrl+U`, close: `esc`; `?` again switches between category and key order, kept for the session). Also in every fullscreen viewer except exec mode, where it lists what that viewer supports in its current state. `F1` opens full help |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 | `}` / `{` | Move current tab right / left |
