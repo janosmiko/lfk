@@ -61,6 +61,13 @@ func TestNormalizeKeybinding(t *testing.T) {
 		{"punctuation key survives", "ctrl+@", "ctrl+@"},
 		{"plus as the key survives", "ctrl++", "ctrl++"},
 		{"unknown modifier left alone", "hyperctrl+x", "hyperctrl+x"},
+		// A trailing plus with nothing after it is a typo, not the "+" key.
+		// Rewriting "ctrl+alt+" into "ctrl++" would turn a malformed binding
+		// into a DIFFERENT working one, which is the silent reordering this
+		// function exists to avoid.
+		{"trailing plus is not the plus key", "ctrl+", "ctrl+"},
+		{"trailing plus after two modifiers", "ctrl+alt+", "ctrl+alt+"},
+		{"trailing plus after a non-modifier", "ga+", "ga+"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

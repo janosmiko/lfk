@@ -277,6 +277,13 @@ func TestGotoChordReachable(t *testing.T) {
 		{"gpp", "g", false},      // two letters, no such key name
 		{"gctrl+pp", "g", false}, // modifier over two keys
 		{"ga+b", "g", false},     // "a" is not a modifier
+
+		// A trailing plus with nothing after it is a typo, not the "+" key.
+		// Only "ctrl++" spells a modified "+"; dropping the last component
+		// unconditionally used to swallow the modifier and pass these.
+		{"gctrl+", "g", false},
+		{"gctrl+alt+", "g", false},
+		{"gga+", "g", false},
 	}
 	for _, tc := range cases {
 		if got := GotoChordReachable(tc.chord, tc.prefix); got != tc.want {

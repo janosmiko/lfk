@@ -365,8 +365,12 @@ func NormalizeKeybinding(s string) string {
 	}
 	parts := strings.Split(s, "+")
 	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
-	if key == "" && len(mods) > 0 {
-		// The key itself is "+", e.g. "ctrl++".
+	// Only "ctrl++" spells a modified "+": it splits to [ctrl "" ""], so the
+	// component before the empty key is empty too. A trailing-plus typo like
+	// "ctrl+alt+" splits to [ctrl alt ""], and dropping the last component
+	// unconditionally rewrote it into "ctrl++" — a DIFFERENT, valid binding,
+	// which is exactly the silent reordering this function promises not to do.
+	if key == "" && len(mods) > 0 && mods[len(mods)-1] == "" {
 		key, mods = "+", mods[:len(mods)-1]
 	}
 	if len(mods) == 0 {
@@ -442,8 +446,12 @@ func IsSingleKeypress(s string) bool {
 	}
 	parts := strings.Split(s, "+")
 	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
-	if key == "" && len(mods) > 0 {
-		key, mods = "+", mods[:len(mods)-1] // the key itself is "+"
+	// Same rule as NormalizeKeybinding: an empty key means the literal "+" only
+	// when the component before it is empty too. Dropping the last component
+	// unconditionally swallowed the modifier, so "ctrl+", "ga+" and "ctrl+alt+"
+	// all passed as the "+" key and the popup advertised unreachable chords.
+	if key == "" && len(mods) > 0 && mods[len(mods)-1] == "" {
+		key, mods = "+", mods[:len(mods)-1]
 	}
 	for _, m := range mods {
 		if _, isMod := helpKeyDisplayModifiers[m]; !isMod {
