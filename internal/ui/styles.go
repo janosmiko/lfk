@@ -28,6 +28,7 @@ const (
 	defaultColorPurple     = "#bb9af7" // Purple - special values
 	defaultColorOrange     = "#ff9e64" // Orange - high usage warning
 	defaultColorCyan       = "#73daca" // Cyan - very new resources (< 1h)
+	defaultColorMagenta    = "#e88fe0" // Magenta - which-key Actions accent
 	defaultColorBase       = "#24283b" // Dark background base
 	defaultColorBarBg      = "#313446" // Slightly lighter bar background
 	defaultColorSurface    = "#2a2e40" // Surface background for overlays
@@ -67,6 +68,7 @@ var (
 	ColorPurple     = defaultColorPurple
 	ColorOrange     = defaultColorOrange
 	ColorCyan       = defaultColorCyan
+	ColorMagenta    = defaultColorMagenta
 	ColorBase       = defaultColorBase
 	ColorBarBg      = defaultColorBarBg
 	ColorSurface    = defaultColorSurface
@@ -276,10 +278,14 @@ var (
 	//
 	// WhichKeyDescStyle is the ungrouped default: the g-prefix goto popup has
 	// no groups and renders entirely through it. No group may reuse its color,
-	// or that group loses its cue (TestWhichKeyGroupStyles_NeverMatchThePlainDescription).
+	// nor the key's, or the two halves of a row collapse into one
+	// (TestWhichKeyGroupStyles_NeverMatchThePlainDescriptionOrTheKey). The key
+	// keeps Secondary because HelpKeyStyle draws every hint-bar hotkey in that
+	// same green bold; Actions is what moved, having held Secondary since the
+	// accent sat on the KEY rather than on the description.
 	WhichKeyKeyStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 	WhichKeyDescStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
-	WhichKeyActionsStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary))
+	WhichKeyActionsStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorMagenta))
 	WhichKeyViewsStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	WhichKeyFilterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorCyan))
 	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))

@@ -108,9 +108,9 @@ func ApplyTheme(t Theme) {
 	// lipgloss.Color(ColorX) call sites otherwise stay frozen at the default
 	// Tokyonight palette regardless of which theme is loaded.
 	//
-	// ColorOrange / ColorCyan have no Theme field (they are special-purpose
-	// constants — high-CPU warning amber, freshly-created cyan) and stay at
-	// their compile-time defaults.
+	// ColorOrange / ColorCyan / ColorMagenta have no Theme field (they are
+	// special-purpose constants — high-CPU warning amber, freshly-created cyan,
+	// which-key Actions magenta) and stay at their compile-time defaults.
 	ColorPrimary = t.Primary
 	ColorSecondary = t.Secondary
 	ColorFile = t.Text
@@ -123,6 +123,7 @@ func ApplyTheme(t Theme) {
 	ColorPurple = t.Purple
 	ColorOrange = defaultColorOrange
 	ColorCyan = defaultColorCyan
+	ColorMagenta = defaultColorMagenta
 	ColorBase = t.Base
 	ColorBarBg = t.BarBg
 	ColorSurface = t.Surface
@@ -335,22 +336,25 @@ func ApplyTheme(t Theme) {
 		Background(barBg)
 
 	// Which-key group accents, which tint the DESCRIPTION (the key keeps one
-	// accent throughout). Four track the theme; Cyan and Orange have no Theme
-	// field (the same special-purpose constants the age and usage columns use),
-	// so they are the ones that can sit badly on an unusually light Base — run
-	// them through the same contrast floor the theme colors got above when the
-	// user asked for one.
-	wkCyan, wkOrange := ColorCyan, ColorOrange
+	// accent throughout — t.Secondary, the same hotkey green every hint bar
+	// draws its keys in, which is why no group may claim it). Three track the
+	// theme; Cyan, Orange and Magenta have no Theme field (the same
+	// special-purpose constants the age and usage columns use), so they are the
+	// ones that can sit badly on an unusually light Base — run them through the
+	// same contrast floor the theme colors got above when the user asked for
+	// one.
+	wkCyan, wkOrange, wkMagenta := ColorCyan, ColorOrange, ColorMagenta
 	if ConfigMinContrastRatio > 0 {
 		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
 		wkOrange = EnforceMinContrast(wkOrange, t.Base, ConfigMinContrastRatio)
+		wkMagenta = EnforceMinContrast(wkMagenta, t.Base, ConfigMinContrastRatio)
 	}
 	// No Background here (nor in theme_nocolor.go): the panel paints its own
 	// background per render from BaseBg, which also tracks the transparency
 	// setting, so baking one in would double-set it.
 	WhichKeyKeyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
 	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
-	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary))
+	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkMagenta))
 	WhichKeyViewsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary))
 	WhichKeyFilterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkCyan))
 	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple))

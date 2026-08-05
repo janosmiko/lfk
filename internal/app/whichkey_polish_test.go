@@ -51,22 +51,63 @@ func TestWhichKeyGroupStyles_NeverUseTheErrorColor(t *testing.T) {
 	}
 }
 
-// The ungrouped description style is the baseline every cell without a group
-// draws in, so a group that reuses its color has no cue at all — the exact
-// failure mode the accent moved onto the description to avoid (Settings used to
-// be the plain text color, which was distinct only while the accent sat on the
-// key). This is what keeps the goto-popup fallback below a real assertion
-// rather than a tautology.
-func TestWhichKeyGroupStyles_NeverMatchThePlainDescription(t *testing.T) {
+// A group accent must differ from BOTH styles every cell already carries:
+//
+//   - the ungrouped description style, the baseline every cell without a group
+//     draws in, so a group that reuses its color has no cue at all — the exact
+//     failure mode the accent moved onto the description to avoid (Settings
+//     used to be the plain text color, which was distinct only while the accent
+//     sat on the key). This is what keeps the goto-popup fallback below a real
+//     assertion rather than a tautology.
+//   - the key accent, drawn one space to the LEFT of the description on the
+//     same row. Checking only the plain description is what let Actions ship in
+//     the key's own green: the palette was picked while the accent still sat on
+//     the key, and moving it to the description turned "so most entries look
+//     unchanged" into a whole row in one color.
+func TestWhichKeyGroupStyles_NeverMatchThePlainDescriptionOrTheKey(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ApplyTheme(ui.DefaultTheme())
-	plain := newWhichKeyCellStyles().desc.GetForeground()
-	if plain == nil {
-		t.Fatal("precondition: the ungrouped description must have a foreground to compare against")
+	cellStyles := newWhichKeyCellStyles()
+	against := map[string]color.Color{
+		"ungrouped description color": cellStyles.desc.GetForeground(),
+		"key accent":                  cellStyles.key.GetForeground(),
+	}
+	for what, fg := range against {
+		if fg == nil {
+			t.Fatalf("precondition: the %s must have a foreground to compare against", what)
+		}
 	}
 	for g, st := range whichKeyGroupStyles() {
-		if st.GetForeground() == plain {
-			t.Errorf("group %q renders in the ungrouped description color %v; it has no category cue", g, plain)
+		for what, fg := range against {
+			if st.GetForeground() == fg {
+				t.Errorf("group %q renders in the %s %v; key and description collapse into one color", g, what, fg)
+			}
+		}
+	}
+}
+
+// In no-color mode the accents are gone and weight is the only separator left:
+// the key stays bold, every description (grouped or not) stays plain.
+func TestWhichKeyStyles_NoColorKeepsTheKeyBold(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	noColor := ui.ConfigNoColor
+	t.Cleanup(func() {
+		ui.ConfigNoColor = noColor
+		ui.ApplyTheme(ui.DefaultTheme())
+	})
+	ui.ConfigNoColor = true
+	ui.ApplyTheme(ui.DefaultTheme())
+
+	cellStyles := newWhichKeyCellStyles()
+	if !cellStyles.key.GetBold() {
+		t.Error("the key is not bold in no-color mode; nothing distinguishes it from its description")
+	}
+	if cellStyles.desc.GetBold() {
+		t.Error("the ungrouped description is bold in no-color mode; bold is what marks the key")
+	}
+	for g, st := range whichKeyGroupStyles() {
+		if st.GetBold() {
+			t.Errorf("group %q is bold in no-color mode; bold is what marks the key", g)
 		}
 	}
 }

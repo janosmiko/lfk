@@ -292,11 +292,11 @@ The panel is context-aware per view. In the explorer it lists what the current r
 
 Precedence: the saved choice wins over `which_key_grouped` (default `true`), which is only the startup default for someone who has never toggled. The state file also records the `which_key_grouped` value in force at the time, so changing that setting afterwards retires the saved choice and the new default applies again. Delete the state file to reset.
 
-Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout -- in key order the color is the only category cue left, so both modes carry it. A legend row at the bottom of the panel names each color in that color, so the mapping doesn't have to be memorized -- only the categories actually offered on the current row appear in it, and it is omitted with `no_color`.
+Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout -- the same green the hint bar draws hotkeys in, and no category uses it, so the key never matches the description beside it. In key order the color is the only category cue left, so both modes carry it. A legend row at the bottom of the panel names each color in that color, so the mapping doesn't have to be memorized -- only the categories actually offered on the current row appear in it, and it is omitted with `no_color`.
 
 | Category | Color | Examples |
 |---|---|---|
-| Actions | green | Delete, Edit, Logs, Copy |
+| Actions | magenta | Delete, Edit, Logs, Copy |
 | Views | blue | Resource map, RBAC browser, Task queue |
 | Filter | cyan | Filter, Search, Namespace selector |
 | Selection | purple | Toggle selection, Select range, Diff |

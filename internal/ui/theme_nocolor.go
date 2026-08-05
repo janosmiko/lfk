@@ -34,6 +34,7 @@ func applyNoColorTheme() {
 	ColorPurple = ""
 	ColorOrange = ""
 	ColorCyan = ""
+	ColorMagenta = ""
 	ColorBase = ""
 	ColorBarBg = ""
 	ColorSurface = ""
