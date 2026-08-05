@@ -156,6 +156,8 @@ var whichKeyCatalogList = []whichKeyModeCatalog{
 	{modeDiff, "diff view", whichKeyDiffCatalog},
 	{modeExplain, "API Explorer", whichKeyExplainCatalog},
 	{modeObjectExplorer, "Object Explorer", whichKeyObjectExplorerCatalog},
+	{modeLogTop, "Log Top", whichKeyLogTopCatalog},
+	{modeEventViewer, "event viewer", whichKeyEventViewerCatalog},
 }
 
 // whichKeyCatalogs indexes whichKeyCatalogList for the render and dispatch

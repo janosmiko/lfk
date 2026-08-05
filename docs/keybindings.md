@@ -272,8 +272,8 @@ The panel is context-aware per view. In the explorer it lists what the current r
 | Diff view | Yes |
 | API Explorer | Yes |
 | Object Explorer | Yes |
-| Log Top | Not yet -- `?` is a no-op there |
-| Event viewer (fullscreen) | Not yet -- `?` still opens help |
+| Log Top | Yes |
+| Event viewer (fullscreen) | Yes |
 | Exec mode | No -- every key goes to the PTY, including `?` |
 | Overlays (can-i, error log, sync waves, network policy) | No -- overlay keys are handled before the leader |
 
@@ -537,7 +537,9 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `f` | Filter rows (matches dimension values) |
 | `/` | Search and jump to matching row |
 | `n` / `N` | Next / previous search match |
+| `Tab` | Cycle the dimension `Enter` drills into |
 | `Enter` | Drill into selected group (descends to the next unused dimension, marked `▸` in its column header) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |
 
 ## Exec Mode (embedded terminal)
@@ -661,7 +663,8 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy N lines from cursor (count-prefixed yank) |
-| `?` / `F1` | Open this help, scrolled to the Event Timeline section |
+| `?` | Which-key panel (fullscreen viewer only) -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Open this help, scrolled to the Event Timeline section (`?` too, in the overlay) |
 | `q` / `Esc` | Close overlay (or exit fullscreen back to overlay) |
 
 > Events are pulled from the cluster, correlated to the selected resource (or shown cluster-wide on the timeline overlay), and grouped when their Type/Reason/Message/Object match. The line buffer (1-9 then a motion key) is consumed after each motion, so `5j 3k` jumps down 5 then up 3 without any digit leaking into the next command.

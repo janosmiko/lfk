@@ -4,12 +4,13 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/logagg"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// Per-viewer behaviour for the second batch of catalogs (the diff viewer and
-// the API and Object Explorers). The registry-wide sweeps live in
+// Per-viewer behaviour for the second batch of catalogs (diff, API Explorer,
+// Object Explorer, Log Top, event viewer). The registry-wide sweeps live in
 // whichkey_viewers_test.go and pick these viewers up automatically; what is
 // here is the one assertion per predicate that its handler's gate was read
 // correctly.
@@ -310,5 +311,130 @@ func TestWhichKeyObjectExplorer_APIExplorerNeedsAResourceType(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{}
 	if slices.Contains(whichKeyOffered(m), "API Explorer") {
 		t.Errorf("with no resource type the key only toasts; got %v", whichKeyOffered(m))
+	}
+}
+
+// --- Log Top ---
+
+// handleLogTopKey pops a drill frame before it returns to the log viewer.
+func TestWhichKeyLogTop_QuitLabelFollowsTheDrillStack(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyViewerModel(modeLogTop)
+	if labels := whichKeyOffered(m); !slices.Contains(labels, "Back to log viewer") || slices.Contains(labels, "Pop drill level") {
+		t.Errorf("with no drill frame q returns to the viewer; got %v", labels)
+	}
+	m.logTop.drillStack = []logTopDrillFrame{{groupBy: []string{logagg.FieldPath}}}
+	if labels := whichKeyOffered(m); !slices.Contains(labels, "Pop drill level") || slices.Contains(labels, "Back to log viewer") {
+		t.Errorf("with a drill frame q pops it; got %v", labels)
+	}
+}
+
+// logTopCycleDrillTarget returns unchanged when every dimension is pinned.
+func TestWhichKeyLogTop_DrillCycleNeedsACandidate(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	if labels := whichKeyOffered(whichKeyViewerModel(modeLogTop)); !slices.Contains(labels, "Cycle drill dimension") {
+		t.Errorf("an unpinned dimension is left; got %v", labels)
+	}
+
+	pinned := whichKeyViewerModel(modeLogTop)
+	pinned.logTop.displayDims = pinned.logTop.groupBy
+	if labels := whichKeyOffered(pinned); slices.Contains(labels, "Cycle drill dimension") {
+		t.Errorf("every dimension is pinned; the key is a no-op; got %v", labels)
+	}
+}
+
+// logTopCycleSort returns unchanged with no sortable column, but the flip and
+// reset keys write the sort state either way.
+func TestWhichKeyLogTop_SortCycleNeedsAColumn(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyViewerModel(modeLogTop)
+	m.logTop.colHidden = map[string]bool{}
+	for _, c := range m.logTopColumnList() {
+		m.logTop.colHidden[c] = true
+	}
+	labels := whichKeyOffered(m)
+	for _, banned := range []string{"Sort next column", "Sort previous column"} {
+		if slices.Contains(labels, banned) {
+			t.Errorf("with every column hidden %q cycles nothing; got %v", banned, labels)
+		}
+	}
+	for _, want := range []string{"Flip sort direction", "Reset sort"} {
+		if !slices.Contains(labels, want) {
+			t.Errorf("%q writes the sort state regardless; got %v", want, labels)
+		}
+	}
+}
+
+// Log Top has no help case at all, so the panel must not claim it has one.
+func TestWhichKeyLogTop_OffersNoHelpRow(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	if labels := whichKeyOffered(whichKeyViewerModel(modeLogTop)); slices.Contains(labels, "Full help") {
+		t.Errorf("handleLogTopKey has no help case; got %v", labels)
+	}
+}
+
+// --- Event viewer ---
+
+func TestWhichKeyEventViewer_VisualModeSwapsTheCatalog(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyViewerModel(modeEventViewer)
+	m.eventTimelineVisualMode = 'v'
+	visual := whichKeyOffered(m)
+	if !slices.Contains(visual, "Copy selection") || !slices.Contains(visual, "Cancel selection") {
+		t.Errorf("visual mode must offer the yank and the q-cancel; got %v", visual)
+	}
+	for _, banned := range []string{"Copy line", "Search in content", "Toggle line wrapping", "Back to explorer", "Full help"} {
+		if slices.Contains(visual, banned) {
+			t.Errorf("visual mode must not offer %q; the visual handler has no case for it", banned)
+		}
+	}
+	// handleEventViewerModeKey claims the fullscreen toggle BEFORE the visual
+	// routing, so this one key survives where every other normal-mode key dies.
+	if !slices.Contains(visual, "Minimize to overlay") {
+		t.Errorf("the fullscreen toggle is claimed ahead of the visual handler; got %v", visual)
+	}
+}
+
+// The clear-search branch is keyed to esc only, so q leaves the viewer whether
+// or not a search is applied — unlike the YAML and describe viewers.
+func TestWhichKeyEventViewer_QuitDoesNotSplitOnTheSearch(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyViewerModel(modeEventViewer)
+	m.eventTimelineSearchQuery = "Warning"
+	labels := whichKeyOffered(m)
+	if !slices.Contains(labels, "Back to explorer") {
+		t.Errorf("q still leaves with a search applied; got %v", labels)
+	}
+	if slices.Contains(labels, "Clear search") {
+		t.Errorf("only esc clears the search here, and esc is never advertised; got %v", labels)
+	}
+}
+
+func TestWhichKeyEventViewer_YankNeedsACursorLine(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyViewerModel(modeEventViewer)
+	m.eventTimelineLines = nil
+	if labels := whichKeyOffered(m); slices.Contains(labels, "Copy line") {
+		t.Errorf("an empty timeline must hide the yank; got %v", labels)
+	}
+
+	counted := whichKeyViewerModel(modeEventViewer)
+	counted.eventTimelineLineInput = "3"
+	if labels := whichKeyOffered(counted); !slices.Contains(labels, "Copy N lines") || slices.Contains(labels, "Copy line") {
+		t.Errorf("with a count armed the yank copies a range; got %v", labels)
 	}
 }

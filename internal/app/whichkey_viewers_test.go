@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/logagg"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -107,6 +108,12 @@ func whichKeyViewerModel(mode viewMode) Model {
 		name:  "p1",
 	}
 	m.objectExplorerView.level = model.ObjectFieldsAt(m.objectExplorerView.root, nil)
+	m.logTop.rows = []logagg.Row{{Values: []string{"GET /api"}}}
+	m.logTop.displayDims = []string{logagg.FieldPath, logagg.FieldMethod}
+	m.logTop.groupBy = []string{logagg.FieldPath}
+	m.logTop.colOrder = []string{logagg.FieldPath}
+	m.eventTimelineLines = []string{"10m  Normal  Scheduled  pod/p1", "9m  Warning  BackOff  pod/p1"}
+	m.eventTimelineCursor = 0
 	return m
 }
 
@@ -267,6 +274,35 @@ func wkViewerScenarios(t *testing.T, mode viewMode) []struct {
 			{"live refresh off", func() Model { m := base(); m.objectExplorerLive = false; return m }},
 			{"no resource type", func() Model { m := base(); m.nav.ResourceType = model.ResourceTypeEntry{}; return m }},
 		}
+	case modeLogTop:
+		return []scenario{
+			{"normal", base},
+			{"drilled in", func() Model {
+				m := base()
+				m.logTop.drillStack = []logTopDrillFrame{{groupBy: []string{logagg.FieldPath}}}
+				return m
+			}},
+			{"every dimension pinned", func() Model { m := base(); m.logTop.displayDims = m.logTop.groupBy; return m }},
+			{"all columns hidden", func() Model {
+				m := base()
+				m.logTop.colHidden = map[string]bool{}
+				for _, c := range m.logTopColumnList() {
+					m.logTop.colHidden[c] = true
+				}
+				return m
+			}},
+			{"no rows", func() Model { m := base(); m.logTop.rows = nil; return m }},
+		}
+	case modeEventViewer:
+		return []scenario{
+			{"normal", base},
+			{"visual char", func() Model { m := base(); m.eventTimelineVisualMode = 'v'; return m }},
+			{"visual line", func() Model { m := base(); m.eventTimelineVisualMode = 'V'; return m }},
+			{"counted", func() Model { m := base(); m.eventTimelineLineInput = "3"; return m }},
+			{"search applied", func() Model { m := base(); m.eventTimelineSearchQuery = "Warning"; return m }},
+			{"cursor off content", func() Model { m := base(); m.eventTimelineCursor = 999; return m }},
+			{"no lines", func() Model { m := base(); m.eventTimelineLines = nil; return m }},
+		}
 	}
 	t.Fatalf("catalogued mode %q has no scenario set; add one covering every branch its "+
 		"predicates take, or the sweeps that drive off this will pass on nothing",
@@ -329,8 +365,10 @@ func wkTextViewerModes(t *testing.T) map[viewMode]bool {
 		modeLogs:           true,
 		modeDescribe:       true,
 		modeDiff:           true,
+		modeEventViewer:    true,
 		modeExplain:        false,
 		modeObjectExplorer: false,
+		modeLogTop:         false,
 	}
 	for _, mc := range whichKeyViewerCatalogs() {
 		if _, ok := out[mc.mode]; !ok {
@@ -539,12 +577,17 @@ func TestWhichKeyCatalogs_UncataloguedModeOffersNothing(t *testing.T) {
 func wkViewerHelpContexts(t *testing.T) map[viewMode]string {
 	t.Helper()
 	out := map[viewMode]string{
-		modeYAML:           "YAML View",
-		modeLogs:           "Log Viewer",
-		modeDescribe:       "Describe View",
-		modeDiff:           "Diff View",
-		modeExplain:        "API Explorer",
+		modeYAML:     "YAML View",
+		modeLogs:     "Log Viewer",
+		modeDescribe: "Describe View",
+		modeDiff:     "Diff View",
+		modeExplain:  "API Explorer",
+		// Log Top writes no helpContextMode of its own — its handler has no
+		// help case at all (update_logtop.go) — so this is the context its
+		// help section carries, reached from the log viewer's help screen.
+		modeLogTop:         "Log Top",
 		modeObjectExplorer: "Object Explorer",
+		modeEventViewer:    "Event Timeline",
 	}
 	for _, mc := range whichKeyViewerCatalogs() {
 		if out[mc.mode] == "" {

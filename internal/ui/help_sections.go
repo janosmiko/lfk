@@ -83,7 +83,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.JumpOwner, "Jump to owner/controller"},
 				{kb.JumpBack, "Jump back through teleport history"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down / up"},
-				{kb.ExpandCollapse, "Expand / collapse all groups"},
+				{kb.ExpandCollapse, "Expand / collapse all groups (Events: group duplicates)"},
 			},
 		},
 		{
@@ -160,7 +160,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.Refresh, "Refresh current view"},
 				{kb.Delete, "Delete (Tab cycles the cascade policy)"},
 				{kb.ForceDelete, "Force delete (Pod/Job only)"},
-				{kb.SaveResource, "Save resource to file"},
+				{kb.SaveResource, "Save resource to file (Events: warnings-only)"},
 				{kb.CopyName, "Copy resource name"},
 				{kb.CopyYAML, "Copy-as picker (YAML/JSON/Table)"},
 				{kb.CopyField, "Copy a single field (Tab: all manifest fields)"},
@@ -405,6 +405,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Log Top", context: "Log Top",
 			bindings: []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{"j/k", "Navigate rows"},
 				{"g/G", "Jump to top / bottom"},
 				{".", "Group-by field picker (multi-select)"},
@@ -412,17 +413,24 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{",", "Show / hide and reorder columns"},
 				{">/<", "Cycle sort column / flip direction"},
 				{"=/-", "Reset sort"},
+				{kb.Filter, "Filter rows live"},
+				{kb.Search, "Search rows and jump to match"},
+				{kb.NextMatch + "/" + kb.PrevMatch, "Next / previous match"},
+				{"tab", "Cycle the dimension enter drills into"},
 				{"enter", "Drill into selected group"},
 				{"esc/q", "Pop drill level or return to log viewer"},
 			},
 		},
 		{
+			// Grouping and warnings-only used to be listed here; they are keys of
+			// the explorer's Events list (handleKeyExpandCollapse,
+			// handleExplorerActionKeySaveResource), not of the timeline, and are
+			// documented in Navigation and Actions where they dispatch.
 			title: "Event Timeline", context: "Event Timeline",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now (fullscreen)"},
 				{kb.Fullscreen, "Toggle fullscreen event viewer"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
-				{kb.ExpandCollapse, "Toggle event grouping"},
-				{kb.SaveResource, "Toggle warnings-only"},
 				{"q/esc", "Close overlay (or exit fullscreen)"},
 			}...),
 		},
