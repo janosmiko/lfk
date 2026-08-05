@@ -263,8 +263,8 @@ func TestWhichKeyGridFor(t *testing.T) {
 	if g.boxN != 1 || g.boxW != 14 {
 		t.Fatalf("narrow container: got box_count=%d box_width=%d, want 1 and 14", g.boxN, g.boxW)
 	}
-	if g.descW[0] < 0 || g.keyW[0] < 1 {
-		t.Fatalf("narrow container produced an unusable cell: keyW=%d descW=%d", g.keyW[0], g.descW[0])
+	if g.descW < 0 || g.keyW < 1 {
+		t.Fatalf("narrow container produced an unusable cell: keyW=%d descW=%d", g.keyW, g.descW)
 	}
 }
 
@@ -286,7 +286,7 @@ func TestWhichKeyGridFor_LeadAppliesEvenAtSingleColumn(t *testing.T) {
 	}
 	// lead + key field + gap + desc field must still land exactly on boxW, so
 	// the content the row writes fills the column with no unaccounted slack.
-	if got := g.lead + g.keyW[0] + whichKeyGap + g.descW[0]; got != g.boxW {
+	if got := g.lead + g.keyW + whichKeyGap + g.descW; got != g.boxW {
 		t.Fatalf("single column: lead+keyW+gap+descW=%d, want boxW=%d", got, g.boxW)
 	}
 }
@@ -309,24 +309,21 @@ func TestWhichKeyGridFor_MaxColsCapsWideContainers(t *testing.T) {
 	}
 }
 
-// TestWhichKeyGridFor_KeyFieldIsPerColumn is the whole point of Change 2: the
-// key field is sized from the widest key IN THAT COLUMN, exactly like
-// which-key.nvim accumulates a width per table column (layout.lua:74). Sizing
-// it from the widest key in the panel instead indents every single-character
-// key by the width of the one "ctrl+alt+y" that lives four columns over.
+// TestWhichKeyGridFor_KeyFieldIsShared pins the key field as ONE width for the
+// whole panel, the widest key as DRAWN. Per-column sizing (what this replaces)
+// made the field depend on which entries landed in which column, so the same
+// catalog drew different inter-column gaps in grouped order than in key order.
+//
 // Run under both icon modes: the symbol form is three columns wide where the
 // textual one is ten, so a grid that measured the BINDING rather than the drawn
 // key would reserve seven dead columns in symbol mode.
-func TestWhichKeyGridFor_KeyFieldIsPerColumn(t *testing.T) {
+func TestWhichKeyGridFor_KeyFieldIsShared(t *testing.T) {
 	for _, icons := range []string{"simple", "unicode"} {
 		t.Run(icons, func(t *testing.T) {
 			restoreWhichKeyGlobals(t)
 			ui.IconMode = icons
-			// container 70 -> box_width clamps to whichKeyMinColW (30) in both
-			// icon modes (the widest entry, "ctrl+alt+y Mouse capture", stays
-			// under 30 columns even spelled out), box_count 2, so 4 entries
-			// fill 2 rows x 2 columns column-major: d/e in column 0,
-			// ctrl+alt+y/x in column 1.
+			// container 70 -> box_count 2, so 4 entries fill 2 rows x 2
+			// columns column-major: d/e in column 0, ctrl+alt+y/x in column 1.
 			cells := []whichKeyCell{
 				{key: "d", desc: "Delete"},
 				{key: "e", desc: "Edit"},
@@ -337,17 +334,46 @@ func TestWhichKeyGridFor_KeyFieldIsPerColumn(t *testing.T) {
 			if g.boxN != 2 || g.rowN != 2 {
 				t.Fatalf("precondition: want a 2x2 grid, got box_count=%d rows=%d", g.boxN, g.rowN)
 			}
-			if g.keyW[0] != 1 {
-				t.Errorf("column 0 holds only 1-char keys; key field = %d, want 1", g.keyW[0])
-			}
 			want := lipgloss.Width(cells[2].keyText())
-			if g.keyW[1] != want {
-				t.Errorf("column 1 key field = %d, want %d (its own widest key as drawn)", g.keyW[1], want)
+			if g.keyW != want {
+				t.Errorf("key field = %d, want %d (the panel's widest key as drawn)", g.keyW, want)
 			}
-			if g.descW[0] <= g.descW[1] {
-				t.Errorf("a narrower key field must leave a wider label field: descW=%v", g.descW)
+			if g.lead+g.keyW+whichKeyGap+g.descW != g.boxW {
+				t.Errorf("fields must fill the column exactly: lead=%d keyW=%d descW=%d boxW=%d",
+					g.lead, g.keyW, g.descW, g.boxW)
 			}
 		})
+	}
+}
+
+// TestWhichKeyGridFor_GeometryIgnoresEntryOrder is the guard for the reported
+// defect: the same entries in a different order must produce the SAME grid, so
+// toggling grouped/key order can never move a column or change a gap. Reversal
+// stands in for any permutation — it is the one that puts every wide chord in
+// the opposite column from where it started.
+func TestWhichKeyGridFor_GeometryIgnoresEntryOrder(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	for _, icons := range []string{"nerdfont", "unicode", "simple"} {
+		ui.IconMode = icons
+		m := whichKeyTestModel()
+		grouped := m.whichKeyLeaderCells()
+		byKey := append([]whichKeyCell(nil), grouped...)
+		sortWhichKeyCells(byKey, false)
+		reversed := append([]whichKeyCell(nil), grouped...)
+		slices.Reverse(reversed)
+
+		for container := 1; container <= 250; container++ {
+			want := whichKeyGridFor(grouped, container)
+			for name, other := range map[string][]whichKeyCell{"key order": byKey, "reversed": reversed} {
+				if got := whichKeyGridFor(other, container); got != want {
+					t.Fatalf("icons=%s container=%d: %s grid %+v differs from grouped %+v",
+						icons, container, name, got, want)
+				}
+			}
+		}
 	}
 }
 
@@ -597,9 +623,8 @@ func TestWhichKeyGoto_AllEntriesReachableViaScrolling(t *testing.T) {
 			rendered.WriteString("\n")
 			rendered.WriteString(stripANSI(m.renderWhichKey(bg)))
 		}
-		for i, c := range cells {
-			col := i / lay.grid.rowN
-			drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW[col])
+		for _, c := range cells {
+			drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
 			if !strings.Contains(rendered.String(), drawn) {
 				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], drawn)
 			}

@@ -223,10 +223,9 @@ func whichKeyContentRows(t *testing.T, out string, container, legendRows int) []
 }
 
 // TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned is the visual
-// property the neovim port exists for: every column is the same width, and
-// inside each column the key is right-aligned against a field sized to THAT
-// column, followed by exactly one space. A global key field (the bug this
-// replaces) shows up here as a column-0 field far wider than its own keys.
+// property the neovim port exists for: every column is the same width, and in
+// every one of them the key is right-aligned against the same shared field,
+// followed by exactly one space.
 func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -268,21 +267,26 @@ func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) 
 			key := cells[idx].keyText()
 			widest[b] = max(widest[b], lipgloss.Width(key))
 			start := b * g.boxW
-			field := string(runes[start+g.lead : start+g.lead+g.keyW[b]])
+			field := string(runes[start+g.lead : start+g.lead+g.keyW])
 			if strings.TrimLeft(field, " ") != key {
 				t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, key)
 			}
-			if got := runes[start+g.lead+g.keyW[b]]; got != ' ' {
+			if got := runes[start+g.lead+g.keyW]; got != ' ' {
 				t.Fatalf("row %d col %d: want a single space after the key, got %q", r, b, got)
 			}
 		}
 	}
-	// Each column's field is sized to its OWN widest key. A global field (the
-	// bug this replaces) makes column 0 wider than anything it actually holds.
-	for b, w := range widest {
-		if w > 0 && g.keyW[b] != w {
-			t.Errorf("column %d key field is %d wide but its widest key is %d", b, g.keyW[b], w)
-		}
+	// One field for the whole panel, sized to the panel's widest key: with a
+	// per-column field (what this replaces) a column holding only 1-wide keys
+	// starts its ink two cells left of the column next to it, so the gaps
+	// between columns differed — and differed again when the entry order
+	// moved the chords into other columns.
+	panelWidest := 0
+	for _, w := range widest {
+		panelWidest = max(panelWidest, w)
+	}
+	if g.keyW != panelWidest {
+		t.Errorf("key field is %d wide, want the panel's widest key %d (per column: %v)", g.keyW, panelWidest, widest)
 	}
 }
 

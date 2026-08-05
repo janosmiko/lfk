@@ -152,17 +152,34 @@ const (
 	whichKeyMinHeight = 2 + 2*whichKeyPadV + whichKeyBottomGap + 1
 )
 
-// whichKeyGrid is the cell geometry for one panel. Columns are uniformly wide,
-// but the key field inside each is sized to that column's own widest key —
-// otherwise one "ctrl+space" would indent every single-character key in the
-// panel by ten columns.
+// whichKeyGrid is the cell geometry for one panel. Columns are uniformly wide
+// and so is the key field inside them, the way which-key.nvim's own table
+// accumulates one width per FIELD rather than per column.
+//
+// keyW was per-column for a while, sized to each column's own widest key, to
+// avoid one "ctrl+space" indenting every single-character key by ten columns.
+// That traded the indent for a worse defect: the field width then depended on
+// which entries happened to land in which column, so the same catalog at the
+// same terminal size drew different inter-column gaps in grouped order than in
+// key order (the two orders scatter the modifier chords differently). A user
+// reported exactly that. Two things retired the original objection:
+//
+//   - Key glyphs replaced the textual chords, so in the icon modes lfk
+//     actually defaults to (unicode, nerdfont) the widest key in the whole
+//     explorer catalog is 2-3 cells, not 10 — the indent is one or two spaces.
+//   - box_width is now measured as keyW + gap + widest label (below), which is
+//     what a global key field really occupies, so the textual modes pay for
+//     their 10-cell chords with a wider column instead of a starved label.
+//
+// A single width also makes the geometry a pure function of the cell SET
+// rather than its order, which is what makes the two orderings match.
 type whichKeyGrid struct {
-	boxW  int   // column width, spacing included
-	boxN  int   // column count
-	rowN  int   // grid rows; entries fill column-major
-	lead  int   // spaces before each column, always whichKeySpacing
-	keyW  []int // per column: right-aligned key field
-	descW []int // per column: description field; 0 drops the description
+	boxW  int // column width, spacing included
+	boxN  int // column count
+	rowN  int // grid rows; entries fill column-major
+	lead  int // spaces before each column, always whichKeySpacing
+	keyW  int // right-aligned key field, shared by every column
+	descW int // description field; 0 drops the description
 }
 
 // whichKeyGridFor ports which-key.nvim's box arithmetic (view.lua:340-344):
@@ -173,8 +190,13 @@ type whichKeyGrid struct {
 //	box_width     = floor(container / box_count)   <- columns divide evenly
 //	box_height    = ceil(#items / box_count)
 //
-// The key and description fields are then measured per column, the way
-// which-key.nvim's table accumulates a width per column (layout.lua:74).
+// max_row_width is the widest row as DRAWN, which with a shared key field
+// (see whichKeyGrid) is the widest key plus the widest label, not the widest
+// key+label of any single entry: a one-character key next to the longest label
+// still gets the full key field in front of it. Measuring the per-entry sum
+// instead under-reports by exactly the padding the renderer then adds, which
+// is how the textual icon modes ended up with labels truncated to fit a column
+// too narrow for what was being drawn in it.
 //
 // which-key.nvim's extra `max(box_height, 2)` floor is deliberately dropped:
 // there it keeps the popup window from being a single line tall, a job
@@ -186,9 +208,14 @@ type whichKeyGrid struct {
 // short-label content defeats the width-driven column limit at wide
 // terminals in a way neovim's own long-label catalog never triggers.
 func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
-	maxRow := 0
+	maxKey, maxDesc := 0, 0
 	for _, c := range cells {
-		maxRow = max(maxRow, lipgloss.Width(c.keyText())+whichKeyGap+lipgloss.Width(c.desc))
+		maxKey = max(maxKey, lipgloss.Width(c.keyText()))
+		maxDesc = max(maxDesc, lipgloss.Width(c.desc))
+	}
+	maxRow := 0
+	if len(cells) > 0 {
+		maxRow = maxKey + whichKeyGap + maxDesc
 	}
 	boxW := min(max(maxRow, whichKeyMinColW), max(container, 1))
 	boxN := max(container/(boxW+whichKeySpacing), 1)
@@ -211,21 +238,14 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	}
 	g.rowN = (len(cells) + boxN - 1) / boxN
 	contentW := max(boxW-whichKeySpacing, 1)
-	g.keyW = make([]int, boxN)
-	g.descW = make([]int, boxN)
-	for b := range boxN {
-		w := 0
-		for i := b * g.rowN; i < (b+1)*g.rowN && i < len(cells); i++ {
-			w = max(w, lipgloss.Width(cells[i].keyText()))
-		}
-		// A key wider than the cell would starve the label; clamp it so at least
-		// one column of description survives, and let writeWhichKeyCell truncate.
-		if w+whichKeyGap+1 > contentW {
-			w = max(contentW-whichKeyGap-1, 1)
-		}
-		g.keyW[b] = w
-		g.descW[b] = max(contentW-w-whichKeyGap, 0)
+	// A key wider than the cell would starve the label; clamp it so at least
+	// one column of description survives, and let writeWhichKeyCell truncate.
+	// Reachable only on a terminal too narrow for box_width to honour maxRow.
+	if maxKey+whichKeyGap+1 > contentW {
+		maxKey = max(contentW-whichKeyGap-1, 1)
 	}
+	g.keyW = maxKey
+	g.descW = max(contentW-maxKey-whichKeyGap, 0)
 	return g
 }
 
@@ -290,25 +310,24 @@ func (st whichKeyCellStyles) descStyle(g whichKeyGroup) lipgloss.Style {
 
 // writeWhichKeyCell lays one entry out as which-key.nvim's two-column mini
 // table (view.lua:323-331 with an empty separator): the key right-aligned in
-// its column's key field, one space, then the label filling the rest of the
+// the shared key field, one space, then the label filling the rest of the
 // cell, padded to the full column width so the next column starts at a fixed
 // offset. Writes straight into the row's builder rather than returning a
 // string — the panel re-renders every frame, and a per-cell buffer is an
 // allocation per entry for nothing.
-func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, col int, st whichKeyCellStyles) {
-	keyW, descW := g.keyW[col], g.descW[col]
-	key := ui.Truncate(c.keyText(), keyW)
-	sb.WriteString(wkPad(g.lead + max(keyW-lipgloss.Width(key), 0)))
+func (g whichKeyGrid) writeWhichKeyCell(sb *strings.Builder, c whichKeyCell, st whichKeyCellStyles) {
+	key := ui.Truncate(c.keyText(), g.keyW)
+	sb.WriteString(wkPad(g.lead + max(g.keyW-lipgloss.Width(key), 0)))
 	sb.WriteString(st.key.Render(key))
-	if descW == 0 {
+	if g.descW == 0 {
 		// No room for a label: the key alone is still worth showing.
-		sb.WriteString(wkPad(g.boxW - whichKeySpacing - keyW))
+		sb.WriteString(wkPad(g.boxW - whichKeySpacing - g.keyW))
 		return
 	}
-	desc := ui.Truncate(c.desc, descW)
+	desc := ui.Truncate(c.desc, g.descW)
 	sb.WriteString(wkPad(whichKeyGap))
 	sb.WriteString(st.descStyle(c.group).Render(desc))
-	sb.WriteString(wkPad(descW - lipgloss.Width(desc)))
+	sb.WriteString(wkPad(g.descW - lipgloss.Width(desc)))
 }
 
 // whichKeyStyles are the two styles every which-key panel path renders with.
@@ -568,7 +587,7 @@ func whichKeyRows(grid whichKeyGrid, cells []whichKeyCell, lo, hi int, st whichK
 			if idx >= len(cells) {
 				break // nothing to the right of the last entry on this row
 			}
-			grid.writeWhichKeyCell(&sb, cells[idx], c, st)
+			grid.writeWhichKeyCell(&sb, cells[idx], st)
 		}
 		out = append(out, sb.String())
 	}

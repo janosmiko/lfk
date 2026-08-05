@@ -213,8 +213,8 @@ func TestRenderWhichKeyPanel_SymbolChordStillAligns(t *testing.T) {
 				t.Fatalf("precondition: chord must render as glyphs, got %q", got)
 			}
 			// The key field is sized from the GLYPHS, not from "ctrl+shift+x".
-			if want := lipgloss.Width(wantChord); lay.grid.keyW[1] != want {
-				t.Errorf("column 1 key field = %d, want %d (the drawn width)", lay.grid.keyW[1], want)
+			if want := lipgloss.Width(wantChord); lay.grid.keyW != want {
+				t.Errorf("column 1 key field = %d, want %d (the drawn width)", lay.grid.keyW, want)
 			}
 
 			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
@@ -231,11 +231,11 @@ func TestRenderWhichKeyPanel_SymbolChordStillAligns(t *testing.T) {
 						break
 					}
 					start := b*g.boxW + g.lead
-					field := string(runes[start : start+g.keyW[b]])
+					field := string(runes[start : start+g.keyW])
 					if strings.TrimLeft(field, " ") != cells[idx].keyText() {
 						t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, cells[idx].keyText())
 					}
-					if runes[start+g.keyW[b]] != ' ' {
+					if runes[start+g.keyW] != ' ' {
 						t.Fatalf("row %d col %d: want a single space after the key", r, b)
 					}
 				}

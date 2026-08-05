@@ -471,7 +471,7 @@ func TestWhichKeyLeader_OpensOnTheFirstSortedEntriesAt80x24(t *testing.T) {
 	out := stripANSI(m.renderWhichKeyLeader(strings.Repeat("\n", m.height)))
 	for b := range lay.grid.boxN {
 		first := cells[b*lay.grid.rowN]
-		want := first.keyText() + " " + ui.Truncate(first.desc, lay.grid.descW[b])
+		want := first.keyText() + " " + ui.Truncate(first.desc, lay.grid.descW)
 		if !strings.Contains(out, want) {
 			t.Fatalf("the unscrolled panel must open on column %d's first entry %q:\n%s", b, want, out)
 		}
@@ -509,7 +509,7 @@ func TestWhichKeyLeader_NeverEmptyBoxAtShortHeights(t *testing.T) {
 			t.Errorf("h=%d: a rendered panel must lay out", h)
 			continue
 		}
-		want := cells[0].keyText() + " " + ui.Truncate(cells[0].desc, lay.grid.descW[0])
+		want := cells[0].keyText() + " " + ui.Truncate(cells[0].desc, lay.grid.descW)
 		if !strings.Contains(out, want) {
 			t.Errorf("CRITICAL-2: h=%d rendered a box with no real content (missing %q):\n%s", h, want, out)
 		}
@@ -562,13 +562,10 @@ func TestWhichKeyLeader_AllEntriesReachableViaScrolling(t *testing.T) {
 			rendered.WriteString("\n")
 			rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
 		}
-		// A label wider than its column's description field is ellipsized, so
-		// match the text the panel is actually supposed to draw rather than the
-		// raw label. Column-major fill puts entry i in column i/rowN, and each
-		// column has its own key/description widths.
-		for i, c := range cells {
-			col := i / lay.grid.rowN
-			drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW[col])
+		// A label wider than the description field is ellipsized, so match the
+		// text the panel is actually supposed to draw rather than the raw label.
+		for _, c := range cells {
+			drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
 			if !strings.Contains(rendered.String(), drawn) {
 				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], drawn)
 			}

@@ -488,9 +488,8 @@ func TestWhichKeyCatalogs_AllEntriesReachableViaScrolling(t *testing.T) {
 					rendered.WriteString("\n")
 					rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
 				}
-				for i, c := range cells {
-					col := i / lay.grid.rowN
-					drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW[col])
+				for _, c := range cells {
+					drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
 					if !strings.Contains(rendered.String(), drawn) {
 						t.Errorf("%q never appears at any scroll offset — unreachable", drawn)
 					}
@@ -1141,7 +1140,7 @@ func TestWhichKeyCatalogs_PanelRendersOverEveryCatalogedMode(t *testing.T) {
 			}
 
 			view := stripANSI(m.renderView())
-			drawn := cells[0].keyText() + " " + ui.Truncate(cells[0].desc, lay.grid.descW[0])
+			drawn := cells[0].keyText() + " " + ui.Truncate(cells[0].desc, lay.grid.descW)
 			if !strings.Contains(view, drawn) {
 				t.Errorf("the panel must render %q over %s:\n%s", drawn, mc.name, view)
 			}

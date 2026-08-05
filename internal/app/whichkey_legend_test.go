@@ -294,9 +294,8 @@ func TestWhichKeyLegend_NeverMistakenForAnEntryByReachability(t *testing.T) {
 		rendered.WriteString("\n")
 		rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
 	}
-	for i, c := range cells {
-		col := i / lay.grid.rowN
-		drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW[col])
+	for _, c := range cells {
+		drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
 		if !strings.Contains(rendered.String(), drawn) {
 			t.Errorf("%q never appears at any scroll offset — the legend row must not have starved it", drawn)
 		}
