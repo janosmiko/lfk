@@ -42,20 +42,24 @@ type wkDiffCtx struct {
 }
 
 // newWKDiffCtx resolves the diff and the cursor's line once per availability
-// pass. Safe on a zero-value Model: computeDiff of two empty strings yields no
-// lines and every bound below is a length compare.
+// pass. Safe on a zero-value Model: the cache pointer is nil-safe and
+// computeDiff of two empty strings yields no lines, so every bound below is a
+// length compare.
+//
+// The diff comes from the viewer's memo, not a fresh pass: this runs on every
+// frame the panel is on screen, while the LCS table behind it only changes
+// when the compared documents or the folds do — none of which a keystroke that
+// merely moves the cursor touches.
 func newWKDiffCtx(m *Model) *wkDiffCtx {
-	// One computeDiff pass, not two: ComputeDiffFoldRegions would run its own.
-	raw := ui.ComputeDiffLines(m.diffView.left, m.diffView.right)
-	regions := ui.ComputeDiffFoldRegionsFromLines(raw)
-	vis := ui.BuildVisibleDiffLines(raw, regions, m.diffView.foldState)
+	d := m.diffView.diffCache.Resolve(m.diffView.left, m.diffView.right, m.diffView.foldState)
+	regions, vis := d.Regions(), d.Visible()
 	c := &wkDiffCtx{
 		m:        m,
 		visual:   m.diffView.visualMode,
 		counted:  m.diffView.lineInput != "",
 		regions:  regions,
 		vis:      vis,
-		lineText: ui.DiffLineTextIn(raw, vis, m.diffView.cursor, m.diffView.cursorSide, m.diffView.unified),
+		lineText: d.LineText(m.diffView.cursor, m.diffView.cursorSide, m.diffView.unified),
 	}
 	// Mirror handleDiffNormalCopy's loop, not just its bound: it skips
 	// empty-side lines and returns unchanged once none survived. Bounded by
@@ -64,7 +68,7 @@ func newWKDiffCtx(m *Model) *wkDiffCtx {
 	if c.counted {
 		end := min(m.diffView.cursor+parseCountPrefix(m.diffView.lineInput), len(vis))
 		for i := max(m.diffView.cursor, 0); i < end; i++ {
-			if ui.DiffLineTextIn(raw, vis, i, m.diffView.cursorSide, m.diffView.unified) != "" {
+			if d.LineText(i, m.diffView.cursorSide, m.diffView.unified) != "" {
 				c.countedText = true
 				break
 			}

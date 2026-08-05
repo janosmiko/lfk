@@ -129,7 +129,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		warningEventsOnly:          ui.ConfigEventsWarningsOnly,
 		eventGrouping:              ui.ConfigEventsGrouping,
 		scheduler:                  scheduler.New(scheduler.DefaultThreshold),
-		diffView:                   diffViewState{wrap: ui.ConfigDiffViewerWrap, lineNumbers: ui.ConfigDiffViewerLineNumbers, unified: ui.ConfigDiffViewerUnified},
+		diffView:                   diffViewState{wrap: ui.ConfigDiffViewerWrap, lineNumbers: ui.ConfigDiffViewerLineNumbers, unified: ui.ConfigDiffViewerUnified, diffCache: &ui.DiffCache{}},
 		execTickGen:                &atomic.Uint64{},
 		logReaderInFlight:          make(map[chan string]bool),
 		reqCtx:                     reqCtx,

@@ -10,6 +10,7 @@ import (
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -458,6 +459,9 @@ func basePush80Model() Model {
 		reqCtx:              context.Background(),
 		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
 		watchThrottle:       true, // production default (ui.ConfigWatchThrottle)
+		// Mirrors app_init. Without it a diff-viewer test measures the
+		// uncached path, which is not the one the app runs.
+		diffView: diffViewState{diffCache: &ui.DiffCache{}},
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
