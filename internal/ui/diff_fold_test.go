@@ -66,7 +66,7 @@ func TestBuildVisibleDiffLines(t *testing.T) {
 	}
 	content := strings.Join(lines, "\n")
 	diffLines := computeDiff(content, content)
-	regions := computeDiffFoldRegionsFromLines(diffLines)
+	regions := ComputeDiffFoldRegionsFromLines(diffLines)
 
 	t.Run("no folds applied shows all lines", func(t *testing.T) {
 		visLines := BuildVisibleDiffLines(diffLines, regions, nil)

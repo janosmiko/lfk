@@ -39,8 +39,9 @@ type wkDiffCtx struct {
 // pass. Safe on a zero-value Model: computeDiff of two empty strings yields no
 // lines and every bound below is a length compare.
 func newWKDiffCtx(m *Model) *wkDiffCtx {
-	regions := ui.ComputeDiffFoldRegions(m.diffView.left, m.diffView.right)
+	// One computeDiff pass, not two: ComputeDiffFoldRegions would run its own.
 	raw := ui.ComputeDiffLines(m.diffView.left, m.diffView.right)
+	regions := ui.ComputeDiffFoldRegionsFromLines(raw)
 	vis := ui.BuildVisibleDiffLines(raw, regions, m.diffView.foldState)
 	return &wkDiffCtx{
 		m:        m,
