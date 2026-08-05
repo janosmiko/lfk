@@ -79,16 +79,30 @@ func TestWhichKeyLeaderCells_CarryTheCatalogGroup(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	m := whichKeyTestModel()
 
+	// The catalog is the authority on each entry's group; the panel only copies
+	// it. Keying by key alone is sound because available() drops any key two
+	// surviving entries share (wkDropAmbiguousKeys) — the entries that
+	// deliberately reuse one (the y copy variants, the q splits, the two
+	// open-in-browser entries) carry mutually exclusive predicates.
 	byKey := map[string]whichKeyGroup{}
 	kb := ui.ActiveKeybindings
 	for _, a := range m.availableWhichKeyActions() {
-		byKey[a.Key(kb)] = a.Group
+		k := a.Key(kb)
+		if prev, dup := byKey[k]; dup {
+			t.Fatalf("two offered entries share key %q (groups %q, %q); available() should have dropped it", k, prev, a.Group)
+		}
+		byKey[k] = a.Group
 	}
 	groups := map[whichKeyGroup]bool{}
 	st := newWhichKeyCellStyles()
 	for _, c := range m.whichKeyLeaderCells() {
-		if c.group == "" {
-			t.Errorf("leader entry %q (%s) lost its group", c.key, c.desc)
+		// Comparing against the catalog's own group, not merely against "":
+		// one wrong-but-non-empty group on every cell would pass that.
+		switch want, ok := byKey[c.key]; {
+		case !ok:
+			t.Errorf("leader entry %q (%s) is not an offered catalog entry", c.key, c.desc)
+		case c.group != want:
+			t.Errorf("leader entry %q (%s) carries group %q, want the catalog's %q", c.key, c.desc, c.group, want)
 		}
 		// The key is uniform now, so the group must reach the DESCRIPTION or it
 		// reaches nothing.
