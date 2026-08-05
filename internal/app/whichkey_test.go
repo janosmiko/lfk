@@ -608,12 +608,20 @@ func TestWhichKeyGoto_AllEntriesReachableViaScrolling(t *testing.T) {
 // key, so a chord starting with anything else can never fire — but the popup
 // keyed its cells with strings.TrimPrefix, which is a no-op when the prefix is
 // absent, so it drew a cell labelled "zp" that no keypress could reach.
+//
+// The second key is one KEYPRESS, so "gjj" is unreachable for the same reason
+// while "gctrl+p" and "gtab" are perfectly reachable. The bindings are set here
+// rather than loaded, because the popup reads the mutable global and must hold
+// the rule on its own.
 func TestWhichKeyCells_NeverAdvertisesAnUnreachableChord(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()
 	kb.GotoPods = "zp"           // wrong prefix
 	kb.PreviousNamespace = "z\\" // wrong prefix
+	kb.GotoJobs = "gjj"          // two keypresses after the prefix
 	kb.GotoNodes = "gn"          // still reachable
+	kb.GotoSecrets = "gctrl+p"   // modified key: one keypress, reachable
+	kb.GotoPVs = "gtab"          // named key: one keypress, reachable
 	ui.ActiveKeybindings = kb
 
 	m := whichKeyTestModel()
@@ -622,12 +630,14 @@ func TestWhichKeyCells_NeverAdvertisesAnUnreachableChord(t *testing.T) {
 	for _, c := range cells {
 		keys = append(keys, c.key)
 	}
-	for _, bad := range []string{"zp", "z\\"} {
+	for _, bad := range []string{"zp", "z\\", "jj"} {
 		if slices.Contains(keys, bad) {
 			t.Errorf("popup advertises %q, which handleGotoChord can never build; cells=%v", bad, keys)
 		}
 	}
-	if !slices.Contains(keys, "n") {
-		t.Errorf("reachable chord gn must still be offered as %q; cells=%v", "n", keys)
+	for _, want := range []string{"n", "ctrl+p", "tab"} {
+		if !slices.Contains(keys, want) {
+			t.Errorf("reachable chord must still be offered as %q; cells=%v", want, keys)
+		}
 	}
 }

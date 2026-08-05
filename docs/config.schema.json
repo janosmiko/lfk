@@ -86,7 +86,7 @@
     },
     "goto_targets": {
       "type": ["object", "null"],
-      "description": "User-defined g-prefix goto chords. Key is the full chord (e.g. \"gA\") and must start with the jump_top key.",
+      "description": "User-defined g-prefix goto chords. Key is the full chord (e.g. \"gA\") and must be the jump_top key plus one keypress.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,

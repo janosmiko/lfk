@@ -555,7 +555,7 @@ filter_presets:
 
 # ─── Extra Goto Chords ──────────────────────────────────────────────────────
 # Extra goto chords (g prefix), including CRDs. Key is the full chord; must
-# start with jump_top.
+# start with jump_top plus one keypress ("gA", "gctrl+p").
 # goto_targets:
 #   ga: { kind: Application, group: argoproj.io, name: ArgoCD Applications }
 #   gA: { kind: ApplicationSet, group: argoproj.io, name: AppSets }

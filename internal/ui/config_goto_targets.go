@@ -9,10 +9,18 @@ import (
 
 // GotoChordReachable reports whether a chord can ever be dispatched.
 // handleGotoChord (internal/app/whichkey.go) builds the chord it looks up as
-// jump_top + the next keypress, so a chord that does not start with jump_top,
-// or that is jump_top alone, is unreachable however it was configured.
+// jump_top + msg.String() for ONE keypress, so a chord that does not start with
+// jump_top, or whose remainder is not a single keypress, is unreachable however
+// it was configured.
+//
+// The remainder is measured in keypresses, not runes: "gctrl+p", "gtab" and
+// "gf1" are all one key after the prefix and stay reachable, while "gAA" is two
+// and never is.
 func GotoChordReachable(chord, jumpTopPrefix string) bool {
-	return strings.HasPrefix(chord, jumpTopPrefix) && len(chord) > len(jumpTopPrefix)
+	if !strings.HasPrefix(chord, jumpTopPrefix) {
+		return false
+	}
+	return IsSingleKeypress(strings.TrimPrefix(chord, jumpTopPrefix))
 }
 
 // dropUnreachableGotoChords blanks every goto_* chord (and previous_namespace)
@@ -30,10 +38,10 @@ func GotoChordReachable(chord, jumpTopPrefix string) bool {
 // Those defaults were already unreachable — this only stops the popup
 // advertising them.
 //
-// The rule mirrors the one applyGotoTargets already enforces on user-defined
-// goto_targets, so both halves of the feature reject the same shapes. Fields
-// are found by yaml tag rather than listed, so a new goto_* binding is
-// validated the day it is added.
+// applyGotoTargets calls the same predicate on user-defined goto_targets, so
+// both halves of the feature reject the same shapes. Fields are found by yaml
+// tag rather than listed, so a new goto_* binding is validated the day it is
+// added.
 //
 // Writes to stderr for the same reason loadConfigFile does: LoadConfig runs
 // before logger.Init, so a logger call here would go to io.Discard.
@@ -78,8 +86,9 @@ var ConfigGotoTargets map[string]GotoTargetEntry
 // applyGotoTargets validates and loads goto_targets from cfg into ConfigGotoTargets.
 // jumpTopPrefix is the already-merged jump_top keybinding (pass kb.JumpTop from
 // LoadConfig so custom jump_top values are validated against the correct prefix).
-// A chord must be exactly 2 runes, start with jumpTopPrefix, and have a non-empty
-// kind; invalid entries are silently skipped.
+// A chord must satisfy GotoChordReachable — the same rule the built-in goto
+// bindings are held to, so the two halves of the feature cannot drift apart —
+// and have a non-empty kind; invalid entries are silently skipped.
 func applyGotoTargets(cfg configFile, jumpTopPrefix string) {
 	if len(cfg.GotoTargets) == 0 {
 		// Reset so a previous non-empty value does not survive a reload that
@@ -89,7 +98,7 @@ func applyGotoTargets(cfg configFile, jumpTopPrefix string) {
 	}
 	valid := make(map[string]GotoTargetEntry, len(cfg.GotoTargets))
 	for chord, t := range cfg.GotoTargets {
-		if len([]rune(chord)) != 2 || !strings.HasPrefix(chord, jumpTopPrefix) || t.Kind == "" {
+		if !GotoChordReachable(chord, jumpTopPrefix) || t.Kind == "" {
 			continue
 		}
 		valid[chord] = t

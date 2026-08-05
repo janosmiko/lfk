@@ -76,6 +76,20 @@ func TestLoadConfig_GotoTargets_InvalidSkipped(t *testing.T) {
 			rejectChord: "xA",
 		},
 		{
+			// goto_targets are held to the same reachability rule as the
+			// built-in bindings, so a modified key is a valid chord tail.
+			name: "modified_key_accepted",
+			yamlBody: `goto_targets:
+  gctrl+p:
+    kind: ApplicationSet
+  gpp:
+    kind: Pod
+`,
+			validChord:  "gctrl+p",
+			validKind:   "ApplicationSet",
+			rejectChord: "gpp",
+		},
+		{
 			name: "empty_kind",
 			yamlBody: `goto_targets:
   gB:
@@ -184,6 +198,24 @@ func TestLoadConfig_UnreachableGotoChordsDropped(t *testing.T) {
 			want: map[string]string{"pods": "zp", "nodes": ""},
 		},
 		{
+			name: "a two-key suffix is dropped: handleGotoChord reads one keypress",
+			yamlBody: `keybindings:
+  jump_top: "g"
+  goto_pods: "gpp"
+  goto_nodes: "gn"
+`,
+			want: map[string]string{"pods": "", "nodes": "gn"},
+		},
+		{
+			name: "a modified key is still one keypress and survives",
+			yamlBody: `keybindings:
+  jump_top: "g"
+  goto_pods: "gctrl+p"
+  goto_nodes: "gtab"
+`,
+			want: map[string]string{"pods": "gctrl+p", "nodes": "gtab"},
+		},
+		{
 			name: "previous_namespace obeys the same rule",
 			yamlBody: `keybindings:
   jump_top: "g"
@@ -230,6 +262,21 @@ func TestGotoChordReachable(t *testing.T) {
 		{"", "g", false},   // unset
 		{"zp", "z", true},  // custom jump_top
 		{"g\\", "g", true}, // previous_namespace default shape
+
+		// The remainder is one KEYPRESS, not one rune. A modified or named key
+		// prints as a word and stays reachable; a run of two keys never is.
+		{"gAA", "g", false},
+		{"gctrl+p", "g", true},
+		{"gctrl+alt+y", "g", true},
+		{"gctrl++", "g", true}, // the literal "+" key under a modifier
+		{"g+", "g", true},
+		{"gtab", "g", true},
+		{"gpgup", "g", true},
+		{"gf12", "g", true},
+		{"gspace", "g", true},
+		{"gpp", "g", false},      // two letters, no such key name
+		{"gctrl+pp", "g", false}, // modifier over two keys
+		{"ga+b", "g", false},     // "a" is not a modifier
 	}
 	for _, tc := range cases {
 		if got := GotoChordReachable(tc.chord, tc.prefix); got != tc.want {

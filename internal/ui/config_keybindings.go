@@ -3,8 +3,10 @@ package ui
 import (
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Keybindings defines configurable keybindings for the application.
@@ -400,6 +402,55 @@ func NormalizeKeybinding(s string) string {
 func isSingleLetter(s string) bool {
 	r := []rune(s)
 	return len(r) == 1 && unicode.IsLetter(r[0])
+}
+
+// namedKeys are the key names Bubble Tea prints for keys that carry no text of
+// their own. Every other single keypress is a single rune, so a longer value
+// that is not named here is two keys run together ("AA"), not a key.
+//
+// The kitty-protocol extras (mediaplay, capslock, the bare modifier keys) are
+// deliberately absent: no lfk surface dispatches them, so a chord ending in one
+// is far more likely a typo — which the load-time warning then names.
+var namedKeys = buildNamedKeys()
+
+func buildNamedKeys() map[string]bool {
+	m := map[string]bool{
+		"enter": true, "tab": true, "backspace": true, "esc": true, "escape": true,
+		"space": true, "up": true, "down": true, "left": true, "right": true,
+		"home": true, "end": true, "pgup": true, "pgdown": true,
+		"insert": true, "delete": true, "begin": true, "find": true, "select": true,
+	}
+	for i := 1; i <= 63; i++ { // f1..f63 is the range Bubble Tea names
+		m["f"+strconv.Itoa(i)] = true
+	}
+	return m
+}
+
+// IsSingleKeypress reports whether s is what msg.String() returns for exactly
+// one key event.
+//
+// One keypress is neither one byte nor one rune: a modified or named key prints
+// as a word ("ctrl+p", "shift+tab", "pgup", "f12"). So the modifiers come off
+// first and the key under them must then be a single rune or a named key.
+//
+// splitModifierChord is deliberately not reused: it refuses the literal "+" key
+// ("ctrl++") so the display path leaves such chords textual, but that is a real
+// keypress this predicate has to accept.
+func IsSingleKeypress(s string) bool {
+	if s == "" {
+		return false
+	}
+	parts := strings.Split(s, "+")
+	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
+	if key == "" && len(mods) > 0 {
+		key, mods = "+", mods[:len(mods)-1] // the key itself is "+"
+	}
+	for _, m := range mods {
+		if _, isMod := helpKeyDisplayModifiers[m]; !isMod {
+			return false
+		}
+	}
+	return utf8.RuneCountInString(key) == 1 || namedKeys[key]
 }
 
 // ActiveKeybindings holds the currently active keybinding configuration.
