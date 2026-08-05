@@ -142,7 +142,7 @@ appearance:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `colorscheme` | string | `"tokyonight-storm"` | Built-in color scheme name. Dual-mode `"dark:X,light:Y"` supported. |
-| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). Also decides how the which-key panel draws keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`). |
+| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). Also decides how the which-key panel and the help screen's key column draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`). |
 | `no_color` | bool | `false` | Strip all colors (monochrome). `NO_COLOR` env var takes precedence. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars and surfaces. |
 | `min_contrast_ratio` | float | `0.0` | Readability knob in `[0.0, 1.0]`. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |

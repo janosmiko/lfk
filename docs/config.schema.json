@@ -100,7 +100,7 @@
     },
     "which_key_enabled": {
       "type": "boolean",
-      "description": "Show the which-key popup while a chord prefix (g) is pending, and the leader action panel while the which-key leader (?) is armed. Both still work when false.",
+      "description": "Show the which-key popup while a chord prefix (g) is pending, and the leader action panel while the which-key leader (?) is armed. false hides both panels; the keys keep working — g still starts a goto chord, and the leader key falls through to whatever else claims it (the help screen, by default).",
       "default": true
     },
     "which_key_delay_ms": {

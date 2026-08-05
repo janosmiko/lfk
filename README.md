@@ -267,7 +267,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 | Key | Action |
 |---|---|
-| `F1` | Toggle help screen (`?` too, outside the explorer) |
+| `F1` | Toggle help screen (`?` too, where no which-key panel exists: overlays and exec mode) |
 | `f` | Filter items in current view |
 | `/` | Search and jump to match |
 | `n` / `N` | Next / previous search match |

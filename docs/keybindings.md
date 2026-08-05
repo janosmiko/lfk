@@ -1290,7 +1290,7 @@ keybindings:
   toggle_rare: "H"       # Toggle rarely used resource types in the sidebar
 
   # Views and Modes
-  help: "?"              # Toggle help
+  help: "f1"             # Toggle help (default "?" is taken by which_key_leader)
   filter: "f"            # Filter items
   search: "/"            # Search and jump
   toggle_preview: "P"    # Toggle YAML preview

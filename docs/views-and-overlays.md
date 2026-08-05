@@ -23,8 +23,10 @@ lfk's UI is built from three layered concepts:
 
 Source of truth for the enums:
 [`internal/app/app_types.go`](../internal/app/app_types.go) — `viewMode`
-and `overlayKind`. When those enums change, update this doc and
-[`internal/ui/help.go`](../internal/ui/help.go).
+and `overlayKind`. When those enums change, update this doc and the help
+catalog in
+[`internal/ui/help_sections.go`](../internal/ui/help_sections.go)
+(`internal/ui/help.go` renders that catalog; it holds no per-view rows).
 
 Default trigger keys below come from
 [`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go);
@@ -39,7 +41,7 @@ Listed in `viewMode` declaration order.
 | ----------------- | ------------------------------------- | ---------------------------------------------------------------------- |
 | `modeExplorer`    | default                               | Three-column resource browser (clusters → resource types → resources). |
 | `modeYAML`        | `Enter` on a resource                 | Full-screen YAML preview with search and copy.                         |
-| `modeHelp`        | `?`                                   | Searchable, filterable keybinding reference.                           |
+| `modeHelp`        | `F1`                                  | Searchable, filterable keybinding reference. `?` also opens it in the overlays and exec mode, where no which-key panel claims the key. |
 | `modeLogs`        | `L` on a pod / workload               | Log viewer with follow, wrap, search, visual selection.                |
 | `modeDescribe`    | `v` on a resource                     | `kubectl describe`-style detail view.                                  |
 | `modeDiff`        | `d` between two selected resources    | Side-by-side diff (e.g. ArgoCD live vs. desired).                      |
