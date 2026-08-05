@@ -875,30 +875,40 @@ func TestWhichKeyLog_VisualModeSwapsTheCatalog(t *testing.T) {
 	}
 }
 
-// severityStep clamps to [0, ui.LogError] (logfilter.go:108-112): at either end
-// the key redraws the same view and changes nothing.
-func TestWhichKeyLog_SeverityStepsHideAtTheClamps(t *testing.T) {
+// severityStep clamps to [0, ui.LogError] (logfilter.go:108-112), so at either
+// end one half of the pair is inert. USER DECISION: show both anyway. The
+// threshold starts at 0, so hiding the down-step there made it reachable only
+// by someone who had already pressed the up-step — an undiscoverable key in a
+// panel whose whole job is discovery. Pressing the inert half is a no-op.
+func TestWhichKeyLog_SeverityStepsStayVisibleAtTheClamps(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	floor := whichKeyViewerModel(modeLogs)
-	floor.logView.sevThreshold = 0
-	labels := whichKeyOffered(floor)
-	if slices.Contains(labels, "Lower min severity") {
-		t.Errorf("at threshold 0 the down-step is clamped; got %v", labels)
-	}
-	if !slices.Contains(labels, "Raise min severity") {
-		t.Errorf("at threshold 0 the up-step still moves; got %v", labels)
+	for _, tc := range []struct {
+		name      string
+		threshold int
+	}{
+		{"floor", 0},
+		{"ceiling", ui.LogError},
+	} {
+		m := whichKeyViewerModel(modeLogs)
+		m.logView.sevThreshold = tc.threshold
+		labels := whichKeyOffered(m)
+		for _, want := range []string{"Raise min severity", "Lower min severity"} {
+			if !slices.Contains(labels, want) {
+				t.Errorf("at the %s both halves stay offered; %q is missing from %v", tc.name, want, labels)
+			}
+		}
 	}
 
-	ceiling := whichKeyViewerModel(modeLogs)
-	ceiling.logView.sevThreshold = ui.LogError
-	labels = whichKeyOffered(ceiling)
-	if slices.Contains(labels, "Raise min severity") {
-		t.Errorf("at LogError the up-step is clamped; got %v", labels)
-	}
-	if !slices.Contains(labels, "Lower min severity") {
-		t.Errorf("at LogError the down-step still moves; got %v", labels)
+	// The visual gate is the one that stays: there "i" arms a text object.
+	visual := whichKeyViewerModel(modeLogs)
+	visual.logView.visualMode = true
+	labels := whichKeyOffered(visual)
+	for _, banned := range []string{"Raise min severity", "Lower min severity"} {
+		if slices.Contains(labels, banned) {
+			t.Errorf("visual mode must not offer %q; handleLogVisualKey has no case for it", banned)
+		}
 	}
 }
 

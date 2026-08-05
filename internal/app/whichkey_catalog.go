@@ -13,6 +13,7 @@ type whichKeyEntry struct {
 	Label string
 	Group whichKeyGroup
 	Order int
+	Pair  string
 }
 
 // wkAction is one catalog entry. C is the catalog's OWN resolved context type.
@@ -52,10 +53,30 @@ type wkAction[C any] struct {
 	// like "<"/">" that a plain ASCII compare would otherwise split apart.
 	// Leave unset unless an entry needs a specific position within its group.
 	Order int
+	// Pair names a BIDIRECTIONAL pair: two entries, two keys, one value moved
+	// in opposite directions (raise/lower a threshold, next/previous column).
+	// Both halves must carry the same name, and
+	// TestWhichKeyCatalogs_BidirectionalPairsAppearTogether then requires them
+	// to be offered together or not at all.
+	//
+	// USER DECISION: a clamped half is still shown at its limit, because the
+	// alternative makes it undiscoverable — `i` (lower severity) only appeared
+	// after the user had already found `o` (raise it), which is the wrong way
+	// round for a discovery aid. Pressing the inert half is a harmless no-op.
+	//
+	// Declared, not inferred: nothing in an entry says which value its handler
+	// moves or in which direction, so a guard that tried to work pairs out
+	// from keys or labels would be guessing. Naming the pair is the honest
+	// version, and an unnamed pair simply gets no guard rather than a wrong one.
+	//
+	// This is NOT for one key with two labels (follow/unfollow, unified/
+	// side-by-side): those are mutually exclusive by construction, exactly one
+	// is ever visible, and nothing is hidden from the user.
+	Pair string
 }
 
 func (a wkAction[C]) entry() whichKeyEntry {
-	return whichKeyEntry{Key: a.Key, Label: a.Label, Group: a.Group, Order: a.Order}
+	return whichKeyEntry{Key: a.Key, Label: a.Label, Group: a.Group, Order: a.Order, Pair: a.Pair}
 }
 
 // wkLiteralKey wraps a key a handler hardcodes in its switch rather than

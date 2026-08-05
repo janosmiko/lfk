@@ -35,6 +35,12 @@ func whichKeyGroupOrder() []whichKeyGroup {
 	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
 }
 
+// wkPairSortColumn names the sort-column cycle, a bidirectional pair in both
+// the explorer and Log Top. Neither half ever clamps — the cycle is modulo the
+// column count (update_keys_sort.go:22,44) — so it is declared to hold that
+// symmetry rather than to fix an asymmetry.
+const wkPairSortColumn = "sort column cycle"
+
 // whichKeyAction is one row of the explorer's leader panel: a catalog entry
 // whose predicates read explorer row state (wkCtx). Every other mode binds
 // wkAction to its own context type — see whichkey_catalog.go.
@@ -543,8 +549,8 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	// "=" in between. SortReset ("-") is left unordered on purpose — it isn't
 	// part of that pair, and the unset default (wkOrderRank) sorts it after
 	// all three regardless.
-	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Avail: wkSortApplies, Order: 1},
-	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Avail: wkSortApplies, Order: 2},
+	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Avail: wkSortApplies, Order: 1, Pair: wkPairSortColumn},
+	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Avail: wkSortApplies, Order: 2, Pair: wkPairSortColumn},
 	{Key: func(kb ui.Keybindings) string { return kb.SortFlip }, Label: "Flip sort direction", Group: wkSort, Avail: wkSortApplies, Order: 3},
 	{Key: func(kb ui.Keybindings) string { return kb.SortReset }, Label: "Reset sort", Group: wkSort, Avail: wkSortApplies},
 

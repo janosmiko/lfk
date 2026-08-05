@@ -66,10 +66,10 @@ var whichKeyLogTopActionList = []wkAction[*wkLogTopCtx]{
 	// through; flip and reset write the sort state either way. The explicit
 	// Order matches the explorer's ("<" then ">" then "="), which a plain ASCII
 	// compare would otherwise split apart.
-	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Order: 1, Avail: func(c *wkLogTopCtx) bool {
+	{Key: func(kb ui.Keybindings) string { return kb.SortPrev }, Label: "Sort previous column", Group: wkSort, Order: 1, Pair: wkPairSortColumn, Avail: func(c *wkLogTopCtx) bool {
 		return c.sortable
 	}},
-	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Order: 2, Avail: func(c *wkLogTopCtx) bool {
+	{Key: func(kb ui.Keybindings) string { return kb.SortNext }, Label: "Sort next column", Group: wkSort, Order: 2, Pair: wkPairSortColumn, Avail: func(c *wkLogTopCtx) bool {
 		return c.sortable
 	}},
 	{Key: func(kb ui.Keybindings) string { return kb.SortFlip }, Label: "Flip sort direction", Group: wkSort, Order: 3},

@@ -36,6 +36,10 @@ func newWKLogCtx(m *Model) *wkLogCtx {
 func wkLogNormal(c *wkLogCtx) bool { return !c.visual }
 func wkLogVisual(c *wkLogCtx) bool { return c.visual }
 
+// wkPairLogSeverity names the log viewer's bidirectional pair: kb.SeverityUp /
+// kb.SeverityDown, the two halves of severityStep.
+const wkPairLogSeverity = "log severity threshold"
+
 // wkLogSwitchPodAvailable and wkLogFilterContainersAvailable are the two
 // branches handleLogKeyOther takes (update_logs_normal.go:502-538): a group
 // resource opens the pod selector, a single Pod opens the container filter,
@@ -73,13 +77,13 @@ var whichKeyLogActionList = []wkAction[*wkLogCtx]{
 	{Key: func(kb ui.Keybindings) string { return kb.Filter }, Label: "Filter log lines", Group: wkFilter, Avail: wkLogNormal},
 	{Key: func(kb ui.Keybindings) string { return kb.Search }, Label: "Search in content", Group: wkFilter, Avail: wkLogNormal},
 	// severityStep clamps to [0, ui.LogError] (logfilter.go:108-112), so at
-	// either end the key redraws the same view and changes nothing.
-	{Key: func(kb ui.Keybindings) string { return kb.SeverityUp }, Label: "Raise min severity", Group: wkFilter, Avail: func(c *wkLogCtx) bool {
-		return !c.visual && c.m.logView.sevThreshold < ui.LogError
-	}},
-	{Key: func(kb ui.Keybindings) string { return kb.SeverityDown }, Label: "Lower min severity", Group: wkFilter, Avail: func(c *wkLogCtx) bool {
-		return !c.visual && c.m.logView.sevThreshold > 0
-	}},
+	// either end one of these two redraws the same view and changes nothing.
+	// Both are shown anyway — see wkAction.Pair: the threshold starts at 0, so
+	// hiding the down-step there meant it only ever appeared to someone who had
+	// already found the up-step. The visual gate stays: there "i" is the text
+	// object prelude (update_logs.go:208-213), a different key entirely.
+	{Key: func(kb ui.Keybindings) string { return kb.SeverityUp }, Label: "Raise min severity", Group: wkFilter, Pair: wkPairLogSeverity, Avail: wkLogNormal},
+	{Key: func(kb ui.Keybindings) string { return kb.SeverityDown }, Label: "Lower min severity", Group: wkFilter, Pair: wkPairLogSeverity, Avail: wkLogNormal},
 	// update_logs_normal.go:502-538 — one key, two different overlays.
 	{Key: wkLiteralKey("\\"), Label: "Switch pod", Group: wkFilter, Avail: wkLogSwitchPodAvailable},
 	{Key: wkLiteralKey("\\"), Label: "Filter containers", Group: wkFilter, Avail: wkLogFilterContainersAvailable},
