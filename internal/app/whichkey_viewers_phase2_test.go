@@ -110,6 +110,52 @@ func TestWhichKeyDiff_CountPrefixRelabelsTheYank(t *testing.T) {
 	}
 }
 
+// The counted yank has TWO silent no-op paths, not one: running off the end of
+// the visible list, and a range whose every line is empty on the active side —
+// handleDiffNormalCopy skips those and returns unchanged on an empty parts
+// slice (update_diff.go:510-512). A run of consecutive added lines read from
+// the left pane is exactly that shape, so the predicate must scan the range,
+// not just bound it.
+func TestWhichKeyDiff_CountedYankNeedsTextOnTheActiveSide(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	base := func() Model {
+		m := whichKeyViewerModel(modeDiff)
+		m.diffView.left = ""
+		m.diffView.right = "a: 1\nb: 2\nc: 3\n"
+		m.diffView.foldState = nil
+		m.diffView.cursor = 0
+		m.diffView.lineInput = "3"
+		return m
+	}
+
+	empty := base()
+	empty.diffView.cursorSide = 0
+	if labels := whichKeyOffered(empty); slices.Contains(labels, "Copy N lines") {
+		t.Errorf("every line in the counted range is empty on the left; the yank copies nothing. got %v", labels)
+	}
+
+	full := base()
+	full.diffView.cursorSide = 1
+	if labels := whichKeyOffered(full); !slices.Contains(labels, "Copy N lines") {
+		t.Errorf("the right side carries all three lines; the yank copies them. got %v", labels)
+	}
+
+	// A range that STRADDLES an empty line still copies the rest, so one
+	// non-empty line anywhere in it is enough to keep the entry offered.
+	straddle := whichKeyViewerModel(modeDiff)
+	straddle.diffView.left = "kind: Pod\n"
+	straddle.diffView.right = "kind: Pod\nadded: 1\nadded: 2\n"
+	straddle.diffView.foldState = nil
+	straddle.diffView.cursor = 0
+	straddle.diffView.cursorSide = 0
+	straddle.diffView.lineInput = "3"
+	if labels := whichKeyOffered(straddle); !slices.Contains(labels, "Copy N lines") {
+		t.Errorf("the first line has text on the left; the yank copies it. got %v", labels)
+	}
+}
+
 // toggleDiffFoldAtCursor needs the cursor inside a fold region;
 // toggleAllDiffFolds needs at least one region to exist.
 func TestWhichKeyDiff_FoldEntriesFollowTheDocument(t *testing.T) {

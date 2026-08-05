@@ -33,6 +33,12 @@ type wkDiffCtx struct {
 	// empty (update_diff.go:503-512) — on a side-by-side diff that is every
 	// added line seen from the left pane, so it is not an edge case.
 	lineText string
+	// countedText is lineText's answer for the whole COUNTED range: at least
+	// one line in [cursor, cursor+count) carries text on the active side. The
+	// handler's empty-parts return is a second silent no-op the cursor bound
+	// alone does not model, and a run of consecutive added lines read from the
+	// left pane hits it.
+	countedText bool
 }
 
 // newWKDiffCtx resolves the diff and the cursor's line once per availability
@@ -43,7 +49,7 @@ func newWKDiffCtx(m *Model) *wkDiffCtx {
 	raw := ui.ComputeDiffLines(m.diffView.left, m.diffView.right)
 	regions := ui.ComputeDiffFoldRegionsFromLines(raw)
 	vis := ui.BuildVisibleDiffLines(raw, regions, m.diffView.foldState)
-	return &wkDiffCtx{
+	c := &wkDiffCtx{
 		m:        m,
 		visual:   m.diffView.visualMode,
 		counted:  m.diffView.lineInput != "",
@@ -51,6 +57,20 @@ func newWKDiffCtx(m *Model) *wkDiffCtx {
 		vis:      vis,
 		lineText: ui.DiffLineTextIn(raw, vis, m.diffView.cursor, m.diffView.cursorSide, m.diffView.unified),
 	}
+	// Mirror handleDiffNormalCopy's loop, not just its bound: it skips
+	// empty-side lines and returns unchanged once none survived. Bounded by
+	// len(vis) exactly as the handler's `end` is, so a huge count prefix costs
+	// one pass over an already-resolved diff, not more.
+	if c.counted {
+		end := min(m.diffView.cursor+parseCountPrefix(m.diffView.lineInput), len(vis))
+		for i := max(m.diffView.cursor, 0); i < end; i++ {
+			if ui.DiffLineTextIn(raw, vis, i, m.diffView.cursorSide, m.diffView.unified) != "" {
+				c.countedText = true
+				break
+			}
+		}
+	}
+	return c
 }
 
 func wkDiffNormal(c *wkDiffCtx) bool { return !c.visual }
@@ -113,10 +133,12 @@ var whichKeyDiffActionList = []wkAction[*wkDiffCtx]{
 		return !c.visual && !c.counted && c.lineText != ""
 	}},
 	// A count copies a RANGE, and the handler skips the empty-side lines inside
-	// it, so the cursor line being empty does not make the key a no-op — only
-	// running off the end of the visible list does.
+	// it, so the cursor line being empty does not on its own make the key a
+	// no-op — a later line in the range can still carry text. What does make it
+	// one is running off the end of the visible list, or the WHOLE range being
+	// empty on the active side (countedText).
 	{Key: wkLiteralKey("y"), Label: "Copy N lines", Group: wkActions, Avail: func(c *wkDiffCtx) bool {
-		return !c.visual && c.counted && c.m.diffView.cursor >= 0 && c.m.diffView.cursor < len(c.vis)
+		return !c.visual && c.counted && c.m.diffView.cursor >= 0 && c.m.diffView.cursor < len(c.vis) && c.countedText
 	}},
 	{Key: wkLiteralKey("y"), Label: "Copy selection", Group: wkActions, Avail: wkDiffVisual},
 
