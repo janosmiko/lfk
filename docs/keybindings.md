@@ -263,7 +263,7 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 
 ## Which-Key Panel
 
-`?` opens a panel above the status bar listing the hotkeys actionable right now as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first (letters and digits, then punctuation), then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
+`?` opens a panel above the status bar listing the hotkeys actionable right now as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first, then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. Within each of those, letters and digits come first, then punctuation, then named keys (`F1`, `Space`, `Tab`). The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
 
 The panel is context-aware per view. In the explorer it lists what the current row supports; in a fullscreen viewer it lists what that viewer supports in its current state -- visual mode swaps the yank and hides the normal-mode keys, an armed count prefix relabels `y`, the log viewer's follow, severity, and `--previous` toggles read their current direction, and the diff viewer's `Tab` disappears in unified mode.
 

@@ -55,9 +55,15 @@ func TestSortWhichKeyCells_PortsNeovimOrdering(t *testing.T) {
 			[]string{"@", "\\", "ctrl+y", "alt+b"},
 		},
 		{
+			// CHANGED with DEFECT 1's fix: the digit runs still compare
+			// numerically, but "10" is no longer a single keypress by shape
+			// (nothing binds it), so it ranks after the named keys instead of
+			// next to the single digit "2". wkKeyShapeRank's own table pins
+			// that classification; this case keeps covering the natural
+			// compare, now within the two shape classes it applies to.
 			"digit runs compare numerically",
 			[]string{"f10", "f2", "f1", "10", "2"},
-			[]string{"2", "10", "f1", "f2", "f10"},
+			[]string{"2", "f1", "f2", "f10", "10"},
 		},
 		{
 			"lowercase before uppercase on a tie",
@@ -65,9 +71,14 @@ func TestSortWhichKeyCells_PortsNeovimOrdering(t *testing.T) {
 			[]string{"d", "D", "y", "Y"},
 		},
 		{
+			// CHANGED with DEFECT 1's fix: "f1" is a named key, so it trails
+			// every single-character key of its tier — the letters AND the
+			// punctuation — instead of natural-sorting between "a" and "y".
+			// Same rule inside the ctrl tier: "ctrl+space" already trailed
+			// "ctrl+a" here, now by shape rather than by natural key.
 			"all four together",
 			[]string{"Y", "ctrl+space", ".", "y", "f1", "a", "ctrl+a", "?"},
-			[]string{"a", "f1", "y", "Y", ".", "?", "ctrl+a", "ctrl+space"},
+			[]string{"a", "y", "Y", ".", "?", "f1", "ctrl+a", "ctrl+space"},
 		},
 	}
 	for _, tc := range tests {
@@ -198,20 +209,132 @@ func TestWhichKeyLeaderCells_AreSorted(t *testing.T) {
 	// "P") — see TestSortWhichKeyCells_ClustersByGroupThenKey for that
 	// boundary case and TestWhichKeyLeaderCells_GroupsFormContiguousRuns for
 	// the clustering property itself.
+	//
+	// Nor does it hold across MODIFIER TIERS, and with DEFECT 1's fix it never
+	// silently did: the shape is now read under the modifiers, so Views'
+	// "ctrl+g" ranks alphanumeric where the old whole-string alphanum rank
+	// called every chord punctuation. A later tier restarting at its own
+	// letters is the tier working, not a sort bug.
 	var curGroup whichKeyGroup
+	curTier := -1
 	seenPunct := ""
 	for i, c := range cells {
-		if i == 0 || c.group != curGroup {
-			curGroup = c.group
+		if i == 0 || c.group != curGroup || wkModTier(c.key) != curTier {
+			curGroup, curTier = c.group, wkModTier(c.key)
 			seenPunct = ""
 		}
-		if wkAlphanumRank(c.key) == 1 && seenPunct == "" {
+		if wkKeyShapeRank(c.key) == 1 && seenPunct == "" {
 			seenPunct = c.key
 			continue
 		}
-		if seenPunct != "" && wkAlphanumRank(c.key) == 0 {
+		if seenPunct != "" && wkKeyShapeRank(c.key) == 0 {
 			t.Errorf("within group %q, alphanumeric key %q sorts after punctuation key %q", c.group, c.key, seenPunct)
 		}
+	}
+}
+
+// TestSortWhichKeyCells_NamedKeysTrailTheSingleCharacterKeys pins DEFECT 1's
+// fix (USER DECISION): a multi-character NAMED key ("f1", "space", "tab") is
+// its own shape class and sorts after every single-character key of its
+// modifier tier — alphanumerics first, then punctuation, then the named keys —
+// so it lands immediately before the tier that follows. Reported as "f1" being
+// drawn between "F" and "H" and "space" under "s": both names are letters and
+// digits throughout, so the old alphanum rank called them plain keys and the
+// natural sort filed them under their first letter.
+func TestSortWhichKeyCells_NamedKeysTrailTheSingleCharacterKeys(t *testing.T) {
+	got := wkSortedKeys("f1", "H", "space", "!", "F", "ctrl+g", "tab", "`", "s")
+	want := []string{
+		// single-character alphanumerics (natural key is case-insensitive)
+		"F", "H", "s",
+		// punctuation
+		"!", "`",
+		// multi-character named keys, last in the tier
+		"f1", "space", "tab",
+		// then the ctrl tier
+		"ctrl+g",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// TestWkKeyShapeRank_ClassifiesEveryKeyShape pins the four classes directly,
+// independent of the other sorters — including that the shape is read from the
+// key UNDER the modifiers, so the rule holds inside every tier.
+func TestWkKeyShapeRank_ClassifiesEveryKeyShape(t *testing.T) {
+	tests := []struct {
+		key  string
+		rank int
+	}{
+		{"d", 0},
+		{"D", 0},
+		{"7", 0},
+		{"ctrl+d", 0},
+		{"alt+7", 0},
+		{"?", 1},
+		{"\\", 1},
+		{"`", 1},
+		{"+", 1},
+		{"é", 1},
+		{"ctrl+/", 1},
+		{"f1", 2},
+		{"f12", 2},
+		{"space", 2},
+		{"tab", 2},
+		{"esc", 2},
+		{"pgdown", 2},
+		{"up", 2},
+		{"ctrl+space", 2},
+		{"shift+tab", 2},
+		{"10", 3},
+		{"ga", 3},
+		{"ctrl++", 3},
+		{"", 3},
+	}
+	for _, tc := range tests {
+		if got := wkKeyShapeRank(tc.key); got != tc.rank {
+			t.Errorf("wkKeyShapeRank(%q) = %d, want %d", tc.key, got, tc.rank)
+		}
+	}
+}
+
+// The same property on the real panel: the catalog's own "f1" (Full help) must
+// come after every single-character key of its group and before the group's
+// first ctrl chord.
+func TestWhichKeyLeaderCells_NamedKeysSortAfterTheLetters(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	cells := whichKeyTestModel().whichKeyLeaderCells()
+	namedAt, lastSingleAt, firstChordAt := -1, -1, -1
+	var group whichKeyGroup
+	for i, c := range cells {
+		if c.key == "f1" {
+			namedAt, group = i, c.group
+		}
+	}
+	if namedAt < 0 {
+		t.Fatal("precondition: the panel must offer the named key f1 (Full help)")
+	}
+	for i, c := range cells {
+		if c.group != group {
+			continue
+		}
+		if wkModTier(c.key) == 0 && wkKeyShapeRank(c.key) < 2 {
+			lastSingleAt = i
+		}
+		if wkModTier(c.key) > 0 && firstChordAt < 0 {
+			firstChordAt = i
+		}
+	}
+	if lastSingleAt < 0 || firstChordAt < 0 {
+		t.Fatalf("precondition: group %q must offer both single-character keys and a chord", group)
+	}
+	if namedAt < lastSingleAt {
+		t.Errorf("f1 is at index %d, ahead of the group's last single-character key at %d", namedAt, lastSingleAt)
+	}
+	if namedAt > firstChordAt {
+		t.Errorf("f1 is at index %d, behind the group's first chord at %d", namedAt, firstChordAt)
 	}
 }
 

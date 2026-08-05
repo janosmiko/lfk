@@ -437,6 +437,16 @@ func buildNamedKeys() map[string]bool {
 	return m
 }
 
+// IsNamedKey reports whether s is Bubble Tea's name for a key that carries no
+// text of its own ("space", "f1", "pgup") — the multi-character key shape, as
+// opposed to the single rune every other keypress prints as.
+//
+// Exposed for the which-key sort, which must file those names after the
+// single-character keys instead of letting "f1" and "space" natural-sort into
+// the middle of the letters. It reads the same table IsSingleKeypress does so
+// the two can never disagree on what counts as a name.
+func IsNamedKey(s string) bool { return namedKeys[s] }
+
 // IsSingleKeypress reports whether s is what msg.String() returns for exactly
 // one key event.
 //

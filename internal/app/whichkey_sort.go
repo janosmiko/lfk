@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -25,7 +26,8 @@ const wkNaturalDigits = 9
 //     other modifier combination (see wkModTier below)
 //  2. order    — explicit per-entry override (whichKeyAction.Order); entries
 //     that don't set one fall through unchanged
-//  3. alphanum — plain letter/digit keys ahead of everything else
+//  3. shape    — single-character alphanumerics, then single-character
+//     punctuation, then multi-character named keys (see wkKeyShapeRank)
 //  4. natural  — digit runs compared numerically, case-insensitively
 //  5. case     — lowercase ahead of uppercase, so "d" precedes "D"
 //
@@ -54,18 +56,18 @@ func sortWhichKeyCells(cells []whichKeyCell, grouped bool) {
 		groupRank = wkGroupRanks()
 	}
 	type ranked struct {
-		cell                                   whichKeyCell
-		group, modTier, order, alphanum, upper int
-		natural                                string
+		cell                                whichKeyCell
+		group, modTier, order, shape, upper int
+		natural                             string
 	}
 	rs := make([]ranked, len(cells))
 	for i, c := range cells {
 		rs[i] = ranked{
-			cell:     c,
-			modTier:  wkModTier(c.key),
-			alphanum: wkAlphanumRank(c.key),
-			upper:    wkCaseRank(c.key),
-			natural:  wkNaturalKey(c.key),
+			cell:    c,
+			modTier: wkModTier(c.key),
+			shape:   wkKeyShapeRank(c.key),
+			upper:   wkCaseRank(c.key),
+			natural: wkNaturalKey(c.key),
 		}
 		if grouped {
 			rs[i].group = wkGroupRank(groupRank, c.group)
@@ -81,8 +83,8 @@ func sortWhichKeyCells(cells []whichKeyCell, grouped bool) {
 			return a.modTier < b.modTier
 		case a.order != b.order:
 			return a.order < b.order
-		case a.alphanum != b.alphanum:
-			return a.alphanum < b.alphanum
+		case a.shape != b.shape:
+			return a.shape < b.shape
 		case a.natural != b.natural:
 			return a.natural < b.natural
 		case a.upper != b.upper:
@@ -120,17 +122,45 @@ func wkGroupRank(ranks map[whichKeyGroup]int, g whichKeyGroup) int {
 	return len(ranks)
 }
 
-// wkAlphanumRank is which-key.nvim's `alphanum` sorter (view.lua:36-38).
-func wkAlphanumRank(key string) int {
-	if key == "" {
+// wkKeyShapeRank ranks a binding by the SHAPE of the key under its modifiers:
+//
+//	0  a single alphanumeric character   "d", "7", "ctrl+d"
+//	1  any other single character        "?", "\\", "ctrl+/"
+//	2  a multi-character named key       "f1", "space", "ctrl+space"
+//	3  anything else                     a typo'd binding, "ctrl++"
+//
+// Ranks 0 and 1 are which-key.nvim's `alphanum` sorter (view.lua:36-38), which
+// this replaces. That sorter matched the whole binding against ^[a-zA-Z0-9]+$,
+// and a key NAME is letters and digits too — so "f1" and "space" ranked as
+// plain keys and the natural sort then filed them under their first letter,
+// drawing "f1" between "F" and "H" and "space" under "s". A name is a shape of
+// its own (USER DECISION: it sorts after the single-character keys, which puts
+// it at the end of its tier, next to the multi-character chords that follow).
+//
+// The shape is read from the key UNDER the modifiers, so the rule holds inside
+// every tier — "ctrl+space" trails "ctrl+z" exactly as "space" trails "z".
+// ui.IsNamedKey is the same table ui.IsSingleKeypress consults; the panel must
+// not grow a second opinion on what a key name is.
+//
+// Rank 3 covers what is not a keypress shape at all: a binding
+// SplitModifierChord refuses (the literal "+" chords) has no key to read, and a
+// mistyped one ("ga") is not a key. Both sort last within their tier rather
+// than being silently filed among the real names.
+func wkKeyShapeRank(key string) int {
+	base := key
+	if _, last, ok := ui.SplitModifierChord(key); ok {
+		base = last
+	}
+	switch {
+	case len(base) == 1 && isWKAlphanum(base[0]):
+		return 0
+	case utf8.RuneCountInString(base) == 1:
 		return 1
+	case ui.IsNamedKey(base):
+		return 2
+	default:
+		return 3
 	}
-	for i := range len(key) {
-		if !isWKAlphanum(key[i]) {
-			return 1
-		}
-	}
-	return 0
 }
 
 // wkModTier is the USER-REQUESTED primary ordering within a group: plain keys
@@ -150,7 +180,8 @@ func wkAlphanumRank(key string) int {
 // Named keys without a modifier ("esc", "tab", "f1", "space") are plain
 // bindings to SplitModifierChord (no "+"), so they land in tier 0 with the
 // letters — the same divergence from neovim's own `mod` sorter that the
-// removed wkModRank used to document.
+// removed wkModRank used to document. Within that tier wkKeyShapeRank then
+// files them after every single-character key.
 func wkModTier(key string) int {
 	mods, _, ok := ui.SplitModifierChord(key)
 	if !ok {
