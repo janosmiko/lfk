@@ -44,8 +44,10 @@ func newWKExplainCtx(m *Model) *wkExplainCtx {
 var whichKeyExplainActionList = []wkAction[*wkExplainCtx]{
 	{Key: wkLiteralHelpKey, Label: "Full help", Group: wkViews},
 	// update_explain.go:242-243 -> handleExplainKeyQ (640-645): q leaves the
-	// view outright, unlike esc, which walks back one level first.
-	{Key: wkLiteralKey("q"), Label: "Back", Group: wkViews},
+	// view outright, unlike esc, which walks back one level first. The label
+	// says so — this view has schema levels, so "Back" would read as the step
+	// esc takes and h/backspace advertise.
+	{Key: wkLiteralKey("q"), Label: "Close API Explorer", Group: wkViews},
 
 	// update_explain.go:246-247 / 252-253 — the level search and the recursive
 	// browser. Both are unconditional: the search prompt opens on an empty

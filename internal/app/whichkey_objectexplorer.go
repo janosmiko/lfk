@@ -65,8 +65,10 @@ func newWKObjectExplorerCtx(m *Model) *wkObjectExplorerCtx {
 var whichKeyObjectExplorerActionList = []wkAction[*wkObjectExplorerCtx]{
 	{Key: wkLiteralHelpKey, Label: "Full help", Group: wkViews},
 	// objectexplorer.go:258-260 -> exitObjectExplorer (237-241): q closes the
-	// browser outright at any depth, where esc would walk back one level.
-	{Key: wkLiteralKey("q"), Label: "Back", Group: wkViews},
+	// browser outright at any depth, where esc would walk back one level. The
+	// label says so — this view has levels, so "Back" would read as the step
+	// esc takes and h/backspace advertise.
+	{Key: wkLiteralKey("q"), Label: "Close Object Explorer", Group: wkViews},
 
 	// objectexplorer.go:286-291 — the in-level filter and the whole-object find.
 	{Key: wkLiteralKey("/"), Label: "Filter this level", Group: wkFilter},

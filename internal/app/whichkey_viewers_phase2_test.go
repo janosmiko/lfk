@@ -283,6 +283,29 @@ func TestWhichKeyExplain_HelpKeyIgnoresTheHelpRebind(t *testing.T) {
 	}
 }
 
+// TestWhichKeyLevelledViewers_QuitLabelsSayCloseNotBack pins the label against
+// its handler in the two viewers that have levels. handleExplainKeyQ and
+// exitObjectExplorer both leave outright at any depth; the step back one level
+// is esc's, and esc is never advertised (whichKeyLeaderIntercept eats it while
+// the panel is shown). "Back" there named the wrong key's behaviour.
+func TestWhichKeyLevelledViewers_QuitLabelsSayCloseNotBack(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	for mode, want := range map[viewMode]string{
+		modeExplain:        "Close API Explorer",
+		modeObjectExplorer: "Close Object Explorer",
+	} {
+		labels := whichKeyOffered(whichKeyViewerModel(mode))
+		if !slices.Contains(labels, want) {
+			t.Errorf("%s must label q %q; got %v", whichKeyModeNames[mode], want, labels)
+		}
+		if slices.Contains(labels, "Back") {
+			t.Errorf("%s must not label q %q — esc is what walks back; got %v", whichKeyModeNames[mode], "Back", labels)
+		}
+	}
+}
+
 // --- Object Explorer ---
 
 func TestWhichKeyObjectExplorer_YanksNeedACursorNode(t *testing.T) {

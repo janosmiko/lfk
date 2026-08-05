@@ -356,7 +356,13 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{"Y", "Yank the selected node's full YAML"},
 				{"P", "Open the whole resource in the YAML viewer"},
 				{"I", "Open API Explorer at the schema of the item"},
-			}, append(objectExplorerScrollEntries(kb), helpEntry{"q/esc", "Back one level / close at root"})...),
+			}, append(objectExplorerScrollEntries(kb), []helpEntry{
+				// Two rows, not "q/esc": objectexplorer.go:258-274 gives them
+				// different jobs — q always closes, esc walks out one step at
+				// a time. Matches the API Explorer block above.
+				{"q", "Close Object Explorer"},
+				{"esc", "Clear filter / back one level / close at root"},
+			}...)...),
 		},
 		{
 			title: "Can-I Browser", context: "Can-I Browser",

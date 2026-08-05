@@ -432,7 +432,8 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `I` | Open the API Explorer at the selected item's schema |
 | `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
-| `q` / `Esc` | Back one level / close at root |
+| `q` | Close the Object Explorer |
+| `Esc` | Clear filter / back one level / close at root |
 
 Live refresh defaults to on; set `object_explorer.live: false` to start paused. Set `object_explorer.tree: true` to open in the tree view (`api_explorer.tree` for the API Explorer). See [Viewer Defaults](config-reference.md#viewer-defaults).
 
