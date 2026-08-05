@@ -373,6 +373,13 @@ func NormalizeKeybinding(s string) string {
 	if key == "" && len(mods) > 0 && mods[len(mods)-1] == "" {
 		key, mods = "+", mods[:len(mods)-1]
 	}
+	// Still empty means a trailing plus naming no key at all. Every modifier
+	// may be valid ("alt+ctrl+"), so this has to bail before the reordering
+	// below, which would otherwise hand back "ctrl+alt+" — malformed input
+	// rewritten into different malformed input.
+	if key == "" {
+		return s
+	}
 	if len(mods) == 0 {
 		return s
 	}

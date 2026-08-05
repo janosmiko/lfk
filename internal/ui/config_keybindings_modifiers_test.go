@@ -68,6 +68,12 @@ func TestNormalizeKeybinding(t *testing.T) {
 		{"trailing plus is not the plus key", "ctrl+", "ctrl+"},
 		{"trailing plus after two modifiers", "ctrl+alt+", "ctrl+alt+"},
 		{"trailing plus after a non-modifier", "ga+", "ga+"},
+		// The three above pass for reasons that are not the rule: one modifier
+		// needs no reordering, "ctrl+alt+" is already canonical, and "ga" is an
+		// unknown modifier that early-returns. Only a malformed binding whose
+		// modifiers are BOTH valid and out of order reaches the reordering
+		// path, which used to hand back "ctrl+alt+".
+		{"malformed input is not reordered either", "alt+ctrl+", "alt+ctrl+"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
