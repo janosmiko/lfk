@@ -342,7 +342,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{"j/k", "Navigate fields"},
 				{"l/enter/Right", "Drill into object/array field"},
 				{"h/Backspace/Left", "Go back one level"},
-				{"J/K", "Scroll the YAML preview pane"},
+				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll the YAML preview pane"},
 				{"/", "Filter the current level by key"},
 				{"r", "Recursive find across the whole object"},
 				{kb.TreeView, "Toggle tree view (whole subtree)"},
@@ -353,7 +353,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{"Y", "Yank the selected node's full YAML"},
 				{"P", "Open the whole resource in the YAML viewer"},
 				{"I", "Open API Explorer at the schema of the item"},
-			}, append(scrollHelpEntries(), helpEntry{"q/esc", "Back one level / close at root"})...),
+			}, append(objectExplorerScrollEntries(kb), helpEntry{"q/esc", "Back one level / close at root"})...),
 		},
 		{
 			title: "Can-I Browser", context: "Can-I Browser",
@@ -407,10 +407,10 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 			bindings: []helpEntry{
 				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{"j/k", "Navigate rows"},
-				{"g/G", "Jump to top / bottom"},
+				{kb.JumpTop + "/" + kb.JumpBottom, "Jump to top / bottom"},
 				{".", "Group-by field picker (multi-select)"},
 				{"p", "Log format profile picker"},
-				{",", "Show / hide and reorder columns"},
+				{kb.ColumnToggle, "Show / hide and reorder columns"},
 				{kb.SortNext + "/" + kb.SortPrev, "Cycle sort column"},
 				{kb.SortFlip, "Flip sort direction"},
 				{kb.SortReset, "Reset sort"},
@@ -507,11 +507,31 @@ func trafficCaptureHelpSections() []helpSection {
 // scrollHelpEntries is the scroll/jump block every scrollable view shares.
 // One definition keeps the wording identical across sections and stops the
 // same four rows being re-typed a dozen times.
+//
+// The keys stay literal on purpose: every view that uses this block (error
+// log, API explorer, can-i, netpol, sync waves) dispatches them as string
+// literals too, so reading kb here would advertise a key those handlers
+// never receive. The Object Explorer is the one exception — see
+// objectExplorerScrollEntries.
 func scrollHelpEntries() []helpEntry {
 	return []helpEntry{
 		{"j/k", "Scroll down / up"},
 		{"gg/G", "Top / bottom"},
 		{"ctrl+d/ctrl+u", "Half-page down / up"},
+		{"ctrl+f/ctrl+b", "Full-page down / up"},
+	}
+}
+
+// objectExplorerScrollEntries is the scroll block for the Object Explorer.
+// It differs from scrollHelpEntries in one row: handleObjectExplorerNavKey
+// dispatches the half-page step on kb.PageDown / kb.PageUp with no literal
+// ctrl+d / ctrl+u alias, so the shared row kept advertising ctrl+d after a
+// page_down rebind had already moved it.
+func objectExplorerScrollEntries(kb Keybindings) []helpEntry {
+	return []helpEntry{
+		{"j/k", "Scroll down / up"},
+		{"gg/G", "Top / bottom"},
+		{kb.PageDown + "/" + kb.PageUp, "Half-page down / up"},
 		{"ctrl+f/ctrl+b", "Full-page down / up"},
 	}
 }
