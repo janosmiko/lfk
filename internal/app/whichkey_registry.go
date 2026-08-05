@@ -605,14 +605,6 @@ func whichKeyExcludedBindings() map[string]string {
 		"JumpOwner": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
 		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
 
-		// Viewer-local, in a viewer that has no catalog yet: ToggleUnified is
-		// the diff viewer's unified/side-by-side switch (update_diff.go) and
-		// TreeView the Object/API Explorer's subtree toggle
-		// (update_objectexplorer.go, update_explain.go). Both become registry
-		// entries when their viewer gets a catalog.
-		"ToggleUnified": "viewer-local, diff viewer has no catalog yet",
-		"TreeView":      "viewer-local, object/API explorer has no catalog yet",
-
 		// The leader itself: pressing it opens the panel rather than running a
 		// listed action, so listing it would advertise the panel from inside
 		// the panel.

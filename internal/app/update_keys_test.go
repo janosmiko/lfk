@@ -805,10 +805,12 @@ func TestP4DiffKeyU(t *testing.T) {
 	assert.True(t, rm.diffView.unified)
 }
 
+// f1, not "?": the which-key leader claims "?" in every mode that has a
+// catalog, and the diff viewer gained one in phase 2.
 func TestP4DiffKeyHelp(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -89,6 +90,23 @@ func whichKeyViewerModel(mode viewMode) Model {
 	m.logView.lines = []string{"line one", "line two"}
 	m.logView.cursor = 0
 	m.describeView.content = "Name:\tp1\nNamespace:\tdefault\n"
+	// The diff needs a run of unchanged lines long enough to be foldable
+	// (ComputeDiffFoldRegions wants four) plus one changed line either side, so
+	// the fold and the yank entries have something real to gate on.
+	m.diffView.left = "kind: Pod\na: 1\nb: 2\nc: 3\nd: 4\ne: 5\nname: left\n"
+	m.diffView.right = "kind: Pod\na: 1\nb: 2\nc: 3\nd: 4\ne: 5\nname: right\n"
+	m.diffView.leftName, m.diffView.rightName = "p1", "p2"
+	m.explainFields = []model.ExplainField{
+		{Name: "spec", Path: "spec", Type: "Object"},
+		{Name: "status", Path: "status", Type: "Object"},
+	}
+	m.explainResource = "pods"
+	m.objectExplorerView = objectExplorerState{
+		root:  map[string]any{"kind": "Pod", "metadata": map[string]any{"name": "p1"}},
+		title: "Pod/p1",
+		name:  "p1",
+	}
+	m.objectExplorerView.level = model.ObjectFieldsAt(m.objectExplorerView.root, nil)
 	return m
 }
 
@@ -181,6 +199,74 @@ func wkViewerScenarios(t *testing.T, mode viewMode) []struct {
 			{"search applied", func() Model { m := base(); m.describeView.searchQuery = "Name"; return m }},
 			{"cursor off content", func() Model { m := base(); m.describeView.cursor = 999; return m }},
 		}
+	case modeDiff:
+		return []scenario{
+			{"normal", base},
+			{"visual", func() Model { m := base(); m.diffView.visualMode = true; return m }},
+			{"counted", func() Model { m := base(); m.diffView.lineInput = "4"; return m }},
+			{"unified", func() Model { m := base(); m.diffView.unified = true; return m }},
+			{"right side", func() Model { m := base(); m.diffView.cursorSide = 1; return m }},
+			{"cursor off content", func() Model { m := base(); m.diffView.cursor = 999; return m }},
+			{"cursor outside any fold region", func() Model { m := base(); m.diffView.cursor = 6; return m }},
+			{"folds collapsed", func() Model { m := base(); m.diffView.foldState = []bool{true}; return m }},
+			{"no foldable run", func() Model {
+				m := base()
+				m.diffView.left, m.diffView.right = "a: 1\n", "a: 2\n"
+				return m
+			}},
+			{"empty diff", func() Model { m := base(); m.diffView.left, m.diffView.right = "", ""; return m }},
+		}
+	case modeExplain:
+		return []scenario{
+			{"normal", base},
+			{"tree", func() Model {
+				m := base()
+				m.explainTree = true
+				m.explainTreeWanted = true
+				m.explainTreeAll = []model.ExplainField{
+					{Name: "spec", Path: "spec"},
+					{Name: "containers", Path: "spec.containers"},
+				}
+				return m
+			}},
+			{"tree on a leaf row", func() Model {
+				m := base()
+				m.explainTree = true
+				m.explainTreeWanted = true
+				m.explainTreeAll = []model.ExplainField{{Name: "spec", Path: "spec"}}
+				return m
+			}},
+			{"tree fetch in flight", func() Model { m := base(); m.explainTreeWanted = true; return m }},
+			{"no fields", func() Model { m := base(); m.explainFields = nil; return m }},
+			{"cursor off fields", func() Model { m := base(); m.explainCursor = 999; return m }},
+		}
+	case modeObjectExplorer:
+		return []scenario{
+			{"normal", base},
+			{"tree", func() Model {
+				m := base()
+				m.objectExplorerView.tree = true
+				m.objectExplorerView.rebuildTreeRows()
+				return m
+			}},
+			{"tree filtered", func() Model {
+				m := base()
+				m.objectExplorerView.tree = true
+				m.objectExplorerView.rebuildTreeRows()
+				m.objectExplorerView.filter = "name"
+				return m
+			}},
+			{"cursor off level", func() Model { m := base(); m.objectExplorerView.cursor = 999; return m }},
+			{"empty object", func() Model {
+				m := base()
+				m.objectExplorerView = objectExplorerState{}
+				return m
+			}},
+			// The base model is live (the production default), so the scenario
+			// that adds coverage is the paused one.
+			{"live refresh off", func() Model { m := base(); m.objectExplorerLive = false; return m }},
+			{"no resource type", func() Model { m := base(); m.nav.ResourceType = model.ResourceTypeEntry{}; return m }},
+		}
 	}
 	t.Fatalf("catalogued mode %q has no scenario set; add one covering every branch its "+
 		"predicates take, or the sweeps that drive off this will pass on nothing",
@@ -225,26 +311,68 @@ func TestWhichKeyCatalogs_NoDuplicateKeysOffered(t *testing.T) {
 // shown, so a viewer entry keyed to esc would advertise a keystroke the panel
 // itself eats. The motion keys are excluded on the explorer's rule — the panel
 // lists actions, not the keymap.
+// wkTextViewerModes names the catalogued viewers whose handler implements the
+// vim WORD motions, so w/b/e/W/B/E and 0/$/^ are motions there and must never
+// be advertised. The list viewers (the API and Object Explorers, Log Top) have
+// no such cases in their switches — objectexplorer.go:257-338,
+// update_explain.go:239-303 and update_logtop.go:22-148 all go straight from
+// j/k/g/G/page to their action keys — so "w" there is kb.WatchMode and nothing
+// else, exactly as it is in the explorer.
+//
+// A catalogued viewer missing from this map is a hard failure: defaulting
+// either way would silently pick a ban set for it, and picking the smaller one
+// is how a real word motion would get advertised.
+func wkTextViewerModes(t *testing.T) map[viewMode]bool {
+	t.Helper()
+	out := map[viewMode]bool{
+		modeYAML:           true,
+		modeLogs:           true,
+		modeDescribe:       true,
+		modeDiff:           true,
+		modeExplain:        false,
+		modeObjectExplorer: false,
+	}
+	for _, mc := range whichKeyViewerCatalogs() {
+		if _, ok := out[mc.mode]; !ok {
+			t.Fatalf("catalogued viewer %q is not classified as a text or list viewer; "+
+				"say which motion set its handler implements", mc.name)
+		}
+	}
+	return out
+}
+
 func TestWhichKeyCatalogs_NeverAdvertiseEscOrMotions(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()
 	ui.ActiveKeybindings = kb
+	textViewer := wkTextViewerModes(t)
 
 	// The motion set is VIEWER-scoped: w/e/W/B/E are word motions inside a text
 	// viewer but ordinary action bindings in the explorer (kb.WatchMode,
 	// kb.SecretEditor, kb.SaveResource, kb.SecurityBadgeToggle, kb.Edit), so
 	// banning them everywhere would be wrong. esc is banned everywhere.
-	viewerMotions := []string{
-		"j", "k", "h", "l", "0", "$", "^", "w", "b", "e", "W", "B", "E",
+	cursorMotions := []string{
+		"j", "k", "h", "l",
 		"g", "G", "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b",
 		"home", "end", "pgup", "pgdown",
 		kb.NextMatch, kb.PrevMatch,
 	}
+	// Drilling in and out is the list viewers' navigation, the same way the
+	// explorer's Enter/Left/Right are — and kb.Enter is excluded registry-wide
+	// on exactly that reason.
+	listNavigation := []string{"enter", "left", "right", "up", "down", "backspace"}
+	wordMotions := []string{"0", "$", "^", "w", "b", "e", "W", "B", "E"}
+
 	for _, mc := range whichKeyCatalogList {
 		t.Run(mc.name, func(t *testing.T) {
 			banned := []string{"esc"}
 			if mc.mode != modeExplorer {
-				banned = append(banned, viewerMotions...)
+				banned = append(banned, cursorMotions...)
+				if textViewer[mc.mode] {
+					banned = append(banned, wordMotions...)
+				} else {
+					banned = append(banned, listNavigation...)
+				}
 			}
 			for _, e := range mc.catalog.entries() {
 				key := e.Key(kb)
@@ -377,15 +505,21 @@ func TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode(t *testing.T) {
 	}
 }
 
-// TestWhichKeyCatalogs_UncataloguedModeOffersNothing: the diff viewer and the
-// exec terminal have no catalog in phase 1, so the leader key must fall through
-// rather than open an empty box.
+// TestWhichKeyCatalogs_UncataloguedModeOffersNothing: a mode with no catalog
+// must let the leader key fall through rather than open an empty box.
+//
+// modeExec is the deliberate one. handleExecKey forwards every unclaimed
+// keystroke straight into the PTY (ptyexec.go:186-202), so a catalog there
+// would advertise keys the shell swallows AND steal "?" from the program
+// running inside it — the panel's own arming runs ahead of handleModeKey
+// (update_keys.go:71-77). Its keymap is the Ctrl+] prefix, which is a chord
+// the panel has no way to express. The help screen documents it instead.
 func TestWhichKeyCatalogs_UncataloguedModeOffersNothing(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 
-	for _, mode := range []viewMode{modeDiff, modeExec, modeExplain, modeObjectExplorer, modeLogTop, modeEventViewer} {
+	for _, mode := range []viewMode{modeExec, modeHelp, modeKubetris, modeCredits} {
 		m := whichKeyTestModel()
 		m.mode = mode
 		if got := m.availableWhichKeyActions(); len(got) != 0 {
@@ -405,9 +539,12 @@ func TestWhichKeyCatalogs_UncataloguedModeOffersNothing(t *testing.T) {
 func wkViewerHelpContexts(t *testing.T) map[viewMode]string {
 	t.Helper()
 	out := map[viewMode]string{
-		modeYAML:     "YAML View",
-		modeLogs:     "Log Viewer",
-		modeDescribe: "Describe View",
+		modeYAML:           "YAML View",
+		modeLogs:           "Log Viewer",
+		modeDescribe:       "Describe View",
+		modeDiff:           "Diff View",
+		modeExplain:        "API Explorer",
+		modeObjectExplorer: "Object Explorer",
 	}
 	for _, mc := range whichKeyViewerCatalogs() {
 		if out[mc.mode] == "" {

@@ -308,6 +308,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Diff View", context: "Diff View",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{"tab", "Switch cursor side (side-by-side mode)"},
 				{kb.ToggleFold, "Toggle fold unchanged section at cursor"},
 				{kb.ToggleFoldAll, "Toggle all folds"},
@@ -320,6 +321,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "API Explorer", context: "API Explorer",
 			bindings: append([]helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{"j/k", "Navigate fields"},
 				{"l/enter", "Drill into field (Object/array types)"},
 				{"h/Backspace", "Go back one level"},
@@ -336,6 +338,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Object Explorer", context: "Object Explorer",
 			bindings: append([]helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
 				{"j/k", "Navigate fields"},
 				{"l/enter/Right", "Drill into object/array field"},
 				{"h/Backspace/Left", "Go back one level"},

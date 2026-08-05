@@ -261,7 +261,7 @@ See [Which-Key Panel](#which-key-panel) for the `?` action panel.
 
 `?` opens a panel above the status bar listing the hotkeys actionable right now as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first (letters and digits, then punctuation), then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
 
-The panel is context-aware per view. In the explorer it lists what the current row supports; in a fullscreen viewer it lists what that viewer supports in its current state -- visual mode swaps the yank and hides the normal-mode keys, an armed count prefix relabels `y`, and the log viewer's follow, severity, and `--previous` toggles read their current direction.
+The panel is context-aware per view. In the explorer it lists what the current row supports; in a fullscreen viewer it lists what that viewer supports in its current state -- visual mode swaps the yank and hides the normal-mode keys, an armed count prefix relabels `y`, the log viewer's follow, severity, and `--previous` toggles read their current direction, and the diff viewer's `Tab` disappears in unified mode.
 
 | View | Panel |
 |---|---|
@@ -269,7 +269,13 @@ The panel is context-aware per view. In the explorer it lists what the current r
 | YAML view | Yes |
 | Log viewer | Yes |
 | Describe view | Yes |
-| Other viewers | Not yet -- `?` still opens help there |
+| Diff view | Yes |
+| API Explorer | Yes |
+| Object Explorer | Yes |
+| Log Top | Not yet -- `?` is a no-op there |
+| Event viewer (fullscreen) | Not yet -- `?` still opens help |
+| Exec mode | No -- every key goes to the PTY, including `?` |
+| Overlays (can-i, error log, sync waves, network policy) | No -- overlay keys are handled before the leader |
 
 | Key | Action |
 |---|---|
@@ -418,6 +424,8 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `y` / `Y` | Yank the selected node's path / full YAML |
 | `P` | Open the whole resource in the full YAML viewer |
 | `I` | Open the API Explorer at the selected item's schema |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back one level / close at root |
 
 Live refresh defaults to on; set `object_explorer.live: false` to start paused. Set `object_explorer.tree: true` to open in the tree view (`api_explorer.tree` for the API Explorer). See [Viewer Defaults](config-reference.md#viewer-defaults).
@@ -614,6 +622,8 @@ from `terminal:` in the config.
 | `#` | Toggle line numbers |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `u` | Toggle unified/side-by-side view |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
 ## Event Timeline
@@ -784,6 +794,8 @@ The editor picks one of two modes based on the value being edited:
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |
 

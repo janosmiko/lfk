@@ -67,6 +67,18 @@ func wkLiteralKey(key string) func(ui.Keybindings) string {
 	return func(ui.Keybindings) string { return key }
 }
 
+// wkLiteralHelpKey is whichKeyHelpKey for the two viewers whose help case
+// matches a HARDCODED "?" rather than kb.Help — the API Explorer
+// (update_explain.go:240) and the Object Explorer (objectexplorer.go:275).
+// Rebinding kb.Help does not move that key, so the panel must keep saying "?";
+// the leader still wins it when it is bound there, leaving f1 the only way in.
+func wkLiteralHelpKey(kb ui.Keybindings) string {
+	if kb.WhichKeyLeader == "?" {
+		return "f1"
+	}
+	return "?"
+}
+
 // whichKeyCatalog is one mode's catalog with its context type erased, so the
 // panel and the guards can iterate every mode through a single interface.
 // Adding a viewer is a new wkCatalog value plus one row in
@@ -141,6 +153,9 @@ var whichKeyCatalogList = []whichKeyModeCatalog{
 	{modeYAML, "YAML view", whichKeyYAMLCatalog},
 	{modeLogs, "log viewer", whichKeyLogCatalog},
 	{modeDescribe, "describe view", whichKeyDescribeCatalog},
+	{modeDiff, "diff view", whichKeyDiffCatalog},
+	{modeExplain, "API Explorer", whichKeyExplainCatalog},
+	{modeObjectExplorer, "Object Explorer", whichKeyObjectExplorerCatalog},
 }
 
 // whichKeyCatalogs indexes whichKeyCatalogList for the render and dispatch
