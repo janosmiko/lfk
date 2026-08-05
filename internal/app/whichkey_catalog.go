@@ -15,13 +15,26 @@ type whichKeyEntry struct {
 	Order int
 }
 
-// wkAction is one catalog entry. C is the catalog's OWN resolved context type,
-// which is what makes the per-mode split safe rather than merely tidy: a YAML
-// predicate cannot compile against explorer row state, and an explorer
-// predicate cannot compile against yamlView. The alternative — one wkCtx
-// carrying every mode's fields — would leave a dozen viewers' worth of
-// always-zero fields readable from every predicate, which is precisely how a
-// predicate ends up silently answering from state its own mode never resolved.
+// wkAction is one catalog entry. C is the catalog's OWN resolved context type.
+// What that actually buys, precisely:
+//
+//   - A predicate cannot read another viewer's RESOLVED context. wkYAMLCtx's
+//     memoized fields (visibleLines, foldSection, sel) are unreachable from a
+//     log predicate, so a predicate can never answer from a field its own mode
+//     never resolved and left at zero.
+//   - Entries cannot be moved between catalogs. A wkAction[*wkYAMLCtx] does not
+//     fit wkCatalog[*wkLogCtx].actions, so a copy-pasted row is a compile error
+//     rather than a live entry whose predicate reads the wrong viewer.
+//   - resolve runs once per availability pass no matter how many predicates read
+//     the context, which is load-bearing: a regression that lost it took the
+//     render from 211 to 420 allocs/op.
+//
+// What it does NOT buy, and you must check yourself: every context embeds
+// m *Model, so ANY predicate can reach ANY Model field, including another
+// viewer's state. That is sometimes correct — wkYAMLObjectExplorerAvailable
+// reads explorer row state because its handler does — but the type system will
+// not stop you writing a predicate that disagrees with its handler. Read the
+// handler.
 //
 // Key is a function so a rebind is picked up at render time rather than baked
 // in at package init. Avail is nil for entries that always apply in that mode;

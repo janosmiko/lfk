@@ -19,6 +19,29 @@ var whichKeyModeNames = func() map[viewMode]string {
 	return out
 }()
 
+// whichKeyViewerCatalogs is whichKeyCatalogList minus the explorer: every
+// catalogued FULLSCREEN viewer. DERIVED, never listed — every sweep below runs
+// off this, so registering a catalog is the single edit that puts a viewer
+// under all of them. Hardcoding the mode list instead is what let a viewer join
+// the registry and pick up no coverage at all.
+//
+// The explorer is the one exclusion, and only because it already has the
+// equivalent sweeps of its own: TestAvailableWhichKeyActions_NoDuplicateKeysOffered,
+// TestWhichKeyLeader_AllEntriesReachableViaScrolling and the level-scoping
+// table. It also has no ui.ViewerHelpRows context — its keys are documented in
+// the general help sections, which TestWhichKeyRegistry_CoversEveryBinding
+// checks instead.
+func whichKeyViewerCatalogs() []whichKeyModeCatalog {
+	out := make([]whichKeyModeCatalog, 0, len(whichKeyCatalogList))
+	for _, mc := range whichKeyCatalogList {
+		if mc.mode == modeExplorer {
+			continue
+		}
+		out = append(out, mc)
+	}
+	return out
+}
+
 // TestWhichKeyCatalogs_RegistryIsTheOnlySeam pins the "add a viewer by adding a
 // catalog" contract: the lookup map the render and dispatch paths use is
 // derived from whichKeyCatalogList and nothing else, so a viewer added to one
@@ -34,6 +57,23 @@ func TestWhichKeyCatalogs_RegistryIsTheOnlySeam(t *testing.T) {
 		if _, ok := whichKeyCatalogs[mc.mode]; !ok {
 			t.Errorf("mode %q is in the list but missing from the lookup map", mc.name)
 		}
+	}
+}
+
+// TestWhichKeyCatalogs_EveryCatalogHasARenderSite ties the registry to the two
+// places renderView actually draws the panel: the explorer branch and the
+// fullscreen branch (view.go). Registering a catalog for a mode in neither one
+// arms the leader — and so hands whichKeyLeaderIntercept esc and ctrl+d/ctrl+u
+// to swallow — with nothing on screen to show for it. Invisible but stateful is
+// the worst thing a discovery aid can be, and no other guard would catch it:
+// they all call renderWhichKeyLeader directly rather than through renderView.
+func TestWhichKeyCatalogs_EveryCatalogHasARenderSite(t *testing.T) {
+	for _, mc := range whichKeyCatalogList {
+		if mc.mode == modeExplorer || isFullscreenRenderMode(mc.mode) {
+			continue
+		}
+		t.Errorf("%s has a catalog but renderView draws the panel in neither the explorer "+
+			"nor the fullscreen branch; add it to isFullscreenRenderMode or drop the catalog", mc.name)
 	}
 }
 
@@ -72,14 +112,19 @@ func whichKeyOfferedKeys(m Model) []string {
 }
 
 // wkViewerScenarios enumerates the state combinations each viewer catalog's
-// predicates branch on, so the duplicate-key guard below sweeps the real
-// product rather than one happy path. Every conditional named in a catalog
-// comment (visual mode, an armed count prefix, an applied search, follow,
-// previous, the severity ends, the pod/container branch) has a scenario here.
-func wkViewerScenarios(mode viewMode) []struct {
+// predicates branch on, so the sweeps below run the real product rather than
+// one happy path. Every conditional named in a catalog comment (visual mode, an
+// armed count prefix, an applied search, follow, previous, the severity ends,
+// the pod/container branch) has a scenario here.
+//
+// A catalogued mode with no scenario set is a hard failure, not an empty slice:
+// returning nil gave the sweeps a subtest that iterated nothing and PASSED, so
+// a new viewer looked covered while being tested on no state at all.
+func wkViewerScenarios(t *testing.T, mode viewMode) []struct {
 	name  string
 	build func() Model
 } {
+	t.Helper()
 	type scenario = struct {
 		name  string
 		build func() Model
@@ -137,6 +182,9 @@ func wkViewerScenarios(mode viewMode) []struct {
 			{"cursor off content", func() Model { m := base(); m.describeView.cursor = 999; return m }},
 		}
 	}
+	t.Fatalf("catalogued mode %q has no scenario set; add one covering every branch its "+
+		"predicates take, or the sweeps that drive off this will pass on nothing",
+		whichKeyModeNames[mode])
 	return nil
 }
 
@@ -150,9 +198,9 @@ func TestWhichKeyCatalogs_NoDuplicateKeysOffered(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	for _, mode := range []viewMode{modeYAML, modeLogs, modeDescribe} {
-		t.Run(whichKeyModeNames[mode], func(t *testing.T) {
-			for _, sc := range wkViewerScenarios(mode) {
+	for _, mc := range whichKeyViewerCatalogs() {
+		t.Run(mc.name, func(t *testing.T) {
+			for _, sc := range wkViewerScenarios(t, mc.mode) {
 				t.Run(sc.name, func(t *testing.T) {
 					m := sc.build()
 					kb := ui.ActiveKeybindings
@@ -241,11 +289,11 @@ func TestWhichKeyCatalogs_AllEntriesReachableViaScrolling(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 
-	for _, mode := range []viewMode{modeYAML, modeLogs, modeDescribe} {
+	for _, mc := range whichKeyViewerCatalogs() {
 		for _, size := range [][2]int{{80, 14}, {80, 24}, {120, 40}} {
-			name := fmt.Sprintf("%s/%dx%d", whichKeyModeNames[mode], size[0], size[1])
+			name := fmt.Sprintf("%s/%dx%d", mc.name, size[0], size[1])
 			t.Run(name, func(t *testing.T) {
-				m := whichKeyViewerModel(mode)
+				m := whichKeyViewerModel(mc.mode)
 				m.width, m.height = size[0], size[1]
 
 				out, _ := m.handleKey(leaderKey())
@@ -287,29 +335,45 @@ func TestWhichKeyCatalogs_AllEntriesReachableViaScrolling(t *testing.T) {
 }
 
 // TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode: the catalog is keyed on
-// m.mode, so a viewer can never show the explorer's Delete/Scale/Namespace
-// rows, and the explorer can never show the log viewer's follow toggle.
+// m.mode, so no mode may offer a label only some OTHER catalogue declares — a
+// viewer can never show the explorer's Delete/Scale rows, and the explorer can
+// never show the log viewer's follow toggle.
+//
+// The foreign-label set is computed pairwise off the registry rather than
+// listed, so a phase-2 viewer is checked against every catalog already present
+// and every catalog already present is checked against it, both without an
+// edit here. A label two catalogs both declare is skipped: shared wording
+// ("Copy line") is not a leak.
 func TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	explorerOnly := []string{"Delete", "Scale", "Namespace selector", "Action menu"}
-	for _, mode := range []viewMode{modeYAML, modeLogs, modeDescribe} {
-		t.Run(whichKeyModeNames[mode], func(t *testing.T) {
-			labels := whichKeyOffered(whichKeyViewerModel(mode))
-			for _, label := range explorerOnly {
-				if slices.Contains(labels, label) {
-					t.Errorf("explorer entry %q leaked into %s", label, whichKeyModeNames[mode])
+	declares := make(map[viewMode]map[string]bool, len(whichKeyCatalogList))
+	for _, mc := range whichKeyCatalogList {
+		labels := make(map[string]bool)
+		for _, e := range mc.catalog.entries() {
+			labels[e.Label] = true
+		}
+		declares[mc.mode] = labels
+	}
+
+	for _, mc := range whichKeyCatalogList {
+		t.Run(mc.name, func(t *testing.T) {
+			offered := whichKeyOffered(whichKeyViewerModel(mc.mode))
+			for _, other := range whichKeyCatalogList {
+				if other.mode == mc.mode {
+					continue
+				}
+				for _, e := range other.catalog.entries() {
+					if declares[mc.mode][e.Label] {
+						continue
+					}
+					if slices.Contains(offered, e.Label) {
+						t.Errorf("%s entry %q leaked into %s", other.name, e.Label, mc.name)
+					}
 				}
 			}
 		})
-	}
-
-	explorer := whichKeyTestModel()
-	for _, label := range []string{"Follow new lines", "Fold section at cursor", "Copy selection"} {
-		if slices.Contains(whichKeyOffered(explorer), label) {
-			t.Errorf("viewer entry %q leaked into the explorer", label)
-		}
 	}
 }
 
@@ -335,13 +399,22 @@ func TestWhichKeyCatalogs_UncataloguedModeOffersNothing(t *testing.T) {
 
 // wkViewerHelpContexts maps each catalogued viewer to the help screen's own
 // context name for it — the same string the viewer's handler writes into
-// m.helpContextMode.
-func wkViewerHelpContexts() map[viewMode]string {
-	return map[viewMode]string{
+// m.helpContextMode. A catalogued viewer missing from the map is a hard failure
+// rather than a skipped mode: silently omitting it would drop the only
+// cross-check between the catalog and the help section for that viewer.
+func wkViewerHelpContexts(t *testing.T) map[viewMode]string {
+	t.Helper()
+	out := map[viewMode]string{
 		modeYAML:     "YAML View",
 		modeLogs:     "Log Viewer",
 		modeDescribe: "Describe View",
 	}
+	for _, mc := range whichKeyViewerCatalogs() {
+		if out[mc.mode] == "" {
+			t.Fatalf("catalogued viewer %q has no help context here; add its m.helpContextMode string", mc.name)
+		}
+	}
+	return out
 }
 
 // wkHelpUndocumentedKeys names the catalog keys the view's help section
@@ -367,9 +440,11 @@ func TestWhichKeyCatalogs_EveryEntryIsDocumentedInItsViewHelp(t *testing.T) {
 	kb := ui.DefaultKeybindings()
 	ui.ActiveKeybindings = kb
 	undocumented := wkHelpUndocumentedKeys()
+	helpContexts := wkViewerHelpContexts(t)
 
-	for mode, helpCtx := range wkViewerHelpContexts() {
-		t.Run(whichKeyModeNames[mode], func(t *testing.T) {
+	for _, mc := range whichKeyViewerCatalogs() {
+		helpCtx := helpContexts[mc.mode]
+		t.Run(mc.name, func(t *testing.T) {
 			documented := map[string]bool{}
 			for _, row := range ui.ViewerHelpRows(helpCtx) {
 				// The whole string first: "/" is itself a binding
@@ -384,7 +459,7 @@ func TestWhichKeyCatalogs_EveryEntryIsDocumentedInItsViewHelp(t *testing.T) {
 			if len(documented) == 0 {
 				t.Fatalf("no help rows carry context %q", helpCtx)
 			}
-			for _, e := range whichKeyCatalogs[mode].entries() {
+			for _, e := range mc.catalog.entries() {
 				key := e.Key(kb)
 				if documented[key] {
 					continue
@@ -793,30 +868,100 @@ func TestWhichKeyDescribe_YankHiddenWithTheCursorOffContent(t *testing.T) {
 
 // --- rendering ---
 
-// TestWhichKeyViewer_PanelRendersOverTheViewer proves the whole path end to
-// end: the leader key inside the YAML viewer draws the bordered panel over the
-// viewer's content and swaps the viewer's hint bar for the panel's own.
-func TestWhichKeyViewer_PanelRendersOverTheViewer(t *testing.T) {
+// TestPrimeWhichKeyCells_LeaderWinsOverAStalePendingG pins the ORDER of the two
+// cases in primeWhichKeyCells, which is load-bearing and looks arbitrary.
+//
+// pendingG and armed are only mutually exclusive in the explorer, where
+// handleGotoChord swallows the leader key while the g prefix is up. In a viewer
+// they are not: g sets pendingG (update_logs_normal.go), the default branch of
+// an unrecognised key clears only lineInput, so pendingG survives, and the
+// leader can then arm on top of it. Test armed second and the log viewer's
+// leader panel silently renders the explorer's goto cheatsheet instead of its
+// own keys. Every phase-2 viewer inherits the same stale-pendingG quirk
+// (update_diff.go, update_explain.go, the object explorer).
+func TestPrimeWhichKeyCells_LeaderWinsOverAStalePendingG(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	m := whichKeyViewerModel(modeLogs)
+	m.pendingG = true // left behind by a g the viewer never cleared
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	m = m.primeWhichKeyCells()
+	if len(m.whichKey.cells) == 0 {
+		t.Fatal("the primed frame cache must hold the log viewer's cells")
+	}
+
+	descs := make([]string, 0, len(m.whichKey.cells))
+	for _, c := range m.whichKey.cells {
+		descs = append(descs, c.desc)
+	}
+	if !slices.Contains(descs, "Follow new lines") {
+		t.Errorf("an armed leader must show the log viewer's own cells; got %v", descs)
+	}
+	for _, gotoDesc := range []string{"list top", "Pods", "Deployments"} {
+		if slices.Contains(descs, gotoDesc) {
+			t.Errorf("the goto popup's %q leaked into the leader panel; primeWhichKeyCells must test armed before pendingG", gotoDesc)
+		}
+	}
+}
+
+// wkLastLine returns the bottom line of a rendered view — the hint bar in every
+// mode.
+func wkLastLine(view string) string {
+	lines := strings.Split(view, "\n")
+	return lines[len(lines)-1]
+}
+
+// TestWhichKeyCatalogs_PanelRendersOverEveryCatalogedMode proves the whole path
+// end to end for EVERY registered catalog: the leader key draws the bordered
+// panel over the mode's own content and swaps its hint bar for the panel's.
+//
+// This is the only guard that goes through renderView, which makes it the only
+// one that would notice a catalog whose panel is armed but never drawn — the
+// rest call renderWhichKeyLeader directly and so render a panel view.go would
+// not. Driven off the registry for exactly that reason: a phase-2 viewer left
+// out of this sweep would be the one thing nothing else covers.
+func TestWhichKeyCatalogs_PanelRendersOverEveryCatalogedMode(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
 	ui.ConfigWhichKeyLeaderDelayMs = 0
 
-	m := whichKeyViewerModel(modeYAML)
-	m.width, m.height = 100, 30
-	out, _ := m.handleKey(leaderKey())
-	m = out.(Model)
+	for _, mc := range whichKeyCatalogList {
+		t.Run(mc.name, func(t *testing.T) {
+			m := whichKeyViewerModel(mc.mode)
+			m.width, m.height = 100, 30
+			before := wkLastLine(stripANSI(m.renderView()))
 
-	view := stripANSI(m.renderView())
-	for _, want := range []string{"Copy line", "Search in content", "Visual select"} {
-		if !strings.Contains(view, want) {
-			t.Errorf("the panel must render %q over the YAML viewer:\n%s", want, view)
-		}
-	}
-	if !strings.Contains(view, "esc: close") {
-		t.Errorf("the viewer's hint bar must be swapped for the panel's:\n%s", view)
-	}
-	if strings.Contains(view, "object explorer") {
-		t.Errorf("the viewer's own hint bar must be gone while the panel is up:\n%s", view)
+			out, _ := m.handleKey(leaderKey())
+			m = out.(Model)
+			if !m.whichKey.shown {
+				t.Fatal("precondition: the leader must show the panel")
+			}
+			cells := m.whichKeyLeaderCells()
+			if len(cells) == 0 {
+				t.Fatal("the catalog offered nothing at all")
+			}
+			lay, ok := m.whichKeyLayoutFor(cells)
+			if !ok {
+				t.Fatal("the panel must lay out at 100x30")
+			}
+
+			view := stripANSI(m.renderView())
+			drawn := cells[0].keyText() + " " + ui.Truncate(cells[0].desc, lay.grid.descW[0])
+			if !strings.Contains(view, drawn) {
+				t.Errorf("the panel must render %q over %s:\n%s", drawn, mc.name, view)
+			}
+			after := wkLastLine(view)
+			if !strings.Contains(after, "esc: close") {
+				t.Errorf("%s's hint bar must be the panel's while it is up; got %q", mc.name, after)
+			}
+			if after == before {
+				t.Errorf("%s's own hint bar must be swapped out, not kept; both read %q", mc.name, before)
+			}
+		})
 	}
 }
