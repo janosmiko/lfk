@@ -46,7 +46,11 @@ func (m Model) gotoTargets() []gotoTarget {
 	out := make([]gotoTarget, 0, len(base)+len(ui.ConfigGotoTargets))
 	idx := map[string]int{}
 	for _, gt := range base {
-		if gt.Chord == "" {
+		// Same predicate handleGotoChord's lookup implies, applied here so the
+		// popup (which renders this list) can never advertise a chord the
+		// dispatcher cannot build. LoadConfig already blanks these, but the
+		// bindings are a mutable global and this list feeds both surfaces.
+		if !ui.GotoChordReachable(gt.Chord, kb.JumpTop) {
 			continue
 		}
 		idx[gt.Chord] = len(out)
@@ -257,7 +261,7 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	for _, gt := range targets {
 		cells = append(cells, whichKeyCell{key: strings.TrimPrefix(gt.Chord, prefix), desc: gt.Label})
 	}
-	if pn := ui.ActiveKeybindings.PreviousNamespace; pn != "" {
+	if pn := ui.ActiveKeybindings.PreviousNamespace; ui.GotoChordReachable(pn, prefix) {
 		cells = append(cells, whichKeyCell{key: strings.TrimPrefix(pn, prefix), desc: "Previous namespace"})
 	}
 	sortWhichKeyCells(cells, m.whichKeyGrouped())

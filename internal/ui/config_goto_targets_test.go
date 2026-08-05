@@ -146,3 +146,94 @@ goto_targets:
 		t.Error("chord gA should have been rejected because jump_top was changed to f")
 	}
 }
+
+// TestLoadConfig_UnreachableGotoChordsDropped covers the half-configurable
+// goto chord: handleGotoChord only ever builds jump_top + the next key, so a
+// goto_* value that starts with anything else is dead. Before it was dropped
+// at load, the g-prefix popup still drew a cell for it.
+func TestLoadConfig_UnreachableGotoChordsDropped(t *testing.T) {
+	cases := []struct {
+		name     string
+		yamlBody string
+		want     map[string]string // field value after load
+	}{
+		{
+			name: "wrong prefix is dropped, siblings survive",
+			yamlBody: `keybindings:
+  jump_top: "g"
+  goto_pods: "zp"
+  goto_nodes: "gn"
+`,
+			want: map[string]string{"pods": "", "nodes": "gn"},
+		},
+		{
+			name: "prefix alone is dropped: the second key is what selects the target",
+			yamlBody: `keybindings:
+  jump_top: "g"
+  goto_pods: "g"
+`,
+			want: map[string]string{"pods": ""},
+		},
+		{
+			name: "a custom jump_top makes the matching chord reachable",
+			yamlBody: `keybindings:
+  jump_top: "z"
+  goto_pods: "zp"
+  goto_nodes: "gn"
+`,
+			want: map[string]string{"pods": "zp", "nodes": ""},
+		},
+		{
+			name: "previous_namespace obeys the same rule",
+			yamlBody: `keybindings:
+  jump_top: "g"
+  previous_namespace: "z\\"
+`,
+			want: map[string]string{"prevns": ""},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "config.yaml")
+			if err := os.WriteFile(path, []byte(tc.yamlBody), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			orig := ActiveKeybindings
+			t.Cleanup(func() { ActiveKeybindings = orig })
+			LoadConfig(path)
+
+			got := map[string]string{
+				"pods":   ActiveKeybindings.GotoPods,
+				"nodes":  ActiveKeybindings.GotoNodes,
+				"prevns": ActiveKeybindings.PreviousNamespace,
+			}
+			for field, want := range tc.want {
+				if got[field] != want {
+					t.Errorf("%s = %q, want %q", field, got[field], want)
+				}
+			}
+		})
+	}
+}
+
+// TestGotoChordReachable pins the predicate both surfaces share.
+func TestGotoChordReachable(t *testing.T) {
+	cases := []struct {
+		chord, prefix string
+		want          bool
+	}{
+		{"gp", "g", true},
+		{"zp", "g", false},
+		{"g", "g", false},  // prefix alone: handleGotoChord falls through to gg
+		{"", "g", false},   // unset
+		{"zp", "z", true},  // custom jump_top
+		{"g\\", "g", true}, // previous_namespace default shape
+	}
+	for _, tc := range cases {
+		if got := GotoChordReachable(tc.chord, tc.prefix); got != tc.want {
+			t.Errorf("GotoChordReachable(%q, %q) = %v, want %v", tc.chord, tc.prefix, got, tc.want)
+		}
+	}
+}

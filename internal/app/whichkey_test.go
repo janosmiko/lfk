@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -599,5 +600,34 @@ func TestWhichKeyGoto_AllEntriesReachableViaScrolling(t *testing.T) {
 				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], drawn)
 			}
 		}
+	}
+}
+
+// TestWhichKeyCells_NeverAdvertisesAnUnreachableChord is the regression for the
+// half-configurable goto chord. handleGotoChord looks up jump_top + the next
+// key, so a chord starting with anything else can never fire — but the popup
+// keyed its cells with strings.TrimPrefix, which is a no-op when the prefix is
+// absent, so it drew a cell labelled "zp" that no keypress could reach.
+func TestWhichKeyCells_NeverAdvertisesAnUnreachableChord(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	kb := ui.DefaultKeybindings()
+	kb.GotoPods = "zp"           // wrong prefix
+	kb.PreviousNamespace = "z\\" // wrong prefix
+	kb.GotoNodes = "gn"          // still reachable
+	ui.ActiveKeybindings = kb
+
+	m := whichKeyTestModel()
+	cells := m.whichKeyCells()
+	keys := make([]string, 0, len(cells))
+	for _, c := range cells {
+		keys = append(keys, c.key)
+	}
+	for _, bad := range []string{"zp", "z\\"} {
+		if slices.Contains(keys, bad) {
+			t.Errorf("popup advertises %q, which handleGotoChord can never build; cells=%v", bad, keys)
+		}
+	}
+	if !slices.Contains(keys, "n") {
+		t.Errorf("reachable chord gn must still be offered as %q; cells=%v", "n", keys)
 	}
 }

@@ -33,7 +33,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `abbreviations` | map[string]string | *(see Abbreviations section)* | Custom search abbreviation overrides/extensions. |
 | `custom_actions` | map[string]list | `{}` | User-defined actions per resource type. |
 | `filter_presets` | map[string]list | `{}` | User-defined quick filter presets per resource type. |
-| `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`); value = `{kind, group, name}`. Overrides built-ins on collision. |
+| `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`), which must start with `jump_top` plus one key; value = `{kind, group, name}`. Overrides built-ins on collision. |
 | `which_key_enabled` | bool | `true` | Show the goto popup while the `g` prefix is pending, and the action panel while the which-key leader (`?`) is armed (explorer and every fullscreen viewer except exec mode). |
 | `which_key_delay_ms` | int | `0` | Delay before the goto popup appears (ms, 0-2000). |
 | `which_key_leader_delay_ms` | int | `0` | Delay before the which-key action panel appears (ms, 0-2000). |

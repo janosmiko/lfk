@@ -55,7 +55,11 @@ goto_targets:
 
 The `g` popup also lists `g\`, which jumps to the previous namespace (swaps the scope back and forth).
 
-All built-in chords are rebindable under `keybindings`.
+All built-in chords are rebindable under `keybindings`. Every chord must start
+with `jump_top` (default `g`) and add one more key -- the dispatcher only ever
+looks up `jump_top` + the next keypress. A chord that does not is reported at
+startup and ignored. Rebinding `jump_top` therefore disables the built-in
+chords, which all start with `g`; re-point the ones you use at the new prefix.
 
 ## Views and Tools
 
