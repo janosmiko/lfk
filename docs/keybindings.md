@@ -288,7 +288,9 @@ The panel is context-aware per view. In the explorer it lists what the current r
 | `Esc` | Close |
 | any other key | Close, and still run normally |
 
-`?` no longer closes the panel -- it toggles the entry order and the chosen order lasts for the session. `which_key_grouped` (default `true`) sets the startup order; the toggle is not written back to the config.
+`?` no longer closes the panel -- it toggles the entry order. The chosen order is saved the moment you press the key and survives a restart; it is stored in `~/.local/state/lfk/whichkey_prefs.yaml`, never written back to your config file.
+
+Precedence: the saved choice wins over `which_key_grouped` (default `true`), which is only the startup default for someone who has never toggled. The state file also records the `which_key_grouped` value in force at the time, so changing that setting afterwards retires the saved choice and the new default applies again. Delete the state file to reset.
 
 Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout -- in key order the color is the only category cue left, so both modes carry it. A legend row at the bottom of the panel names each color in that color, so the mapping doesn't have to be memorized -- only the categories actually offered on the current row appear in it, and it is omitted with `no_color`.
 
@@ -315,7 +317,7 @@ Keys render as glyphs when `icons` allows them; `simple`, `none`, and `no_color`
 
 `nerdfont` uses which-key.nvim's keycap glyphs (plain arrow keycaps for `left`/`right`/`up`/`down` — Material Design Icons has no dedicated keyboard-arrow set) and pads each modifier with a space, since the proportional Nerd Font variants draw a keycap wider than one cell. `unicode` keeps `enter`/`esc` as words: `⏎`/`⎋` are easily confused at one cell; `tab`/`backspace`/the arrows each have one unambiguous glyph, so those switch. The goto popup (`g`) has no categories and keeps a single description color.
 
-`?` is the leader in every view that has a panel, so `F1` is the help key there. Inside a search or filter prompt `?` stays a literal character. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal, `which_key_grouped` (default `true`) sets the startup entry order.
+`?` is the leader in every view that has a panel, so `F1` is the help key there. Inside a search or filter prompt `?` stays a literal character. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal, `which_key_grouped` (default `true`) sets the startup entry order until the leader key toggles it (saved in `~/.local/state/lfk/whichkey_prefs.yaml`).
 
 ## Bookmarks
 

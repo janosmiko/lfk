@@ -569,7 +569,8 @@ filter_presets:
 # which_key_leader_delay_ms: 0
 
 # Startup order of the action panel: true groups by category, false sorts by
-# key. The leader key toggles it for the session.
+# key. The leader key toggles it and saves the choice to
+# ~/.local/state/lfk/whichkey_prefs.yaml, which then outranks this setting.
 # which_key_grouped: true
 
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────

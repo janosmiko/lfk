@@ -15,6 +15,10 @@ import (
 // tests mutate and restores it after the test, so test order can't leak state.
 func restoreWhichKeyGlobals(t *testing.T) {
 	t.Helper()
+	// The entry-order toggle writes to the state directory, so every
+	// which-key test gets its own: a toggle in one must not become another's
+	// startup preference.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	kb := ui.ActiveKeybindings
 	enabled := ui.ConfigWhichKeyEnabled
 	delay := ui.ConfigWhichKeyDelayMs

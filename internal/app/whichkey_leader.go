@@ -17,11 +17,11 @@ type whichKeyState struct {
 	shown  bool // delay elapsed, panel drawn
 	seq    int
 	scroll int
-	// grouping is the panel's entry order for the rest of the session. The
-	// zero value follows ui.ConfigWhichKeyGrouped rather than copying it, so a
-	// zero-value Model reads the CONFIGURED default instead of a stale
-	// snapshot of it — the runtime toggle is session state and is never
-	// written back to the config file.
+	// grouping is the panel's entry order. The zero value follows
+	// ui.ConfigWhichKeyGrouped rather than copying it, so a zero-value Model
+	// reads the CONFIGURED default instead of a stale snapshot of it. NewModel
+	// seeds it from the state file (whichkey_prefs.go); the runtime toggle is
+	// persisted there, never written back to the user's config file.
 	grouping wkGrouping
 	// cells caches the visible panel's entries for the duration of ONE
 	// render. The panel and the hint bar both need them, and each build runs
@@ -55,13 +55,18 @@ func (m Model) whichKeyGrouped() bool {
 }
 
 // toggleWhichKeyGrouping flips the panel between grouped and pure key order and
-// pins the result for the session.
+// pins the result for good.
+//
+// The write happens here rather than at quit: lfk can be killed, and every
+// other preference in the state directory is written the moment it changes.
 func (m Model) toggleWhichKeyGrouping() Model {
-	if m.whichKeyGrouped() {
-		m.whichKey.grouping = wkGroupOff
-	} else {
+	grouped := !m.whichKeyGrouped()
+	if grouped {
 		m.whichKey.grouping = wkGroupOn
+	} else {
+		m.whichKey.grouping = wkGroupOff
 	}
+	saveWhichKeyGrouping(grouped)
 	return m
 }
 

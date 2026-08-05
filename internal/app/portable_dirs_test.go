@@ -26,6 +26,7 @@ func TestPortableStateDir(t *testing.T) {
 		{"cluster-colors", clusterColorsFilePath(), filepath.Join(stateDir, "cluster-colors.yaml")},
 		{"portforwards", portForwardStatePath(), filepath.Join(stateDir, "portforwards.yaml")},
 		{"local-clusters", localClusterStateFilePath(), filepath.Join(stateDir, "local-clusters.yaml")},
+		{"whichkey-prefs", whichKeyPrefsFilePath(), filepath.Join(stateDir, "whichkey_prefs.yaml")},
 		{"kubetris", highScoreFilePath(), filepath.Join(stateDir, "kubetris-highscore")},
 		{"history", historyFilePathFor("history"), filepath.Join(stateDir, "history")},
 	}

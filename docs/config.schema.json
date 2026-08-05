@@ -119,7 +119,7 @@
     },
     "which_key_grouped": {
       "type": "boolean",
-      "description": "Startup order of the leader which-key panel: true clusters entries by category, false sorts purely by key. The leader key toggles it for the session.",
+      "description": "Startup order of the leader which-key panel: true clusters entries by category, false sorts purely by key. The leader key toggles it and saves the choice to the state directory, which then outranks this setting.",
       "default": true
     },
     "terminal": {
