@@ -141,16 +141,66 @@ func (c wkCatalog[C]) available(m *Model) []whichKeyEntry {
 	kb := ui.ActiveKeybindings
 	ctx := c.resolve(m)
 	out := make([]whichKeyEntry, 0, len(c.actions))
+	keys := make([]string, 0, len(c.actions))
 	for _, a := range c.actions {
-		if a.Key(kb) == "" {
+		k := a.Key(kb)
+		if k == "" {
 			continue
 		}
 		if a.Avail != nil && !a.Avail(ctx) {
 			continue
 		}
 		out = append(out, a.entry())
+		keys = append(keys, k)
 	}
-	return out
+	return wkDropAmbiguousKeys(out, keys)
+}
+
+// wkDropAmbiguousKeys removes every entry that shares its resolved key with
+// another entry surviving the same pass.
+//
+// This only ever fires after a REBIND lands a ui.Keybindings field on a key one
+// of the viewers hardcodes — kb.Refresh = "r" collides with the Object
+// Explorer's literal "r" (objectexplorer.go:289), a k9s habit that costs
+// nothing to configure. One of the two rows is then a lie, and the panel cannot
+// tell which: the viewers interleave literal and kb.* cases in their switches
+// (update_describe.go dispatches kb.ToggleWrap BEFORE "y"; update_yaml.go
+// dispatches "y" before kb.Refresh), so neither "the literal wins" nor "the
+// binding wins" holds. Advertising neither is the only answer that is never
+// false; the key still works, it just stops being advertised as two things.
+//
+// Under any keybinding set that does not create such an overlap this is a
+// no-op: the entries that deliberately share a key (y with three meanings, q
+// with two) carry mutually exclusive predicates, so at most one survives the
+// filter above. The scan is O(n^2) over ~40 short strings and allocates nothing
+// unless it actually finds a collision.
+func wkDropAmbiguousKeys(out []whichKeyEntry, keys []string) []whichKeyEntry {
+	dup := false
+	for i := range keys {
+		for j := i + 1; j < len(keys) && !dup; j++ {
+			dup = keys[i] == keys[j]
+		}
+		if dup {
+			break
+		}
+	}
+	if !dup {
+		return out
+	}
+	kept := make([]whichKeyEntry, 0, len(out))
+	for i := range out {
+		unique := true
+		for j := range keys {
+			if j != i && keys[j] == keys[i] {
+				unique = false
+				break
+			}
+		}
+		if unique {
+			kept = append(kept, out[i])
+		}
+	}
+	return kept
 }
 
 func (c wkCatalog[C]) inputFocused(m *Model) bool {

@@ -87,9 +87,13 @@ func TestAvailableWhichKeyActions_SecretEditorOnlyForSecretAndConfigMap(t *testi
 func TestAvailableWhichKeyActions_RespectsRebind(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()
-	kb.Delete = "X"
+	// "f9" is unbound by default. The old value here was "X", which is
+	// kb.ForceDelete's own default — both rows are offered on a Pod row, so the
+	// rebind collided and wkDropAmbiguousKeys correctly hid both. That made this
+	// test assert the rebind was ignored, which is not what it is about.
+	kb.Delete = "f9"
 	ui.ActiveKeybindings = kb
-	if !containsKey(whichKeyKeys(whichKeyTestModel()), "X") {
+	if !containsKey(whichKeyKeys(whichKeyTestModel()), "f9") {
 		t.Fatal("registry must resolve keys from ActiveKeybindings at call time")
 	}
 }
