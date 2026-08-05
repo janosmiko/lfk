@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -225,11 +227,14 @@ func TestWhichKeyLegend_SitsOnLastLineCentered(t *testing.T) {
 	if first == -1 || first == lastBar {
 		t.Fatalf("panel's last content row is not a body row: %q", lines[last])
 	}
+	// Cells throughout, never bytes or runes: whichKeyPadH and lay.container
+	// are terminal columns, and the panel draws glyphs that are two columns
+	// wide, so byte offsets into this row are not the columns they look like.
 	body := string(r[first+1 : lastBar])
-	if len(body) < whichKeyPadH+lay.container {
-		t.Fatalf("last body row is %d wide, want at least %d", len(body), whichKeyPadH+lay.container)
+	if got := lipgloss.Width(body); got < whichKeyPadH+lay.container {
+		t.Fatalf("last body row is %d wide, want at least %d", got, whichKeyPadH+lay.container)
 	}
-	inner := body[whichKeyPadH : whichKeyPadH+lay.container]
+	inner := ansi.Cut(body, whichKeyPadH, whichKeyPadH+lay.container)
 	if strings.TrimSpace(inner) == "" {
 		t.Fatalf("panel's last content line is blank; the legend must hug the border, not a padding row: %q", inner)
 	}
@@ -239,9 +244,9 @@ func TestWhichKeyLegend_SitsOnLastLineCentered(t *testing.T) {
 		}
 	}
 
-	trimmed := strings.TrimSpace(inner)
-	lead := strings.Index(inner, trimmed)
-	trail := len(inner) - lead - len(trimmed)
+	innerW := lipgloss.Width(inner)
+	lead := innerW - lipgloss.Width(strings.TrimLeft(inner, " "))
+	trail := innerW - lipgloss.Width(strings.TrimRight(inner, " "))
 	if diff := lead - trail; diff < -1 || diff > 1 {
 		t.Errorf("legend not centered: %d leading spaces vs %d trailing (want within 1 column), row=%q", lead, trail, inner)
 	}

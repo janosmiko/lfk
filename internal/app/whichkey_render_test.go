@@ -716,8 +716,11 @@ func TestWhichKeyLegend_StaysCentredUnderTransparentBg(t *testing.T) {
 		if trimmed == "" {
 			t.Fatalf("offset %d: the legend row is blank: %q", off, inner)
 		}
-		lead := strings.Index(inner, trimmed)
-		trail := len([]rune(inner)) - lead - len([]rune(trimmed))
+		// Columns, not runes: the legend is centred against a cell width, and
+		// a group name with a wide glyph in it would make the two disagree.
+		innerW := lipgloss.Width(inner)
+		lead := innerW - lipgloss.Width(strings.TrimLeft(inner, " "))
+		trail := innerW - lipgloss.Width(strings.TrimRight(inner, " "))
 		if diff := lead - trail; diff < -1 || diff > 1 {
 			t.Errorf("offset %d: legend not centred: %d leading vs %d trailing columns, row=%q",
 				off, lead, trail, inner)

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -151,8 +152,9 @@ func TestWhichKeyStrip_IsWideNotTall(t *testing.T) {
 	m.whichKey.shown = true
 
 	lines, first, last := whichKeyStripBox(t, m)
-	// The panel spans the full width, so its border row must too.
-	if got := len([]rune(lines[first])); got != m.width {
+	// The panel spans the full width, so its border row must too. Cells, not
+	// runes: the panel renders keycap glyphs that are two columns wide.
+	if got := lipgloss.Width(lines[first]); got != m.width {
 		t.Errorf("panel width = %d, want the full %d columns", got, m.width)
 	}
 	// Count keys on the widest content row: >2 means the grid really went wide.
