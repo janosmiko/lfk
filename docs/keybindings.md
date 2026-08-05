@@ -1317,8 +1317,6 @@ keybindings:
   toggle_preview_logs: "L"  # Toggle live-log preview pane (deeper levels only)
   logs: "ctrl+l"         # Open fullscreen log viewer
   refresh: "R"           # Refresh view
-  restart: "r"           # Restart resource (action menu only)
-  exec: "s"              # Exec into container (action menu only)
   edit: "E"              # Edit in $KUBE_EDITOR or $EDITOR
   describe: "v"          # Describe resource
   delete: "D"            # Delete resource

@@ -84,8 +84,6 @@ type Keybindings struct {
 	SecretEditor      string `json:"secret_editor" yaml:"secret_editor"`
 	CreateTemplate    string `json:"create_template" yaml:"create_template"`
 	Refresh           string `json:"refresh" yaml:"refresh"`
-	Restart           string `json:"restart" yaml:"restart"`
-	Exec              string `json:"exec" yaml:"exec"`
 	Edit              string `json:"edit" yaml:"edit"`
 	Describe          string `json:"describe" yaml:"describe"`
 	Delete            string `json:"delete" yaml:"delete"`
@@ -244,8 +242,8 @@ func DefaultKeybindings() Keybindings {
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",
 		Logs: "ctrl+l", LabelEditor: "i", SecretEditor: "e",
-		CreateTemplate: "a", Refresh: "R", Restart: "r",
-		Exec: "s", Edit: "E", Describe: "v", Delete: "D",
+		CreateTemplate: "a", Refresh: "R",
+		Edit: "E", Describe: "v", Delete: "D",
 		ForceDelete: "X", Scale: "S",
 		OpenBrowser: "ctrl+o", CopyName: "y", CopyYAML: "Y",
 		CopyField:  "ctrl+y",

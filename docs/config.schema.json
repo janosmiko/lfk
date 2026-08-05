@@ -460,8 +460,6 @@
         "secret_editor": { "type": "string" },
         "create_template": { "type": "string" },
         "refresh": { "type": "string" },
-        "restart": { "type": "string" },
-        "exec": { "type": "string" },
         "edit": { "type": "string" },
         "describe": { "type": "string" },
         "delete": { "type": "string" },

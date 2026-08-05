@@ -471,8 +471,6 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 |---|---|---|
 | `logs` | `ctrl+l` | Open the fullscreen log viewer for the selected resource |
 | `refresh` | `R` | Refresh current view |
-| `restart` | `r` | Restart resource (action menu only) |
-| `exec` | `s` | Exec into container (action menu only) |
 | `describe` | `v` | Describe selected resource |
 | `delete` | `D` | Delete resource (force delete Pod/Job if already deleting) |
 | `force_delete` | `X` | Force delete (Pod/Job only) |

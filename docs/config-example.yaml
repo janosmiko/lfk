@@ -394,8 +394,6 @@ keybindings:
   logs: "ctrl+l" # Open fullscreen log viewer (default: ctrl+l)
   toggle_preview_logs: "L" # Toggle right-pane live-log preview (default: L)
   refresh: "R" # Refresh view (default: R)
-  restart: "r" # Restart resource (default: r)
-  exec: "s" # Exec into pod (default: s)
   describe: "v" # Describe resource (default: v)
   delete: "D" # Delete resource (default: D)
   force_delete: "X" # Force delete resource (default: X)

@@ -642,16 +642,5 @@ func whichKeyExcludedBindings() map[string]string {
 		// and listed in the same goto popup (whichKeyCells), even though it
 		// swaps namespace scope rather than switching resource type.
 		"PreviousNamespace": "goto chord, has its own popup",
-
-		// Restart and Exec are defined in DefaultKeybindings and read by
-		// TestDefaultKeybindings, but no explorer dispatcher ever compares a
-		// keypress against kb.Restart or kb.Exec: the "Restart"/"Exec" actions
-		// (update_actions.go, update_actions_exec_pod.go) are reachable only
-		// through the Action menu, whose per-kind items (model.ActionsForKind)
-		// carry their own hardcoded quick-key hints independent of these
-		// fields. Registering either here would advertise a keystroke that the
-		// explorer never dispatches.
-		"Restart": "not dispatched outside the action menu (dead binding)",
-		"Exec":    "not dispatched outside the action menu (dead binding)",
 	}
 }

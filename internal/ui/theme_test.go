@@ -37,8 +37,6 @@ func TestDefaultKeybindings(t *testing.T) {
 	kb := DefaultKeybindings()
 	assert.NotEmpty(t, kb.Logs)
 	assert.NotEmpty(t, kb.Refresh)
-	assert.NotEmpty(t, kb.Restart)
-	assert.NotEmpty(t, kb.Exec)
 	assert.NotEmpty(t, kb.Describe)
 	assert.NotEmpty(t, kb.Delete)
 	assert.NotEmpty(t, kb.ForceDelete)

@@ -550,27 +550,6 @@ func TestAvailableWhichKeyActions_HidesAllNamespacesInUnionMode(t *testing.T) {
 	}
 }
 
-// Regression for the drift-guard sweep: Restart and Exec are defined in
-// DefaultKeybindings (theme_test.go asserts they are non-empty) but no
-// explorer dispatcher compares a keypress against either field — the
-// "Restart"/"Exec" actions are reachable only through the action menu, whose
-// items carry their own hardcoded quick-key hints. Confirms they are excluded
-// rather than silently missing from both the registry and the exclusion map.
-func TestWhichKeyExcludedBindings_RestartAndExecAreDeadBindings(t *testing.T) {
-	excluded := whichKeyExcludedBindings()
-	for _, name := range []string{"Restart", "Exec"} {
-		if _, ok := excluded[name]; !ok {
-			t.Errorf("%q must be listed in whichKeyExcludedBindings", name)
-		}
-	}
-	kb := ui.DefaultKeybindings()
-	for _, a := range whichKeyExplorerActions() {
-		if a.Key(kb) == kb.Restart || a.Key(kb) == kb.Exec {
-			t.Errorf("registry entry %q resolves to Restart/Exec's key, but neither is dispatched by the explorer", a.Label)
-		}
-	}
-}
-
 // Regression: OpenMarks ("'") was previously excluded with a false, circular
 // reason ("reachable from the bookmarks overlay") — it is in fact the key
 // that OPENS that overlay. handleKeyOpenMarks (update_keys.go) has no gate at
