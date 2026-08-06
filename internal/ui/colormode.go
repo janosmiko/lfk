@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -19,17 +20,25 @@ var (
 )
 
 // ParseColorModeMsg inspects an arbitrary bubbletea message to determine
-// whether it is an unrecognized CSI sequence carrying a CSI ?997 dark/light
-// color-mode report (Color Palette Update Notifications protocol).
+// whether it carries a CSI ?997 dark/light color-mode report (Color Palette
+// Update Notifications protocol).
 //
-// bubbletea wraps unknown CSI sequences in an unexported named []byte type
-// (unknownCSISequenceMsg). We use reflection to reach the raw bytes and match
-// against the known sequences without importing that private type.
-// A named-type check (Name() != "") ensures plain []byte values are ignored.
+// bubbletea v2 decodes the report into a typed ultraviolet event, which it
+// passes through untranslated. Older bubbletea wrapped unrecognized CSI
+// sequences in an unexported named []byte type (unknownCSISequenceMsg); that
+// path is kept as a fallback, matched by reflection so the private type need
+// not be imported. A named-type check (Name() != "") ensures plain []byte
+// values are ignored.
 //
 // Returns (dark=true, true) for a dark-mode report, (dark=false, true) for a
 // light-mode report, and (_, false) when msg is unrelated.
 func ParseColorModeMsg(msg tea.Msg) (dark bool, ok bool) {
+	switch msg.(type) {
+	case uv.DarkColorSchemeEvent:
+		return true, true
+	case uv.LightColorSchemeEvent:
+		return false, true
+	}
 	rv := reflect.ValueOf(msg)
 	rt := reflect.TypeOf(msg)
 	// Require a named slice-of-bytes (like unknownCSISequenceMsg), not plain []byte.
