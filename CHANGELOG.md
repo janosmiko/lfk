@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.16.0](https://github.com/janosmiko/lfk/compare/v0.15.16...v0.16.0) (2026-08-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* "?" no longer opens the help screen from the explorer; use F1, or set which_key_leader to another key.
+* the TUI now runs on Bubble Tea v2, which negotiates keyboard and mouse capabilities with the terminal differently from v1. Canonical keybinding spellings changed as listed above; configs using the old spellings are normalised automatically, but the stored and displayed form differs. The default mouse_toggle binding is now "ctrl+alt+y" and toggle_select is "space".
+
+### Features
+
+* context-aware which-key panel, and a reworked help screen ([#578](https://github.com/janosmiko/lfk/issues/578)) ([d8d77f3](https://github.com/janosmiko/lfk/commit/d8d77f3b7c703f140b16a2329c633bebb3791655))
+* migrate to Bubble Tea v2 and support Ctrl+Shift keybindings ([#573](https://github.com/janosmiko/lfk/issues/573)) ([a5da319](https://github.com/janosmiko/lfk/commit/a5da3199b5058dceb611fc2a15f2d156075a4a03))
+
+
+### Bug Fixes
+
+* scope Ctrl+C bulk-action cancel to the tab that started it ([#579](https://github.com/janosmiko/lfk/issues/579)) ([4f5f774](https://github.com/janosmiko/lfk/commit/4f5f774fb52de4faee15052aa3becd7cee471c7e))
+
 ## [0.15.16](https://github.com/janosmiko/lfk/compare/v0.15.15...v0.15.16) (2026-07-31)
 
 
