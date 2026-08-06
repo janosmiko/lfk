@@ -511,11 +511,20 @@ func DiffVisibleIndexForOriginal(left, right string, foldRegions []DiffFoldRegio
 func DiffLineTextAt(left, right string, foldRegions []DiffFoldRegion, foldState []bool, visibleIdx, side int, unified bool) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
+	return DiffLineTextIn(rawDiffLines, visLines, visibleIdx, side, unified)
+}
+
+// DiffLineTextIn is DiffLineTextAt for a caller that already holds the computed
+// diff. computeDiff builds an O(nxm) LCS table, so a caller resolving several
+// facts about the same diff (the which-key panel does: total lines, the fold
+// region at the cursor, the yank target) must reuse one pass rather than pay
+// for one per fact.
+func DiffLineTextIn(rawDiffLines []diffLine, visLines []VisibleDiffLine, visibleIdx, side int, unified bool) string {
 	if visibleIdx < 0 || visibleIdx >= len(visLines) {
 		return ""
 	}
 	vl := visLines[visibleIdx]
-	if vl.IsFoldPlaceholder || vl.Original < 0 {
+	if vl.IsFoldPlaceholder || vl.Original < 0 || vl.Original >= len(rawDiffLines) {
 		return ""
 	}
 	dl := rawDiffLines[vl.Original]

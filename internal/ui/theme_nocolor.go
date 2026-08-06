@@ -121,6 +121,21 @@ func applyNoColorTheme() {
 	StatusBarStyle = lipgloss.NewStyle().Faint(true).Padding(0, 1)
 	HelpKeyStyle = lipgloss.NewStyle().Bold(true)
 
+	// Which-key: the group accent is purely a color cue on the description, so
+	// without color every group collapses to the same plain description the
+	// panel had before groups were colored at all. Faint/italic/underline are
+	// not pressed into service as substitutes — six groups need six cues, there
+	// are not six legible attributes, and a half-applied scheme reads as noise.
+	// The entries stay perfectly usable; only the category hint is gone.
+	WhichKeyKeyStyle = lipgloss.NewStyle().Bold(true)
+	WhichKeyDescStyle = lipgloss.NewStyle()
+	WhichKeyActionsStyle = lipgloss.NewStyle()
+	WhichKeyViewsStyle = lipgloss.NewStyle()
+	WhichKeyFilterStyle = lipgloss.NewStyle()
+	WhichKeySelectionStyle = lipgloss.NewStyle()
+	WhichKeySortStyle = lipgloss.NewStyle()
+	WhichKeySettingsStyle = lipgloss.NewStyle()
+
 	ErrorStyle = lipgloss.NewStyle().Bold(true)
 	CurrentMarkerStyle = lipgloss.NewStyle().Bold(true)
 

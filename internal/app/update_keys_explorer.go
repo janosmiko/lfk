@@ -23,6 +23,17 @@ func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// The which-key leader is a pure overlay: the scroll keys move it, esc
+	// closes it, and every other key closes it and then runs its normal action.
+	// Because every listed action already has a bare binding here, "run the
+	// listed action" and "fall through" are the same thing — one dispatch path,
+	// so the panel can never disagree with what the key actually does.
+	mdl, consumed := m.whichKeyLeaderIntercept(msg)
+	m = mdl
+	if consumed {
+		return m, nil
+	}
+
 	if m.pendingMark {
 		m.pendingMark = false
 		key := msg.String()
@@ -78,6 +89,51 @@ func withLazySecurityProbe(mdl tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	return mm, cmd
 }
 
+// ctrlSpaceAlias returns the other spelling of the ctrl+space chord so a
+// dispatcher can accept both, and returns any other binding unchanged (a
+// harmless duplicate switch case).
+//
+// A terminal sends ctrl+space as NUL (0x00), which Bubble Tea v2 decodes to
+// {Code: KeySpace, Mod: ModCtrl} — printed "ctrl+space". The older "ctrl+@"
+// spelling is emitted only under LegacyKeyEncoding.CtrlAt, which lfk never
+// enables, so a config that still says "ctrl+@" would otherwise be dead. Both
+// are accepted rather than only swapping the default, because the stale
+// spelling is already written into existing user configs.
+func ctrlSpaceAlias(binding string) string {
+	switch binding {
+	case "ctrl+@":
+		return "ctrl+space"
+	case "ctrl+space":
+		return "ctrl+@"
+	}
+	return binding
+}
+
+// handleExplorerSelectionKey dispatches the multi-selection keys and the
+// which-key leader. Split out of handleExplorerNavKey to keep that function
+// under the gocyclo budget; it must stay ahead of handleExplorerUIKey in the
+// chain so the leader wins the "?" it shares with kb.Help.
+func (m Model) handleExplorerSelectionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case kb.SelectRange, ctrlSpaceAlias(kb.SelectRange):
+		return m.handleKeySelectRange(), nil, true
+	case kb.ToggleSelect:
+		return m.handleKeyToggleSelect(), nil, true
+	case kb.SelectAll:
+		return m.handleKeySelectAll(), nil, true
+	case kb.WhichKeyLeader:
+		// With the panel disabled the leader key opens nothing, so let it fall
+		// through to whatever else claims it (kb.Help, by default).
+		if !ui.ConfigWhichKeyEnabled {
+			return m, nil, false
+		}
+		mdl, cmd := m.armWhichKeyLeader()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
 func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 
@@ -90,6 +146,9 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	}
 
 	if mdl, cmd, handled := m.handleExplorerJumpKey(msg); handled {
+		return mdl, cmd, true
+	}
+	if mdl, cmd, handled := m.handleExplorerSelectionKey(msg); handled {
 		return mdl, cmd, true
 	}
 
@@ -126,15 +185,6 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
 		return mdl, cmd, true
-	case kb.SelectRange:
-		mdl := m.handleKeySelectRange()
-		return mdl, nil, true
-	case kb.ToggleSelect:
-		mdl := m.handleKeyToggleSelect()
-		return mdl, nil, true
-	case kb.SelectAll:
-		mdl := m.handleKeySelectAll()
-		return mdl, nil, true
 	case kb.Left, "left":
 		if m.fullscreenDashboard {
 			m.fullscreenDashboard = false
@@ -266,7 +316,7 @@ func (m Model) handleExplorerJumpTop() (tea.Model, tea.Cmd) {
 	}
 	if m.pendingG {
 		m.pendingG = false
-		m.whichKeyShown = false
+		m.hideWhichKeyPopup()
 		m.setCursor(0)
 		m.clampCursor()
 		m.syncExpandedGroup()

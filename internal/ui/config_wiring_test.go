@@ -83,6 +83,7 @@ abbreviations:
   zz: pod
 keybindings:
   refresh: ctrl+f5
+  which_key_leader: ctrl+k
 resource_columns:
   Pod: [IP, Node]
 views:
@@ -106,6 +107,8 @@ goto_targets:
     kind: Deployment
 which_key_enabled: false
 which_key_delay_ms: 250
+which_key_leader_delay_ms: 450
+which_key_grouped: false
 monitoring:
   _global:
     node_metrics: prometheus
@@ -195,6 +198,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, "dracula", ActiveSchemeName, "colorscheme")
 	assert.Equal(t, "/tmp/lfk-wiring-test.log", ConfigLogPath, "log_path")
 	assert.Equal(t, "ctrl+f5", ActiveKeybindings.Refresh, "keybindings")
+	assert.Equal(t, "ctrl+k", ActiveKeybindings.WhichKeyLeader, "keybindings.which_key_leader")
 	assert.Equal(t, "pod", SearchAbbreviations["zz"], "abbreviations")
 
 	// Scalar settings (applyConfigOptions).
@@ -299,6 +303,8 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, "Deployment", ConfigGotoTargets["gx"].Kind, "goto_targets")
 	assert.False(t, ConfigWhichKeyEnabled, "which_key_enabled")
 	assert.Equal(t, 250, ConfigWhichKeyDelayMs, "which_key_delay_ms")
+	assert.Equal(t, 450, ConfigWhichKeyLeaderDelayMs, "which_key_leader_delay_ms")
+	assert.False(t, ConfigWhichKeyGrouped, "which_key_grouped")
 
 	// Per-cluster overrides (clusters.<ctx>.*).
 	assert.True(t, ConfigClusterReadOnly["ctx1"], "clusters.read_only")
@@ -415,6 +421,8 @@ var wiringCoveredFields = map[string]string{
 	"goto_targets":              "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
 	"which_key_enabled":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
 	"which_key_delay_ms":        "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"which_key_leader_delay_ms": "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyLeaderDelay*",
+	"which_key_grouped":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyGrouped",
 }
 
 // TestConfigFile_EveryFieldHasWiringCoverage is a forcing function: it fails if

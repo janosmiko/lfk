@@ -86,7 +86,7 @@
     },
     "goto_targets": {
       "type": ["object", "null"],
-      "description": "User-defined g-prefix goto chords. Key is the full chord (e.g. \"gA\") and must start with the jump_top key.",
+      "description": "User-defined g-prefix goto chords. Key is the full chord (e.g. \"gA\") and must be the jump_top key plus one keypress.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
@@ -100,7 +100,7 @@
     },
     "which_key_enabled": {
       "type": "boolean",
-      "description": "Show the which-key popup while a chord prefix (g) is pending. Chords still work when false.",
+      "description": "Show the which-key popup while a chord prefix (g) is pending, and the leader action panel while the which-key leader (?) is armed. false hides both panels; the keys keep working — g still starts a goto chord, and the leader key falls through to whatever else claims it (the help screen, by default).",
       "default": true
     },
     "which_key_delay_ms": {
@@ -109,6 +109,18 @@
       "maximum": 2000,
       "description": "Delay before the which-key popup appears, in milliseconds (0 = immediate).",
       "default": 0
+    },
+    "which_key_leader_delay_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2000,
+      "description": "Delay before the leader which-key panel appears, in milliseconds (0 = immediate).",
+      "default": 0
+    },
+    "which_key_grouped": {
+      "type": "boolean",
+      "description": "Startup order of the leader which-key panel: true clusters entries by category, false sorts purely by key. The leader key toggles it and saves the choice to the state directory, which then outranks this setting.",
+      "default": true
     },
     "terminal": {
       "type": "string",
@@ -448,8 +460,6 @@
         "secret_editor": { "type": "string" },
         "create_template": { "type": "string" },
         "refresh": { "type": "string" },
-        "restart": { "type": "string" },
-        "exec": { "type": "string" },
         "edit": { "type": "string" },
         "describe": { "type": "string" },
         "delete": { "type": "string" },
@@ -469,6 +479,7 @@
         "prev_tab": { "type": "string" },
         "move_tab_left": { "type": "string" },
         "move_tab_right": { "type": "string" },
+        "which_key_leader": { "type": "string" },
         "set_mark": { "type": "string" },
         "open_marks": { "type": "string" },
         "terminal_toggle": { "type": "string" },

@@ -15,18 +15,16 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Enter` | Open full-screen YAML view / navigate into |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
-| `p` | Pin/unpin resource type (at resource types level) |
-| `x` | At resource types level: pin/unpin or hide/show the selected resource type, or pin/unpin its dashboard summary, via the action menu (saved per cluster context / union set) |
-| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
+| `z` | Toggle expand / collapse all resource groups / toggle event grouping in the Events list |
+| `x` | At resource types level: pin / unpin or hide / show the selected resource type, or pin / unpin its dashboard summary, via the action menu (saved per cluster context / union set) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
-| `J` / `K` | Scroll preview pane down/up |
+| `J` / `K` | Scroll preview pane down / up |
 | `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the Object Explorer for it |
 | `Backspace` | Jump back through teleport history (owner, port-forward, orphan, finding, and mark jumps push history; hierarchical `h`/`l` navigation does not) |
 
 ## Goto Navigation
 
-Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
+Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the goto which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
 
 | Key | Resource |
 |---|---|
@@ -57,20 +55,27 @@ goto_targets:
 
 The `g` popup also lists `g\`, which jumps to the previous namespace (swaps the scope back and forth).
 
-All built-in chords are rebindable under `keybindings`.
+All built-in chords are rebindable under `keybindings`. Every chord must start
+with `jump_top` (default `g`) and add one more key -- the dispatcher only ever
+looks up `jump_top` + the next keypress. A chord that does not is reported at
+startup and ignored. Rebinding `jump_top` therefore disables the built-in
+chords, which all start with `g`; re-point the ones you use at the new prefix.
 
 ## Views and Tools
 
 | Key | Action |
 |---|---|
-| `?` | Toggle help screen |
+| `F1` | Toggle help screen |
+| `?` | Which-key action panel -- see [Which-Key Panel](#which-key-panel) |
 | `P` | Toggle between details summary and YAML preview |
 | | Details pane shows labels, finalizers, annotation count, and resource metadata |
 | | Details view shows deletion timestamp (with warning highlight) for resources being deleted |
+| `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) |
 | `F` | Cycle layout: hide sidebar -> fullscreen -> restore (dashboards toggle fullscreen) |
 | `M` | Toggle resource relationship map view |
-| `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
-| `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
+| `,` | Column visibility toggle (show / hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
+| `p` | Pin / unpin resource type (at resource types level) |
+| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
 | `I` | API Explorer (browse resource structure interactively) |
 | `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
 | `U` | RBAC permissions browser (can-i) |
@@ -101,9 +106,10 @@ Your chosen sort is remembered per resource kind and per cluster context, and pe
 | `w` | Toggle watch mode (auto-refresh every 2s) |
 | `Ctrl+R` | Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab) |
 | `T` | Switch color scheme (live preview, not persisted) |
-| `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
-| `B` | Show/hide the per-resource SEC severity badge on explorer rows |
-| `i` | Show/hide ignored security findings (security view only — shadows the Label Editor there, which is a no-op on synthetic finding rows) |
+| `Ctrl+T` | Cycle terminal mode (pty/exec/mux — mux skipped without tmux/zellij) |
+| `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
+| `B` | Show / hide the per-resource SEC severity badge on explorer rows |
+| `i` | Show / hide ignored security findings (security view only — shadows the Label Editor there, which is a no-op on synthetic finding rows) |
 
 ## Orphan filter presets
 
@@ -153,16 +159,19 @@ Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason 
 
 ## Search and Filter
 
-| Key | Action |
-|---|---|
-| `f` | Start filter mode (filter items in current view) |
-| `/` | Start search mode (search and jump to match) |
-| `.` | Quick filter presets |
-| `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. |
-| `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). |
-| `n` | Jump to next search match |
-| `N` | Jump to previous search match |
-| `Esc` | Clear filter / cancel search |
+| Key | Action | Config key |
+|---|---|---|
+| `f` | Start filter mode (filter items in current view) | `filter` |
+| `/` | Start search mode (search and jump to match) | `search` |
+| `.` | Quick filter presets | `filter_presets` |
+| `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. | |
+| `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). | |
+| `n` | Jump to next search match | `next_match` |
+| `N` | Jump to previous search match | `prev_match` |
+| `Esc` | Clear filter / cancel search | |
+| `\` | Open namespace selector (then `.` to filter to current item's namespace) | `namespace_selector` |
+| `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
+| `g\` | Jump to previous namespace (swaps the scope back and forth) | `previous_namespace` |
 
 Each list remembers its `f` filter per tab: drilling into a resource (logs, containers, owned objects) and navigating back keeps the filter applied. A different list starts unfiltered; press `Esc` to clear a list's filter.
 
@@ -175,10 +184,6 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | Key | Action | Config key |
 |---|---|---|
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
-| `\` | Open namespace selector (then `.` to filter to current item's namespace) | `namespace_selector` |
-| `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
-| `g\` | Jump to previous namespace (swaps the scope back and forth) | `previous_namespace` |
-| `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
 | `Ctrl+L` | Open fullscreen log viewer for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |
@@ -237,7 +242,7 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 | Key | Action |
 |---|---|
 | `y` | Copy resource name to clipboard (with multi-selection: newline-joined names of all selected items) |
-| `Y` | Open copy-as picker (YAML / JSON / Table). YAML/JSON support multi-selection (multi-doc YAML joined with `---`, JSON array). Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest. |
+| `Y` | Open copy-as picker (YAML/JSON/Table). YAML/JSON support multi-selection (multi-doc YAML joined with `---`, JSON array). Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest. |
 | `Ctrl+Y` | Copy a single field. Opens instantly on the visible table columns (Name, Status, extras...) — `Enter` copies the cell value. `Tab` switches to the full manifest field list, where array elements are labeled semantically (`status.addresses[ExternalIP].address` for a node's external IP) so filtering `ExternalIP` finds the address row. With multi-selection the chosen column/field is extracted from every selected item, one value per line; labeled array elements resolve per manifest (not by index), and items missing the field are skipped. Remembers the last-copied entry per resource kind for the session and preselects it next time. |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
 
@@ -248,11 +253,71 @@ When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and
 | Key | Action |
 |---|---|
 | `Space` | Toggle selection on current item (sets anchor) |
-| `Ctrl+Space` | Select range from anchor to cursor |
+| `Ctrl+Space` | Select range from anchor to cursor (legacy `ctrl+@` spelling still accepted) |
 | `Ctrl+A` | Select / deselect all visible items |
 | `Esc` | Clear selection |
 
 When items are selected, press `x` to open the bulk action menu (delete, force delete, scale, restart, diff).
+
+See [Which-Key Panel](#which-key-panel) for the `?` action panel.
+
+## Which-Key Panel
+
+`?` opens a panel above the status bar listing the hotkeys actionable right now as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first, then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. Within each of those, letters and digits come first, then punctuation, then named keys (`F1`, `Space`, `Tab`). The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
+
+The panel is context-aware per view. In the explorer it lists what the current row supports; in a fullscreen viewer it lists what that viewer supports in its current state -- visual mode swaps the yank and hides the normal-mode keys, an armed count prefix relabels `y`, the log viewer's follow, severity, and `--previous` toggles read their current direction, and the diff viewer's `Tab` disappears in unified mode.
+
+| View | Panel |
+|---|---|
+| Explorer | Yes |
+| YAML view | Yes |
+| Log viewer | Yes |
+| Describe view | Yes |
+| Diff view | Yes |
+| API Explorer | Yes |
+| Object Explorer | Yes |
+| Log Top | Yes |
+| Event viewer (fullscreen) | Yes |
+| Exec mode | No -- every key goes to the PTY, including `?` |
+| Overlays (can-i, error log, sync waves, network policy) | No -- overlay keys are handled before the leader |
+
+| Key | Action |
+|---|---|
+| `?` | Open the panel; press again to switch between category order and key order |
+| `Ctrl+D` / `Ctrl+U` | Scroll half a page (only when the content overflows) |
+| `Esc` | Close |
+| any other key | Close, and still run normally |
+
+`?` no longer closes the panel -- it toggles the entry order. The chosen order is saved the moment you press the key and survives a restart; it is stored in `~/.local/state/lfk/whichkey_prefs.yaml`, never written back to your config file.
+
+Precedence: the saved choice wins over `which_key_grouped` (default `true`), which is only the startup default for someone who has never toggled. The state file also records the `which_key_grouped` value in force at the time, so changing that setting afterwards retires the saved choice and the new default applies again. Delete the state file to reset.
+
+Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout -- the same green the hint bar draws hotkeys in, and no category uses it, so the key never matches the description beside it. In key order the color is the only category cue left, so both modes carry it. A legend row at the bottom of the panel names each color in that color, so the mapping doesn't have to be memorized -- only the categories actually offered on the current row appear in it, and it is omitted with `no_color`.
+
+| Category | Color | Examples |
+|---|---|---|
+| Actions | magenta | Delete, Edit, Logs, Copy |
+| Views | blue | Resource map, RBAC browser, Task queue |
+| Filter | cyan | Filter, Search, Namespace selector |
+| Selection | purple | Toggle selection, Select range, Diff |
+| Sort | amber | Sort next/previous, Flip, Reset |
+| Settings | orange | Watch mode, Read-only, Color scheme |
+
+Keys render as glyphs when `icons` allows them; `simple`, `none`, and `no_color` keep the textual form. The help screen's (`F1`) key column uses this same substitution.
+
+| Binding | `nerdfont` | `unicode` / `emoji` | `simple` / `none` |
+|---|---|---|---|
+| `ctrl+d` | `󰘴 D` | `⌃D` | `ctrl+d` |
+| `ctrl+shift+x` | `󰘴 󰘶 X` | `⌃⇧X` | `ctrl+shift+x` |
+| `space` | `󱁐` | `␣` | `space` |
+| `tab` | `󰌒` | `⇥` | `tab` |
+| `backspace` | `󰁮` | `⌫` | `backspace` |
+| `left` / `right` / `up` / `down` | `󰁍` / `󰁔` / `󰁝` / `󰁅` | `←` / `→` / `↑` / `↓` | `left` / `right` / `up` / `down` |
+| `enter` / `esc` | `󰌑` / `󱊷` | `enter` / `esc` | `enter` / `esc` |
+
+`nerdfont` uses which-key.nvim's keycap glyphs (plain arrow keycaps for `left`/`right`/`up`/`down` — Material Design Icons has no dedicated keyboard-arrow set) and pads each modifier with a space, since the proportional Nerd Font variants draw a keycap wider than one cell. `unicode` keeps `enter`/`esc` as words: `⏎`/`⎋` are easily confused at one cell; `tab`/`backspace`/the arrows each have one unambiguous glyph, so those switch. The goto popup (`g`) has no categories and keeps a single description color.
+
+`?` is the leader in every view that has a panel, so `F1` is the help key there. Inside a search or filter prompt `?` stays a literal character. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal, `which_key_grouped` (default `true`) sets the startup entry order until the leader key toggles it (saved in `~/.local/state/lfk/whichkey_prefs.yaml`).
 
 ## Bookmarks
 
@@ -285,6 +350,8 @@ suffix in their name.
 
 ## Help View
 
+The in-app screen is a quick reference: one binding per line, keys right-aligned, modifier chords drawn as symbols (`⌃D`, `⇧Tab`) when the terminal supports them. Search and filter match the textual chord, so typing `ctrl` finds a row drawn as `⌃D`. This document is the exhaustive reference.
+
 | Key | Action |
 |---|---|
 | `/` | Search — highlights matches inline without removing non-matching lines |
@@ -293,22 +360,22 @@ suffix in their name.
 | `n` / `N` | Jump to next / previous search match (after Enter) |
 | `f` | Filter — narrows the visible list to lines matching the query |
 | `Esc` | Cascades: clear active search → clear active filter → close help |
-| `j` / `k` | Scroll down/up |
-| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll down/up |
+| `j` / `k` | Scroll down / up |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDown` / `PgUp` | Full-page scroll |
 | `g` / `G` | Jump to top / bottom |
 | `q` / `?` / `F1` | Close help |
 
 ## YAML View
 
-> Search (`/`), help (`?`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed.
+> Search (`/`), help (`F1`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Scroll up/down |
-| `123j` / `123k` | Move cursor down/up N visible lines (count-prefixed motion; folds skipped) |
-| `h` / `l` | Move cursor column left/right |
-| `123h` / `123l` | Move cursor column left/right by N runes |
+| `j` / `k` | Scroll up / down |
+| `123j` / `123k` | Move cursor down / up N visible lines (count-prefixed motion; folds skipped) |
+| `h` / `l` | Move cursor column left / right |
+| `123h` / `123l` | Move cursor column left / right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace character |
 | `w` / `b` | Move cursor to next/previous word start |
@@ -329,17 +396,19 @@ suffix in their name.
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
-| `h` / `l` | Move selection column left/right (in visual mode) |
+| `h` / `l` | Move selection column left / right (in visual mode) |
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank; folds skipped) |
 | `z` | Toggle fold on section under cursor |
-| `Z` | Toggle all folds (collapse/expand all) |
+| `Z` | Toggle all folds (collapse / expand all) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `R` | Re-fetch the resource and refresh the view, keeping cursor/scroll (configurable via `refresh`) |
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
 The top breadcrumb shows the resource name and the attribute path under the cursor (e.g. `lfk > ctx > Pods > my-pod > spec.containers[0].image`), like the Object Explorer location.
@@ -357,13 +426,16 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `/` | Filter the current level by key (in tree view: keys anywhere in the subtree) |
 | `r` | Recursive find overlay (search keys across the whole object) |
 | `T` | Toggle tree view — expand the whole subtree with ASCII-art guides (configurable via `tree_view`) |
-| `Space` / `z` | Fold/unfold the subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
+| `Space` / `z` | Fold / unfold the subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
 | `R` | Manually refresh the browsed object now (configurable via `refresh`) |
-| `w` | Toggle live refresh on/off — title shows `[PAUSED]` when off (configurable via `watch_mode`) |
+| `w` | Toggle live refresh on / off — title shows `[PAUSED]` when off (configurable via `watch_mode`) |
 | `y` / `Y` | Yank the selected node's path / full YAML |
 | `P` | Open the whole resource in the full YAML viewer |
 | `I` | Open the API Explorer at the selected item's schema |
-| `q` / `Esc` | Back one level / close at root |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
+| `q` | Close the Object Explorer |
+| `Esc` | Clear filter / back one level / close at root |
 
 Live refresh defaults to on; set `object_explorer.live: false` to start paused. Set `object_explorer.tree: true` to open in the tree view (`api_explorer.tree` for the API Explorer). See [Viewer Defaults](config-reference.md#viewer-defaults).
 
@@ -371,10 +443,10 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor up/down |
-| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
-| `h` / `l` | Move cursor column left/right |
-| `123h` / `123l` | Move cursor column left/right by N runes |
+| `j` / `k` | Move cursor up / down |
+| `123j` / `123k` | Move cursor down / up N lines (count-prefixed motion) |
+| `h` / `l` | Move cursor column left / right |
+| `123h` / `123l` | Move cursor column left / right by N runes |
 | `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
 | `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
 | `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
@@ -394,16 +466,18 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
 ## Log Viewer
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor up/down |
-| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
-| `h` / `l` / `Left` / `Right` | Move cursor column left/right |
-| `123h` / `123l` | Move cursor column left/right by N runes |
+| `j` / `k` | Move cursor up / down |
+| `123j` / `123k` | Move cursor down / up N lines (count-prefixed motion) |
+| `h` / `l` / `Left` / `Right` | Move cursor column left / right |
+| `123h` / `123l` | Move cursor column left / right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace character |
 | `w` / `b` | Move cursor to next/previous word start |
@@ -437,11 +511,13 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
-| `h` / `l` | Move selection column left/right (in visual mode) |
+| `h` / `l` | Move selection column left / right (in visual mode) |
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Close log viewer |
 
 The log viewer's `/` keeps its own persistent history at `$XDG_STATE_HOME/lfk/log-search-history` (default `~/.local/state/lfk/log-search-history`), separate from the explorer's `query-history`. Log search matches raw log lines (substring/regex over arbitrary text) rather than resource names, so pooling the two would surface irrelevant entries on Up/Down in either context.
@@ -466,11 +542,13 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `-` | Reset sort to REQ descending |
 | `.` | Open group-by field picker (multi-select) |
 | `p` | Open profile picker (traefik-json / ingress-nginx / nginx-combined / envoy / json / logfmt / auto) |
-| `,` | Open column picker: show/hide and reorder dimension columns, show/hide metric columns |
+| `,` | Open column picker: show / hide and reorder dimension columns, show / hide metric columns |
 | `f` | Filter rows (matches dimension values) |
 | `/` | Search and jump to matching row |
 | `n` / `N` | Next / previous search match |
+| `Tab` | Cycle the dimension `Enter` drills into |
 | `Enter` | Drill into selected group (descends to the next unused dimension, marked `▸` in its column header) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |
 
 ## Exec Mode (embedded terminal)
@@ -522,10 +600,10 @@ from `terminal:` in the config.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor up/down |
-| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
-| `h` / `l` | Move cursor column left/right |
-| `123h` / `123l` | Move cursor column left/right by N runes |
+| `j` / `k` | Move cursor up / down |
+| `123j` / `123k` | Move cursor down / up N lines (count-prefixed motion) |
+| `h` / `l` | Move cursor column left / right |
+| `123h` / `123l` | Move cursor column left / right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace |
 | `w` / `b` | Move cursor to next/previous word start |
@@ -546,7 +624,7 @@ from `terminal:` in the config.
 | `v` | Character visual selection |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
-| `h` / `l` | Move selection column left/right (in visual mode) |
+| `h` / `l` | Move selection column left / right (in visual mode) |
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank; empty-side lines skipped) |
@@ -555,6 +633,8 @@ from `terminal:` in the config.
 | `#` | Toggle line numbers |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `u` | Toggle unified/side-by-side view |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
 ## Event Timeline
@@ -563,10 +643,10 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor down/up |
-| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
-| `h` / `l` / `Left` / `Right` | Move cursor column left/right |
-| `123h` / `123l` | Move cursor column left/right by N runes |
+| `j` / `k` | Move cursor down / up |
+| `123j` / `123k` | Move cursor down / up N lines (count-prefixed motion) |
+| `h` / `l` / `Left` / `Right` | Move cursor column left / right |
+| `123h` / `123l` | Move cursor column left / right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace |
 | `w` / `b` | Move cursor to next/previous word start |
@@ -592,7 +672,8 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy N lines from cursor (count-prefixed yank) |
-| `?` / `F1` | Open this help, scrolled to the Event Timeline section |
+| `?` | Which-key panel (fullscreen viewer only) -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Open this help, scrolled to the Event Timeline section (`?` too, in the overlay) |
 | `q` / `Esc` | Close overlay (or exit fullscreen back to overlay) |
 
 > Events are pulled from the cluster, correlated to the selected resource (or shown cluster-wide on the timeline overlay), and grouped when their Type/Reason/Message/Object match. The line buffer (1-9 then a motion key) is consumed after each motion, so `5j 3k` jumps down 5 then up 3 without any digit leaking into the next command.
@@ -606,9 +687,9 @@ Ready, Restarts, Status, Age) and extras from the resource's
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Navigate up/down |
+| `j` / `k` | Navigate up / down |
 | `Space` | Toggle the current entry |
-| `J` / `K` | Reorder the current entry down/up |
+| `J` / `K` | Reorder the current entry down / up |
 | `/` | Filter entries by name |
 | `c` | Clear selection (uncheck every entry) |
 | `R` | Reset to defaults for the current kind |
@@ -648,7 +729,7 @@ enters edit mode for the selected (or new) entry.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor up/down |
+| `j` / `k` | Move cursor up / down |
 | `e` | Edit selected key/value |
 | `a` | Add a new key/value entry |
 | `y` | Copy: cursor row's value when nothing is selected, **opens the format picker automatically when 1+ rows are selected** (so you don't silently copy a single value while ignoring the marked bundle) |
@@ -721,10 +802,12 @@ The editor picks one of two modes based on the value being edited:
 | `n` / `N` | Next / previous search match (recursive: auto-drills into children / searches parent) |
 | `r` | Recursive field browser (browse all nested fields with filter) |
 | `T` | Toggle tree view — show the whole field subtree with ASCII-art guides; stays on while drilling/going back until toggled off (configurable via `tree_view`) |
-| `Space` / `z` | Fold/unfold the field subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
+| `Space` / `z` | Fold / unfold the field subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `F1` | Full help |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |
 
@@ -734,7 +817,7 @@ The editor picks one of two modes based on the value being edited:
 |---|---|
 | `j` / `k` | Navigate groups |
 | `J` / `K` | Scroll resource list down / up |
-| `/` | Search/filter groups by name |
+| `/` | Search / filter groups by name |
 | `a` | Toggle all/allowed-only permissions |
 | `s` | Switch subject (User/Group/SA) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
@@ -802,7 +885,7 @@ resource, the view says so explicitly — no policy restrictions apply.
 
 | Key | Action |
 |---|---|
-| `j` / `k` / Mouse wheel | Scroll up/down |
+| `j` / `k` / Mouse wheel | Scroll up / down |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
@@ -874,13 +957,13 @@ Invalid config values are dropped at startup with a warning in the error log.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor up/down |
+| `j` / `k` | Move cursor up / down |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `V` | Line visual selection |
 | `v` | Character visual selection (from cursor column) |
-| `h` / `l` / `Left` / `Right` | Move cursor column left/right |
+| `h` / `l` / `Left` / `Right` | Move cursor column left / right |
 | `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
 | `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
 | `y` | Copy selected lines (visual mode) or all entries (normal mode) |
@@ -902,6 +985,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `[` | Previous tab |
 | `}` | Move current tab right (shift+]) |
 | `{` | Move current tab left (shift+[) |
+| `Ctrl+C` | Close current tab (quit if last tab) |
 
 ## Read-Only Mode
 
@@ -988,8 +1072,8 @@ or `Esc` to cancel.
 | Click namespace badge in title bar | Open the namespace selector |
 | Click row in namespace selector | Apply that namespace and close |
 | Click outside a centered overlay | Dismiss it (same as `Esc`) — fullscreen / custom overlays are keyboard-only |
-| Wheel up/down inside a centered overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
-| Scroll wheel over middle pane | Move the row selection up/down |
+| Wheel up / down inside a centered overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
+| Scroll wheel over middle pane | Move the row selection up / down |
 | Scroll wheel over right pane | Scroll the preview under the pointer |
 | Scroll wheel in the Object Explorer / log viewer | Same per-pane routing — over the preview pane it scrolls the preview, over the list it moves the cursor |
 | `Ctrl+Option+Y` | Toggle mouse capture — release it to select text where `Shift+Drag` doesn't work, press again to re-enable |
@@ -1017,9 +1101,9 @@ Press `:` to open the command bar. It supports four types of input:
 | `Shift+Tab` | Cycle suggestions backward |
 | `Ctrl+N` / `Down` | Cycle suggestions forward |
 | `Ctrl+P` / `Up` | Cycle suggestions backward |
-| `Ctrl+D` / `Ctrl+U` | Scroll suggestions (half page down/up) |
-| `Ctrl+F` / `Ctrl+B` | Scroll suggestions (full page down/up) |
-| `Ctrl+Space` | Open/refresh suggestions |
+| `Ctrl+D` / `Ctrl+U` | Scroll suggestions (half page down / up) |
+| `Ctrl+F` / `Ctrl+B` | Scroll suggestions (full page down / up) |
+| `Ctrl+Space` | Open / refresh suggestions |
 | `Space` / `Right` | Accept ghost text preview |
 | `Enter` | Accept selected suggestion, or execute command when no suggestions |
 | `Esc` | Close suggestions first, then close command bar |
@@ -1057,7 +1141,6 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 | `T` | Switch color scheme |
 | `q` | Quit application (with confirmation) |
 | `Esc` | Go back one level / close overlay / quit |
-| `Ctrl+C` | Close current tab (quit if last tab) |
 
 ## Action Menu Items
 
@@ -1209,7 +1292,7 @@ keybindings:
   toggle_rare: "H"       # Toggle rarely used resource types in the sidebar
 
   # Views and Modes
-  help: "?"              # Toggle help
+  help: "f1"             # Toggle help (default "?" is taken by which_key_leader)
   filter: "f"            # Filter items
   search: "/"            # Search and jump
   toggle_preview: "P"    # Toggle YAML preview
@@ -1241,8 +1324,6 @@ keybindings:
   toggle_preview_logs: "L"  # Toggle live-log preview pane (deeper levels only)
   logs: "ctrl+l"         # Open fullscreen log viewer
   refresh: "R"           # Refresh view
-  restart: "r"           # Restart resource (action menu only)
-  exec: "s"              # Exec into container (action menu only)
   edit: "E"              # Edit in $KUBE_EDITOR or $EDITOR
   describe: "v"          # Describe resource
   delete: "D"            # Delete resource
@@ -1252,15 +1333,16 @@ keybindings:
   secret_editor: "e"     # Secret/configmap editor
   create_template: "a"   # Create from template
   copy_name: "y"         # Copy name
-  copy_yaml: "Y"         # Open copy-as picker (YAML / JSON / Table)
+  copy_yaml: "Y"         # Open copy-as picker (YAML/JSON/Table)
   copy_field: "ctrl+y"   # Copy a single manifest field (filterable picker)
   paste_apply: "ctrl+p"  # Apply from clipboard
   open_browser: "ctrl+o" # Open in browser
   diff: "d"              # Diff resources
 
   # Multi-selection
+  which_key_leader: "?"  # Open the which-key action panel
   toggle_select: "space" # Toggle selection (space bar)
-  select_range: "ctrl+@" # Select range (Ctrl+Space)
+  select_range: "ctrl+space" # Select range (legacy "ctrl+@" still accepted)
   select_all: "ctrl+a"   # Select all
 
   # Tabs

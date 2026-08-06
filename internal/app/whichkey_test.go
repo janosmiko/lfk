@@ -1,9 +1,12 @@
 package app
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -12,15 +15,25 @@ import (
 // tests mutate and restores it after the test, so test order can't leak state.
 func restoreWhichKeyGlobals(t *testing.T) {
 	t.Helper()
+	// The entry-order toggle writes to the state directory, so every
+	// which-key test gets its own: a toggle in one must not become another's
+	// startup preference.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	kb := ui.ActiveKeybindings
 	enabled := ui.ConfigWhichKeyEnabled
 	delay := ui.ConfigWhichKeyDelayMs
+	leaderDelay := ui.ConfigWhichKeyLeaderDelayMs
+	grouped := ui.ConfigWhichKeyGrouped
 	dim := ui.ConfigDimOverlay
+	icons := ui.IconMode
 	t.Cleanup(func() {
 		ui.ActiveKeybindings = kb
 		ui.ConfigWhichKeyEnabled = enabled
 		ui.ConfigWhichKeyDelayMs = delay
+		ui.ConfigWhichKeyLeaderDelayMs = leaderDelay
+		ui.ConfigWhichKeyGrouped = grouped
 		ui.ConfigDimOverlay = dim
+		ui.IconMode = icons
 	})
 }
 
@@ -147,7 +160,7 @@ func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out, cmd, handled := m.handleGotoChord(tea.KeyPressMsg{Code: 'P', Text: "P"})
 	if !handled {
 		t.Fatal("unregistered second key must be consumed (handled=true)")
@@ -156,7 +169,7 @@ func TestHandleGotoChord_UnregisteredConsumesAndCloses(t *testing.T) {
 		t.Fatal("unregistered second key must be a noop (no command)")
 	}
 	rm := out.(Model)
-	if rm.pendingG || rm.whichKeyShown {
+	if rm.pendingG || rm.whichKey.shown {
 		t.Fatal("unregistered second key must close the prefix and the popup")
 	}
 	// A real goto sets Level to LevelResources; an unregistered key must leave
@@ -176,78 +189,191 @@ func TestHandleGotoChord_EscClosesPopup(t *testing.T) {
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out, cmd, handled := m.handleGotoChord(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if !handled || cmd != nil {
 		t.Fatal("esc must be consumed as a noop while the prefix is armed")
 	}
 	rm := out.(Model)
-	if rm.pendingG || rm.whichKeyShown {
+	if rm.pendingG || rm.whichKey.shown {
 		t.Fatal("esc must close the prefix and the popup")
 	}
 }
 
-// Completing gg (jump to top) must clear whichKeyShown along with pendingG so
+// Completing gg (jump to top) must clear whichKey.shown along with pendingG so
 // no stale visibility flag lingers.
 func TestExplorerJumpTop_GGClearsWhichKeyShown(t *testing.T) {
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out, _ := m.handleExplorerJumpTop()
 	rm := out.(Model)
-	if rm.pendingG || rm.whichKeyShown {
-		t.Fatalf("gg must clear both pendingG and whichKeyShown; got pendingG=%v whichKeyShown=%v", rm.pendingG, rm.whichKeyShown)
+	if rm.pendingG || rm.whichKey.shown {
+		t.Fatalf("gg must clear both pendingG and whichKey.shown; got pendingG=%v whichKey.shown=%v", rm.pendingG, rm.whichKey.shown)
 	}
 }
 
-func TestLayoutWhichKey(t *testing.T) {
-	mk := func(n int) []string {
-		out := make([]string, n)
-		for i := range out {
-			out[i] = "x x" // width 3
+// wkGridCells builds n entries whose labels are descLen columns wide, which is
+// all whichKeyGridFor measures.
+func wkGridCells(n, descLen int) []whichKeyCell {
+	cells := make([]whichKeyCell, n)
+	for i := range cells {
+		cells[i] = whichKeyCell{key: "k", desc: strings.Repeat("d", descLen)}
+	}
+	return cells
+}
+
+// TestWhichKeyGridFor pins the ported which-key.nvim box arithmetic
+// (view.lua:340-344). The property that matters is that every column is the
+// SAME width and the columns divide the container evenly — the old per-column
+// widest sizing plus gap-spreading is what read as ragged.
+func TestWhichKeyGridFor(t *testing.T) {
+	// max_row_width = 1 (key) + 1 (the single gap) + 20 = 22.
+	// box_width = clamp(22, 30, 100) = 30; box_count = floor(100/(30+3)) = 3;
+	// box_width = floor(100/3) = 33.
+	g := whichKeyGridFor(wkGridCells(15, 20), 100)
+	if g.boxN != 3 || g.boxW != 33 {
+		t.Fatalf("container 100: got box_count=%d box_width=%d, want 3 and 33", g.boxN, g.boxW)
+	}
+	if g.rowN != 5 {
+		t.Fatalf("15 entries over 3 columns must be 5 rows, got %d", g.rowN)
+	}
+
+	// Even division: the columns fill the container with less than one column
+	// of slack left, and never overflow it.
+	for _, container := range []int{40, 60, 74, 100, 114, 200} {
+		for _, descLen := range []int{3, 12, 20, 45} {
+			g := whichKeyGridFor(wkGridCells(9, descLen), container)
+			if used := g.boxN * g.boxW; used > container || container-used >= g.boxN {
+				t.Errorf("container=%d desc=%d: %d columns of %d use %d — not an even division",
+					container, descLen, g.boxN, g.boxW, used)
+			}
 		}
-		return out
 	}
 
-	sumOf := func(xs []int) int {
-		s := 0
-		for _, x := range xs {
-			s += x
+	// layout.width.min floors the column width, so tiny entries still get
+	// readable columns rather than a dozen sliver ones.
+	if g := whichKeyGridFor(wkGridCells(15, 1), 100); g.boxN != 3 {
+		t.Fatalf("min column width must cap the column count at 3, got %d (box_width=%d)", g.boxN, g.boxW)
+	}
+
+	// A container narrower than one column collapses to a single column
+	// instead of producing a zero-width or negative layout.
+	g = whichKeyGridFor(wkGridCells(15, 20), 14)
+	if g.boxN != 1 || g.boxW != 14 {
+		t.Fatalf("narrow container: got box_count=%d box_width=%d, want 1 and 14", g.boxN, g.boxW)
+	}
+	if g.descW < 0 || g.keyW < 1 {
+		t.Fatalf("narrow container produced an unusable cell: keyW=%d descW=%d", g.keyW, g.descW)
+	}
+}
+
+// TestWhichKeyGridFor_LeadAppliesEvenAtSingleColumn pins the panel's outer
+// left margin at whichKeyPadH+whichKeySpacing (2+3=5) regardless of column
+// count. which-key.nvim only prepends layout.spacing when box_count > 1
+// because its popup shrink-wraps to content at one column; lfk's panel always
+// draws full width, so without the same lead there the reserved spacing
+// budget would land as a stray gap on the right (whatever FillLinesBg pads
+// the short row out with) instead of a margin on the left. See whichKeyGridFor
+// for the full rationale.
+func TestWhichKeyGridFor_LeadAppliesEvenAtSingleColumn(t *testing.T) {
+	g := whichKeyGridFor(wkGridCells(15, 20), 14)
+	if g.boxN != 1 {
+		t.Fatalf("precondition: want a single column, got %d", g.boxN)
+	}
+	if g.lead != whichKeySpacing {
+		t.Fatalf("single column: lead=%d, want whichKeySpacing (%d)", g.lead, whichKeySpacing)
+	}
+	// lead + key field + gap + desc field must still land exactly on boxW, so
+	// the content the row writes fills the column with no unaccounted slack.
+	if got := g.lead + g.keyW + whichKeyGap + g.descW; got != g.boxW {
+		t.Fatalf("single column: lead+keyW+gap+descW=%d, want boxW=%d", got, g.boxW)
+	}
+}
+
+// TestWhichKeyGridFor_MaxColsCapsWideContainers pins whichKeyMaxCols: with
+// entries well under whichKeyMinColW, the width-driven formula alone would
+// still pack a lot of columns into a very wide container (e.g. 7 at a
+// 244-column container, the container a 250-column terminal produces) -
+// exactly the "9 narrow columns, 5 rows" regression this task fixes. The
+// ceiling caps it at whichKeyMaxCols regardless of how much width is left
+// over, and the leftover width goes to widening the columns rather than
+// adding more of them.
+func TestWhichKeyGridFor_MaxColsCapsWideContainers(t *testing.T) {
+	g := whichKeyGridFor(wkGridCells(50, 20), 244)
+	if g.boxN != whichKeyMaxCols {
+		t.Fatalf("wide container: got box_count=%d, want the max-cols ceiling %d", g.boxN, whichKeyMaxCols)
+	}
+	if want := 244 / whichKeyMaxCols; g.boxW != want {
+		t.Fatalf("wide container: got box_width=%d, want %d (container/max-cols)", g.boxW, want)
+	}
+}
+
+// TestWhichKeyGridFor_KeyFieldIsShared pins the key field as ONE width for the
+// whole panel, the widest key as DRAWN. Per-column sizing (what this replaces)
+// made the field depend on which entries landed in which column, so the same
+// catalog drew different inter-column gaps in grouped order than in key order.
+//
+// Run under both icon modes: the symbol form is three columns wide where the
+// textual one is ten, so a grid that measured the BINDING rather than the drawn
+// key would reserve seven dead columns in symbol mode.
+func TestWhichKeyGridFor_KeyFieldIsShared(t *testing.T) {
+	for _, icons := range []string{"simple", "unicode"} {
+		t.Run(icons, func(t *testing.T) {
+			restoreWhichKeyGlobals(t)
+			ui.IconMode = icons
+			// container 70 -> box_count 2, so 4 entries fill 2 rows x 2
+			// columns column-major: d/e in column 0, ctrl+alt+y/x in column 1.
+			cells := []whichKeyCell{
+				{key: "d", desc: "Delete"},
+				{key: "e", desc: "Edit"},
+				{key: "ctrl+alt+y", desc: "Mouse capture"},
+				{key: "x", desc: "Exec"},
+			}
+			g := whichKeyGridFor(cells, 70)
+			if g.boxN != 2 || g.rowN != 2 {
+				t.Fatalf("precondition: want a 2x2 grid, got box_count=%d rows=%d", g.boxN, g.rowN)
+			}
+			want := lipgloss.Width(cells[2].keyText())
+			if g.keyW != want {
+				t.Errorf("key field = %d, want %d (the panel's widest key as drawn)", g.keyW, want)
+			}
+			if g.lead+g.keyW+whichKeyGap+g.descW != g.boxW {
+				t.Errorf("fields must fill the column exactly: lead=%d keyW=%d descW=%d boxW=%d",
+					g.lead, g.keyW, g.descW, g.boxW)
+			}
+		})
+	}
+}
+
+// TestWhichKeyGridFor_GeometryIgnoresEntryOrder is the guard for the reported
+// defect: the same entries in a different order must produce the SAME grid, so
+// toggling grouped/key order can never move a column or change a gap. Reversal
+// stands in for any permutation — it is the one that puts every wide chord in
+// the opposite column from where it started.
+func TestWhichKeyGridFor_GeometryIgnoresEntryOrder(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	for _, icons := range []string{"nerdfont", "unicode", "simple"} {
+		ui.IconMode = icons
+		m := whichKeyTestModel()
+		grouped := m.whichKeyLeaderCells()
+		byKey := append([]whichKeyCell(nil), grouped...)
+		sortWhichKeyCells(byKey, false)
+		reversed := append([]whichKeyCell(nil), grouped...)
+		slices.Reverse(reversed)
+
+		for container := 1; container <= 250; container++ {
+			want := whichKeyGridFor(grouped, container)
+			for name, other := range map[string][]whichKeyCell{"key order": byKey, "reversed": reversed} {
+				if got := whichKeyGridFor(other, container); got != want {
+					t.Fatalf("icons=%s container=%d: %s grid %+v differs from grouped %+v",
+						icons, container, name, got, want)
+				}
+			}
 		}
-		return s
-	}
-
-	// 15 entries -> 4 columns, ceil(15/4)=4 rows; stretched to the target width
-	// with the slack in the gaps and no trailing space past the last column
-	// (inner == sum(colW) + sum(gaps)).
-	lay := layoutWhichKey(mk(15), 100, 200)
-	if len(lay.colW) != 4 || lay.rows != 4 {
-		t.Fatalf("15 entries: want 4 cols / 4 rows, got %d cols / %d rows", len(lay.colW), lay.rows)
-	}
-	if lay.inner != 100 {
-		t.Fatalf("grid must stretch to target inner 100, got %d", lay.inner)
-	}
-	if sumOf(lay.colW)+sumOf(lay.gaps) != lay.inner {
-		t.Fatalf("no-trailing-gap invariant broken: cols=%v gaps=%v inner=%d", lay.colW, lay.gaps, lay.inner)
-	}
-
-	// Adding entries keeps 4 columns and grows rows (expand vertically).
-	lay2 := layoutWhichKey(mk(23), 100, 200)
-	if len(lay2.colW) != 4 || lay2.rows != 6 { // ceil(23/4)=6
-		t.Fatalf("23 entries: want 4 cols / 6 rows, got %d cols / %d rows", len(lay2.colW), lay2.rows)
-	}
-
-	// Each column is sized to its own widest entry. 4 entries, 4 columns, 1 row.
-	wide := []string{"short", "a-very-long-entry", "short", "short"}
-	lay3 := layoutWhichKey(wide, 100, 200)
-	if lay3.colW[1] != len("a-very-long-entry") || lay3.colW[0] != len("short") {
-		t.Fatalf("per-column widths wrong: %v", lay3.colW)
-	}
-
-	// Narrow terminal reduces the column count to fit.
-	lay4 := layoutWhichKey(mk(15), 5, 5)
-	if len(lay4.colW) >= 4 {
-		t.Fatalf("narrow width must reduce columns, got %d", len(lay4.colW))
 	}
 }
 
@@ -391,5 +517,156 @@ func TestGotoResourceType_BackNavLandsOnJumpedType(t *testing.T) {
 	want := model.ResourceTypeEntry{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments"}
 	if got := visible[c]; got.Extra != want.ResourceRef() {
 		t.Fatalf("cursor landed on %q (%s), want Deployment (%s)", got.Name, got.Extra, want.ResourceRef())
+	}
+}
+
+// TestWhichKeyGoto_ScrollResetsOnCloseAndReopen is the goto popup's mirror of
+// TestWhichKeyLeader_ScrollResetsOnDisarmAndRearm. The offset lives on
+// whichKeyState, which BOTH popups share, but only the leader used to rewind
+// it: scrolling the goto popup, dismissing it, then pressing g again reopened
+// it scrolled to its tail with the first entries off screen — it read as if
+// the popup had lost half its list.
+func TestWhichKeyGoto_ScrollResetsOnCloseAndReopen(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyDelayMs = 0
+	m := gotoTestModel()
+	m.width, m.height = 80, 12
+
+	out, _ := m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+	m = out.(Model)
+	if !m.pendingG || !m.whichKey.shown {
+		t.Fatalf("precondition: g must arm and show the popup (pendingG=%v shown=%v)", m.pendingG, m.whichKey.shown)
+	}
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyCells())
+	if !ok || lay.maxScroll == 0 {
+		t.Fatalf("precondition: the goto popup must overflow at 80x12 (ok=%v maxScroll=%d)", ok, lay.maxScroll)
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+	m = out.(Model)
+	if m.whichKey.scroll == 0 {
+		t.Fatal("precondition: ctrl+d should have scrolled the goto popup")
+	}
+
+	// Dismiss with an unmapped continuation ("gP" is no goto target).
+	out, _ = m.handleExplorerKey(keyMsg("P"))
+	m = out.(Model)
+	if m.whichKey.shown {
+		t.Fatal("an unmapped continuation must close the popup")
+	}
+	if m.whichKey.scroll != 0 {
+		t.Fatalf("closing the goto popup must rewind its viewport, got scroll=%d", m.whichKey.scroll)
+	}
+
+	out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+	if got := out.(Model).whichKey.scroll; got != 0 {
+		t.Fatalf("reopening the goto popup must start at the top, got scroll=%d", got)
+	}
+}
+
+// TestWhichKeyGoto_ScrollSurvivesALeaderPanelOffset is the other half of the
+// shared-state bug: the leader panel and the goto popup write the same scroll
+// field, so an offset left by one must never open the other mid-list.
+func TestWhichKeyGoto_ScrollSurvivesALeaderPanelOffset(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyDelayMs = 0
+	m := gotoTestModel()
+	m.width, m.height = 80, 12
+	m.whichKey.scroll = 99 // as if the leader panel had been scrolled
+
+	out, _ := m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+	if got := out.(Model).whichKey.scroll; got != 0 {
+		t.Fatalf("arming the goto popup must start at the top, got scroll=%d", got)
+	}
+}
+
+// TestWhichKeyGoto_AllEntriesReachableViaScrolling is the goto popup's mirror
+// of TestWhichKeyLeader_AllEntriesReachableViaScrolling. The popup shares
+// whichKeyLayoutFor and the scroll code with the leader panel but had no
+// reachability sweep of its own, so an off-by-one in maxScroll would have been
+// caught on one surface and missed on the other. Sizes are chosen so the goto
+// cells actually overflow.
+func TestWhichKeyGoto_AllEntriesReachableViaScrolling(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	ui.ConfigWhichKeyDelayMs = 0
+
+	for _, size := range [][2]int{{80, 12}, {80, 14}, {100, 13}} {
+		m := gotoTestModel()
+		m.width, m.height = size[0], size[1]
+
+		out, _ := m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.JumpTop))
+		m = out.(Model)
+		cells := m.whichKeyCells()
+		lay, ok := m.whichKeyLayoutFor(cells)
+		if !ok {
+			t.Fatalf("%dx%d: the goto popup must lay out", size[0], size[1])
+		}
+		if lay.maxScroll == 0 {
+			t.Fatalf("%dx%d: this size must overflow, otherwise it proves nothing", size[0], size[1])
+		}
+
+		bg := strings.Repeat("\n", m.height)
+		var rendered strings.Builder
+		rendered.WriteString(stripANSI(m.renderWhichKey(bg)))
+		for step := 0; m.whichKey.scroll < lay.maxScroll; step++ {
+			if step > lay.bodyRows {
+				t.Fatalf("%dx%d: ctrl+d never reached the end (%d of %d)", size[0], size[1], m.whichKey.scroll, lay.maxScroll)
+			}
+			out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
+			m = out.(Model)
+			rendered.WriteString("\n")
+			rendered.WriteString(stripANSI(m.renderWhichKey(bg)))
+		}
+		for _, c := range cells {
+			drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
+			if !strings.Contains(rendered.String(), drawn) {
+				t.Errorf("%dx%d: %q never appears at any scroll offset — unreachable", size[0], size[1], drawn)
+			}
+		}
+	}
+}
+
+// TestWhichKeyCells_NeverAdvertisesAnUnreachableChord is the regression for the
+// half-configurable goto chord. handleGotoChord looks up jump_top + the next
+// key, so a chord starting with anything else can never fire — but the popup
+// keyed its cells with strings.TrimPrefix, which is a no-op when the prefix is
+// absent, so it drew a cell labelled "zp" that no keypress could reach.
+//
+// The second key is one KEYPRESS, so "gjj" is unreachable for the same reason
+// while "gctrl+p" and "gtab" are perfectly reachable. The bindings are set here
+// rather than loaded, because the popup reads the mutable global and must hold
+// the rule on its own.
+func TestWhichKeyCells_NeverAdvertisesAnUnreachableChord(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	kb := ui.DefaultKeybindings()
+	kb.GotoPods = "zp"           // wrong prefix
+	kb.PreviousNamespace = "z\\" // wrong prefix
+	kb.GotoJobs = "gjj"          // two keypresses after the prefix
+	kb.GotoNodes = "gn"          // still reachable
+	kb.GotoSecrets = "gctrl+p"   // modified key: one keypress, reachable
+	kb.GotoPVs = "gtab"          // named key: one keypress, reachable
+	ui.ActiveKeybindings = kb
+
+	m := whichKeyTestModel()
+	cells := m.whichKeyCells()
+	keys := make([]string, 0, len(cells))
+	for _, c := range cells {
+		keys = append(keys, c.key)
+	}
+	for _, bad := range []string{"zp", "z\\", "jj"} {
+		if slices.Contains(keys, bad) {
+			t.Errorf("popup advertises %q, which handleGotoChord can never build; cells=%v", bad, keys)
+		}
+	}
+	for _, want := range []string{"n", "ctrl+p", "tab"} {
+		if !slices.Contains(keys, want) {
+			t.Errorf("reachable chord must still be offered as %q; cells=%v", want, keys)
+		}
 	}
 }

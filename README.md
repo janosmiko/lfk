@@ -151,7 +151,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Configurable keybindings** for direct actions, including `Ctrl+Shift` chords that stay distinct from plain `Ctrl` (requires Kitty keyboard protocol or xterm `modifyOtherKeys`: Ghostty, kitty, WezTerm, foot, xterm — not macOS Terminal.app; see [Ctrl+Shift chords](docs/keybindings.md#ctrlshift-chords))
 - **Configurable search abbreviations**
 - **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
-- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable.
+- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable. Also decides how the which-key panel and help screen draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
 - **Configurable table columns** (global, per-resource-type, and per-cluster)
 - **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
@@ -238,7 +238,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 ## Keybindings
 
-> For the complete keybinding reference (YAML view, log viewer, describe, diff, exec mode, and all sub-modes), see [docs/keybindings.md](docs/keybindings.md). Press `?` or `F1` in-app for the built-in help screen.
+> For the complete keybinding reference (YAML view, log viewer, describe, diff, exec mode, and all sub-modes), see [docs/keybindings.md](docs/keybindings.md). Press `F1` in-app for the built-in help screen, `?` for the which-key action panel.
 
 ### Navigation
 
@@ -267,7 +267,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 | Key | Action |
 |---|---|
-| `?` | Toggle help screen |
+| `F1` | Toggle help screen (`?` too, where no which-key panel exists: overlays and exec mode) |
 | `f` | Filter items in current view |
 | `/` | Search and jump to match |
 | `n` / `N` | Next / previous search match |
@@ -307,6 +307,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
 | `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
+| `?` | Which-key action panel: hotkeys actionable right now, descriptions colored by category with a color legend at the bottom (scroll: `Ctrl+D`/`Ctrl+U`, close: `esc`; `?` again switches between category and key order, kept for the session). Also in every fullscreen viewer except exec mode, where it lists what that viewer supports in its current state. `F1` opens full help |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 | `}` / `{` | Move current tab right / left |

@@ -288,3 +288,702 @@ func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
 			"BuildHelpLines must return plain text (no ANSI escapes) — line %d: %q", i, line)
 	}
 }
+
+// --- one hotkey per line ---
+
+// The help screen renders one binding per row, so a catalog entry with an
+// empty key would draw as a prose-only line — exactly the wall of text the
+// screen was reworked to remove. Long explanations live in
+// docs/keybindings.md instead.
+func TestHelpSections_EveryEntryHasAKey(t *testing.T) {
+	for _, section := range helpSections() {
+		for i, b := range section.bindings {
+			assert.NotEmptyf(t, strings.TrimSpace(b.key),
+				"section %q entry %d (%q) has no key — prose-only rows are not allowed",
+				section.title, i, b.desc)
+		}
+	}
+}
+
+// A description must not restate where the user already is. The Bookmarks
+// section once carried "(in overlay)" on six consecutive rows — the section
+// IS the overlay, so the parenthetical cost six rows of width and told the
+// reader nothing. The help screen is scanned for one row, not read as prose.
+func TestHelpSections_DescriptionsDoNotRestateTheirSection(t *testing.T) {
+	for _, section := range helpSections() {
+		for _, b := range section.bindings {
+			assert.NotContainsf(t, b.desc, "(in overlay)",
+				"section %q: %q restates the section's own scope", section.title, b.desc)
+		}
+	}
+}
+
+// --- right-aligned key column ---
+
+// Every entry row shares one key-column width, and the key sits flush
+// against its right edge, so all descriptions start at the same column.
+func TestBuildHelpSpecs_KeyColumnIsGloballyRightAligned(t *testing.T) {
+	specs := buildHelpSpecs("", "", helpInnerWidth(160))
+	width := -1
+	sawEntry := false
+	for _, s := range specs {
+		if s.kind != helpLineEntry {
+			continue
+		}
+		sawEntry = true
+		w := lipgloss.Width(s.key)
+		if width < 0 {
+			width = w
+		}
+		assert.Equalf(t, width, w,
+			"key column width must be identical on every row: %q", s.key)
+		if s.keyText == "" {
+			continue // wrapped continuation row: key cell is intentionally blank
+		}
+		assert.Falsef(t, strings.HasSuffix(s.key, " "),
+			"key must be right-aligned (no trailing pad): %q", s.key)
+	}
+	assert.True(t, sawEntry, "expected at least one entry row")
+}
+
+// The description column therefore starts at one fixed offset on every row.
+func TestHelpSpecPlain_DescriptionsStartAtOneColumn(t *testing.T) {
+	specs := buildHelpSpecs("", "", helpInnerWidth(160))
+	offsets := make(map[int]struct{})
+	for _, s := range specs {
+		if s.kind != helpLineEntry || s.desc == "" {
+			continue
+		}
+		line := helpSpecPlain(s)
+		offsets[lipgloss.Width(line)-lipgloss.Width(s.desc)] = struct{}{}
+	}
+	assert.Len(t, offsets, 1, "descriptions must all start at the same column, got offsets %v", offsets)
+}
+
+// --- symbol keys vs. the search index ---
+
+// The key column draws "⌃D" while the search index keeps "Ctrl+D", so a
+// user typing "ctrl" still finds the row. This is the whole reason
+// helpLineSpec carries both forms.
+func TestBuildHelpLines_SearchIndexKeepsTextualChord(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	IconMode = "unicode"
+	ConfigNoColor = false
+
+	joined := strings.Join(BuildHelpLines("", "", 160), "\n")
+	assert.Contains(t, joined, "Ctrl+D",
+		"the search index must carry the textual chord so a 'ctrl' query matches")
+	assert.NotContains(t, joined, "⌃",
+		"the search index must not carry the symbol form")
+
+	rendered := ansi.Strip(RenderHelpScreen(160, 200, 0, "", "", "", -1))
+	assert.Contains(t, rendered, "⌃D",
+		"the key column must draw the symbol form")
+
+	// The two paths must stay row-for-row aligned or n/N jumps to the
+	// wrong line.
+	assert.Len(t, BuildHelpLines("", "", 160), len(buildHelpSpecs("", "", helpInnerWidth(160))))
+}
+
+// A "ctrl" query must select the rows whose key column draws a symbol
+// chord — the search index is what MatchLine sees.
+func TestBuildHelpLines_CtrlQueryMatchesSymbolRenderedRows(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+	IconMode = "unicode"
+
+	var matched []string
+	for _, line := range BuildHelpLines("", "", 160) {
+		if MatchLine(line, "ctrl") {
+			matched = append(matched, line)
+		}
+	}
+	assert.NotEmpty(t, matched, `a "ctrl" search must match rows drawn as symbol chords`)
+	assert.Contains(t, strings.Join(matched, "\n"), "Ctrl+D")
+}
+
+// The f filter runs over the same textual form, so filtering by "ctrl"
+// narrows to the chord rows instead of returning "No matching keybindings".
+func TestBuildHelpSpecs_FilterMatchesTextualChord(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+	IconMode = "unicode"
+
+	specs := buildHelpSpecs("ctrl", "", helpInnerWidth(160))
+	assert.NotEmpty(t, specs)
+	for _, s := range specs {
+		assert.NotEqual(t, helpLineMessage, s.kind, "filter must find the chord rows")
+	}
+	found := false
+	for _, s := range specs {
+		if s.kind == helpLineEntry && strings.Contains(s.keyText, "Ctrl") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, `filtering by "ctrl" must keep symbol-rendered chord rows`)
+}
+
+// A row whose drawn key shares no characters with the query still shows
+// the hit: the whole key cell is highlighted instead of a substring.
+func TestRenderHelpScreen_SymbolChordRowShowsSearchHighlight(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	originalIcons := IconMode
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		IconMode = originalIcons
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	IconMode = "unicode"
+	ApplyTheme(DefaultTheme())
+
+	plain := RenderHelpScreen(160, 200, 0, "", "", "", -1)
+	searched := RenderHelpScreen(160, 200, 0, "", "ctrl", "", -1)
+
+	assert.NotEqual(t, plain, searched,
+		`a "ctrl" search must visibly highlight the symbol-rendered chord rows`)
+	assert.Equal(t, ansi.Strip(plain), ansi.Strip(searched),
+		"the highlight must add color only, never visible characters")
+}
+
+// --- chord tokenizer ---
+
+// Catalog keys are not always one binding. Formatting has to work
+// token-wise so composites keep their exact separators.
+func TestHelpKeyDisplay_CompositeKeys(t *testing.T) {
+	tests := []struct{ given, want string }{
+		{"ctrl+d/ctrl+u", "Ctrl+D/Ctrl+U"},
+		{"ctrl+] ctrl+u/ctrl+d", "Ctrl+] Ctrl+U/Ctrl+D"},
+		// A bare key is never a chord, so it keeps its verbatim spelling
+		// (same contract as helpKeyDisplay("space") == "space").
+		{"tab/shift+tab", "tab/Shift+Tab"},
+		{"m<a-z/0-9>", "m<a-z/0-9>"},
+		{"123<motion>", "123<motion>"},
+		{"Click ns badge", "Click ns badge"},
+		{"space/Right", "space/Right"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.given, func(t *testing.T) {
+			assert.Equal(t, tt.want, helpKeyDisplay(tt.given))
+		})
+	}
+}
+
+// helpKeySymbols draws " / " between alternative bindings instead of the
+// raw "/" (spaced and dimmed at render time — see styleHelpKeyCell), so
+// this test's expectations gain the surrounding spaces for every case where
+// "/" joins two real alternatives. "m<a-z/0-9>" is the deliberate
+// exception: its "/" is inside "<...>", part of one placeholder token
+// (any letter or digit after m), not a separator — it must stay literal.
+func TestHelpKeySymbols_ByIconMode(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+
+	ConfigNoColor = false
+	IconMode = "unicode"
+	assert.Equal(t, "⌃D / ⌃U", helpKeySymbols("ctrl+d/ctrl+u"))
+	assert.Equal(t, "⇥ / ⇧⇥", helpKeySymbols("tab/shift+tab"))
+	assert.Equal(t, "m<a-z/0-9>", helpKeySymbols("m<a-z/0-9>"))
+	assert.Equal(t, "h / ←", helpKeySymbols("h/Left"))
+
+	// Terminals that promise only ASCII keep the readable textual chord,
+	// spaced the same way.
+	IconMode = "none"
+	assert.Equal(t, "Ctrl+D / Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+	IconMode = "unicode"
+	ConfigNoColor = true
+	assert.Equal(t, "Ctrl+D / Ctrl+U", helpKeySymbols("ctrl+d/ctrl+u"))
+}
+
+// helpKeySymbols must apply the same bare-named-key substitution
+// KeyChordDisplay uses for the which-key panel, including inside a
+// slash-joined alternative list ("h/Backspace/Left" -> "h / <backspace> /
+// <left>") — the panel and the help screen must never disagree on how a
+// named key draws.
+func TestHelpKeySymbols_NamedKeyIcons(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	ConfigNoColor = false
+
+	tests := []struct {
+		icons, given, want string
+	}{
+		{"nerdfont", "tab", "\U000F0312"},
+		{"nerdfont", "space", "\U000F1050"},
+		{"nerdfont", "backspace", "\U000F006E"},
+		{"nerdfont", "Left", "\U000F004D"}, // catalog labels are capitalized
+		{"nerdfont", "Right", "\U000F0054"},
+		{"nerdfont", "Up", "\U000F005D"},
+		{"nerdfont", "Down", "\U000F0045"},
+		{"nerdfont", "h/Backspace/Left", "h / \U000F006E / \U000F004D"},
+		{"nerdfont", "space/Right", "\U000F1050 / \U000F0054"},
+		{"unicode", "tab", "⇥"},
+		{"unicode", "space", "␣"},
+		{"unicode", "backspace", "⌫"},
+		{"unicode", "Left", "←"},
+		{"unicode", "Right", "→"},
+		{"unicode", "Up", "↑"},
+		{"unicode", "Down", "↓"},
+		{"unicode", "h/Backspace/Left", "h / ⌫ / ←"},
+		{"unicode", "space/Right", "␣ / →"},
+		// enter/esc keep the earlier, narrower decision: nerdfont's large
+		// keycaps already resolved them (pre-existing glyphs), unicode's
+		// small ⏎/⎋ never did and this change does not revisit that.
+		{"nerdfont", "enter", "\U000F0311"},
+		{"nerdfont", "esc", "\U000F12B7"},
+		{"unicode", "enter", "enter"},
+		{"unicode", "esc", "esc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.icons+"/"+tt.given, func(t *testing.T) {
+			IconMode = tt.icons
+			assert.Equal(t, tt.want, helpKeySymbols(tt.given))
+		})
+	}
+}
+
+// The catalog's Mouse section describes mouse actions, not keybindings, and
+// happens to use the words "left"/"right" for panes and a button ("Click
+// left pane", "Right-click"). Those must never draw an arrow key icon: every
+// genuine list of alternative bindings in this catalog joins with "/"
+// ("h/Backspace/Left"), never a space or hyphen, so helpKeySymbols uses that
+// as the signal to leave prose alone. Without this guard "Right-click"
+// would render as "→-click", telling the user to press an arrow key for a
+// mouse action.
+func TestHelpKeySymbols_MouseProseStaysTextual(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	ConfigNoColor = false
+
+	prose := []string{"Right-click", "Click left pane", "Click right pane"}
+	for _, icons := range []string{"nerdfont", "unicode"} {
+		IconMode = icons
+		for _, key := range prose {
+			t.Run(icons+"/"+key, func(t *testing.T) {
+				assert.Equal(t, key, helpKeySymbols(key),
+					"a mouse-action label must never be read as a keyboard chord")
+			})
+		}
+	}
+}
+
+// A search for a named key's word must still find its row even though the
+// key column now draws an icon: the search index (keyText) stays textual
+// while only the rendered key column (key) draws the symbol.
+//
+// Every key the active icon table substitutes is queried, driven off the
+// table itself rather than a hardcoded list — a hardcoded {backspace, tab,
+// left} left "space", "enter", "esc" and three of the four arrows unguarded,
+// and would not have covered a newly added glyph at all. A named key with no
+// row in the catalog is skipped (verified against the textual baseline, so
+// the skip can never hide a genuine icon-mode regression).
+func TestBuildHelpLines_NamedKeyQueryMatchesIconRenderedRows(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+
+	countMatches := func(query string) int {
+		n := 0
+		for _, line := range BuildHelpLines("", "", 160) {
+			if MatchLine(line, query) {
+				n++
+			}
+		}
+		return n
+	}
+
+	// Baseline: the same queries against the textual (non-icon) rendering.
+	IconMode = "simple"
+	baseline := map[string]int{}
+	for _, names := range []map[string]string{nerdKeyGlyphs, unicodeKeyGlyphs} {
+		for name := range names {
+			baseline[name] = countMatches(name)
+		}
+	}
+	covered := 0
+	for _, n := range baseline {
+		if n > 0 {
+			covered++
+		}
+	}
+	assert.GreaterOrEqual(t, covered, 7,
+		"precondition: most substituted key names must appear in the catalog, else this test guards nothing")
+
+	for _, icons := range []string{"nerdfont", "unicode"} {
+		IconMode = icons
+		_, names, _ := keyGlyphs()
+		for name := range names {
+			if baseline[name] == 0 {
+				continue // no catalog row uses this key at all
+			}
+			t.Run(icons+"/"+name, func(t *testing.T) {
+				assert.Equalf(t, baseline[name], countMatches(name),
+					"a %q search must find the same rows in %s mode as in textual mode", name, icons)
+			})
+		}
+	}
+}
+
+// The f filter runs over the same textual search index, so filtering by a
+// named key's word must narrow to its row instead of "No matching
+// keybindings" — mirroring TestBuildHelpSpecs_FilterMatchesTextualChord for
+// the new icon-drawn keys.
+func TestBuildHelpSpecs_FilterMatchesNamedKeyWord(t *testing.T) {
+	originalIcons := IconMode
+	t.Cleanup(func() { IconMode = originalIcons })
+	IconMode = "nerdfont"
+
+	specs := buildHelpSpecs("backspace", "", helpInnerWidth(160))
+	assert.NotEmpty(t, specs)
+	found := false
+	for _, s := range specs {
+		if s.kind == helpLineEntry && strings.Contains(strings.ToLower(s.keyText), "backspace") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, `filtering by "backspace" must keep the icon-rendered row`)
+}
+
+// Icons mostly narrow the key column ("backspace" 9 cols -> 1). The column
+// is sized from lipgloss.Width and shared across every section (see
+// helpKeyColumnWidth), so this checks every entry's key column against the
+// real computed width at the icon modes and terminal sizes this change
+// touches — a byte-counted width would have passed for the old ASCII words
+// but silently misaligned once "Backspace" (9 cells) became one glyph.
+//
+// A row is allowed to exceed keyWidth (never to fall short of it): that is
+// helpKeyColumnWidth's documented cap-overflow case (a key past innerW/3
+// overflows its own cell rather than shrinking every description), already
+// exercised by "Click middle pane" — 17 cells wide, uncapped — at width 80
+// regardless of icon mode, since neither word is a named key.
+func TestBuildHelpSpecs_KeysAlignWithinSection_IconModesAndSizes(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	ConfigNoColor = false
+
+	for _, icons := range []string{"nerdfont", "unicode"} {
+		for _, screenWidth := range []int{80, 160} {
+			t.Run(icons+"/", func(t *testing.T) {
+				IconMode = icons
+				innerW := helpInnerWidth(screenWidth)
+				groups := collectHelpGroups("", "")
+				keyWidth := helpKeyColumnWidth(groups, innerW)
+				specs := buildHelpSpecs("", "", innerW)
+
+				exact := 0
+				for _, s := range specs {
+					if s.kind != helpLineEntry {
+						continue
+					}
+					w := lipgloss.Width(s.key)
+					assert.GreaterOrEqualf(t, w, keyWidth,
+						"icons=%s width=%d: key %q (width %d) padded shorter than the column width %d",
+						icons, screenWidth, s.key, w, keyWidth)
+					if w == keyWidth {
+						exact++
+					}
+				}
+				assert.Positive(t, exact,
+					"the column-width padding path must be exercised by at least one row")
+			})
+		}
+	}
+}
+
+// --- goto chord notation ---
+
+// The goto row is written in vim's placeholder notation ("g{key}"), built
+// from the JumpTop binding so a rebind follows. Two ways it could break on
+// the way to the screen: the chord tokenizer could mangle the braces (they
+// are not chord runes, so "key" is a token of its own), or applyKeySeparator
+// could read something inside them as an alternative. Neither may happen —
+// the row must draw exactly as written, in every icon mode.
+func TestHelpSections_GotoChordNotation(t *testing.T) {
+	originalIcons := IconMode
+	originalKB := ActiveKeybindings
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ActiveKeybindings = originalKB
+	})
+
+	gotoKey := func() string {
+		for _, section := range helpSections() {
+			for _, b := range section.bindings {
+				if b.desc == "Goto resource type" {
+					return b.key
+				}
+			}
+		}
+		return ""
+	}
+
+	ActiveKeybindings = DefaultKeybindings()
+	assert.Equal(t, ActiveKeybindings.JumpTop+"{key}", gotoKey(),
+		"the goto row must be built from the JumpTop binding, not a hardcoded g")
+
+	// A rebind must carry through, otherwise the help lies about the chord.
+	rebound := DefaultKeybindings()
+	rebound.JumpTop = "t"
+	ActiveKeybindings = rebound
+	assert.Equal(t, "t{key}", gotoKey())
+
+	ActiveKeybindings = DefaultKeybindings()
+	for _, icons := range []string{"nerdfont", "unicode", "simple", "none"} {
+		t.Run(icons, func(t *testing.T) {
+			IconMode = icons
+			assert.Equal(t, "g{key}", helpKeySymbols("g{key}"),
+				"the placeholder braces must reach the key column untouched")
+			assert.NotContains(t, helpKeySymbols("g{key}"), helpKeySeparator,
+				"a placeholder chord is one binding, not two alternatives")
+		})
+	}
+}
+
+// --- separator spacing ---
+
+// applyKeySeparator must space a "/" only where it genuinely separates two
+// alternative bindings, and leave it alone everywhere else. Separator and
+// binding are now the same character, so the "leave alone" rows are the
+// load-bearing ones: they are what keeps an unspaced literal "/" tellable
+// apart from a spaced separator downstream (styleHelpKeyCell splits on the
+// spaced form).
+//
+// This table enumerates every shape of "/" found in the live help catalog
+// (help_sections.go) plus the bracket-guarded placeholder case, so a future
+// catalog entry that adds a new shape has a home to extend.
+func TestApplyKeySeparator_Enumeration(t *testing.T) {
+	tests := []struct {
+		name, given, want string
+	}{
+		{"bare Search key: nothing on either side, not a separator", "/", "/"},
+		{"two full alternatives", "h/Left", "h / Left"},
+		{"doubled-chord alternative", "gg/Home", "gg / Home"},
+		{"three alternatives", "0/1/2", "0 / 1 / 2"},
+		{"two single-char alternatives", ">/<", "> / <"},
+		{"two chord alternatives (post chord-mapping)", "⌃D/⌃U", "⌃D / ⌃U"},
+		{"bracket-guarded range placeholder: leave alone", "m<a-z/0-9>", "m<a-z/0-9>"},
+		{"unbracketed range list: three real alternatives", "a-z/A-Z/0-9", "a-z / A-Z / 0-9"},
+		{"single key, no slash at all", "d", "d"},
+		{"vim-style placeholder chord: braces are not separators", "g{key}", "g{key}"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, applyKeySeparator(tt.given))
+		})
+	}
+}
+
+// The spacing is display-only: the search index (BuildHelpLines) must keep
+// the tight "/" so a user who searches for a substring straddling the
+// separator is unaffected — and so the two forms stay easy to tell apart
+// in the source now that they share a character.
+func TestBuildHelpLines_SearchIndexKeepsTightSlash(t *testing.T) {
+	originalIcons := IconMode
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		IconMode = originalIcons
+		ConfigNoColor = originalNoColor
+	})
+	IconMode = "unicode"
+	ConfigNoColor = false
+
+	joined := strings.Join(BuildHelpLines("", "", 160), "\n")
+	assert.Contains(t, joined, "gg/Home", "search index must carry the tight textual alternative")
+	assert.NotContains(t, joined, "gg / Home", "search index must not carry the display-only spacing")
+
+	rendered := ansi.Strip(RenderHelpScreen(160, 200, 0, "", "", "", -1))
+	assert.Contains(t, rendered, "gg / Home", "the rendered key column must draw the spaced separator")
+}
+
+// A user searching for one alternative among several ("Home" inside the
+// row drawn as "gg / Home") must still find and highlight the row — the
+// separator gaining spaces must not break the search a user already
+// relies on to locate a key.
+func TestRenderHelpScreen_SearchFindsRowWithSpacedAlternativeKey(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
+	lines := BuildHelpLines("", "", 160)
+	found := false
+	for _, l := range lines {
+		if MatchLine(l, "Home") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, `search for "Home" must find the row rendered as "gg / Home"`)
+
+	plain := RenderHelpScreen(160, 200, 0, "", "", "", -1)
+	searched := RenderHelpScreen(160, 200, 0, "", "Home", "", -1)
+	assert.NotEqual(t, plain, searched, `a "Home" search must visibly highlight the row`)
+	assert.Contains(t, ansi.Strip(searched), "gg / Home",
+		"search highlighting must not change the visible characters")
+}
+
+// The separator must draw dimmer than the keys around it — the whole
+// point of the change — not merely spaced. Confirms the key segments and
+// the separator segment open with different SGR codes.
+func TestStyleHelpKeyCell_SeparatorStyledDifferentlyFromKeys(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
+	rendered := styleHelpKeyCell("h"+helpKeySeparator+"Left", "", SearchHighlightStyle, keyStyle)
+
+	keyOpen := styleOpenCodes(keyStyle)
+	sepOpen := styleOpenCodes(OverlayDimStyle)
+	assert.NotEmpty(t, keyOpen)
+	assert.NotEmpty(t, sepOpen)
+	assert.NotEqual(t, keyOpen, sepOpen,
+		"key style and separator style must emit different SGR codes")
+	assert.Contains(t, rendered, keyOpen, "rendered cell must open with the key style")
+	assert.Contains(t, rendered, sepOpen, "rendered cell must switch to the dim style for the separator")
+
+	// A single-binding key (no separator) must render identically to the
+	// pre-split path — no separator segment, no extra codes.
+	single := styleHelpKeyCell("d", "", SearchHighlightStyle, keyStyle)
+	assert.Equal(t, HighlightMatchStyledOver("d", "", SearchHighlightStyle, keyStyle), single)
+}
+
+// In no-color mode the separator has no distinct foreground, but it must
+// still draw as literal " / " with spaces either side — the visual gap
+// the user asked for does not depend on color being available.
+func TestHelpKeySymbols_SpacedSeparatorSurvivesNoColor(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	originalIcons := IconMode
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		IconMode = originalIcons
+	})
+	ConfigNoColor = true
+	IconMode = "unicode"
+
+	assert.Equal(t, "h / Left", helpKeySymbols("h/Left"))
+}
+
+// Separator and binding are now the same character, so the bare Search key
+// "/" is the one row that could be mistaken for a separator and dimmed into
+// invisibility. It must render entirely in keyStyle: one segment, no
+// OverlayDimStyle anywhere in the cell.
+func TestStyleHelpKeyCell_BareSlashSearchKeyIsNotDimmed(t *testing.T) {
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
+
+	// The cell the renderer actually hands to styleHelpKeyCell: the catalog
+	// key resolved to its drawn form, then right-aligned in the column.
+	drawn := helpKeySymbols("/")
+	assert.Equal(t, "/", drawn, "the Search binding must stay an unspaced slash")
+	cell := padKeyLeft(drawn, helpKeyColumnMinWidth)
+
+	rendered := styleHelpKeyCell(cell, "", SearchHighlightStyle, keyStyle)
+	assert.NotContains(t, rendered, styleOpenCodes(OverlayDimStyle),
+		"a slash that IS the binding must never pick up the dim separator style")
+	assert.Equal(t, HighlightMatchStyledOver(cell, "", SearchHighlightStyle, keyStyle), rendered,
+		"the bare Search key must take the single-segment path, identical to any other one-binding key")
+}
+
+// End-to-end counterpart: the catalog's "/" rows must reach the renderer as
+// a one-binding cell. If applyKeySeparator ever spaced them, styleHelpKeyCell
+// would split the cell and dim the only character the row has.
+func TestBuildHelpSpecs_BareSlashRowsStayOneSegment(t *testing.T) {
+	seen := 0
+	for _, s := range buildHelpSpecs("", "", helpInnerWidth(160)) {
+		if s.kind != helpLineEntry || strings.TrimSpace(s.key) != "/" {
+			continue
+		}
+		seen++
+		assert.NotContains(t, s.key, helpKeySeparator,
+			"the bare Search/filter key cell must not contain a separator: %q", s.key)
+	}
+	assert.Positive(t, seen, `expected at least one catalog row bound to a bare "/"`)
+}
+
+// TestRenderHelpScreen_NeverExceedsTheTerminal is the help screen's mirror of
+// the which-key geometry sweep. The box is 70%/80% of the terminal with 50x20
+// floors, and those floors used to be unclamped: any terminal under ~52
+// columns or ~22 rows got a help overlay LARGER than the terminal it was
+// drawn into. Sweeps small widths and heights and asserts the rendered
+// overlay fits.
+//
+// helpBoxHardW/helpBoxHardH are the irreducible box (title, two scroll
+// indicators, two borders, two padding pairs, one help line), so terminals
+// below 14 columns or 10 rows cannot be satisfied by any clamp and are
+// excluded rather than pretended about.
+func TestRenderHelpScreen_NeverExceedsTheTerminal(t *testing.T) {
+	for w := helpBoxHardW + helpBoxFrame; w <= 90; w += 3 {
+		for h := helpBoxHardH + helpBoxFrame; h <= 40; h += 3 {
+			out := RenderHelpScreen(w, h, 0, "", "", "", -1)
+			gotW := lipgloss.Width(out)
+			gotH := len(strings.Split(out, "\n"))
+			assert.LessOrEqualf(t, gotW, w, "help overlay is %d columns wide in a %dx%d terminal", gotW, w, h)
+			assert.LessOrEqualf(t, gotH, h, "help overlay is %d rows tall in a %dx%d terminal", gotH, w, h)
+		}
+	}
+}
+
+// The clamp must not change the help screen at the sizes people actually use:
+// these are the exact dimensions the overlay rendered at before it was added.
+func TestRenderHelpScreen_SizeUnchangedAtNormalTerminals(t *testing.T) {
+	cases := []struct{ termW, termH, wantW, wantH int }{
+		{80, 24, 58, 22},
+		{100, 30, 72, 26},
+		{120, 40, 86, 34},
+		{200, 50, 142, 42},
+	}
+	for _, tc := range cases {
+		out := RenderHelpScreen(tc.termW, tc.termH, 0, "", "", "", -1)
+		assert.Equalf(t, tc.wantW, lipgloss.Width(out), "help overlay width at %dx%d", tc.termW, tc.termH)
+		assert.Equalf(t, tc.wantH, len(strings.Split(out, "\n")), "help overlay height at %dx%d", tc.termW, tc.termH)
+	}
+}
+
+// HelpVisibleLines drives the app-layer scroll clamps, so it must agree with
+// the box the renderer actually draws — including once the terminal clamp
+// starts biting.
+func TestHelpVisibleLines_MatchesTheRenderedBox(t *testing.T) {
+	for h := helpBoxHardH + helpBoxFrame; h <= 45; h++ {
+		out := RenderHelpScreen(80, h, 0, "", "", "", -1)
+		gotH := len(strings.Split(out, "\n"))
+		assert.Equalf(t, HelpVisibleLines(h)+helpBoxChromeH+helpBoxFrame, gotH,
+			"visible-line budget and rendered height disagree at height %d", h)
+	}
+}

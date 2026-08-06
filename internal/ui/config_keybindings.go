@@ -3,8 +3,10 @@ package ui
 import (
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Keybindings defines configurable keybindings for the application.
@@ -84,8 +86,6 @@ type Keybindings struct {
 	SecretEditor      string `json:"secret_editor" yaml:"secret_editor"`
 	CreateTemplate    string `json:"create_template" yaml:"create_template"`
 	Refresh           string `json:"refresh" yaml:"refresh"`
-	Restart           string `json:"restart" yaml:"restart"`
-	Exec              string `json:"exec" yaml:"exec"`
 	Edit              string `json:"edit" yaml:"edit"`
 	Describe          string `json:"describe" yaml:"describe"`
 	Delete            string `json:"delete" yaml:"delete"`
@@ -109,6 +109,13 @@ type Keybindings struct {
 	PrevTab      string `json:"prev_tab" yaml:"prev_tab"`
 	MoveTabLeft  string `json:"move_tab_left" yaml:"move_tab_left"`
 	MoveTabRight string `json:"move_tab_right" yaml:"move_tab_right"`
+
+	// WhichKeyLeader arms the context-aware which-key panel, which lists the
+	// hotkeys actionable right now — on the explorer's current row, or in the
+	// fullscreen viewer's current state. Dispatched ahead of Help, so while
+	// the two share the default "?" the help screen is reached with f1
+	// everywhere (see HelpScreenKey).
+	WhichKeyLeader string `json:"which_key_leader" yaml:"which_key_leader"`
 
 	// Bookmarks
 	SetMark   string `json:"set_mark" yaml:"set_mark"`
@@ -186,6 +193,21 @@ type Keybindings struct {
 	PreviousNamespace string `json:"previous_namespace" yaml:"previous_namespace"`
 }
 
+// HelpScreenKey reports the key that actually opens the help screen.
+// WhichKeyLeader is dispatched ahead of Help in every mode that has a
+// which-key catalog — the explorer and the fullscreen viewers alike — so while
+// the two share a binding the help screen is only reachable with f1.
+//
+// Lives on Keybindings because both the help catalog (internal/ui) and the
+// app's hint bar need the same answer. Two copies of this rule have already
+// drifted apart once and advertised a key that did not open help.
+func (k Keybindings) HelpScreenKey() string {
+	if k.Help == k.WhichKeyLeader {
+		return "f1"
+	}
+	return k.Help
+}
+
 // DefaultKeybindings returns the default keybinding configuration.
 func DefaultKeybindings() Keybindings {
 	return Keybindings{
@@ -222,20 +244,29 @@ func DefaultKeybindings() Keybindings {
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",
 		Logs: "ctrl+l", LabelEditor: "i", SecretEditor: "e",
-		CreateTemplate: "a", Refresh: "R", Restart: "r",
-		Exec: "s", Edit: "E", Describe: "v", Delete: "D",
+		CreateTemplate: "a", Refresh: "R",
+		Edit: "E", Describe: "v", Delete: "D",
 		ForceDelete: "X", Scale: "S",
 		OpenBrowser: "ctrl+o", CopyName: "y", CopyYAML: "Y",
 		CopyField:  "ctrl+y",
 		PasteApply: "ctrl+p", Diff: "d",
 
 		// Multi-selection
-		ToggleSelect: "space", SelectRange: "ctrl+@", SelectAll: "ctrl+a",
+		// "ctrl+space", not "ctrl+@": a terminal sends the chord as NUL (0x00),
+		// which Bubble Tea v2 decodes to {Code: KeySpace, Mod: ModCtrl} unless
+		// the app opts into LegacyKeyEncoding.CtrlAt — lfk never does, so the
+		// "ctrl+@" spelling no real keypress can produce. Existing configs that
+		// still say "ctrl+@" keep working via ctrlSpaceAlias in the dispatcher.
+		ToggleSelect: "space", SelectRange: "ctrl+space", SelectAll: "ctrl+a",
 
 		// Tabs. Move keys mirror the switch keys: "}" (shift+]) moves the
 		// active tab one slot right, "{" (shift+[) one slot left.
 		NewTab: "t", NextTab: "]", PrevTab: "[",
 		MoveTabLeft: "{", MoveTabRight: "}",
+
+		// Which-key leader. "?" has no side effect of its own, unlike the
+		// space it replaced, and help stays reachable via f1 in the explorer.
+		WhichKeyLeader: "?",
 
 		// Bookmarks
 		SetMark: "m", OpenMarks: "'",
@@ -334,9 +365,20 @@ func NormalizeKeybinding(s string) string {
 	}
 	parts := strings.Split(s, "+")
 	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
-	if key == "" && len(mods) > 0 {
-		// The key itself is "+", e.g. "ctrl++".
+	// Only "ctrl++" spells a modified "+": it splits to [ctrl "" ""], so the
+	// component before the empty key is empty too. A trailing-plus typo like
+	// "ctrl+alt+" splits to [ctrl alt ""], and dropping the last component
+	// unconditionally rewrote it into "ctrl++" — a DIFFERENT, valid binding,
+	// which is exactly the silent reordering this function promises not to do.
+	if key == "" && len(mods) > 0 && mods[len(mods)-1] == "" {
 		key, mods = "+", mods[:len(mods)-1]
+	}
+	// Still empty means a trailing plus naming no key at all. Every modifier
+	// may be valid ("alt+ctrl+"), so this has to bail before the reordering
+	// below, which would otherwise hand back "ctrl+alt+" — malformed input
+	// rewritten into different malformed input.
+	if key == "" {
+		return s
 	}
 	if len(mods) == 0 {
 		return s
@@ -371,6 +413,69 @@ func NormalizeKeybinding(s string) string {
 func isSingleLetter(s string) bool {
 	r := []rune(s)
 	return len(r) == 1 && unicode.IsLetter(r[0])
+}
+
+// namedKeys are the key names Bubble Tea prints for keys that carry no text of
+// their own. Every other single keypress is a single rune, so a longer value
+// that is not named here is two keys run together ("AA"), not a key.
+//
+// The kitty-protocol extras (mediaplay, capslock, the bare modifier keys) are
+// deliberately absent: no lfk surface dispatches them, so a chord ending in one
+// is far more likely a typo — which the load-time warning then names.
+var namedKeys = buildNamedKeys()
+
+func buildNamedKeys() map[string]bool {
+	m := map[string]bool{
+		"enter": true, "tab": true, "backspace": true, "esc": true, "escape": true,
+		"space": true, "up": true, "down": true, "left": true, "right": true,
+		"home": true, "end": true, "pgup": true, "pgdown": true,
+		"insert": true, "delete": true, "begin": true, "find": true, "select": true,
+	}
+	for i := 1; i <= 63; i++ { // f1..f63 is the range Bubble Tea names
+		m["f"+strconv.Itoa(i)] = true
+	}
+	return m
+}
+
+// IsNamedKey reports whether s is Bubble Tea's name for a key that carries no
+// text of its own ("space", "f1", "pgup") — the multi-character key shape, as
+// opposed to the single rune every other keypress prints as.
+//
+// Exposed for the which-key sort, which must file those names after the
+// single-character keys instead of letting "f1" and "space" natural-sort into
+// the middle of the letters. It reads the same table IsSingleKeypress does so
+// the two can never disagree on what counts as a name.
+func IsNamedKey(s string) bool { return namedKeys[s] }
+
+// IsSingleKeypress reports whether s is what msg.String() returns for exactly
+// one key event.
+//
+// One keypress is neither one byte nor one rune: a modified or named key prints
+// as a word ("ctrl+p", "shift+tab", "pgup", "f12"). So the modifiers come off
+// first and the key under them must then be a single rune or a named key.
+//
+// splitModifierChord is deliberately not reused: it refuses the literal "+" key
+// ("ctrl++") so the display path leaves such chords textual, but that is a real
+// keypress this predicate has to accept.
+func IsSingleKeypress(s string) bool {
+	if s == "" {
+		return false
+	}
+	parts := strings.Split(s, "+")
+	key, mods := parts[len(parts)-1], parts[:len(parts)-1]
+	// Same rule as NormalizeKeybinding: an empty key means the literal "+" only
+	// when the component before it is empty too. Dropping the last component
+	// unconditionally swallowed the modifier, so "ctrl+", "ga+" and "ctrl+alt+"
+	// all passed as the "+" key and the popup advertised unreachable chords.
+	if key == "" && len(mods) > 0 && mods[len(mods)-1] == "" {
+		key, mods = "+", mods[:len(mods)-1]
+	}
+	for _, m := range mods {
+		if _, isMod := helpKeyDisplayModifiers[m]; !isMod {
+			return false
+		}
+	}
+	return utf8.RuneCountInString(key) == 1 || namedKeys[key]
 }
 
 // ActiveKeybindings holds the currently active keybinding configuration.

@@ -400,9 +400,87 @@ func (m Model) statusBar() string {
 	// 2 columns so the gap between keymap and chips reads as a clear gutter
 	// (the elastic-spacer minimum is 1, but a 2-col gutter is more comfortable).
 	leftBudget := max(innerWidth-lipgloss.Width(right)-2, 0)
-	left := ui.FormatHintPartsFit(m.explorerHintEntries(), leftBudget)
+	left := ui.FormatHintPartsFit(m.leaderOrExplorerHints(), leftBudget)
 
 	content := ui.JoinStatusBar(left, right, innerWidth)
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+}
+
+// helpHintKey names the key a hint bar advertises as "help": whichever key
+// actually reaches the help screen. Defers to whichKeyHelpKey — the same rule
+// the panel's own "Full help" row renders with, so the bar and the panel one
+// row above it can never disagree.
+//
+// The extra gate is the disabled case whichKeyHelpKey doesn't model: with the
+// panel off, the leader key falls through to kb.Help instead of claiming it
+// (handleExplorerSelectionKey, handleViewerWhichKeyLeader), so the collision
+// the f1 fallback exists for never happens.
+func helpHintKey(kb ui.Keybindings) string {
+	if !ui.ConfigWhichKeyEnabled || kb.WhichKeyLeader == "" {
+		return kb.Help
+	}
+	return whichKeyHelpKey(kb)
+}
+
+// leaderOrExplorerHints returns whichever which-key popup's own hints while
+// it is visible, and the normal explorer keymap otherwise. Only the LEFT half
+// of the bar swaps, so the chip group (sort, selected count, position, filter
+// preset) keeps rendering underneath the panel — the panel covers rows, not
+// the bar.
+//
+// Two popups share whichKeyState (armed/shown) but are otherwise independent:
+// the leader panel (m.whichKey.armed) and the g-prefix goto popup
+// (m.pendingG, which never sets armed). Each is gated on its own arm flag AND
+// shown, not on shown alone — with a configured reveal delay the popup isn't
+// drawn yet, and flipping the bar for an invisible popup would drop the
+// chip group and the real keymap for nothing on screen to show for it.
+func (m Model) leaderOrExplorerHints() []ui.HintEntry {
+	switch {
+	case m.pendingG && m.whichKey.shown:
+		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyCells), false)
+	case m.whichKey.armed && m.whichKey.shown:
+		return m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells), true)
+	default:
+		return m.explorerHintEntries()
+	}
+}
+
+// whichKeyPopupHints builds the hint pair a which-key-style popup actually
+// honours while shown: the scroll keys, but only when cells overflow the
+// viewport (the way which-key.nvim conditions its own "<c-d>/<c-u> scroll"
+// help entry, view.lua:447-449), and esc to close. Shared by the leader panel
+// and the g-prefix goto popup — both close the same way via
+// disarmWhichKeyLeader/handleGotoChord and neither pages beyond this.
+//
+// leader adds the entry-order toggle. It is the leader panel's only, and it has
+// to be advertised: the leader key used to close the panel and now reorders it
+// instead, so a user pressing it again to get out of the way needs to be told
+// that esc is the way out.
+func (m Model) whichKeyPopupHints(cells []whichKeyCell, leader bool) []ui.HintEntry {
+	hints := make([]ui.HintEntry, 0, 3)
+	if lay, ok := m.whichKeyLayoutFor(cells); ok && lay.maxScroll > 0 {
+		kb := ui.ActiveKeybindings
+		hints = append(hints, ui.HintEntry{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"})
+	}
+	hints = append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
+	// Last on purpose: FormatHintPartsFit drops from the end, and at 80 columns
+	// something has to go. "close" is the one a user stuck in the panel needs.
+	if leader {
+		if lk := ui.ActiveKeybindings.WhichKeyLeader; lk != "" {
+			hints = append(hints, ui.HintEntry{Key: lk, Desc: "group/key order"})
+		}
+	}
+	return hints
+}
+
+// whichKeyLeaderHintBar renders the leader panel's own hints as a full-width
+// status line. The fullscreen viewers draw their hint bar inside their own
+// content instead of going through statusBar(), so the swap
+// leaderOrExplorerHints performs for the explorer has to be done there by
+// replacing the rendered line.
+func (m Model) whichKeyLeaderHintBar() string {
+	hints := m.whichKeyPopupHints(m.frameWhichKeyCells(m.whichKeyLeaderCells), true)
+	content := ui.FormatHintPartsFit(hints, max(m.width-2, 10))
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
@@ -473,7 +551,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.NewTab, Desc: "new tab"},
-			{Key: kb.Help, Desc: "help"},
+			{Key: helpHintKey(kb), Desc: "help"},
 			{Key: "q", Desc: "quit"},
 		}
 	}
@@ -542,7 +620,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	hintEntries = append(hintEntries, ui.HintEntry{Key: ui.ActiveKeybindings.JumpTop, Desc: "goto"})
 	hintEntries = append(hintEntries,
-		ui.HintEntry{Key: kb.Help, Desc: "help"},
+		ui.HintEntry{Key: helpHintKey(kb), Desc: "help"},
 		ui.HintEntry{Key: "q", Desc: "quit"},
 	)
 	return m.appendEventsHintEntries(hintEntries)

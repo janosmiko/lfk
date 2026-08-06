@@ -394,8 +394,6 @@ keybindings:
   logs: "ctrl+l" # Open fullscreen log viewer (default: ctrl+l)
   toggle_preview_logs: "L" # Toggle right-pane live-log preview (default: L)
   refresh: "R" # Refresh view (default: R)
-  restart: "r" # Restart resource (default: r)
-  exec: "s" # Exec into pod (default: s)
   describe: "v" # Describe resource (default: v)
   delete: "D" # Delete resource (default: D)
   force_delete: "X" # Force delete resource (default: X)
@@ -418,6 +416,8 @@ keybindings:
   security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
   move_tab_left: "{" # Move the current tab one slot left (default: { = shift+[)
   move_tab_right: "}" # Move the current tab one slot right (default: } = shift+])
+  which_key_leader: "?" # Open the which-key action panel (default: ?; explorer and the fullscreen viewers, not exec mode or overlays; F1 opens help there)
+  select_range: "ctrl+space" # Select range from anchor to cursor (default: ctrl+space; legacy "ctrl+@" still accepted)
   previous_namespace: "g\\" # Jump to previous namespace, swapping the scope back and forth (default: g\)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
@@ -555,7 +555,7 @@ filter_presets:
 
 # ─── Extra Goto Chords ──────────────────────────────────────────────────────
 # Extra goto chords (g prefix), including CRDs. Key is the full chord; must
-# start with jump_top.
+# start with jump_top plus one keypress ("gA", "gctrl+p").
 # goto_targets:
 #   ga: { kind: Application, group: argoproj.io, name: ArgoCD Applications }
 #   gA: { kind: ApplicationSet, group: argoproj.io, name: AppSets }
@@ -564,6 +564,14 @@ filter_presets:
 # ─── Which-Key Popup ─────────────────────────────────────────────────────────
 # which_key_enabled: true
 # which_key_delay_ms: 0
+
+# Delay before the which-key action panel (leader "?") appears (ms, 0-2000).
+# which_key_leader_delay_ms: 0
+
+# Startup order of the action panel: true groups by category, false sorts by
+# key. The leader key toggles it and saves the choice to
+# ~/.local/state/lfk/whichkey_prefs.yaml, which then outranks this setting.
+# which_key_grouped: true
 
 # ─── Pinned CRD Groups ──────────────────────────────────────────────────────
 # Pin CRD API groups so they appear right after built-in categories

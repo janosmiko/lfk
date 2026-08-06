@@ -1,5 +1,7 @@
 package app
 
+import "github.com/janosmiko/lfk/internal/ui"
+
 // diffViewState holds all state for the full-screen diff viewer (the resource
 // compare / revision-diff view). It groups the previously flat diff* fields on
 // Model into one cohesive value, mirroring yamlViewState and the other
@@ -32,6 +34,13 @@ type diffViewState struct {
 
 	foldState []bool // per-unchanged-region collapsed state
 
+	// diffCache memoizes the LCS pass over left/right. A POINTER, and created
+	// once in app_init: View() runs on a throwaway Model copy (renderView), so
+	// a value cache — or one lazily created there — would be thrown away with
+	// it and never hit. Derived, not state: keyed on the content it was built
+	// from, so a copy that shares it can only ever get its own diff back.
+	diffCache *ui.DiffCache
+
 	visualMode   bool // true when in visual selection mode
 	visualType   rune // 'V' = line, 'v' = char, 'B' = block
 	visualStart  int  // anchor line (visible-line index)
@@ -44,6 +53,11 @@ type diffViewState struct {
 // copy returns a deep copy: the matchLines and foldState slices are cloned so
 // a value stored in a TabState never aliases the live viewer's backing arrays.
 // Scalars, strings, and the TextInput value are copied by assignment.
+//
+// diffCache is deliberately SHARED rather than cloned. It is a memo keyed on
+// the diff it holds, so the worst a second tab can do is evict the first one's
+// entry; giving each tab its own would instead hand a fresh nil cache to every
+// snapshot restore.
 func (s diffViewState) copy() diffViewState {
 	cp := s
 	if s.matchLines != nil {

@@ -354,12 +354,13 @@ func TestHandleKeyEnterFullView(t *testing.T) {
 	assert.Equal(t, modeYAML, result.mode)
 }
 
-// --- handleKey: ? opens help ---
+// --- handleKey: f1 opens help ---
+// "?" is the which-key leader in the explorer, so f1 is the help key there.
 
-func TestHandleKeyQuestionMarkOpensHelp(t *testing.T) {
+func TestHandleKeyF1OpensHelp(t *testing.T) {
 	m := baseExplorerModel()
 
-	ret, _ := m.handleKey(runeKey('?'))
+	ret, _ := m.handleKey(keyMsg("f1"))
 	result := ret.(Model)
 	assert.Equal(t, modeHelp, result.mode)
 	assert.Equal(t, 0, result.helpScroll)
@@ -663,16 +664,18 @@ func TestPush2HandleKeyExplorerModeColon(t *testing.T) {
 	assert.True(t, rm.commandBarActive)
 }
 
+// In the explorer "?" arms the which-key leader rather than opening help.
 func TestPush2HandleKeyExplorerModeQuestion(t *testing.T) {
 	m := basePush80v2Model()
 	result, _ := m.handleKey(keyMsg("?"))
 	rm := result.(Model)
-	assert.Equal(t, modeHelp, rm.mode)
+	assert.NotEqual(t, modeHelp, rm.mode)
+	assert.True(t, rm.whichKey.armed)
 }
 
 func TestPush3HandleKeyHelp(t *testing.T) {
 	m := basePush80v3Model()
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }
@@ -802,10 +805,12 @@ func TestP4DiffKeyU(t *testing.T) {
 	assert.True(t, rm.diffView.unified)
 }
 
+// f1, not "?": the which-key leader claims "?" in every mode that has a
+// catalog, and the diff viewer gained one in phase 2.
 func TestP4DiffKeyHelp(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }
@@ -855,10 +860,13 @@ func TestP4LogKeyNumber(t *testing.T) {
 	assert.True(t, rm.logView.lineNumbers)
 }
 
+// f1, not "?": the which-key leader claims "?" in every mode that has a
+// catalog, so the log viewer resolves the collision the same way the explorer
+// does (ui.Keybindings.HelpScreenKey).
 func TestP4LogKeyHelp(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }
@@ -1306,7 +1314,7 @@ func TestPush4HandleKeyPageUp(t *testing.T) {
 
 func TestPush4HandleKeyHelp(t *testing.T) {
 	m := basePush4Model()
-	result, _ := m.handleKey(keyMsg("?"))
+	result, _ := m.handleKey(keyMsg("f1"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
 }

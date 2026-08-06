@@ -326,10 +326,16 @@ func TestStatusBarShowsSelectionCount(t *testing.T) {
 }
 
 func TestStatusBarKeyHints(t *testing.T) {
+	// 210, not 200: the help slot now advertises the key that actually opens
+	// the help screen, which at the default bindings is "f1" (the leader owns
+	// "?"), one column wider than the old label. At 200 the full keymap no
+	// longer fits and FormatHintPartsFit drops the last entry — the assertion
+	// below is about both hints rendering, not about the exact width they
+	// stop fitting at.
 	m := Model{
 		nav:           model.NavigationState{Level: model.LevelResources},
 		middleItems:   []model.Item{{Name: "pod"}},
-		width:         200,
+		width:         210,
 		height:        40,
 		tabs:          []TabState{{}},
 		selectedItems: make(map[string]bool),

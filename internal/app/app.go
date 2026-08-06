@@ -202,9 +202,9 @@ type Model struct {
 	// pendingTargetNamespace narrows pendingTarget to one ns (empty = name-only).
 	pendingTargetNamespace string
 
-	// pendingG: vim 'gg' -> next 'g' jumps to top; whichKeyShown: popup visible while armed.
-	pendingG      bool
-	whichKeyShown bool
+	// pendingG: vim 'gg' -> next 'g' jumps to top; whichKey: popup + leader-panel state.
+	pendingG bool
+	whichKey whichKeyState
 
 	// Vim text-object operator pending in visual mode ('i'/'a'); 0 = none.
 	pendingTextObject byte

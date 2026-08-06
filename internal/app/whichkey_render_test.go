@@ -1,9 +1,12 @@
 package app
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -14,7 +17,7 @@ func TestRenderWhichKey_ListsTargets(t *testing.T) {
 	ui.ConfigWhichKeyDelayMs = 0
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	out := stripANSI(m.renderWhichKey(strings.Repeat("\n", m.height)))
 	for _, want := range []string{"Pods", "Deployments", "list top"} {
 		if !strings.Contains(out, want) {
@@ -32,7 +35,7 @@ func TestRenderWhichKey_AnchoredToBottom(t *testing.T) {
 	ui.ConfigWhichKeyDelayMs = 0
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	lines := strings.Split(stripANSI(m.renderWhichKey(strings.Repeat("\n", m.height))), "\n")
 	podsRow := -1
 	for i, l := range lines {
@@ -54,9 +57,677 @@ func TestRenderWhichKey_HiddenWhenDisabled(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = false
 	m := gotoTestModel()
 	m.pendingG = true
-	m.whichKeyShown = true
+	m.whichKey.shown = true
 	bg := strings.Repeat("\n", m.height)
 	if got := m.renderWhichKey(bg); got != bg {
 		t.Fatal("popup must not render when which_key_enabled is false")
+	}
+}
+
+// TestRenderWhichKeyPanel_RendersAFlatListWithNoHeaders replaces the old
+// group-header assertion. neovim's which-key has no section headers at all —
+// every entry is one row of a single list — so a panel that draws a bare label
+// with no key next to it is drawing something neovim never would.
+func TestRenderWhichKeyPanel_RendersAFlatListWithNoHeaders(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := gotoTestModel()
+	cells := []whichKeyCell{{key: "d", desc: "Delete"}, {key: "e", desc: "Edit"}, {key: "s", desc: "Sort next column"}}
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+	for _, want := range []string{"d Delete", "e Edit", "s Sort next column"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("panel missing %q (key, one space, label):\n%s", want, out)
+		}
+	}
+	// The former group titles were rendered as their own row. Nothing may put a
+	// section name on screen any more.
+	for _, banned := range []string{"Actions", "Views", "Selection", "Settings", "Filter", "->"} {
+		if strings.Contains(out, banned) {
+			t.Fatalf("flat panel must not render %q:\n%s", banned, out)
+		}
+	}
+}
+
+func TestRenderWhichKeyPanel_EmptyCellsRenderNothing(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ConfigWhichKeyEnabled = true
+	m := gotoTestModel()
+	bg := strings.Repeat("\n", m.height)
+	if got := m.renderWhichKeyPanel(bg, nil, 0); got != bg {
+		t.Fatal("an empty entry list must render nothing, not an empty box")
+	}
+	if got := m.renderWhichKeyPanel(bg, []whichKeyCell{}, 0); got != bg {
+		t.Fatal("a zero-length entry list must render nothing")
+	}
+}
+
+func TestRenderWhichKeyPanel_TinyTerminalRendersNothing(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ConfigWhichKeyEnabled = true
+	m := gotoTestModel()
+	m.width, m.height = 10, 4
+	bg := strings.Repeat("\n", m.height)
+	cells := []whichKeyCell{{key: "d", desc: "Delete"}}
+	if got := m.renderWhichKeyPanel(bg, cells, 0); got != bg {
+		t.Fatal("panel must be skipped when the terminal is too small")
+	}
+}
+
+// TestRenderWhichKeyPanel_OverflowScrollsInsteadOfDropping replaces the old
+// "+N more" footer assertion. The panel no longer pages or truncates: content
+// past the viewport scrolls, so the invariant that matters is stronger — every
+// entry must be REACHABLE, and the panel must still never overflow the screen.
+func TestRenderWhichKeyPanel_OverflowScrollsInsteadOfDropping(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := gotoTestModel()
+	m.height = 12 // deliberately short
+	cells := make([]whichKeyCell, 0, 48)
+	for i := range 48 {
+		cells = append(cells, whichKeyCell{key: string(rune('a' + i%8)), desc: fmt.Sprintf("entry %02d", i)})
+	}
+
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok || lay.maxScroll == 0 {
+		t.Fatalf("precondition: 48 cells at height %d must overflow; maxScroll=%d", m.height, lay.maxScroll)
+	}
+
+	var seen strings.Builder
+	for scroll := 0; scroll <= lay.maxScroll; scroll++ {
+		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, scroll))
+		if lines := strings.Split(out, "\n"); len(lines) > m.height+1 {
+			t.Fatalf("scroll %d: panel overflowed the screen: %d lines for height %d", scroll, len(lines), m.height)
+		}
+		seen.WriteString(out)
+		seen.WriteString("\n")
+	}
+	rendered := seen.String()
+	for i := range 48 {
+		want := fmt.Sprintf("entry %02d", i)
+		if !strings.Contains(rendered, want) {
+			t.Errorf("%q never appears at any scroll offset — unreachable", want)
+		}
+	}
+}
+
+// TestRenderWhichKeyPanel_ScrollClampsToTheEnd: an out-of-range offset must land
+// on the last full screen, never past it or on a short/blank tail.
+func TestRenderWhichKeyPanel_ScrollClampsToTheEnd(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := whichKeyTestModel()
+	m.width, m.height = 80, 24
+
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok || lay.maxScroll == 0 {
+		t.Fatalf("precondition: the full catalog must overflow at 80x24; maxScroll=%d", lay.maxScroll)
+	}
+	bg := strings.Repeat("\n", m.height)
+	atEnd := m.renderWhichKeyPanel(bg, cells, lay.maxScroll)
+	if beyond := m.renderWhichKeyPanel(bg, cells, lay.maxScroll+50); beyond != atEnd {
+		t.Fatal("an offset past the end must clamp to the last screen")
+	}
+	if before := m.renderWhichKeyPanel(bg, cells, -5); before != m.renderWhichKeyPanel(bg, cells, 0) {
+		t.Fatal("a negative offset must clamp to the top")
+	}
+}
+
+// whichKeyContentRows returns the panel's body rows with the border and the
+// horizontal padding stripped, so a test can index straight into the grid.
+// legendRows must match the layout's lay.legendRows: the legend now hugs the
+// bottom border, with the vertical padding gap sitting above it rather than
+// below, so the padding to drop is no longer symmetric top/bottom whenever a
+// legend is present — it must be excised from the middle instead.
+//
+// The box no longer starts at column 0: whichKeyOuterMargin insets it from
+// the terminal edge, so a body row reads as background padding, then '│',
+// then content, then '│', then more background padding. The border is
+// located by its first and last '│' rather than assumed at the line's own
+// first and last rune.
+func whichKeyContentRows(t *testing.T, out string, container, legendRows int) []string {
+	t.Helper()
+	var rows []string
+	for line := range strings.SplitSeq(out, "\n") {
+		r := []rune(line)
+		first, last := -1, -1
+		for i, ch := range r {
+			if ch == '│' {
+				if first == -1 {
+					first = i
+				}
+				last = i
+			}
+		}
+		if first == -1 || first == last {
+			continue // border row (no vertical bars) or untouched background
+		}
+		body := r[first+1 : last]
+		if len(body) < whichKeyPadH+container {
+			t.Fatalf("body row is %d wide, want at least %d", len(body), whichKeyPadH+container)
+		}
+		rows = append(rows, string(body[whichKeyPadH:whichKeyPadH+container]))
+	}
+	// Drop the box's vertical padding rows; they are bordered but hold no grid.
+	if len(rows) < 2*whichKeyPadV+legendRows {
+		t.Fatalf("panel has %d bordered rows, fewer than its own padding", len(rows))
+	}
+	entries := append([]string{}, rows[whichKeyPadV:len(rows)-whichKeyPadV-legendRows]...)
+	if legendRows > 0 {
+		entries = append(entries, rows[len(rows)-legendRows:]...)
+	}
+	return entries
+}
+
+// TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned is the visual
+// property the neovim port exists for: every column is the same width, and in
+// every one of them the key is right-aligned against the same shared field,
+// followed by exactly one space.
+func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := whichKeyTestModel()
+	m.width, m.height = 120, 40
+
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok {
+		t.Fatal("precondition: the panel must lay out at 120x40")
+	}
+	g := lay.grid
+	if g.boxN < 2 {
+		t.Fatalf("precondition: 120 columns must fit at least 2 grid columns, got %d", g.boxN)
+	}
+
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+	rows := whichKeyContentRows(t, out, lay.container, lay.legendRows)
+	// The full catalog spans several groups at this size, so the legend
+	// footer adds one more content row beyond the entry viewport.
+	if want := lay.viewRows + lay.legendRows; len(rows) != want {
+		t.Fatalf("panel drew %d body rows, want %d", len(rows), want)
+	}
+	widest := make([]int, g.boxN)
+	// The legend footer (if any) is the last row and is not part of the grid
+	// — it must not be walked as if it were an entry row, or its own content
+	// gets measured against an unrelated column offset.
+	for r, row := range rows[:lay.viewRows] {
+		runes := []rune(row)
+		for b := range g.boxN {
+			idx := b*g.rowN + r
+			if idx >= len(cells) {
+				break
+			}
+			// Measure the key AS DRAWN: a symbol-rendered chord ("⌃D") is
+			// narrower than its binding ("ctrl+d"), and the grid is sized
+			// from the drawn form.
+			key := cells[idx].keyText()
+			widest[b] = max(widest[b], lipgloss.Width(key))
+			start := b * g.boxW
+			field := string(runes[start+g.lead : start+g.lead+g.keyW])
+			if strings.TrimLeft(field, " ") != key {
+				t.Fatalf("row %d col %d: key field %q is not %q right-aligned", r, b, field, key)
+			}
+			if got := runes[start+g.lead+g.keyW]; got != ' ' {
+				t.Fatalf("row %d col %d: want a single space after the key, got %q", r, b, got)
+			}
+		}
+	}
+	// One field for the whole panel, sized to the panel's widest key: with a
+	// per-column field (what this replaces) a column holding only 1-wide keys
+	// starts its ink two cells left of the column next to it, so the gaps
+	// between columns differed — and differed again when the entry order
+	// moved the chords into other columns.
+	panelWidest := 0
+	for _, w := range widest {
+		panelWidest = max(panelWidest, w)
+	}
+	if g.keyW != panelWidest {
+		t.Errorf("key field is %d wide, want the panel's widest key %d (per column: %v)", g.keyW, panelWidest, widest)
+	}
+}
+
+// TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth guards against a
+// panel wider than the terminal: a single cell whose "key desc" text alone
+// exceeds the available inner width must be ellipsized, not left to blow out
+// the box. Uses a real catalog label ("Copy as (YAML/JSON/table)", 27 chars)
+// at widths that pass whichKeyMinWidth but are still narrower than the label.
+func TestRenderWhichKeyPanel_OverlongLabelNeverExceedsWidth(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+	m := gotoTestModel()
+	m.height = 20
+	cells := []whichKeyCell{{key: "Y", desc: "Copy as (YAML/JSON/table)"}}
+	for _, w := range []int{20, 25, 34} {
+		m.width = w
+		out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
+		for line := range strings.SplitSeq(out, "\n") {
+			if got := lipgloss.Width(line); got > w {
+				t.Fatalf("width %d: rendered line %q is %d columns wide", w, line, got)
+			}
+		}
+	}
+}
+
+// TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes sweeps every width
+// from whichKeyMinWidth to 250 and every height from whichKeyMinHeight to 40.
+// This panel's height/width maths has broken four times in its history, and
+// whichKeyMaxCols, the lead-spacing rule, and the outer margin all changed
+// independently, so the sweep checks the properties that must survive at
+// every size rather than a handful of sampled points: no rendered line
+// exceeds the terminal width, the box never exceeds the terminal height, the
+// column count never goes to zero, the box itself stays a well-formed
+// rectangle (exactly one top and one bottom border, every body row the same
+// width), and the box is inset from both edges by exactly
+// whichKeyOuterMarginFor(w) once the terminal is wide enough to afford a
+// margin at all, or touches both edges (no inset) below that. Calls the same
+// production function the renderer uses rather than re-deriving the tier
+// table here, so the two can never drift apart.
+func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	m := whichKeyTestModel()
+	cells := m.whichKeyLeaderCells()
+	fifthColAt := -1
+
+	for w := whichKeyMinWidth; w <= 250; w++ {
+		for h := whichKeyMinHeight; h <= 40; h++ {
+			m.width, m.height = w, h
+			lay, ok := m.whichKeyLayoutFor(cells)
+			if !ok {
+				continue // below the real floor whichKeyPanelGeometry enforces
+			}
+			if lay.grid.boxN < 1 {
+				t.Fatalf("%dx%d: column count is %d, must never be zero", w, h, lay.grid.boxN)
+			}
+			if lay.grid.boxN == 5 && (fifthColAt == -1 || w < fifthColAt) {
+				fifthColAt = w
+			}
+			out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", h), cells, 0))
+			lines := strings.Split(out, "\n")
+			if len(lines) > h {
+				t.Fatalf("%dx%d: panel is %d lines tall, terminal has %d", w, h, len(lines), h)
+			}
+			topN, bottomN, bodyWidth := 0, 0, -1
+			for _, line := range lines {
+				if got := lipgloss.Width(line); got > w {
+					t.Fatalf("%dx%d: line %q is %d columns wide, exceeds terminal width", w, h, line, got)
+				}
+				switch {
+				case strings.Contains(line, "╭") && strings.Contains(line, "╮"):
+					topN++
+					left, right := whichKeyLineGaps(line, '╭', '╮')
+					wantMargin := whichKeyOuterMarginFor(w)
+					if left != wantMargin || right != wantMargin {
+						t.Fatalf("%dx%d: box gaps are %d/%d, want %d/%d (margin %d)", w, h, left, right, wantMargin, wantMargin, wantMargin)
+					}
+				case strings.Contains(line, "╰") && strings.Contains(line, "╯"):
+					bottomN++
+				case strings.Contains(line, "│"):
+					if bodyWidth == -1 {
+						bodyWidth = lipgloss.Width(line)
+					} else if got := lipgloss.Width(line); got != bodyWidth {
+						t.Fatalf("%dx%d: ragged box, body row width %d, want %d", w, h, got, bodyWidth)
+					}
+				}
+			}
+			if topN != 1 || bottomN != 1 {
+				t.Fatalf("%dx%d: malformed box, saw %d top corners and %d bottom corners", w, h, topN, bottomN)
+			}
+		}
+	}
+	t.Logf("5th column first appears at width %d", fifthColAt)
+}
+
+// TestWhichKeyOuterMarginFor_CheckpointsMatchOrBeatTheOldFlatMargin pins the
+// margin/column table documented on the whichKeyOuterMargin* constants: the
+// enlarged margin must be strictly larger than the old flat 4 at the wider
+// checkpoints, and every checkpoint's column count must match what the old
+// flat margin=4 policy gave (verified against the real leader catalog, not a
+// synthetic one, since box_width's 30-column floor only holds because lfk's
+// actual labels stay under it).
+func TestWhichKeyOuterMarginFor_CheckpointsMatchOrBeatTheOldFlatMargin(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	const oldFlatMargin = 4
+	cases := []struct {
+		width      int
+		wantMargin int
+		wantCols   int
+	}{
+		{80, 4, 2},
+		{100, 4, 2},
+		{120, 4, 3},
+		{160, 8, 4},
+		{200, 8, 5},
+		{250, 12, 5},
+	}
+
+	m := whichKeyTestModel()
+	m.height = 40
+	cells := m.whichKeyLeaderCells()
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("width=%d", tc.width), func(t *testing.T) {
+			if got := whichKeyOuterMarginFor(tc.width); got != tc.wantMargin {
+				t.Fatalf("whichKeyOuterMarginFor(%d) = %d, want %d", tc.width, got, tc.wantMargin)
+			}
+			if tc.wantMargin < oldFlatMargin {
+				t.Fatalf("checkpoint %d: margin %d must never be smaller than the old flat %d", tc.width, tc.wantMargin, oldFlatMargin)
+			}
+
+			m.width = tc.width
+			lay, ok := m.whichKeyLayoutFor(cells)
+			if !ok {
+				t.Fatalf("width %d: panel must lay out", tc.width)
+			}
+			if lay.grid.boxN != tc.wantCols {
+				t.Fatalf("width %d: got %d columns, want %d", tc.width, lay.grid.boxN, tc.wantCols)
+			}
+
+			oldContainer := max(tc.width-2*oldFlatMargin-(2*whichKeyPadH+2), 1)
+			oldGrid := whichKeyGridFor(cells, oldContainer)
+			if lay.grid.boxN < oldGrid.boxN {
+				t.Fatalf("width %d: new margin gives %d columns, old flat margin gave %d — regression", tc.width, lay.grid.boxN, oldGrid.boxN)
+			}
+		})
+	}
+}
+
+// whichKeyLineGaps reports the number of columns before the first occurrence
+// of left and after the last occurrence of right on line — the visible
+// terminal margin on each side of the box border, used to confirm the panel
+// is actually inset rather than just narrower than the terminal for some
+// unrelated reason.
+func whichKeyLineGaps(line string, left, right rune) (int, int) {
+	r := []rune(line)
+	li := -1
+	for i, ch := range r {
+		if ch == left {
+			li = i
+			break
+		}
+	}
+	ri := -1
+	for i, c := range slices.Backward(r) {
+		if c == right {
+			ri = i
+			break
+		}
+	}
+	return li, len(r) - ri - 1
+}
+
+// whichKeyRenderBenchModel is a full-catalog leader panel at the given size,
+// armed and shown, i.e. exactly what View() renders on every frame while the
+// user is paging.
+func whichKeyRenderBenchModel(w, h int) Model {
+	m := whichKeyTestModel()
+	m.width, m.height = w, h
+	m.whichKey = whichKeyState{armed: true, shown: true}
+	return m
+}
+
+// BenchmarkWhichKeyLeaderRender measures the per-frame cost of the panel.
+// Layout is what the hint bar and the scroll keys also pay, so it is measured
+// on its own alongside the full styled render.
+func BenchmarkWhichKeyLeaderRender(b *testing.B) {
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	sizes := []struct {
+		name string
+		w, h int
+	}{
+		{"80x24", 80, 24},
+		{"120x40", 120, 40},
+	}
+	for _, s := range sizes {
+		m := whichKeyRenderBenchModel(s.w, s.h)
+		bg := strings.Repeat("x\n", s.h)
+		b.Run(s.name+"/Layout", func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderCells())
+			}
+		})
+		b.Run(s.name+"/Full", func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = m.renderWhichKeyLeader(bg)
+			}
+		})
+	}
+}
+
+// wkLeaderRenderAllocPerRow caps allocations per RENDERED ROW of the panel.
+// Normalised per row on purpose: the panel is now as tall as its content, so a
+// flat per-call ceiling would move every time the catalog or the default
+// terminal size changes, and would say nothing about whether the layout itself
+// got more expensive. Measured at 78 allocs/row for the uniform-column grid
+// (61 before the group colors and the legend row landed), against 162/row for
+// the per-column-widest + gap-spreading layout it replaced — that old layout
+// would fail this guard, which is the point. The threshold still sits well
+// above the measurement so CI hardware variance can't flake it, while
+// a reintroduced per-cell re-measure or a whole-catalog render (instead of just
+// the viewport) still trips it.
+const wkLeaderRenderAllocPerRow = 140
+
+func TestWhichKeyLeaderRender_AllocationCeiling(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	m := whichKeyRenderBenchModel(80, 24)
+	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
+	if !ok {
+		t.Fatal("precondition: the panel must lay out at 80x24")
+	}
+	bg := strings.Repeat("x\n", 24)
+	res := testing.Benchmark(func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_ = m.renderWhichKeyLeader(bg)
+		}
+	})
+	perRow := float64(res.MemAllocs) / float64(res.N) / float64(lay.viewRows)
+	if perRow > wkLeaderRenderAllocPerRow {
+		t.Fatalf("renderWhichKeyLeader allocates %.0f times per rendered row (threshold %d); the panel re-lays out on every frame, so a per-cell re-measure or a render of the whole catalog costs a full frame", perRow, wkLeaderRenderAllocPerRow)
+	}
+	t.Logf("renderWhichKeyLeader: %.0f allocs/op over %d rows = %.0f/row (threshold %d)",
+		float64(res.MemAllocs)/float64(res.N), lay.viewRows, perRow, wkLeaderRenderAllocPerRow)
+}
+
+// wkLeaderLayoutAllocThreshold caps the layout-only pass, which the hint bar
+// runs on every frame in ADDITION to the render above just to decide whether
+// to advertise the scroll keys. (The cells themselves are built once per frame
+// now — see primeWhichKeyCells — but the layout is still derived twice.)
+// Measured at 117 allocs/op, up from 61 before the group colors and the legend
+// row landed. The benchmark below builds the cells too, so the measurement
+// covers the worst case, not the cached one.
+const wkLeaderLayoutAllocThreshold = 200
+
+func TestWhichKeyLeaderLayout_AllocationCeiling(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	m := whichKeyRenderBenchModel(80, 24)
+	res := testing.Benchmark(func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderCells())
+		}
+	})
+	allocs := float64(res.MemAllocs) / float64(res.N)
+	if allocs > wkLeaderLayoutAllocThreshold {
+		t.Fatalf("whichKeyLayoutFor allocates %.0f times per call (threshold %d); it must stay a plain row count, never a styled render", allocs, wkLeaderLayoutAllocThreshold)
+	}
+	t.Logf("whichKeyLayoutFor: %.0f allocs/op (threshold %d)", allocs, wkLeaderLayoutAllocThreshold)
+}
+
+// wkBoxGeometry measures a rendered panel's bordered box: the column its left
+// edge sits at and its width in columns. Reads the border runes rather than
+// recomputing the layout, so it measures what actually landed on screen.
+func wkBoxGeometry(t *testing.T, out string) (left, width int) {
+	t.Helper()
+	for line := range strings.SplitSeq(out, "\n") {
+		r := []rune(line)
+		first, last := -1, -1
+		for i, ch := range r {
+			if ch == '│' {
+				if first == -1 {
+					first = i
+				}
+				last = i
+			}
+		}
+		if first >= 0 && first != last {
+			return first, last - first + 1
+		}
+	}
+	t.Fatalf("no bordered box found in:\n%s", out)
+	return 0, 0
+}
+
+// TestWhichKeyPanel_GeometryIsScrollInvariantUnderTransparentBg pins the panel
+// box to one width and one left edge at every scroll offset, with
+// transparent_bg on.
+//
+// FillLinesBg deliberately no-ops when the background is NoColor{} — exactly
+// what ui.BaseBg is in transparent mode — and the panel was relying on it to
+// pad every row out to lay.container. With the padding gone, lipgloss
+// auto-sized the box to the widest VISIBLE line, and because the column-major
+// fill exposes a different number of populated columns at different offsets,
+// the box resized and re-centred as the user scrolled (measured at 200x10:
+// width 181 -> 146, left edge 9 -> 27) while the legend stayed centred against
+// a width the box never rendered at.
+func TestWhichKeyPanel_GeometryIsScrollInvariantUnderTransparentBg(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	transparent := ui.ConfigTransparentBg
+	theme := ui.ActiveTheme
+	t.Cleanup(func() {
+		ui.ConfigTransparentBg = transparent
+		ui.ApplyTheme(theme)
+	})
+	ui.ConfigTransparentBg = true
+	ui.ApplyTheme(ui.DefaultTheme())
+
+	for _, size := range [][2]int{{200, 10}, {120, 20}, {80, 14}} {
+		m := whichKeyTestModel()
+		m.width, m.height = size[0], size[1]
+		m.whichKey.armed = true
+		m.whichKey.shown = true
+
+		cells := m.whichKeyLeaderCells()
+		lay, ok := m.whichKeyLayoutFor(cells)
+		if !ok {
+			t.Fatalf("%dx%d: the panel must lay out", size[0], size[1])
+		}
+		if lay.maxScroll == 0 {
+			t.Fatalf("%dx%d: this size must overflow, otherwise scrolling proves nothing", size[0], size[1])
+		}
+
+		bg := strings.Repeat("\n", m.height)
+		wantLeft, wantWidth := -1, -1
+		for off := 0; off <= lay.maxScroll; off++ {
+			out := stripANSI(m.renderWhichKeyPanel(bg, cells, off))
+			left, width := wkBoxGeometry(t, out)
+			if off == 0 {
+				wantLeft, wantWidth = left, width
+				continue
+			}
+			if width != wantWidth {
+				t.Errorf("%dx%d: box width changed with scroll: %d at offset 0, %d at offset %d",
+					size[0], size[1], wantWidth, width, off)
+			}
+			if left != wantLeft {
+				t.Errorf("%dx%d: box left edge moved with scroll: column %d at offset 0, %d at offset %d",
+					size[0], size[1], wantLeft, left, off)
+			}
+		}
+
+		// The box must also be the width the legend is centred against:
+		// container + horizontal padding + the two border columns.
+		if want := lay.container + 2*whichKeyPadH + 2; wantWidth != want {
+			t.Errorf("%dx%d: box is %d columns wide, but the legend is centred against %d",
+				size[0], size[1], wantWidth, want)
+		}
+	}
+}
+
+// TestWhichKeyLegend_StaysCentredUnderTransparentBg is the visible symptom of
+// the geometry bug: a box narrower than lay.container leaves the legend, which
+// is centred against lay.container, off-centre by up to half the difference.
+func TestWhichKeyLegend_StaysCentredUnderTransparentBg(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ConfigWhichKeyEnabled = true
+
+	transparent := ui.ConfigTransparentBg
+	theme := ui.ActiveTheme
+	t.Cleanup(func() {
+		ui.ConfigTransparentBg = transparent
+		ui.ApplyTheme(theme)
+	})
+	ui.ConfigTransparentBg = true
+	ui.ApplyTheme(ui.DefaultTheme())
+
+	m := whichKeyTestModel()
+	m.width, m.height = 200, 10
+	m.whichKey.armed = true
+	m.whichKey.shown = true
+
+	cells := m.whichKeyLeaderCells()
+	lay, ok := m.whichKeyLayoutFor(cells)
+	if !ok || lay.legendRows == 0 || lay.maxScroll == 0 {
+		t.Fatalf("precondition: need a scrollable panel with a legend (ok=%v legendRows=%d maxScroll=%d)",
+			ok, lay.legendRows, lay.maxScroll)
+	}
+
+	bg := strings.Repeat("\n", m.height)
+	for off := 0; off <= lay.maxScroll; off++ {
+		out := stripANSI(m.renderWhichKeyPanel(bg, cells, off))
+		lines := strings.Split(out, "\n")
+		borderLast := -1
+		for i, l := range lines {
+			if strings.ContainsAny(l, "╭╮╰╯│") {
+				borderLast = i
+			}
+		}
+		r := []rune(lines[borderLast-1])
+		first, lastBar := -1, -1
+		for i, ch := range r {
+			if ch == '│' {
+				if first == -1 {
+					first = i
+				}
+				lastBar = i
+			}
+		}
+		inner := string(r[first+1+whichKeyPadH : lastBar-whichKeyPadH])
+		trimmed := strings.TrimSpace(inner)
+		if trimmed == "" {
+			t.Fatalf("offset %d: the legend row is blank: %q", off, inner)
+		}
+		// Columns, not runes: the legend is centred against a cell width, and
+		// a group name with a wide glyph in it would make the two disagree.
+		innerW := lipgloss.Width(inner)
+		lead := innerW - lipgloss.Width(strings.TrimLeft(inner, " "))
+		trail := innerW - lipgloss.Width(strings.TrimRight(inner, " "))
+		if diff := lead - trail; diff < -1 || diff > 1 {
+			t.Errorf("offset %d: legend not centred: %d leading vs %d trailing columns, row=%q",
+				off, lead, trail, inner)
+		}
 	}
 }

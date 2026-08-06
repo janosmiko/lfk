@@ -33,9 +33,11 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `abbreviations` | map[string]string | *(see Abbreviations section)* | Custom search abbreviation overrides/extensions. |
 | `custom_actions` | map[string]list | `{}` | User-defined actions per resource type. |
 | `filter_presets` | map[string]list | `{}` | User-defined quick filter presets per resource type. |
-| `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`); value = `{kind, group, name}`. Overrides built-ins on collision. |
-| `which_key_enabled` | bool | `true` | Show the which-key popup while the `g` prefix is pending. |
-| `which_key_delay_ms` | int | `0` | Delay before the popup appears (ms, 0-2000). |
+| `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`), which must be `jump_top` plus one keypress (`gA`, `gctrl+p`); value = `{kind, group, name}`. Overrides built-ins on collision. |
+| `which_key_enabled` | bool | `true` | Show the goto popup while the `g` prefix is pending, and the action panel while the which-key leader (`?`) is armed (explorer and every fullscreen viewer except exec mode). |
+| `which_key_delay_ms` | int | `0` | Delay before the goto popup appears (ms, 0-2000). |
+| `which_key_leader_delay_ms` | int | `0` | Delay before the which-key action panel appears (ms, 0-2000). |
+| `which_key_grouped` | bool | `true` | Startup order of the action panel: `true` groups by category, `false` sorts by key. The leader key toggles it and saves the choice to `~/.local/state/lfk/whichkey_prefs.yaml`, which then outranks this setting; changing this setting afterwards retires the saved choice. |
 | `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context and per-union-set in `~/.local/state/lfk/pinned.yaml`). |
 | `pinned_summaries` | list[string] | *(built-in defaults)* | Resource types (`group/resource` pin keys) whose status summaries show on the cluster dashboard. Unset shows built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates); `[]` disables them. Also manageable in-app via the action menu (`x`) at the resource types level (stored per-context and per-union-set in `~/.local/state/lfk/pinned_summaries.yaml`). Max 10 per scope. |
@@ -140,7 +142,7 @@ appearance:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `colorscheme` | string | `"tokyonight-storm"` | Built-in color scheme name. Dual-mode `"dark:X,light:Y"` supported. |
-| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). |
+| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). Also decides how the which-key panel and the help screen's key column draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`). |
 | `no_color` | bool | `false` | Strip all colors (monochrome). `NO_COLOR` env var takes precedence. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars and surfaces. |
 | `min_contrast_ratio` | float | `0.0` | Readability knob in `[0.0, 1.0]`. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
@@ -469,8 +471,6 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 |---|---|---|
 | `logs` | `ctrl+l` | Open the fullscreen log viewer for the selected resource |
 | `refresh` | `R` | Refresh current view |
-| `restart` | `r` | Restart resource (action menu only) |
-| `exec` | `s` | Exec into container (action menu only) |
 | `describe` | `v` | Describe selected resource |
 | `delete` | `D` | Delete resource (force delete Pod/Job if already deleting) |
 | `force_delete` | `X` | Force delete (Pod/Job only) |
@@ -1106,6 +1106,7 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `$XDG_STATE_HOME/lfk/pinned.yaml` | Per-context and per-union-set pinned CRD groups, managed via `p` key (default: `~/.local/state/lfk/pinned.yaml`) |
 | `$XDG_STATE_HOME/lfk/hidden_types.yaml` | Per-context and per-union-set hidden resource types, managed via the action menu (`x`) at the resource types level (default: `~/.local/state/lfk/hidden_types.yaml`) |
 | `$XDG_STATE_HOME/lfk/pinned_summaries.yaml` | Per-context and per-union-set resource-type summaries pinned to the cluster dashboard, managed via the action menu (default: `~/.local/state/lfk/pinned_summaries.yaml`) |
+| `$XDG_STATE_HOME/lfk/whichkey_prefs.yaml` | Which-key panel entry order from the leader-key toggle, auto-managed; outranks `which_key_grouped` (default: `~/.local/state/lfk/whichkey_prefs.yaml`) |
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
 
 State files stored at the legacy `~/.config/lfk/` location are automatically migrated to the new XDG state directory on first access.
