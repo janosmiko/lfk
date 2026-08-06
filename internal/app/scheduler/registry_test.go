@@ -602,6 +602,40 @@ func TestDisownTasksMakesThemCancellableFromAnyTab(t *testing.T) {
 	assert.True(t, cancelled)
 }
 
+func TestSameSignatureTasksFromTwoTabsBothSurvive(t *testing.T) {
+	r := New(0)
+	cancelledA, cancelledB := false, false
+	r.StartCancellable(7, KindMutation, "Delete pods (5)", "prod / ns", func() { cancelledA = true })
+	r.StartCancellable(8, KindMutation, "Delete pods (5)", "prod / ns", func() { cancelledB = true })
+
+	assert.Len(t, r.Snapshot(), 2, "identical labels from two tabs are two operations")
+
+	r.CancelMutationsOwnedBy(8)
+	assert.False(t, cancelledA, "the other tab's task must keep its cancel func")
+	assert.True(t, cancelledB)
+}
+
+func TestStartStripsOwnerOfAlreadyClosedTab(t *testing.T) {
+	r := New(0)
+	// The tab closes while the work is still queued; it registers afterwards.
+	r.DisownTasks(7)
+	r.StartOwned(7, KindMutation, "Delete", "ns")
+
+	assert.True(t, r.HasActiveMutationsOwnedBy(9), "work from a closed tab must be cancellable anywhere")
+}
+
+func TestDisownedSetIsBounded(t *testing.T) {
+	r := New(0)
+	for i := uint64(1); i <= disownedCap+10; i++ {
+		r.DisownTasks(i)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	assert.Len(t, r.disowned, disownedCap)
+	assert.Len(t, r.disownedOrder, disownedCap)
+}
+
 func TestDisownTasksIgnoresOtherOwners(t *testing.T) {
 	r := New(0)
 	r.StartOwned(7, KindMutation, "Delete", "ns")

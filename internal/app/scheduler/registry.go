@@ -37,6 +37,12 @@ const DefaultCompletedCap = 1000
 // and only the history entry remains.
 const DefaultLingerDuration = 10 * time.Second
 
+// disownedCap bounds the set of closed-tab UIDs kept for stripping
+// ownership off work queued before the tab closed. Only tabs closed
+// while work is still queued matter, and queues drain in seconds, so a
+// small window is enough.
+const disownedCap = 64
+
 // Kind classifies a tracked async operation. Used to label rows in the
 // :tasks overlay.
 type Kind int
@@ -147,10 +153,15 @@ func (c CompletedTask) Duration() time.Duration {
 // Registry is a process-global record of tracked operations.
 // Safe for concurrent use from any number of goroutines.
 type Registry struct {
-	mu             sync.Mutex
-	tasks          map[uint64]*Task
-	cancels        map[uint64]context.CancelFunc // cancel funcs for cancellable tasks
-	order          []uint64                      // insertion order for stable Snapshot output
+	mu      sync.Mutex
+	tasks   map[uint64]*Task
+	cancels map[uint64]context.CancelFunc // cancel funcs for cancellable tasks
+	// disowned holds the UIDs of closed tabs. Work already queued when a
+	// tab closes registers later, so the owner is stripped at Start time
+	// too — otherwise it would come back owned by a tab that is gone.
+	disowned       map[uint64]struct{}
+	disownedOrder  []uint64 // insertion order, for the cap
+	order          []uint64 // insertion order for stable Snapshot output
 	nextID         atomic.Uint64
 	threshold      time.Duration
 	lingerDuration time.Duration   // how long finished tasks stay in the Running list
@@ -189,6 +200,7 @@ func NewWithCap(threshold time.Duration, completedCap int) *Registry {
 	return &Registry{
 		tasks:          make(map[uint64]*Task),
 		cancels:        make(map[uint64]context.CancelFunc),
+		disowned:       make(map[uint64]struct{}),
 		threshold:      threshold,
 		lingerDuration: DefaultLingerDuration,
 		completedCap:   completedCap,
@@ -259,9 +271,14 @@ func (r *Registry) startWithPriority(kind Kind, prio Priority, name, target stri
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// Dedupe: drop any prior task with the same visible signature.
+	if _, dead := r.disowned[task.Owner]; dead {
+		task.Owner = 0
+	}
+	// Dedupe: drop any prior task with the same visible signature. Owner is
+	// part of the signature — two tabs running the same operation are two
+	// operations, and collapsing them would leave the loser uncancellable.
 	for oldID, t := range r.tasks {
-		if t.Kind == kind && t.Name == name && t.Target == target {
+		if t.Kind == kind && t.Name == name && t.Target == target && t.Owner == task.Owner {
 			delete(r.tasks, oldID)
 			delete(r.cancels, oldID)
 			for i, oid := range r.order {
@@ -355,6 +372,17 @@ func (r *Registry) DisownTasks(owner uint64) {
 		if t.Owner == owner {
 			t.Owner = 0
 		}
+	}
+	if _, seen := r.disowned[owner]; seen {
+		return
+	}
+	r.disowned[owner] = struct{}{}
+	r.disownedOrder = append(r.disownedOrder, owner)
+	// Evict the oldest entries past the cap. Queued work starts within
+	// seconds, so a UID that old can no longer have anything pending.
+	for len(r.disownedOrder) > disownedCap {
+		delete(r.disowned, r.disownedOrder[0])
+		r.disownedOrder = r.disownedOrder[1:]
 	}
 }
 
