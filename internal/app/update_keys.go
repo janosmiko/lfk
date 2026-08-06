@@ -367,7 +367,43 @@ func (m Model) handleKeyNextMatch() (tea.Model, tea.Cmd) {
 		m.syncExpandedGroup()
 		return m, m.loadPreview()
 	}
-	return m, nil
+	// When not in search mode, jump to the namespace of the currently
+	// selected resource (sets namespace scope to the resource's namespace).
+	return m.handleKeyJumpToNamespace()
+}
+
+// handleKeyJumpToNamespace scopes the view to the namespace of the resource
+// under the cursor. At LevelClusters or in union mode it is a no-op with a
+// status message. When the selected resource is cluster-scoped (empty
+// namespace) it reports an error.
+func (m Model) handleKeyJumpToNamespace() (tea.Model, tea.Cmd) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Namespace selection requires a selected context", true)
+		return m, scheduleStatusClear()
+	}
+	if m.unionMode {
+		m.setStatusMessage("Union mode supports exactly one namespace", true)
+		return m, scheduleStatusClear()
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil || sel.Namespace == "" {
+		m.setStatusMessage("No namespaced resource selected to jump to", true)
+		return m, scheduleStatusClear()
+	}
+	ns := sel.Namespace
+	oldNs := m.namespace
+	beforeScope := m.captureNamespaceScope()
+	m.selectedNamespaces = map[string]bool{ns: true}
+	m.namespace = ns
+	m.allNamespaces = false
+	m.nsSelectionNegated = false
+	m.nsSelectionModified = false
+	m.recordPreviousNamespace(beforeScope)
+	m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
+	m.cancelAndReset()
+	m.requestGen++
+	m.setStatusMessage("Namespace: "+ns, false)
+	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
 
 func (m Model) handleKeyPrevMatch() (tea.Model, tea.Cmd) {

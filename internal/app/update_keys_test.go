@@ -1635,3 +1635,98 @@ func TestCtrlCClosesTabWhenNoMutationsActive(t *testing.T) {
 	assert.True(t, handled)
 	// Should fall through to normal close-tab behavior (not cancelled)
 }
+
+// --- handleKeyNextMatch / handleKeyJumpToNamespace ---
+
+func TestHandleKeyNextMatch_JumpsToNamespaceWhenNotInSearch(t *testing.T) {
+	m := baseExplorerModel()
+	m.middleItems = []model.Item{
+		{Name: "pod-a", Kind: "Pod", Namespace: "team-alpha"},
+		{Name: "pod-b", Kind: "Pod", Namespace: "team-beta"},
+	}
+	m.setCursor(1)
+	m.namespace = ""
+	m.allNamespaces = true
+	m.selectedNamespaces = map[string]bool{"default": true}
+
+	ret, cmd := m.handleKeyNextMatch()
+	result := ret.(Model)
+
+	assert.NotNil(t, cmd, "refresh command should be returned")
+	assert.Equal(t, "team-beta", result.namespace)
+	assert.False(t, result.allNamespaces)
+	assert.True(t, result.selectedNamespaces["team-beta"])
+	assert.Len(t, result.selectedNamespaces, 1)
+	assert.Contains(t, result.statusMessage, "team-beta")
+	assert.False(t, result.statusMessageErr)
+}
+
+func TestHandleKeyNextMatch_NextMatchWhenSearchActive(t *testing.T) {
+	m := baseExplorerModel()
+	m.searchInput = TextInput{Value: "pod"}
+	m.middleItems = []model.Item{
+		{Name: "pod-a", Kind: "Pod"},
+		{Name: "pod-b", Kind: "Pod"},
+		{Name: "svc-c", Kind: "Service"},
+	}
+	m.setCursor(0)
+
+	ret, _ := m.handleKeyNextMatch()
+	result := ret.(Model)
+
+	// When search is active, should jump to next search match, not change namespace
+	assert.Equal(t, "default", result.namespace)
+	assert.True(t, result.allNamespaces)
+}
+
+func TestHandleKeyJumpToNamespace_AtLevelClusters(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+
+	ret, _ := m.handleKeyJumpToNamespace()
+	result := ret.(Model)
+
+	assert.True(t, result.statusMessageErr)
+	assert.Contains(t, result.statusMessage, "selected context")
+}
+
+func TestHandleKeyJumpToNamespace_InUnionMode(t *testing.T) {
+	m := baseExplorerModel()
+	m.unionMode = true
+	m.middleItems = []model.Item{
+		{Name: "pod-a", Kind: "Pod", Namespace: "team-alpha"},
+	}
+	m.setCursor(0)
+
+	ret, _ := m.handleKeyJumpToNamespace()
+	result := ret.(Model)
+
+	assert.True(t, result.statusMessageErr)
+	assert.Contains(t, result.statusMessage, "Union mode")
+}
+
+func TestHandleKeyJumpToNamespace_ClusterScopedResource(t *testing.T) {
+	m := baseExplorerModel()
+	m.middleItems = []model.Item{
+		{Name: "node-1", Kind: "Node", Namespace: ""},
+	}
+	m.setCursor(0)
+
+	ret, _ := m.handleKeyJumpToNamespace()
+	result := ret.(Model)
+
+	assert.True(t, result.statusMessageErr)
+	assert.Contains(t, result.statusMessage, "No namespaced resource")
+}
+
+func TestHandleKeyJumpToNamespace_NoSelection(t *testing.T) {
+	m := baseExplorerModel()
+	m.middleItems = []model.Item{}
+	m.setCursor(-1)
+
+	ret, _ := m.handleKeyJumpToNamespace()
+	result := ret.(Model)
+
+	assert.True(t, result.statusMessageErr)
+	assert.Contains(t, result.statusMessage, "No namespaced resource")
+}
