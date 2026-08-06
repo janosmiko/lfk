@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/janosmiko/lfk/compare/v0.16.0...v0.16.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* apply dual colorscheme again under Bubble Tea v2 ([#580](https://github.com/janosmiko/lfk/issues/580)) ([#581](https://github.com/janosmiko/lfk/issues/581)) ([0a16c12](https://github.com/janosmiko/lfk/commit/0a16c1246a57eb4cd584bfd638c85cdd47f28dad))
+
 ## [0.16.0](https://github.com/janosmiko/lfk/compare/v0.15.16...v0.16.0) (2026-08-06)
 
 
