@@ -77,12 +77,26 @@ func TestWhichKeyGroupStyles_NeverMatchThePlainDescriptionOrTheKey(t *testing.T)
 			t.Fatalf("precondition: the %s must have a foreground to compare against", what)
 		}
 	}
+	// Exactly one group may take the normal text color: Actions is the largest,
+	// so it stays neutral and the accents mark the smaller groups. A second
+	// neutral group would make two categories indistinguishable, so the count
+	// is asserted rather than the rule simply relaxed. The KEY check has no
+	// such exemption — a group matching the key accent is always wrong, which
+	// is the collision that reached the user.
+	neutral := 0
 	for g, st := range whichKeyGroupStyles() {
-		for what, fg := range against {
-			if st.GetForeground() == fg {
-				t.Errorf("group %q renders in the %s %v; key and description collapse into one color", g, what, fg)
+		if st.GetForeground() == cellStyles.key.GetForeground() {
+			t.Errorf("group %q renders in the key accent %v; key and description collapse into one color", g, cellStyles.key.GetForeground())
+		}
+		if st.GetForeground() == cellStyles.desc.GetForeground() {
+			neutral++
+			if g != wkActions {
+				t.Errorf("group %q renders in the ungrouped description color; only Actions may be neutral", g)
 			}
 		}
+	}
+	if neutral != 1 {
+		t.Errorf("exactly one group must carry the normal text color, found %d", neutral)
 	}
 }
 
@@ -145,9 +159,12 @@ func TestWhichKeyLeaderCells_CarryTheCatalogGroup(t *testing.T) {
 		case c.group != want:
 			t.Errorf("leader entry %q (%s) carries group %q, want the catalog's %q", c.key, c.desc, c.group, want)
 		}
-		// The key is uniform now, so the group must reach the DESCRIPTION or it
-		// reaches nothing.
-		if st.descStyle(c.group).Render(c.desc) == st.desc.Render(c.desc) {
+		// The key is uniform now, so an accent must reach the DESCRIPTION or it
+		// reaches nothing. Actions is the deliberate exception: it is the
+		// largest group and takes the normal text color so the five smaller
+		// groups carry the accents (see the group-style guard, which pins that
+		// exactly one group may be neutral).
+		if c.group != wkActions && st.descStyle(c.group).Render(c.desc) == st.desc.Render(c.desc) {
 			t.Errorf("leader entry %q (%s) draws its description in the ungrouped style", c.key, c.desc)
 		}
 		groups[c.group] = true
@@ -175,8 +192,10 @@ func TestWhichKeyCells_GotoPopupStaysUngrouped(t *testing.T) {
 			t.Fatalf("goto entry %q renders %q, want the ungrouped %q", c.key, got, want)
 		}
 	}
-	// The fallback only means something while a real group renders differently.
-	grouped := st.descStyle(whichKeyGroupOrder()[0])
+	// The fallback only means something while an ACCENTED group renders
+	// differently. whichKeyGroupOrder()[0] is Actions, which is deliberately
+	// neutral, so probing it would compare the ungrouped style with itself.
+	grouped := st.descStyle(wkViews)
 	if grouped.Render("Delete") == st.desc.Render("Delete") {
 		t.Fatal("every group renders like the ungrouped style; the fallback assertion above proves nothing")
 	}

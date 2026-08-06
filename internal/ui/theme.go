@@ -108,7 +108,7 @@ func ApplyTheme(t Theme) {
 	// lipgloss.Color(ColorX) call sites otherwise stay frozen at the default
 	// Tokyonight palette regardless of which theme is loaded.
 	//
-	// ColorOrange / ColorCyan / ColorMagenta have no Theme field (they are
+	// ColorOrange / ColorCyan have no Theme field (they are
 	// special-purpose constants — high-CPU warning amber, freshly-created cyan,
 	// which-key Actions magenta) and stay at their compile-time defaults.
 	ColorPrimary = t.Primary
@@ -123,7 +123,6 @@ func ApplyTheme(t Theme) {
 	ColorPurple = t.Purple
 	ColorOrange = defaultColorOrange
 	ColorCyan = defaultColorCyan
-	ColorMagenta = defaultColorMagenta
 	ColorBase = t.Base
 	ColorBarBg = t.BarBg
 	ColorSurface = t.Surface
@@ -343,18 +342,17 @@ func ApplyTheme(t Theme) {
 	// ones that can sit badly on an unusually light Base — run them through the
 	// same contrast floor the theme colors got above when the user asked for
 	// one.
-	wkCyan, wkOrange, wkMagenta := ColorCyan, ColorOrange, ColorMagenta
+	wkCyan, wkOrange := ColorCyan, ColorOrange
 	if ConfigMinContrastRatio > 0 {
 		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
 		wkOrange = EnforceMinContrast(wkOrange, t.Base, ConfigMinContrastRatio)
-		wkMagenta = EnforceMinContrast(wkMagenta, t.Base, ConfigMinContrastRatio)
 	}
 	// No Background here (nor in theme_nocolor.go): the panel paints its own
 	// background per render from BaseBg, which also tracks the transparency
 	// setting, so baking one in would double-set it.
 	WhichKeyKeyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
 	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
-	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkMagenta))
+	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
 	WhichKeyViewsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary))
 	WhichKeyFilterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkCyan))
 	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple))

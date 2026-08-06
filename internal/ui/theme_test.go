@@ -169,7 +169,6 @@ func TestApplyTheme_TracksActiveThemeInColorSlots(t *testing.T) {
 	// Orange / Cyan / Magenta are special-purpose constants with no theme slot.
 	assert.Equal(t, defaultColorOrange, ColorOrange)
 	assert.Equal(t, defaultColorCyan, ColorCyan)
-	assert.Equal(t, defaultColorMagenta, ColorMagenta)
 }
 
 func TestColumnsForKind(t *testing.T) {

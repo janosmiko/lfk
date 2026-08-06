@@ -59,7 +59,6 @@ func TestSetNoColor_TogglesAndRebuildsStyles(t *testing.T) {
 	assert.Empty(t, ColorError)
 	assert.Empty(t, ColorWarning)
 	assert.Empty(t, ColorCyan)
-	assert.Empty(t, ColorMagenta)
 
 	// Inline styles that reference the theme color slots must emit no
 	// color SGR because lipgloss.Color("") returns NoColor{}.
