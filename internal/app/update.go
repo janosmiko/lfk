@@ -75,7 +75,10 @@ func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		if dark, ok := ui.ParseColorModeMsg(msg); ok {
 			ui.SetColorMode(dark)
-			return m, nil
+			// The scheme is applied outside the model, so the cached previews
+			// still hold the previous theme's baked colors; re-render them now
+			// instead of leaving them stale until the next data tick.
+			return m.recomposeThemedContent(), nil
 		}
 		if mdl, cmd, ok := m.updateResourceMsg(msg); ok {
 			return mdl, cmd
