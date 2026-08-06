@@ -624,16 +624,21 @@ func TestStartStripsOwnerOfAlreadyClosedTab(t *testing.T) {
 	assert.True(t, r.HasActiveMutationsOwnedBy(9), "work from a closed tab must be cancellable anywhere")
 }
 
-func TestDisownedSetIsBounded(t *testing.T) {
+// A queued task can register long after its tab closed, with any number of
+// other tabs closing in between. The closed-owner record must survive that.
+func TestStartStripsOwnerAfterManyLaterClosures(t *testing.T) {
 	r := New(0)
-	for i := uint64(1); i <= disownedCap+10; i++ {
+	r.DisownTasks(1)
+	for i := uint64(2); i <= 200; i++ {
 		r.DisownTasks(i)
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	assert.Len(t, r.disowned, disownedCap)
-	assert.Len(t, r.disownedOrder, disownedCap)
+	cancelled := false
+	r.StartCancellable(1, KindMutation, "Delete", "ns", func() { cancelled = true })
+
+	assert.True(t, r.HasActiveMutationsOwnedBy(999), "late registration from a closed tab must stay cancellable")
+	r.CancelMutationsOwnedBy(999)
+	assert.True(t, cancelled)
 }
 
 func TestDisownTasksIgnoresOtherOwners(t *testing.T) {

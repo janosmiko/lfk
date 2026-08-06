@@ -37,12 +37,6 @@ const DefaultCompletedCap = 1000
 // and only the history entry remains.
 const DefaultLingerDuration = 10 * time.Second
 
-// disownedCap bounds the set of closed-tab UIDs kept for stripping
-// ownership off work queued before the tab closed. Only tabs closed
-// while work is still queued matter, and queues drain in seconds, so a
-// small window is enough.
-const disownedCap = 64
-
 // Kind classifies a tracked async operation. Used to label rows in the
 // :tasks overlay.
 type Kind int
@@ -159,8 +153,11 @@ type Registry struct {
 	// disowned holds the UIDs of closed tabs. Work already queued when a
 	// tab closes registers later, so the owner is stripped at Start time
 	// too — otherwise it would come back owned by a tab that is gone.
+	// Entries are never evicted: a queued task can register at any later
+	// point, and there is no moment where that becomes impossible (it may
+	// sit behind arbitrarily long work). Growth is one 8-byte key per tab
+	// the user closes, so even an extreme session stays well under 100 KB.
 	disowned       map[uint64]struct{}
-	disownedOrder  []uint64 // insertion order, for the cap
 	order          []uint64 // insertion order for stable Snapshot output
 	nextID         atomic.Uint64
 	threshold      time.Duration
@@ -373,17 +370,7 @@ func (r *Registry) DisownTasks(owner uint64) {
 			t.Owner = 0
 		}
 	}
-	if _, seen := r.disowned[owner]; seen {
-		return
-	}
 	r.disowned[owner] = struct{}{}
-	r.disownedOrder = append(r.disownedOrder, owner)
-	// Evict the oldest entries past the cap. Queued work starts within
-	// seconds, so a UID that old can no longer have anything pending.
-	for len(r.disownedOrder) > disownedCap {
-		delete(r.disowned, r.disownedOrder[0])
-		r.disownedOrder = r.disownedOrder[1:]
-	}
 }
 
 // CancelMutationsOwnedBy cancels the in-flight KindMutation tasks started
