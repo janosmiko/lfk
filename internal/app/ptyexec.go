@@ -157,10 +157,22 @@ func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case "G":
 			m.execScrollOffset = 0
 			return m, nil
+		case "esc":
+			// Esc exits exec mode and returns to explorer.
+			m.cleanupExecPTY()
+			m.mode = modeExplorer
+			return m, nil
 		default:
 			// Cancel prefix — key is swallowed (not forwarded).
 			return m, nil
 		}
+	}
+
+	// Esc exits exec mode and returns to explorer.
+	if msg.String() == "esc" {
+		m.cleanupExecPTY()
+		m.mode = modeExplorer
+		return m, nil
 	}
 
 	// Ctrl+] pressed: set prefix flag and show hint.
@@ -170,7 +182,7 @@ func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// Direct scroll bindings (no Ctrl+] prefix needed). Unlike the prefixed
+	//  Direct scroll bindings (no Ctrl+] prefix needed). Unlike the prefixed
 	// scroll keys these shadow the PTY program, so hand them back to
 	// full-screen programs (vim, less, htop) that page themselves — our
 	// line-stream scrollback cannot reconstruct their output anyway.

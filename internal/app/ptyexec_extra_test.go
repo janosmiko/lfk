@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -232,4 +233,54 @@ func TestHandleExecKeyPageKeysRespectAltScreen(t *testing.T) {
 			})
 		}
 	})
+}
+
+// --- handleExecKey: Esc exits exec mode ---
+
+func TestHandleExecKeyEscExitsToExplorer(t *testing.T) {
+	m := Model{
+		mode:    modeExec,
+		execPTY: nil,
+		tabs:    []TabState{{}},
+		width:   80,
+		height:  40,
+	}
+	ret, _ := m.handleExecKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	result := ret.(Model)
+	assert.Equal(t, modeExplorer, result.mode)
+	assert.False(t, result.execEscPressed)
+}
+
+func TestHandleExecKeyEscAfterCtrlBracketPrefixExits(t *testing.T) {
+	m := Model{
+		mode:           modeExec,
+		execPTY:        nil,
+		execEscPressed: true,
+		tabs:           []TabState{{}},
+		width:          80,
+		height:         40,
+	}
+	ret, _ := m.handleExecKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	result := ret.(Model)
+	assert.Equal(t, modeExplorer, result.mode)
+	assert.False(t, result.execEscPressed)
+}
+
+func TestHandleExecKeyEscAfterExitedProcessExitsCleanly(t *testing.T) {
+	m := Model{
+		mode:    modeExec,
+		execPTY: nil,
+		tabs:    []TabState{{}},
+		width:   80,
+		height:  40,
+	}
+	// Simulate an exited process.
+	done := make(chan struct{})
+	close(done)
+	m.execDone = &atomic.Bool{}
+	m.execDone.Store(true)
+
+	ret, _ := m.handleExecKey(tea.KeyPressMsg{Code: tea.KeyEsc})
+	result := ret.(Model)
+	assert.Equal(t, modeExplorer, result.mode)
 }
