@@ -443,6 +443,11 @@ type hpaScaleState struct {
 
 // TabState holds per-tab navigation state so each tab is fully independent.
 type TabState struct {
+	// uid identifies this tab for the lifetime of the process. Background
+	// work records it so Ctrl+C only cancels operations started from the
+	// tab the user is on (tab index shifts when tabs close or reorder).
+	uid uint64
+
 	// needsLoad is true for tabs restored from a session file that have not
 	// yet had their items loaded.  When loadTab detects this flag it triggers
 	// a full refreshCurrentLevel instead of the lighter loadPreview.

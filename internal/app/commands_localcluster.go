@@ -110,6 +110,7 @@ func (m Model) dispatchCreateLocalCluster(p localcluster.Provider, spec localclu
 	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
+		m.currentTabUID(),
 		scheduler.KindMutation,
 		fmt.Sprintf("Create %s/%s", p.Name(), spec.Name),
 		"",
@@ -127,6 +128,7 @@ func (m Model) dispatchStartLocalCluster(p localcluster.LifecycleProvider, name 
 	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
+		m.currentTabUID(),
 		scheduler.KindMutation,
 		fmt.Sprintf("Start %s/%s", p.Name(), name),
 		"",
@@ -140,6 +142,7 @@ func (m Model) dispatchStopLocalCluster(p localcluster.LifecycleProvider, name s
 	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
+		m.currentTabUID(),
 		scheduler.KindMutation,
 		fmt.Sprintf("Stop %s/%s", p.Name(), name),
 		"",
@@ -153,6 +156,7 @@ func (m Model) dispatchDeleteLocalCluster(p localcluster.Provider, name string) 
 	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
+		m.currentTabUID(),
 		scheduler.KindMutation,
 		fmt.Sprintf("Delete %s/%s", p.Name(), name),
 		"",

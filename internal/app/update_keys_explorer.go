@@ -137,11 +137,16 @@ func (m Model) handleExplorerSelectionKey(msg tea.KeyPressMsg) (tea.Model, tea.C
 func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 
-	if m.scheduler != nil && m.scheduler.HasActiveMutations() {
+	// Only this tab's own mutations intercept Ctrl+C/Esc. Work started on
+	// another tab must not swallow the key — the user expects it to close
+	// the tab they are looking at.
+	if m.scheduler != nil {
 		if key := msg.String(); key == "ctrl+c" || key == "esc" {
-			m.scheduler.CancelMutations()
-			m.setStatusMessage("Cancelling...", false)
-			return m, nil, true
+			if owner := m.currentTabUID(); m.scheduler.HasActiveMutationsOwnedBy(owner) {
+				m.scheduler.CancelMutationsOwnedBy(owner)
+				m.setStatusMessage("Cancelling...", false)
+				return m, nil, true
+			}
 		}
 	}
 
@@ -290,6 +295,7 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 	}
 	if m.nav.Level == model.LevelClusters && len(m.tabs) > 1 {
 		m.cancelActiveTabLogStreams()
+		m.scheduler.DisownTasks(m.currentTabUID())
 		m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
 		if m.activeTab > 0 {
 			m.activeTab--

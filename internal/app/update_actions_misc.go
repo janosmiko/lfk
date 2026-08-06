@@ -126,6 +126,7 @@ func (m *Model) cancelAllTabLogStreams() {
 func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 	if len(m.tabs) > 1 {
 		m.cancelActiveTabLogStreams()
+		m.scheduler.DisownTasks(m.currentTabUID())
 		m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
 		if m.activeTab > 0 {
 			m.activeTab--

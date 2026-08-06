@@ -985,7 +985,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `[` | Previous tab |
 | `}` | Move current tab right (shift+]) |
 | `{` | Move current tab left (shift+[) |
-| `Ctrl+C` | Close current tab (quit if last tab) |
+| `Ctrl+C` | Close current tab (quit if last tab). Cancels a bulk action first, but only one started on this tab |
 
 ## Read-Only Mode
 
