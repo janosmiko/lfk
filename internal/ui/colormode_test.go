@@ -3,6 +3,7 @@ package ui
 import (
 	"testing"
 
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,6 +25,18 @@ func TestParseColorModeMsg_Light(t *testing.T) {
 	dark, ok := ParseColorModeMsg(msg)
 	assert.True(t, ok, "CSI ?997;2n should be recognized as a color-mode report")
 	assert.False(t, dark, "CSI ?997;2n should report light mode")
+}
+
+// bubbletea v2 decodes CSI ?997 into typed ultraviolet events instead of the
+// raw byte message v1 delivered; both shapes must keep working.
+func TestParseColorModeMsg_UltravioletEvents(t *testing.T) {
+	dark, ok := ParseColorModeMsg(uv.DarkColorSchemeEvent{})
+	assert.True(t, ok, "uv.DarkColorSchemeEvent should be recognized as a color-mode report")
+	assert.True(t, dark, "uv.DarkColorSchemeEvent should report dark mode")
+
+	dark, ok = ParseColorModeMsg(uv.LightColorSchemeEvent{})
+	assert.True(t, ok, "uv.LightColorSchemeEvent should be recognized as a color-mode report")
+	assert.False(t, dark, "uv.LightColorSchemeEvent should report light mode")
 }
 
 func TestParseColorModeMsg_Unrelated(t *testing.T) {

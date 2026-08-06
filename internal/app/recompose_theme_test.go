@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -140,6 +141,44 @@ func TestColorschemeLivePreviewRecomposesFooters(t *testing.T) {
 	assert.Equal(t, overlayColorscheme, result.overlay, "overlay stays open during preview")
 	assert.NotEqual(t, before, result.metricsContent,
 		"moving the cursor must recompose the metrics footer with the previewed theme")
+}
+
+// TestColorModeReportRecomposesFooters guards the auto dark/light path: when
+// the terminal reports a color-mode flip, the configured scheme is applied
+// outside the model, so the cached footers must be recomposed too — otherwise
+// they keep the previous theme's baked colors until the next data tick.
+func TestColorModeReportRecomposesFooters(t *testing.T) {
+	withTrueColor(t)
+	origDark := ui.ConfigDarkColorscheme
+	origLight := ui.ConfigLightColorscheme
+	t.Cleanup(func() {
+		ui.ConfigDarkColorscheme = origDark
+		ui.ConfigLightColorscheme = origLight
+	})
+	ui.ConfigDarkColorscheme = "dracula"
+	ui.ConfigLightColorscheme = "rose-pine-dawn"
+	ui.SetColorMode(true)
+
+	m := Model{
+		width:  120,
+		height: 40,
+		tabs:   []TabState{{}},
+		metricsData: &metricsInputs{
+			cpuUsed: 500, cpuReq: 1000, cpuLim: 2000,
+			memUsed: 256, memReq: 512, memLim: 1024,
+		},
+		nav: model.NavigationState{Context: "ctx"},
+	}
+	m = m.recomposeMetrics()
+	before := m.metricsContent
+	require.NotEmpty(t, before)
+
+	ret, _ := m.updateImpl(uv.LightColorSchemeEvent{})
+	result := ret.(Model)
+
+	assert.Equal(t, "rose-pine-dawn", ui.ActiveSchemeName, "light report must apply the light scheme")
+	assert.NotEqual(t, before, result.metricsContent,
+		"a color-mode flip must recompose the metrics footer with the new theme")
 }
 
 // TestRecomposeIsNoOpWithoutRetainedData ensures recompose leaves the footers
