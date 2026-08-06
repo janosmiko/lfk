@@ -23,6 +23,7 @@ type SubmitReq struct {
 	Timeout     time.Duration                      // 0 = use config-default for Kind
 	SilentTrack bool                               // mirrors existing suppressBgtasks
 	Gen         uint64                             // caller's requestGen for Sig
+	Owner       uint64                             // UID of the tab that submitted the work
 }
 
 // Sig returns the coalesce signature for this submission.

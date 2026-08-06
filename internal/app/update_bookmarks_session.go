@@ -242,6 +242,7 @@ func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item)
 
 func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) TabState {
 	tab := TabState{
+		uid: nextTabUID(),
 		nav: model.NavigationState{
 			Context: st.Context,
 		},

@@ -374,7 +374,7 @@ func (r *Registry) runTask(task *queuedTask) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	rt := &runningTask{task: task, cancel: cancel}
 
-	visID := r.startWithPriority(task.req.Kind, task.req.Priority, task.req.Name, task.req.Target, task.req.SilentTrack)
+	visID := r.startWithPriority(task.req.Kind, task.req.Priority, task.req.Name, task.req.Target, task.req.SilentTrack, task.req.Owner)
 	r.registerRunning(task.req.KubeContext, rt)
 	value, err := task.req.Fn(ctx)
 	cancel()

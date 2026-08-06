@@ -695,7 +695,7 @@ func (m Model) trackBgTask(kind scheduler.Kind, name, target string, inner func(
 	if m.suppressBgtasks {
 		id = registry.StartUntracked()
 	} else {
-		id = registry.Start(kind, name, target)
+		id = registry.StartOwned(m.currentTabUID(), kind, name, target)
 	}
 	return func() tea.Msg {
 		defer registry.Finish(id)
@@ -726,6 +726,7 @@ func (m Model) scheduleK8sCall(prio scheduler.Priority, kind scheduler.Kind, nam
 		Target:      target,
 		Gen:         m.requestGen,
 		SilentTrack: m.suppressBgtasks,
+		Owner:       m.currentTabUID(),
 		Fn: func(ctx context.Context) (any, error) {
 			return fn(ctx), nil
 		},

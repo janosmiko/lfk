@@ -137,6 +137,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		reqCancel:                  reqCancel,
 		middleTableRenderer:        ui.NewTableRenderer(),
 		tabs: []TabState{{
+			uid:                nextTabUID(),
 			nav:                model.NavigationState{Level: model.LevelClusters},
 			namespace:          defaultNS,
 			splitPreview:       ui.ConfigSplitPreview,

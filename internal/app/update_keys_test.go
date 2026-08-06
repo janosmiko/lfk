@@ -1594,7 +1594,7 @@ func TestDescribeSearchSwallowsNewTabKey(t *testing.T) {
 func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
 	cancelled := false
 	r := scheduler.New(0)
-	r.StartCancellable(scheduler.KindMutation, "Delete pods (5)", "ctx / ns", func() { cancelled = true })
+	r.StartCancellable(0, scheduler.KindMutation, "Delete pods (5)", "ctx / ns", func() { cancelled = true })
 
 	m := baseModelNav()
 	m.scheduler = r
@@ -1610,7 +1610,7 @@ func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
 func TestEscCancelsMutationsInsteadOfNavigatingBack(t *testing.T) {
 	cancelled := false
 	r := scheduler.New(0)
-	r.StartCancellable(scheduler.KindMutation, "Scale deploys (3)", "ctx / ns", func() { cancelled = true })
+	r.StartCancellable(0, scheduler.KindMutation, "Scale deploys (3)", "ctx / ns", func() { cancelled = true })
 
 	m := baseModelNav()
 	m.scheduler = r

@@ -108,6 +108,10 @@ type Task struct {
 	Silent     bool      // suppress from title-bar indicator only
 	Current    int       // progress: items processed so far (0 = not started)
 	Total      int       // progress: total items (0 = unknown/not applicable)
+	// Owner is the UID of the tab that started the task, so Ctrl+C only
+	// cancels work started from the tab the user is looking at. 0 means
+	// no owning tab and matches every tab.
+	Owner uint64
 }
 
 // IsFinished reports whether the task has had Finish() called and is
@@ -143,10 +147,18 @@ func (c CompletedTask) Duration() time.Duration {
 // Registry is a process-global record of tracked operations.
 // Safe for concurrent use from any number of goroutines.
 type Registry struct {
-	mu             sync.Mutex
-	tasks          map[uint64]*Task
-	cancels        map[uint64]context.CancelFunc // cancel funcs for cancellable tasks
-	order          []uint64                      // insertion order for stable Snapshot output
+	mu      sync.Mutex
+	tasks   map[uint64]*Task
+	cancels map[uint64]context.CancelFunc // cancel funcs for cancellable tasks
+	// disowned holds the UIDs of closed tabs. Work already queued when a
+	// tab closes registers later, so the owner is stripped at Start time
+	// too — otherwise it would come back owned by a tab that is gone.
+	// Entries are never evicted: a queued task can register at any later
+	// point, and there is no moment where that becomes impossible (it may
+	// sit behind arbitrarily long work). Growth is one 8-byte key per tab
+	// the user closes, so even an extreme session stays well under 100 KB.
+	disowned       map[uint64]struct{}
+	order          []uint64 // insertion order for stable Snapshot output
 	nextID         atomic.Uint64
 	threshold      time.Duration
 	lingerDuration time.Duration   // how long finished tasks stay in the Running list
@@ -185,6 +197,7 @@ func NewWithCap(threshold time.Duration, completedCap int) *Registry {
 	return &Registry{
 		tasks:          make(map[uint64]*Task),
 		cancels:        make(map[uint64]context.CancelFunc),
+		disowned:       make(map[uint64]struct{}),
 		threshold:      threshold,
 		lingerDuration: DefaultLingerDuration,
 		completedCap:   completedCap,
@@ -224,14 +237,21 @@ func (r *Registry) SetLingerDurationForTest(d time.Duration) {
 // without a registry (e.g. minimal test fixtures). Finish(0) is already
 // a no-op, so the standard defer pattern still works.
 func (r *Registry) Start(kind Kind, name, target string) uint64 {
-	return r.startWithPriority(kind, DefaultPriorityFor(kind), name, target, false)
+	return r.StartOwned(0, kind, name, target)
+}
+
+// StartOwned is Start with an owning tab UID recorded on the task, so
+// per-tab cancellation (Ctrl+C) only reaches work started from that tab.
+// Owner 0 means "no owning tab" and matches every tab.
+func (r *Registry) StartOwned(owner uint64, kind Kind, name, target string) uint64 {
+	return r.startWithPriority(kind, DefaultPriorityFor(kind), name, target, false, owner)
 }
 
 // startWithPriority is the internal variant of Start that lets scheduler
 // workers override the priority lookup with the submission's explicit
 // choice and mark routine work as silent. External callers use Start
 // and get DefaultPriorityFor(kind), Silent=false.
-func (r *Registry) startWithPriority(kind Kind, prio Priority, name, target string, silent bool) uint64 {
+func (r *Registry) startWithPriority(kind Kind, prio Priority, name, target string, silent bool, owner uint64) uint64 {
 	if r == nil {
 		return 0
 	}
@@ -244,12 +264,18 @@ func (r *Registry) startWithPriority(kind Kind, prio Priority, name, target stri
 		Target:    target,
 		StartedAt: time.Now(),
 		Silent:    silent,
+		Owner:     owner,
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// Dedupe: drop any prior task with the same visible signature.
+	if _, dead := r.disowned[task.Owner]; dead {
+		task.Owner = 0
+	}
+	// Dedupe: drop any prior task with the same visible signature. Owner is
+	// part of the signature — two tabs running the same operation are two
+	// operations, and collapsing them would leave the loser uncancellable.
 	for oldID, t := range r.tasks {
-		if t.Kind == kind && t.Name == name && t.Target == target {
+		if t.Kind == kind && t.Name == name && t.Target == target && t.Owner == task.Owner {
 			delete(r.tasks, oldID)
 			delete(r.cancels, oldID)
 			for i, oid := range r.order {
@@ -275,9 +301,9 @@ func (r *Registry) StartUntracked() uint64 {
 
 // StartCancellable records a new tracked task with a cancel function and
 // returns its ID. The cancel function can be invoked later via Cancel(id)
-// or CancelMutations(). Otherwise identical to Start.
-func (r *Registry) StartCancellable(kind Kind, name, target string, cancel context.CancelFunc) uint64 {
-	id := r.Start(kind, name, target)
+// or CancelMutationsOwnedBy(owner). Otherwise identical to StartOwned.
+func (r *Registry) StartCancellable(owner uint64, kind Kind, name, target string, cancel context.CancelFunc) uint64 {
+	id := r.StartOwned(owner, kind, name, target)
 	if r == nil || id == 0 {
 		return id
 	}
@@ -322,17 +348,42 @@ func (r *Registry) Cancel(id uint64) {
 	}
 }
 
-// CancelMutations cancels all in-flight tasks of KindMutation that have
-// a registered cancel function. Used when the user presses Ctrl+C or Esc
-// during bulk operations.
-func (r *Registry) CancelMutations() {
+// ownedBy reports whether a task belongs to the given tab. Tasks started
+// without an owner (Owner 0) match every tab so untagged work stays
+// cancellable from wherever the user is.
+func (t *Task) ownedBy(owner uint64) bool {
+	return t.Owner == 0 || t.Owner == owner
+}
+
+// DisownTasks clears the owner on every task started by the given tab, so
+// work outliving its tab stays cancellable from the remaining ones. Called
+// when a tab closes — UIDs are never reused, so an owner that no longer
+// exists would otherwise match no tab at all.
+func (r *Registry) DisownTasks(owner uint64) {
+	if r == nil || owner == 0 {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.tasks {
+		if t.Owner == owner {
+			t.Owner = 0
+		}
+	}
+	r.disowned[owner] = struct{}{}
+}
+
+// CancelMutationsOwnedBy cancels the in-flight KindMutation tasks started
+// from the given tab that have a registered cancel function. Used when
+// the user presses Ctrl+C or Esc during bulk operations.
+func (r *Registry) CancelMutationsOwnedBy(owner uint64) {
 	if r == nil {
 		return
 	}
 	r.mu.Lock()
 	var toCancel []context.CancelFunc
 	for id, t := range r.tasks {
-		if t.Kind == KindMutation {
+		if t.Kind == KindMutation && t.ownedBy(owner) {
 			if fn, ok := r.cancels[id]; ok {
 				toCancel = append(toCancel, fn)
 				delete(r.cancels, id)
@@ -345,10 +396,11 @@ func (r *Registry) CancelMutations() {
 	}
 }
 
-// HasActiveMutations returns true if there are any in-flight KindMutation
-// tasks. Used by the key handler to decide whether Ctrl+C/Esc should
-// cancel bulk operations instead of closing the tab/quitting.
-func (r *Registry) HasActiveMutations() bool {
+// HasActiveMutationsOwnedBy returns true if the given tab has in-flight
+// KindMutation tasks. Used by the key handler to decide whether Ctrl+C/Esc
+// should cancel bulk operations instead of closing the tab/quitting — work
+// started on another tab must not swallow the key.
+func (r *Registry) HasActiveMutationsOwnedBy(owner uint64) bool {
 	if r == nil {
 		return false
 	}
@@ -357,7 +409,7 @@ func (r *Registry) HasActiveMutations() bool {
 	for _, t := range r.tasks {
 		// Finished-lingering mutations are not "active" — they have
 		// already returned. Only in-flight mutations count.
-		if t.Kind == KindMutation && t.FinishedAt.IsZero() {
+		if t.Kind == KindMutation && t.FinishedAt.IsZero() && t.ownedBy(owner) {
 			return true
 		}
 	}

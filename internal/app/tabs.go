@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,6 +13,10 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// tabUIDSeq issues tab UIDs. Process-global so every tab of every Model
+// gets a distinct value.
+var tabUIDSeq atomic.Uint64
 
 // pushLeft saves the current leftItems and promotes middleItems to become the new leftItems.
 func (m *Model) pushLeft() {
@@ -661,9 +666,29 @@ func (m *Model) moveActiveTab(direction int) bool {
 	return true
 }
 
+// nextTabUID hands out the stable per-tab identity used to attribute
+// background work to the tab that started it. Tab index cannot serve as
+// that identity: closing or reordering tabs shifts it.
+func nextTabUID() uint64 {
+	return tabUIDSeq.Add(1)
+}
+
+// currentTabUID returns the active tab's UID, or 0 when there is no tab
+// (minimal test fixtures). 0 means "unowned" to the scheduler.
+func (m *Model) currentTabUID() uint64 {
+	if m.activeTab < 0 || m.activeTab >= len(m.tabs) {
+		return 0
+	}
+	if m.tabs[m.activeTab].uid == 0 {
+		m.tabs[m.activeTab].uid = nextTabUID()
+	}
+	return m.tabs[m.activeTab].uid
+}
+
 // cloneCurrentTab creates a deep copy of the current model state as a new TabState.
 func (m *Model) cloneCurrentTab() TabState {
 	newTab := TabState{
+		uid:                     nextTabUID(),
 		nav:                     m.nav,
 		leftItems:               append([]model.Item(nil), m.leftItems...),
 		middleItems:             append([]model.Item(nil), m.middleItems...),

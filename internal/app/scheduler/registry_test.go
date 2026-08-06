@@ -529,7 +529,7 @@ func TestUpdateProgressNilReceiver(t *testing.T) {
 func TestStartCancellable(t *testing.T) {
 	r := New(0)
 	cancelled := false
-	id := r.StartCancellable(KindMutation, "Delete", "ns", func() { cancelled = true })
+	id := r.StartCancellable(0, KindMutation, "Delete", "ns", func() { cancelled = true })
 	assert.NotZero(t, id)
 	snap := r.Snapshot()
 	require.Len(t, snap, 1)
@@ -551,10 +551,10 @@ func TestCancelNilReceiver(t *testing.T) {
 func TestCancelMutations(t *testing.T) {
 	r := New(0)
 	cancelled1, cancelled2, cancelled3 := false, false, false
-	r.StartCancellable(KindMutation, "Delete", "ns", func() { cancelled1 = true })
-	r.StartCancellable(KindMutation, "Scale", "ns", func() { cancelled2 = true })
-	r.StartCancellable(KindResourceList, "List Pods", "ns", func() { cancelled3 = true })
-	r.CancelMutations()
+	r.StartCancellable(0, KindMutation, "Delete", "ns", func() { cancelled1 = true })
+	r.StartCancellable(0, KindMutation, "Scale", "ns", func() { cancelled2 = true })
+	r.StartCancellable(0, KindResourceList, "List Pods", "ns", func() { cancelled3 = true })
+	r.CancelMutationsOwnedBy(1)
 	assert.True(t, cancelled1, "mutation task 1 should be cancelled")
 	assert.True(t, cancelled2, "mutation task 2 should be cancelled")
 	assert.False(t, cancelled3, "non-mutation task should not be cancelled")
@@ -562,30 +562,134 @@ func TestCancelMutations(t *testing.T) {
 
 func TestCancelMutationsNilReceiver(t *testing.T) {
 	var r *Registry
-	r.CancelMutations() // should not panic
+	r.CancelMutationsOwnedBy(1) // should not panic
+}
+
+func TestCancelMutationsOwnedByScopesToOwner(t *testing.T) {
+	r := New(0)
+	mine, theirs, unowned := false, false, false
+	r.StartCancellable(7, KindMutation, "Delete", "ns", func() { mine = true })
+	r.StartCancellable(8, KindMutation, "Scale", "ns", func() { theirs = true })
+	r.StartCancellable(0, KindMutation, "Restart", "ns", func() { unowned = true })
+
+	r.CancelMutationsOwnedBy(7)
+
+	assert.True(t, mine, "own tab's mutation should be cancelled")
+	assert.False(t, theirs, "another tab's mutation should survive")
+	assert.True(t, unowned, "unowned mutation should be cancelled from any tab")
+}
+
+func TestHasActiveMutationsOwnedByScopesToOwner(t *testing.T) {
+	r := New(0)
+	id := r.StartOwned(7, KindMutation, "Delete", "ns")
+
+	assert.True(t, r.HasActiveMutationsOwnedBy(7))
+	assert.False(t, r.HasActiveMutationsOwnedBy(8), "another tab must not see this mutation")
+
+	r.Finish(id)
+	assert.False(t, r.HasActiveMutationsOwnedBy(7))
+}
+
+func TestDisownTasksMakesThemCancellableFromAnyTab(t *testing.T) {
+	r := New(0)
+	cancelled := false
+	r.StartCancellable(7, KindMutation, "Delete", "ns", func() { cancelled = true })
+
+	r.DisownTasks(7)
+
+	assert.True(t, r.HasActiveMutationsOwnedBy(9), "disowned task should match any tab")
+	r.CancelMutationsOwnedBy(9)
+	assert.True(t, cancelled)
+}
+
+func TestSameSignatureTasksFromTwoTabsBothSurvive(t *testing.T) {
+	r := New(0)
+	cancelledA, cancelledB := false, false
+	r.StartCancellable(7, KindMutation, "Delete pods (5)", "prod / ns", func() { cancelledA = true })
+	r.StartCancellable(8, KindMutation, "Delete pods (5)", "prod / ns", func() { cancelledB = true })
+
+	assert.Len(t, r.Snapshot(), 2, "identical labels from two tabs are two operations")
+
+	r.CancelMutationsOwnedBy(8)
+	assert.False(t, cancelledA, "the other tab's task must keep its cancel func")
+	assert.True(t, cancelledB)
+}
+
+func TestStartStripsOwnerOfAlreadyClosedTab(t *testing.T) {
+	r := New(0)
+	// The tab closes while the work is still queued; it registers afterwards.
+	r.DisownTasks(7)
+	r.StartOwned(7, KindMutation, "Delete", "ns")
+
+	assert.True(t, r.HasActiveMutationsOwnedBy(9), "work from a closed tab must be cancellable anywhere")
+}
+
+// A queued task can register long after its tab closed, with any number of
+// other tabs closing in between. The closed-owner record must survive that.
+func TestStartStripsOwnerAfterManyLaterClosures(t *testing.T) {
+	r := New(0)
+	r.DisownTasks(1)
+	for i := uint64(2); i <= 200; i++ {
+		r.DisownTasks(i)
+	}
+
+	cancelled := false
+	r.StartCancellable(1, KindMutation, "Delete", "ns", func() { cancelled = true })
+
+	assert.True(t, r.HasActiveMutationsOwnedBy(999), "late registration from a closed tab must stay cancellable")
+	r.CancelMutationsOwnedBy(999)
+	assert.True(t, cancelled)
+}
+
+func TestDisownTasksIgnoresOtherOwners(t *testing.T) {
+	r := New(0)
+	r.StartOwned(7, KindMutation, "Delete", "ns")
+
+	r.DisownTasks(8)
+
+	assert.False(t, r.HasActiveMutationsOwnedBy(9), "another tab's task must keep its owner")
+}
+
+func TestDisownTasksZeroOwnerAndNilReceiver(t *testing.T) {
+	r := New(0)
+	r.StartOwned(7, KindMutation, "Delete", "ns")
+	r.DisownTasks(0) // no-op: 0 is the unowned sentinel, not a tab
+	assert.False(t, r.HasActiveMutationsOwnedBy(9))
+
+	var nilReg *Registry
+	nilReg.DisownTasks(1) // should not panic
+}
+
+func TestStartOwnedRecordsOwnerInSnapshot(t *testing.T) {
+	r := New(0)
+	r.StartOwned(42, KindMutation, "Delete", "ns")
+
+	snap := r.Snapshot()
+	require.Len(t, snap, 1)
+	assert.Equal(t, uint64(42), snap[0].Owner)
 }
 
 func TestHasActiveMutations(t *testing.T) {
 	r := New(0)
-	assert.False(t, r.HasActiveMutations())
+	assert.False(t, r.HasActiveMutationsOwnedBy(1))
 	id := r.Start(KindResourceList, "List", "ns")
-	assert.False(t, r.HasActiveMutations())
+	assert.False(t, r.HasActiveMutationsOwnedBy(1))
 	r.Finish(id)
 	mutID := r.Start(KindMutation, "Delete", "ns")
-	assert.True(t, r.HasActiveMutations())
+	assert.True(t, r.HasActiveMutationsOwnedBy(1))
 	r.Finish(mutID)
-	assert.False(t, r.HasActiveMutations())
+	assert.False(t, r.HasActiveMutationsOwnedBy(1))
 }
 
 func TestHasActiveMutationsNilReceiver(t *testing.T) {
 	var r *Registry
-	assert.False(t, r.HasActiveMutations())
+	assert.False(t, r.HasActiveMutationsOwnedBy(1))
 }
 
 func TestFinishCleansCancelFunc(t *testing.T) {
 	r := New(0)
 	cancelled := false
-	id := r.StartCancellable(KindMutation, "Delete", "ns", func() { cancelled = true })
+	id := r.StartCancellable(0, KindMutation, "Delete", "ns", func() { cancelled = true })
 	r.Finish(id)
 	r.Cancel(id) // should be no-op after Finish
 	assert.False(t, cancelled, "cancel func should be removed by Finish")
