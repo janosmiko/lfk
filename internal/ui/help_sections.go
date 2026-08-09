@@ -293,6 +293,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{kb.ToggleFold, "Toggle fold on section under cursor"},
 				{kb.ToggleFoldAll, "Toggle all folds"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
+				{"m", "Toggle inline field-manager blame"},
 				{kb.Refresh, "Re-fetch and refresh (keeps position)"},
 				{"ctrl+e", "Edit resource in editor"},
 				{"O", "Open Object Explorer at the attribute under cursor"},

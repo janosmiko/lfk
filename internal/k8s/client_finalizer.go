@@ -171,7 +171,7 @@ func (c *Client) RemoveFinalizerFromResource(
 		return fmt.Errorf("marshaling patch: %w", err)
 	}
 
-	_, err = lister.Patch(ctx, match.Name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{})
+	_, err = lister.Patch(ctx, match.Name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{FieldManager: FieldManager()})
 	if err != nil {
 		return fmt.Errorf("patching finalizers on %s/%s: %w", match.Kind, match.Name, err)
 	}

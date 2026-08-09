@@ -30,8 +30,27 @@ type yamlViewState struct {
 
 	wrap bool // word-wrap toggle
 
+	// Field-manager blame, shown as a trailing note on the cursor line.
+	// blame has one entry per original content line and is rebuilt whenever
+	// the content or the owners change.
+	// blameReq numbers each fetch. Two toggles over one document produce two
+	// replies the content hash cannot tell apart, so only the newest number
+	// is accepted.
+	blameOn      bool
+	blameLoading bool
+	blameReq     uint64
+	blame        []blameLine
+
 	sections  []yamlSection   // parsed hierarchical sections
 	collapsed map[string]bool // collapsed state per section key (persists across resources)
+}
+
+// resetBlame turns the field-manager note off. Blame is per resource and
+// costs a fetch, so opening the viewer on something else starts without it.
+func (s *yamlViewState) resetBlame() {
+	s.blameOn = false
+	s.blameLoading = false
+	s.blame = nil
 }
 
 // copy returns a deep copy: slices and the map are cloned so a value stored
@@ -44,6 +63,9 @@ func (s yamlViewState) copy() yamlViewState {
 	}
 	if s.sections != nil {
 		cp.sections = append([]yamlSection(nil), s.sections...)
+	}
+	if s.blame != nil {
+		cp.blame = append([]blameLine(nil), s.blame...)
 	}
 	cp.collapsed = copyMapStringBool(s.collapsed)
 	return cp

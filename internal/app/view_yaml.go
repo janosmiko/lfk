@@ -47,6 +47,7 @@ func (m Model) viewYAML() string {
 			{Key: "y", Desc: "copy"},
 			{Key: ui.ActiveKeybindings.ToggleFold, Desc: "fold"},
 			{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+			{Key: "m", Desc: "blame"},
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},
@@ -142,6 +143,8 @@ func (m Model) viewYAML() string {
 
 	// Apply YAML highlighting to visible lines, with search highlights and cursor.
 	renderCtx := yamlRenderCtx{
+		blame:          m.yamlView.blame,
+		blameInline:    m.yamlView.blameOn,
 		yamlScroll:     yamlScroll,
 		mapping:        mapping,
 		matchSet:       matchSet,
@@ -240,6 +243,8 @@ type yamlRenderCtx struct {
 	currentMatch                        int
 	searchQuery                         string
 	gutterWidth, contentWidth, maxLines int
+	blame                               []blameLine
+	blameInline                         bool
 	yamlCursor                          int
 	visualMode                          bool
 	visualType                          rune
@@ -312,12 +317,50 @@ func yamlPrependGutter(content, lineNum, foldPrefix string, isCursor, isSelected
 		if visualMode {
 			return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix + content
 		}
-		return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix + ui.RenderCursorAtCol(content, rawContent, curCol)
+		return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix +
+			ui.RenderCursorAtCol(content, rawContent, curCol)
 	}
 	if isSelected {
 		return ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNum) + foldPrefix + content
 	}
 	return " " + ui.DimStyle.Render(lineNum) + foldPrefix + content
+}
+
+// yamlBlameInline renders the field-manager note that trails the cursor line,
+// the way an editor shows git blame as virtual text. Only the cursor line gets
+// it: managedFields records one timestamp per manager entry, so printing it on
+// every line would repeat the same value down the whole document.
+//
+// used is the display width the line already occupies.
+func yamlBlameInline(ctx yamlRenderCtx, origLine, used int) string {
+	if !ctx.blameInline || ctx.visualMode || origLine < 0 || origLine >= len(ctx.blame) {
+		return ""
+	}
+	entry := ctx.blame[origLine]
+	if entry.manager == "" {
+		return ""
+	}
+	text := "  " + strings.Join(yamlBlameParts(entry), " \u2022 ")
+	available := ctx.contentWidth - used
+	if available < yamlBlameMinInlineWidth {
+		return ""
+	}
+	return ui.FieldManagerStyle(entry.manager, true).Render(ui.Truncate(text, available))
+}
+
+func yamlBlameParts(entry blameLine) []string {
+	parts := make([]string, 0, 4)
+	parts = append(parts, entry.manager)
+	if entry.owner.Operation != "" {
+		parts = append(parts, entry.owner.Operation)
+	}
+	if !entry.owner.Time.IsZero() {
+		parts = append(parts, ui.FormatAge(entry.owner.Time)+" ago")
+	}
+	if entry.rolled {
+		parts = append(parts, "inherited")
+	}
+	return parts
 }
 
 // renderYAMLWrappedLine renders a single YAML line with word wrapping.
@@ -339,6 +382,9 @@ func renderYAMLWrappedLine(result []string, contentLine, foldPrefix string, visI
 			pad := strings.Repeat(" ", 1+ctx.gutterWidth+1+yamlFoldPrefixLen+2)
 			hl = pad + hl
 		}
+		if si == len(subLines)-1 && visIdx == ctx.yamlCursor {
+			hl += yamlBlameInline(ctx, origLine, lipgloss.Width(hl))
+		}
 		result = append(result, hl)
 		if len(result) >= ctx.maxLines {
 			break
@@ -357,5 +403,8 @@ func renderYAMLNonWrappedLine(result []string, contentLine, foldPrefix string, v
 	}
 	lineNum := yamlLineNumStr(origLine, ctx.gutterWidth)
 	hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen, contentLine)
+	if visIdx == ctx.yamlCursor {
+		hl += yamlBlameInline(ctx, origLine, lipgloss.Width(hl))
+	}
 	return append(result, hl)
 }

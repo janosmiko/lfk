@@ -404,6 +404,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse / expand all) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
+| `m` | Toggle inline field-manager blame on the cursor line |
 | `R` | Re-fetch the resource and refresh the view, keeping cursor/scroll (configurable via `refresh`) |
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |

@@ -83,7 +83,7 @@ func (c *Client) ActivateKnativeRevision(contextName, namespace, revisionName st
 		return "", fmt.Errorf("building Activate patch for %s: %w", revisionName, err)
 	}
 	if _, err := dynClient.Resource(knativeServiceGVR).Namespace(namespace).Patch(
-		ctx, parent, k8stypes.MergePatchType, patchBody, metav1.PatchOptions{},
+		ctx, parent, k8stypes.MergePatchType, patchBody, metav1.PatchOptions{FieldManager: FieldManager()},
 	); err != nil {
 		return "", fmt.Errorf("activating Revision %s on Service %s: %w", revisionName, parent, err)
 	}

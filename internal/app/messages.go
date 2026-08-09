@@ -108,6 +108,25 @@ type yamlLoadedMsg struct {
 	err      error
 }
 
+// yamlBlameLoadedMsg carries the finished blame lines for the YAML viewer.
+// It arrives from a separate fetch, because the YAML itself is rendered
+// without managedFields. The per-line walk happens in the loader goroutine,
+// like the content and section parse in buildYAMLLoadedMsg, so a 50k-line CRD
+// does not stall the event loop. contentHash identifies the document the
+// lines were built from, so a reply that lands after a refresh is dropped
+// instead of naming the wrong owner. The length is compared with the hash,
+// because the hash alone is unkeyed and a collision would attach the wrong
+// lines to the document on screen.
+// req numbers the fetch this reply answers, because two fetches over one
+// unchanged document share a hash and would otherwise land in either order.
+type yamlBlameLoadedMsg struct {
+	blame       []blameLine
+	req         uint64
+	contentHash uint64
+	contentLen  int
+	err         error
+}
+
 // previewYAMLLoadedMsg carries YAML content for the split/full preview in the
 // right column. As with yamlLoadedMsg, the content is pre-indented inside the
 // loading goroutine to keep the main event loop responsive.

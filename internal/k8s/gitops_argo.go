@@ -235,7 +235,7 @@ func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool
 		}
 
 		_, err = dynClient.Resource(appGVR).Namespace(namespace).Update(
-			context.Background(), app, metav1.UpdateOptions{},
+			context.Background(), app, metav1.UpdateOptions{FieldManager: FieldManager()},
 		)
 		if err != nil {
 			if apierrors.IsConflict(err) {
@@ -278,7 +278,7 @@ func (c *Client) TerminateArgoSync(contextName, namespace, name string) error {
 
 	opState["phase"] = "Terminating"
 	_, err = dynClient.Resource(appGVR).Namespace(namespace).Update(
-		context.Background(), app, metav1.UpdateOptions{},
+		context.Background(), app, metav1.UpdateOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("terminating sync for %s: %w", name, err)
@@ -298,7 +298,7 @@ func (c *Client) RefreshArgoApp(contextName, namespace, name string) error {
 
 	patch := []byte(`{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}`)
 	_, err = dynClient.Resource(appGVR).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("refreshing application %s: %w", name, err)
@@ -318,7 +318,7 @@ func (c *Client) RefreshArgoAppSet(contextName, namespace, name string) error {
 
 	patch := []byte(`{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"true"}}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("refreshing applicationset %s: %w", name, err)
@@ -399,7 +399,7 @@ func (c *Client) UpdateAutoSyncConfig(ctx context.Context, contextName, namespac
 	}
 
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{},
+		ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 
 	return err
