@@ -1020,7 +1020,8 @@ For lines that have already scrolled off the visible viewport, lfk keeps
 an in-app scrollback ring (~5000 lines per PTY tab, ANSI-stripped). Use
 `Ctrl+]` `Ctrl+U` / `Ctrl+D` to scroll by half a viewport, `Ctrl+]`
 `Ctrl+B` / `Ctrl+F` for full-viewport pages, `Ctrl+]` `g` to jump to the
-oldest captured line, `Ctrl+]` `G` to snap back to live. Typing a real
+oldest captured line, `Ctrl+]` `G` to snap back to live. Press `Esc` at
+any time to exit exec mode and return to the explorer. Typing a real
 character also snaps to live so subsequent input goes to the visible prompt.
 
 The scrollback ring is populated from the byte stream, not the rendered

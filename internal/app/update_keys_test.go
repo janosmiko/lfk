@@ -1663,6 +1663,7 @@ func TestHandleKeyNextMatch_JumpsToNamespaceWhenNotInSearch(t *testing.T) {
 
 func TestHandleKeyNextMatch_NextMatchWhenSearchActive(t *testing.T) {
 	m := baseExplorerModel()
+	m.allNamespaces = true
 	m.searchInput = TextInput{Value: "pod"}
 	m.middleItems = []model.Item{
 		{Name: "pod-a", Kind: "Pod"},

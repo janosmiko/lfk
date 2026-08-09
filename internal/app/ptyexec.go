@@ -120,6 +120,8 @@ func (m *Model) cleanupExecPTY() {
 //   - Ctrl+] then G                = jump back to live (offset 0)
 //   - Ctrl+] then Ctrl+]           = exit terminal
 //   - Ctrl+] then any other key    = cancel, return to PTY
+//
+// Esc (anytime) also exits exec mode and returns to explorer.
 func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// If process has exited, any key returns to explorer.
 	if m.execDone != nil && m.execDone.Load() {
@@ -178,7 +180,7 @@ func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+] pressed: set prefix flag and show hint.
 	if msg.String() == "ctrl+]" {
 		m.execEscPressed = true
-		m.setStatusMessage("Ctrl+]: ]/[ tabs, t new, Ctrl+U/D half-page, Ctrl+B/F page, PgUp/Dn page, g/G top/live, Ctrl+] exit", false)
+		m.setStatusMessage("Ctrl+]: ]/[ tabs, t new, Ctrl+U/D half-page, Ctrl+B/F page, PgUp/Dn page, g/G top/live, Ctrl+] exit, Esc exit", false)
 		return m, scheduleStatusClear()
 	}
 

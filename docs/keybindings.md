@@ -559,6 +559,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | Key | Action |
 |---|---|
 | `Ctrl+]` `Ctrl+]` | Exit terminal and return to explorer |
+| `Esc` | Exit terminal and return to explorer |
 | `Ctrl+]` `]` | Next tab (PTY keeps running in background) |
 | `Ctrl+]` `[` | Previous tab (PTY keeps running in background) |
 | `Ctrl+]` `t` | New tab (clone current context) |
@@ -568,7 +569,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `PgUp` / `PgDown` | Scroll back / forward by a full viewport (no prefix needed; passed through to full-screen programs) |
 | Mouse wheel | Scroll the PTY scrollback (1 line per tick) |
 
-All other keys are forwarded to the PTY process. The PTY session continues running when you switch tabs, so you can return to it later. Typing any character snaps the view back to the live shell so you don't accidentally type into history.
+All other keys are forwarded to the PTY process. The PTY session continues running when you switch tabs, so you can return to it later. Typing any character snaps the view back to the live shell so you don't accidentally type into history. Press `Esc` at any time to exit exec mode and return to the explorer.
 
 ### Scrollback
 

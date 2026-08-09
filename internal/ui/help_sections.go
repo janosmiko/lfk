@@ -458,6 +458,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 			bindings: []helpEntry{
 				{"ctrl+]", "Prefix key (like tmux Ctrl+b)"},
 				{"ctrl+] ctrl+]", "Exit terminal and return to explorer"},
+				{"esc", "Exit terminal and return to explorer"},
 				{"ctrl+] " + kb.NextTab, "Next tab (PTY keeps running)"},
 				{"ctrl+] " + kb.PrevTab, "Previous tab (PTY keeps running)"},
 				{"ctrl+] " + kb.NewTab, "New tab (clone current context)"},

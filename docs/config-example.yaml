@@ -647,7 +647,8 @@ confirm_on_exit: true
 # Clamped to [100, 100000]. Default 5000 covers an extended interactive
 # session without bloating memory. Use Ctrl+] Ctrl+U/Ctrl+D (half page),
 # Ctrl+] Ctrl+B/Ctrl+F (full page), Ctrl+] g/G (oldest/live), or the
-# mouse wheel (1 line per tick) to navigate.
+# mouse wheel (1 line per tick) to navigate. Press Esc at any time to
+# exit exec mode and return to the explorer.
 # scrollback_lines: 5000
 
 # ─── Watch Interval ───────────────────────────────────────────────────────────
