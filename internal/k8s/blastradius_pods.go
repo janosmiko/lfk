@@ -58,6 +58,38 @@ func (c *Client) PodsForSelector(
 	return podsForSelectorFrom(ctx, clientset, namespace, selector)
 }
 
+// NamedPod is an evicted pod that still carries its name, so a bulk selection
+// can match the rows the user picked against one list per namespace.
+type NamedPod struct {
+	EvictedPod
+	Name string
+}
+
+// PodsInNamespace lists every pod in one namespace. A bulk selection uses it
+// to resolve many rows with one call instead of one call per row.
+func (c *Client) PodsInNamespace(ctx context.Context, contextName, namespace string) ([]NamedPod, error) {
+	clientset, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return nil, err
+	}
+	return podsInNamespaceFrom(ctx, clientset, namespace)
+}
+
+func podsInNamespaceFrom(ctx context.Context, cs kubernetes.Interface, namespace string) ([]NamedPod, error) {
+	list, err := cs.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing pods in %s: %w", namespace, err)
+	}
+	out := make([]NamedPod, 0, len(list.Items))
+	for i := range list.Items {
+		out = append(out, NamedPod{
+			EvictedPod: EvictedPodsFrom(list.Items[i : i+1])[0],
+			Name:       list.Items[i].Name,
+		})
+	}
+	return out, nil
+}
+
 // podsOnNodeFrom re-filters on the client because the fake clientset used in
 // tests ignores FieldSelector, and a server that ignored it would otherwise
 // hand back the whole cluster. Same reasoning as crash_investigator.go.

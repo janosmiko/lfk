@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -19,11 +21,33 @@ type blastRadiusState struct {
 	// req numbers each fetch, so a reply for a dialog the user already
 	// closed and reopened cannot land on the new one.
 	req uint64
+
+	// pods and pdbs are kept only for the scale overlay, where the answer
+	// changes with every keystroke. Recomputing from these costs nothing;
+	// refetching on each digit would not.
+	pods []k8s.EvictedPod
+	pdbs []policyv1.PodDisruptionBudget
 }
 
 func (s *blastRadiusState) reset() {
 	s.radius = nil
 	s.loading = false
+	s.pods = nil
+	s.pdbs = nil
+}
+
+// scaleBlastRadius answers what scaling to target costs, from the pods already
+// fetched. Scaling up removes nothing, so it has no blast radius.
+func (s *blastRadiusState) scaleBlastRadius(target int) *k8s.BlastRadius {
+	if s.pods == nil {
+		return nil
+	}
+	going := len(s.pods) - target
+	if going <= 0 {
+		return nil
+	}
+	radius := k8s.ComputeBlastRadius(s.pods[:going], s.pdbs, len(s.pods))
+	return &radius
 }
 
 // blastRadiusNotes turns the computed cost into the lines the confirm box
@@ -48,6 +72,9 @@ func blastRadiusNotes(r *k8s.BlastRadius, loading, showReplicas bool) []ui.Confi
 		parts = append(parts, fmt.Sprintf("%d of %d ready after", r.ReadyAfter, r.ReadyBefore))
 	}
 	parts = append(parts, budgetSummary(r.PDBs))
+	if r.Uncounted > 0 {
+		parts = append(parts, fmt.Sprintf("%d rows not counted", r.Uncounted))
+	}
 
 	notes := []ui.ConfirmNote{{Text: "Blast radius: " + strings.Join(parts, ", ")}}
 	if violated := violatedBudgets(r.PDBs); violated != "" {
@@ -95,6 +122,30 @@ func violatedBudgets(pdbs []k8s.PDBImpact) string {
 		return ""
 	}
 	return "Violates " + strings.Join(out, "; ")
+}
+
+// bulkPodTargets splits a bulk selection into the pod names to look up, keyed
+// by namespace, and a count of rows it cannot resolve.
+//
+// A list row carries no labels and no spec, so a workload row would need its
+// own API call to learn which pods it claims. One call per selected row turns
+// a fifty-row selection into fifty calls, so those rows are reported as
+// uncounted instead. Pod rows cost one list per namespace, however many are
+// selected.
+func bulkPodTargets(items []model.Item) (map[string]map[string]bool, int) {
+	byNS := make(map[string]map[string]bool)
+	uncounted := 0
+	for _, it := range items {
+		if it.Kind != "Pod" {
+			uncounted++
+			continue
+		}
+		if byNS[it.Namespace] == nil {
+			byNS[it.Namespace] = make(map[string]bool)
+		}
+		byNS[it.Namespace][it.Name] = true
+	}
+	return byNS, uncounted
 }
 
 // workloadSelectorFrom reads spec.selector off the object the action was

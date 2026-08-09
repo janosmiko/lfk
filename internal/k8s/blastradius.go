@@ -33,6 +33,12 @@ type BlastRadius struct {
 	ReadyBefore int
 	ReadyAfter  int
 	Violation   bool
+
+	// Uncounted is how many selected rows the figures leave out. A bulk
+	// selection can hold workload rows whose pods cannot be resolved without
+	// one API call per row, and a silent undercount would be worse than
+	// saying so.
+	Uncounted int
 }
 
 // ComputeBlastRadius works out what removing these pods costs. It makes no

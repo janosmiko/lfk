@@ -148,9 +148,9 @@ func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 	return m.beginShutdown()
 }
 
-func (m Model) executeActionScale() Model {
+func (m Model) executeActionScale() (Model, tea.Cmd) {
 	if m.actionCtx.kind == "HorizontalPodAutoscaler" {
-		return m.openHPAScaleOverlay()
+		return m.openHPAScaleOverlay(), nil
 	}
 	// Prefill with the workload's current desired replica count so the user
 	// can step from it rather than retype.
@@ -160,7 +160,8 @@ func (m Model) executeActionScale() Model {
 		m.scaleInput.Clear()
 	}
 	m.overlay = overlayScaleInput
-	return m
+	m.beginBlastRadius()
+	return m, m.loadScaleBlastRadius()
 }
 
 func (m Model) executeActionVulnScan() (tea.Model, tea.Cmd) {

@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
@@ -152,11 +153,16 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return m.renderOverlayConfirmType()
 	case overlayScaleInput:
 		w := min(45, m.width-10)
+		// Recomputed from the pods already fetched, so the line follows the
+		// number as it is typed without another call per digit.
+		target, _ := strconv.Atoi(m.scaleInput.Value)
+		notes := blastRadiusNotes(m.blast.scaleBlastRadius(target), m.blast.loading, true)
 		return ui.RenderOverlayInput(ui.OverlayInputConfig{
 			Title: "Scale Deployment",
 			Width: w - 4,
 			Rows:  []ui.OverlayInputRow{{Label: "Replicas: ", Input: m.scaleInput.Value, ShowCursor: true, Cursor: m.scaleInput.Cursor}},
-		}), w, min(8, m.height-6), true
+			Notes: notes,
+		}), w, min(8+blastRadiusRows(notes, w-4), m.height-6), true
 	case overlayHPAScale:
 		w := min(56, m.width-10)
 		return ui.RenderOverlayInput(ui.OverlayInputConfig{

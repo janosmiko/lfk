@@ -4,6 +4,7 @@ import (
 	"context"
 
 	tea "charm.land/bubbletea/v2"
+	policyv1 "k8s.io/api/policy/v1"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -16,6 +17,42 @@ type blastRadiusLoadedMsg struct {
 	radius *k8s.BlastRadius
 	req    uint64
 	err    error
+
+	// pods and pdbs are carried only for the scale overlay, which recomputes
+	// from them as the user types instead of refetching per digit.
+	pods []k8s.EvictedPod
+	pdbs []policyv1.PodDisruptionBudget
+}
+
+// loadScaleBlastRadius fetches once when the scale overlay opens. The overlay
+// then recomputes locally as the replica count is typed.
+func (m Model) loadScaleBlastRadius() tea.Cmd {
+	req := m.blast.req
+	client := m.client
+	ctxName := m.actionCtx.context
+	namespace := m.actionCtx.namespace
+	selector := workloadSelectorFrom(m.actionCtx.raw)
+	if client == nil || selector == nil {
+		return nil
+	}
+
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindYAMLFetch,
+		"Blast radius: "+m.actionCtx.name,
+		bgtaskTarget(ctxName, namespace),
+		func(ctx context.Context) tea.Msg {
+			pods, err := client.PodsForSelector(ctx, ctxName, namespace, selector)
+			if err != nil {
+				return blastRadiusLoadedMsg{req: req, err: err}
+			}
+			pdbs, err := client.ListPodDisruptionBudgets(ctx, ctxName, namespace)
+			if err != nil {
+				return blastRadiusLoadedMsg{req: req, err: err}
+			}
+			return blastRadiusLoadedMsg{req: req, pods: pods, pdbs: pdbs}
+		},
+	)
 }
 
 // loadBlastRadius fetches the pods an action would remove and the budgets that
@@ -57,6 +94,55 @@ func (m Model) loadBlastRadius(drain bool) tea.Cmd {
 				return blastRadiusLoadedMsg{req: req, err: err}
 			}
 			radius := k8s.ComputeBlastRadius(pods, pdbs, readyBefore)
+			return blastRadiusLoadedMsg{radius: &radius, req: req}
+		},
+	)
+}
+
+// loadBulkBlastRadius totals what a whole selection costs, as one line rather
+// than one per row. Cost is bounded by the number of distinct namespaces, not
+// by how many rows are selected.
+func (m Model) loadBulkBlastRadius() tea.Cmd {
+	req := m.blast.req
+	client := m.client
+	ctxName := m.effectiveContext()
+	byNS, uncounted := bulkPodTargets(m.bulkItems)
+	if client == nil {
+		return nil
+	}
+
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindYAMLFetch,
+		"Blast radius: selection",
+		bgtaskTarget(ctxName, ""),
+		func(ctx context.Context) tea.Msg {
+			var evicting []k8s.EvictedPod
+			for namespace, names := range byNS {
+				pods, err := client.PodsInNamespace(ctx, ctxName, namespace)
+				if err != nil {
+					return blastRadiusLoadedMsg{req: req, err: err}
+				}
+				for _, p := range pods {
+					if names[p.Name] {
+						evicting = append(evicting, p.EvictedPod)
+					}
+				}
+			}
+			// One namespace keeps the budget list narrow; several make a
+			// cluster-wide list cheaper than one call per namespace.
+			pdbNamespace := ""
+			if len(byNS) == 1 {
+				for namespace := range byNS {
+					pdbNamespace = namespace
+				}
+			}
+			pdbs, err := client.ListPodDisruptionBudgets(ctx, ctxName, pdbNamespace)
+			if err != nil {
+				return blastRadiusLoadedMsg{req: req, err: err}
+			}
+			radius := k8s.ComputeBlastRadius(evicting, pdbs, 0)
+			radius.Uncounted = uncounted
 			return blastRadiusLoadedMsg{radius: &radius, req: req}
 		},
 	)
@@ -107,6 +193,8 @@ func (m Model) updateBlastRadiusLoaded(msg blastRadiusLoadedMsg) (tea.Model, tea
 		return m, nil
 	}
 	m.blast.radius = msg.radius
+	m.blast.pods = msg.pods
+	m.blast.pdbs = msg.pdbs
 	return m, nil
 }
 

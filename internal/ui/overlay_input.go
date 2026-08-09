@@ -28,6 +28,11 @@ type OverlayInputConfig struct {
 	Subtitle string // dim line under title (e.g. resource name)
 	Hint     string // dim line under subtitle (e.g. "Current: 10Gi")
 
+	// Notes are one-line facts about what the entered value costs, rendered
+	// under the input rows. Same shape as the confirm overlay, so a caller
+	// can word a blast radius once and show it in either.
+	Notes []ConfirmNote
+
 	// Optional candidate list. Rendered above the input rows when
 	// Candidates is non-empty. CandidateCursor selects which row is
 	// highlighted (-1 means "no candidate selected — cursor lives in the
@@ -104,6 +109,18 @@ func RenderOverlayInput(cfg OverlayInputConfig) string {
 		if i < len(cfg.Rows)-1 {
 			b.WriteString("\n")
 		}
+	}
+	for _, note := range cfg.Notes {
+		style := OverlayNormalStyle
+		if note.Warn {
+			style = OverlayWarningStyle
+		}
+		text := note.Text
+		if cfg.Width > 0 {
+			text = strings.Join(wrapConfirmText(text, cfg.Width), "\n")
+		}
+		b.WriteString("\n\n")
+		b.WriteString(style.Render(text))
 	}
 	return b.String()
 }

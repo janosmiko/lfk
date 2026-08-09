@@ -88,3 +88,17 @@ func TestPodsForSelector_NilSelectorReturnsNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got, "no selector means the workload claims no pods")
 }
+
+func TestPodsInNamespace_CarriesTheNameForMatching(t *testing.T) {
+	cs := fake.NewSimpleClientset(
+		runningPod("prod", "web-1", "node-a", map[string]string{"app": "web"}, true),
+		runningPod("prod", "web-2", "node-a", map[string]string{"app": "web"}, false),
+	)
+
+	got, err := podsInNamespaceFrom(t.Context(), cs, "prod")
+
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.ElementsMatch(t, []string{"web-1", "web-2"}, []string{got[0].Name, got[1].Name})
+	assert.Equal(t, "prod", got[0].Namespace, "the embedded EvictedPod still carries the namespace")
+}

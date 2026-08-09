@@ -5,8 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	policyv1 "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 func TestBlastRadiusNotes_LoadingShowsAPlaceholder(t *testing.T) {
@@ -260,4 +263,113 @@ func TestUpdateBlastRadiusLoaded_FailureLeavesTheDialogUsable(t *testing.T) {
 	got := mdl.(Model)
 	assert.False(t, got.blast.loading, "a failed lookup must not leave the line on 'checking'")
 	assert.Nil(t, got.blast.radius)
+}
+
+func bulkItem(kind, ns, name string) model.Item {
+	return model.Item{Kind: kind, Namespace: ns, Name: name}
+}
+
+func TestBulkPodTargets_GroupsPodsByNamespace(t *testing.T) {
+	items := []model.Item{
+		bulkItem("Pod", "prod", "web-1"),
+		bulkItem("Pod", "prod", "web-2"),
+		bulkItem("Pod", "staging", "web-1"),
+	}
+
+	byNS, uncounted := bulkPodTargets(items)
+
+	assert.Zero(t, uncounted)
+	assert.Equal(t, map[string]map[string]bool{
+		"prod":    {"web-1": true, "web-2": true},
+		"staging": {"web-1": true},
+	}, byNS)
+}
+
+func TestBulkPodTargets_CountsRowsItCannotResolve(t *testing.T) {
+	items := []model.Item{
+		bulkItem("Pod", "prod", "web-1"),
+		bulkItem("Deployment", "prod", "web"),
+		bulkItem("StatefulSet", "prod", "db"),
+	}
+
+	byNS, uncounted := bulkPodTargets(items)
+
+	require.Len(t, byNS, 1)
+	assert.Equal(t, 2, uncounted,
+		"a workload row carries no labels, so it cannot be resolved without a call per row")
+}
+
+func TestBlastRadiusNotes_UncountedRowsAreStated(t *testing.T) {
+	r := &k8s.BlastRadius{Evicting: 3, ReadyBefore: 0, ReadyAfter: 0, Uncounted: 2}
+
+	notes := blastRadiusNotes(r, false, false)
+
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0].Text, "2 rows not counted")
+}
+
+func TestScaleBlastRadius_ScalingDownEvictsTheDifference(t *testing.T) {
+	s := blastRadiusState{pods: []k8s.EvictedPod{
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+	}}
+
+	got := s.scaleBlastRadius(2)
+
+	require.NotNil(t, got)
+	assert.Equal(t, 3, got.Evicting, "five down to two removes three")
+	assert.Equal(t, 5, got.ReadyBefore)
+	assert.Equal(t, 2, got.ReadyAfter)
+}
+
+func TestScaleBlastRadius_ScalingUpOrLevelCostsNothing(t *testing.T) {
+	s := blastRadiusState{pods: []k8s.EvictedPod{{Namespace: "prod"}, {Namespace: "prod"}}}
+
+	assert.Nil(t, s.scaleBlastRadius(2), "no change removes nothing")
+	assert.Nil(t, s.scaleBlastRadius(9), "scaling up removes nothing")
+}
+
+func TestScaleBlastRadius_NoPodsYet(t *testing.T) {
+	var s blastRadiusState
+
+	assert.Nil(t, s.scaleBlastRadius(0), "nothing fetched yet, so nothing to say")
+}
+
+func TestScaleBlastRadius_CountsAgainstTheBudget(t *testing.T) {
+	s := blastRadiusState{
+		pods: []k8s.EvictedPod{
+			{Namespace: "prod", Labels: map[string]string{"app": "web"}, Ready: true},
+			{Namespace: "prod", Labels: map[string]string{"app": "web"}, Ready: true},
+		},
+		pdbs: []policyv1.PodDisruptionBudget{{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "web-pdb"},
+			Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}}},
+			Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+		}},
+	}
+
+	got := s.scaleBlastRadius(1)
+
+	require.NotNil(t, got)
+	assert.True(t, got.Violation, "a budget allowing nothing is breached by scaling down one")
+}
+
+func TestRenderOverlayScaleInput_ShowsTheLineAsYouType(t *testing.T) {
+	m := Model{width: 80, height: 24, overlay: overlayScaleInput}
+	m.scaleInput.Set("2")
+	m.blast.pods = []k8s.EvictedPod{
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+	}
+
+	out, _, _, _ := m.renderOverlayContent()
+
+	assert.Contains(t, stripANSI(out), "3 pods")
+	assert.Contains(t, stripANSI(out), "2 of 5 ready after")
 }
