@@ -241,3 +241,43 @@ func TestResetBlame_ClearsEverything(t *testing.T) {
 	assert.False(t, s.blameLoading)
 	assert.Nil(t, s.blame)
 }
+
+func TestUpdateYamlBlameLoaded_DropsAnOlderRequestForTheSameContent(t *testing.T) {
+	// Two toggles in a row put two fetches in flight over one document, so
+	// the content hash cannot tell them apart. Only the newer owners count.
+	content := "spec:\n  replicas: 3\n"
+	m := Model{}
+	m.yamlView.content = content
+	m.yamlView.blameOn = true
+	m.yamlView.blameReq = 2
+
+	reply := func(req uint64, manager string) yamlBlameLoadedMsg {
+		return yamlBlameLoadedMsg{
+			blame:       []blameLine{{}, {manager: manager}},
+			req:         req,
+			contentHash: yamlContentHash(content),
+			contentLen:  len(content),
+		}
+	}
+
+	mdl, _ := m.updateYamlBlameLoaded(reply(2, "current"))
+	mdl, _ = mdl.(Model).updateYamlBlameLoaded(reply(1, "stale"))
+
+	got := mdl.(Model)
+	require.Len(t, got.yamlView.blame, 2)
+	assert.Equal(t, "current", got.yamlView.blame[1].manager,
+		"a reply from the earlier fetch must not overwrite the later one")
+	assert.True(t, got.yamlView.blameOn, "a dropped reply leaves the view as it is")
+}
+
+func TestHandleYAMLToggleBlame_EachRequestGetsANewNumber(t *testing.T) {
+	m := Model{}
+	m.yamlView.content = "spec:\n  replicas: 3\n"
+
+	mdl, _ := m.handleYAMLToggleBlame()
+	first := mdl.(Model).yamlView.blameReq
+	mdl, _ = mdl.(Model).handleYAMLToggleBlame() // off
+	mdl, _ = mdl.(Model).handleYAMLToggleBlame() // on again
+
+	assert.Greater(t, mdl.(Model).yamlView.blameReq, first)
+}

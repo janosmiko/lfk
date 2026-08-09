@@ -174,3 +174,34 @@ func TestKeyColonIndex(t *testing.T) {
 	assert.Equal(t, 11, keyColonIndex("'weird:key': v"))
 	assert.Equal(t, -1, keyColonIndex("no colon here"))
 }
+
+func TestComputeYAMLBlame_HeaderStaysBlankWhenChildrenDifferInTime(t *testing.T) {
+	// One manager wrote both labels, but in two separate applies. The header
+	// has no single write time, so it must not borrow one from a child.
+	content := "metadata:\n" +
+		"  labels:\n" +
+		"    app: web\n" +
+		"    tier: front\n"
+	older := metav1.NewTime(time.Now().Add(-72 * time.Hour))
+	newer := metav1.NewTime(time.Now())
+	entry := func(at metav1.Time, raw string) metav1.ManagedFieldsEntry {
+		fields := &metav1.FieldsV1{}
+		fields.SetRawBytes([]byte(raw))
+		return metav1.ManagedFieldsEntry{
+			Manager:   "argocd",
+			Operation: metav1.ManagedFieldsOperationApply,
+			Time:      &at,
+			FieldsV1:  fields,
+		}
+	}
+	owners := k8s.NewFieldOwners([]metav1.ManagedFieldsEntry{
+		entry(older, `{"f:metadata":{"f:labels":{"f:app":{}}}}`),
+		entry(newer, `{"f:metadata":{"f:labels":{"f:tier":{}}}}`),
+	})
+
+	got := computeYAMLBlame(content, owners)
+
+	assert.Equal(t, "argocd", got[2].manager, "the child keeps its own owner")
+	assert.Empty(t, got[1].manager,
+		"the header covers two different writes, so it names neither")
+}

@@ -47,6 +47,7 @@ func (m Model) viewYAML() string {
 			{Key: "y", Desc: "copy"},
 			{Key: ui.ActiveKeybindings.ToggleFold, Desc: "fold"},
 			{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+			{Key: "m", Desc: "blame"},
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},

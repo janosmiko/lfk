@@ -33,8 +33,12 @@ type yamlViewState struct {
 	// Field-manager blame, shown as a trailing note on the cursor line.
 	// blame has one entry per original content line and is rebuilt whenever
 	// the content or the owners change.
+	// blameReq numbers each fetch. Two toggles over one document produce two
+	// replies the content hash cannot tell apart, so only the newest number
+	// is accepted.
 	blameOn      bool
 	blameLoading bool
+	blameReq     uint64
 	blame        []blameLine
 
 	sections  []yamlSection   // parsed hierarchical sections

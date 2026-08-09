@@ -68,6 +68,7 @@ func (m Model) loadYAMLBlame() tea.Cmd {
 	}
 	client := m.client
 	content := m.yamlView.content
+	req := m.yamlView.blameReq
 	return m.scheduleK8sCall(
 		scheduler.PriorityHigh,
 		scheduler.KindYAMLFetch,
@@ -76,10 +77,11 @@ func (m Model) loadYAMLBlame() tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			owners, err := client.GetFieldOwners(ctx, kctx, ns, rt, name)
 			if err != nil {
-				return yamlBlameLoadedMsg{err: err}
+				return yamlBlameLoadedMsg{req: req, err: err}
 			}
 			return yamlBlameLoadedMsg{
 				blame:       computeYAMLBlame(content, owners),
+				req:         req,
 				contentHash: yamlContentHash(content),
 				contentLen:  len(content),
 			}

@@ -91,7 +91,10 @@ func uniformChildManager(lines []string, out []blameLine, header int) (blameLine
 		if out[j].manager == "" {
 			return blameLine{}, false
 		}
-		if child.manager != "" && child.manager != out[j].manager {
+		// The whole owner has to match, not just the name: one manager can
+		// write two children in two applies, and the header would then show
+		// the write time of whichever child came last.
+		if child.manager != "" && (child.manager != out[j].manager || child.owner != out[j].owner) {
 			return blameLine{}, false
 		}
 		child = out[j]

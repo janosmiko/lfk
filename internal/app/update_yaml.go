@@ -139,6 +139,7 @@ func (m Model) handleYAMLToggleBlame() (tea.Model, tea.Cmd) {
 	}
 	m.yamlView.blameOn = true
 	m.yamlView.blameLoading = true
+	m.yamlView.blameReq++
 	m.setStatusMessage("Loading field owners…", false)
 	return m, m.loadYAMLBlame()
 }

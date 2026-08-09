@@ -117,8 +117,11 @@ type yamlLoadedMsg struct {
 // instead of naming the wrong owner. The length is compared with the hash,
 // because the hash alone is unkeyed and a collision would attach the wrong
 // lines to the document on screen.
+// req numbers the fetch this reply answers, because two fetches over one
+// unchanged document share a hash and would otherwise land in either order.
 type yamlBlameLoadedMsg struct {
 	blame       []blameLine
+	req         uint64
 	contentHash uint64
 	contentLen  int
 	err         error

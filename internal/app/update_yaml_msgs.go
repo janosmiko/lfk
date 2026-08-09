@@ -39,6 +39,11 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 // updateYamlBlameLoaded stores the per-line blame entries. Any failure turns
 // blame off again rather than leaving the note permanently empty.
 func (m Model) updateYamlBlameLoaded(msg yamlBlameLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.req != m.yamlView.blameReq {
+		// An earlier fetch answering late. The document may be byte-identical,
+		// so the hash below cannot catch this one.
+		return m, nil
+	}
 	m.yamlView.blameLoading = false
 	if !m.yamlView.blameOn {
 		// The user turned blame off while the fetch was in flight. Their
