@@ -127,6 +127,22 @@ func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(copyToSystemClipboard(strings.Join(parts, "\n")), scheduleStatusClear())
 }
 
+// handleYAMLToggleBlame shows or hides the field-manager note. Turning it on
+// triggers a second fetch, because the YAML on screen was loaded without
+// managedFields.
+func (m Model) handleYAMLToggleBlame() (tea.Model, tea.Cmd) {
+	if m.yamlView.blameOn {
+		m.yamlView.blameOn = false
+		m.yamlView.blameLoading = false
+		m.yamlView.blame = nil
+		return m, nil
+	}
+	m.yamlView.blameOn = true
+	m.yamlView.blameLoading = true
+	m.setStatusMessage("Loading field owners…", false)
+	return m, m.loadYAMLBlame()
+}
+
 // handleYAMLRefresh re-fetches the resource and replaces the viewer content in
 // place. Scroll, cursor, and fold state are preserved (updateYamlLoaded only
 // swaps content/sections), so a manual refresh doesn't lose the user's spot.
@@ -170,6 +186,8 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case kb.Help, "f1":
 		return m.handleYAMLKeyQuestion()
+	case "m":
+		return m.handleYAMLToggleBlame()
 	case "O":
 		return m.handleYAMLKeyObjectExplorer()
 	case "I":

@@ -36,6 +36,39 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateYamlBlameLoaded stores the per-line blame entries. Any failure turns
+// blame off again rather than leaving the note permanently empty.
+func (m Model) updateYamlBlameLoaded(msg yamlBlameLoadedMsg) (tea.Model, tea.Cmd) {
+	m.yamlView.blameLoading = false
+	if !m.yamlView.blameOn {
+		// The user turned blame off while the fetch was in flight. Their
+		// key press wins over the reply.
+		return m, nil
+	}
+	if isContextCanceled(msg.err) {
+		m.yamlView.blameOn = false
+		return m, nil
+	}
+	if msg.err != nil {
+		m.yamlView.blameOn = false
+		m.setStatusMessage("Field owners: "+msg.err.Error(), true)
+		return m, scheduleStatusClear()
+	}
+	if msg.contentLen != len(m.yamlView.content) || msg.contentHash != yamlContentHash(m.yamlView.content) {
+		// The document was refreshed while the managers were in flight.
+		m.yamlView.blameOn = false
+		return m, nil
+	}
+	m.yamlView.blame = msg.blame
+	if m.yamlView.blame == nil {
+		m.yamlView.blameOn = false
+		m.setStatusMessage("This object records no field managers", false)
+		return m, scheduleStatusClear()
+	}
+	m.setStatusMessage("Field owners on. Press m to hide.", false)
+	return m, scheduleStatusClear()
+}
+
 func (m Model) updatePreviewYAMLLoaded(msg previewYAMLLoadedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response, discard

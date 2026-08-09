@@ -279,15 +279,33 @@ func buildSummaryBar(dim summaryDimension, items []model.Item) SummaryBar {
 // UTF-8-encoded as two bytes but decode to a single rune >= 0x7f, so an
 // ASCII-only filter (r < 0x20 || r == 0x7f) lets them through as if printable.
 func sanitizeSummaryValue(s string) string {
+	return SanitizeTerminalText(s)
+}
+
+// SanitizeTerminalText strips the control characters described above from any
+// cluster-controlled string before it reaches the screen. Exported so every
+// such string passes through one implementation: the YAML blame gutter shows
+// field manager names, which a non-core apiserver can set to anything.
+//
+// It also drops the bidi embedding, override, and isolate characters
+// (U+202A-U+202E, U+2066-U+2069). Those reorder the text that follows them,
+// so a hostile name can make one value read as another on screen. The plain
+// direction marks U+200E and U+200F stay, because they only hint at direction
+// and legitimate right-to-left text uses them.
+func SanitizeTerminalText(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if r < 0x20 || (r >= 0x7f && r <= 0x9f) {
+		if r < 0x20 || (r >= 0x7f && r <= 0x9f) || isBidiOverride(r) {
 			continue
 		}
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+func isBidiOverride(r rune) bool {
+	return (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069)
 }
 
 const summaryBarCells = 14
