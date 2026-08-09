@@ -207,8 +207,7 @@ var (
 			Foreground(lipgloss.Color(ColorPrimary)).
 			Bold(true)
 
-	YamlValueStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorFile))
+	YamlValueStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
 
 	YamlPunctuationStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(ColorDimmed))
@@ -258,10 +257,11 @@ var (
 			Foreground(lipgloss.Color(ColorSecondary)).
 			Bold(true)
 
-	// Schema footnote pane (ctrl+k): the header names the field and carries
+	// Schema side pane (ctrl+k): the header names the field and carries
 	// the accent; the description is prose to read, so it stays plain.
 	FieldDocHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 	FieldDocTextStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
+	FieldDocErrorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
 
 	// Which-key panel. The panel draws one flat list with no section
 	// headers, so the description's color is the only thing left that says

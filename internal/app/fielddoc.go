@@ -1,6 +1,9 @@
 package app
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 // fieldDocMaxEntries bounds the description cache. One entry is a short string,
 // so a few hundred cost little, and the bound stops a long session from growing
@@ -107,6 +110,23 @@ func fieldDocPath(objPath []string) string {
 		segs = append(segs, s)
 	}
 	return strings.Join(segs, ".")
+}
+
+// parseExplainError reduces a failed kubectl explain run to the one line worth
+// showing. kubectl prints the KIND/VERSION preamble even when it fails and then
+// exits non-zero, so the raw output plus the exit status fills the pane with
+// noise around a single "error:" line.
+func parseExplainError(output string, cmdErr error) error {
+	for line := range strings.SplitSeq(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if msg, ok := strings.CutPrefix(trimmed, "error:"); ok {
+			return errors.New(strings.TrimSpace(msg))
+		}
+	}
+	if trimmed := strings.TrimSpace(output); trimmed != "" {
+		return errors.New(trimmed)
+	}
+	return cmdErr
 }
 
 // parseExplainFieldHeader reads the "FIELD: name <type>" line that kubectl

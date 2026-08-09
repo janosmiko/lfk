@@ -62,7 +62,7 @@ type Model struct {
 	// distinct right-pane preview state and are intentionally not part of it.
 	yamlView yamlViewState
 
-	// Schema footnote pane (ctrl+k) and its description cache; see fielddoc.go.
+	// Schema side pane (ctrl+k) and its description cache; see fielddoc.go.
 	fieldDoc fieldDocState
 
 	// yamlReturnMode is the mode the full-screen YAML viewer returns to on

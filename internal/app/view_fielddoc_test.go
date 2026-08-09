@@ -1,14 +1,15 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func fieldDocViewModel() Model {
@@ -22,37 +23,69 @@ func fieldDocViewModel() Model {
 	return m
 }
 
-// The pane takes its lines out of the body, not off the bottom of the terminal.
-// If Update and View disagree the cursor scrolls in behind the pane.
-func TestFieldDocPaneShrinksYAMLViewport(t *testing.T) {
+func TestSplitFieldDocWidth(t *testing.T) {
+	tests := []struct {
+		name        string
+		total       int
+		wantPaneNil bool
+	}{
+		{name: "narrow terminal gets no pane", total: 80, wantPaneNil: true},
+		{name: "tiny terminal gets no pane", total: 40, wantPaneNil: true},
+		{name: "roomy terminal gets a pane", total: 120},
+		{name: "wide terminal gets a pane", total: 200},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viewW, paneW := splitFieldDocWidth(tt.total)
+
+			assert.Equal(t, tt.total, viewW+paneW, "the split must account for every column")
+			if tt.wantPaneNil {
+				assert.Zero(t, paneW)
+				return
+			}
+			assert.GreaterOrEqual(t, paneW, fieldDocMinPaneWidth)
+			assert.LessOrEqual(t, paneW, fieldDocMaxPaneWidth)
+			assert.GreaterOrEqual(t, viewW, fieldDocMinViewWidth, "the viewer must keep room to read")
+		})
+	}
+}
+
+// The pane takes columns now, not rows, so neither viewer loses body height.
+func TestFieldDocPaneDoesNotShrinkHeights(t *testing.T) {
 	m := fieldDocViewModel()
-	before := m.yamlViewportLines()
+	yamlBefore, oeBefore := m.yamlViewportLines(), m.objectExplorerBodyHeight()
 
 	m.fieldDoc.on = true
-	after := m.yamlViewportLines()
 
-	assert.Equal(t, before-ui.FieldDocPaneHeight, after,
-		"the viewport must lose exactly the pane's lines")
+	assert.Equal(t, yamlBefore, m.yamlViewportLines())
+	assert.Equal(t, oeBefore, m.objectExplorerBodyHeight())
 }
 
-func TestFieldDocPaneShrinksObjectExplorerBody(t *testing.T) {
+func TestFieldDocPaneWidthZeroWhenClosed(t *testing.T) {
 	m := fieldDocViewModel()
-	before := m.objectExplorerBodyHeight()
 
+	assert.Zero(t, m.fieldDocPaneWidth())
+	assert.Empty(t, m.renderFieldDocPane(m.height, false))
+}
+
+// The joined view must stay exactly as wide and as tall as the terminal, or
+// lipgloss pads one side and the layout tears.
+func TestYAMLViewWithSchemaPaneKeepsTerminalBox(t *testing.T) {
+	closed := fieldDocViewModel()
+	m := fieldDocViewModel()
 	m.fieldDoc.on = true
-	after := m.objectExplorerBodyHeight()
+	m.fieldDoc.key = fieldDocKey{resource: "pods", apiVersion: "v1", path: "spec.dnsPolicy"}
+	m.fieldDoc.entry = fieldDocEntry{fieldType: "<string>", desc: strings.Repeat("word ", 200)}
 
-	assert.Equal(t, before-ui.FieldDocPaneHeight, after)
+	open := m.viewYAML()
+
+	assert.Equal(t, m.width, lipgloss.Width(open), "the view must fill the terminal width")
+	assert.Equal(t, lipgloss.Height(closed.viewYAML()), lipgloss.Height(open),
+		"opening the pane must not change the view height")
 }
 
-func TestFieldDocPaneHeightZeroWhenClosed(t *testing.T) {
-	m := fieldDocViewModel()
-
-	assert.Equal(t, 0, m.fieldDocPaneHeight())
-	assert.Empty(t, m.renderFieldDocPane())
-}
-
-func TestYAMLViewRendersFieldDocPane(t *testing.T) {
+func TestYAMLViewRendersSchemaPane(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", apiVersion: "v1", path: "spec.dnsPolicy"}
@@ -60,34 +93,22 @@ func TestYAMLViewRendersFieldDocPane(t *testing.T) {
 
 	view := stripANSI(m.viewYAML())
 
+	assert.Contains(t, view, "SCHEMA")
 	assert.Contains(t, view, "spec.dnsPolicy")
 	assert.Contains(t, view, "Set DNS policy for the pod.")
 }
 
-func TestYAMLViewOmitsFieldDocPaneWhenClosed(t *testing.T) {
+func TestYAMLViewOmitsSchemaPaneWhenClosed(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.entry = fieldDocEntry{desc: "Set DNS policy for the pod."}
 
 	view := stripANSI(m.viewYAML())
 
+	assert.NotContains(t, view, "SCHEMA")
 	assert.NotContains(t, view, "Set DNS policy for the pod.")
 }
 
-// The whole view must keep fitting the terminal, or the pane pushes the hint
-// bar off the bottom of the screen.
-func TestYAMLViewWithFieldDocPaneFitsTerminalHeight(t *testing.T) {
-	m := fieldDocViewModel()
-	m.fieldDoc.on = true
-	m.fieldDoc.entry = fieldDocEntry{fieldType: "<string>", desc: strings.Repeat("long ", 200)}
-
-	closed := len(strings.Split(stripANSI(fieldDocViewModel().viewYAML()), "\n"))
-	open := len(strings.Split(stripANSI(m.viewYAML()), "\n"))
-
-	require.Positive(t, closed)
-	assert.Equal(t, closed, open, "opening the pane must not make the view taller")
-}
-
-func TestYAMLViewFieldDocEmptyState(t *testing.T) {
+func TestYAMLViewSchemaPaneEmptyState(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.opaque"}
@@ -95,4 +116,50 @@ func TestYAMLViewFieldDocEmptyState(t *testing.T) {
 	view := stripANSI(m.viewYAML())
 
 	assert.Contains(t, view, "No description")
+}
+
+// The reported bug: the raw exit status and the KIND/VERSION preamble reached
+// the pane instead of the one line that says what went wrong.
+func TestYAMLViewSchemaPaneShowsErrorAlone(t *testing.T) {
+	m := fieldDocViewModel()
+	m.fieldDoc.on = true
+	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "metadata.annotations.checksum/config"}
+	m.fieldDoc.err = parseExplainError(
+		"KIND:       Pod\nVERSION:    v1\n\nerror: field \"checksum/config\" does not exist\n",
+		errors.New("exit status 1"),
+	).Error()
+
+	view := stripANSI(m.viewYAML())
+
+	assert.Contains(t, view, `field "checksum/config" does not exist`)
+	assert.NotContains(t, view, "exit status")
+	assert.NotContains(t, view, "VERSION:")
+}
+
+func TestObjectExplorerViewKeepsTerminalBox(t *testing.T) {
+	m := fieldDocViewModel()
+	m.mode = modeObjectExplorer
+	closedH := lipgloss.Height(m.viewObjectExplorer())
+
+	m.fieldDoc.on = true
+	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+	m.fieldDoc.entry = fieldDocEntry{fieldType: "<string>", desc: "Set DNS policy."}
+	open := m.viewObjectExplorer()
+
+	require.Contains(t, stripANSI(open), "SCHEMA")
+	assert.Equal(t, m.width, lipgloss.Width(open))
+	assert.Equal(t, closedH, lipgloss.Height(open))
+}
+
+// Opening on a terminal that cannot fit both panes has to say so rather than
+// toggling a pane the user never sees.
+func TestToggleFieldDocRefusesNarrowTerminal(t *testing.T) {
+	m := fieldDocViewModel()
+	m.width = 70
+
+	mdl, _ := m.toggleFieldDoc([]string{"spec", "dnsPolicy"})
+	got := mdl.(Model)
+
+	assert.False(t, got.fieldDoc.on)
+	assert.Contains(t, got.statusMessage, "too narrow")
 }

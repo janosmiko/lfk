@@ -3,19 +3,11 @@ package ui
 import (
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
-// FieldDocPaneHeight is the total line count the footnote pane claims, header
-// included. It is fixed rather than sized to the text so the body above does
-// not resize under the cursor as the user walks the document.
-const FieldDocPaneHeight = 6
-
-// fieldDocBodyLines is what is left for the description once the header takes
-// its line.
-const fieldDocBodyLines = FieldDocPaneHeight - 1
-
-// FieldDocPane is what the footnote shows about one field. Err wins over Desc:
+// FieldDocPane is what the side pane shows about one field. Err wins over Desc:
 // a description left over from another field would read as if it belonged to
 // the field that failed.
 type FieldDocPane struct {
@@ -26,46 +18,73 @@ type FieldDocPane struct {
 	Loading   bool
 }
 
-// RenderFieldDocPane draws the schema footnote: a header naming the field and
-// its type, then the description. It always returns FieldDocPaneHeight lines.
-func RenderFieldDocPane(width int, p FieldDocPane) string {
-	if width < 1 {
-		width = 1
+// RenderFieldDocPane draws the schema side pane: a title bar naming the field,
+// a bordered body holding the description, and a status row that keeps the
+// pane level with the viewer's hint bar. The result is exactly width columns
+// and height rows, so it joins horizontally next to the main view.
+//
+// omitFooter drops the status row, for callers that draw one full-width footer
+// under both panes. The output is then one row shorter.
+//
+// It mirrors RenderLogPreviewPane, which solves the same layout problem for the
+// log viewer's structured preview.
+func RenderFieldDocPane(width, height int, p FieldDocPane, omitFooter bool) string {
+	if width < 10 {
+		width = 10
+	}
+	if height < 3 {
+		height = 3
 	}
 
-	lines := make([]string, 0, FieldDocPaneHeight)
-	lines = append(lines, fieldDocHeader(width, p))
+	// The pane must come out exactly height rows, or JoinHorizontal pads the
+	// shorter side and the two panes drift apart. The rows it does not own:
+	// the title bar, the two border rows, and the status row.
+	// omitFooter drops the status row rather than growing the body, so the
+	// body keeps the same size and the pane comes out one row shorter.
+	contentHeight := max(height-4, 1)
+	contentWidth := max(width-4, 6) // border 2 + padding 2
 
-	for _, l := range fieldDocBody(width, p) {
-		lines = append(lines, FieldDocTextStyle.Render(l))
+	titleBar := FillLinesBg(
+		TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(fieldDocTitle(p)),
+		width, BarBg)
+
+	bodyLines := fieldDocBody(contentWidth, p)
+	if len(bodyLines) > contentHeight {
+		bodyLines = bodyLines[:contentHeight]
 	}
+	for len(bodyLines) < contentHeight {
+		bodyLines = append(bodyLines, "")
+	}
+	bodyContent := FillLinesBg(strings.Join(bodyLines, "\n"), contentWidth, BaseBg)
+	body := FullscreenBorderStyle(width, contentHeight).Render(bodyContent)
 
-	return FillLinesBg(strings.Join(lines, "\n"), width, BaseBg)
+	if omitFooter {
+		return lipgloss.JoinVertical(lipgloss.Left, titleBar, body)
+	}
+	// An empty status row keeps the pane's height level with the viewer's
+	// title + body + hint-bar layout, so JoinHorizontal pads neither side.
+	footer := StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render("")
+	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, footer)
 }
 
-// fieldDocHeader names the field, its type, and rules off the pane from the
-// body above it.
-func fieldDocHeader(width int, p FieldDocPane) string {
+// fieldDocTitle names the field and its type. A deep path is cut from the
+// front, because the leaf is what says which field is being read.
+func fieldDocTitle(p FieldDocPane) string {
 	label := p.Path
 	if label == "" {
 		label = "(root)"
 	}
+	title := " SCHEMA "
 	if p.FieldType != "" {
-		label += " " + p.FieldType
+		title += HelpKeyStyle.Render(p.FieldType) + " "
 	}
-	label = " " + label + " "
-
-	head := "──" + label
-	if w := ansi.StringWidth(head); w < width {
-		head += strings.Repeat("─", width-w)
-	}
-	return FieldDocHeaderStyle.Render(Truncate(head, width))
+	return title + label
 }
 
-// fieldDocBody returns exactly fieldDocBodyLines lines of text, wrapped to the
-// width and padded out so the pane keeps its height.
-func fieldDocBody(width int, p FieldDocPane) []string {
-	text := ""
+// fieldDocBody wraps the text the pane is showing to the content width. Each
+// line is padded out so the border encloses a solid block.
+func fieldDocBody(contentWidth int, p FieldDocPane) []string {
+	var text string
 	switch {
 	case p.Err != "":
 		text = p.Err
@@ -77,24 +96,24 @@ func fieldDocBody(width int, p FieldDocPane) []string {
 		text = "No description in the cluster schema for this field."
 	}
 
-	// One leading space keeps the text off the left edge; the trailing one
-	// stops a wrapped word from touching the right edge.
-	textWidth := max(width-2, 1)
-	wrapped := strings.Split(ansi.Wordwrap(text, textWidth, ""), "\n")
+	style := FieldDocTextStyle
+	if p.Err != "" {
+		style = FieldDocErrorStyle
+	}
 
-	out := make([]string, 0, fieldDocBodyLines)
-	for i := range fieldDocBodyLines {
-		if i >= len(wrapped) {
+	out := make([]string, 0, 8)
+	for para := range strings.SplitSeq(text, "\n") {
+		if strings.TrimSpace(para) == "" {
 			out = append(out, "")
 			continue
 		}
-		line := " " + strings.TrimRight(wrapped[i], " ")
-		// The last line absorbs any overflow marker, so a long description
-		// reads as cut off rather than as ending mid-sentence.
-		if i == fieldDocBodyLines-1 && len(wrapped) > fieldDocBodyLines {
-			line = Truncate(line, max(textWidth-1, 1)) + "…"
+		for line := range strings.SplitSeq(ansi.Wordwrap(para, contentWidth, ""), "\n") {
+			out = append(out, style.Render(Truncate(strings.TrimRight(line, " "), contentWidth)))
 		}
-		out = append(out, Truncate(line, width))
 	}
 	return out
 }
+
+// FieldDocTitleFor is what the pane's title bar would read for a field. It lets
+// callers advertise the same label elsewhere without re-rendering the pane.
+func FieldDocTitleFor(p FieldDocPane) string { return fieldDocTitle(p) }

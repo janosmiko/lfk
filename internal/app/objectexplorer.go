@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -512,7 +513,7 @@ func (m *Model) moveObjectExplorerCursor(delta int) {
 // objectExplorerBodyHeight mirrors the contentHeight the renderer uses
 // (title + hint bar + column borders + outer frame consume 6 lines).
 func (m Model) objectExplorerBodyHeight() int {
-	return max(m.height-6-m.fieldDocPaneHeight(), 3)
+	return max(m.height-6, 3)
 }
 
 // previewPaneHeight is the number of YAML lines visible in the preview pane.
@@ -571,12 +572,15 @@ func (m Model) viewObjectExplorer() string {
 		ui.HintEntry{Key: kb.FieldDoc, Desc: "field doc"},
 		ui.HintEntry{Key: "q", Desc: "close"},
 	)
-	hint := ui.RenderHintBar(hints, m.width)
-	// The footnote rides above the hint bar, which both the flat and the tree
-	// renderer draw at the bottom of whatever height they are given.
-	if pane := m.renderFieldDocPane(); pane != "" {
-		hint = pane + "\n" + hint
+	// The schema pane takes columns off the right, so narrow m.width before
+	// anything below measures itself against it. m is a value copy, so the
+	// narrowing stays inside this render.
+	schemaPane := m.renderFieldDocPane(m.height, false)
+	if schemaPane != "" {
+		m.width -= lipgloss.Width(schemaPane)
 	}
+
+	hint := ui.RenderHintBar(hints, m.width)
 
 	title := "Object Explorer: " + rt.title
 	if !m.objectExplorerLive {
@@ -587,11 +591,11 @@ func (m Model) viewObjectExplorer() string {
 	}
 
 	if rt.tree {
-		return m.viewObjectExplorerTree(title, hint)
+		return joinFieldDocPane(m.viewObjectExplorerTree(title, hint), schemaPane)
 	}
 
 	parentFields, parentCursor := m.objectExplorerParentLevel()
-	return ui.RenderObjectExplorerView(
+	return joinFieldDocPane(ui.RenderObjectExplorerView(
 		rt.visible(),
 		rt.cursor,
 		rt.scroll,
@@ -603,8 +607,17 @@ func (m Model) viewObjectExplorer() string {
 		rt.filterBar(),
 		hint,
 		m.width,
-		m.height-m.fieldDocPaneHeight(),
-	)
+		m.height,
+	), schemaPane)
+}
+
+// joinFieldDocPane puts the schema pane beside a rendered view, or returns the
+// view untouched when the pane is closed or does not fit.
+func joinFieldDocPane(view, pane string) string {
+	if pane == "" {
+		return view
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, view, pane)
 }
 
 // objectExplorerParentLevel returns the fields of the level above the current

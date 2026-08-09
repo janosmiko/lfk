@@ -121,10 +121,13 @@ func applyNoColorTheme() {
 	StatusBarStyle = lipgloss.NewStyle().Faint(true).Padding(0, 1)
 	HelpKeyStyle = lipgloss.NewStyle().Bold(true)
 
-	// Schema footnote pane: without color the header keeps bold, which is the
+	// Schema side pane: without color the header keeps bold, which is the
 	// only cue left that separates it from the description below it.
 	FieldDocHeaderStyle = lipgloss.NewStyle().Bold(true)
 	FieldDocTextStyle = lipgloss.NewStyle()
+	// Without color, bold is the only thing left to mark an error apart from
+	// the description it replaces.
+	FieldDocErrorStyle = lipgloss.NewStyle().Bold(true)
 
 	// Which-key: the group accent is purely a color cue on the description, so
 	// without color every group collapses to the same plain description the

@@ -19,9 +19,7 @@ func (m Model) yamlViewportLines() int {
 	if len(m.tabs) > 1 {
 		overhead = 6
 	}
-	// The footnote pane eats into the same body the render path measures, so
-	// both have to subtract it or the cursor scrolls in behind the pane.
-	lines := max(m.height-overhead-m.fieldDocPaneHeight(), 3)
+	lines := max(m.height-overhead, 3)
 	return lines
 }
 

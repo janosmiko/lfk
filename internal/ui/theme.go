@@ -334,13 +334,15 @@ func ApplyTheme(t Theme) {
 		Bold(true).
 		Background(barBg)
 
-	// Schema footnote pane (ctrl+k). It sits inside the document body, so it
+	// Schema side pane (ctrl+k). It sits inside the document body, so it
 	// takes the base background, not the bar background the hint bar uses.
 	FieldDocHeaderStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
 		Bold(true)
 	FieldDocTextStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Text))
+	FieldDocErrorStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(t.Error))
 
 	// Which-key group accents, which tint the DESCRIPTION (the key keeps one
 	// accent throughout — t.Secondary, the same hotkey green every hint bar

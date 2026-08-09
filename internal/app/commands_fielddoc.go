@@ -75,10 +75,7 @@ func (m Model) execKubectlExplainField(req uint64, key fieldDocKey) tea.Cmd {
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			logger.Error("kubectl explain failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
-			return fieldDocLoadedMsg{
-				req: req, key: key,
-				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
-			}
+			return fieldDocLoadedMsg{req: req, key: key, err: parseExplainError(string(output), cmdErr)}
 		}
 
 		desc, _ := parseExplainOutput(string(output), key.path)

@@ -408,7 +408,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
-| `Ctrl+K` | Toggle the schema footnote for the attribute under the cursor (configurable via `field_doc`) |
+| `Ctrl+K` | Toggle the schema side pane for the attribute under the cursor (configurable via `field_doc`) |
 | `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
@@ -434,7 +434,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `y` / `Y` | Yank the selected node's path / full YAML |
 | `P` | Open the whole resource in the full YAML viewer |
 | `I` | Open the API Explorer at the selected item's schema |
-| `Ctrl+K` | Toggle the schema footnote for the selected item (configurable via `field_doc`) |
+| `Ctrl+K` | Toggle the schema side pane for the selected item (configurable via `field_doc`) |
 | `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` | Close the Object Explorer |
@@ -1306,7 +1306,7 @@ keybindings:
   theme_selector: "T"    # Theme selector
   finalizer_search: "ctrl+g"  # Finalizer search
   api_explorer: "I"      # API Explorer
-  field_doc: "ctrl+k"    # Schema footnote for the field under the cursor
+  field_doc: "ctrl+k"    # Schema side pane for the field under the cursor
   object_explorer: "O"   # Object Explorer (browse live object)
   rbac_browser: "U"      # RBAC browser
   secret_toggle: "ctrl+s" # Secret visibility

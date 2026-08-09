@@ -492,7 +492,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
 | `tree_view` | `T` | Toggle the ASCII-art tree view (Object Explorer, API Explorer). Shares the `T` default with `theme_selector`, but they apply in separate contexts (explorers vs. resource list). |
-| `field_doc` | `ctrl+k` | Toggle the schema footnote for the field under the cursor (YAML viewer, Object Explorer). |
+| `field_doc` | `ctrl+k` | Toggle the schema side pane for the field under the cursor (YAML viewer, Object Explorer). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
 | `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod or container (explorer; deeper levels only). |
 | `fullscreen` | `F` | Explorer: cycle layout (hide sidebar -> fullscreen -> restore). Dashboard / event timeline / error log: fullscreen toggle. |

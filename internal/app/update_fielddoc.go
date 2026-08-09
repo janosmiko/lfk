@@ -6,30 +6,60 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// fieldDocPaneHeight is the number of body lines the footnote takes away from
-// the viewer above it, so the cursor keeps a viewport it fits in.
-func (m Model) fieldDocPaneHeight() int {
+// Pane sizing. The schema pane sits beside the viewer, so it takes columns,
+// not rows. Below fieldDocMinTotalWidth there is no split worth making: the
+// viewer would be squeezed to nothing.
+const (
+	fieldDocMinTotalWidth = 90
+	fieldDocMinPaneWidth  = 32
+	fieldDocMaxPaneWidth  = 60
+	fieldDocMinViewWidth  = 50
+)
+
+// splitFieldDocWidth divides the terminal between the viewer and the schema
+// pane. A zero pane width means the terminal is too narrow to show both, and
+// the caller keeps the viewer at full width. It mirrors splitLogPreviewWidth.
+func splitFieldDocWidth(total int) (viewW, paneW int) {
+	if total < fieldDocMinTotalWidth {
+		return total, 0
+	}
+	paneW = min(max(total*2/5, fieldDocMinPaneWidth), fieldDocMaxPaneWidth)
+	if total-paneW < fieldDocMinViewWidth {
+		paneW = total - fieldDocMinViewWidth
+	}
+	if paneW < fieldDocMinPaneWidth {
+		return total, 0
+	}
+	return total - paneW, paneW
+}
+
+// fieldDocPaneWidth is the columns the pane takes right now: zero when it is
+// closed, and zero when the terminal cannot fit both it and the viewer.
+func (m Model) fieldDocPaneWidth() int {
 	if !m.fieldDoc.on {
 		return 0
 	}
-	return ui.FieldDocPaneHeight
+	_, paneW := splitFieldDocWidth(m.width)
+	return paneW
 }
 
-// renderFieldDocPane draws the footnote, or nothing when it is closed.
-func (m Model) renderFieldDocPane() string {
-	if !m.fieldDoc.on {
+// renderFieldDocPane draws the schema pane at the given height, or nothing when
+// it is closed or does not fit.
+func (m Model) renderFieldDocPane(height int, omitFooter bool) string {
+	paneW := m.fieldDocPaneWidth()
+	if paneW == 0 {
 		return ""
 	}
-	return ui.RenderFieldDocPane(m.width, ui.FieldDocPane{
+	return ui.RenderFieldDocPane(paneW, height, ui.FieldDocPane{
 		Path:      m.fieldDoc.key.path,
 		FieldType: m.fieldDoc.entry.fieldType,
 		Desc:      m.fieldDoc.entry.desc,
 		Err:       m.fieldDoc.err,
 		Loading:   m.fieldDoc.loading,
-	})
+	}, omitFooter)
 }
 
-// toggleFieldDoc opens or closes the schema footnote pane. Opening it shows the
+// toggleFieldDoc opens or closes the schema side pane. Opening it shows the
 // field under the cursor; closing it drops what was on screen but keeps the
 // cache, so re-opening on a visited field costs nothing.
 func (m Model) toggleFieldDoc(objPath []string) (tea.Model, tea.Cmd) {
@@ -39,6 +69,10 @@ func (m Model) toggleFieldDoc(objPath []string) (tea.Model, tea.Cmd) {
 	}
 	if _, ok := m.fieldDocKeyForPath(objPath); !ok {
 		m.setStatusMessage("Cannot determine resource type", true)
+		return m, scheduleStatusClear()
+	}
+	if _, paneW := splitFieldDocWidth(m.width); paneW == 0 {
+		m.setStatusMessage("Terminal too narrow for the schema pane", true)
 		return m, scheduleStatusClear()
 	}
 	m.fieldDoc.on = true

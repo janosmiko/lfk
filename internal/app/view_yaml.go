@@ -12,6 +12,14 @@ import (
 )
 
 func (m Model) viewYAML() string {
+	// The schema pane takes columns off the right. Render it first, then
+	// narrow m.width so the whole viewer below lays itself out in what is
+	// left; m is a value copy, so the narrowing stays inside this render.
+	schemaPane := m.renderFieldDocPane(m.height, false)
+	if schemaPane != "" {
+		m.width -= lipgloss.Width(schemaPane)
+	}
+
 	yamlTitleText := m.yamlTitle()
 	if m.yamlView.wrap {
 		yamlTitleText += " [WRAP]"
@@ -79,7 +87,7 @@ func (m Model) viewYAML() string {
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
-	maxLines := max(m.height-4-m.fieldDocPaneHeight(), 3)
+	maxLines := max(m.height-4, 3)
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
 	visLines, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
@@ -187,10 +195,11 @@ func (m Model) viewYAML() string {
 	borderStyle := ui.FullscreenBorderStyle(m.width, maxLines)
 	body := borderStyle.Render(bodyContent)
 
-	if pane := m.renderFieldDocPane(); pane != "" {
-		return lipgloss.JoinVertical(lipgloss.Left, title, body, pane, hint)
+	view := lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
+	if schemaPane != "" {
+		return lipgloss.JoinHorizontal(lipgloss.Top, view, schemaPane)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
+	return view
 }
 
 func (m Model) yamlTitle() string {
