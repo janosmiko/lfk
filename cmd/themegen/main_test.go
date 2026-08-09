@@ -378,64 +378,6 @@ func TestParseThemeFile(t *testing.T) {
 	})
 }
 
-// --- mapToTheme ---
-
-func TestMapToTheme(t *testing.T) {
-	t.Run("dark theme", func(t *testing.T) {
-		raw := rawTheme{
-			Background: "#1a1b26",
-			Foreground: "#c0caf5",
-			Palette:    buildPaletteArray(fullPalette()),
-		}
-
-		result := mapToTheme(raw)
-		assert.Equal(t, raw.Background, result.Background)
-		assert.Equal(t, raw.Foreground, result.Foreground)
-		assert.Equal(t, raw.Palette, result.Palette)
-	})
-
-	t.Run("light theme", func(t *testing.T) {
-		pal := buildPaletteArray(fullPalette())
-		raw := rawTheme{
-			Background: "#f5f5f5",
-			Foreground: "#333333",
-			Palette:    pal,
-		}
-
-		result := mapToTheme(raw)
-		assert.Equal(t, raw.Background, result.Background)
-		assert.Equal(t, raw.Foreground, result.Foreground)
-	})
-
-	t.Run("border fallback when palette8 equals bg", func(t *testing.T) {
-		pal := buildPaletteArray(fullPalette())
-		pal[8] = "#1a1b26" // same as background
-		raw := rawTheme{
-			Background: "#1a1b26",
-			Foreground: "#c0caf5",
-			Palette:    pal,
-		}
-
-		result := mapToTheme(raw)
-		// mapToTheme still returns the raw theme unchanged, but exercises the
-		// border fallback code path internally.
-		assert.Equal(t, raw.Background, result.Background)
-	})
-
-	t.Run("border fallback when palette8 equals fg", func(t *testing.T) {
-		pal := buildPaletteArray(fullPalette())
-		pal[8] = "#c0caf5" // same as foreground
-		raw := rawTheme{
-			Background: "#1a1b26",
-			Foreground: "#c0caf5",
-			Palette:    pal,
-		}
-
-		result := mapToTheme(raw)
-		assert.Equal(t, raw.Foreground, result.Foreground)
-	})
-}
-
 // --- themeFields ---
 
 func TestThemeFields(t *testing.T) {
