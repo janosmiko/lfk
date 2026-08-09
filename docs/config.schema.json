@@ -323,6 +323,11 @@
       "description": "Disable all mutating actions globally. Per-context overrides under clusters.<name>.read_only and the --read-only CLI flag take precedence.",
       "default": false
     },
+    "field_manager": {
+      "type": "string",
+      "description": "Field manager name sent on every write. The apiserver stores it in metadata.managedFields, which the YAML blame view reads. Empty uses lfk:<os-user>; set \"lfk\" to keep the username off the cluster. Cut to 128 characters.",
+      "default": ""
+    },
     "show_rare_types": {
       "type": "boolean",
       "description": "Show rarely-used resource types (CSI internals, admission webhooks, leases, runtime classes, the \"Advanced\" category) from startup, as if the H toggle were pressed.",

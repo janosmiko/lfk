@@ -64,7 +64,7 @@ func (c *Client) UpdateSecretData(contextName, namespace, name string, data map[
 		secret.Data[k] = []byte(v)
 	}
 
-	_, err = cs.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+	_, err = cs.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{FieldManager: FieldManager()})
 	if err != nil {
 		return fmt.Errorf("updating secret: %w", err)
 	}
@@ -124,7 +124,7 @@ func (c *Client) UpdateConfigMapData(contextName, namespace, name string, data m
 	cm.Data = make(map[string]string, len(data))
 	maps.Copy(cm.Data, data)
 
-	_, err = cs.CoreV1().ConfigMaps(namespace).Update(context.Background(), cm, metav1.UpdateOptions{})
+	_, err = cs.CoreV1().ConfigMaps(namespace).Update(context.Background(), cm, metav1.UpdateOptions{FieldManager: FieldManager()})
 	if err != nil {
 		return fmt.Errorf("updating configmap: %w", err)
 	}
@@ -247,9 +247,9 @@ func (c *Client) UpdateLabelAnnotationData(ctx context.Context, contextName stri
 	}
 
 	if rt.Namespaced {
-		_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{})
+		_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{FieldManager: FieldManager()})
 	} else {
-		_, err = dynClient.Resource(gvr).Patch(ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{})
+		_, err = dynClient.Resource(gvr).Patch(ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{FieldManager: FieldManager()})
 	}
 	if err != nil {
 		return fmt.Errorf("updating labels/annotations: %w", err)
@@ -346,7 +346,7 @@ func (c *Client) TriggerCronJob(ctx context.Context, contextName, namespace, cro
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
 
-	created, err := cs.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{})
+	created, err := cs.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{FieldManager: FieldManager()})
 	if err != nil {
 		return "", fmt.Errorf("creating job: %w", err)
 	}
@@ -374,7 +374,7 @@ func (c *Client) ToggleCronJobSuspend(ctx context.Context, contextName, namespac
 	logger.Info("Toggling CronJob suspend", "context", contextName, "namespace", namespace, "cronjob", name, "suspend", newState)
 
 	patch := fmt.Appendf(nil, `{"spec":{"suspend":%t}}`, newState)
-	if _, err := cs.BatchV1().CronJobs(namespace).Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err := cs.BatchV1().CronJobs(namespace).Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()}); err != nil {
 		return false, fmt.Errorf("setting cronjob %s suspend=%t: %w", name, newState, err)
 	}
 	return newState, nil

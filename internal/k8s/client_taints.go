@@ -67,7 +67,7 @@ func (c *Client) UpdateNodeTaints(ctx context.Context, contextName, name string,
 	}
 	node.Spec.Taints = out
 
-	if _, err := cs.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
+	if _, err := cs.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{FieldManager: FieldManager()}); err != nil {
 		return fmt.Errorf("updating node taints: %w", err)
 	}
 	return nil

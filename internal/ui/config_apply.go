@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -189,6 +190,11 @@ func applyConfigOptions(cfg configFile) {
 	}
 	if cfg.ReadOnly != nil {
 		ConfigReadOnly = *cfg.ReadOnly
+	}
+	// Trim first so `field_manager: " "` cannot replace the default with
+	// whitespace, which the apiserver would store verbatim.
+	if fm := strings.TrimSpace(cfg.FieldManager); fm != "" {
+		k8s.FieldManagerOverride = fm
 	}
 	if cfg.ShowRareTypes != nil {
 		ConfigShowRareTypes = *cfg.ShowRareTypes

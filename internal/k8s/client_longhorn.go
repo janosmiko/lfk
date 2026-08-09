@@ -99,7 +99,7 @@ func (c *Client) ForceDeleteLonghornNode(ctx context.Context, contextName, names
 	}
 
 	patch := []byte(`{"spec":{"allowScheduling":false}}`)
-	if _, err := res.Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err := res.Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()}); err != nil {
 		return fmt.Errorf("disabling scheduling on Longhorn node %s: %w", name, err)
 	}
 	if err := res.Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
@@ -126,7 +126,7 @@ func (c *Client) SetLonghornNodeEviction(ctx context.Context, contextName, names
 	if evict {
 		patch = []byte(`{"spec":{"allowScheduling":false,"evictionRequested":true}}`)
 	}
-	if _, err := res.Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err := res.Patch(ctx, name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()}); err != nil {
 		return fmt.Errorf("setting eviction=%t on Longhorn node %s: %w", evict, name, err)
 	}
 	return nil

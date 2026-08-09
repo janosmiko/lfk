@@ -173,7 +173,7 @@ func (c *Client) ToggleNodeSchedulable(ctx context.Context, contextName, nodeNam
 	logger.Info("Toggling node scheduling", "context", contextName, "node", nodeName, "unschedulable", cordoned)
 
 	patch := fmt.Appendf(nil, `{"spec":{"unschedulable":%t}}`, cordoned)
-	if _, err := cs.CoreV1().Nodes().Patch(ctx, nodeName, k8stypes.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+	if _, err := cs.CoreV1().Nodes().Patch(ctx, nodeName, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()}); err != nil {
 		return false, fmt.Errorf("setting node %s unschedulable=%t: %w", nodeName, cordoned, err)
 	}
 	return cordoned, nil
@@ -197,7 +197,7 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 			return fmt.Errorf("getting scale for %s: %w", name, err)
 		}
 		scale.Spec.Replicas = replicas
-		_, err = appsV1.Deployments(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		_, err = appsV1.Deployments(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{FieldManager: FieldManager()})
 		if err != nil {
 			return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
 		}
@@ -207,7 +207,7 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 			return fmt.Errorf("getting scale for %s: %w", name, err)
 		}
 		scale.Spec.Replicas = replicas
-		_, err = appsV1.StatefulSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		_, err = appsV1.StatefulSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{FieldManager: FieldManager()})
 		if err != nil {
 			return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
 		}
@@ -217,7 +217,7 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 			return fmt.Errorf("getting scale for %s: %w", name, err)
 		}
 		scale.Spec.Replicas = replicas
-		_, err = appsV1.ReplicaSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		_, err = appsV1.ReplicaSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{FieldManager: FieldManager()})
 		if err != nil {
 			return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
 		}
@@ -240,7 +240,7 @@ func (c *Client) PatchHPAScale(contextName, namespace string, rt model.ResourceT
 	gvr := schema.GroupVersionResource{Group: rt.APIGroup, Version: rt.APIVersion, Resource: rt.Resource}
 	patch := fmt.Appendf(nil, `{"spec":{"minReplicas":%d,"maxReplicas":%d}}`, minReplicas, maxReplicas)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("scaling HPA %s to min=%d max=%d: %w", name, minReplicas, maxReplicas, err)
@@ -259,7 +259,7 @@ func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
 	patch := fmt.Appendf(nil, `{"spec":{"resources":{"requests":{"storage":"%s"}}}}`, newSize)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("resizing PVC %s to %s: %w", name, newSize, err)
@@ -297,11 +297,11 @@ func (c *Client) RestartResource(contextName, namespace, name, kind string) erro
 
 	switch kind {
 	case "Deployment":
-		_, err = appsV1.Deployments(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		_, err = appsV1.Deployments(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{FieldManager: FieldManager()})
 	case "StatefulSet":
-		_, err = appsV1.StatefulSets(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		_, err = appsV1.StatefulSets(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{FieldManager: FieldManager()})
 	case "DaemonSet":
-		_, err = appsV1.DaemonSets(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+		_, err = appsV1.DaemonSets(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{FieldManager: FieldManager()})
 	default:
 		return fmt.Errorf("unsupported kind for restart: %s", kind)
 	}
@@ -356,7 +356,7 @@ func (c *Client) RollbackDeployment(ctx context.Context, contextName, namespace,
 				return fmt.Errorf("marshaling patch: %w", err)
 			}
 
-			_, err = cs.AppsV1().Deployments(namespace).Patch(ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{})
+			_, err = cs.AppsV1().Deployments(namespace).Patch(ctx, name, k8stypes.MergePatchType, patchData, metav1.PatchOptions{FieldManager: FieldManager()})
 			if err != nil {
 				return fmt.Errorf("patching deployment: %w", err)
 			}
@@ -458,6 +458,9 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 		qps, burst := foregroundRate(displayName)
 		applyRateLimit(cfg, qps, burst)
 	}
+	// Name the tool, its version and the person to the apiserver, which
+	// records the agent in the audit log.
+	cfg.UserAgent = UserAgent()
 	return cfg, nil
 }
 
