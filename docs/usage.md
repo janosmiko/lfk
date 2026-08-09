@@ -90,6 +90,11 @@ When `--context` or `--namespace` flags are provided, the saved session state is
 ignored and the app opens directly in the specified context/namespace. The user
 can still change the namespace during the session.
 
+Restoring a session takes two steps: lfk opens the saved resource type as soon
+as the cluster list arrives, then selects the saved row when the resource list
+comes back. Press a key or click during that gap and lfk gives up the saved row,
+so an arriving list cannot pull the cursor away from where you went.
+
 ## Mouse Support
 
 By default, lfk captures mouse input for click navigation, scroll, and tab

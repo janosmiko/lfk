@@ -15,6 +15,9 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	if msg.err != nil {
+		// Without a context list there is nothing to restore into; show the
+		// error rather than a splash that never ends.
+		m.abandonSessionRestore()
 		m.err = msg.err
 		m.setErrorFromErr("Warning: ", msg.err)
 		return m, scheduleStatusClear()
@@ -62,6 +65,8 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 		return mdl, cmd
 	}
 
+	// No session to restore (or it already ran): the cluster picker is ready.
+	m.finishSessionRestore()
 	cmds := make([]tea.Cmd, 0, 1+len(pfCmds))
 	cmds = append(cmds, m.loadPreview())
 	cmds = append(cmds, pfCmds...)
@@ -248,6 +253,9 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			return m, m.loadResources(false)
 		}
 	}
+	// Discovery landed without a list load to wait on, so the resource-type
+	// sidebar is the finished restore. Let the explorer paint.
+	m.finishSessionRestoreForContext(isCurrentContext)
 	return m, nil
 }
 
@@ -255,6 +263,8 @@ func (m Model) handleAPIResourceDiscoveryError(msg apiResourceDiscoveryMsg, isCu
 	// API resource discovery failed (permissions, etc.) -- fall back to
 	// seed resources so the user can still navigate.
 	logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
+	// Nothing further is coming for this context; do not strand the splash.
+	m.finishSessionRestoreForContext(isCurrentContext)
 	if isCurrentContext && m.loading {
 		// Mirror the success branch's wasInitial guard. m.loading alone
 		// is unreliable as an "is this the initial discovery" signal
@@ -331,6 +341,11 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 		return m, nil // stale response, discard
 	}
 	m.loading = false
+	// The list the restore was waiting for is here (or failed): either way the
+	// explorer now has as much as it is going to get, so let it paint.
+	if !msg.forPreview {
+		m.finishSessionRestore()
+	}
 	if isContextCanceled(msg.err) {
 		return m, nil
 	}
