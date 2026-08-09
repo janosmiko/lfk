@@ -968,7 +968,13 @@ func TestPush2DirectActionScaleNoSelection(t *testing.T) {
 	result, cmd := m.directActionScale()
 	rm := result.(Model)
 	assert.Equal(t, overlayScaleInput, rm.overlay)
-	assert.Nil(t, cmd)
+	// The overlay asks for its blast radius as it opens. This row has no raw
+	// object, so the reply is an error, but it still has to arrive or the
+	// overlay would sit on "checking disruption budgets" for good.
+	require.NotNil(t, cmd)
+	msg, ok := cmd().(blastRadiusLoadedMsg)
+	require.True(t, ok)
+	assert.Equal(t, rm.blast.req, msg.req)
 }
 
 func TestPush2DirectActionScaleNonScaleable(t *testing.T) {

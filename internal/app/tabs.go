@@ -573,6 +573,10 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.loadLogTopFromTab(t)
 	// Close overlays and reset transient state.
 	m.overlay = overlayNone
+	// The blast radius belongs to the overlay being closed here, and it is
+	// not part of the per-tab snapshot, so it must not follow the user into
+	// the next tab.
+	m.blast.reset()
 	m.filterActive = false
 	m.searchActive = false
 	m.err = nil

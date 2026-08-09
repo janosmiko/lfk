@@ -130,3 +130,22 @@ func TestRenderOverlayInput(t *testing.T) {
 		assert.NotContains(t, out, "Available ports:")
 	})
 }
+
+func TestRenderOverlayInput_NotesRenderBelowTheRows(t *testing.T) {
+	out := stripANSI(RenderOverlayInput(OverlayInputConfig{
+		Title: "Scale Deployment",
+		Rows:  []OverlayInputRow{{Label: "Replicas: ", Input: "2"}},
+		Notes: []ConfirmNote{{Text: "Blast radius: 3 pods, 2 of 5 ready after"}},
+	}))
+
+	assert.Contains(t, out, "Blast radius: 3 pods")
+	assert.Less(t, strings.Index(out, "Replicas"), strings.Index(out, "Blast radius"))
+}
+
+func TestRenderOverlayInput_AWarningNoteIsStyledApart(t *testing.T) {
+	plain := RenderOverlayInput(OverlayInputConfig{Title: "t", Notes: []ConfirmNote{{Text: "x"}}})
+	warned := RenderOverlayInput(OverlayInputConfig{Title: "t", Notes: []ConfirmNote{{Text: "x", Warn: true}}})
+
+	assert.Equal(t, stripANSI(plain), stripANSI(warned))
+	assert.NotEqual(t, plain, warned)
+}

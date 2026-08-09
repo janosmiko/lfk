@@ -159,7 +159,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.SecretEditor, "Secret/ConfigMap editor"},
 				{kb.LabelEditor, "Edit labels/annotations"},
 				{kb.Refresh, "Refresh current view"},
-				{kb.Delete, "Delete (Tab cycles the cascade policy)"},
+				{kb.Delete, "Delete (Tab cycles cascade; shows blast radius)"},
 				{kb.ForceDelete, "Force delete (Pod/Job only)"},
 				{kb.Scale, "Scale (Deployment/StatefulSet/ReplicaSet/HPA)"},
 				{kb.CreateTemplate, "Create new resource from template"},

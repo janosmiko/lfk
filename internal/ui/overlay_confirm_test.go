@@ -174,3 +174,54 @@ func TestRenderOverlayConfirm(t *testing.T) {
 		assert.NotContains(t, out, "to confirm")
 	})
 }
+
+func TestRenderOverlayConfirm_NotesAppearBelowTheChoiceRow(t *testing.T) {
+	out := stripANSI(RenderOverlayConfirm(OverlayConfirmConfig{
+		Title:       "Confirm Delete",
+		Warning:     "Delete web?",
+		ChoiceLabel: "Cascade",
+		ChoiceValue: "Background",
+		Notes: []ConfirmNote{
+			{Text: "PDB web-pdb 2 -> 0 allowed, 3 of 5 ready after"},
+		},
+	}))
+
+	assert.Contains(t, out, "PDB web-pdb 2 -> 0 allowed")
+	assert.Less(t, strings.Index(out, "Background"), strings.Index(out, "PDB web-pdb"),
+		"the note sits below the cascade row, not above it")
+}
+
+func TestRenderOverlayConfirm_AWarningNoteIsStyledApart(t *testing.T) {
+	plain := RenderOverlayConfirm(OverlayConfirmConfig{
+		Title: "t", Notes: []ConfirmNote{{Text: "same text"}},
+	})
+	warned := RenderOverlayConfirm(OverlayConfirmConfig{
+		Title: "t", Notes: []ConfirmNote{{Text: "same text", Warn: true}},
+	})
+
+	assert.Equal(t, stripANSI(plain), stripANSI(warned), "same words")
+	assert.NotEqual(t, plain, warned, "a PDB violation must not look like an ordinary note")
+}
+
+func TestRenderOverlayConfirm_NoNotesChangesNothing(t *testing.T) {
+	without := RenderOverlayConfirm(OverlayConfirmConfig{Title: "t", Warning: "w"})
+	empty := RenderOverlayConfirm(OverlayConfirmConfig{Title: "t", Warning: "w", Notes: nil})
+
+	assert.Equal(t, without, empty)
+}
+
+func TestRenderOverlayConfirm_EmptyNoteTextDoesNotPanic(t *testing.T) {
+	// wrapConfirmText returns no lines for empty or blank text, so a naive
+	// lines[0] panics on a note whose value has not been filled in yet.
+	assert.NotPanics(t, func() {
+		RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:     "t",
+			WrapWidth: 40,
+			Notes: []ConfirmNote{
+				{Label: "Removes", Text: ""},
+				{Label: "Budget", Text: "   "},
+				{Text: ""},
+			},
+		})
+	})
+}

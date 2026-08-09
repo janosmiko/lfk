@@ -475,8 +475,8 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 		mdl, cmd := m.executeActionResize()
 		return mdl, cmd, true
 	case "Scale":
-		mdl := m.executeActionScale()
-		return mdl, nil, true
+		mdl, cmd := m.executeActionScale()
+		return mdl, cmd, true
 	case "Restart":
 		mdl, cmd := m.executeActionRestart()
 		return mdl, cmd, true
@@ -701,7 +701,8 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.resetDeletePropagation()
 		m.overlay = overlayConfirm
 		m.pendingAction = "Delete"
-		return m, nil
+		m.beginBlastRadius()
+		return m, m.loadBulkBlastRadius()
 	case "Force Delete":
 		m.confirmAction = fmt.Sprintf("%d resources (FORCE)%s", len(m.bulkItems), clustersSuffix)
 		m.confirmTitle = "Confirm Force Delete"

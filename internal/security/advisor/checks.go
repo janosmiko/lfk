@@ -9,10 +9,9 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/security"
 )
 
@@ -226,17 +225,11 @@ func (d *clusterData) pdbMatches(w *workload) bool {
 	return false
 }
 
-// pdbSelectorMatches mirrors policy/v1 semantics: a nil selector matches
-// nothing, an empty selector matches every pod in the namespace.
+// pdbSelectorMatches is the shared matcher. The blast-radius line in the
+// confirm dialogs has to agree with these findings, so both read one
+// implementation.
 func pdbSelectorMatches(p *policyv1.PodDisruptionBudget, podLabels map[string]string) bool {
-	if p.Spec.Selector == nil {
-		return false
-	}
-	sel, err := metav1.LabelSelectorAsSelector(p.Spec.Selector)
-	if err != nil {
-		return false
-	}
-	return sel.Matches(labels.Set(podLabels))
+	return k8s.PDBSelectorMatches(p, podLabels)
 }
 
 // pdbFindings flags PDBs that block node drains: maxUnavailable 0 (or "0%"),

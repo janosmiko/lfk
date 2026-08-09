@@ -3,7 +3,10 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
+
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
@@ -152,11 +155,26 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return m.renderOverlayConfirmType()
 	case overlayScaleInput:
 		w := min(45, m.width-10)
-		return ui.RenderOverlayInput(ui.OverlayInputConfig{
+		// Recomputed from the pods already fetched, so the line follows the
+		// number as it is typed without another call per digit.
+		target, _ := strconv.Atoi(m.scaleInput.Value)
+		// A scale-down has its pods removed by the controller, which does not
+		// use the eviction API, so no budget can refuse it.
+		notes := blastRadiusNotes(m.blast.scaleBlastRadius(target), m.blast.loading, false)
+		if len(notes) > 0 {
+			w = min(64, m.width-10)
+		}
+		scaleContent := ui.RenderOverlayInput(ui.OverlayInputConfig{
 			Title: "Scale Deployment",
 			Width: w - 4,
 			Rows:  []ui.OverlayInputRow{{Label: "Replicas: ", Input: m.scaleInput.Value, ShowCursor: true, Cursor: m.scaleInput.Cursor}},
-		}), w, min(8, m.height-6), true
+			Notes: notes,
+		})
+		scaleH := min(8, m.height-6)
+		if len(notes) > 0 {
+			scaleH = min(max(scaleH, lipgloss.Height(scaleContent)), m.height-6)
+		}
+		return scaleContent, w, scaleH, true
 	case overlayHPAScale:
 		w := min(56, m.width-10)
 		return ui.RenderOverlayInput(ui.OverlayInputConfig{

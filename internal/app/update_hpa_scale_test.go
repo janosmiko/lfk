@@ -26,7 +26,7 @@ func hpaActionCtxModel() Model {
 
 func TestExecuteActionScale_HPAOpensHPAOverlay(t *testing.T) {
 	m := hpaActionCtxModel()
-	m = m.executeActionScale()
+	m, _ = m.executeActionScale()
 
 	assert.Equal(t, overlayHPAScale, m.overlay)
 	assert.Equal(t, "2", m.hpaScale.min.Value)
@@ -42,7 +42,7 @@ func TestExecuteActionScale_HPAOpensHPAOverlay(t *testing.T) {
 func TestExecuteActionScale_DeploymentUsesPlainOverlay(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "web", "default", "Deployment", model.ResourceTypeEntry{})
-	m = m.executeActionScale()
+	m, _ = m.executeActionScale()
 	assert.Equal(t, overlayScaleInput, m.overlay)
 }
 
@@ -136,7 +136,7 @@ func TestExecuteActionScale_WorkloadPrefillsReplicas(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "web", "default", "Deployment", model.ResourceTypeEntry{})
 	m.actionCtx.raw = map[string]any{"spec": map[string]any{"replicas": int64(4)}}
-	m = m.executeActionScale()
+	m, _ = m.executeActionScale()
 	assert.Equal(t, overlayScaleInput, m.overlay)
 	assert.Equal(t, "4", m.scaleInput.Value)
 }
