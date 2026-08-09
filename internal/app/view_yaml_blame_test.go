@@ -281,3 +281,21 @@ func TestHandleYAMLToggleBlame_EachRequestGetsANewNumber(t *testing.T) {
 
 	assert.Greater(t, mdl.(Model).yamlView.blameReq, first)
 }
+
+func TestLoadYAMLBlame_NoTargetReplyCarriesTheRequestNumber(t *testing.T) {
+	// An empty Model has no selected item, so the target lookup fails. The
+	// reply still has to reach the handler, or the view stays on "Loading".
+	m := Model{}
+	m.yamlView.blameOn = true
+	m.yamlView.blameLoading = true
+	m.yamlView.blameReq = 3
+
+	msg, ok := m.loadYAMLBlame()().(yamlBlameLoadedMsg)
+	require.True(t, ok)
+	assert.Equal(t, uint64(3), msg.req)
+
+	mdl, _ := m.updateYamlBlameLoaded(msg)
+	got := mdl.(Model)
+	assert.False(t, got.yamlView.blameLoading, "the reply has to clear the loading state")
+	assert.False(t, got.yamlView.blameOn)
+}

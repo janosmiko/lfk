@@ -60,15 +60,17 @@ func (m Model) yamlBlameTarget() (kctx, ns string, rt model.ResourceTypeEntry, n
 // second GET on purpose: the YAML fetch strips managedFields so the rendered
 // document stays readable, and this runs only when the user asks for blame.
 func (m Model) loadYAMLBlame() tea.Cmd {
+	// Every reply carries the request number, the failures too. A reply
+	// without it is dropped, and the view then waits on a fetch that ended.
+	req := m.yamlView.blameReq
 	kctx, ns, rt, name, ok := m.yamlBlameTarget()
 	if !ok {
 		return func() tea.Msg {
-			return yamlBlameLoadedMsg{err: errNoBlameTarget}
+			return yamlBlameLoadedMsg{req: req, err: errNoBlameTarget}
 		}
 	}
 	client := m.client
 	content := m.yamlView.content
-	req := m.yamlView.blameReq
 	return m.scheduleK8sCall(
 		scheduler.PriorityHigh,
 		scheduler.KindYAMLFetch,
