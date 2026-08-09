@@ -5,21 +5,31 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// ListKinds maps every seeded GroupVersionResource to its List kind — the
-// shape dynamicfake.NewSimpleDynamicClientWithCustomListKinds needs to serve
-// List calls. metrics.k8s.io/v1 is mapped alongside v1beta1 because
-// internal/k8s.metricsGVR tries both; only v1beta1 carries seed data since
-// GetPodMetrics/GetNodeMetrics stop at the first route that returns.
+// ListKinds maps every GroupVersionResource any internal/k8s code path can
+// LIST against the dynamic client to its List kind — the shape
+// dynamicfake.NewSimpleDynamicClientWithCustomListKinds needs to serve List
+// calls. An unregistered GVR makes the fake panic on List instead of
+// returning an error, so this map must register every resource a List call
+// can target, not only the ones seeded with data (see
+// TestListKinds_CoversEveryAdvertisedResource and
+// TestNewDemoClient_DiscoverAPIResources_NoPanic). metrics.k8s.io/v1 is
+// mapped alongside v1beta1 because internal/k8s.metricsGVR tries both; only
+// v1beta1 carries seed data since GetPodMetrics/GetNodeMetrics stop at the
+// first route that returns.
 func ListKinds() map[schema.GroupVersionResource]string {
 	return map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "pods"}:       "PodList",
-		{Group: "", Version: "v1", Resource: "services"}:   "ServiceList",
-		{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
-		{Group: "", Version: "v1", Resource: "nodes"}:      "NodeList",
-		{Group: "", Version: "v1", Resource: "events"}:     "EventList",
+		{Group: "", Version: "v1", Resource: "pods"}:           "PodList",
+		{Group: "", Version: "v1", Resource: "services"}:       "ServiceList",
+		{Group: "", Version: "v1", Resource: "configmaps"}:     "ConfigMapList",
+		{Group: "", Version: "v1", Resource: "nodes"}:          "NodeList",
+		{Group: "", Version: "v1", Resource: "events"}:         "EventList",
+		{Group: "", Version: "v1", Resource: "namespaces"}:     "NamespaceList",
+		{Group: "", Version: "v1", Resource: "secrets"}:        "SecretList",
+		{Group: "", Version: "v1", Resource: "resourcequotas"}: "ResourceQuotaList",
 
-		{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
-		{Group: "apps", Version: "v1", Resource: "replicasets"}: "ReplicaSetList",
+		{Group: "apps", Version: "v1", Resource: "deployments"}:  "DeploymentList",
+		{Group: "apps", Version: "v1", Resource: "replicasets"}:  "ReplicaSetList",
+		{Group: "apps", Version: "v1", Resource: "statefulsets"}: "StatefulSetList",
 
 		{Group: "batch", Version: "v1", Resource: "jobs"}: "JobList",
 
@@ -27,6 +37,26 @@ func ListKinds() map[schema.GroupVersionResource]string {
 		{Group: "metrics.k8s.io", Version: "v1", Resource: "pods"}:       "PodMetricsList",
 		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 		{Group: "metrics.k8s.io", Version: "v1", Resource: "nodes"}:      "NodeMetricsList",
+
+		// apiextensions.k8s.io/v1 CustomResourceDefinitions: fetchCRDPrinterColumns
+		// (internal/k8s/discovery.go) lists this unconditionally as part of
+		// every DiscoverAPIResources call. Zero CRDs are seeded in demo mode,
+		// but the registration must exist regardless or the fake panics
+		// before it gets the chance to return an empty list.
+		{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}: "CustomResourceDefinitionList",
+
+		// networking.k8s.io/v1 NetworkPolicies and their Cilium CRD
+		// counterparts: listed by internal/k8s/netpol_matching.go when
+		// resolving policies affecting a pod or service.
+		{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"}:          "NetworkPolicyList",
+		{Group: "cilium.io", Version: "v2", Resource: "ciliumnetworkpolicies"}:            "CiliumNetworkPolicyList",
+		{Group: "cilium.io", Version: "v2", Resource: "ciliumclusterwidenetworkpolicies"}: "CiliumClusterwideNetworkPolicyList",
+
+		// autoscaling.k8s.io VerticalPodAutoscalers: listed by
+		// internal/k8s/client_rightsizing.go's findVPA across both served
+		// API versions.
+		{Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"}:      "VerticalPodAutoscalerList",
+		{Group: "autoscaling.k8s.io", Version: "v1beta2", Resource: "verticalpodautoscalers"}: "VerticalPodAutoscalerList",
 	}
 }
 

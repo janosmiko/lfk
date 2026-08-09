@@ -45,7 +45,11 @@ func NewTestClient(cs, dyn any) *Client {
 // kubeconfig, then marks itself IsDemo so the app layer can show a badge.
 func NewDemoClient() (*Client, error) {
 	dyn := demo.NewDynamicClient()
-	c := NewTestClient(demo.NewClientset(), dyn)
+	// The Client sees a guarded dynamic.Interface (see demo.GuardListPanics)
+	// so a demo fixture gap degrades a List call to an error instead of
+	// panicking a scheduler worker goroutine. The ticker keeps the raw fake
+	// so it can still reach Tracker() to mutate seed data.
+	c := NewTestClient(demo.NewClientset(), demo.GuardListPanics(dyn))
 	c.demo = true
 	c.demoTicker = demo.NewTicker(dyn, demoTickerInterval)
 	c.demoTicker.Start(context.Background())

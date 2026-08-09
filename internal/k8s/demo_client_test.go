@@ -85,6 +85,22 @@ func TestNewDemoClient_NoKubeconfigNeeded(t *testing.T) {
 	assert.True(t, c.IsDemo())
 }
 
+// TestNewDemoClient_DiscoverAPIResources_NoPanic is the regression guard for
+// the --demo startup crash: fetchCRDPrinterColumns lists
+// customresourcedefinitions unconditionally, and a demo dynamic fake
+// missing that ListKind registration panics instead of erroring (see
+// dynamicfake's NewSimpleDynamicClientWithCustomListKinds). DiscoverAPIResources
+// runs on a scheduler worker goroutine, so nothing upstream can recover a
+// panic reaching this call.
+func TestNewDemoClient_DiscoverAPIResources_NoPanic(t *testing.T) {
+	c, err := NewDemoClient()
+	require.NoError(t, err)
+
+	entries, err := c.DiscoverAPIResources(t.Context(), c.CurrentContext())
+	require.NoError(t, err)
+	assert.NotEmpty(t, entries)
+}
+
 // TestNewDemoClient_TickerLifetime guards the demo ticker's goroutine
 // lifetime: NewDemoClient must start it, and Client.Shutdown must stop it,
 // so a demo session never leaks a background goroutine past the client
