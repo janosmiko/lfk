@@ -533,9 +533,10 @@ func TestBlastRadiusNotes_ViolationDoesNotRepeatTheBudgetName(t *testing.T) {
 	notes := blastRadiusNotes(r, false, false)
 
 	require.Len(t, notes, 2)
-	assert.Contains(t, notes[1].Text, "data-platform-postgres-primary",
-		"the budget row names it once, in the value column")
 	assert.True(t, notes[1].Warn)
+	joined := notes[0].Text + " " + notes[1].Text
+	assert.Equal(t, 1, strings.Count(joined, "data-platform-postgres-primary"),
+		"the name belongs in the budget row and nowhere else")
 }
 
 func TestBlastRadiusNotes_SeveralViolationsStillNameThem(t *testing.T) {

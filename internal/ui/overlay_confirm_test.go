@@ -209,3 +209,19 @@ func TestRenderOverlayConfirm_NoNotesChangesNothing(t *testing.T) {
 
 	assert.Equal(t, without, empty)
 }
+
+func TestRenderOverlayConfirm_EmptyNoteTextDoesNotPanic(t *testing.T) {
+	// wrapConfirmText returns no lines for empty or blank text, so a naive
+	// lines[0] panics on a note whose value has not been filled in yet.
+	assert.NotPanics(t, func() {
+		RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:     "t",
+			WrapWidth: 40,
+			Notes: []ConfirmNote{
+				{Label: "Removes", Text: ""},
+				{Label: "Budget", Text: "   "},
+				{Text: ""},
+			},
+		})
+	})
+}

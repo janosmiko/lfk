@@ -38,6 +38,11 @@ func renderConfirmNote(note ConfirmNote, labelWidth, wrapWidth int) string {
 	pad := max(labelWidth-lipgloss.Width(label), 1)
 	valueWidth := max(wrapWidth-labelWidth, minConfirmValueWidth)
 	lines := wrapConfirmText(note.Text, valueWidth)
+	if len(lines) == 0 {
+		// Blank text wraps to nothing. Keep the label row rather than
+		// indexing an empty slice.
+		lines = []string{""}
+	}
 
 	var b strings.Builder
 	b.WriteString(OverlayNormalStyle.Render(label + strings.Repeat(" ", pad)))
