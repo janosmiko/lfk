@@ -101,7 +101,7 @@ appearance:
 
 # ─── Field manager ─────────────────────────────────────────────────────────────
 # Name lfk sends as the field manager on every write. The API server stores it
-# in metadata.managedFields, which the YAML blame view (b) reads, so a change
+# in metadata.managedFields, which the YAML blame view (m) reads, so a change
 # shows who made it instead of only naming the tool.
 # Set a plain "lfk" to keep your username off the cluster.
 # Cut to 128 characters, the API limit.

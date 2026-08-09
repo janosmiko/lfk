@@ -191,11 +191,11 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ReadOnly != nil {
 		ConfigReadOnly = *cfg.ReadOnly
 	}
-	// Trim first so `field_manager: " "` cannot replace the default with
-	// whitespace, which the apiserver would store verbatim.
-	if fm := strings.TrimSpace(cfg.FieldManager); fm != "" {
-		k8s.FieldManagerOverride = fm
-	}
+	// Clear first: a reload after the key is deleted has to return to the
+	// derived name, not keep signing writes with the old identity. Trim so
+	// `field_manager: " "` cannot install whitespace, which the apiserver
+	// would store verbatim.
+	k8s.FieldManagerOverride = strings.TrimSpace(cfg.FieldManager)
 	if cfg.ShowRareTypes != nil {
 		ConfigShowRareTypes = *cfg.ShowRareTypes
 	}

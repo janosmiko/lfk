@@ -669,3 +669,26 @@ func TestLoadConfig_FieldManagerBlankKeepsDefault(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadConfig_FieldManagerRemovedKeyClearsTheOverride proves a reload after
+// the key is deleted returns to the derived "lfk:<user>" name. A stale override
+// would keep signing writes with an identity the config no longer names.
+func TestLoadConfig_FieldManagerRemovedKeyClearsTheOverride(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	require.NoError(t, os.WriteFile(path, []byte("field_manager: lfk-ci\n"), 0o600))
+	LoadConfig(path)
+	require.Equal(t, "lfk-ci", k8s.FieldManagerOverride)
+
+	for _, second := range []string{"", `field_manager: ""`, `field_manager: "   "`} {
+		require.NoError(t, os.WriteFile(path, []byte(second+"\n"), 0o600))
+		LoadConfig(path)
+
+		assert.Empty(t, k8s.FieldManagerOverride, "reload with %q", second)
+		assert.True(t, strings.HasPrefix(k8s.FieldManager(), "lfk:"), "got %q", k8s.FieldManager())
+	}
+}
