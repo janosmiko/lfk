@@ -54,7 +54,7 @@ Requires Nix ≥ 2.4 with flakes enabled (`experimental-features = nix-command f
 ```bash
 nix run github:janosmiko/lfk
 # pinned to a release:
-nix run github:janosmiko/lfk/v0.9.22
+nix run github:janosmiko/lfk/v0.16.1
 ```
 
 **Install into your profile:**
@@ -62,7 +62,7 @@ nix run github:janosmiko/lfk/v0.9.22
 ```bash
 nix profile install github:janosmiko/lfk
 # or a specific release:
-nix profile install github:janosmiko/lfk/v0.9.22
+nix profile install github:janosmiko/lfk/v0.16.1
 ```
 
 **Use as a flake input** (e.g. in a NixOS / home-manager config):
