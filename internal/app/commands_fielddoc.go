@@ -23,6 +23,10 @@ const fieldDocDebounce = 250 * time.Millisecond
 // credential plugin waiting on input cannot hold a worker for the session.
 const fieldDocFetchTimeout = 15 * time.Second
 
+// fieldDocWaitDelay is how long to wait for output pipes to close after the
+// process is killed, before giving up on them and returning.
+const fieldDocWaitDelay = 2 * time.Second
+
 // fieldDocKeyForPath addresses the field under the cursor in the schema of the
 // resource the viewer is showing. It reports false when the navigation state
 // carries no resource type, which leaves nothing to ask the schema about.
@@ -82,6 +86,10 @@ func (m Model) execKubectlExplainField(reqCtx context.Context, req uint64, key f
 			args = append(args, "--api-version", key.apiVersion)
 		}
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		// Killing kubectl does not close pipes a grandchild still holds (a
+		// credential plugin, say), and CombinedOutput reads to EOF. Without a
+		// WaitDelay the worker would stay blocked on a process already killed.
+		cmd.WaitDelay = fieldDocWaitDelay
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()

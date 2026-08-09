@@ -147,8 +147,13 @@ func TestExecKubectlExplainFieldReportsMissingKubectl(t *testing.T) {
 
 // A cancelled request must end the process, not wait out its deadline. The stub
 // sleeps far longer than the test would tolerate if cancellation did not work.
+//
+// The sleep runs as a CHILD of the stub shell on purpose. Killing the shell
+// leaves that child holding the output pipe, which is what a credential plugin
+// does in the real failure, and CombinedOutput reads to EOF. Only cmd.WaitDelay
+// gets the worker back. Without it this hangs for the full sleep.
 func TestExecKubectlExplainFieldStopsOnCancel(t *testing.T) {
-	fakeKubectl(t, "sleep 60")
+	fakeKubectl(t, "sleep 60 &\nwait")
 	m := fieldDocExecModel(t)
 	ctx, cancel := context.WithCancel(t.Context())
 
