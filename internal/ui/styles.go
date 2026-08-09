@@ -90,19 +90,15 @@ var (
 			Foreground(lipgloss.Color(ColorSelectedFg)).
 			Background(lipgloss.Color(ColorSelectedBg))
 
-	NormalStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorFile))
+	NormalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
 
-	DimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDimmed))
+	DimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 
 	// BarDimStyle is DimStyle but with bar background (for status bar hints).
-	BarDimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDimmed))
+	BarDimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 
 	// BarNormalStyle is NormalStyle but with bar background (for status bar text).
-	BarNormalStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorFile))
+	BarNormalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
 
 	// Category header in resource type list.
 	CategoryStyle = lipgloss.NewStyle().
@@ -117,8 +113,7 @@ var (
 				Bold(true)
 
 	// Resource type icon style.
-	IconStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorPrimary))
+	IconStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 
 	// Status colors: Green=running, Blue=progressing, Red=error, Grey=completed/other, Amber=warning.
 	StatusRunning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary))
@@ -212,8 +207,7 @@ var (
 			Foreground(lipgloss.Color(ColorPrimary)).
 			Bold(true)
 
-	YamlValueStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorFile))
+	YamlValueStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
 
 	YamlPunctuationStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(ColorDimmed))
@@ -262,6 +256,12 @@ var (
 	HelpKeyStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorSecondary)).
 			Bold(true)
+
+	// Schema side pane (ctrl+k): the header names the field and carries
+	// the accent; the description is prose to read, so it stays plain.
+	FieldDocHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
+	FieldDocTextStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
+	FieldDocErrorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
 
 	// Which-key panel. The panel draws one flat list with no section
 	// headers, so the description's color is the only thing left that says

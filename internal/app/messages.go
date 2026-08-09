@@ -127,6 +127,24 @@ type yamlBlameLoadedMsg struct {
 	err         error
 }
 
+// fieldDocLoadedMsg carries one field description read from the cluster schema.
+// req numbers the fetch this reply answers: moving the cursor bumps the number,
+// so a reply for the line the user already left is dropped instead of painting
+// the wrong text under the new one. key names the field the text describes and
+// is what the reply is cached under.
+type fieldDocLoadedMsg struct {
+	req   uint64
+	key   fieldDocKey
+	entry fieldDocEntry
+	err   error
+}
+
+// fieldDocDebounceMsg fires after the cursor has rested for fieldDocDebounce.
+// Without it, holding j down would spawn one kubectl process per line.
+type fieldDocDebounceMsg struct {
+	req uint64
+}
+
 // previewYAMLLoadedMsg carries YAML content for the split/full preview in the
 // right column. As with yamlLoadedMsg, the content is pre-indented inside the
 // loading goroutine to keep the main event loop responsive.

@@ -437,6 +437,7 @@
         "secret_toggle": { "type": "string" },
         "finalizer_search": { "type": "string" },
         "api_explorer": { "type": "string" },
+        "field_doc": { "type": "string" },
         "object_explorer": { "type": "string" },
         "tree_view": { "type": "string" },
         "rbac_browser": { "type": "string" },

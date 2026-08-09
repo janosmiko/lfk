@@ -88,6 +88,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser and an ASCII-art tree view (`T`, sticky across navigation; `Space` folds branches)
 - **Object Explorer** for drilling into the selected resource's live object (`O` key); arrays expand into indexed elements, so recursive status trees (e.g. `.status.steps[].steps[]`) are walkable; live-refreshes under watch mode (`w` to pause, `R` to refresh manually); `T` toggles a tree view that expands the whole subtree with ASCII-art guides, `Space` folds branches
+- **Schema side pane** (`Ctrl+K`) shows the cluster's own description of the field under the cursor, in a bordered pane beside the YAML viewer and Object Explorer; it follows the cursor, reads the connected cluster so CRDs resolve like built-in kinds, and caches what it reads
 - **Namespace selector** overlay with type-to-filter
 - **All-namespaces mode** (enabled by default)
 - **Local cluster management** — create, list, and delete `kind` clusters; create, list, start, stop, and delete `k3d` and `minikube` clusters (kind has no native start/stop) from inside lfk via the `Ctrl+N` manager overlay.
@@ -282,6 +283,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Ctrl+G` | Finalizer search and remove |
 | `I` | API Explorer (browse resource structure interactively) |
 | `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
+| `Ctrl+K` | Schema side pane for the field under the cursor (YAML viewer, Object Explorer) |
 | `U` | RBAC permissions browser (can-i) |
 | `T` | Open theme selector |
 | `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl (`:k get pod`), shell (`:! cmd`) |
@@ -403,6 +405,7 @@ All search and filter inputs support three modes, auto-detected from the query s
 - Walk any resource's live object with `O` (Object Explorer): `r` finds keys recursively, `T` expands an ASCII tree, `y` copies the field path
 - Forget `kubectl explain` - `I` opens the API Explorer, and `n`/`N` searches auto-drill into nested fields
 - In the YAML viewer, press `O` on a line to jump into the Object Explorer at that attribute, or `I` to see its schema
+- `Ctrl+K` opens a side pane with the schema description of the field under the cursor, and keeps it in step as you move
 - Fold YAML sections with `z` (`Z` folds all); edit the resource in your `$EDITOR` with `Ctrl+E`
 - Every viewer speaks vim: counts (`100j`, `42G`, `5n`), visual selections (`v` / `V` / `Ctrl+V`), and text objects (`viw`) work everywhere
 - Make noisy logs readable with `P` - the structured preview parses JSON, logfmt, klog, zap, nginx, envoy, Java, and postgres lines

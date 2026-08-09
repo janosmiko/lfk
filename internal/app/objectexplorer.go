@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -246,7 +247,8 @@ func (m Model) handleObjectExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	if m.objectExplorerView.filterActive {
 		return m.handleObjectExplorerFilterKey(msg)
 	}
-	return m.handleObjectExplorerNavKey(msg)
+	mdl, cmd := m.handleObjectExplorerNavKey(msg)
+	return followFieldDocCursor(mdl, cmd, func(u Model) []string { return u.selectedNodePath() })
 }
 
 // handleObjectExplorerNavKey handles normal browsing keys.
@@ -299,6 +301,10 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.C
 		return m.refreshObjectExplorer()
 	case "I":
 		return m.openExplainAtObjectPath(m.selectedNodePath(), modeObjectExplorer)
+	// Before PreviewDown/PreviewUp: a user who rebinds the footnote onto J or K
+	// gets the footnote, rather than a key that silently does nothing.
+	case kb.FieldDoc:
+		return m.toggleFieldDoc(m.selectedNodePath())
 	case "y":
 		return m.copySelectedNodePath()
 	case "Y":
@@ -507,7 +513,14 @@ func (m *Model) moveObjectExplorerCursor(delta int) {
 // objectExplorerBodyHeight mirrors the contentHeight the renderer uses
 // (title + hint bar + column borders + outer frame consume 6 lines).
 func (m Model) objectExplorerBodyHeight() int {
-	return max(m.height-6, 3)
+	h := m.height
+	if m.fieldDocPaneWidth() > 0 {
+		// The columns give up one row to the shared hint bar under both panes,
+		// and the render path does the same. They must agree or the cursor
+		// scrolls out of view by a row.
+		h--
+	}
+	return max(h-6, 3)
 }
 
 // previewPaneHeight is the number of YAML lines visible in the preview pane.
@@ -563,9 +576,22 @@ func (m Model) viewObjectExplorer() string {
 		ui.HintEntry{Key: kb.Refresh, Desc: "refresh"},
 		ui.HintEntry{Key: kb.WatchMode, Desc: "live on/off"},
 		ui.HintEntry{Key: "I", Desc: "explain"},
+		ui.HintEntry{Key: kb.FieldDoc, Desc: "schema"},
 		ui.HintEntry{Key: "q", Desc: "close"},
 	)
-	hint := ui.RenderHintBar(hints, m.width)
+	// The schema pane takes columns off the right. The hint bar keeps the full
+	// terminal width and goes under both panes, or it would lose entries to
+	// the narrower column. m is a value copy, so the narrowing below stays
+	// inside this render.
+	fullWidth := m.width
+	schemaPane := m.renderFieldDocPane(m.height, true)
+	hint := ui.RenderHintBar(hints, fullWidth)
+	viewHeight := m.height
+	if schemaPane != "" {
+		m.width -= lipgloss.Width(schemaPane)
+		// The columns give up one row to the shared hint bar below them.
+		viewHeight--
+	}
 
 	title := "Object Explorer: " + rt.title
 	if !m.objectExplorerLive {
@@ -575,12 +601,19 @@ func (m Model) viewObjectExplorer() string {
 		title += " [TREE]"
 	}
 
+	// With the pane open the inner hint row is left blank and the real hint bar
+	// is drawn once, full width, under both panes.
+	innerHint := hint
+	if schemaPane != "" {
+		innerHint = ""
+	}
+
 	if rt.tree {
-		return m.viewObjectExplorerTree(title, hint)
+		return joinFieldDocPane(m.viewObjectExplorerTree(title, innerHint), schemaPane, hint)
 	}
 
 	parentFields, parentCursor := m.objectExplorerParentLevel()
-	return ui.RenderObjectExplorerView(
+	return joinFieldDocPane(ui.RenderObjectExplorerView(
 		rt.visible(),
 		rt.cursor,
 		rt.scroll,
@@ -590,10 +623,21 @@ func (m Model) viewObjectExplorer() string {
 		m.selectedNodeYAML(),
 		rt.previewScroll,
 		rt.filterBar(),
-		hint,
+		innerHint,
 		m.width,
-		m.height,
-	)
+		viewHeight,
+	), schemaPane, hint)
+}
+
+// joinFieldDocPane puts the schema pane beside a rendered view and draws one
+// full-width hint bar under both. With no pane it returns the view untouched,
+// because the view already carries its own hint bar.
+func joinFieldDocPane(view, pane, hint string) string {
+	if pane == "" {
+		return view
+	}
+	return lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.JoinHorizontal(lipgloss.Top, view, pane), hint)
 }
 
 // objectExplorerParentLevel returns the fields of the level above the current

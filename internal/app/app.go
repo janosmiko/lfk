@@ -62,6 +62,9 @@ type Model struct {
 	// distinct right-pane preview state and are intentionally not part of it.
 	yamlView yamlViewState
 
+	// Schema side pane (ctrl+k) and its description cache; see fielddoc.go.
+	fieldDoc fieldDocState
+
 	// yamlReturnMode is the mode the full-screen YAML viewer returns to on
 	// q/esc. Defaults to modeExplorer (the zero value); set to
 	// modeObjectExplorer when the YAML viewer is opened from the Object Explorer
@@ -183,8 +186,7 @@ type Model struct {
 
 	// Fullscreen toggles: middle = hides left and right columns; dashboard
 	// = renders the cluster dashboard full screen.
-	fullscreenMiddle    bool
-	fullscreenDashboard bool
+	fullscreenMiddle, fullscreenDashboard bool
 	// hideLeftPane hides only the left resource-type sidebar; middle and
 	// right preview stay visible. One phase of the kb.Fullscreen cycle.
 	hideLeftPane bool
@@ -235,9 +237,8 @@ type Model struct {
 	// ui.ConfigObjectExplorerLive; runtime toggle is w inside the explorer.
 	// objectExplorerForceSync forces a single re-sync on the next list refresh
 	// even when live is off, so manual refresh (R) updates the view once.
-	objectExplorerLive      bool
-	objectExplorerForceSync bool
-	objectExplorerTree      bool // session tree-view pref (T); seeded from ui.ConfigObjectExplorerTree
+	objectExplorerLive, objectExplorerForceSync bool
+	objectExplorerTree                          bool // session tree-view pref (T); seeded from ui.ConfigObjectExplorerTree
 
 	// Read-only mode: blocks all mutating actions for the active tab. Mirrors
 	// the active TabState.readOnly; re-evaluated on context switch and tab
@@ -443,9 +444,8 @@ type Model struct {
 	// running ↔ history; tasksOverlayShowAll (`a`, history only) lifts
 	// the sub-second filter; tasksOverlayFrozenHistory pauses the live
 	// history while scrolled (cleared on scroll-to-top, Tab, `a`, esc).
-	tasksOverlayShowCompleted bool
-	tasksOverlayShowAll       bool
-	tasksOverlayFrozenHistory []ui.BackgroundTaskRow
+	tasksOverlayShowCompleted, tasksOverlayShowAll bool
+	tasksOverlayFrozenHistory                      []ui.BackgroundTaskRow
 
 	// tasksOverlayScroll is the first-visible-row index for the :tasks
 	// overlay. Bumped by j/k (and friends) inside the overlay; reset on

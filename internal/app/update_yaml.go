@@ -34,7 +34,24 @@ func (m Model) handleYAMLKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLVisualKey(msg)
 	}
 
-	return m.handleYAMLNormalKey(msg)
+	mdl, cmd := m.handleYAMLNormalKey(msg)
+	return followFieldDocCursor(mdl, cmd, func(u Model) []string { return u.yamlCursorPath() })
+}
+
+// followFieldDocCursor re-points an open footnote pane at whatever the cursor
+// landed on. It runs once per key press instead of inside each motion, because
+// the viewers move the cursor from a dozen places (j, G, ctrl+d, a search jump)
+// and every one of them would otherwise need the same call.
+func followFieldDocCursor(mdl tea.Model, cmd tea.Cmd, path func(Model) []string) (tea.Model, tea.Cmd) {
+	updated, ok := mdl.(Model)
+	if !ok || !updated.fieldDoc.on {
+		return mdl, cmd
+	}
+	updated, followCmd := updated.showFieldDoc(path(updated))
+	if followCmd == nil {
+		return updated, cmd
+	}
+	return updated, tea.Batch(cmd, followCmd)
 }
 
 // handleYAMLSearchInput handles key events when the YAML search input is active.
@@ -193,6 +210,8 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyObjectExplorer()
 	case "I":
 		return m.openExplainAtObjectPath(m.yamlCursorPath(), modeYAML)
+	case kb.FieldDoc:
+		return m.toggleFieldDoc(m.yamlCursorPath())
 	case "V":
 		return m.handleYAMLKeyV()
 	case "v":

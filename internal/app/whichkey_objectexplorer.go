@@ -95,6 +95,12 @@ var whichKeyObjectExplorerActionList = []wkAction[*wkObjectExplorerCtx]{
 		rt := c.m.nav.ResourceType
 		return rt.Resource != "" || rt.Kind != ""
 	}},
+	// objectexplorer.go — kb.FieldDoc. Same availability rule as the API
+	// Explorer above: both resolve the resource type to reach the schema.
+	{Key: func(kb ui.Keybindings) string { return kb.FieldDoc }, Label: "Field description", Group: wkViews, Avail: func(c *wkObjectExplorerCtx) bool {
+		rt := c.m.nav.ResourceType
+		return rt.Resource != "" || rt.Kind != ""
+	}},
 
 	// objectexplorer.go:298-299 — a one-shot re-fetch, independent of the live
 	// setting and of the cursor.
