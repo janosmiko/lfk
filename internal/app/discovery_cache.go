@@ -217,6 +217,45 @@ func loadAllDiscoveryCaches(reqCtx context.Context, client *k8s.Client) map[stri
 	return out
 }
 
+// sessionRestoreContext names the one context a saved session opens on: the
+// active tab's for a multi-tab session, the legacy single-tab field otherwise.
+func sessionRestoreContext(sess *SessionState) string {
+	if sess == nil {
+		return ""
+	}
+	if len(sess.Tabs) == 0 {
+		return sess.Context
+	}
+	i := sess.ActiveTab
+	if i < 0 || i >= len(sess.Tabs) {
+		i = 0
+	}
+	return sess.Tabs[i].Context
+}
+
+// loadDiscoveryCacheForContext reads the on-disk snapshot for one context and
+// returns it in the same shape updateAPIResourceDiscovery produces, pseudo
+// resources first. Returns nil when the host cannot be resolved or no usable
+// snapshot exists, which leaves the caller on the built-in seed list.
+//
+// One context, one clientcmd.ClientConfig() call. loadAllDiscoveryCaches pays
+// that per kubeconfig context, which is why it runs off the main goroutine;
+// this is the single-context read a session restore can afford up front.
+func loadDiscoveryCacheForContext(client *k8s.Client, contextName string) []model.ResourceTypeEntry {
+	if client == nil || contextName == "" {
+		return nil
+	}
+	host := client.HostForContext(contextName)
+	if host == "" {
+		return nil
+	}
+	snap := loadDiscoveryCacheForHost(host)
+	if snap == nil || len(snap.Entries) == 0 {
+		return nil
+	}
+	return append(model.PseudoResources(), modelEntriesFromDiscoveryCache(snap.Entries)...)
+}
+
 // updateDiscoveryCacheForContext is the single mutator used by the discovery
 // success path: resolve the context to its host, write the host's enriched
 // snapshot. No-op when the host can't be resolved — the live data is still

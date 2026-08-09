@@ -736,9 +736,9 @@ type Model struct {
 	pendingUnionSetName string // namespace picker is choosing for this union set
 
 	// Session persistence: restores navigation state across restarts.
-	pendingSession      *SessionState      // loaded session waiting to be applied after contexts load
-	sessionRestored     bool               // true once the pending session has been applied
-	pendingPortForwards *PortForwardStates // loaded port forwards waiting to be re-established
+	pendingSession                    *SessionState      // loaded session waiting to be applied after contexts load
+	pendingPortForwards               *PortForwardStates // loaded port forwards waiting to be re-established
+	sessionRestored, restoringSession bool               // apply-once guard; restore in flight (session_restore_guard.go)
 
 	// Jump history: back stack for "teleport" jumps; jump_back pops it. Capped at jumpHistoryCap.
 	jumpBackStack []navSnapshot

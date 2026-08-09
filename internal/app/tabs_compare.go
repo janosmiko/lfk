@@ -19,11 +19,12 @@ func (m *Model) sortMiddleItems() {
 		return
 	}
 
-	cols := ui.ActiveSortableColumns
-	if len(cols) == 0 {
-		return
-	}
-
+	// Deliberately no ui.ActiveSortableColumns check here. That slice is
+	// filled during a middle-table render, so it is still empty when the
+	// first resourcesLoadedMsg after launch arrives. Gating on it left the
+	// opening list in raw apiserver order and let the next refresh re-sort
+	// it, which moved every row that shares a primary key with another.
+	// The sort needs only the column name, which the model already holds.
 	colName := m.sortColumnName
 	if colName == "" {
 		// Production always seeds sortColumnName with sortColDefault in

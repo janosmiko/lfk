@@ -49,6 +49,17 @@ func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// The first keystroke after launch means the user is steering. Drop the
+	// restore's saved cursor so the resource list, which may still be seconds
+	// away, cannot pull them back to the row they quit on. The key itself is
+	// handled normally.
+	if m.restoringSession {
+		switch msg.(type) {
+		case tea.KeyPressMsg, tea.PasteMsg, tea.MouseClickMsg, tea.MouseWheelMsg:
+			m.abandonSessionRestore()
+		}
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.updateWindowSize(msg)

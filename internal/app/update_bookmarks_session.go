@@ -81,6 +81,9 @@ func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 
 func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item) (tea.Model, tea.Cmd) {
 	if !contextInList(sess.Context, contexts) {
+		// The saved cluster is gone from the kubeconfig; the cluster picker is
+		// as restored as this session gets.
+		m.finishSessionRestore()
 		return m, m.loadPreview()
 	}
 
@@ -194,8 +197,12 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	}
 
 	if needsDiscovery {
+		// The resource-type list is still coming; keep the splash up until
+		// updateAPIResourceDiscovery settles it.
 		m.setMiddleItems(nil)
 		m.loading = true
+	} else {
+		m.finishSessionRestore()
 	}
 	m.clampCursor()
 	cmds = append(cmds, m.loadPreview())
@@ -210,6 +217,7 @@ func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item)
 
 	activeSess := sess.Tabs[activeIdx]
 	if !contextInList(activeSess.Context, contexts) {
+		m.finishSessionRestore()
 		return m, m.loadPreview()
 	}
 

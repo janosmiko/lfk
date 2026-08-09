@@ -58,10 +58,13 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		// contextsLoadedMsg arrives; loading=false there falls through to the
 		// "No items" / "No resource types found" empty states until the reply
 		// lands. The loaded-message handlers clear the flag once data arrives.
-		loading:             true,
-		nav:                 model.NavigationState{Level: model.LevelClusters},
-		bookmarks:           loadBookmarks(),
-		pendingSession:      pendingSession,
+		loading:        true,
+		nav:            model.NavigationState{Level: model.LevelClusters},
+		bookmarks:      loadBookmarks(),
+		pendingSession: pendingSession,
+		// Arm the restore guard from the very first frame so a keystroke that
+		// beats the resource list is not undone when the list arrives.
+		restoringSession:    pendingSession != nil,
 		pendingPortForwards: loadPortForwardState(),
 		commandHistory:      loadCommandHistory(),
 		queryHistory:        loadInputHistory(historyFileQuery),
@@ -175,6 +178,18 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// hangs the model construction (and therefore the first render). The
 	// async path overlays cached entries onto m.discoveredResources when the
 	// preload message arrives; until then the sidebar shows the seed list.
+	//
+	// The one context a restored session opens is the exception, and it is a
+	// single clientcmd call rather than one per context. A saved CRD view has
+	// no match in the built-in seeds, so without the snapshot the restore has
+	// to park on the resource-type browser and jump to the list a second later
+	// when live discovery answers. Reading the snapshot here lets the restore
+	// navigate straight to the saved view on the first frame.
+	if ctxName := sessionRestoreContext(pendingSession); ctxName != "" {
+		if entries := loadDiscoveryCacheForContext(client, ctxName); len(entries) > 0 {
+			m.discoveredResources[ctxName] = entries
+		}
+	}
 
 	// When CLI flags are provided, replace the file-loaded session with a
 	// synthetic one so the app opens in the requested context/namespace.
