@@ -51,15 +51,17 @@ func TestSplitFieldDocWidth(t *testing.T) {
 	}
 }
 
-// The pane takes columns now, not rows, so neither viewer loses body height.
-func TestFieldDocPaneDoesNotShrinkHeights(t *testing.T) {
+// The pane takes columns, not rows. The YAML viewer keeps every body line; the
+// Object Explorer gives up exactly one row, to the hint bar that moves out from
+// under its columns to span both panes.
+func TestFieldDocPaneCostsNoYAMLRowsAndOneOERow(t *testing.T) {
 	m := fieldDocViewModel()
 	yamlBefore, oeBefore := m.yamlViewportLines(), m.objectExplorerBodyHeight()
 
 	m.fieldDoc.on = true
 
 	assert.Equal(t, yamlBefore, m.yamlViewportLines())
-	assert.Equal(t, oeBefore, m.objectExplorerBodyHeight())
+	assert.Equal(t, oeBefore-1, m.objectExplorerBodyHeight())
 }
 
 func TestFieldDocPaneWidthZeroWhenClosed(t *testing.T) {
@@ -83,6 +85,63 @@ func TestYAMLViewWithSchemaPaneKeepsTerminalBox(t *testing.T) {
 	assert.Equal(t, m.width, lipgloss.Width(open), "the view must fill the terminal width")
 	assert.Equal(t, lipgloss.Height(closed.viewYAML()), lipgloss.Height(open),
 		"opening the pane must not change the view height")
+}
+
+// lastLine returns the hint bar, which both viewers draw as the bottom row.
+func hintBarRow(t *testing.T, view string) string {
+	t.Helper()
+	rows := strings.Split(stripANSI(view), "\n")
+	return rows[len(rows)-1]
+}
+
+// The hint bar spans the terminal under both panes. Drawing it inside the
+// narrowed viewer column cost it entries instead. It must read the same open
+// as closed; how many entries fit at a given width is a separate matter.
+func TestYAMLViewHintBarUnchangedByPane(t *testing.T) {
+	m := fieldDocViewModel()
+	m.fieldDoc.on = true
+	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+
+	assert.Equal(t, hintBarRow(t, fieldDocViewModel().viewYAML()), hintBarRow(t, m.viewYAML()),
+		"the pane must not cost the hint bar any entries")
+}
+
+func TestObjectExplorerHintBarUnchangedByPane(t *testing.T) {
+	closed := fieldDocViewModel()
+	closed.mode = modeObjectExplorer
+	m := fieldDocViewModel()
+	m.mode = modeObjectExplorer
+	m.fieldDoc.on = true
+	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+
+	assert.Equal(t, hintBarRow(t, closed.viewObjectExplorer()), hintBarRow(t, m.viewObjectExplorer()),
+		"the pane must not cost the hint bar any entries")
+}
+
+// A terminal wide enough for every entry must show every entry with the pane
+// open, which is the case the report came from.
+func TestYAMLViewHintBarCompleteOnAWideTerminal(t *testing.T) {
+	m := fieldDocViewModel()
+	m.width = 300
+	m.fieldDoc.on = true
+	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+
+	hint := hintBarRow(t, m.viewYAML())
+
+	for _, want := range []string{"scroll", "visual select", "object explorer", "explain", "schema", "back"} {
+		assert.Contains(t, hint, want, "hint entry %q must survive the pane", want)
+	}
+}
+
+// The pane is sized like the log viewer's structured preview, so the same
+// terminal gives both the same width.
+func TestFieldDocPaneMatchesLogPreviewWidth(t *testing.T) {
+	for _, total := range []int{100, 120, 160, 200, 300} {
+		_, logPaneW := splitLogPreviewWidth(total)
+		_, docPaneW := splitFieldDocWidth(total)
+
+		assert.Equal(t, logPaneW, docPaneW, "width %d: the two side panes must agree", total)
+	}
 }
 
 func TestYAMLViewRendersSchemaPane(t *testing.T) {

@@ -12,10 +12,13 @@ import (
 )
 
 func (m Model) viewYAML() string {
-	// The schema pane takes columns off the right. Render it first, then
-	// narrow m.width so the whole viewer below lays itself out in what is
-	// left; m is a value copy, so the narrowing stays inside this render.
-	schemaPane := m.renderFieldDocPane(m.height, false)
+	// The schema pane takes columns off the right. The hint bar keeps the full
+	// terminal width and goes under both panes, or it would lose entries to
+	// the narrower column. Render the pane first, then narrow m.width so the
+	// viewer lays itself out in what is left; m is a value copy, so the
+	// narrowing stays inside this render.
+	fullWidth := m.width
+	schemaPane := m.renderFieldDocPane(m.height, true)
 	if schemaPane != "" {
 		m.width -= lipgloss.Width(schemaPane)
 	}
@@ -59,11 +62,11 @@ func (m Model) viewYAML() string {
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},
-			{Key: ui.ActiveKeybindings.FieldDoc, Desc: "field doc"},
+			{Key: ui.ActiveKeybindings.FieldDoc, Desc: "schema"},
 			{Key: "q/esc", Desc: "back"},
 		}
 	}
-	hint := ui.RenderHintBar(yamlHints, m.width)
+	hint := ui.RenderHintBar(yamlHints, fullWidth)
 
 	// Status messages (e.g. copy feedback) take precedence over the hint
 	// bar and any search prompt \u2014 same pattern the log viewer uses.
@@ -73,7 +76,7 @@ func (m Model) viewYAML() string {
 	case m.yamlView.searchMode:
 		yamlModeInd := ui.SearchModeIndicator(m.yamlView.searchText.Value)
 		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
-		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
+		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
 	case m.yamlView.searchText.Value != "":
 		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlView.matchIdx+1, len(m.yamlView.matchLines))
 		if len(m.yamlView.matchLines) == 0 {
@@ -84,7 +87,7 @@ func (m Model) viewYAML() string {
 			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render(ui.ActiveKeybindings.NextMatch+"/"+ui.ActiveKeybindings.PrevMatch) + ui.BarDimStyle.Render(": next/prev")
 		}
 		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.yamlView.searchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
-		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
+		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
 	}
 
 	maxLines := max(m.height-4, 3)
@@ -195,11 +198,12 @@ func (m Model) viewYAML() string {
 	borderStyle := ui.FullscreenBorderStyle(m.width, maxLines)
 	body := borderStyle.Render(bodyContent)
 
-	view := lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
 	if schemaPane != "" {
-		return lipgloss.JoinHorizontal(lipgloss.Top, view, schemaPane)
+		panes := lipgloss.JoinHorizontal(lipgloss.Top,
+			lipgloss.JoinVertical(lipgloss.Left, title, body), schemaPane)
+		return lipgloss.JoinVertical(lipgloss.Left, panes, hint)
 	}
-	return view
+	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
 }
 
 func (m Model) yamlTitle() string {

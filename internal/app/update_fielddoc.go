@@ -9,10 +9,12 @@ import (
 // Pane sizing. The schema pane sits beside the viewer, so it takes columns,
 // not rows. Below fieldDocMinTotalWidth there is no split worth making: the
 // viewer would be squeezed to nothing.
+// The bounds match the log viewer's structured preview, so the two side panes
+// come out the same width on the same terminal.
 const (
 	fieldDocMinTotalWidth = 90
-	fieldDocMinPaneWidth  = 32
-	fieldDocMaxPaneWidth  = 60
+	fieldDocMinPaneWidth  = 30
+	fieldDocMaxPaneWidth  = 80
 	fieldDocMinViewWidth  = 50
 )
 

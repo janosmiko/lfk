@@ -513,7 +513,14 @@ func (m *Model) moveObjectExplorerCursor(delta int) {
 // objectExplorerBodyHeight mirrors the contentHeight the renderer uses
 // (title + hint bar + column borders + outer frame consume 6 lines).
 func (m Model) objectExplorerBodyHeight() int {
-	return max(m.height-6, 3)
+	h := m.height
+	if m.fieldDocPaneWidth() > 0 {
+		// The columns give up one row to the shared hint bar under both panes,
+		// and the render path does the same. They must agree or the cursor
+		// scrolls out of view by a row.
+		h--
+	}
+	return max(h-6, 3)
 }
 
 // previewPaneHeight is the number of YAML lines visible in the preview pane.
@@ -569,18 +576,22 @@ func (m Model) viewObjectExplorer() string {
 		ui.HintEntry{Key: kb.Refresh, Desc: "refresh"},
 		ui.HintEntry{Key: kb.WatchMode, Desc: "live on/off"},
 		ui.HintEntry{Key: "I", Desc: "explain"},
-		ui.HintEntry{Key: kb.FieldDoc, Desc: "field doc"},
+		ui.HintEntry{Key: kb.FieldDoc, Desc: "schema"},
 		ui.HintEntry{Key: "q", Desc: "close"},
 	)
-	// The schema pane takes columns off the right, so narrow m.width before
-	// anything below measures itself against it. m is a value copy, so the
-	// narrowing stays inside this render.
-	schemaPane := m.renderFieldDocPane(m.height, false)
+	// The schema pane takes columns off the right. The hint bar keeps the full
+	// terminal width and goes under both panes, or it would lose entries to
+	// the narrower column. m is a value copy, so the narrowing below stays
+	// inside this render.
+	fullWidth := m.width
+	schemaPane := m.renderFieldDocPane(m.height, true)
+	hint := ui.RenderHintBar(hints, fullWidth)
+	viewHeight := m.height
 	if schemaPane != "" {
 		m.width -= lipgloss.Width(schemaPane)
+		// The columns give up one row to the shared hint bar below them.
+		viewHeight--
 	}
-
-	hint := ui.RenderHintBar(hints, m.width)
 
 	title := "Object Explorer: " + rt.title
 	if !m.objectExplorerLive {
@@ -590,8 +601,15 @@ func (m Model) viewObjectExplorer() string {
 		title += " [TREE]"
 	}
 
+	// With the pane open the inner hint row is left blank and the real hint bar
+	// is drawn once, full width, under both panes.
+	innerHint := hint
+	if schemaPane != "" {
+		innerHint = ""
+	}
+
 	if rt.tree {
-		return joinFieldDocPane(m.viewObjectExplorerTree(title, hint), schemaPane)
+		return joinFieldDocPane(m.viewObjectExplorerTree(title, innerHint), schemaPane, hint)
 	}
 
 	parentFields, parentCursor := m.objectExplorerParentLevel()
@@ -605,19 +623,21 @@ func (m Model) viewObjectExplorer() string {
 		m.selectedNodeYAML(),
 		rt.previewScroll,
 		rt.filterBar(),
-		hint,
+		innerHint,
 		m.width,
-		m.height,
-	), schemaPane)
+		viewHeight,
+	), schemaPane, hint)
 }
 
-// joinFieldDocPane puts the schema pane beside a rendered view, or returns the
-// view untouched when the pane is closed or does not fit.
-func joinFieldDocPane(view, pane string) string {
+// joinFieldDocPane puts the schema pane beside a rendered view and draws one
+// full-width hint bar under both. With no pane it returns the view untouched,
+// because the view already carries its own hint bar.
+func joinFieldDocPane(view, pane, hint string) string {
 	if pane == "" {
 		return view
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, view, pane)
+	return lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.JoinHorizontal(lipgloss.Top, view, pane), hint)
 }
 
 // objectExplorerParentLevel returns the fields of the level above the current
