@@ -95,5 +95,7 @@ func TestDeferredRestore_ResolvableTypeStillAppliesTheParkedFilter(t *testing.T)
 	assert.Equal(t, model.LevelResources, got.nav.Level)
 	assert.Equal(t, "backup", got.filterText, "the parked filter still rides through")
 	assert.Equal(t, "backup-db", got.pendingTarget)
+	assert.Equal(t, "ns-2", got.pendingTargetNamespace,
+		"without the namespace the cursor can land on a same-named row in another one")
 	assert.NotNil(t, cmd)
 }
