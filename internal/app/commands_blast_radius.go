@@ -136,39 +136,58 @@ func (m Model) loadBulkBlastRadius() tea.Cmd {
 		"Blast radius: selection",
 		bgtaskTarget(ctxName, ""),
 		func(ctx context.Context) tea.Msg {
-			var evicting []k8s.EvictedPod
-			for namespace, want := range byNS {
-				pods, err := client.PodsInNamespace(ctx, ctxName, namespace)
-				if err != nil {
-					return blastRadiusLoadedMsg{req: req, err: err}
-				}
-				selectors, err := compileSelectors(want.selectors)
-				if err != nil {
-					return blastRadiusLoadedMsg{req: req, err: err}
-				}
-				for _, p := range pods {
-					if want.names[p.Name] || matchesAny(selectors, p.Labels) {
-						evicting = append(evicting, p.EvictedPod)
-					}
-				}
-			}
-			// One namespace keeps the budget list narrow; several make a
-			// cluster-wide list cheaper than one call per namespace.
-			pdbNamespace := ""
-			if len(byNS) == 1 {
-				for namespace := range byNS {
-					pdbNamespace = namespace
-				}
-			}
-			pdbs, err := client.ListPodDisruptionBudgets(ctx, ctxName, pdbNamespace)
+			radius, err := bulkBlastRadius(byNS, uncounted,
+				func(ns string) ([]k8s.NamedPod, error) {
+					return client.PodsInNamespace(ctx, ctxName, ns)
+				},
+				func(ns string) ([]policyv1.PodDisruptionBudget, error) {
+					return client.ListPodDisruptionBudgets(ctx, ctxName, ns)
+				})
 			if err != nil {
 				return blastRadiusLoadedMsg{req: req, err: err}
 			}
-			radius := k8s.ComputeBlastRadius(evicting, pdbs, 0)
-			radius.Uncounted = uncounted
-			return blastRadiusLoadedMsg{radius: &radius, req: req}
+			return blastRadiusLoadedMsg{radius: radius, req: req}
 		},
 	)
+}
+
+// bulkBlastRadius totals a selection namespace by namespace. Both lookups stay
+// namespace-scoped on purpose: a cluster-wide budget list needs cluster-scoped
+// RBAC, which a user holding only a namespaced Role does not have, and the
+// whole line would fail for them. Cost is two calls per distinct namespace,
+// however many rows are selected.
+func bulkBlastRadius(
+	byNS map[string]*bulkTargets, uncounted int,
+	pods func(string) ([]k8s.NamedPod, error),
+	budgets func(string) ([]policyv1.PodDisruptionBudget, error),
+) (*k8s.BlastRadius, error) {
+	var (
+		evicting []k8s.EvictedPod
+		pdbs     []policyv1.PodDisruptionBudget
+	)
+	for namespace, want := range byNS {
+		found, err := pods(namespace)
+		if err != nil {
+			return nil, err
+		}
+		selectors, err := compileSelectors(want.selectors)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range found {
+			if want.names[p.Name] || matchesAny(selectors, p.Labels) {
+				evicting = append(evicting, p.EvictedPod)
+			}
+		}
+		nsPDBs, err := budgets(namespace)
+		if err != nil {
+			return nil, err
+		}
+		pdbs = append(pdbs, nsPDBs...)
+	}
+	radius := k8s.ComputeBlastRadius(evicting, pdbs, 0)
+	radius.Uncounted = uncounted
+	return &radius, nil
 }
 
 // compileSelectors turns the label selectors of the selected workloads into

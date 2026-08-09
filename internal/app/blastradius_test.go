@@ -622,6 +622,14 @@ func TestUsesNodePods(t *testing.T) {
 	assert.False(t, usesNodePods(false, "Pod"))
 }
 
+func pdb(namespace, name string, allowed int32, matchLabels map[string]string) policyv1.PodDisruptionBudget {
+	return policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
+		Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: matchLabels}},
+		Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: allowed},
+	}
+}
+
 func deployRow(ns, name, app string) model.Item {
 	return model.Item{Kind: "Deployment", Namespace: ns, Name: name, Raw: map[string]any{
 		"spec": map[string]any{"selector": map[string]any{"matchLabels": map[string]any{"app": app}}},
@@ -666,4 +674,61 @@ func TestBlastRadiusNotes_NoPodsStillReportsUncountedRows(t *testing.T) {
 
 	require.NotEmpty(t, notes)
 	assert.Contains(t, notes[0].Text, "2 rows not counted")
+}
+
+func TestBulkBlastRadius_NeverAsksForAClusterWideBudgetList(t *testing.T) {
+	// An empty namespace lists budgets cluster-wide, which needs cluster-scoped
+	// RBAC. A user holding only a namespaced Role gets 403 and loses the whole
+	// line, so every lookup here stays inside a named namespace.
+	byNS := map[string]*bulkTargets{
+		"prod":    {names: map[string]bool{"web-1": true}},
+		"staging": {names: map[string]bool{"web-1": true}},
+	}
+	var podNS, pdbNS []string
+
+	_, err := bulkBlastRadius(byNS, 0,
+		func(ns string) ([]k8s.NamedPod, error) { podNS = append(podNS, ns); return nil, nil },
+		func(ns string) ([]policyv1.PodDisruptionBudget, error) {
+			pdbNS = append(pdbNS, ns)
+			return nil, nil
+		})
+
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"prod", "staging"}, podNS)
+	assert.ElementsMatch(t, []string{"prod", "staging"}, pdbNS)
+	assert.NotContains(t, pdbNS, "", "an empty namespace means every namespace")
+}
+
+func TestBulkBlastRadius_MergesBudgetsAcrossNamespaces(t *testing.T) {
+	byNS := map[string]*bulkTargets{
+		"prod":    {names: map[string]bool{"web-1": true}},
+		"staging": {names: map[string]bool{"web-1": true}},
+	}
+
+	got, err := bulkBlastRadius(byNS, 3,
+		func(ns string) ([]k8s.NamedPod, error) {
+			return []k8s.NamedPod{{
+				Name:       "web-1",
+				EvictedPod: k8s.EvictedPod{Namespace: ns, Labels: map[string]string{"app": "web"}, Ready: true},
+			}}, nil
+		},
+		func(ns string) ([]policyv1.PodDisruptionBudget, error) {
+			return []policyv1.PodDisruptionBudget{pdb(ns, "web-pdb", 0, map[string]string{"app": "web"})}, nil
+		})
+
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.Evicting, "one pod from each namespace")
+	assert.Len(t, got.PDBs, 2, "each namespace contributes its own budget")
+	assert.True(t, got.Violation)
+	assert.Equal(t, 3, got.Uncounted, "the uncounted rows survive the merge")
+}
+
+func TestBulkBlastRadius_ReportsAFailedLookup(t *testing.T) {
+	byNS := map[string]*bulkTargets{"prod": {names: map[string]bool{"web-1": true}}}
+
+	_, err := bulkBlastRadius(byNS, 0,
+		func(string) ([]k8s.NamedPod, error) { return nil, assert.AnError },
+		func(string) ([]policyv1.PodDisruptionBudget, error) { return nil, nil })
+
+	require.Error(t, err, "a failed pod list must not be reported as an empty blast radius")
 }
