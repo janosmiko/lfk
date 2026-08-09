@@ -221,6 +221,8 @@ Cascade controls what happens to dependent objects (a Job's pods, a Deployment's
 
 Set the starting policy with `delete_propagation_policy` in the config. Bulk delete uses the policy shown in the dialog.
 
+The dialog also states the blast radius: pods removed, ready replicas left, and the PodDisruptionBudget headroom spent. A budget the action would breach is shown in the warning color. The drain confirm shows the same line without the replica count.
+
 ### Force delete confirm dialog
 
 | Key | Action |
