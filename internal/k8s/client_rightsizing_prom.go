@@ -152,9 +152,15 @@ func (c *Client) queryPromContainerMetric(ctx context.Context, contextName, quer
 
 // runPrometheusQuery dispatches a Prometheus instant query through the
 // configured Service.ProxyGet pipeline. Tests override via testPromQuery.
+// Demo mode is turned away before ever building a request: the demo
+// backend's fake clientset panics inside ProxyGet itself (see
+// errPrometheusUnavailableDemo), so it must never be called even once.
 func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query string) ([]byte, error) {
 	if c.testPromQuery != nil {
 		return c.testPromQuery(ctx, contextName, query)
+	}
+	if c.demo {
+		return nil, errPrometheusUnavailableDemo
 	}
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
@@ -169,8 +175,7 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 	doQuery := func(ns, svc string) ([]byte, error) {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		result := cs.CoreV1().Services(ns).ProxyGet("http", svc, promPort, "/api/v1/query", params)
-		return result.DoRaw(rctx)
+		return safeProxyGetRaw(rctx, cs, ns, svc, promPort, "/api/v1/query", params)
 	}
 	// Keyed by contextName (not the clientset): clientsetForContext builds a
 	// fresh clientset per call, so a clientset key would never hit and re-run

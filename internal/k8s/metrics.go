@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -19,12 +20,36 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// errPrometheusUnavailableDemo is returned by every Prometheus/Alertmanager
+// service-proxy query attempted on a demo Client, instead of calling
+// ProxyGet at all. The fake clientset --demo mode runs on has no proxy
+// subresource support: ProxyGet itself (not just the request it builds)
+// panics with a nil pointer dereference, so demo mode must be turned away
+// before that call rather than after it fails.
+var errPrometheusUnavailableDemo = errors.New("prometheus/alertmanager queries are unavailable in demo mode")
+
 // promSvcCache caches the working namespace+service for Prometheus ProxyGet per context.
 var promSvcCache sync.Map // key: contextName, value: promSvcEntry
 
 type promSvcEntry struct {
 	namespace string
 	service   string
+}
+
+// safeProxyGetRaw calls Services(ns).ProxyGet(...).DoRaw(ctx), recovering
+// from any panic the underlying REST client raises. This is defense in
+// depth alongside the explicit demo-mode checks that already turn queries
+// away before reaching this call: a proxy failure of any kind — including
+// one this package didn't anticipate — degrades to an error instead of
+// crashing the TUI.
+func safeProxyGetRaw(ctx context.Context, cs kubernetes.Interface, ns, svc, port, path string, params map[string]string) (data []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("prometheus/alertmanager proxy request panicked: %v", r)
+		}
+	}()
+	result := cs.CoreV1().Services(ns).ProxyGet("http", svc, port, path, params)
+	return result.DoRaw(ctx)
 }
 
 func (c *Client) metricsGVR(resource string) []schema.GroupVersionResource {
@@ -479,7 +504,7 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 // queryPrometheusNodeMetric runs a PromQL instant query via Kubernetes service proxy
 // and returns a map of node name -> float64 value.
 func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
-	return queryPrometheusMetric(ctx, contextName, cs, namespaces, services, port, query, parsePrometheusNodeResponse)
+	return queryPrometheusMetric(ctx, contextName, cs, c.demo, namespaces, services, port, query, parsePrometheusNodeResponse)
 }
 
 // queryPrometheusMetric runs a PromQL instant query via Kubernetes service proxy
@@ -487,9 +512,15 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName stri
 // (rather than a method) so it can be generic over the parsed result type T --
 // callers needing a different shape (e.g. node uptime, which splits into
 // name-keyed and address-keyed maps) reuse the same service-discovery and
-// promSvcCache logic instead of duplicating it.
-func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string, parse func([]byte) (T, error)) (T, error) {
+// promSvcCache logic instead of duplicating it. isDemo is threaded in
+// (rather than accessed via a *Client) for the same reason: it's a plain
+// value the caller already has, and keeps this function testable without a
+// full Client.
+func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, isDemo bool, namespaces, services []string, port, query string, parse func([]byte) (T, error)) (T, error) {
 	var zero T
+	if isDemo {
+		return zero, errPrometheusUnavailableDemo
+	}
 	params := map[string]string{"query": query}
 
 	// Check cache for a known working namespace+service. Keyed by contextName
@@ -498,8 +529,7 @@ func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs ku
 	// on every poll.
 	if cached, ok := promSvcCache.Load(contextName); ok {
 		entry := cached.(promSvcEntry)
-		result := cs.CoreV1().Services(entry.namespace).ProxyGet("http", entry.service, port, "/api/v1/query", params)
-		data, err := result.DoRaw(ctx)
+		data, err := safeProxyGetRaw(ctx, cs, entry.namespace, entry.service, port, "/api/v1/query", params)
 		if err == nil {
 			parsed, err := parse(data)
 			if err == nil {
@@ -513,8 +543,7 @@ func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs ku
 	var lastErr error
 	for _, ns := range namespaces {
 		for _, svc := range services {
-			result := cs.CoreV1().Services(ns).ProxyGet("http", svc, port, "/api/v1/query", params)
-			data, err := result.DoRaw(ctx)
+			data, err := safeProxyGetRaw(ctx, cs, ns, svc, port, "/api/v1/query", params)
 			if err != nil {
 				lastErr = err
 				continue
