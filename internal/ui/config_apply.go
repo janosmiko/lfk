@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -190,6 +191,11 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ReadOnly != nil {
 		ConfigReadOnly = *cfg.ReadOnly
 	}
+	// Clear first: a reload after the key is deleted has to return to the
+	// derived name, not keep signing writes with the old identity. Trim so
+	// `field_manager: " "` cannot install whitespace, which the apiserver
+	// would store verbatim.
+	k8s.FieldManagerOverride = strings.TrimSpace(cfg.FieldManager)
 	if cfg.ShowRareTypes != nil {
 		ConfigShowRareTypes = *cfg.ShowRareTypes
 	}

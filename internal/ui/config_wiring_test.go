@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -76,6 +77,7 @@ secret_lazy_loading: true
 informer_cache: always
 min_contrast_ratio: 0.5
 read_only: true
+field_manager: lfk-ci
 show_rare_types: true
 kubeconfig_dir: /tmp/lfk-kcfg
 kubeconfig_exclusive: false
@@ -248,6 +250,8 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, InformerCacheAlways, ConfigInformerCacheMode, "informer_cache")
 	assert.InDelta(t, 0.5, ConfigMinContrastRatio, 1e-9, "min_contrast_ratio")
 	assert.True(t, ConfigReadOnly, "read_only")
+	assert.Equal(t, "lfk-ci", k8s.FieldManagerOverride, "field_manager")
+	assert.Equal(t, "lfk-ci", k8s.FieldManager(), "field_manager reaches the write path")
 	assert.True(t, ConfigShowRareTypes, "show_rare_types")
 	assert.Equal(t, []string{"/tmp/lfk-kcfg"}, ConfigKubeconfigDirs, "kubeconfig_dir")
 	assert.False(t, ConfigKubeconfigExclusive, "kubeconfig_exclusive")
@@ -410,6 +414,7 @@ var wiringCoveredFields = map[string]string{
 	"informer_cache":            "TestLoadConfig_AllSettingsWired",
 	"min_contrast_ratio":        "TestLoadConfig_AllSettingsWired",
 	"read_only":                 "TestLoadConfig_AllSettingsWired",
+	"field_manager":             "TestLoadConfig_AllSettingsWired + TestLoadConfig_FieldManagerBlankKeepsDefault",
 	"show_rare_types":           "TestLoadConfig_AllSettingsWired",
 	"security":                  "TestLoadConfig_AllSettingsWired",
 	"rightsizing_defaults":      "TestLoadConfig_AllSettingsWired",
@@ -507,6 +512,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origInformer := ConfigInformerCacheMode
 	origContrast := ConfigMinContrastRatio
 	origReadOnly := ConfigReadOnly
+	origFieldManager := k8s.FieldManagerOverride
 	origShowRare := ConfigShowRareTypes
 	origSecEnabled := ConfigSecurityEnabled
 	origSecHideBadges := ConfigSecurityHideBadges
@@ -599,6 +605,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigInformerCacheMode = origInformer
 		ConfigMinContrastRatio = origContrast
 		ConfigReadOnly = origReadOnly
+		k8s.FieldManagerOverride = origFieldManager
 		ConfigShowRareTypes = origShowRare
 		ConfigSecurityEnabled = origSecEnabled
 		ConfigSecurityHideBadges = origSecHideBadges
@@ -638,5 +645,50 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		scheduler.ConfigAgingThreshold = origAging
 
 		ApplyTheme(origTheme)
+	}
+}
+
+// TestLoadConfig_FieldManagerBlankKeepsDefault proves a blank or whitespace
+// value cannot replace the derived "lfk:<user>" name with an empty string,
+// which the apiserver would store verbatim.
+func TestLoadConfig_FieldManagerBlankKeepsDefault(t *testing.T) {
+	for _, value := range []string{`field_manager: ""`, `field_manager: "   "`, ""} {
+		t.Run(value, func(t *testing.T) {
+			restore := snapshotAllConfigGlobals(t)
+			defer restore()
+
+			k8s.FieldManagerOverride = ""
+			dir := t.TempDir()
+			path := filepath.Join(dir, "config.yaml")
+			require.NoError(t, os.WriteFile(path, []byte(value+"\n"), 0o600))
+
+			LoadConfig(path)
+
+			assert.Empty(t, k8s.FieldManagerOverride)
+			assert.True(t, strings.HasPrefix(k8s.FieldManager(), "lfk:"), "got %q", k8s.FieldManager())
+		})
+	}
+}
+
+// TestLoadConfig_FieldManagerRemovedKeyClearsTheOverride proves a reload after
+// the key is deleted returns to the derived "lfk:<user>" name. A stale override
+// would keep signing writes with an identity the config no longer names.
+func TestLoadConfig_FieldManagerRemovedKeyClearsTheOverride(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	require.NoError(t, os.WriteFile(path, []byte("field_manager: lfk-ci\n"), 0o600))
+	LoadConfig(path)
+	require.Equal(t, "lfk-ci", k8s.FieldManagerOverride)
+
+	for _, second := range []string{"", `field_manager: ""`, `field_manager: "   "`} {
+		require.NoError(t, os.WriteFile(path, []byte(second+"\n"), 0o600))
+		LoadConfig(path)
+
+		assert.Empty(t, k8s.FieldManagerOverride, "reload with %q", second)
+		assert.True(t, strings.HasPrefix(k8s.FieldManager(), "lfk:"), "got %q", k8s.FieldManager())
 	}
 }

@@ -593,9 +593,9 @@ func (c *Client) PatchLabels(ctx context.Context, contextName, namespace, name s
 	}
 
 	if namespace != "" {
-		_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{})
+		_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{FieldManager: FieldManager()})
 	} else {
-		_, err = dynClient.Resource(gvr).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{})
+		_, err = dynClient.Resource(gvr).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{FieldManager: FieldManager()})
 	}
 	return err
 }
@@ -619,9 +619,9 @@ func (c *Client) PatchAnnotations(ctx context.Context, contextName, namespace, n
 	}
 
 	if namespace != "" {
-		_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{})
+		_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{FieldManager: FieldManager()})
 	} else {
-		_, err = dynClient.Resource(gvr).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{})
+		_, err = dynClient.Resource(gvr).Patch(ctx, name, k8stypes.MergePatchType, data, metav1.PatchOptions{FieldManager: FieldManager()})
 	}
 	return err
 }

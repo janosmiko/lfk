@@ -118,7 +118,7 @@ func (c *Client) ReconcileFluxResource(contextName, namespace, name string, gvr 
 	now := time.Now().Format(time.RFC3339Nano)
 	patch := fmt.Appendf(nil, `{"metadata":{"annotations":{"reconcile.fluxcd.io/requestedAt":"%s"}}}`, now)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("reconciling %s %s: %w", gvr.Resource, name, err)
@@ -137,7 +137,7 @@ func (c *Client) ForceRenewCertificate(contextName, namespace, name string) erro
 	gvr := schema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}
 	patch := []byte(`{"status":{"conditions":[{"type":"Issuing","status":"True","reason":"ManuallyTriggered","message":"Certificate re-issuance triggered via lfk"}]}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}, "status",
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()}, "status",
 	)
 	if err != nil {
 		return fmt.Errorf("triggering renewal for certificate %s: %w", name, err)
@@ -154,7 +154,7 @@ func (c *Client) SuspendFluxResource(contextName, namespace, name string, gvr sc
 
 	patch := []byte(`{"spec":{"suspend":true}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("suspending %s %s: %w", gvr.Resource, name, err)
@@ -171,7 +171,7 @@ func (c *Client) ResumeFluxResource(contextName, namespace, name string, gvr sch
 
 	patch := []byte(`{"spec":{"suspend":false}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("resuming %s %s: %w", gvr.Resource, name, err)
@@ -215,11 +215,11 @@ func (c *Client) ForceRefreshExternalSecret(contextName, namespace, name string,
 	var patchErr error
 	if namespace != "" {
 		_, patchErr = dynClient.Resource(gvr).Namespace(namespace).Patch(
-			context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+			context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 		)
 	} else {
 		_, patchErr = dynClient.Resource(gvr).Patch(
-			context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+			context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 		)
 	}
 	if patchErr != nil {
@@ -238,7 +238,7 @@ func (c *Client) PauseKEDAResource(contextName, namespace, name string, gvr sche
 
 	patch := []byte(`{"metadata":{"annotations":{"autoscaling.keda.sh/paused-replicas":"0"}}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("pausing %s %s: %w", gvr.Resource, name, err)
@@ -278,7 +278,7 @@ func (c *Client) UnpauseKEDAResource(contextName, namespace, name string, gvr sc
 
 	patch := []byte(`{"metadata":{"annotations":{"autoscaling.keda.sh/paused-replicas":null}}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("unpausing %s %s: %w", gvr.Resource, name, err)

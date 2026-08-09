@@ -23,7 +23,7 @@ func (c *Client) SuspendArgoWorkflow(contextName, namespace, name string) error 
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
 	patch := []byte(`{"spec":{"suspend":true}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("suspending workflow %s: %w", name, err)
@@ -41,7 +41,7 @@ func (c *Client) ResumeArgoWorkflow(contextName, namespace, name string) error {
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
 	patch := []byte(`{"spec":{"suspend":false}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("resuming workflow %s: %w", name, err)
@@ -60,7 +60,7 @@ func (c *Client) StopArgoWorkflow(contextName, namespace, name string) error {
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
 	patch := []byte(`{"spec":{"shutdown":"Stop"}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("stopping workflow %s: %w", name, err)
@@ -79,7 +79,7 @@ func (c *Client) TerminateArgoWorkflow(contextName, namespace, name string) erro
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
 	patch := []byte(`{"spec":{"shutdown":"Terminate"}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("terminating workflow %s: %w", name, err)
@@ -117,7 +117,7 @@ func (c *Client) ResubmitArgoWorkflow(contextName, namespace, name string) (stri
 	}
 
 	obj := &unstructured.Unstructured{Object: newWf}
-	_, err = dynClient.Resource(gvr).Namespace(namespace).Create(context.Background(), obj, metav1.CreateOptions{})
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Create(context.Background(), obj, metav1.CreateOptions{FieldManager: FieldManager()})
 	if err != nil {
 		return "", fmt.Errorf("creating resubmitted workflow: %w", err)
 	}
@@ -155,7 +155,7 @@ func (c *Client) SubmitWorkflowFromTemplate(contextName, namespace, templateName
 	}
 
 	obj := &unstructured.Unstructured{Object: newWf}
-	_, err = dynClient.Resource(gvr).Namespace(namespace).Create(context.Background(), obj, metav1.CreateOptions{})
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Create(context.Background(), obj, metav1.CreateOptions{FieldManager: FieldManager()})
 	if err != nil {
 		return "", fmt.Errorf("submitting workflow from template %s: %w", templateName, err)
 	}
@@ -299,7 +299,7 @@ func (c *Client) SuspendCronWorkflow(contextName, namespace, name string) error 
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "cronworkflows"}
 	patch := []byte(`{"spec":{"suspend":true}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("suspending cron workflow %s: %w", name, err)
@@ -339,7 +339,7 @@ func (c *Client) ResumeCronWorkflow(contextName, namespace, name string) error {
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "cronworkflows"}
 	patch := []byte(`{"spec":{"suspend":false}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
 		return fmt.Errorf("resuming cron workflow %s: %w", name, err)

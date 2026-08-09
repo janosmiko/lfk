@@ -209,6 +209,11 @@ type configFile struct {
 	// overrides under clusters.<name>.read_only take precedence; the
 	// --read-only CLI flag wins over both.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+	// FieldManager overrides the name lfk sends as the field manager on every
+	// write. The apiserver records it in metadata.managedFields, which the
+	// YAML blame view reads. Empty falls back to "lfk:<os-user>"; set a plain
+	// "lfk" to keep the username off the cluster.
+	FieldManager string `json:"field_manager" yaml:"field_manager"`
 	// ShowRareTypes, when true, surfaces the rarely-used resource types (CSI
 	// internals, admission webhooks, leases, runtime classes, and the
 	// synthetic "Advanced" category of uncategorized core resources) in the
