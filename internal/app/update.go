@@ -131,6 +131,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case securityIgnoresSaveErrMsg:
 		mdl, cmd := m.updateSecurityIgnoresSaveErr(msg)
 		return mdl, cmd, true
+	case yamlBlameLoadedMsg:
+		mdl, cmd := m.updateYamlBlameLoaded(msg)
+		return mdl, cmd, true
 	case yamlLoadedMsg:
 		mdl, cmd := m.updateYamlLoaded(msg)
 		return mdl, cmd, true

@@ -148,6 +148,7 @@ var whichKeyYAMLActionList = []wkAction[*wkYAMLCtx]{
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleFold }, Label: "Fold section at cursor", Group: wkViews, Avail: func(c *wkYAMLCtx) bool { return !c.visual && c.foldSection != "" }},
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleFoldAll }, Label: "Fold / unfold all", Group: wkViews, Avail: func(c *wkYAMLCtx) bool { return !c.visual && c.foldable }},
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleWrap }, Label: "Toggle line wrapping", Group: wkSettings, Avail: wkYAMLNormal},
+	{Key: wkLiteralKey("m"), Label: "Toggle field-manager blame", Group: wkSettings, Avail: wkYAMLNormal},
 
 	// update_yaml.go:187-188 / 183-184 — search, then the two things q does.
 	{Key: func(kb ui.Keybindings) string { return kb.Search }, Label: "Search in content", Group: wkFilter, Avail: wkYAMLNormal},

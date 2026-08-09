@@ -768,6 +768,7 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	m.yamlView.content = "Loading..."
 	m.yamlView.sections = nil
 	m.yamlView.visualCurCol = yamlFoldPrefixLen
+	m.yamlView.resetBlame()
 	return m, m.loadYAML()
 }
 
