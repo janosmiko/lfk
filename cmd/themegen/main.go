@@ -67,12 +67,11 @@ func run(inputDir, output, skipList string) error {
 			continue
 		}
 
-		theme := mapToTheme(td)
 		isLight := luminance(mustParseHex(td.Background)) > 0.5
 
 		themes = append(themes, themeEntry{
 			Name:    name,
-			Theme:   theme,
+			Theme:   td,
 			IsLight: isLight,
 		})
 	}
@@ -112,8 +111,6 @@ type rawTheme struct {
 	Foreground string
 	Palette    [16]string // palette[0..15]
 }
-
-type themeData = rawTheme
 
 func parseThemeFile(path string) (rawTheme, error) {
 	f, err := os.Open(path)
@@ -261,41 +258,6 @@ func darken(hex string, amount float64) string {
 
 // --- Theme mapping ---
 
-func mapToTheme(t rawTheme) themeData {
-	isLight := luminance(mustParseHex(t.Background)) > 0.5
-
-	// Derive BarBg: slightly offset from background.
-	var barBg, surface string
-	if isLight {
-		barBg = darken(t.Background, 0.06)
-		surface = darken(t.Background, 0.03)
-	} else {
-		barBg = lighten(t.Background, 0.06)
-		surface = lighten(t.Background, 0.03)
-	}
-
-	// Use palette 8 (bright black) for border/dimmed if distinct enough,
-	// otherwise derive from bg/fg midpoint.
-	border := t.Palette[8]
-	if border == t.Background || border == t.Foreground {
-		border = blendColor(t.Background, t.Foreground, 0.25)
-	}
-
-	// Store derived values back into the struct for template output.
-	// We reuse rawTheme fields but the template reads from the mapped values below.
-	_ = barBg
-	_ = surface
-	_ = border
-
-	// Return a rawTheme with the mapped colors stored for template use.
-	// The template will read Primary, Secondary, etc. from this struct.
-	return rawTheme{
-		Background: t.Background,
-		Foreground: t.Foreground,
-		Palette:    t.Palette,
-	}
-}
-
 // themeFields returns the 13 Theme field values for a rawTheme.
 func themeFields(t rawTheme) [13]string {
 	isLight := luminance(mustParseHex(t.Background)) > 0.5
@@ -335,7 +297,7 @@ func themeFields(t rawTheme) [13]string {
 
 type themeEntry struct {
 	Name    string
-	Theme   themeData
+	Theme   rawTheme
 	IsLight bool
 }
 
