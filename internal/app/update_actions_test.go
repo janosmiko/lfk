@@ -829,7 +829,8 @@ func TestCovExecuteActionDelete(t *testing.T) {
 	m := testModelExec()
 	result, cmd := m.executeAction("Delete")
 	rm := result.(Model)
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the confirm asks for its blast radius as it opens")
+	assert.True(t, rm.blast.loading)
 	assert.Equal(t, overlayConfirm, rm.overlay)
 	assert.Equal(t, "Delete", rm.pendingAction)
 }
@@ -940,7 +941,8 @@ func TestCovExecuteActionDrain(t *testing.T) {
 	m.actionCtx.name = "node-1"
 	result, cmd := m.executeAction("Drain")
 	rm := result.(Model)
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the confirm asks for its blast radius as it opens")
+	assert.True(t, rm.blast.loading)
 	assert.Equal(t, overlayConfirm, rm.overlay)
 }
 
@@ -1688,8 +1690,9 @@ func TestFinalExecuteActionEdit(t *testing.T) {
 func TestFinalExecuteActionDelete(t *testing.T) {
 	m := baseFinalModel()
 	result, cmd := m.executeAction("Delete")
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the confirm asks for its blast radius as it opens")
 	rm := result.(Model)
+	assert.True(t, rm.blast.loading)
 	assert.Equal(t, overlayConfirm, rm.overlay)
 	assert.Equal(t, "Delete", rm.pendingAction)
 }
@@ -1831,8 +1834,9 @@ func TestFinalExecuteActionDrain(t *testing.T) {
 	m := baseFinalModel()
 	m.actionCtx.kind = "Node"
 	result, cmd := m.executeAction("Drain")
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the confirm asks for its blast radius as it opens")
 	rm := result.(Model)
+	assert.True(t, rm.blast.loading)
 	assert.Equal(t, overlayConfirm, rm.overlay)
 	assert.Equal(t, "Drain", rm.pendingAction)
 	// The confirm must describe a drain, not fall back to the overlay's

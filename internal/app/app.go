@@ -167,10 +167,10 @@ type Model struct {
 	// Confirm action label + the pending delete's cascade policy (see delete_propagation.go).
 	confirmAction      string
 	confirmPropagation model.DeletePropagation
+	blast              blastRadiusState // what the action costs (see blastradius.go)
 
 	// Title and question for the type-to-confirm overlay.
-	confirmTitle    string
-	confirmQuestion string
+	confirmTitle, confirmQuestion string
 
 	// Text input for type-to-confirm overlay (e.g., Force Finalize).
 	confirmTypeInput TextInput

@@ -201,7 +201,7 @@ func (m Model) executeActionEdit() (tea.Model, tea.Cmd) {
 }
 
 // executeActionDelete handles the "Delete" action.
-func (m Model) executeActionDelete() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+func (m Model) executeActionDelete() (tea.Model, tea.Cmd) {
 	m.confirmAction = m.actionCtx.name
 	// Clear any override left by a previous non-delete confirm so the simple
 	// confirm overlay falls back to its "Delete X?" wording.
@@ -210,7 +210,8 @@ func (m Model) executeActionDelete() (tea.Model, tea.Cmd) { //nolint:unparam // 
 	m.resetDeletePropagation()
 	m.overlay = overlayConfirm
 	m.pendingAction = "Delete"
-	return m, nil
+	m.beginBlastRadius()
+	return m, m.loadBlastRadius(false)
 }
 
 // executeActionEvictReplicas handles the "Evict Replicas" action on a
@@ -448,14 +449,15 @@ func (m Model) executeActionToggleCordon() (tea.Model, tea.Cmd) {
 }
 
 // executeActionDrain handles the "Drain" action.
-func (m Model) executeActionDrain() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+func (m Model) executeActionDrain() (tea.Model, tea.Cmd) {
 	m.confirmTitle = "Confirm Drain"
 	m.confirmQuestion = fmt.Sprintf(
 		"Drain node %s? Pods will be evicted and the node cordoned (DaemonSet pods stay, emptyDir data is deleted).",
 		m.actionCtx.name)
 	m.pendingAction = "Drain"
 	m.overlay = overlayConfirm
-	return m, nil
+	m.beginBlastRadius()
+	return m, m.loadBlastRadius(true)
 }
 
 // executeActionTrigger handles the "Trigger" action.

@@ -16,6 +16,13 @@ import (
 //
 // Keymap hints are deliberately NOT rendered here — they live in the
 // shared hint bar so two confirm dialogs never disagree on their footer.
+// ConfirmNote is one line of consequence shown in a confirm overlay, such as
+// the disruption budget headroom an action would spend.
+type ConfirmNote struct {
+	Text string
+	Warn bool
+}
+
 type OverlayConfirmConfig struct {
 	Title   string
 	Warning string   // warning-styled question line (e.g. "Delete my-pod?")
@@ -29,6 +36,11 @@ type OverlayConfirmConfig struct {
 	ChoiceLabel string
 	ChoiceValue string
 	ChoiceWarn  bool
+
+	// Notes are one-line facts about what the action costs, rendered under
+	// the choice row. Warn styles a note as a warning, so a budget the
+	// action would breach does not look like an ordinary line.
+	Notes []ConfirmNote
 
 	// TypeToken triggers the type-to-confirm row. When non-empty, the
 	// overlay prompts the user to type the token verbatim; Input is the
@@ -49,6 +61,15 @@ type OverlayConfirmConfig struct {
 	// resource names (e.g. dev-envs-autoscaled-cx43-...). Callers pass the
 	// box inner width.
 	WrapWidth int
+}
+
+// WrappedLineCount reports how many rows text takes at this width, so a
+// caller can size a box around content the overlay will wrap.
+func WrappedLineCount(text string, width int) int {
+	if width <= 0 {
+		return 1
+	}
+	return len(wrapConfirmText(text, width))
 }
 
 // wrapConfirmText word-wraps text to width display columns on whitespace
@@ -137,6 +158,18 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 			valueStyle = OverlayWarningStyle
 		}
 		b.WriteString(valueStyle.Render(cfg.ChoiceValue))
+		b.WriteString("\n\n")
+	}
+	for _, note := range cfg.Notes {
+		style := OverlayNormalStyle
+		if note.Warn {
+			style = OverlayWarningStyle
+		}
+		text := note.Text
+		if cfg.WrapWidth > 0 {
+			text = strings.Join(wrapConfirmText(text, cfg.WrapWidth), "\n")
+		}
+		b.WriteString(style.Render(text))
 		b.WriteString("\n\n")
 	}
 	for i, line := range cfg.Body {

@@ -113,6 +113,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		m.confirmTitle = ""
 		m.confirmQuestion = ""
 		m.pendingAction = ""
+		m.blast.reset()
 		m.resetBulkAction()
 		if returnToTaints {
 			m.overlay = overlayTaintEditor

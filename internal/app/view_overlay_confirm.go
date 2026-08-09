@@ -31,12 +31,16 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 		choiceLabel, choiceValue, choiceWarn = cascadeChoiceRow(m.deletePropagation(), w-4)
 		h = min(10, m.height-6)
 	}
+	// A drain has no single workload, so its line drops the replica count.
+	notes := blastRadiusNotes(m.blast.radius, m.blast.loading, m.pendingAction != "Drain")
+	h = min(h+blastRadiusRows(notes, w-4), m.height-6)
 	return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
 		Title:       title,
 		Warning:     warning,
 		ChoiceLabel: choiceLabel,
 		ChoiceValue: choiceValue,
 		ChoiceWarn:  choiceWarn,
+		Notes:       notes,
 		WrapWidth:   w - 4,
 	}), w, h, true
 }
