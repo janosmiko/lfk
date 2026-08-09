@@ -236,6 +236,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "q":
 		m.overlay = overlayNone
 		m.scaleInput.Clear()
+		m.blast.reset()
 		m.resetBulkAction()
 		return m, nil
 	case "enter":
@@ -244,6 +245,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Invalid replica count", true)
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			m.blast.reset()
 			m.resetBulkAction()
 			return m, scheduleStatusClear()
 		}
@@ -253,6 +255,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			m.blast.reset()
 			m.resetBulkAction()
 			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
 			return m, scheduleStatusClear()
@@ -260,6 +263,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		m.loading = true
 		m.scaleInput.Clear()
+		m.blast.reset()
 
 		// Bulk mode.
 		if m.bulkMode && len(m.bulkItems) > 0 {
@@ -308,6 +312,7 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 	case "esc", "q":
 		m.overlay = overlayNone
 		m.scaleInput.Clear()
+		m.blast.reset()
 		return m, nil
 	case "enter":
 		newSize := strings.TrimSpace(m.scaleInput.Value)
@@ -315,11 +320,13 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 			m.setStatusMessage("No size specified", true)
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			m.blast.reset()
 			return m, scheduleStatusClear()
 		}
 		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			m.blast.reset()
 			m.setStatusMessage(readOnlyBlockedMessage("Resize PVC"), true)
 			return m, scheduleStatusClear()
 		}
@@ -327,6 +334,7 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		m.loading = true
 		m.addLogEntry("DBG", fmt.Sprintf("Resizing PVC %s to %s in %s", m.actionCtx.name, newSize, m.actionNamespace()))
 		m.scaleInput.Clear()
+		m.blast.reset()
 		return m, m.resizePVC(newSize)
 	case "backspace":
 		if len(m.scaleInput.Value) > 0 {

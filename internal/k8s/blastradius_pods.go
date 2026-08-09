@@ -82,9 +82,12 @@ func podsInNamespaceFrom(ctx context.Context, cs kubernetes.Interface, namespace
 	}
 	out := make([]NamedPod, 0, len(list.Items))
 	for i := range list.Items {
+		p := &list.Items[i]
+		// Built directly rather than through EvictedPodsFrom on a one-element
+		// slice, which allocated a throwaway slice per pod.
 		out = append(out, NamedPod{
-			EvictedPod: EvictedPodsFrom(list.Items[i : i+1])[0],
-			Name:       list.Items[i].Name,
+			EvictedPod: EvictedPod{Namespace: p.Namespace, Labels: p.Labels, Ready: podIsReady(p)},
+			Name:       p.Name,
 		})
 	}
 	return out, nil

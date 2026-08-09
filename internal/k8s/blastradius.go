@@ -67,6 +67,8 @@ func ComputeBlastRadius(
 	// pods actually going, and a negative count on screen helps nobody.
 	out.ReadyAfter = max(readyBefore-readyGoing, 0)
 
+	// Pre-sized: the scale overlay recomputes this on every keystroke.
+	out.PDBs = make([]PDBImpact, 0, len(pdbs))
 	for i := range pdbs {
 		b := &pdbs[i]
 		covered := 0

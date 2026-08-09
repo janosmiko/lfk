@@ -704,7 +704,8 @@ func TestCovExecuteBulkActionDelete(t *testing.T) {
 	ret, cmd := m.executeBulkAction("Delete")
 	result := ret.(Model)
 	assert.Equal(t, overlayConfirm, result.overlay)
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the bulk confirm asks for the blast radius of the whole selection")
+	assert.True(t, result.blast.loading)
 }
 
 func TestCovExecuteBulkActionForceDelete(t *testing.T) {
@@ -839,7 +840,7 @@ func TestCovExecuteActionScale(t *testing.T) {
 	m := testModelExec()
 	result, cmd := m.executeAction("Scale")
 	rm := result.(Model)
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the overlay asks for its blast radius as it opens")
 	assert.Equal(t, overlayScaleInput, rm.overlay)
 }
 
@@ -1700,7 +1701,7 @@ func TestFinalExecuteActionDelete(t *testing.T) {
 func TestFinalExecuteActionScale(t *testing.T) {
 	m := baseFinalModel()
 	result, cmd := m.executeAction("Scale")
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "the overlay asks for its blast radius as it opens")
 	rm := result.(Model)
 	assert.Equal(t, overlayScaleInput, rm.overlay)
 }

@@ -42,7 +42,11 @@ func (s *blastRadiusState) scaleBlastRadius(target int) *k8s.BlastRadius {
 	if s.pods == nil {
 		return nil
 	}
-	going := len(s.pods) - target
+	// Clamped both ways. A target above the pod count removes nothing, and a
+	// negative one cannot remove more than every pod. Only the digit-only key
+	// filter keeps a negative out today, and memory safety must not rest on
+	// the caller.
+	going := min(len(s.pods)-target, len(s.pods))
 	if going <= 0 {
 		return nil
 	}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 
 	tea "charm.land/bubbletea/v2"
 	policyv1 "k8s.io/api/policy/v1"
@@ -9,6 +10,10 @@ import (
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 )
+
+// errNoBlastTarget means there is nothing to measure: no client, or an object
+// with no selector to find pods by. The dialog drops the line and carries on.
+var errNoBlastTarget = errors.New("blast radius is not available for this action")
 
 // blastRadiusLoadedMsg carries the cost of the pending action. req numbers the
 // fetch, because closing and reopening a confirm can leave an older reply in
@@ -33,7 +38,11 @@ func (m Model) loadScaleBlastRadius() tea.Cmd {
 	namespace := m.actionCtx.namespace
 	selector := workloadSelectorFrom(m.actionCtx.raw)
 	if client == nil || selector == nil {
-		return nil
+		// Still answer. beginBlastRadius already turned the spinner on, and a
+		// silent return would leave the overlay reading "checking..." forever.
+		return func() tea.Msg {
+			return blastRadiusLoadedMsg{req: req, err: errNoBlastTarget}
+		}
 	}
 
 	return m.scheduleK8sCall(
@@ -70,7 +79,7 @@ func (m Model) loadBlastRadius(drain bool) tea.Cmd {
 	name := m.actionCtx.name
 	raw := m.actionCtx.raw
 	if client == nil {
-		return nil
+		return func() tea.Msg { return blastRadiusLoadedMsg{req: req, err: errNoBlastTarget} }
 	}
 
 	return m.scheduleK8sCall(
@@ -108,7 +117,7 @@ func (m Model) loadBulkBlastRadius() tea.Cmd {
 	ctxName := m.effectiveContext()
 	byNS, uncounted := bulkPodTargets(m.bulkItems)
 	if client == nil {
-		return nil
+		return func() tea.Msg { return blastRadiusLoadedMsg{req: req, err: errNoBlastTarget} }
 	}
 
 	return m.scheduleK8sCall(

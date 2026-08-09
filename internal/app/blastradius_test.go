@@ -3,6 +3,8 @@ package app
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	policyv1 "k8s.io/api/policy/v1"
@@ -372,4 +374,61 @@ func TestRenderOverlayScaleInput_ShowsTheLineAsYouType(t *testing.T) {
 
 	assert.Contains(t, stripANSI(out), "3 pods")
 	assert.Contains(t, stripANSI(out), "2 of 5 ready after")
+}
+
+func TestScaleBlastRadius_NegativeTargetDoesNotPanic(t *testing.T) {
+	// Only the digit-only key filter keeps a negative out of here today.
+	// The function must not depend on its caller for memory safety.
+	s := blastRadiusState{pods: []k8s.EvictedPod{{Namespace: "prod"}, {Namespace: "prod"}}}
+
+	assert.NotPanics(t, func() {
+		got := s.scaleBlastRadius(-1)
+		require.NotNil(t, got)
+		assert.Equal(t, 2, got.Evicting, "scaling below zero can remove no more than every pod")
+	})
+}
+
+func TestScaleBlastRadius_HugeTargetIsSafe(t *testing.T) {
+	s := blastRadiusState{pods: []k8s.EvictedPod{{Namespace: "prod"}}}
+
+	assert.NotPanics(t, func() { assert.Nil(t, s.scaleBlastRadius(1<<30)) })
+}
+
+func TestLoadScaleBlastRadius_AlwaysAnswers(t *testing.T) {
+	// A workload whose object has no spec.selector must still get a reply,
+	// or the overlay sits on "checking disruption budgets" forever.
+	m := Model{}
+	m.beginBlastRadius()
+	m.actionCtx.raw = map[string]any{"spec": map[string]any{}}
+
+	cmd := m.loadScaleBlastRadius()
+
+	require.NotNil(t, cmd, "no selector still owes the overlay an answer")
+	msg, ok := cmd().(blastRadiusLoadedMsg)
+	require.True(t, ok)
+	assert.Equal(t, m.blast.req, msg.req, "and the answer has to carry the request number")
+
+	mdl, _ := m.updateBlastRadiusLoaded(msg)
+	assert.False(t, mdl.(Model).blast.loading, "the reply clears the spinner")
+}
+
+func TestHandleScaleOverlayKey_ClosingReleasesTheFetchedPods(t *testing.T) {
+	keys := map[string]tea.KeyPressMsg{
+		"esc":             {Code: tea.KeyEscape},
+		"q":               {Code: 'q', Text: "q"},
+		"enter (invalid)": {Code: tea.KeyEnter},
+	}
+	for name, key := range keys {
+		t.Run(name, func(t *testing.T) {
+			m := Model{overlay: overlayScaleInput}
+			m.blast.pods = []k8s.EvictedPod{{Namespace: "prod"}}
+			m.blast.pdbs = []policyv1.PodDisruptionBudget{{}}
+
+			mdl, _ := m.handleScaleOverlayKey(key)
+
+			got := mdl.(Model)
+			assert.Nil(t, got.blast.pods, "a closed overlay must not keep the pod list alive")
+			assert.Nil(t, got.blast.pdbs)
+		})
+	}
 }
