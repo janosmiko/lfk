@@ -53,7 +53,7 @@ func makeDebugContainerName(now time.Time) string {
 var remoteCaptureKiller = terminateRemoteCapture
 
 func (kubectlDebugBackend) Start(ctx context.Context, req CaptureRequest) (io.ReadCloser, context.CancelFunc, *exec.Cmd, *stderrBuffer, error) {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := KubectlPath()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("kubectl not in PATH: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +111,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 	return func() tea.Msg {
 		defer registry.Finish(id)
 
-		kubectlPath, err := exec.LookPath("kubectl")
+		kubectlPath, err := k8s.KubectlPath()
 		if err != nil {
 			return bulkActionResultMsg{failed: total, errors: []string{"kubectl not found"}}
 		}

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -158,7 +159,7 @@ func (m Model) startPreviewLogStream(ref podRef, reconnect bool) (Model, tea.Cmd
 	// needing kubectl to be present.
 	m.previewLog.podKey = ref.key()
 
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		m.previewLog.err = fmt.Sprintf("kubectl not found: %v", err)
 		return m, nil
@@ -607,7 +608,7 @@ func (m Model) selectedPodForLogPreview() (podRef, bool) {
 // previewLogHistoryMsg. The fetch runs in the background; the model correlates
 // the result by podKey to drop stale responses.
 func (m Model) fetchOlderPreviewLogs(ref podRef, tail int) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return previewLogHistoryMsg{podKey: ref.key(), err: err}

@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -204,7 +205,7 @@ func (m Model) loadPodsForAction() tea.Cmd {
 // loadPodsForLogAction fetches pods matching the parent resource's selector using kubectl.
 // Uses kubectl instead of the Go client to avoid separate OIDC auth flows.
 func (m Model) loadPodsForLogAction() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return podLogSelectMsg{err: fmt.Errorf("kubectl not found: %w", err)}

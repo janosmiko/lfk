@@ -15,6 +15,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -82,7 +83,7 @@ func (m Model) scheduleLogStreamRestart(ch chan string) tea.Cmd {
 // starts a goroutine that reads stdout line by line. Returns a tea.Cmd that
 // reads the first line from the channel.
 func (m *Model) startLogStream() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -369,7 +370,7 @@ func (m Model) waitForLogLineIfIdle() tea.Cmd {
 // merges their output into a single log channel. This supports streaming logs
 // from multiple pods or parent resources simultaneously.
 func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return m, func() tea.Msg { return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)} }
 	}
@@ -492,7 +493,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 // restartMultiLogStream restarts a multi-log stream using stored items,
 // preserving current viewer settings (used when toggling timestamps).
 func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return m, func() tea.Msg { return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)} }
 	}
@@ -589,7 +590,7 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 // fetchOlderLogs fetches an additional batch of older log lines using a
 // one-shot kubectl logs call (no -f). The result is returned as a logHistoryMsg.
 func (m *Model) fetchOlderLogs() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg { return logHistoryMsg{err: err} }
 	}
@@ -722,7 +723,7 @@ func (m *Model) saveLoadedLogs() (string, error) {
 
 // saveAllLogs runs a one-shot kubectl logs (without --tail) and writes everything to a file.
 func (m *Model) saveAllLogs() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg { return logSaveAllMsg{err: err} }
 	}

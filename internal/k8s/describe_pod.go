@@ -9,14 +9,12 @@ import (
 )
 
 // kubectlBinForDescribe returns the kubectl binary path used by DescribePod.
-// Tests can override via the KUBECTL_BIN env var; production resolves
-// "kubectl" on PATH at exec.CommandContext time, matching the app-layer
-// describe runner in internal/app/commands_exec.go. Evaluated per-call so
-// tests can change the env between sub-tests without leaking state through
-// a package-init capture.
+// Delegates to KubectlPath; falls back to the bare "kubectl" name (letting
+// exec.CommandContext resolve it on PATH at fork time) when resolution
+// fails, matching this function's original never-erroring contract.
 func kubectlBinForDescribe() string {
-	if v := os.Getenv("KUBECTL_BIN"); v != "" {
-		return v
+	if path, err := KubectlPath(); err == nil {
+		return path
 	}
 	return "kubectl"
 }

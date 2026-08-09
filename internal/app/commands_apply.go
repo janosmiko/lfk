@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -122,7 +123,7 @@ func (m Model) applyTemplate(tmpl model.ResourceTemplate) tea.Cmd {
 
 // applyTemplateFile runs kubectl apply -f on the given temp file and cleans it up.
 func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		_ = os.Remove(tmpFile)
 		return func() tea.Msg {

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os/exec"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -154,7 +153,7 @@ func (m Model) launchKubeshark(target model.Item) tea.Cmd {
 	mgr := m.portForwardMgr
 	ctx := m.reqCtx
 	return func() tea.Msg {
-		kubectlPath, err := exec.LookPath("kubectl")
+		kubectlPath, err := k8s.KubectlPath()
 		if err != nil {
 			return kubesharkLaunchedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
 		}

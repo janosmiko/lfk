@@ -2,10 +2,10 @@ package app
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
@@ -13,7 +13,7 @@ import (
 
 // execKubectlPortForward starts a port forward as a background process via the manager.
 func (m Model) execKubectlPortForward(portMapping string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return portForwardStartedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -80,7 +80,7 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 			return portForwardStartedMsg{err: fmt.Errorf("port forward %d not found", id)}
 		}
 	}
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return portForwardStartedMsg{err: fmt.Errorf("kubectl not found: %w", err)}

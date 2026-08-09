@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -35,7 +36,7 @@ func (m Model) deleteResource() tea.Cmd {
 }
 
 func (m Model) forceDeleteResource() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -65,7 +66,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 }
 
 func (m Model) removeFinalizers() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -217,7 +218,7 @@ func (m Model) execKubectlDrain() tea.Cmd {
 // hand-over. Shared by the Node "Drain" action and the Karpenter
 // "Drain Node" action (which resolves the bound node first).
 func (m Model) drainNodeCmd(nodeName string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
