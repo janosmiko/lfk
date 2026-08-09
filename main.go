@@ -10,6 +10,8 @@ import (
 	"net/http"
 	_ "net/http/pprof" // registers /debug/pprof/* under DefaultServeMux when LFK_PPROF_ADDR is set
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/app"
 	"github.com/janosmiko/lfk/internal/completion"
+	"github.com/janosmiko/lfk/internal/democli"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/profiling"
@@ -87,10 +90,33 @@ File locations:
 	}
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(completion.NewCompletionCommand(rootCmd))
+	rootCmd.AddCommand(newDemoKubectlCommand())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+// newDemoKubectlCommand builds the hidden "__demo-kubectl" subcommand that
+// --demo mode points every kubectl call site at (via k8s.KubectlPath
+// returning os.Executable()). It is hidden from help and shell completion —
+// it exists only for lfk to re-exec itself, never for a user to invoke
+// directly. Flag parsing is disabled so kubectl-shaped argv (mixed
+// "--flag value" / "--flag=value" / short flags) passes through to
+// democli.Run untouched instead of being parsed by cobra/pflag.
+func newDemoKubectlCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:                "__demo-kubectl",
+		Hidden:             true,
+		DisableFlagParsing: true,
+		SilenceUsage:       true,
+		SilenceErrors:      true,
+		RunE: func(_ *cobra.Command, args []string) error {
+			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+			defer stop()
+			return democli.Run(ctx, args, os.Stdout, os.Stderr)
+		},
 	}
 }
 
@@ -102,6 +128,10 @@ File locations:
 // on opts.Demo. Otherwise it runs the real kubeconfig discovery path.
 func resolveStartupClient(opts app.StartupOptions) (*k8s.Client, error) {
 	if opts.Demo {
+		// Redirect every kubectl call site (internal/k8s.KubectlPath) at this
+		// binary's own __demo-kubectl subcommand instead of a kubectl on the
+		// user's PATH, so no code path can reach a real cluster.
+		k8s.SetDemoMode(true)
 		return k8s.NewDemoClient()
 	}
 

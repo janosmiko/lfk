@@ -9,8 +9,22 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 )
+
+// resolveHelmPath finds the helm binary, refusing outright in demo mode.
+// Unlike kubectl, helm has no in-process demo stub (k8s.KubectlPath does not
+// cover it, since call sites shell out via exec.LookPath("helm") directly),
+// so every one of those call sites resolves through here instead of
+// exec.LookPath so a real, cluster-connected helm can never run under
+// --demo.
+func resolveHelmPath() (string, error) {
+	if k8s.DemoModeEnabled() {
+		return "", fmt.Errorf("helm is not available in demo mode")
+	}
+	return exec.LookPath("helm")
+}
 
 // runHelmCmdResult runs a prepared helm command to completion and maps the
 // outcome to an actionResultMsg. Used for the non-interactive helm operations
@@ -31,7 +45,7 @@ func runHelmCmdResult(cmd *exec.Cmd, successMsg, failPrefix string) tea.Msg {
 }
 
 func (m Model) uninstallHelmRelease() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("helm not found: %w", err)}
@@ -150,7 +164,7 @@ func buildHelmUpgradeCmd(helmPath, release, ns, ctx, kubeconfig string) *exec.Cm
 }
 
 func (m Model) editHelmValues() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("helm not found: %w", err)}
@@ -175,7 +189,7 @@ func (m Model) editHelmValues() tea.Cmd {
 }
 
 func (m Model) helmDiff() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return diffLoadedMsg{err: fmt.Errorf("helm not found: %w", err)}
@@ -301,7 +315,7 @@ func parseFirstJSONField(jsonStr, field, suffix string) string {
 }
 
 func (m Model) helmUpgrade() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("helm not found: %w", err)}
@@ -321,7 +335,7 @@ func (m Model) helmUpgrade() tea.Cmd {
 }
 
 func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return helmRollbackDoneMsg{err: fmt.Errorf("helm not found: %w", err)}
