@@ -33,6 +33,21 @@ func (m *Model) abandonSessionRestore() {
 	m.restoringSession = false
 	m.pendingTarget = ""
 	m.pendingTargetNamespace = ""
+	m.dropDeferredSessionRestore()
+}
+
+// dropDeferredSessionRestore clears the state a restore parks while it waits for
+// CRD discovery: the resource type it could not resolve from the seed list, and
+// the filter and cursor riding along with it.
+//
+// Every terminal discovery result has to call this. The parked type is matched
+// against whatever context the user is on when discovery next answers, so a
+// restore left armed after a failure resumes in the wrong cluster and drags a
+// dead filter with it.
+//
+// Unlike pendingTarget, nothing but a session restore ever sets these, so this
+// needs no restoringSession guard.
+func (m *Model) dropDeferredSessionRestore() {
 	m.pendingSessionList = pendingSessionListState{}
 	m.sessionResourceTypeAwaitingDiscovery = ""
 	m.sessionResourceNameAwaitingDiscovery = ""

@@ -252,6 +252,9 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			m.applyPendingSessionList()
 			return m, m.loadResources(false)
 		}
+		// Discovery answered and this cluster has no such type. The parked
+		// filter and cursor have nowhere to land.
+		m.dropDeferredSessionRestore()
 	}
 	// Discovery landed without a list load to wait on, so the resource-type
 	// sidebar is the finished restore. Let the explorer paint.
@@ -263,7 +266,11 @@ func (m Model) handleAPIResourceDiscoveryError(msg apiResourceDiscoveryMsg, isCu
 	// API resource discovery failed (permissions, etc.) -- fall back to
 	// seed resources so the user can still navigate.
 	logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
-	// Nothing further is coming for this context; do not strand the splash.
+	// Nothing further is coming for this context. Drop the parked restore too:
+	// left armed, it would resume against whichever cluster the user opens next.
+	if isCurrentContext {
+		m.dropDeferredSessionRestore()
+	}
 	m.finishSessionRestoreForContext(isCurrentContext)
 	if isCurrentContext && m.loading {
 		// Mirror the success branch's wasInitial guard. m.loading alone

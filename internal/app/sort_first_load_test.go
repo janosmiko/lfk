@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -84,11 +83,13 @@ func TestSortMiddleItems_StillSkipsTheResourceTypeBrowser(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelResourceTypes
 	m.sortColumnName = sortColDefault
+	m.sortAscending = true
 	m.middleItems = apiOrderWorkflowTemplates()
 
 	m.sortMiddleItems()
 
-	require.Len(t, m.middleItems, 4)
-	assert.Equal(t, "mget-reports-dev", m.middleItems[0].Namespace,
+	assert.Equal(t,
+		namespacesOf(apiOrderWorkflowTemplates()),
+		namespacesOf(m.middleItems),
 		"the resource-type browser keeps its curated order")
 }
