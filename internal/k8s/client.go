@@ -12,13 +12,24 @@ import (
 
 	"golang.org/x/sync/singleflight"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/k8s/demo"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 )
+
+// applyFieldManager marks writes ApplyManifest makes through the dynamic
+// client, matching the field-manager convention demo.Ticker uses for its
+// own mutations.
+const applyFieldManager = "lfk"
 
 // contextInfo decorates a kubeconfig context with its source file plus a
 // display name that is unique across all loaded files. When several
@@ -83,6 +94,12 @@ type Client struct {
 	// It never talks to a real cluster; IsDemo lets the app layer surface a
 	// badge instead of inspecting the injected fields directly.
 	demo bool
+
+	// demoTicker drives periodic mutations against the demo backend's fake
+	// dynamic client (see internal/k8s/demo.Ticker). Nil for real clients;
+	// NewDemoClient starts it and Shutdown stops it, so its goroutine never
+	// outlives this Client.
+	demoTicker *demo.Ticker
 
 	// testPromQuery, when set, replaces the real Service.ProxyGet
 	// pipeline used by the right-sizing Prometheus strategies. Tests
@@ -307,10 +324,87 @@ func (c *Client) SetInformerCacheMode(mode InformerCacheMode) {
 // future stream subscribers). Idempotent and safe to call from a defer in
 // main.go even when no informers were ever started.
 func (c *Client) Shutdown() {
+	if c.demoTicker != nil {
+		c.demoTicker.Stop()
+	}
 	_, infs := c.informerSnapshot()
 	if infs != nil {
 		infs.Stop()
 	}
+}
+
+// ApplyManifest decodes a (possibly multi-document) YAML manifest and
+// creates or updates each object through the dynamic client — no kubectl
+// subprocess. Demo mode's fake dynamic client lives only in this process,
+// so a subprocess kubectl would write into a separate in-memory tracker the
+// UI never reads from; this is the apply path demo mode must use to
+// actually change what the UI shows. defaultNamespace fills in any object
+// that leaves metadata.namespace unset, matching kubectl apply -n.
+func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespace, manifest string) error {
+	dyn, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return fmt.Errorf("getting dynamic client: %w", err)
+	}
+	dc, err := c.discoveryForContext(contextName)
+	if err != nil {
+		return fmt.Errorf("getting discovery client: %w", err)
+	}
+	// ServerPreferredResources + convertAPIResourceLists, not the fuller
+	// DiscoverAPIResources: that also lists CustomResourceDefinitions for
+	// printer columns, which the demo backend's fake dynamic client isn't
+	// registered to LIST and would panic on.
+	lists, err := discovery.ServerPreferredResources(dc)
+	if err != nil {
+		return fmt.Errorf("discovering api resources: %w", err)
+	}
+	entries := convertAPIResourceLists(lists)
+
+	for _, doc := range splitYAMLDocuments(manifest) {
+		if strings.TrimSpace(doc) == "" {
+			continue
+		}
+		var obj unstructured.Unstructured
+		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
+			return fmt.Errorf("decoding manifest: %w", err)
+		}
+		if obj.GetKind() == "" {
+			continue
+		}
+
+		gvk := obj.GroupVersionKind()
+		var rt *model.ResourceTypeEntry
+		for i := range entries {
+			if entries[i].Kind == gvk.Kind && entries[i].APIGroup == gvk.Group && entries[i].APIVersion == gvk.Version {
+				rt = &entries[i]
+				break
+			}
+		}
+		if rt == nil {
+			return fmt.Errorf("no known resource type for %s", gvk.String())
+		}
+
+		res := dyn.Resource(schema.GroupVersionResource{Group: rt.APIGroup, Version: rt.APIVersion, Resource: rt.Resource})
+		var ri dynamic.ResourceInterface = res
+		if rt.Namespaced {
+			ns := obj.GetNamespace()
+			if ns == "" {
+				ns = defaultNamespace
+			}
+			obj.SetNamespace(ns)
+			ri = res.Namespace(ns)
+		}
+
+		if existing, getErr := ri.Get(ctx, obj.GetName(), metav1.GetOptions{}); getErr == nil {
+			obj.SetResourceVersion(existing.GetResourceVersion())
+			_, err = ri.Update(ctx, &obj, metav1.UpdateOptions{FieldManager: applyFieldManager})
+		} else {
+			_, err = ri.Create(ctx, &obj, metav1.CreateOptions{FieldManager: applyFieldManager})
+		}
+		if err != nil {
+			return fmt.Errorf("applying %s/%s: %w", gvk.Kind, obj.GetName(), err)
+		}
+	}
+	return nil
 }
 
 // NewClient creates a new Kubernetes client, loading configs from:

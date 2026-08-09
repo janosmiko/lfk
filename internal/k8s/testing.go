@@ -1,11 +1,19 @@
 package k8s
 
 import (
+	"context"
+	"time"
+
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/k8s/demo"
 )
+
+// demoTickerInterval is how often NewDemoClient's ticker mutates the fake
+// cluster. Matches ui.DefaultWatchInterval's 2s feel (a few seconds keeps
+// the demo visibly alive without flooding the UI on every watch tick).
+const demoTickerInterval = 3 * time.Second
 
 // NewTestClient creates a Client with injected fake clients for testing.
 // cs should be a kubernetes.Interface (e.g. k8sfake.NewClientset()),
@@ -36,8 +44,11 @@ func NewTestClient(cs, dyn any) *Client {
 // a synthesized context) so a demo Client can never read the user's real
 // kubeconfig, then marks itself IsDemo so the app layer can show a badge.
 func NewDemoClient() (*Client, error) {
-	c := NewTestClient(demo.NewClientset(), demo.NewDynamicClient())
+	dyn := demo.NewDynamicClient()
+	c := NewTestClient(demo.NewClientset(), dyn)
 	c.demo = true
+	c.demoTicker = demo.NewTicker(dyn, demoTickerInterval)
+	c.demoTicker.Start(context.Background())
 	return c, nil
 }
 

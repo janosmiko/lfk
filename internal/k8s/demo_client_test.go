@@ -3,7 +3,9 @@ package k8s
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,4 +83,26 @@ func TestNewDemoClient_NoKubeconfigNeeded(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, c)
 	assert.True(t, c.IsDemo())
+}
+
+// TestNewDemoClient_TickerLifetime guards the demo ticker's goroutine
+// lifetime: NewDemoClient must start it, and Client.Shutdown must stop it,
+// so a demo session never leaks a background goroutine past the client
+// that owns it.
+func TestNewDemoClient_TickerLifetime(t *testing.T) {
+	baseline := runtime.NumGoroutine()
+
+	c, err := NewDemoClient()
+	require.NoError(t, err)
+	require.NotNil(t, c.demoTicker, "NewDemoClient must start a demo ticker")
+
+	require.Eventually(t, func() bool {
+		return runtime.NumGoroutine() > baseline
+	}, time.Second, 10*time.Millisecond, "expected a new goroutine after NewDemoClient")
+
+	c.Shutdown()
+
+	require.Eventually(t, func() bool {
+		return runtime.NumGoroutine() <= baseline+1 // +1 tolerance for runtime jitter
+	}, time.Second, 10*time.Millisecond, "Shutdown did not drain the demo ticker goroutine")
 }
