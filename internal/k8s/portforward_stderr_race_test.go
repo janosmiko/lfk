@@ -56,5 +56,11 @@ func TestPortForwardStderrCaptureNoRace(t *testing.T) {
 	require.Len(t, entries, 1)
 	assert.Contains(t, entries[0].Error, "unable to listen on port",
 		"captured stderr must surface in entry.Error")
-	assert.Positive(t, updates.Load(), "the manager must report the change")
+	// Start reports once before it returns, the monitor once more after
+	// cmd.Wait. Reading the count here would be a race the other way: the
+	// monitor calls back after it releases the lock, so the status can be
+	// visible before the report is.
+	require.Eventually(t, func() bool { return updates.Load() >= 2 },
+		portForwardSettleTimeout, 10*time.Millisecond,
+		"the manager must report the move to Failed, not only the start")
 }
