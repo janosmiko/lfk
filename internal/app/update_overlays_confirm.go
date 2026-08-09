@@ -25,6 +25,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		// was already showing, refuse to commit the mutation.
 		if m.pendingActionBlockedByReadOnly() {
 			m.overlay = overlayNone
+			m.blast.reset()
 			label := m.pendingAction
 			m.pendingAction = ""
 			m.confirmAction = ""
@@ -36,6 +37,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		}
 		m.overlay = overlayNone
 		m.loading = true
+		// The figures belong to the action being committed here; a later
+		// confirm must not open showing them.
+		m.blast.reset()
 		action := m.pendingAction
 		m.pendingAction = ""
 		m.confirmAction = ""

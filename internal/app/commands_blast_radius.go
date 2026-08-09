@@ -116,6 +116,13 @@ func (m Model) loadBulkBlastRadius() tea.Cmd {
 	client := m.client
 	ctxName := m.effectiveContext()
 	byNS, uncounted := bulkPodTargets(m.bulkItems)
+	if len(byNS) == 0 {
+		// No row resolves to a pod, so no budget can be touched. This needs
+		// no cluster call at all, so it answers before the client check.
+		return func() tea.Msg {
+			return blastRadiusLoadedMsg{radius: &k8s.BlastRadius{Uncounted: uncounted}, req: req}
+		}
+	}
 	if client == nil {
 		return func() tea.Msg { return blastRadiusLoadedMsg{req: req, err: errNoBlastTarget} }
 	}
@@ -181,7 +188,9 @@ func blastRadiusPods(
 	}
 	selector := workloadSelectorFrom(raw)
 	if selector == nil {
-		return nil, 0, nil
+		// No selector means no way to find the pods. Say so, rather than
+		// reporting a confident zero.
+		return nil, 0, errNoBlastTarget
 	}
 	pods, err := client.PodsForSelector(ctx, ctxName, namespace, selector)
 	return pods, readyReplicasFrom(raw), err

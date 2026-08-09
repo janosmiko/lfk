@@ -105,11 +105,29 @@ func podsOnNodeFrom(ctx context.Context, cs kubernetes.Interface, nodeName strin
 	}
 	onNode := make([]corev1.Pod, 0, len(list.Items))
 	for i := range list.Items {
-		if list.Items[i].Spec.NodeName == nodeName {
-			onNode = append(onNode, list.Items[i])
+		p := &list.Items[i]
+		if p.Spec.NodeName != nodeName || drainLeavesPod(p) {
+			continue
 		}
+		onNode = append(onNode, *p)
 	}
 	return EvictedPodsFrom(onNode), nil
+}
+
+// drainLeavesPod reports whether a drain leaves a pod where it is. lfk drains
+// with --ignore-daemonsets, so DaemonSet pods never go, and a mirror pod is
+// not removable through the API at all. Counting either would overstate the
+// blast radius and invent budget impacts that cannot happen.
+func drainLeavesPod(p *corev1.Pod) bool {
+	if _, mirror := p.Annotations[corev1.MirrorPodAnnotationKey]; mirror {
+		return true
+	}
+	for _, o := range p.OwnerReferences {
+		if o.Kind == "DaemonSet" {
+			return true
+		}
+	}
+	return false
 }
 
 func podsForSelectorFrom(

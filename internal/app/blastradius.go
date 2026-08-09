@@ -50,7 +50,13 @@ func (s *blastRadiusState) scaleBlastRadius(target int) *k8s.BlastRadius {
 	if going <= 0 {
 		return nil
 	}
-	radius := k8s.ComputeBlastRadius(s.pods[:going], s.pdbs, len(s.pods))
+	readyBefore := 0
+	for _, pod := range s.pods {
+		if pod.Ready {
+			readyBefore++
+		}
+	}
+	radius := k8s.ComputeBlastRadius(s.pods[:going], s.pdbs, readyBefore)
 	return &radius
 }
 

@@ -102,3 +102,41 @@ func TestPodsInNamespace_CarriesTheNameForMatching(t *testing.T) {
 	assert.ElementsMatch(t, []string{"web-1", "web-2"}, []string{got[0].Name, got[1].Name})
 	assert.Equal(t, "prod", got[0].Namespace, "the embedded EvictedPod still carries the namespace")
 }
+
+func daemonSetPod(namespace, name, node string) *corev1.Pod {
+	p := runningPod(namespace, name, node, map[string]string{"app": "agent"}, true)
+	yes := true
+	p.OwnerReferences = []metav1.OwnerReference{{Kind: "DaemonSet", Name: "agent", Controller: &yes}}
+	return p
+}
+
+func TestPodsOnNode_SkipsDaemonSetPods(t *testing.T) {
+	// Drain runs with --ignore-daemonsets, so those pods never go. Counting
+	// them would overstate the blast radius and invent budget impacts.
+	cs := fake.NewSimpleClientset(
+		runningPod("prod", "web-1", "node-a", map[string]string{"app": "web"}, true),
+		daemonSetPod("kube-system", "agent-1", "node-a"),
+	)
+
+	got, err := podsOnNodeFrom(t.Context(), cs, "node-a")
+
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "prod", got[0].Namespace)
+}
+
+func TestPodsOnNode_SkipsMirrorPods(t *testing.T) {
+	// A static pod is not removable through the API, so a drain leaves it.
+	mirror := runningPod("kube-system", "etcd-node-a", "node-a", nil, true)
+	mirror.Annotations = map[string]string{"kubernetes.io/config.mirror": "abc123"}
+	cs := fake.NewSimpleClientset(
+		mirror,
+		runningPod("prod", "web-1", "node-a", map[string]string{"app": "web"}, true),
+	)
+
+	got, err := podsOnNodeFrom(t.Context(), cs, "node-a")
+
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "prod", got[0].Namespace)
+}

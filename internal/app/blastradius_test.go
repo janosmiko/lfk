@@ -462,3 +462,47 @@ func TestLoadTab_ReleasesTheFetchedPods(t *testing.T) {
 	assert.Nil(t, m.blast.pods, "a tab switch must not carry another tab's pod list")
 	assert.Nil(t, m.blast.pdbs)
 }
+
+func TestScaleBlastRadius_ReadyBeforeCountsOnlyReadyPods(t *testing.T) {
+	s := blastRadiusState{pods: []k8s.EvictedPod{
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: true},
+		{Namespace: "prod", Ready: false},
+	}}
+
+	got := s.scaleBlastRadius(1)
+
+	require.NotNil(t, got)
+	assert.Equal(t, 2, got.ReadyBefore, "an unready pod is not a ready replica")
+}
+
+func TestLoadBulkBlastRadius_NoPodRowsSkipsTheBudgetLookup(t *testing.T) {
+	// Nothing resolves to a pod, so no budget can be touched. Asking the API
+	// anyway risks losing the uncounted total to a failed call.
+	m := Model{}
+	m.beginBlastRadius()
+	m.bulkItems = []model.Item{
+		{Kind: "Deployment", Namespace: "prod", Name: "web"},
+		{Kind: "StatefulSet", Namespace: "prod", Name: "db"},
+	}
+
+	cmd := m.loadBulkBlastRadius()
+
+	require.NotNil(t, cmd)
+	msg, ok := cmd().(blastRadiusLoadedMsg)
+	require.True(t, ok)
+	require.NoError(t, msg.err)
+	require.NotNil(t, msg.radius)
+	assert.Equal(t, 2, msg.radius.Uncounted, "the rows still have to be reported")
+	assert.Zero(t, msg.radius.Evicting)
+}
+
+func TestHandleConfirmOverlayKey_ConfirmingReleasesTheBlastRadius(t *testing.T) {
+	m := Model{overlay: overlayConfirm, pendingAction: "Evict Replicas"}
+	m.blast.radius = &k8s.BlastRadius{Evicting: 3}
+
+	mdl, _ := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: 'y', Text: "y"})
+
+	assert.Nil(t, mdl.(Model).blast.radius,
+		"the next confirm must not open showing the last one's figures")
+}
