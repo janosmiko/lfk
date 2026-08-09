@@ -432,3 +432,33 @@ func TestHandleScaleOverlayKey_ClosingReleasesTheFetchedPods(t *testing.T) {
 		})
 	}
 }
+
+func TestCloseCurrentOverlay_ReleasesTheFetchedPods(t *testing.T) {
+	// Ctrl+C and the overlay toggle key are intercepted before the
+	// per-overlay handler, so they never reach handleScaleOverlayKey.
+	m := Model{overlay: overlayScaleInput}
+	m.blast.pods = []k8s.EvictedPod{{Namespace: "prod"}}
+	m.blast.pdbs = []policyv1.PodDisruptionBudget{{}}
+
+	mdl, _ := m.closeCurrentOverlay()
+
+	got := mdl.(Model)
+	assert.Nil(t, got.blast.pods)
+	assert.Nil(t, got.blast.pdbs)
+	assert.False(t, got.blast.loading)
+}
+
+func TestLoadTab_ReleasesTheFetchedPods(t *testing.T) {
+	// Switching tabs closes the overlay by assignment, bypassing every
+	// close handler.
+	m := Model{overlay: overlayScaleInput}
+	m.blast.pods = []k8s.EvictedPod{{Namespace: "prod"}}
+	m.blast.pdbs = []policyv1.PodDisruptionBudget{{}}
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+
+	m.loadTab(1)
+
+	assert.Nil(t, m.blast.pods, "a tab switch must not carry another tab's pod list")
+	assert.Nil(t, m.blast.pdbs)
+}

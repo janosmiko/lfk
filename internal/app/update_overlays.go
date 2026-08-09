@@ -58,6 +58,10 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	// or toggle key) abandons the action, so a later single-item action
 	// must not be misrouted through the stale selection.
 	m.resetBulkAction()
+	// Release the blast-radius fetch for the same reason: this is the close
+	// path for Ctrl+C and the toggle key, which never reach the per-overlay
+	// handlers.
+	m.blast.reset()
 	if m.previousOverlay != overlayNone {
 		m.overlay = m.previousOverlay
 		m.previousOverlay = overlayNone
