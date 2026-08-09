@@ -246,7 +246,8 @@ func (m Model) handleObjectExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	if m.objectExplorerView.filterActive {
 		return m.handleObjectExplorerFilterKey(msg)
 	}
-	return m.handleObjectExplorerNavKey(msg)
+	mdl, cmd := m.handleObjectExplorerNavKey(msg)
+	return followFieldDocCursor(mdl, cmd, func(u Model) []string { return u.selectedNodePath() })
 }
 
 // handleObjectExplorerNavKey handles normal browsing keys.
@@ -299,6 +300,10 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.C
 		return m.refreshObjectExplorer()
 	case "I":
 		return m.openExplainAtObjectPath(m.selectedNodePath(), modeObjectExplorer)
+	// Before PreviewDown/PreviewUp: a user who rebinds the footnote onto J or K
+	// gets the footnote, rather than a key that silently does nothing.
+	case kb.FieldDoc:
+		return m.toggleFieldDoc(m.selectedNodePath())
 	case "y":
 		return m.copySelectedNodePath()
 	case "Y":
@@ -507,7 +512,7 @@ func (m *Model) moveObjectExplorerCursor(delta int) {
 // objectExplorerBodyHeight mirrors the contentHeight the renderer uses
 // (title + hint bar + column borders + outer frame consume 6 lines).
 func (m Model) objectExplorerBodyHeight() int {
-	return max(m.height-6, 3)
+	return max(m.height-6-m.fieldDocPaneHeight(), 3)
 }
 
 // previewPaneHeight is the number of YAML lines visible in the preview pane.
@@ -563,9 +568,15 @@ func (m Model) viewObjectExplorer() string {
 		ui.HintEntry{Key: kb.Refresh, Desc: "refresh"},
 		ui.HintEntry{Key: kb.WatchMode, Desc: "live on/off"},
 		ui.HintEntry{Key: "I", Desc: "explain"},
+		ui.HintEntry{Key: kb.FieldDoc, Desc: "field doc"},
 		ui.HintEntry{Key: "q", Desc: "close"},
 	)
 	hint := ui.RenderHintBar(hints, m.width)
+	// The footnote rides above the hint bar, which both the flat and the tree
+	// renderer draw at the bottom of whatever height they are given.
+	if pane := m.renderFieldDocPane(); pane != "" {
+		hint = pane + "\n" + hint
+	}
 
 	title := "Object Explorer: " + rt.title
 	if !m.objectExplorerLive {
@@ -592,7 +603,7 @@ func (m Model) viewObjectExplorer() string {
 		rt.filterBar(),
 		hint,
 		m.width,
-		m.height,
+		m.height-m.fieldDocPaneHeight(),
 	)
 }
 

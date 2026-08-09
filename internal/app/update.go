@@ -134,6 +134,11 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case yamlBlameLoadedMsg:
 		mdl, cmd := m.updateYamlBlameLoaded(msg)
 		return mdl, cmd, true
+	case fieldDocDebounceMsg:
+		mdl, cmd := m.updateFieldDocDebounce(msg)
+		return mdl, cmd, true
+	case fieldDocLoadedMsg:
+		return m.updateFieldDocLoaded(msg), nil, true
 	case yamlLoadedMsg:
 		mdl, cmd := m.updateYamlLoaded(msg)
 		return mdl, cmd, true

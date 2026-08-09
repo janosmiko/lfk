@@ -51,6 +51,7 @@ func (m Model) viewYAML() string {
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},
+			{Key: ui.ActiveKeybindings.FieldDoc, Desc: "field doc"},
 			{Key: "q/esc", Desc: "back"},
 		}
 	}
@@ -78,7 +79,7 @@ func (m Model) viewYAML() string {
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
-	maxLines := max(m.height-4, 3)
+	maxLines := max(m.height-4-m.fieldDocPaneHeight(), 3)
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
 	visLines, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
@@ -186,6 +187,9 @@ func (m Model) viewYAML() string {
 	borderStyle := ui.FullscreenBorderStyle(m.width, maxLines)
 	body := borderStyle.Render(bodyContent)
 
+	if pane := m.renderFieldDocPane(); pane != "" {
+		return lipgloss.JoinVertical(lipgloss.Left, title, body, pane, hint)
+	}
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
 }
 

@@ -162,6 +162,7 @@ and follow their own dismissal rules.
 | ------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `overlayErrorLog`  | `!`             | Application error log overlay (lfk's own error buffer). Has its own `errorLogFullscreen` toggle for full-screen mode. |
 | `commandBarActive` | `:`             | Bottom-of-screen `:command [args]` input with autocomplete, history, and ghost-text preview.                          |
+| `fieldDoc.on`      | `Ctrl+K`        | Schema footnote pane in the YAML viewer and Object Explorer. Shows the cluster's description of the field under the cursor and follows it as the cursor moves. Takes its 6 lines out of the body above it, so both `yamlViewportLines` and `objectExplorerBodyHeight` subtract it. |
 
 ## Adding a new view, fullscreen flag, or overlay
 

@@ -56,6 +56,7 @@ type Keybindings struct {
 	SecretToggle      string `json:"secret_toggle" yaml:"secret_toggle"`
 	FinalizerSearch   string `json:"finalizer_search" yaml:"finalizer_search"`
 	APIExplorer       string `json:"api_explorer" yaml:"api_explorer"`
+	FieldDoc          string `json:"field_doc" yaml:"field_doc"`
 	ObjectExplorer    string `json:"object_explorer" yaml:"object_explorer"`
 	TreeView          string `json:"tree_view" yaml:"tree_view"`
 	RBACBrowser       string `json:"rbac_browser" yaml:"rbac_browser"`
@@ -229,6 +230,10 @@ func DefaultKeybindings() Keybindings {
 		ToggleFollow: "F", ToggleTimestamps: "s", TogglePrefixes: "p", ToggleUnified: "u",
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",
 		FinalizerSearch: "ctrl+g", APIExplorer: "I", ObjectExplorer: "O", RBACBrowser: "U",
+		// Schema footnote. "ctrl+k" and not "K": K is PreviewUp, and the
+		// footnote has to work in the Object Explorer, which scrolls its
+		// preview pane with J/K.
+		FieldDoc: "ctrl+k",
 		// "T" is also the explorer-level ThemeSelector; TreeView only dispatches
 		// inside the Object/API Explorer modes, which have their own handlers.
 		TreeView:      "T",

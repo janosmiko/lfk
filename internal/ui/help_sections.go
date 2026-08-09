@@ -298,6 +298,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{"ctrl+e", "Edit resource in editor"},
 				{"O", "Open Object Explorer at the attribute under cursor"},
 				{"I", "Open API Explorer at the schema of the attribute"},
+				{kb.FieldDoc, "Toggle schema description of the field under cursor"},
 				{"q/esc", "Back to explorer"},
 			}...),
 		},
@@ -357,6 +358,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 				{"Y", "Yank the selected node's full YAML"},
 				{"P", "Open the whole resource in the YAML viewer"},
 				{"I", "Open API Explorer at the schema of the item"},
+				{kb.FieldDoc, "Toggle schema description of the item under cursor"},
 			}, append(objectExplorerScrollEntries(kb), []helpEntry{
 				// Two rows, not "q/esc": objectexplorer.go:258-274 gives them
 				// different jobs — q always closes, esc walks out one step at

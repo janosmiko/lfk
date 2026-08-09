@@ -141,6 +141,10 @@ var whichKeyYAMLActionList = []wkAction[*wkYAMLCtx]{
 	{Key: whichKeyHelpKey, Label: "Full help", Group: wkViews, Avail: wkYAMLNormal},
 	{Key: wkLiteralKey("O"), Label: "Object Explorer", Group: wkViews, Avail: wkYAMLObjectExplorerAvailable},
 	{Key: wkLiteralKey("I"), Label: "API Explorer", Group: wkViews, Avail: wkYAMLAPIExplorerAvailable},
+	// update_yaml.go — kb.FieldDoc, read from the binding because the handler
+	// reads it too, so a rebind shows the key the user actually presses. The
+	// availability rule is the API Explorer's: both need a resolvable type.
+	{Key: func(kb ui.Keybindings) string { return kb.FieldDoc }, Label: "Field description", Group: wkViews, Avail: wkYAMLAPIExplorerAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.Refresh }, Label: "Re-fetch YAML", Group: wkActions, Avail: wkYAMLRefreshAvailable},
 	{Key: wkLiteralKey("ctrl+e"), Label: "Edit in $EDITOR", Group: wkActions, Avail: wkYAMLEditAvailable},
 
