@@ -64,9 +64,9 @@ func (s *blastRadiusState) scaleBlastRadius(target int) *k8s.BlastRadius {
 // shows. A violation is a second, warning-styled note rather than words inside
 // the first one, so the color carries the meaning on its own.
 //
-// showReplicas is false for a node drain, which has no single workload whose
-// replica count would mean anything.
-func blastRadiusNotes(r *k8s.BlastRadius, loading, showReplicas bool) []ui.ConfirmNote {
+// Drain and bulk have no single workload, so they carry no replica count and
+// the phrase is left out rather than printed as "0 of 0".
+func blastRadiusNotes(r *k8s.BlastRadius, loading bool) []ui.ConfirmNote {
 	if loading {
 		return []ui.ConfirmNote{{Text: "Blast radius: checking disruption budgets..."}}
 	}
@@ -78,7 +78,7 @@ func blastRadiusNotes(r *k8s.BlastRadius, loading, showReplicas bool) []ui.Confi
 	}
 
 	parts := []string{fmt.Sprintf("%d %s", r.Evicting, plural(r.Evicting, "pod", "pods"))}
-	if showReplicas {
+	if r.ReadyBefore > 0 {
 		parts = append(parts, fmt.Sprintf("%d of %d ready after", r.ReadyAfter, r.ReadyBefore))
 	}
 	parts = append(parts, budgetSummary(r.PDBs))
@@ -87,20 +87,10 @@ func blastRadiusNotes(r *k8s.BlastRadius, loading, showReplicas bool) []ui.Confi
 	}
 
 	notes := []ui.ConfirmNote{{Text: "Blast radius: " + strings.Join(parts, ", ")}}
-	if violated := violatedBudgets(r.PDBs); violated != "" {
+	if violated := violatedBudgets(r.PDBs, len(r.PDBs) == 1); violated != "" {
 		notes = append(notes, ui.ConfirmNote{Text: violated, Warn: true})
 	}
 	return notes
-}
-
-// blastRadiusRows is how many rows the notes add to the box, counting the
-// blank line each one is followed by and any wrapping at the box width.
-func blastRadiusRows(notes []ui.ConfirmNote, inner int) int {
-	rows := 0
-	for _, n := range notes {
-		rows += ui.WrappedLineCount(n.Text, inner) + 1
-	}
-	return rows
 }
 
 // budgetSummary names one budget in full and counts the rest. Naming every
@@ -118,20 +108,24 @@ func budgetSummary(pdbs []k8s.PDBImpact) string {
 }
 
 // violatedBudgets states the shortfall for each budget the action would
-// breach, so the user sees which one blocks and by how much.
-func violatedBudgets(pdbs []k8s.PDBImpact) string {
+// breach. named is false when the line above already names the only budget,
+// because repeating a long namespace and name there wraps the box for nothing.
+func violatedBudgets(pdbs []k8s.PDBImpact, sole bool) string {
 	var out []string
 	for _, p := range pdbs {
 		if !p.Violated {
 			continue
 		}
-		out = append(out, fmt.Sprintf("%s/%s allows %d, needs %d",
-			p.Namespace, p.Name, p.AllowedBefore, p.Evicting))
+		over := -p.AllowedAfter
+		if sole {
+			return fmt.Sprintf("Over budget by %d", over)
+		}
+		out = append(out, fmt.Sprintf("%s/%s by %d", p.Namespace, p.Name, over))
 	}
 	if len(out) == 0 {
 		return ""
 	}
-	return "Violates " + strings.Join(out, "; ")
+	return "Over budget: " + strings.Join(out, "; ")
 }
 
 // bulkPodTargets splits a bulk selection into the pod names to look up, keyed

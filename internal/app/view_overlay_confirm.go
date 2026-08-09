@@ -31,10 +31,8 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 		choiceLabel, choiceValue, choiceWarn = cascadeChoiceRow(m.deletePropagation(), w-4)
 		h = min(10, m.height-6)
 	}
-	// A drain has no single workload, so its line drops the replica count.
-	notes := blastRadiusNotes(m.blast.radius, m.blast.loading, m.pendingAction != "Drain")
-	h = min(h+blastRadiusRows(notes, w-4), m.height-6)
-	return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+	notes := blastRadiusNotes(m.blast.radius, m.blast.loading)
+	content := ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
 		Title:       title,
 		Warning:     warning,
 		ChoiceLabel: choiceLabel,
@@ -42,7 +40,13 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 		ChoiceWarn:  choiceWarn,
 		Notes:       notes,
 		WrapWidth:   w - 4,
-	}), w, h, true
+	})
+	if len(notes) > 0 {
+		// Measure the wrapped result rather than guessing rows on top of a
+		// base height. Guessing left several blank rows under the text.
+		h = min(max(h, lipgloss.Height(content)), m.height-6)
+	}
+	return content, w, h, true
 }
 
 // cascadeChoiceRow builds the Cascade row for a confirm box of inner width

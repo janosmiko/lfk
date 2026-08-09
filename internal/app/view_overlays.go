@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -156,13 +158,18 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		// Recomputed from the pods already fetched, so the line follows the
 		// number as it is typed without another call per digit.
 		target, _ := strconv.Atoi(m.scaleInput.Value)
-		notes := blastRadiusNotes(m.blast.scaleBlastRadius(target), m.blast.loading, true)
-		return ui.RenderOverlayInput(ui.OverlayInputConfig{
+		notes := blastRadiusNotes(m.blast.scaleBlastRadius(target), m.blast.loading)
+		scaleContent := ui.RenderOverlayInput(ui.OverlayInputConfig{
 			Title: "Scale Deployment",
 			Width: w - 4,
 			Rows:  []ui.OverlayInputRow{{Label: "Replicas: ", Input: m.scaleInput.Value, ShowCursor: true, Cursor: m.scaleInput.Cursor}},
 			Notes: notes,
-		}), w, min(8+blastRadiusRows(notes, w-4), m.height-6), true
+		})
+		scaleH := min(8, m.height-6)
+		if len(notes) > 0 {
+			scaleH = min(max(scaleH, lipgloss.Height(scaleContent)), m.height-6)
+		}
+		return scaleContent, w, scaleH, true
 	case overlayHPAScale:
 		w := min(56, m.width-10)
 		return ui.RenderOverlayInput(ui.OverlayInputConfig{

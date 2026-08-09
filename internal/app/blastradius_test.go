@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestBlastRadiusNotes_LoadingShowsAPlaceholder(t *testing.T) {
-	notes := blastRadiusNotes(nil, true, true)
+	notes := blastRadiusNotes(nil, true)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "checking")
@@ -23,14 +24,14 @@ func TestBlastRadiusNotes_LoadingShowsAPlaceholder(t *testing.T) {
 }
 
 func TestBlastRadiusNotes_NothingYetAndNotLoadingIsSilent(t *testing.T) {
-	assert.Empty(t, blastRadiusNotes(nil, false, true),
+	assert.Empty(t, blastRadiusNotes(nil, false),
 		"a dialog that never asked for a blast radius must look untouched")
 }
 
 func TestBlastRadiusNotes_WorkloadShowsReplicasRemaining(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 2, ReadyBefore: 5, ReadyAfter: 3}
 
-	notes := blastRadiusNotes(r, false, true)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "2 pods")
@@ -40,7 +41,7 @@ func TestBlastRadiusNotes_WorkloadShowsReplicasRemaining(t *testing.T) {
 func TestBlastRadiusNotes_DrainOmitsTheReplicaCount(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 12, ReadyBefore: 0, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "12 pods")
@@ -51,7 +52,7 @@ func TestBlastRadiusNotes_DrainOmitsTheReplicaCount(t *testing.T) {
 func TestBlastRadiusNotes_NoBudgetSaysSo(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 1, ReadyBefore: 3, ReadyAfter: 2}
 
-	notes := blastRadiusNotes(r, false, true)
+	notes := blastRadiusNotes(r, false)
 
 	assert.Contains(t, notes[0].Text, "no disruption budget")
 }
@@ -62,7 +63,7 @@ func TestBlastRadiusNotes_SingleBudgetShowsBeforeAndAfter(t *testing.T) {
 		PDBs: []k8s.PDBImpact{{Namespace: "prod", Name: "web-pdb", AllowedBefore: 2, AllowedAfter: 0, Evicting: 2}},
 	}
 
-	notes := blastRadiusNotes(r, false, true)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "web-pdb 2 -> 0 allowed")
@@ -78,7 +79,7 @@ func TestBlastRadiusNotes_SeveralBudgetsAreCounted(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "2 disruption budgets",
@@ -93,14 +94,14 @@ func TestBlastRadiusNotes_ViolationGetsItsOwnWarningLine(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, true)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.False(t, notes[0].Warn)
 	assert.True(t, notes[1].Warn, "AC: a violation is marked by color, not only by words")
-	assert.Contains(t, notes[1].Text, "prod/web-pdb")
-	assert.Contains(t, notes[1].Text, "allows 1")
-	assert.Contains(t, notes[1].Text, "needs 2")
+	assert.Contains(t, notes[0].Text, "web-pdb", "the first line names the budget")
+	assert.Contains(t, notes[1].Text, "Over budget by 1",
+		"one eviction past a budget allowing one is an overage of one")
 }
 
 func TestBlastRadiusNotes_SeveralViolationsAreListedOnOneLine(t *testing.T) {
@@ -112,7 +113,7 @@ func TestBlastRadiusNotes_SeveralViolationsAreListedOnOneLine(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.True(t, notes[1].Warn)
@@ -123,7 +124,7 @@ func TestBlastRadiusNotes_SeveralViolationsAreListedOnOneLine(t *testing.T) {
 func TestBlastRadiusNotes_NothingToEvictIsStated(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 0, ReadyBefore: 0, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, true)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "no running pods")
@@ -132,7 +133,7 @@ func TestBlastRadiusNotes_NothingToEvictIsStated(t *testing.T) {
 func TestBlastRadiusNotes_OnePodReadsAsSingular(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 1, ReadyBefore: 1, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, true)
+	notes := blastRadiusNotes(r, false)
 
 	assert.Contains(t, notes[0].Text, "1 pod,")
 	assert.NotContains(t, notes[0].Text, "1 pods")
@@ -304,7 +305,7 @@ func TestBulkPodTargets_CountsRowsItCannotResolve(t *testing.T) {
 func TestBlastRadiusNotes_UncountedRowsAreStated(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 3, ReadyBefore: 0, ReadyAfter: 0, Uncounted: 2}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := blastRadiusNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "2 rows not counted")
@@ -505,4 +506,72 @@ func TestHandleConfirmOverlayKey_ConfirmingReleasesTheBlastRadius(t *testing.T) 
 
 	assert.Nil(t, mdl.(Model).blast.radius,
 		"the next confirm must not open showing the last one's figures")
+}
+
+func TestBlastRadiusNotes_ZeroReadyBeforeDropsThePhrase(t *testing.T) {
+	// Bulk and drain have no single workload, so readyBefore is 0 and
+	// "0 of 0 ready after" says nothing.
+	r := &k8s.BlastRadius{Evicting: 5, ReadyBefore: 0, ReadyAfter: 0}
+
+	notes := blastRadiusNotes(r, false)
+
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0].Text, "5 pods")
+	assert.NotContains(t, notes[0].Text, "ready after")
+}
+
+func TestBlastRadiusNotes_ViolationDoesNotRepeatTheBudgetName(t *testing.T) {
+	// The line above already names the budget in full. Repeating a long
+	// namespace/name pair wraps the box and reads as noise.
+	r := &k8s.BlastRadius{
+		Evicting: 5, Violation: true,
+		PDBs: []k8s.PDBImpact{{
+			Namespace: "data-platform-dev", Name: "data-platform-postgres-primary",
+			AllowedBefore: 0, AllowedAfter: -1, Evicting: 1, Violated: true,
+		}},
+	}
+
+	notes := blastRadiusNotes(r, false)
+
+	require.Len(t, notes, 2)
+	assert.Contains(t, notes[0].Text, "data-platform-postgres-primary")
+	assert.NotContains(t, notes[1].Text, "data-platform-postgres-primary",
+		"one mention of the name is enough")
+	assert.Contains(t, notes[1].Text, "1")
+	assert.True(t, notes[1].Warn)
+}
+
+func TestBlastRadiusNotes_SeveralViolationsStillNameThem(t *testing.T) {
+	// With more than one budget the first line only counts them, so the
+	// warning line has to say which ones.
+	r := &k8s.BlastRadius{
+		Evicting: 4, Violation: true,
+		PDBs: []k8s.PDBImpact{
+			{Namespace: "prod", Name: "web-pdb", AllowedBefore: 1, AllowedAfter: -1, Evicting: 2, Violated: true},
+			{Namespace: "prod", Name: "api-pdb", AllowedBefore: 0, AllowedAfter: -2, Evicting: 2, Violated: true},
+		},
+	}
+
+	notes := blastRadiusNotes(r, false)
+
+	require.Len(t, notes, 2)
+	assert.Contains(t, notes[1].Text, "web-pdb")
+	assert.Contains(t, notes[1].Text, "api-pdb")
+}
+
+func TestRenderOverlayConfirm_HeightMatchesTheContent(t *testing.T) {
+	m := Model{width: 80, height: 40, pendingAction: "Delete", confirmAction: "5 resources"}
+	m.blast.radius = &k8s.BlastRadius{
+		Evicting: 5, Violation: true,
+		PDBs: []k8s.PDBImpact{{
+			Namespace: "data-platform-dev", Name: "data-platform-postgres-primary",
+			AllowedBefore: 0, AllowedAfter: -1, Evicting: 1, Violated: true,
+		}},
+	}
+
+	out, _, h, _ := m.renderOverlayConfirm()
+
+	lines := len(strings.Split(strings.TrimRight(stripANSI(out), "\n"), "\n"))
+	assert.LessOrEqual(t, h-lines, 2, "the box must not leave rows of empty space below the text")
+	assert.GreaterOrEqual(t, h, lines, "and it must not clip the text either")
 }
