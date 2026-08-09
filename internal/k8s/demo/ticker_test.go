@@ -29,6 +29,78 @@ func crashLoopContainerStatus(t *testing.T, dyn *dynamicfake.FakeDynamicClient) 
 	return cs
 }
 
+// podEffectivelyRunning reports whether a pod's Phase is Running and its
+// Ready condition is True, mirroring the app's pod-health classification
+// closely enough to catch the crashlooping pod (Phase Running, Ready False)
+// and a Pending flip (Phase Pending) as not-running.
+func podEffectivelyRunning(obj map[string]any) bool {
+	phase, _, _ := unstructured.NestedString(obj, "status", "phase")
+	if phase != "Running" {
+		return false
+	}
+	conditions, _, _ := unstructured.NestedSlice(obj, "status", "conditions")
+	for _, c := range conditions {
+		cm, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		if cm["type"] == "Ready" {
+			return cm["status"] == "True"
+		}
+	}
+	return false
+}
+
+// TestTicker_FullCycleInvariants drives the ticker across a full cycle
+// (the LCM of every per-field cycle length: healthyPodFlipEvery, len(
+// waitingReasons), len(deploymentReadyReplicaCycle)) and asserts the two
+// demo-polish invariants: Running pods stay a strict majority of all pods at
+// every tick, and the web Deployment reports fully ready for a majority of
+// the ticks in the cycle.
+func TestTicker_FullCycleInvariants(t *testing.T) {
+	dyn := NewDynamicClient()
+	tk := NewTicker(dyn, time.Hour)
+	ctx := t.Context()
+
+	const cycleLen = 30 // lcm(5, 2, 3)
+
+	deployClient := dyn.Resource(deploymentGVR).Namespace(NamespaceDemo)
+	deployObj, err := deployClient.Get(ctx, DeploymentWeb, metav1.GetOptions{})
+	require.NoError(t, err)
+	desired, _, err := unstructured.NestedInt64(deployObj.Object, "spec", "replicas")
+	require.NoError(t, err)
+	require.Positive(t, desired)
+
+	readyTicks := 0
+	for i := range cycleLen {
+		require.NoError(t, tk.Tick(ctx))
+
+		podList, err := dyn.Resource(podGVR).Namespace("").List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+
+		var running int
+		for _, item := range podList.Items {
+			if podEffectivelyRunning(item.Object) {
+				running++
+			}
+		}
+		total := len(podList.Items)
+		assert.Greater(t, running*2, total,
+			"tick %d: expected Running pods to be a strict majority (%d running of %d total)", i, running, total)
+
+		deployObj, err := deployClient.Get(ctx, DeploymentWeb, metav1.GetOptions{})
+		require.NoError(t, err)
+		ready, _, err := unstructured.NestedInt64(deployObj.Object, "status", "readyReplicas")
+		require.NoError(t, err)
+		if ready >= desired {
+			readyTicks++
+		}
+	}
+
+	assert.Greater(t, readyTicks*2, cycleLen,
+		"expected the web Deployment to be fully ready for a majority of the cycle (%d/%d ticks ready)", readyTicks, cycleLen)
+}
+
 func TestTicker_TickRaisesRestartCountByOnePerCall(t *testing.T) {
 	dyn := NewDynamicClient()
 	tk := NewTicker(dyn, time.Hour)

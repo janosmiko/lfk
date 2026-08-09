@@ -23,6 +23,7 @@ func seededGVRs() []schema.GroupVersionResource {
 		{Group: "", Version: "v1", Resource: "configmaps"},
 		{Group: "", Version: "v1", Resource: "nodes"},
 		{Group: "", Version: "v1", Resource: "events"},
+		{Group: "", Version: "v1", Resource: "namespaces"},
 		{Group: "apps", Version: "v1", Resource: "deployments"},
 		{Group: "apps", Version: "v1", Resource: "replicasets"},
 		{Group: "batch", Version: "v1", Resource: "jobs"},
@@ -40,6 +41,49 @@ func TestNewDynamicClient_ListsEverySeededKind(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotEmpty(t, list.Items, "expected at least one seeded object for %s", gvr)
 		})
+	}
+}
+
+// TestNamespaces_EveryReferencedNamespaceHasAnObject holds the invariant
+// that made "Namespaces: 0" possible: every namespace any seeded namespaced
+// object lives in must have a matching Namespace object, or GetNamespaces
+// (which lists Namespace objects directly, not derived from workloads)
+// reports fewer namespaces than the cluster actually uses. This guards
+// against a future namespace being introduced into the seed data without a
+// matching Namespace object.
+func TestNamespaces_EveryReferencedNamespaceHasAnObject(t *testing.T) {
+	dyn := NewDynamicClient()
+	ctx := t.Context()
+
+	nsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
+	nsList, err := dyn.Resource(nsGVR).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+
+	seeded := map[string]bool{}
+	for _, item := range nsList.Items {
+		seeded[item.GetName()] = true
+	}
+
+	assert.True(t, seeded[NamespaceDemo], "expected a Namespace object for %q", NamespaceDemo)
+	assert.True(t, seeded[NamespaceJobs], "expected a Namespace object for %q", NamespaceJobs)
+	assert.True(t, seeded["default"], `expected a Namespace object for "default"`)
+	assert.True(t, seeded["kube-system"], `expected a Namespace object for "kube-system"`)
+
+	for _, gvr := range seededGVRs() {
+		if gvr.Resource == "namespaces" {
+			continue
+		}
+		list, err := dyn.Resource(gvr).Namespace("").List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+		for _, item := range list.Items {
+			ns := item.GetNamespace()
+			if ns == "" {
+				continue // cluster-scoped object
+			}
+			assert.True(t, seeded[ns],
+				"%s %s/%s references namespace %q with no matching Namespace object",
+				gvr.Resource, ns, item.GetName(), ns)
+		}
 	}
 }
 

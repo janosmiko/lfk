@@ -35,7 +35,10 @@ func webContainerSpec() corev1.Container {
 func buildDeployment() *appsv1.Deployment {
 	created := demoEpoch.Add(-7 * 24 * time.Hour)
 	labels := map[string]string{"app": "web"}
-	replicas := int32(3)
+	// 6 desired replicas: 5 healthy plus the one crashlooping pod, so the
+	// crashloop stays the single obviously-unhealthy workload among a
+	// mostly-healthy deployment instead of dominating a tiny replica set.
+	replicas := int32(6)
 	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,10 +64,10 @@ func buildDeployment() *appsv1.Deployment {
 			},
 		},
 		Status: appsv1.DeploymentStatus{
-			Replicas:          3,
-			ReadyReplicas:     2,
-			AvailableReplicas: 2,
-			UpdatedReplicas:   3,
+			Replicas:          6,
+			ReadyReplicas:     5,
+			AvailableReplicas: 5,
+			UpdatedReplicas:   6,
 			Conditions: []appsv1.DeploymentCondition{
 				{
 					Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue,
@@ -83,7 +86,7 @@ func buildDeployment() *appsv1.Deployment {
 func buildReplicaSet() *appsv1.ReplicaSet {
 	created := demoEpoch.Add(-7 * 24 * time.Hour)
 	labels := webPodTemplateLabels()
-	replicas := int32(3)
+	replicas := int32(6)
 	controller, block := true, true
 	return &appsv1.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "ReplicaSet"},
@@ -112,14 +115,21 @@ func buildReplicaSet() *appsv1.ReplicaSet {
 				Spec:       corev1.PodSpec{Containers: []corev1.Container{webContainerSpec()}},
 			},
 		},
-		Status: appsv1.ReplicaSetStatus{Replicas: 3, ReadyReplicas: 2, AvailableReplicas: 2},
+		Status: appsv1.ReplicaSetStatus{Replicas: 6, ReadyReplicas: 5, AvailableReplicas: 5},
 	}
 }
 
+// buildWebPods returns the "web" ReplicaSet's pods: 5 healthy pods (one of
+// which the Ticker flips between Running and Pending) and the single
+// crashlooping pod, so Running pods stay a majority throughout the ticker
+// cycle.
 func buildWebPods() []*corev1.Pod {
 	return []*corev1.Pod{
 		healthyWebPod(PodWebHealthy1, uidPodWebHealthy1, "10.0.2.11"),
 		healthyWebPod(PodWebHealthy2, uidPodWebHealthy2, "10.0.2.12"),
+		healthyWebPod(PodWebHealthy3, uidPodWebHealthy3, "10.0.2.14"),
+		healthyWebPod(PodWebHealthy4, uidPodWebHealthy4, "10.0.2.15"),
+		healthyWebPod(PodWebHealthy5, uidPodWebHealthy5, "10.0.2.16"),
 		crashLoopWebPod(),
 	}
 }

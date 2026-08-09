@@ -37,8 +37,10 @@ var (
 var waitingReasons = []string{"CrashLoopBackOff", "Error"}
 
 // deploymentReadyReplicaCycle is the sequence of readyReplicas values the
-// web Deployment cycles through, out of its 3 desired replicas.
-var deploymentReadyReplicaCycle = []int64{2, 1, 3}
+// web Deployment cycles through, out of its 6 desired replicas. Two of the
+// three values are fully ready so the deployment reads as ready for a
+// majority of the cycle, dipping once for a still-visible sign of drift.
+var deploymentReadyReplicaCycle = []int64{6, 6, 5}
 
 // Ticker mutates a demo cluster's fake dynamic client on a fixed interval so
 // its informer-backed watchers see live changes: the crashlooping pod

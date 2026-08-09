@@ -76,6 +76,7 @@ func APIResourceLists() []*metav1.APIResourceList {
 				{Name: "configmaps", Namespaced: true, Kind: "ConfigMap", Verbs: rw},
 				{Name: "nodes", Namespaced: false, Kind: "Node", Verbs: rw},
 				{Name: "events", Namespaced: true, Kind: "Event", Verbs: rw},
+				{Name: "namespaces", Namespaced: false, Kind: "Namespace", Verbs: rw},
 			},
 		},
 		{
