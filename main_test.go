@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -38,5 +39,43 @@ func TestArmForceQuit_KillsThenExitsAfterGrace(t *testing.T) {
 
 	if got[0] != "kill" || got[1] != "exit" {
 		t.Fatalf("expected kill then exit, got %v", got)
+	}
+}
+
+// validatePprofAddr must refuse every bind-all or non-loopback form of
+// LFK_PPROF_ADDR: the pprof endpoint exposes process internals (heap,
+// goroutines, env strings) and must never be reachable off-box.
+func TestValidatePprofAddr(t *testing.T) {
+	valid := []string{
+		"localhost:6060",
+		"127.0.0.1:6060",
+		"[::1]:6060",
+	}
+	for _, addr := range valid {
+		if err := validatePprofAddr(addr); err != nil {
+			t.Errorf("validatePprofAddr(%q) = %v, want nil", addr, err)
+		}
+	}
+
+	invalid := []struct {
+		addr, wantContains string
+	}{
+		{":6060", "loopback"},
+		{"0.0.0.0:6060", "loopback"},
+		{"[::]:6060", "loopback"},
+		{"10.0.0.1:6060", "loopback"},
+		{"example.com:6060", "not an IP"},
+		{"127.0.0.1", "invalid host:port"},
+		{"", "invalid host:port"},
+	}
+	for _, tt := range invalid {
+		err := validatePprofAddr(tt.addr)
+		if err == nil {
+			t.Errorf("validatePprofAddr(%q) = nil, want error", tt.addr)
+			continue
+		}
+		if !strings.Contains(err.Error(), tt.wantContains) {
+			t.Errorf("validatePprofAddr(%q) error = %q, want it to contain %q", tt.addr, err, tt.wantContains)
+		}
 	}
 }
