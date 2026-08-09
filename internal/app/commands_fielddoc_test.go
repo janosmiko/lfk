@@ -153,20 +153,25 @@ func TestExecKubectlExplainFieldReportsMissingKubectl(t *testing.T) {
 // does in the real failure, and CombinedOutput reads to EOF. Only cmd.WaitDelay
 // gets the worker back. Without it this hangs for the full sleep.
 func TestExecKubectlExplainFieldStopsOnCancel(t *testing.T) {
-	fakeKubectl(t, "sleep 60 &\nwait")
+	argvPath := fakeKubectl(t, "sleep 60 &\nwait")
 	m := fieldDocExecModel(t)
 	ctx, cancel := context.WithCancel(t.Context())
 
 	done := make(chan tea.Msg, 1)
-	started := time.Now()
 	go func() {
 		done <- m.execKubectlExplainField(ctx, 1,
 			fieldDocKey{context: "test-ctx", resource: "pods", path: "spec"})()
 	}()
 
-	// Let the process actually start, or this would only prove that an
+	// The stub writes its argv first, so the file appearing means the process
+	// is really running. Cancelling before that would only prove that an
 	// already-cancelled context never spawns one.
-	time.Sleep(300 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(argvPath)
+		return err == nil
+	}, 10*time.Second, 20*time.Millisecond, "the stub kubectl never started")
+
+	cancelledAt := time.Now()
 	cancel()
 
 	select {
@@ -174,9 +179,13 @@ func TestExecKubectlExplainFieldStopsOnCancel(t *testing.T) {
 		got, ok := res.(fieldDocLoadedMsg)
 		require.True(t, ok)
 		assert.Error(t, got.err, "a killed process reports an error, which the pane then ignores")
-		assert.Less(t, time.Since(started), 30*time.Second,
-			"the process must die on cancel, not run out its 60 second sleep")
-	case <-time.After(30 * time.Second):
+		// Well under fieldDocFetchTimeout, so a fetch that ignored cancellation
+		// and merely ran out its 15 second deadline cannot pass this. The
+		// allowance covers cmd.WaitDelay, which is what unblocks the read when
+		// the backgrounded sleep keeps holding the pipe.
+		assert.Less(t, time.Since(cancelledAt), fieldDocFetchTimeout/2,
+			"cancelling must end the fetch, not leave it to the deadline")
+	case <-time.After(fieldDocFetchTimeout / 2):
 		t.Fatal("cancelling the request did not stop the kubectl process")
 	}
 }
