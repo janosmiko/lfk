@@ -281,10 +281,9 @@ func TestBulkPodTargets_GroupsPodsByNamespace(t *testing.T) {
 	byNS, uncounted := bulkPodTargets(items)
 
 	assert.Zero(t, uncounted)
-	assert.Equal(t, map[string]map[string]bool{
-		"prod":    {"web-1": true, "web-2": true},
-		"staging": {"web-1": true},
-	}, byNS)
+	require.Len(t, byNS, 2)
+	assert.Equal(t, map[string]bool{"web-1": true, "web-2": true}, byNS["prod"].names)
+	assert.Equal(t, map[string]bool{"web-1": true}, byNS["staging"].names)
 }
 
 func TestBulkPodTargets_CountsRowsItCannotResolve(t *testing.T) {
@@ -621,4 +620,50 @@ func TestUsesNodePods(t *testing.T) {
 	assert.True(t, usesNodePods(true, ""), "a drain is always the node's pods")
 	assert.False(t, usesNodePods(false, "Deployment"))
 	assert.False(t, usesNodePods(false, "Pod"))
+}
+
+func deployRow(ns, name, app string) model.Item {
+	return model.Item{Kind: "Deployment", Namespace: ns, Name: name, Raw: map[string]any{
+		"spec": map[string]any{"selector": map[string]any{"matchLabels": map[string]any{"app": app}}},
+	}}
+}
+
+func TestBulkPodTargets_ResolvesWorkloadRowsFromTheirOwnObject(t *testing.T) {
+	// A list row carries the source object, so a selected Deployment needs no
+	// extra call to say which pods it claims.
+	items := []model.Item{
+		deployRow("kyverno", "kyverno-admission-controller", "admission"),
+		deployRow("kyverno", "kyverno-background-controller", "background"),
+	}
+
+	byNS, uncounted := bulkPodTargets(items)
+
+	assert.Zero(t, uncounted, "both rows carry a selector, so nothing is unresolved")
+	require.Contains(t, byNS, "kyverno")
+	assert.Len(t, byNS["kyverno"].selectors, 2)
+}
+
+func TestBulkPodTargets_CountsOnlyRowsItTrulyCannotResolve(t *testing.T) {
+	items := []model.Item{
+		bulkItem("Pod", "prod", "web-1"),
+		deployRow("prod", "web", "web"),
+		{Kind: "ConfigMap", Namespace: "prod", Name: "settings"},
+	}
+
+	byNS, uncounted := bulkPodTargets(items)
+
+	assert.Equal(t, 1, uncounted, "a ConfigMap owns no pods and has no selector")
+	assert.Len(t, byNS["prod"].names, 1)
+	assert.Len(t, byNS["prod"].selectors, 1)
+}
+
+func TestBlastRadiusNotes_NoPodsStillReportsUncountedRows(t *testing.T) {
+	// The zero-pods shortcut used to return early and silently drop the
+	// count of rows the figures leave out.
+	r := &k8s.BlastRadius{Evicting: 0, Uncounted: 2}
+
+	notes := blastRadiusNotes(r, false, false)
+
+	require.NotEmpty(t, notes)
+	assert.Contains(t, notes[0].Text, "2 rows not counted")
 }

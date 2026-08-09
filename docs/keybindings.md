@@ -230,7 +230,7 @@ The dialog also states what the action costs, as two labelled rows:
 
 A budget the action would breach is shown in the warning color. Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
 
-Bulk delete shows one line for the whole selection. Workload rows are reported as `N rows not counted`: resolving their pods would cost one API call per selected row.
+Bulk delete shows one line for the whole selection, resolved from the rows themselves at one pod list per namespace. A row that owns no pods, a ConfigMap say, is reported as `N rows not counted`.
 
 ### Force delete confirm dialog
 

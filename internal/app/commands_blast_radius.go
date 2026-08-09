@@ -3,9 +3,12 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 	policyv1 "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -134,13 +137,17 @@ func (m Model) loadBulkBlastRadius() tea.Cmd {
 		bgtaskTarget(ctxName, ""),
 		func(ctx context.Context) tea.Msg {
 			var evicting []k8s.EvictedPod
-			for namespace, names := range byNS {
+			for namespace, want := range byNS {
 				pods, err := client.PodsInNamespace(ctx, ctxName, namespace)
 				if err != nil {
 					return blastRadiusLoadedMsg{req: req, err: err}
 				}
+				selectors, err := compileSelectors(want.selectors)
+				if err != nil {
+					return blastRadiusLoadedMsg{req: req, err: err}
+				}
 				for _, p := range pods {
-					if names[p.Name] {
+					if want.names[p.Name] || matchesAny(selectors, p.Labels) {
 						evicting = append(evicting, p.EvictedPod)
 					}
 				}
@@ -162,6 +169,32 @@ func (m Model) loadBulkBlastRadius() tea.Cmd {
 			return blastRadiusLoadedMsg{radius: &radius, req: req}
 		},
 	)
+}
+
+// compileSelectors turns the label selectors of the selected workloads into
+// matchers once per namespace, rather than once per pod.
+func compileSelectors(sels []*metav1.LabelSelector) ([]labels.Selector, error) {
+	out := make([]labels.Selector, 0, len(sels))
+	for _, s := range sels {
+		sel, err := metav1.LabelSelectorAsSelector(s)
+		if err != nil {
+			return nil, fmt.Errorf("reading a selected workload's selector: %w", err)
+		}
+		out = append(out, sel)
+	}
+	return out, nil
+}
+
+// matchesAny reports whether any selected workload claims this pod. A pod
+// claimed by two of them is still removed once.
+func matchesAny(sels []labels.Selector, podLabels map[string]string) bool {
+	set := labels.Set(podLabels)
+	for _, s := range sels {
+		if s.Matches(set) {
+			return true
+		}
+	}
+	return false
 }
 
 // usesNodePods reports whether the action's blast radius is every pod on a

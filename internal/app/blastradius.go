@@ -79,7 +79,12 @@ func blastRadiusNotes(r *k8s.BlastRadius, loading, enforced bool) []ui.ConfirmNo
 		return nil
 	}
 	if r.Evicting == 0 {
-		return []ui.ConfirmNote{{Label: "Removes", Text: "no running pods"}}
+		text := "no running pods"
+		if r.Uncounted > 0 {
+			text += fmt.Sprintf(" (%d %s not counted)",
+				r.Uncounted, plural(r.Uncounted, "row", "rows"))
+		}
+		return []ui.ConfirmNote{{Label: "Removes", Text: text}}
 	}
 
 	removes := fmt.Sprintf("%d %s", r.Evicting, plural(r.Evicting, "pod", "pods"))
@@ -131,26 +136,42 @@ func budgetRow(pdbs []k8s.PDBImpact, enforced bool) (string, bool) {
 	}
 }
 
-// bulkPodTargets splits a bulk selection into the pod names to look up, keyed
-// by namespace, and a count of rows it cannot resolve.
+// bulkTargets is what one namespace contributes to a bulk selection: the pod
+// names picked directly, and the selectors of the workloads picked.
+type bulkTargets struct {
+	names     map[string]bool
+	selectors []*metav1.LabelSelector
+}
+
+// bulkPodTargets splits a bulk selection into what to look for in each
+// namespace, and a count of rows it cannot resolve.
 //
-// A list row carries no labels and no spec, so a workload row would need its
-// own API call to learn which pods it claims. One call per selected row turns
-// a fifty-row selection into fifty calls, so those rows are reported as
-// uncounted instead. Pod rows cost one list per namespace, however many are
-// selected.
-func bulkPodTargets(items []model.Item) (map[string]map[string]bool, int) {
-	byNS := make(map[string]map[string]bool)
+// Every list row carries its source object, so a selected workload names its
+// own pods without a second call. Cost stays at one pod list per namespace
+// however many rows are selected. A row that is neither a pod nor a workload
+// with a selector, a ConfigMap say, owns no pods and is reported as
+// uncounted rather than quietly ignored.
+func bulkPodTargets(items []model.Item) (map[string]*bulkTargets, int) {
+	byNS := make(map[string]*bulkTargets)
 	uncounted := 0
+	at := func(ns string) *bulkTargets {
+		if byNS[ns] == nil {
+			byNS[ns] = &bulkTargets{names: make(map[string]bool)}
+		}
+		return byNS[ns]
+	}
 	for _, it := range items {
-		if it.Kind != "Pod" {
+		if it.Kind == "Pod" {
+			at(it.Namespace).names[it.Name] = true
+			continue
+		}
+		sel := workloadSelectorFrom(it.Raw)
+		if sel == nil {
 			uncounted++
 			continue
 		}
-		if byNS[it.Namespace] == nil {
-			byNS[it.Namespace] = make(map[string]bool)
-		}
-		byNS[it.Namespace][it.Name] = true
+		t := at(it.Namespace)
+		t.selectors = append(t.selectors, sel)
 	}
 	return byNS, uncounted
 }
