@@ -158,7 +158,12 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		// Recomputed from the pods already fetched, so the line follows the
 		// number as it is typed without another call per digit.
 		target, _ := strconv.Atoi(m.scaleInput.Value)
-		notes := blastRadiusNotes(m.blast.scaleBlastRadius(target), m.blast.loading)
+		// A scale-down has its pods removed by the controller, which does not
+		// use the eviction API, so no budget can refuse it.
+		notes := blastRadiusNotes(m.blast.scaleBlastRadius(target), m.blast.loading, false)
+		if len(notes) > 0 {
+			w = min(64, m.width-10)
+		}
 		scaleContent := ui.RenderOverlayInput(ui.OverlayInputConfig{
 			Title: "Scale Deployment",
 			Width: w - 4,

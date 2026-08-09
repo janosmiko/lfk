@@ -221,7 +221,14 @@ Cascade controls what happens to dependent objects (a Job's pods, a Deployment's
 
 Set the starting policy with `delete_propagation_policy` in the config. Bulk delete uses the policy shown in the dialog.
 
-The dialog also states the blast radius: pods removed, ready replicas left, and the PodDisruptionBudget headroom spent. A budget the action would breach is shown in the warning color. The drain confirm shows the same line without the replica count, and the scale overlay updates it as you type.
+The dialog also states what the action costs, as two labelled rows:
+
+| Row | Says |
+|---|---|
+| `Removes` | Pods removed, and ready replicas left where there is a workload |
+| `Budget` | Which PodDisruptionBudget covers them, and whether this exceeds it |
+
+A budget the action would breach is shown in the warning color. Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
 
 Bulk delete shows one line for the whole selection. Workload rows are reported as `N rows not counted`: resolving their pods would cost one API call per selected row.
 

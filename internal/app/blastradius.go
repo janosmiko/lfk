@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,66 +65,70 @@ func (s *blastRadiusState) scaleBlastRadius(target int) *k8s.BlastRadius {
 //
 // Drain and bulk have no single workload, so they carry no replica count and
 // the phrase is left out rather than printed as "0 of 0".
-func blastRadiusNotes(r *k8s.BlastRadius, loading bool) []ui.ConfirmNote {
+//
+// enforced says whether the budget can actually stop the action. Only the
+// eviction API honours a PodDisruptionBudget, so a drain can be blocked by
+// one. A direct pod delete, and a scale-down where the controller removes the
+// pods, both bypass budgets entirely: they still take the workload below its
+// stated availability, but nothing refuses them.
+func blastRadiusNotes(r *k8s.BlastRadius, loading, enforced bool) []ui.ConfirmNote {
 	if loading {
-		return []ui.ConfirmNote{{Text: "Blast radius: checking disruption budgets..."}}
+		return []ui.ConfirmNote{{Label: "Removes", Text: "checking budgets..."}}
 	}
 	if r == nil {
 		return nil
 	}
 	if r.Evicting == 0 {
-		return []ui.ConfirmNote{{Text: "Blast radius: no running pods to evict"}}
+		return []ui.ConfirmNote{{Label: "Removes", Text: "no running pods"}}
 	}
 
-	parts := []string{fmt.Sprintf("%d %s", r.Evicting, plural(r.Evicting, "pod", "pods"))}
+	removes := fmt.Sprintf("%d %s", r.Evicting, plural(r.Evicting, "pod", "pods"))
 	if r.ReadyBefore > 0 {
-		parts = append(parts, fmt.Sprintf("%d of %d ready after", r.ReadyAfter, r.ReadyBefore))
+		removes += fmt.Sprintf(", %d of %d ready after", r.ReadyAfter, r.ReadyBefore)
 	}
-	parts = append(parts, budgetSummary(r.PDBs))
 	if r.Uncounted > 0 {
-		parts = append(parts, fmt.Sprintf("%d rows not counted", r.Uncounted))
+		removes += fmt.Sprintf(" (%d %s not counted)",
+			r.Uncounted, plural(r.Uncounted, "row", "rows"))
 	}
-
-	notes := []ui.ConfirmNote{{Text: "Blast radius: " + strings.Join(parts, ", ")}}
-	if violated := violatedBudgets(r.PDBs, len(r.PDBs) == 1); violated != "" {
-		notes = append(notes, ui.ConfirmNote{Text: violated, Warn: true})
-	}
-	return notes
-}
-
-// budgetSummary names one budget in full and counts the rest. Naming every
-// budget on a drain would not fit the box.
-func budgetSummary(pdbs []k8s.PDBImpact) string {
-	switch len(pdbs) {
-	case 0:
-		return "no disruption budget covers them"
-	case 1:
-		p := pdbs[0]
-		return fmt.Sprintf("PDB %s %d -> %d allowed", p.Name, p.AllowedBefore, p.AllowedAfter)
-	default:
-		return fmt.Sprintf("%d disruption budgets affected", len(pdbs))
+	text, warn := budgetRow(r.PDBs, enforced)
+	return []ui.ConfirmNote{
+		{Label: "Removes", Text: removes},
+		{Label: "Budget", Text: text, Warn: warn},
 	}
 }
 
-// violatedBudgets states the shortfall for each budget the action would
-// breach. named is false when the line above already names the only budget,
-// because repeating a long namespace and name there wraps the box for nothing.
-func violatedBudgets(pdbs []k8s.PDBImpact, sole bool) string {
-	var out []string
+// budgetRow states what the budgets say about this action, and whether that
+// is a warning. One budget is named; several are counted, because naming them
+// all would not fit.
+func budgetRow(pdbs []k8s.PDBImpact, enforced bool) (string, bool) {
+	violated := 0
 	for _, p := range pdbs {
-		if !p.Violated {
-			continue
+		if p.Violated {
+			violated++
 		}
-		over := -p.AllowedAfter
-		if sole {
-			return fmt.Sprintf("Over budget by %d", over)
+	}
+
+	switch {
+	case len(pdbs) == 0:
+		return "none covers these pods", false
+	case len(pdbs) == 1 && violated == 1:
+		p := pdbs[0]
+		if enforced {
+			return fmt.Sprintf("%s allows %d at once, this evicts %d, so the drain will block",
+				p.Name, p.AllowedBefore, p.Evicting), true
 		}
-		out = append(out, fmt.Sprintf("%s/%s by %d", p.Namespace, p.Name, over))
+		return fmt.Sprintf("%s allows %d at once, this removes %d",
+			p.Name, p.AllowedBefore, p.Evicting), true
+	case len(pdbs) == 1:
+		p := pdbs[0]
+		return fmt.Sprintf("%s allows %d at once, %d left after", p.Name, p.AllowedBefore, p.AllowedAfter), false
+	case violated == 0:
+		return fmt.Sprintf("%d budgets, all within their limits", len(pdbs)), false
+	case enforced:
+		return fmt.Sprintf("%d budgets, %d would block the drain", len(pdbs), violated), true
+	default:
+		return fmt.Sprintf("%d budgets, %d exceeded", len(pdbs), violated), true
 	}
-	if len(out) == 0 {
-		return ""
-	}
-	return "Over budget: " + strings.Join(out, "; ")
 }
 
 // bulkPodTargets splits a bulk selection into the pod names to look up, keyed

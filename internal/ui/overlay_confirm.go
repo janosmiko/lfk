@@ -6,6 +6,67 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// ConfirmNote is one consequence of the action, shown as a labelled row under
+// the choice row it matches in shape. A wrapped value hangs under the value
+// column rather than returning to the left edge, so the label stays readable
+// next to a long name.
+type ConfirmNote struct {
+	Label string
+	Text  string
+	Warn  bool
+}
+
+// renderConfirmNote lays out one note as "Label:   value", wrapping the value
+// into the value column. labelWidth is the width the caller reserved for the
+// widest label, so every row lines up.
+func renderConfirmNote(note ConfirmNote, labelWidth, wrapWidth int) string {
+	style := OverlayNormalStyle
+	if note.Warn {
+		style = OverlayWarningStyle
+	}
+	// A narrow box cannot afford a label column: the label plus a usable
+	// value column would overflow. Fall back to one wrapped string.
+	if note.Label == "" || labelWidth+minConfirmValueWidth > wrapWidth {
+		text := note.Text
+		if note.Label != "" {
+			text = note.Label + ": " + text
+		}
+		return style.Render(strings.Join(wrapConfirmText(text, wrapWidth), "\n"))
+	}
+
+	label := note.Label + ":"
+	pad := max(labelWidth-lipgloss.Width(label), 1)
+	valueWidth := max(wrapWidth-labelWidth, minConfirmValueWidth)
+	lines := wrapConfirmText(note.Text, valueWidth)
+
+	var b strings.Builder
+	b.WriteString(OverlayNormalStyle.Render(label + strings.Repeat(" ", pad)))
+	b.WriteString(style.Render(lines[0]))
+	for _, l := range lines[1:] {
+		b.WriteString("\n")
+		b.WriteString(strings.Repeat(" ", labelWidth))
+		b.WriteString(style.Render(l))
+	}
+	return b.String()
+}
+
+// minConfirmValueWidth is the narrowest value column worth having. Below it
+// the label is dropped and the row wraps as plain text.
+const minConfirmValueWidth = 8
+
+// confirmNoteLabelWidth is the column the values start in: the widest label
+// plus its colon and one space.
+func confirmNoteLabelWidth(notes []ConfirmNote) int {
+	w := 0
+	for _, n := range notes {
+		if n.Label == "" {
+			continue
+		}
+		w = max(w, lipgloss.Width(n.Label)+2)
+	}
+	return w
+}
+
 // OverlayConfirmConfig is the rendering contract for the unified confirm
 // overlay. It covers four historical shapes:
 //
@@ -16,13 +77,6 @@ import (
 //
 // Keymap hints are deliberately NOT rendered here — they live in the
 // shared hint bar so two confirm dialogs never disagree on their footer.
-// ConfirmNote is one line of consequence shown in a confirm overlay, such as
-// the disruption budget headroom an action would spend.
-type ConfirmNote struct {
-	Text string
-	Warn bool
-}
-
 type OverlayConfirmConfig struct {
 	Title   string
 	Warning string   // warning-styled question line (e.g. "Delete my-pod?")
@@ -160,17 +214,21 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 		b.WriteString(valueStyle.Render(cfg.ChoiceValue))
 		b.WriteString("\n\n")
 	}
-	for _, note := range cfg.Notes {
-		style := OverlayNormalStyle
-		if note.Warn {
-			style = OverlayWarningStyle
+	if len(cfg.Notes) > 0 {
+		labelWidth := confirmNoteLabelWidth(cfg.Notes)
+		for i, note := range cfg.Notes {
+			b.WriteString(renderConfirmNote(note, labelWidth, cfg.WrapWidth))
+			// Rows of the same block sit together; only the block is
+			// separated from what follows.
+			if i < len(cfg.Notes)-1 {
+				b.WriteString("\n")
+			}
 		}
-		text := note.Text
-		if cfg.WrapWidth > 0 {
-			text = strings.Join(wrapConfirmText(text, cfg.WrapWidth), "\n")
+		// Separate the block only from what follows it. A trailing separator
+		// with nothing after it is two blank rows at the bottom of the box.
+		if len(cfg.Body) > 0 || cfg.TypeToken != "" {
+			b.WriteString("\n\n")
 		}
-		b.WriteString(style.Render(text))
-		b.WriteString("\n\n")
 	}
 	for i, line := range cfg.Body {
 		b.WriteString(OverlayNormalStyle.Render(line))

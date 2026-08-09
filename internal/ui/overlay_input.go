@@ -110,17 +110,13 @@ func RenderOverlayInput(cfg OverlayInputConfig) string {
 			b.WriteString("\n")
 		}
 	}
-	for _, note := range cfg.Notes {
-		style := OverlayNormalStyle
-		if note.Warn {
-			style = OverlayWarningStyle
+	if len(cfg.Notes) > 0 {
+		labelWidth := confirmNoteLabelWidth(cfg.Notes)
+		b.WriteString("\n")
+		for _, note := range cfg.Notes {
+			b.WriteString("\n")
+			b.WriteString(renderConfirmNote(note, labelWidth, cfg.Width))
 		}
-		text := note.Text
-		if cfg.Width > 0 {
-			text = strings.Join(wrapConfirmText(text, cfg.Width), "\n")
-		}
-		b.WriteString("\n\n")
-		b.WriteString(style.Render(text))
 	}
 	return b.String()
 }

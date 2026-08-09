@@ -95,7 +95,7 @@ func (m Model) loadBlastRadius(drain bool) tea.Cmd {
 			// An empty namespace lists budgets cluster-wide, which a drain
 			// needs and a namespaced action must not do.
 			pdbNamespace := namespace
-			if drain {
+			if usesNodePods(drain, kind) {
 				pdbNamespace = ""
 			}
 			pdbs, err := client.ListPodDisruptionBudgets(ctx, ctxName, pdbNamespace)
@@ -164,6 +164,15 @@ func (m Model) loadBulkBlastRadius() tea.Cmd {
 	)
 }
 
+// usesNodePods reports whether the action's blast radius is every pod on a
+// node. Deleting a Node object takes its pods with it, so it costs the same as
+// a drain. Without this a Node fell through to the workload path, which looks
+// for a spec.selector a Node does not have, and the dialog showed nothing at
+// all for the most destructive action in the list.
+func usesNodePods(drain bool, kind string) bool {
+	return drain || kind == "Node"
+}
+
 // blastRadiusPods returns the pods the action removes and the ready replica
 // count to measure against. A bare Pod is its own blast radius; a workload is
 // whatever its selector claims.
@@ -171,9 +180,9 @@ func blastRadiusPods(
 	ctx context.Context, client *k8s.Client, drain bool,
 	ctxName, namespace, kind, name string, raw map[string]any,
 ) ([]k8s.EvictedPod, int, error) {
-	if drain {
+	if usesNodePods(drain, kind) {
 		pods, err := client.PodsOnNode(ctx, ctxName, name)
-		// Drain has no single workload, so there is no replica count to show.
+		// Neither has a single workload, so there is no replica count.
 		return pods, 0, err
 	}
 	if kind == "Pod" {
