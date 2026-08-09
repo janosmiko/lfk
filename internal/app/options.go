@@ -27,6 +27,7 @@ type StartupOptions struct {
 	NoMouse                 bool
 	NoColor                 bool          // --no-color: forces monochrome output regardless of env/config.
 	ReadOnly                bool          // --read-only: blocks all mutating actions; sticky for the process.
+	Demo                    bool          // --demo: run against an in-memory fake cluster; no kubeconfig needed.
 	WatchInterval           time.Duration // 0 means not set — fall back to config/default.
 	BackgroundWatchInterval time.Duration // 0 means not set — fall back to config/default.
 	ForegroundIdleTimeout   time.Duration // < 0 (default -1) means not set — fall back to config/default; 0 disables.

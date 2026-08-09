@@ -3,14 +3,16 @@ package k8s
 import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/janosmiko/lfk/internal/k8s/demo"
 )
 
 // NewTestClient creates a Client with injected fake clients for testing.
 // cs should be a kubernetes.Interface (e.g. k8sfake.NewClientset()),
 // dyn should be a dynamic.Interface (e.g. dynamicfake.NewSimpleDynamicClient()).
 // Both may be nil if the test does not exercise those code paths.
-// To inject a fake metadata client, set the testMetaClient field directly on
-// the returned *Client (or use NewTestClientWithMeta).
+// To inject a fake metadata client, set the injectedMetaClient field directly
+// on the returned *Client (or use NewTestClientWithMeta).
 func NewTestClient(cs, dyn any) *Client {
 	return &Client{
 		rawConfig: api.Config{
@@ -22,10 +24,21 @@ func NewTestClient(cs, dyn any) *Client {
 		loadingRules: &clientcmd.ClientConfigLoadingRules{
 			Precedence: []string{"/dev/null"},
 		},
-		testClientset:     cs,
-		testDynClient:     dyn,
+		injectedClientset: cs,
+		injectedDynClient: dyn,
 		testHostByDisplay: map[string]string{"test-ctx": "https://test-cluster.example.local:6443"},
 	}
+}
+
+// NewDemoClient builds a Client backed by the internal/k8s/demo fake
+// clientset and dynamic client, for the --demo flag. It reuses
+// NewTestClient's kubeconfig isolation (loadingRules pointed at /dev/null,
+// a synthesized context) so a demo Client can never read the user's real
+// kubeconfig, then marks itself IsDemo so the app layer can show a badge.
+func NewDemoClient() (*Client, error) {
+	c := NewTestClient(demo.NewClientset(), demo.NewDynamicClient())
+	c.demo = true
+	return c, nil
 }
 
 // SetTestHostForContext registers a synthetic host URL for a context so

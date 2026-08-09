@@ -130,7 +130,7 @@ func TestInvalidateDiscoveryCache_PresentKey(t *testing.T) {
 }
 
 func TestDiscoveryForContext_TestClientsetEscape(t *testing.T) {
-	// When testClientset is set, discoveryForContext must bypass the
+	// When injectedClientset is set, discoveryForContext must bypass the
 	// disk-cache path entirely and return the fake's Discovery() —
 	// otherwise unit tests would touch ~/.kube/cache.
 	cs := k8sfake.NewClientset()

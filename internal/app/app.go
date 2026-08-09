@@ -23,6 +23,9 @@ type Model struct {
 	client  *k8s.Client
 	version string // application version string shown in the title bar
 
+	// demoMode mirrors k8s.Client.IsDemo(); drives the title-bar DEMO badge.
+	demoMode bool
+
 	nav model.NavigationState // navigation state
 
 	// Column data.
@@ -508,8 +511,7 @@ type Model struct {
 	// keybinding can suspend capture for native terminal text selection and
 	// later re-enable it. When mouse was never available the toggle is a
 	// no-op.
-	mouseAvailable bool
-	mouseCaptured  bool
+	mouseAvailable, mouseCaptured bool
 	// wheel tracks the active wheel-scroll burst for momentum-tail dropping (#524).
 	wheel wheelBurst
 
@@ -626,10 +628,8 @@ type Model struct {
 	labelResourceType        model.ResourceTypeEntry // the resource type being edited
 
 	// ArgoCD autosync overlay state.
-	autoSyncEnabled  bool
-	autoSyncSelfHeal bool
-	autoSyncPrune    bool
-	autoSyncCursor   int // 0=autosync, 1=selfheal, 2=prune
+	autoSyncEnabled, autoSyncSelfHeal, autoSyncPrune bool
+	autoSyncCursor                                   int // 0=autosync, 1=selfheal, 2=prune
 
 	// Quick filter preset state.
 	filterPresets         []FilterPreset

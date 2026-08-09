@@ -52,7 +52,8 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// persisted active session, else the default workspace (session.yaml).
 	activeSession, pendingSession := loadStartupSession(opts.Session)
 	m := Model{
-		client: client,
+		client:   client,
+		demoMode: client.IsDemo(),
 		// Start in the loading state. Init() dispatches loadContexts()
 		// asynchronously, so the first frame renders before any
 		// contextsLoadedMsg arrives; loading=false there falls through to the

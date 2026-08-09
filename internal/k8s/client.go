@@ -71,12 +71,18 @@ type Client struct {
 	// matches clientcmd's first-writer-wins merge rule for current-context.
 	currentContext string
 
-	// testClientset, testDynClient, and testMetaClient allow tests to inject
-	// fake clients. When set, the corresponding *ForContext helpers return
-	// these instead of building real clients from the kubeconfig.
-	testClientset  any // kubernetes.Interface (avoid import cycle in non-test code)
-	testDynClient  any // dynamic.Interface
-	testMetaClient any // metadata.Interface
+	// injectedClientset, injectedDynClient, and injectedMetaClient let tests
+	// (and NewDemoClient) inject fake clients. When set, the corresponding
+	// *ForContext helpers return these instead of building real clients from
+	// the kubeconfig.
+	injectedClientset  any // kubernetes.Interface (avoid import cycle in non-test code)
+	injectedDynClient  any // dynamic.Interface
+	injectedMetaClient any // metadata.Interface
+
+	// demo is true when this Client was built by NewDemoClient (--demo flag).
+	// It never talks to a real cluster; IsDemo lets the app layer surface a
+	// badge instead of inspecting the injected fields directly.
+	demo bool
 
 	// testPromQuery, when set, replaces the real Service.ProxyGet
 	// pipeline used by the right-sizing Prometheus strategies. Tests
@@ -189,6 +195,13 @@ type Client struct {
 	// by default; toggled via the security ignore-list overlay. Read via
 	// securityIgnoreSnapshot.
 	showIgnored bool
+}
+
+// IsDemo reports whether this Client was built by NewDemoClient (--demo
+// flag) rather than against a real kubeconfig. Nil-safe so callers don't
+// need a guard before checking a possibly-unset client.
+func (c *Client) IsDemo() bool {
+	return c != nil && c.demo
 }
 
 // informerSnapshot returns the current routing config as a single

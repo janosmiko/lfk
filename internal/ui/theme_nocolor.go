@@ -97,6 +97,11 @@ func applyNoColorTheme() {
 		Reverse(true).
 		Padding(0, 1)
 
+	DemoBadgeStyle = lipgloss.NewStyle().
+		Bold(true).
+		Reverse(true).
+		Padding(0, 1)
+
 	ReadOnlyMarkerStyle = lipgloss.NewStyle().Bold(true)
 
 	HeaderStyle = lipgloss.NewStyle().Bold(true).Underline(true)

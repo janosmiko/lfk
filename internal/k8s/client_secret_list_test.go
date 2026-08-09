@@ -38,7 +38,7 @@ func newFakeMetaClient(objects ...*metav1.PartialObjectMetadata) *metadatafake.F
 // should flip SetSecretLazyLoading(false) after construction.
 func newClientWithMeta(mc *metadatafake.FakeMetadataClient, dc *dynamicfake.FakeDynamicClient) *Client {
 	c := NewTestClient(nil, dc)
-	c.testMetaClient = mc
+	c.injectedMetaClient = mc
 	c.SetSecretLazyLoading(true)
 	return c
 }

@@ -68,6 +68,7 @@ File locations:
 	rootCmd.Flags().BoolVar(&cliOpts.NoMouse, "no-mouse", false, "Disable mouse capture (enables native terminal text selection)")
 	rootCmd.Flags().BoolVar(&cliOpts.NoColor, "no-color", false, "Disable foreground/background colors; keep bold/reverse for visibility. Also honors the NO_COLOR env var.")
 	rootCmd.Flags().BoolVar(&cliOpts.ReadOnly, "read-only", false, "Disable all mutating actions (delete/edit/scale/restart/exec/port-forward/drain/cordon). Also configurable as read_only: true (global) or clusters.<ctx>.read_only (per-context) in config.")
+	rootCmd.Flags().BoolVar(&cliOpts.Demo, "demo", false, "Run against an in-memory fake cluster instead of a real one. No kubeconfig required; --context, --kubeconfig, and --kubeconfig-dir are ignored.")
 	rootCmd.Flags().DurationVar(&cliOpts.WatchInterval, "watch-interval", 0, "Watch mode polling interval (e.g. 500ms, 2s, 1m). Clamped to [500ms, 10m]. Overrides config.")
 	rootCmd.Flags().DurationVar(&cliOpts.BackgroundWatchInterval, "background-watch-interval", 0, "Watch interval while unfocused/idle (e.g. 10s). Clamped to [500ms, 10m]. Overrides config.")
 	rootCmd.Flags().DurationVar(&cliOpts.ForegroundIdleTimeout, "foreground-idle-timeout", -1, "Idle window before a focused window throttles (e.g. 120s). 0 disables. Overrides config.")
@@ -91,6 +92,43 @@ File locations:
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// resolveStartupClient builds the Kubernetes client for startup. With
+// --demo it builds the in-memory demo client and returns immediately,
+// skipping kubeconfig directory resolution, kubeconfig loading, and
+// --context validation entirely — the demo cluster has no kubeconfig to
+// read and a fixed set of contexts. This is the only place startup diverts
+// on opts.Demo. Otherwise it runs the real kubeconfig discovery path.
+func resolveStartupClient(opts app.StartupOptions) (*k8s.Client, error) {
+	if opts.Demo {
+		return k8s.NewDemoClient()
+	}
+
+	kubeconfigDirs := k8s.ResolveKubeconfigDirs(
+		opts.KubeconfigDirs,
+		os.Getenv("KUBECONFIG_DIR"),
+		ui.ConfigKubeconfigDirs,
+	)
+	if err := k8s.ValidateKubeconfigDirs(kubeconfigDirs); err != nil {
+		return nil, err
+	}
+
+	kubeconfigExclusive := k8s.ResolveKubeconfigExclusive(
+		opts.KubeconfigExclusiveSet, opts.KubeconfigExclusive,
+		os.Getenv("LFK_KUBECONFIG_EXCLUSIVE"), ui.ConfigKubeconfigExclusive,
+	)
+
+	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDirs, kubeconfigExclusive)
+	if err != nil {
+		return nil, fmt.Errorf("initializing Kubernetes client: %w", err)
+	}
+
+	if opts.Context != "" && !client.ContextExists(opts.Context) {
+		return nil, fmt.Errorf("context %q not found in kubeconfig", opts.Context)
+	}
+
+	return client, nil
 }
 
 // runTUI initializes the Kubernetes client, logger, and starts the Bubbletea TUI.
@@ -117,27 +155,9 @@ func runTUI(opts app.StartupOptions) error {
 		}
 	}
 
-	kubeconfigDirs := k8s.ResolveKubeconfigDirs(
-		opts.KubeconfigDirs,
-		os.Getenv("KUBECONFIG_DIR"),
-		ui.ConfigKubeconfigDirs,
-	)
-	if err := k8s.ValidateKubeconfigDirs(kubeconfigDirs); err != nil {
-		return err
-	}
-
-	kubeconfigExclusive := k8s.ResolveKubeconfigExclusive(
-		opts.KubeconfigExclusiveSet, opts.KubeconfigExclusive,
-		os.Getenv("LFK_KUBECONFIG_EXCLUSIVE"), ui.ConfigKubeconfigExclusive,
-	)
-
-	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDirs, kubeconfigExclusive)
+	client, err := resolveStartupClient(opts)
 	if err != nil {
-		return fmt.Errorf("initializing Kubernetes client: %w", err)
-	}
-
-	if opts.Context != "" && !client.ContextExists(opts.Context) {
-		return fmt.Errorf("context %q not found in kubeconfig", opts.Context)
+		return err
 	}
 
 	// CLI --no-color flag can force monochrome even if config and env don't.
