@@ -45,7 +45,7 @@ func RenderFieldDocPane(width, height int, p FieldDocPane, omitFooter bool) stri
 	contentWidth := max(width-4, 6) // border 2 + padding 2
 
 	titleBar := FillLinesBg(
-		TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(fieldDocTitle(p)),
+		TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(fieldDocTitle(width, p)),
 		width, BarBg)
 
 	bodyLines := fieldDocBody(contentWidth, p)
@@ -67,16 +67,23 @@ func RenderFieldDocPane(width, height int, p FieldDocPane, omitFooter bool) stri
 	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, footer)
 }
 
-// fieldDocTitle names the field and its type. A deep path is cut from the
-// front, because the leaf is what says which field is being read.
-func fieldDocTitle(p FieldDocPane) string {
+// fieldDocTitle names the field and its type. A path too long for the pane is
+// cut from the FRONT, because the leaf is what says which field is being read;
+// letting the title truncate from the right drops exactly the useful part.
+func fieldDocTitle(width int, p FieldDocPane) string {
+	title := " SCHEMA "
+	if p.FieldType != "" {
+		title += HelpKeyStyle.Render(p.FieldType) + " "
+	}
+
 	label := p.Path
 	if label == "" {
 		label = "(root)"
 	}
-	title := " SCHEMA "
-	if p.FieldType != "" {
-		title += HelpKeyStyle.Render(p.FieldType) + " "
+	// TitleStyle pads by one column on each side, so the label gets what is
+	// left of the pane after the prefix and that padding.
+	if room := width - ansi.StringWidth(title) - 2; room > 0 {
+		label = TruncateStart(label, room)
 	}
 	return title + label
 }
@@ -113,7 +120,3 @@ func fieldDocBody(contentWidth int, p FieldDocPane) []string {
 	}
 	return out
 }
-
-// FieldDocTitleFor is what the pane's title bar would read for a field. It lets
-// callers advertise the same label elsewhere without re-rendering the pane.
-func FieldDocTitleFor(p FieldDocPane) string { return fieldDocTitle(p) }

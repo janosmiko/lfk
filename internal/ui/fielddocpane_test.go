@@ -55,12 +55,18 @@ func TestRenderFieldDocPaneShowsPathAndType(t *testing.T) {
 }
 
 // A long path keeps its tail: the leaf is what names the field being read.
+// The description deliberately omits the leaf, or this passes on the body.
 func TestRenderFieldDocPaneKeepsPathTail(t *testing.T) {
-	got := stripANSI(RenderFieldDocPane(30, 12, FieldDocPane{
-		Path: "spec.template.spec.containers.livenessProbe.httpGet.port", Desc: "The port.",
-	}, false))
+	got := RenderFieldDocPane(30, 12, FieldDocPane{
+		Path: "spec.template.spec.containers.livenessProbe.httpGet.port",
+		Desc: "Which one to probe.",
+	}, false)
 
-	assert.Contains(t, got, "port")
+	titleRow := fieldDocLines(t, got)[0]
+
+	assert.Contains(t, titleRow, "port", "the title must keep the leaf segment")
+	assert.NotContains(t, stripANSI(got), "Which one to probe.\nport",
+		"guard against the assertion passing on the description")
 }
 
 func TestRenderFieldDocPaneEmptyState(t *testing.T) {

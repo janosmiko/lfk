@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +18,10 @@ import (
 // about the field under it. One kubectl explain costs a process spawn and a
 // round trip, so a key held down must not start one per line.
 const fieldDocDebounce = 250 * time.Millisecond
+
+// fieldDocFetchTimeout bounds one explain call, so an unreachable cluster or a
+// credential plugin waiting on input cannot hold a worker for the session.
+const fieldDocFetchTimeout = 15 * time.Second
 
 // fieldDocKeyForPath addresses the field under the cursor in the schema of the
 // resource the viewer is showing. It reports false when the navigation state
@@ -63,18 +68,28 @@ func (m Model) execKubectlExplainField(req uint64, key fieldDocKey) tea.Cmd {
 		target = key.resource + "." + key.path
 	}
 	kubectlContext := m.kubectlContext(key.context)
+	parentCtx := m.reqCtx
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Field doc: "+target, key.context, func() tea.Msg {
+		// The pane fetches on cursor movement, so a cluster that never answers
+		// would tie up one scheduler worker per field visited. Retargeting only
+		// drops the reply; the deadline is what ends the process.
+		ctx, cancel := context.WithTimeout(parentCtx, fieldDocFetchTimeout)
+		defer cancel()
+
 		args := []string{"explain", target, "--context", kubectlContext}
 		if key.apiVersion != "" {
 			args = append(args, "--api-version", key.apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			logger.Error("kubectl explain failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
+			// The output is not logged: on an auth failure it carries whatever
+			// the credential plugin printed. The parsed message still reaches
+			// the pane, where the user asked for it.
+			logger.Error("kubectl explain failed", "target", target, "apiVersion", key.apiVersion, "error", cmdErr)
 			return fieldDocLoadedMsg{req: req, key: key, err: parseExplainError(string(output), cmdErr)}
 		}
 

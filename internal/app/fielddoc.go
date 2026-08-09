@@ -80,11 +80,16 @@ func (c *fieldDocCache) len() int {
 // after the cursor moved on is dropped instead of overwriting the new field.
 // The cache is a pointer so every copy of the Model shares one map: the
 // descriptions belong to the cluster, not to a tab or a viewer.
+// display is the path as the user sees it, built by formatObjectPath from the
+// original segments. key.path is the dot-joined form kubectl explain takes; a
+// segment that itself contains a dot (an annotation key, say) survives only in
+// display, so the title never has to be un-joined to read correctly.
 type fieldDocState struct {
 	on      bool
 	loading bool
 	req     uint64
 	key     fieldDocKey
+	display string
 	entry   fieldDocEntry
 	err     string
 	cache   *fieldDocCache
@@ -95,7 +100,7 @@ type fieldDocState struct {
 // the schema says does not change when the user closes a pane.
 func (s *fieldDocState) reset() {
 	s.on, s.loading = false, false
-	s.key, s.entry, s.err = fieldDocKey{}, fieldDocEntry{}, ""
+	s.key, s.entry, s.err, s.display = fieldDocKey{}, fieldDocEntry{}, "", ""
 }
 
 // fieldDocPath turns an object path into the schema path kubectl explain takes.

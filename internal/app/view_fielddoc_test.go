@@ -78,6 +78,7 @@ func TestYAMLViewWithSchemaPaneKeepsTerminalBox(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", apiVersion: "v1", path: "spec.dnsPolicy"}
+	m.fieldDoc.display = "spec.dnsPolicy"
 	m.fieldDoc.entry = fieldDocEntry{fieldType: "<string>", desc: strings.Repeat("word ", 200)}
 
 	open := m.viewYAML()
@@ -101,6 +102,7 @@ func TestYAMLViewHintBarUnchangedByPane(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+	m.fieldDoc.display = "spec.dnsPolicy"
 
 	assert.Equal(t, hintBarRow(t, fieldDocViewModel().viewYAML()), hintBarRow(t, m.viewYAML()),
 		"the pane must not cost the hint bar any entries")
@@ -113,6 +115,7 @@ func TestObjectExplorerHintBarUnchangedByPane(t *testing.T) {
 	m.mode = modeObjectExplorer
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+	m.fieldDoc.display = "spec.dnsPolicy"
 
 	assert.Equal(t, hintBarRow(t, closed.viewObjectExplorer()), hintBarRow(t, m.viewObjectExplorer()),
 		"the pane must not cost the hint bar any entries")
@@ -125,6 +128,7 @@ func TestYAMLViewHintBarCompleteOnAWideTerminal(t *testing.T) {
 	m.width = 300
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+	m.fieldDoc.display = "spec.dnsPolicy"
 
 	hint := hintBarRow(t, m.viewYAML())
 
@@ -148,6 +152,7 @@ func TestYAMLViewRendersSchemaPane(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", apiVersion: "v1", path: "spec.dnsPolicy"}
+	m.fieldDoc.display = "spec.dnsPolicy"
 	m.fieldDoc.entry = fieldDocEntry{fieldType: "<string>", desc: "Set DNS policy for the pod."}
 
 	view := stripANSI(m.viewYAML())
@@ -155,6 +160,19 @@ func TestYAMLViewRendersSchemaPane(t *testing.T) {
 	assert.Contains(t, view, "SCHEMA")
 	assert.Contains(t, view, "spec.dnsPolicy")
 	assert.Contains(t, view, "Set DNS policy for the pod.")
+}
+
+// The title is formatted from the original segments, so an array index reads
+// as "[0]" instead of vanishing into the dot-joined path kubectl is given.
+func TestYAMLViewSchemaPaneTitleKeepsArrayIndex(t *testing.T) {
+	m := fieldDocViewModel()
+	m.fieldDoc.on = true
+	got, _ := m.showFieldDoc([]string{"spec", "containers", "[0]", "image"})
+
+	assert.Equal(t, "spec.containers.image", got.fieldDoc.key.path,
+		"kubectl explain takes the element schema, so the index is dropped there")
+	assert.Contains(t, got.fieldDoc.display, "[0]", "the title keeps the index the user is on")
+	assert.Contains(t, stripANSI(got.viewYAML()), "[0]")
 }
 
 func TestYAMLViewOmitsSchemaPaneWhenClosed(t *testing.T) {
@@ -171,6 +189,7 @@ func TestYAMLViewSchemaPaneEmptyState(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.opaque"}
+	m.fieldDoc.display = "spec.opaque"
 
 	view := stripANSI(m.viewYAML())
 
@@ -183,6 +202,7 @@ func TestYAMLViewSchemaPaneShowsErrorAlone(t *testing.T) {
 	m := fieldDocViewModel()
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "metadata.annotations.checksum/config"}
+	m.fieldDoc.display = "metadata.annotations.checksum/config"
 	m.fieldDoc.err = parseExplainError(
 		"KIND:       Pod\nVERSION:    v1\n\nerror: field \"checksum/config\" does not exist\n",
 		errors.New("exit status 1"),
@@ -202,6 +222,7 @@ func TestObjectExplorerViewKeepsTerminalBox(t *testing.T) {
 
 	m.fieldDoc.on = true
 	m.fieldDoc.key = fieldDocKey{resource: "pods", path: "spec.dnsPolicy"}
+	m.fieldDoc.display = "spec.dnsPolicy"
 	m.fieldDoc.entry = fieldDocEntry{fieldType: "<string>", desc: "Set DNS policy."}
 	open := m.viewObjectExplorer()
 

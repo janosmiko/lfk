@@ -53,7 +53,7 @@ func (m Model) renderFieldDocPane(height int, omitFooter bool) string {
 		return ""
 	}
 	return ui.RenderFieldDocPane(paneW, height, ui.FieldDocPane{
-		Path:      m.fieldDoc.key.path,
+		Path:      m.fieldDoc.display,
 		FieldType: m.fieldDoc.entry.fieldType,
 		Desc:      m.fieldDoc.entry.desc,
 		Err:       m.fieldDoc.err,
@@ -99,6 +99,9 @@ func (m Model) showFieldDoc(objPath []string) (Model, tea.Cmd) {
 	}
 
 	m.fieldDoc.key = key
+	// Formatted from the segments, not from key.path: array indices read as
+	// "[0]" and a segment holding a dot stays one segment.
+	m.fieldDoc.display = formatObjectPath(objPath)
 	m.fieldDoc.err = ""
 	// A new target invalidates any fetch still in flight.
 	m.fieldDoc.req++
