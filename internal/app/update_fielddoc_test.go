@@ -193,6 +193,76 @@ func TestFieldDocDebounceIgnoredWhenPaneClosed(t *testing.T) {
 	assert.Nil(t, cmd, "a closed pane must not fetch")
 }
 
+// Dropping a superseded reply is not enough: the kubectl process would keep a
+// scheduler worker until its own deadline. Moving on has to cancel it.
+func TestFieldDocRetargetCancelsTheFetchInFlight(t *testing.T) {
+	m := fieldDocModel()
+	m.fieldDoc.on = true
+	ctx, cancel := context.WithCancel(t.Context())
+	m.fieldDoc.cancel = cancel
+	m.fieldDoc.key, _ = m.fieldDocKeyForPath([]string{"spec", "dnsPolicy"})
+	m.fieldDoc.loading = true
+
+	got, _ := m.showFieldDoc([]string{"spec", "restartPolicy"})
+
+	require.Error(t, ctx.Err(), "the superseded fetch must be cancelled")
+	assert.Nil(t, got.fieldDoc.cancel, "the spent cancel must not be kept")
+}
+
+func TestFieldDocCloseCancelsTheFetchInFlight(t *testing.T) {
+	m := fieldDocModel()
+	m.fieldDoc.on = true
+	ctx, cancel := context.WithCancel(t.Context())
+	m.fieldDoc.cancel = cancel
+
+	mdl, _ := m.toggleFieldDoc([]string{"spec", "dnsPolicy"})
+
+	require.Error(t, ctx.Err(), "closing the pane must cancel the fetch")
+	assert.False(t, mdl.(Model).fieldDoc.on)
+}
+
+// A finished fetch releases its context rather than leaving it to the parent.
+func TestFieldDocLoadedReleasesTheRequestContext(t *testing.T) {
+	m := fieldDocModel()
+	m.fieldDoc.on = true
+	m.fieldDoc.loading = true
+	m.fieldDoc.req = 2
+	ctx, cancel := context.WithCancel(t.Context())
+	m.fieldDoc.cancel = cancel
+	key := fieldDocKey{context: "test-ctx", resource: "pods", path: "spec.dnsPolicy"}
+
+	got := m.updateFieldDocLoaded(fieldDocLoadedMsg{req: 2, key: key, entry: fieldDocEntry{desc: "d"}})
+
+	require.Error(t, ctx.Err(), "a completed fetch must release its context")
+	assert.Nil(t, got.fieldDoc.cancel)
+}
+
+// A cache hit answers without a fetch, so anything still running is stale.
+func TestFieldDocCacheHitCancelsTheFetchInFlight(t *testing.T) {
+	m := fieldDocModel()
+	m.fieldDoc.on = true
+	ctx, cancel := context.WithCancel(t.Context())
+	m.fieldDoc.cancel = cancel
+	key, ok := m.fieldDocKeyForPath([]string{"spec", "dnsPolicy"})
+	require.True(t, ok)
+	m.fieldDoc.cache.put(key, fieldDocEntry{desc: "cached"})
+
+	got, cmd := m.showFieldDoc([]string{"spec", "dnsPolicy"})
+
+	assert.Nil(t, cmd)
+	assert.Equal(t, "cached", got.fieldDoc.entry.desc)
+	require.Error(t, ctx.Err(), "the stale fetch must be cancelled on a cache hit")
+}
+
+func TestFieldDocCancelInFlightIsSafeWhenIdle(t *testing.T) {
+	s := &fieldDocState{}
+
+	assert.NotPanics(t, func() {
+		s.cancelInFlight()
+		s.cancelInFlight()
+	}, "cancelling with nothing running must be a no-op")
+}
+
 func TestFieldDocToggleClosesAndClears(t *testing.T) {
 	m := fieldDocModel()
 	m.fieldDoc.on = true

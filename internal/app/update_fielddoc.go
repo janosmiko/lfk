@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -103,7 +105,9 @@ func (m Model) showFieldDoc(objPath []string) (Model, tea.Cmd) {
 	// "[0]" and a segment holding a dot stays one segment.
 	m.fieldDoc.display = formatObjectPath(objPath)
 	m.fieldDoc.err = ""
-	// A new target invalidates any fetch still in flight.
+	// A new target invalidates the fetch in flight. Stop the process too, not
+	// just its reply, or it holds a scheduler worker until its own deadline.
+	m.fieldDoc.cancelInFlight()
 	m.fieldDoc.req++
 
 	if entry, hit := m.fieldDoc.cache.get(key); hit {
@@ -124,7 +128,13 @@ func (m Model) updateFieldDocDebounce(msg fieldDocDebounceMsg) (tea.Model, tea.C
 	if !m.fieldDoc.on || msg.req != m.fieldDoc.req || !m.fieldDoc.loading {
 		return m, nil
 	}
-	return m, m.execKubectlExplainField(m.fieldDoc.req, m.fieldDoc.key)
+	// The request context outlives this call: showFieldDoc cancels it when the
+	// cursor moves on, reset when the pane closes, and the reply handler when
+	// the fetch answers.
+	ctx, cancel := context.WithCancel(m.reqCtx)
+	m.fieldDoc.cancelInFlight()
+	m.fieldDoc.cancel = cancel
+	return m, m.execKubectlExplainField(ctx, m.fieldDoc.req, m.fieldDoc.key)
 }
 
 // updateFieldDocLoaded stores a description and caches it. An empty description
@@ -135,6 +145,9 @@ func (m Model) updateFieldDocLoaded(msg fieldDocLoadedMsg) Model {
 		// An earlier fetch answering late, for a field the cursor has left.
 		return m
 	}
+	// The fetch is done, so release its context rather than leaving it to the
+	// parent to clean up when the app exits.
+	m.fieldDoc.cancelInFlight()
 	m.fieldDoc.loading = false
 	if !m.fieldDoc.on {
 		// The user closed the pane while the fetch was in flight.

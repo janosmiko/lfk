@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"strings"
 )
@@ -93,12 +94,27 @@ type fieldDocState struct {
 	entry   fieldDocEntry
 	err     string
 	cache   *fieldDocCache
+
+	// cancel stops the fetch in flight. Dropping a superseded reply is not
+	// enough on its own: the kubectl process would keep a scheduler worker
+	// until its own deadline, and the pool is small.
+	cancel context.CancelFunc
+}
+
+// cancelInFlight stops any running fetch. It is safe to call when none is
+// running, and safe to call twice: a cancel func is idempotent.
+func (s *fieldDocState) cancelInFlight() {
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
 }
 
 // reset closes the pane. The pane is per resource and costs a fetch, so opening
 // the viewer on something else starts with it closed. The cache survives: what
 // the schema says does not change when the user closes a pane.
 func (s *fieldDocState) reset() {
+	s.cancelInFlight()
 	s.on, s.loading = false, false
 	s.key, s.entry, s.err, s.display = fieldDocKey{}, fieldDocEntry{}, "", ""
 }

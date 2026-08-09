@@ -54,7 +54,7 @@ func scheduleFieldDocFetch(req uint64) tea.Cmd {
 // execKubectlExplainField reads one field description from the schema of the
 // connected cluster. It shells out to kubectl explain rather than reading a
 // bundled copy, so the text matches the cluster version and covers CRDs.
-func (m Model) execKubectlExplainField(req uint64, key fieldDocKey) tea.Cmd {
+func (m Model) execKubectlExplainField(reqCtx context.Context, req uint64, key fieldDocKey) tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
 		return func() tea.Msg {
@@ -68,13 +68,13 @@ func (m Model) execKubectlExplainField(req uint64, key fieldDocKey) tea.Cmd {
 		target = key.resource + "." + key.path
 	}
 	kubectlContext := m.kubectlContext(key.context)
-	parentCtx := m.reqCtx
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Field doc: "+target, key.context, func() tea.Msg {
-		// The pane fetches on cursor movement, so a cluster that never answers
-		// would tie up one scheduler worker per field visited. Retargeting only
-		// drops the reply; the deadline is what ends the process.
-		ctx, cancel := context.WithTimeout(parentCtx, fieldDocFetchTimeout)
+		// Two ways out: the caller cancels reqCtx when the cursor moves on or
+		// the pane closes, and the deadline ends a cluster that never answers.
+		// The pane fetches on cursor movement, so without both a slow cluster
+		// would tie up one scheduler worker per field visited.
+		ctx, cancel := context.WithTimeout(reqCtx, fieldDocFetchTimeout)
 		defer cancel()
 
 		args := []string{"explain", target, "--context", kubectlContext}
