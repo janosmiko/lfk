@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
@@ -42,9 +43,21 @@ type promSvcEntry struct {
 // away before reaching this call: a proxy failure of any kind — including
 // one this package didn't anticipate — degrades to an error instead of
 // crashing the TUI.
+//
+// The recover stays broad rather than demo-scoped: every call reaching this
+// function already ran on a real-cluster path, since queryPrometheusMetric
+// checks isDemo and returns errPrometheusUnavailableDemo before ever
+// calling here, so a demo-scoped recover would never fire. That means a
+// real panic here is always a genuine client-go failure on a live cluster,
+// which is exactly the case that must not vanish silently: the recovered
+// value and a stack trace are logged at Error before the panic collapses
+// into a plain error.
 func safeProxyGetRaw(ctx context.Context, cs kubernetes.Interface, ns, svc, port, path string, params map[string]string) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			logger.Error("prometheus/alertmanager proxy request panicked",
+				"namespace", ns, "service", svc, "port", port, "path", path,
+				"panic", r, "stack", string(debug.Stack()))
 			err = fmt.Errorf("prometheus/alertmanager proxy request panicked: %v", r)
 		}
 	}()

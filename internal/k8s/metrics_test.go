@@ -1,14 +1,50 @@
 package k8s
 
 import (
+	"bytes"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+	restclient "k8s.io/client-go/rest"
+	k8stesting "k8s.io/client-go/testing"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// --- safeProxyGetRaw ---
+
+// TestSafeProxyGetRaw_LogsRecoveredPanicWithStack guards TASK-865 finding 3:
+// safeProxyGetRaw's recover silently converted a panic into an error with no
+// log line and no stack, so a genuine client-go panic on a real cluster
+// would vanish without a trace. The recover stays broad (every caller here
+// already runs only on real-cluster paths — queryPrometheusMetric turns
+// demo queries away before ever reaching this function, so a demo-scoped
+// recover would never fire), but it must now log the recovered value and a
+// stack trace before returning the error.
+func TestSafeProxyGetRaw_LogsRecoveredPanicWithStack(t *testing.T) {
+	buf := &bytes.Buffer{}
+	orig := logger.Logger
+	logger.Logger = slog.New(slog.NewTextHandler(buf, nil))
+	defer func() { logger.Logger = orig }()
+
+	cs := k8sfake.NewClientset()
+	cs.PrependProxyReactor("services", func(_ k8stesting.Action) (bool, restclient.ResponseWrapper, error) {
+		panic("boom: proxy exploded")
+	})
+
+	_, err := safeProxyGetRaw(t.Context(), cs, "monitoring", "prometheus", "9090", "/api/v1/query", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom: proxy exploded")
+
+	logged := buf.String()
+	assert.Contains(t, logged, "boom: proxy exploded", "expected the recovered panic value to be logged")
+	assert.Contains(t, logged, "goroutine", "expected a stack trace to be logged alongside the recovered panic")
+}
 
 // --- parsePodMetrics ---
 
