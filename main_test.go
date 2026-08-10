@@ -1,9 +1,13 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/janosmiko/lfk/internal/app"
+	"github.com/janosmiko/lfk/internal/k8s"
 )
 
 // armForceQuit must, after the grace period, kill the program first (to
@@ -77,5 +81,37 @@ func TestValidatePprofAddr(t *testing.T) {
 		if !strings.Contains(err.Error(), tt.wantContains) {
 			t.Errorf("validatePprofAddr(%q) error = %q, want it to contain %q", tt.addr, err, tt.wantContains)
 		}
+	}
+}
+
+// --demo must work with no kubeconfig on disk at all (acceptance criterion
+// 1), and must skip --context validation entirely — a bogus --context
+// would otherwise fail against the real kubeconfig path.
+func TestResolveStartupClient_DemoSkipsKubeconfigResolution(t *testing.T) {
+	emptyDir := t.TempDir()
+	t.Setenv("HOME", emptyDir)
+	t.Setenv("KUBECONFIG", filepath.Join(emptyDir, "does-not-exist"))
+	t.Setenv("KUBECONFIG_DIR", "")
+	t.Cleanup(func() { k8s.SetDemoMode(false) })
+
+	client, err := resolveStartupClient(app.StartupOptions{Demo: true, Context: "no-such-context"})
+	if err != nil {
+		t.Fatalf("resolveStartupClient() error = %v, want nil", err)
+	}
+	if client == nil {
+		t.Fatal("resolveStartupClient() returned nil client")
+	}
+	defer client.Shutdown()
+	if !client.IsDemo() {
+		t.Error("resolveStartupClient() client.IsDemo() = false, want true")
+	}
+}
+
+// TestDemoModeDoesNotLeakAcrossTests guards against k8s.SetDemoMode(true)
+// (set by a prior test's resolveStartupClient call) staying on for the rest
+// of this package's test binary.
+func TestDemoModeDoesNotLeakAcrossTests(t *testing.T) {
+	if k8s.DemoModeEnabled() {
+		t.Fatal("demoMode leaked from a prior test in package main")
 	}
 }

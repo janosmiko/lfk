@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +111,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 	return func() tea.Msg {
 		defer registry.Finish(id)
 
-		kubectlPath, err := exec.LookPath("kubectl")
+		kubectlPath, err := k8s.KubectlPath()
 		if err != nil {
 			return bulkActionResultMsg{failed: total, errors: []string{"kubectl not found"}}
 		}
@@ -148,7 +149,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if rt.Namespaced {
 				patchArgs = append(patchArgs, "-n", itemNs)
 			}
-			patchCmd := exec.CommandContext(ctx, kubectlPath, patchArgs...)
+			patchCmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(patchArgs)...)
 			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", patchCmd)
 			// Best-effort: a failure here (RBAC denial, resource already
@@ -164,7 +165,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 
 			// Force delete.
 			deleteArgs := forceDeleteArgs(rt, ref.Name, kubectlCtx, itemNs, cascade)
-			cmd := exec.CommandContext(ctx, kubectlPath, deleteArgs...)
+			cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(deleteArgs)...)
 			cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", cmd)
 			if _, err := cmd.CombinedOutput(); err != nil {

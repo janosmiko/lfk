@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -378,6 +379,25 @@ func TestPush3HelmUpgradeNoHelm(t *testing.T) {
 	amsg, ok := msg.(actionResultMsg)
 	require.True(t, ok)
 	assert.Error(t, amsg.err)
+}
+
+// TestVulnScanImage_RefusesInDemoMode guards TASK-865 finding 2: trivy is
+// the one binary lookup that never went through k8s.KubectlPath, so a demo
+// session could reach a real network scan (image pull, vuln DB download)
+// against ghcr.io. Vuln Scan must refuse the same way helm's
+// resolveHelmPath does, before ever calling exec.LookPath("trivy").
+func TestVulnScanImage_RefusesInDemoMode(t *testing.T) {
+	k8s.SetDemoMode(true)
+	defer k8s.SetDemoMode(false)
+
+	m := basePush80v3Model()
+	cmd := m.vulnScanImage("nginx:latest")
+	require.NotNil(t, cmd)
+	msg := cmd()
+	dmsg, ok := msg.(describeLoadedMsg)
+	require.True(t, ok)
+	require.Error(t, dmsg.err)
+	assert.Contains(t, dmsg.err.Error(), "demo mode")
 }
 
 func TestPush3VulnScanImageNoTrivy(t *testing.T) {

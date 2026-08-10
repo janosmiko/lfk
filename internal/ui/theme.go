@@ -239,6 +239,14 @@ func ApplyTheme(t Theme) {
 		Bold(true).
 		Padding(0, 1)
 
+	// Demo-mode badge in title bar. Purple so it reads distinctly from the
+	// warning-colored RO badge.
+	DemoBadgeStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(t.SelectedFg)).
+		Background(lipgloss.Color(t.Purple)).
+		Bold(true).
+		Padding(0, 1)
+
 	ReadOnlyMarkerStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Warning)).
 		Background(baseBg).

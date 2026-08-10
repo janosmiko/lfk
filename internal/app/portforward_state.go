@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
@@ -99,7 +98,7 @@ func (m *Model) saveCurrentPortForwards() {
 // restorePortForwards re-establishes saved port forwards from the previous session.
 // Returns tea.Cmds that will start each port forward asynchronously.
 func (m *Model) restorePortForwards() []tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		logger.Error("Cannot restore port forwards: kubectl not found", "error", err)
 		m.addLogEntry("ERR", fmt.Sprintf("Cannot restore port forwards: kubectl not found: %v", err))

@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
@@ -59,7 +60,7 @@ func scheduleFieldDocFetch(req uint64) tea.Cmd {
 // connected cluster. It shells out to kubectl explain rather than reading a
 // bundled copy, so the text matches the cluster version and covers CRDs.
 func (m Model) execKubectlExplainField(reqCtx context.Context, req uint64, key fieldDocKey) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return fieldDocLoadedMsg{req: req, key: key, err: fmt.Errorf("kubectl not found: %w", err)}
@@ -85,7 +86,7 @@ func (m Model) execKubectlExplainField(reqCtx context.Context, req uint64, key f
 		if key.apiVersion != "" {
 			args = append(args, "--api-version", key.apiVersion)
 		}
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		// Killing kubectl does not close pipes a grandchild still holds (a
 		// credential plugin, say), and CombinedOutput reads to EOF. Without a
 		// WaitDelay the worker would stay blocked on a process already killed.

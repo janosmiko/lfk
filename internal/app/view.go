@@ -536,6 +536,11 @@ func (m Model) renderTitleBar() string {
 		readOnlyIndicator = ui.ReadOnlyBadgeStyle.Render("RO")
 	}
 
+	var demoIndicator string
+	if m.demoMode {
+		demoIndicator = ui.DemoBadgeStyle.Render("DEMO")
+	}
+
 	var mutationProgress, tasksIndicator string
 	if m.scheduler != nil && m.scheduler.LenIndicator() > 0 {
 		// Watch-mode auto-refresh marks its tasks Silent so the spinner
@@ -564,7 +569,7 @@ func (m Model) renderTitleBar() string {
 	}
 
 	// Calculate available width for breadcrumb.
-	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(demoIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	maxBcWidth := max(
 		// -1 for minimum gap
 		innerWidth-fixedWidth-1, 10)
@@ -585,7 +590,7 @@ func (m Model) renderTitleBar() string {
 		bc = ui.TitleBreadcrumbStyle.Render(bcText)
 	}
 
-	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(demoIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	gap := max(innerWidth-contentWidth, 0)
 
 	var gapContent string
@@ -604,6 +609,7 @@ func (m Model) renderTitleBar() string {
 		lipgloss.Width(bc) +
 		lipgloss.Width(watchIndicator) +
 		lipgloss.Width(readOnlyIndicator) +
+		lipgloss.Width(demoIndicator) +
 		lipgloss.Width(gapContent) +
 		lipgloss.Width(mutationProgress) +
 		lipgloss.Width(tasksIndicator)
@@ -612,7 +618,7 @@ func (m Model) renderTitleBar() string {
 		nsEndX:   nsStartX + lipgloss.Width(nsLabel),
 	})
 
-	barContent := bc + watchIndicator + readOnlyIndicator + gapContent + mutationProgress + tasksIndicator + nsLabel + versionLabel
+	barContent := bc + watchIndicator + readOnlyIndicator + demoIndicator + gapContent + mutationProgress + tasksIndicator + nsLabel + versionLabel
 	if tint != "" {
 		// Outer wrap also uses the tint so the Padding(0, 1) cells share
 		// the bar background — the inner segments each carry the tint

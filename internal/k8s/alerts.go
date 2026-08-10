@@ -41,6 +41,9 @@ type prometheusAlert struct {
 // It uses the Kubernetes API server proxy to reach Prometheus services in well-known
 // monitoring namespaces without requiring direct network access or port-forward.
 func (c *Client) GetActiveAlerts(ctx context.Context, kubeCtx, namespace, resourceName, resourceKind string) ([]AlertInfo, error) {
+	if c.demo {
+		return nil, errPrometheusUnavailableDemo
+	}
 	clientset, err := c.clientsetForContext(kubeCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get clientset: %w", err)
@@ -52,8 +55,7 @@ func (c *Client) GetActiveAlerts(ctx context.Context, kubeCtx, namespace, resour
 	var lastErr error
 	for _, ns := range promNs {
 		for _, svc := range promSvc {
-			result := clientset.CoreV1().Services(ns).ProxyGet("http", svc, promPort, "/api/v1/alerts", nil)
-			data, err := result.DoRaw(ctx)
+			data, err := safeProxyGetRaw(ctx, clientset, ns, svc, promPort, "/api/v1/alerts", nil)
 			if err != nil {
 				lastErr = err
 				continue
@@ -71,8 +73,7 @@ func (c *Client) GetActiveAlerts(ctx context.Context, kubeCtx, namespace, resour
 	// Try Alertmanager as fallback.
 	for _, ns := range amNs {
 		for _, svc := range amSvc {
-			result := clientset.CoreV1().Services(ns).ProxyGet("http", svc, amPort, "/api/v2/alerts", nil)
-			data, err := result.DoRaw(ctx)
+			data, err := safeProxyGetRaw(ctx, clientset, ns, svc, amPort, "/api/v2/alerts", nil)
 			if err != nil {
 				lastErr = err
 				continue
@@ -137,6 +138,9 @@ func parseAndFilterAlerts(data []byte, resourceNs, resourceName, resourceKind st
 // Pass an empty namespace to retrieve alerts across all namespaces.
 // It tries Prometheus first, then falls back to Alertmanager if Prometheus is not reachable.
 func (c *Client) GetAllActiveAlerts(ctx context.Context, kubeCtx, namespace string) ([]AlertInfo, error) {
+	if c.demo {
+		return nil, errPrometheusUnavailableDemo
+	}
 	clientset, err := c.clientsetForContext(kubeCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get clientset: %w", err)
@@ -148,8 +152,7 @@ func (c *Client) GetAllActiveAlerts(ctx context.Context, kubeCtx, namespace stri
 	var lastErr error
 	for _, ns := range promNs {
 		for _, svc := range promSvc {
-			result := clientset.CoreV1().Services(ns).ProxyGet("http", svc, promPort, "/api/v1/alerts", nil)
-			data, err := result.DoRaw(ctx)
+			data, err := safeProxyGetRaw(ctx, clientset, ns, svc, promPort, "/api/v1/alerts", nil)
 			if err != nil {
 				lastErr = err
 				continue
@@ -167,8 +170,7 @@ func (c *Client) GetAllActiveAlerts(ctx context.Context, kubeCtx, namespace stri
 	// Try Alertmanager as fallback.
 	for _, ns := range amNs {
 		for _, svc := range amSvc {
-			result := clientset.CoreV1().Services(ns).ProxyGet("http", svc, amPort, "/api/v2/alerts", nil)
-			data, err := result.DoRaw(ctx)
+			data, err := safeProxyGetRaw(ctx, clientset, ns, svc, amPort, "/api/v2/alerts", nil)
 			if err != nil {
 				lastErr = err
 				continue

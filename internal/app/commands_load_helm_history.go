@@ -101,7 +101,7 @@ func fetchHelmHistory(helmPath, name, ns, kubeCtx, kubeconfigPaths string) ([]ui
 
 // loadHelmRevisions fetches the revision history for a Helm release.
 func (m Model) loadHelmRevisions() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return helmRevisionListMsg{err: fmt.Errorf("helm not found: %w", err)}
@@ -126,7 +126,7 @@ func (m Model) loadHelmRevisions() tea.Cmd {
 // It reuses fetchHelmHistory but routes the result to helmHistoryListMsg so
 // the update path opens overlayHelmHistory instead of overlayHelmRollback.
 func (m Model) loadHelmHistory() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return helmHistoryListMsg{err: fmt.Errorf("helm not found: %w", err)}

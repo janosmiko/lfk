@@ -1,4 +1,4 @@
-.PHONY: setup lint lint-fix test coverage fuzz build generate-themes sonar bump-version refresh-vendor-hash release goreleaser-check
+.PHONY: setup lint lint-fix test e2e coverage fuzz build generate-themes sonar bump-version refresh-vendor-hash release goreleaser-check
 
 setup:
 	git config core.hooksPath .githooks
@@ -65,6 +65,10 @@ lint-fix:
 
 test:
 	go test ./...
+
+e2e: ## Run e2e tests that drive the built lfk binary under a pty (--demo mode)
+	golangci-lint run --build-tags e2e ./e2e/...
+	go test -tags e2e -count=1 -timeout 2m ./e2e/...
 
 coverage: ## Run tests with coverage report
 	go test ./... -coverprofile=coverage.out

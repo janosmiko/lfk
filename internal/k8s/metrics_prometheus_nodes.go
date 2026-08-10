@@ -161,7 +161,7 @@ func (c *Client) GetNodeUptimes(ctx context.Context, contextName string) (NodeUp
 	// Subtracted server-side so the result is independent of clock skew
 	// between this machine and the cluster.
 	const query = `time() - node_boot_time_seconds`
-	seconds, err := queryPrometheusMetric(qctx, contextName, clientset, promNs, promSvc, promPort, query, parseNodeUptimeVector)
+	seconds, err := queryPrometheusMetric(qctx, contextName, clientset, c.demo, promNs, promSvc, promPort, query, parseNodeUptimeVector)
 	if err != nil {
 		logger.Debug("Prometheus node uptime query failed", "context", contextName, "error", err)
 		return NodeUptimes{}, fmt.Errorf("prometheus node uptime query failed: %w", err)

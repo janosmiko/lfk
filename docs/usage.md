@@ -48,6 +48,9 @@ lfk --kubeconfig-dir /path/to/configs/
 # Merge multiple custom directories (repeat the flag)
 lfk --kubeconfig-dir /team-a/configs/ --kubeconfig-dir /team-b/configs/
 
+# Start with a built-in fake cluster (no kubeconfig required)
+lfk --demo
+
 # Disable mouse capture (enables native terminal text selection)
 lfk --no-mouse
 
@@ -74,6 +77,8 @@ KUBECONFIG_DIR=/path/to/configs/ lfk
 # Merge multiple custom directories via env var (colon-separated, like KUBECONFIG)
 KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
+
+In `--demo`, exec, port-forward, drain, debug, Helm, and vuln scan are unavailable.
 
 `KUBECONFIG` is exclusive by default, exactly like kubectl and k9s: when it is
 set, lfk loads only the files it lists and does **not** also add the default

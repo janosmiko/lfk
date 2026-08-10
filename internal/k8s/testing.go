@@ -1,16 +1,26 @@
 package k8s
 
 import (
+	"context"
+	"time"
+
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/janosmiko/lfk/internal/k8s/demo"
 )
+
+// demoTickerInterval is how often NewDemoClient's ticker mutates the fake
+// cluster. Matches ui.DefaultWatchInterval's 2s feel (a few seconds keeps
+// the demo visibly alive without flooding the UI on every watch tick).
+const demoTickerInterval = 3 * time.Second
 
 // NewTestClient creates a Client with injected fake clients for testing.
 // cs should be a kubernetes.Interface (e.g. k8sfake.NewClientset()),
 // dyn should be a dynamic.Interface (e.g. dynamicfake.NewSimpleDynamicClient()).
 // Both may be nil if the test does not exercise those code paths.
-// To inject a fake metadata client, set the testMetaClient field directly on
-// the returned *Client (or use NewTestClientWithMeta).
+// To inject a fake metadata client, set the injectedMetaClient field directly
+// on the returned *Client (or use NewTestClientWithMeta).
 func NewTestClient(cs, dyn any) *Client {
 	return &Client{
 		rawConfig: api.Config{
@@ -22,10 +32,33 @@ func NewTestClient(cs, dyn any) *Client {
 		loadingRules: &clientcmd.ClientConfigLoadingRules{
 			Precedence: []string{"/dev/null"},
 		},
-		testClientset:     cs,
-		testDynClient:     dyn,
+		injectedClientset: cs,
+		injectedDynClient: dyn,
 		testHostByDisplay: map[string]string{"test-ctx": "https://test-cluster.example.local:6443"},
 	}
+}
+
+// NewDemoClient builds a Client backed by the internal/k8s/demo fake
+// clientset and dynamic client, for the --demo flag. It reuses
+// NewTestClient's kubeconfig isolation (loadingRules pointed at /dev/null,
+// a synthesized context) so a demo Client can never read the user's real
+// kubeconfig, then marks itself IsDemo so the app layer can show a badge.
+func NewDemoClient() (*Client, error) {
+	dyn := demo.NewDynamicClient()
+	cs := demo.NewClientset()
+	// The Client sees a guarded dynamic.Interface (see demo.GuardListPanics)
+	// so a demo fixture gap degrades a List call to an error instead of
+	// panicking a scheduler worker goroutine. The ticker keeps the raw fake
+	// so it can still reach Tracker() to mutate seed data.
+	c := NewTestClient(cs, demo.GuardListPanics(dyn))
+	c.demo = true
+	// cs is passed as an extra clearer alongside dyn: both fakes' embedded
+	// testing.Fake accumulates every Get/List/Create/Update/Delete the app
+	// makes (not just the ticker's own writes) into an action log nothing
+	// else drains, so both need clearing on the same cadence.
+	c.demoTicker = demo.NewTicker(dyn, demoTickerInterval, cs)
+	c.demoTicker.Start(context.Background())
+	return c, nil
 }
 
 // SetTestHostForContext registers a synthetic host URL for a context so

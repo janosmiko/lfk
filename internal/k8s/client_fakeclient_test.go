@@ -26,8 +26,8 @@ import (
 // newFakeClient creates a Client with injected fake clientset and dynamic client.
 func newFakeClient(cs *k8sfake.Clientset, dc *dynamicfake.FakeDynamicClient) *Client {
 	return &Client{
-		testClientset: cs,
-		testDynClient: dc,
+		injectedClientset: cs,
+		injectedDynClient: dc,
 	}
 }
 

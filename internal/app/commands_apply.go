@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -121,8 +123,16 @@ func (m Model) applyTemplate(tmpl model.ResourceTemplate) tea.Cmd {
 }
 
 // applyTemplateFile runs kubectl apply -f on the given temp file and cleans it up.
+// In demo mode it instead routes through Client.ApplyManifest: the demo
+// backend's fake dynamic client lives only in this process, so a kubectl
+// subprocess would write into a separate tracker the UI never reads from —
+// see internal/k8s.Client.ApplyManifest.
 func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	if m.client.IsDemo() {
+		return m.applyTemplateFileDemo(tmpFile, ctx, ns)
+	}
+
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		_ = os.Remove(tmpFile)
 		return func() tea.Msg {
@@ -151,6 +161,32 @@ func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
 		// GetNamespaces round-trip per template apply.
 		return actionResultMsg{
 			message:                  strings.TrimSpace(string(output)),
+			invalidateNamespaceCache: true,
+		}
+	}
+}
+
+// applyTemplateFileDemo applies the temp file's manifest in-process through
+// Client.ApplyManifest and cleans it up, mirroring applyTemplateFile's
+// kubectl path without shelling out.
+func (m Model) applyTemplateFileDemo(tmpFile, ctx, ns string) tea.Cmd {
+	applyCtx := m.reqCtx
+	if applyCtx == nil {
+		applyCtx = context.Background()
+	}
+
+	return func() tea.Msg {
+		defer func() { _ = os.Remove(tmpFile) }()
+
+		content, err := os.ReadFile(tmpFile)
+		if err != nil {
+			return actionResultMsg{err: fmt.Errorf("reading manifest: %w", err)}
+		}
+		if err := m.client.ApplyManifest(applyCtx, ctx, ns, string(content)); err != nil {
+			return actionResultMsg{err: fmt.Errorf("apply: %w", err)}
+		}
+		return actionResultMsg{
+			message:                  "applied",
 			invalidateNamespaceCache: true,
 		}
 	}

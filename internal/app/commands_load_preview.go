@@ -453,7 +453,7 @@ func (m Model) loadNetworkPoliciesForResource() tea.Cmd {
 // loadHelmValues runs `helm get values` and returns the output as a message.
 // If allValues is true, the --all flag is included to show computed defaults too.
 func (m Model) loadHelmValues(allValues bool) tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
+	helmPath, err := resolveHelmPath()
 	if err != nil {
 		return func() tea.Msg {
 			return helmValuesLoadedMsg{err: fmt.Errorf("helm not found: %w", err)}

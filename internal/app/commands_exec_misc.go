@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -35,7 +36,7 @@ func (m Model) deleteResource() tea.Cmd {
 }
 
 func (m Model) forceDeleteResource() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -53,7 +54,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 	deleteArgs := forceDeleteArgs(rt, name, m.kubectlContext(ctx), ns, cascade)
 
 	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
-		cmd := exec.Command(kubectlPath, deleteArgs...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(deleteArgs)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -65,7 +66,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 }
 
 func (m Model) removeFinalizers() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -87,7 +88,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 	}
 
 	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Remove finalizers: %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
-		cmd := exec.Command(kubectlPath, patchArgs...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(patchArgs)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -99,6 +100,20 @@ func (m Model) removeFinalizers() tea.Cmd {
 }
 
 func (m Model) vulnScanImage(image string) tea.Cmd {
+	// trivy has no in-process demo stub (unlike kubectl) and no cluster
+	// context to refuse through, so demo mode is checked directly here,
+	// the same way resolveHelmPath refuses helm — before ever resolving a
+	// real trivy binary that would pull the image manifest and vuln DB
+	// over the network.
+	if k8s.DemoModeEnabled() {
+		return func() tea.Msg {
+			return describeLoadedMsg{
+				title: "Vulnerability Scan",
+				err:   fmt.Errorf("vuln scan is not available in demo mode"),
+			}
+		}
+	}
+
 	trivyPath, err := exec.LookPath("trivy")
 	if err != nil {
 		return func() tea.Msg {
@@ -217,7 +232,7 @@ func (m Model) execKubectlDrain() tea.Cmd {
 // hand-over. Shared by the Node "Drain" action and the Karpenter
 // "Drain Node" action (which resolves the bound node first).
 func (m Model) drainNodeCmd(nodeName string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -229,7 +244,7 @@ func (m Model) drainNodeCmd(nodeName string) tea.Cmd {
 		"--ignore-daemonsets", "--delete-emptydir-data",
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
 	logExecCmd("Running kubectl command", cmd)
 

@@ -191,7 +191,7 @@ go install github.com/janosmiko/lfk@latest
 nix run github:janosmiko/lfk
 ```
 
-`kubectl` is required and must be configured. `helm` and `trivy` are optional (Helm management, image vulnerability scanning).
+`kubectl` is required and must be configured. `helm` and `trivy` are optional (Helm management, image vulnerability scanning). No cluster yet? `lfk --demo` runs against a built-in fake cluster instead.
 
 > See [docs/installation.md](docs/installation.md) for Windows, Docker, NixOS/home-manager flake input, building from source, and the full list of optional CLI dependencies.
 
@@ -200,6 +200,9 @@ nix run github:janosmiko/lfk
 ```bash
 # Use default kubeconfig (~/.kube/config + ~/.kube/config.d/*)
 lfk
+
+# Try it without a cluster (no kubeconfig required)
+lfk --demo
 
 # Start in a specific context / namespace
 lfk --context my-cluster -n kube-system

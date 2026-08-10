@@ -54,11 +54,11 @@ func DiscoveryCacheBaseDir() string {
 }
 
 // discoveryForContext returns a per-context disk-cached discovery client,
-// memoized in-process. testClientset bypasses the disk path so unit tests
-// don't touch the filesystem.
+// memoized in-process. injectedClientset bypasses the disk path so unit
+// tests don't touch the filesystem.
 func (c *Client) discoveryForContext(displayName string) (discovery.DiscoveryInterface, error) {
-	if c.testClientset != nil {
-		if cs, ok := c.testClientset.(kubernetes.Interface); ok {
+	if c.injectedClientset != nil {
+		if cs, ok := c.injectedClientset.(kubernetes.Interface); ok {
 			return cs.Discovery(), nil
 		}
 	}

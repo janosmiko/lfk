@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -87,7 +88,7 @@ func execShellArgs(name, namespace, displayCtx, container, podOS string) []strin
 }
 
 func (m Model) execKubectlExec() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -98,7 +99,7 @@ func (m Model) execKubectlExec() tea.Cmd {
 	args := execShellArgs(m.actionCtx.name, ns, m.kubectlContext(m.actionCtx.context), m.actionCtx.containerName, m.actionCtx.os)
 
 	logger.Info("Starting kubectl exec", "args", strings.Join(args, " "))
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
@@ -119,7 +120,7 @@ func (m Model) execKubectlExec() tea.Cmd {
 }
 
 func (m Model) execKubectlAttach() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -132,7 +133,7 @@ func (m Model) execKubectlAttach() tea.Cmd {
 		args = append(args, "-c", m.actionCtx.containerName)
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -154,7 +155,7 @@ func (m Model) execKubectlAttach() tea.Cmd {
 }
 
 func (m Model) execKubectlDebug() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -164,7 +165,7 @@ func (m Model) execKubectlDebug() tea.Cmd {
 	ns := m.actionNamespace()
 	args := []string{"debug", m.actionCtx.name, "-it", "--image=busybox", "--context", m.kubectlContext(m.actionCtx.context), "-n", ns}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -186,7 +187,7 @@ func (m Model) execKubectlDebug() tea.Cmd {
 }
 
 func (m Model) runDebugPod() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -204,7 +205,7 @@ func (m Model) runDebugPod() tea.Cmd {
 
 	logger.Info("Running debug pod", "pod", podName, "namespace", ns, "context", ctx)
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
@@ -225,7 +226,7 @@ func (m Model) runDebugPod() tea.Cmd {
 }
 
 func (m Model) runDebugPodWithPVC() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -261,7 +262,7 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 		"--overrides", manifest, "--", "sh",
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -355,7 +356,7 @@ func nodeShellArgs(podName, namespace, kctx, overrides string) []string {
 }
 
 func (m Model) execKubectlNodeShell() tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -374,7 +375,7 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	}
 
 	args := nodeShellArgs(podName, nodeShellNamespace, m.kubectlContext(ctx), overrides)
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -396,7 +397,7 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 }
 
 func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return explainLoadedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -424,7 +425,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
@@ -446,7 +447,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 }
 
 func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return explainRecursiveMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -461,7 +462,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
@@ -480,7 +481,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 // for the API Explorer's tree mode. Parsed paths come back relative to the
 // output root, so they are re-anchored at fieldPath.
 func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return explainTreeLoadedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -500,7 +501,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
@@ -529,7 +530,7 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 	kctx := m.effectiveContext()
 	ident := explainTreeDescMsg{resource: resource, apiVersion: apiVersion, kctx: kctx, parent: parentPath}
 
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			msg := ident
@@ -550,7 +551,7 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()

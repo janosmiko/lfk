@@ -11,14 +11,27 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/sync/singleflight"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/k8s/demo"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 )
+
+// applyFieldManager marks writes ApplyManifest makes through the dynamic
+// client, matching the field-manager convention demo.Ticker uses for its
+// own mutations.
+const applyFieldManager = "lfk"
 
 // contextInfo decorates a kubeconfig context with its source file plus a
 // display name that is unique across all loaded files. When several
@@ -71,12 +84,24 @@ type Client struct {
 	// matches clientcmd's first-writer-wins merge rule for current-context.
 	currentContext string
 
-	// testClientset, testDynClient, and testMetaClient allow tests to inject
-	// fake clients. When set, the corresponding *ForContext helpers return
-	// these instead of building real clients from the kubeconfig.
-	testClientset  any // kubernetes.Interface (avoid import cycle in non-test code)
-	testDynClient  any // dynamic.Interface
-	testMetaClient any // metadata.Interface
+	// injectedClientset, injectedDynClient, and injectedMetaClient let tests
+	// (and NewDemoClient) inject fake clients. When set, the corresponding
+	// *ForContext helpers return these instead of building real clients from
+	// the kubeconfig.
+	injectedClientset  any // kubernetes.Interface (avoid import cycle in non-test code)
+	injectedDynClient  any // dynamic.Interface
+	injectedMetaClient any // metadata.Interface
+
+	// demo is true when this Client was built by NewDemoClient (--demo flag).
+	// It never talks to a real cluster; IsDemo lets the app layer surface a
+	// badge instead of inspecting the injected fields directly.
+	demo bool
+
+	// demoTicker drives periodic mutations against the demo backend's fake
+	// dynamic client (see internal/k8s/demo.Ticker). Nil for real clients;
+	// NewDemoClient starts it and Shutdown stops it, so its goroutine never
+	// outlives this Client.
+	demoTicker *demo.Ticker
 
 	// testPromQuery, when set, replaces the real Service.ProxyGet
 	// pipeline used by the right-sizing Prometheus strategies. Tests
@@ -191,6 +216,13 @@ type Client struct {
 	showIgnored bool
 }
 
+// IsDemo reports whether this Client was built by NewDemoClient (--demo
+// flag) rather than against a real kubeconfig. Nil-safe so callers don't
+// need a guard before checking a possibly-unset client.
+func (c *Client) IsDemo() bool {
+	return c != nil && c.demo
+}
+
 // informerSnapshot returns the current routing config as a single
 // consistent pair so callers don't observe a half-updated state if a
 // future SetInformerCacheMode lands between reads.
@@ -294,10 +326,108 @@ func (c *Client) SetInformerCacheMode(mode InformerCacheMode) {
 // future stream subscribers). Idempotent and safe to call from a defer in
 // main.go even when no informers were ever started.
 func (c *Client) Shutdown() {
+	if c.demoTicker != nil {
+		c.demoTicker.Stop()
+	}
 	_, infs := c.informerSnapshot()
 	if infs != nil {
 		infs.Stop()
 	}
+}
+
+// ApplyManifest decodes a (possibly multi-document) YAML manifest and
+// creates or updates each object through the dynamic client — no kubectl
+// subprocess. Demo mode's fake dynamic client lives only in this process,
+// so a subprocess kubectl would write into a separate in-memory tracker the
+// UI never reads from; this is the apply path demo mode must use to
+// actually change what the UI shows. defaultNamespace fills in any object
+// that leaves metadata.namespace unset, matching kubectl apply -n.
+func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespace, manifest string) error {
+	dyn, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return fmt.Errorf("getting dynamic client: %w", err)
+	}
+	dc, err := c.discoveryForContext(contextName)
+	if err != nil {
+		return fmt.Errorf("getting discovery client: %w", err)
+	}
+	// ServerPreferredResources + convertAPIResourceLists, not the fuller
+	// DiscoverAPIResources: that also lists CustomResourceDefinitions for
+	// printer columns, which the demo backend's fake dynamic client isn't
+	// registered to LIST and would panic on.
+	lists, err := discovery.ServerPreferredResources(dc)
+	if err != nil {
+		return fmt.Errorf("discovering api resources: %w", err)
+	}
+	entries := convertAPIResourceLists(lists)
+
+	for _, doc := range splitYAMLDocuments(manifest) {
+		if strings.TrimSpace(doc) == "" {
+			continue
+		}
+		var obj unstructured.Unstructured
+		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
+			return fmt.Errorf("decoding manifest: %w", err)
+		}
+		if obj.GetKind() == "" {
+			continue
+		}
+		// The fake dynamic client performs none of a real apiserver's admission
+		// validation, so a crafted metadata.name here would otherwise reach the
+		// tracker unchanged and later surface unescaped in generated output
+		// (e.g. democli/logs.go's pod-name prefix). Reject anything that isn't
+		// a valid RFC1123 subdomain before it is ever created or updated.
+		if errs := validation.IsDNS1123Subdomain(obj.GetName()); len(errs) > 0 {
+			return fmt.Errorf("invalid name %q for %s: %s", obj.GetName(), obj.GetKind(), strings.Join(errs, "; "))
+		}
+
+		gvk := obj.GroupVersionKind()
+		var rt *model.ResourceTypeEntry
+		for i := range entries {
+			if entries[i].Kind == gvk.Kind && entries[i].APIGroup == gvk.Group && entries[i].APIVersion == gvk.Version {
+				rt = &entries[i]
+				break
+			}
+		}
+		if rt == nil {
+			return fmt.Errorf("no known resource type for %s", gvk.String())
+		}
+
+		res := dyn.Resource(schema.GroupVersionResource{Group: rt.APIGroup, Version: rt.APIVersion, Resource: rt.Resource})
+		var ri dynamic.ResourceInterface = res
+		if rt.Namespaced {
+			ns := obj.GetNamespace()
+			if ns == "" {
+				ns = defaultNamespace
+			}
+			// A namespace is an RFC1123 label, not a subdomain like the name
+			// above — it cannot contain dots. Same admission gap as the name
+			// check: reject before the value reaches the tracker, since it
+			// surfaces unescaped in resourceTitleLabel's "namespace/name"
+			// render used across the YAML, object explorer, logs, describe,
+			// exec, and events sub-titles.
+			if errs := validation.IsDNS1123Label(ns); len(errs) > 0 {
+				return fmt.Errorf("invalid namespace %q for %s: %s", ns, obj.GetKind(), strings.Join(errs, "; "))
+			}
+			obj.SetNamespace(ns)
+			ri = res.Namespace(ns)
+		}
+
+		existing, getErr := ri.Get(ctx, obj.GetName(), metav1.GetOptions{})
+		switch {
+		case getErr == nil:
+			obj.SetResourceVersion(existing.GetResourceVersion())
+			_, err = ri.Update(ctx, &obj, metav1.UpdateOptions{FieldManager: applyFieldManager})
+		case apierrors.IsNotFound(getErr):
+			_, err = ri.Create(ctx, &obj, metav1.CreateOptions{FieldManager: applyFieldManager})
+		default:
+			return fmt.Errorf("checking existing %s/%s: %w", gvk.Kind, obj.GetName(), getErr)
+		}
+		if err != nil {
+			return fmt.Errorf("applying %s/%s: %w", gvk.Kind, obj.GetName(), err)
+		}
+	}
+	return nil
 }
 
 // NewClient creates a new Kubernetes client, loading configs from:

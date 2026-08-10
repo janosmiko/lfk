@@ -106,8 +106,7 @@ var (
 			Bold(true).
 			Italic(true)
 
-	// Category header rendered as a full-width "bar" with a distinct
-	// background, used by explorer columns to separate groups.
+	// Category header rendered as a full-width "bar" with a distinct background, used by explorer columns to separate groups.
 	CategoryBarStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(ColorPrimary)).
 				Bold(true)
@@ -122,10 +121,8 @@ var (
 	StatusOther       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 	StatusWarning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
 
-	// Whole-row status tint (issue #540). Colors mirror the Status cell
-	// (StatusFailed = error, StatusProgressing = primary) so the row tint and
-	// the cell never disagree. Fg variants recolor the row text; Bg variants
-	// lay a muted severity background under the theme's text.
+	// Whole-row status tint (issue #540). Colors mirror the Status cell (StatusFailed = error, StatusProgressing = primary) so
+	// the row tint and the cell never disagree. Fg variants recolor the row text; Bg variants lay a muted severity background.
 	RowTintFailedFg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
 	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	RowTintFailedBg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
@@ -168,6 +165,9 @@ var (
 				Background(lipgloss.Color(ColorWarning)).
 				Bold(true).
 				Padding(0, 1)
+
+	// Demo-mode badge: ReadOnlyBadgeStyle with a distinguishing purple background.
+	DemoBadgeStyle = ReadOnlyBadgeStyle.Background(lipgloss.Color(ColorPurple))
 
 	// Subtle [RO] marker for list rows. Foreground-only so it doesn't
 	// compete with the row content the way a solid-background badge does.

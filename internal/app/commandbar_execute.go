@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -689,7 +690,7 @@ func positionalArgCount(args []string) int {
 // is handed over via tea.ExecProcess and lfk is suspended until the
 // command exits.
 func (m Model) executeKubectlCommand(input string) tea.Cmd {
-	kubectlPath, err := exec.LookPath("kubectl")
+	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)}
@@ -713,6 +714,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	args = m.injectKubectlDefaults(args)
 
 	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
+	args = k8s.DemoKubectlArgs(args)
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command(kubectlPath, args...)

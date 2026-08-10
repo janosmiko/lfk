@@ -493,8 +493,8 @@ func (c *Client) restConfigForContextThrottled(displayName string) (*rest.Config
 func (c *Client) clientsetForContext(contextName string) (kubernetes.Interface, error) {
 	// Allow tests to inject a fake clientset (before the cache so fakes are
 	// never memoized and every test sees its injected client).
-	if c.testClientset != nil {
-		if cs, ok := c.testClientset.(kubernetes.Interface); ok {
+	if c.injectedClientset != nil {
+		if cs, ok := c.injectedClientset.(kubernetes.Interface); ok {
 			return cs, nil
 		}
 	}
@@ -505,8 +505,8 @@ func (c *Client) clientsetForContext(contextName string) (kubernetes.Interface, 
 
 func (c *Client) dynamicForContext(contextName string) (dynamic.Interface, error) {
 	// Allow tests to inject a fake dynamic client (before the cache).
-	if c.testDynClient != nil {
-		if dc, ok := c.testDynClient.(dynamic.Interface); ok {
+	if c.injectedDynClient != nil {
+		if dc, ok := c.injectedDynClient.(dynamic.Interface); ok {
 			return dc, nil
 		}
 	}
@@ -574,8 +574,8 @@ func (c *Client) RawClientsetForContextThrottled(contextName string) kubernetes.
 	if contextName == "" {
 		return nil
 	}
-	if c.testClientset != nil {
-		if cs, ok := c.testClientset.(kubernetes.Interface); ok {
+	if c.injectedClientset != nil {
+		if cs, ok := c.injectedClientset.(kubernetes.Interface); ok {
 			return cs
 		}
 	}
@@ -594,8 +594,8 @@ func (c *Client) RawDynamicForContextThrottled(contextName string) dynamic.Inter
 	if contextName == "" {
 		return nil
 	}
-	if c.testDynClient != nil {
-		if dc, ok := c.testDynClient.(dynamic.Interface); ok {
+	if c.injectedDynClient != nil {
+		if dc, ok := c.injectedDynClient.(dynamic.Interface); ok {
 			return dc
 		}
 	}
@@ -609,11 +609,11 @@ func (c *Client) RawDynamicForContextThrottled(contextName string) dynamic.Inter
 }
 
 // metadataForContext returns a metadata-only client for the given context.
-// When testMetaClient is set (tests), it is returned directly.
+// When injectedMetaClient is set (tests), it is returned directly.
 func (c *Client) metadataForContext(contextName string) (metadata.Interface, error) {
 	// Allow tests to inject a fake metadata client (before the cache).
-	if c.testMetaClient != nil {
-		if mc, ok := c.testMetaClient.(metadata.Interface); ok {
+	if c.injectedMetaClient != nil {
+		if mc, ok := c.injectedMetaClient.(metadata.Interface); ok {
 			return mc, nil
 		}
 	}
