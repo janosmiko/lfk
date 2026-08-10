@@ -6,7 +6,15 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/janosmiko/lfk/internal/ui"
+)
+
+// eventTimelineTypeWidth and eventTimelineReasonWidth are the display-width
+// columns Type and Reason are padded/truncated to in buildEventTimelineLines.
+const (
+	eventTimelineTypeWidth   = 7
+	eventTimelineReasonWidth = 20
 )
 
 // eventTimelineMessageColumn is the column at which the message field
@@ -15,7 +23,21 @@ import (
 // event viewer uses this as the hanging indent for wrap mode so
 // continuation lines align under the message column instead of
 // re-flowing flush to the left margin.
-const eventTimelineMessageColumn = 8 + 1 + 7 + 1 + 20 + 1
+const eventTimelineMessageColumn = 8 + 1 + eventTimelineTypeWidth + 1 + eventTimelineReasonWidth + 1
+
+// padColumn truncates s to at most width display columns (via ui.Truncate)
+// and right-pads it to exactly width with spaces, using lipgloss.Width
+// rather than rune/byte count. Type and Reason are cluster-controlled and
+// can contain wide Unicode; padding by rune count (fmt.Sprintf %-Ns) would
+// shift every column after it because a wide rune occupies two terminal
+// columns but counts as one rune.
+func padColumn(s string, width int) string {
+	s = ui.Truncate(s, width)
+	if pad := width - lipgloss.Width(s); pad > 0 {
+		s += strings.Repeat(" ", pad)
+	}
+	return s
+}
 
 // buildEventTimelineLines converts event timeline data into flat text lines
 // for cursor navigation. Each event becomes a single line with format:
@@ -36,14 +58,14 @@ func (m *Model) buildEventTimelineLines() []string {
 		if e.Count > 1 {
 			countStr = fmt.Sprintf(" (x%d)", e.Count)
 		}
-		typ := ui.SanitizeTerminalText(e.Type)
-		reason := ui.SanitizeTerminalText(e.Reason)
+		typ := padColumn(ui.SanitizeTerminalText(e.Type), eventTimelineTypeWidth)
+		reason := padColumn(ui.SanitizeTerminalText(e.Reason), eventTimelineReasonWidth)
 		message := ui.SanitizeTerminalText(e.Message)
 		src := ""
 		if e.Source != "" {
 			src = " [" + ui.SanitizeTerminalText(e.Source) + "]"
 		}
-		line := fmt.Sprintf("%-8s %-7s %-20s %s%s%s",
+		line := fmt.Sprintf("%-8s %s %s %s%s%s",
 			ts, typ, reason, message, countStr, src)
 		lines = append(lines, line)
 	}
