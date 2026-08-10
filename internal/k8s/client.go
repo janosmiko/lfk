@@ -399,6 +399,15 @@ func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespac
 			if ns == "" {
 				ns = defaultNamespace
 			}
+			// A namespace is an RFC1123 label, not a subdomain like the name
+			// above — it cannot contain dots. Same admission gap as the name
+			// check: reject before the value reaches the tracker, since it
+			// surfaces unescaped in resourceTitleLabel's "namespace/name"
+			// render used across the YAML, object explorer, logs, describe,
+			// exec, and events sub-titles.
+			if errs := validation.IsDNS1123Label(ns); len(errs) > 0 {
+				return fmt.Errorf("invalid namespace %q for %s: %s", ns, obj.GetKind(), strings.Join(errs, "; "))
+			}
 			obj.SetNamespace(ns)
 			ri = res.Namespace(ns)
 		}
