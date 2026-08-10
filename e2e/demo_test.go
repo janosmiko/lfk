@@ -105,8 +105,8 @@ func TestDemoModeStartup(t *testing.T) {
 		"TERM=xterm-256color",
 	}
 
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr // stdout must stay on the pty, or bubbletea's terminal handshake hangs
+	stderr := &output{}
+	cmd.Stderr = stderr // stdout must stay on the pty, or bubbletea's terminal handshake hangs
 
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 200})
 	if err != nil {
@@ -149,8 +149,8 @@ func TestDemoModeStartup(t *testing.T) {
 			t.Log("pty reader goroutine did not finish within shutdownTimeout")
 		}
 
-		if stderr.Len() > 0 {
-			t.Logf("lfk stderr:\n%s", stderr.String())
+		if s := stderr.String(); s != "" {
+			t.Logf("lfk stderr:\n%s", s)
 		}
 	}()
 
