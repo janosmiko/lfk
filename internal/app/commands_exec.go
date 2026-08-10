@@ -76,7 +76,7 @@ func (m Model) execKubectlEdit() tea.Cmd {
 		args = append(args, "-n", ns)
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
@@ -110,7 +110,7 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 	title := "Describe: " + resourceTitleLabel(m.actionCtx.kind, titleNs, name)
 
 	return m.trackBgTask(scheduler.KindSubprocess, title, bgtaskTarget(m.actionCtx.context, ns), func() tea.Msg {
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()

@@ -59,7 +59,7 @@ func (kubectlDebugBackend) Start(ctx context.Context, req CaptureRequest) (io.Re
 	}
 	debugContainer := makeDebugContainerName(time.Now())
 	cctx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(cctx, kubectlPath, kubectlDebugArgv(req, debugContainer)...)
+	cmd := exec.CommandContext(cctx, kubectlPath, DemoKubectlArgs(kubectlDebugArgv(req, debugContainer))...)
 	cmd.Env = os.Environ()
 
 	stdout, err := cmd.StdoutPipe()
@@ -143,7 +143,7 @@ func terminateRemoteCapture(req CaptureRequest, kubectlPath, debugContainer stri
 		// case where the process is already gone.
 		"kill -TERM 1 2>/dev/null || true; sleep 1; kill -KILL 1 2>/dev/null || true",
 	}
-	cmd := exec.CommandContext(ctx, kubectlPath, args...)
+	cmd := exec.CommandContext(ctx, kubectlPath, DemoKubectlArgs(args)...)
 	if err := cmd.Run(); err != nil {
 		logger.Error("remote capture termination failed",
 			"namespace", req.Namespace, "pod", req.PodName,

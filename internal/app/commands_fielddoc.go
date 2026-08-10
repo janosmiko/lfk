@@ -86,7 +86,7 @@ func (m Model) execKubectlExplainField(reqCtx context.Context, req uint64, key f
 		if key.apiVersion != "" {
 			args = append(args, "--api-version", key.apiVersion)
 		}
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		// Killing kubectl does not close pipes a grandchild still holds (a
 		// credential plugin, say), and CombinedOutput reads to EOF. Without a
 		// WaitDelay the worker would stay blocked on a process already killed.

@@ -714,6 +714,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	args = m.injectKubectlDefaults(args)
 
 	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
+	args = k8s.DemoKubectlArgs(args)
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command(kubectlPath, args...)

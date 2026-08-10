@@ -227,7 +227,7 @@ func (m Model) loadPodsForLogAction() tea.Cmd {
 
 		// Fetch pods matching the selector.
 		args := []string{"get", "pods", "-l", selector, "-n", ns, "--context", m.kubectlContext(kctx), "-o", "json"}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		out, err := cmd.Output()

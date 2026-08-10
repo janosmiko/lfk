@@ -149,7 +149,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if rt.Namespaced {
 				patchArgs = append(patchArgs, "-n", itemNs)
 			}
-			patchCmd := exec.CommandContext(ctx, kubectlPath, patchArgs...)
+			patchCmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(patchArgs)...)
 			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", patchCmd)
 			// Best-effort: a failure here (RBAC denial, resource already
@@ -165,7 +165,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 
 			// Force delete.
 			deleteArgs := forceDeleteArgs(rt, ref.Name, kubectlCtx, itemNs, cascade)
-			cmd := exec.CommandContext(ctx, kubectlPath, deleteArgs...)
+			cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(deleteArgs)...)
 			cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", cmd)
 			if _, err := cmd.CombinedOutput(); err != nil {

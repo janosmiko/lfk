@@ -196,7 +196,7 @@ func (m Model) startPreviewLogStream(ref podRef, reconnect bool) (Model, tea.Cmd
 	go func() {
 		defer close(ch)
 
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logger.Info("Starting preview kubectl logs", "args", args, "kubeconfig", kubeconfigPaths)
 
@@ -621,7 +621,7 @@ func (m Model) fetchOlderPreviewLogs(ref podRef, tail int) tea.Cmd {
 	args := kubectlPodLogArgs(ref.name, ref.namespace, m.kubectlContext(ref.context), false, tail, ref.container)
 
 	return func() tea.Msg {
-		cmd := exec.Command(kubectlPath, args...) //nolint:gosec
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...) //nolint:gosec
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logger.Info("Fetching older preview log history", "args", args)
 

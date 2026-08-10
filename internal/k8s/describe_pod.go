@@ -22,7 +22,7 @@ func (c *Client) DescribePod(ctx context.Context, contextName, namespace, podNam
 	}
 
 	args := []string{"describe", "pod", podName, "-n", namespace, "--context", contextName}
-	cmd := exec.CommandContext(ctx, kubectlPath, args...)
+	cmd := exec.CommandContext(ctx, kubectlPath, DemoKubectlArgs(args)...)
 	if path := c.KubeconfigPathForContext(contextName); path != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+path)
 	}

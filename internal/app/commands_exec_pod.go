@@ -99,7 +99,7 @@ func (m Model) execKubectlExec() tea.Cmd {
 	args := execShellArgs(m.actionCtx.name, ns, m.kubectlContext(m.actionCtx.context), m.actionCtx.containerName, m.actionCtx.os)
 
 	logger.Info("Starting kubectl exec", "args", strings.Join(args, " "))
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
@@ -133,7 +133,7 @@ func (m Model) execKubectlAttach() tea.Cmd {
 		args = append(args, "-c", m.actionCtx.containerName)
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -165,7 +165,7 @@ func (m Model) execKubectlDebug() tea.Cmd {
 	ns := m.actionNamespace()
 	args := []string{"debug", m.actionCtx.name, "-it", "--image=busybox", "--context", m.kubectlContext(m.actionCtx.context), "-n", ns}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -205,7 +205,7 @@ func (m Model) runDebugPod() tea.Cmd {
 
 	logger.Info("Running debug pod", "pod", podName, "namespace", ns, "context", ctx)
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
@@ -262,7 +262,7 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 		"--overrides", manifest, "--", "sh",
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -375,7 +375,7 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	}
 
 	args := nodeShellArgs(podName, nodeShellNamespace, m.kubectlContext(ctx), overrides)
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
 
@@ -425,7 +425,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
@@ -462,7 +462,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
@@ -501,7 +501,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
@@ -551,7 +551,7 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()

@@ -103,6 +103,40 @@ func TestKubectlPath_DemoModeOverridesKubectlBin(t *testing.T) {
 	}
 }
 
+// TestDemoKubectlArgs_PrependsSubcommandOnlyInDemoMode guards the fix for
+// the finding that every kubectl exec.Command call site built kubectl-shaped
+// argv without the __demo-kubectl prefix: in demo mode KubectlPath() returns
+// this process's own executable, so the re-exec'd binary must route into the
+// hidden subcommand instead of parsing "edit"/"describe"/etc. as its own
+// root-command argv (which would launch a second TUI instead of the demo
+// kubectl emulation).
+func TestDemoKubectlArgs_PrependsSubcommandOnlyInDemoMode(t *testing.T) {
+	in := []string{"edit", "pod/web", "-n", "demo", "--context", "demo"}
+
+	SetDemoMode(true)
+	got := DemoKubectlArgs(in)
+	SetDemoMode(false)
+	want := append([]string{"__demo-kubectl"}, in...)
+	if len(got) != len(want) {
+		t.Fatalf("DemoKubectlArgs(%v) = %v, want %v", in, got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("DemoKubectlArgs(%v)[%d] = %q, want %q", in, i, got[i], want[i])
+		}
+	}
+
+	got = DemoKubectlArgs(in)
+	if len(got) != len(in) {
+		t.Fatalf("DemoKubectlArgs(%v) outside demo mode = %v, want args unchanged", in, got)
+	}
+	for i := range in {
+		if got[i] != in[i] {
+			t.Errorf("DemoKubectlArgs(%v)[%d] outside demo mode = %q, want %q", in, i, got[i], in[i])
+		}
+	}
+}
+
 func TestKubectlPath_DemoModeOffRestoresNormalResolution(t *testing.T) {
 	SetDemoMode(true)
 	SetDemoMode(false)

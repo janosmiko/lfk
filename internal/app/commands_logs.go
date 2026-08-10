@@ -183,7 +183,7 @@ func (m *Model) startLogStream() tea.Cmd {
 
 		logger.Info("Starting kubectl logs", "args", strings.Join(args, " "), "kubeconfig", kubeconfigPaths)
 
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
@@ -255,7 +255,7 @@ func kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx st
 		"-o", "json",
 	}
 
-	cmd := exec.Command(kubectlPath, getArgs...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(getArgs)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 	logExecCmd("Running kubectl command", cmd)
 	out, err := cmd.Output()
@@ -448,7 +448,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 
 		m.addLogEntry("DBG", "kubectl "+strings.Join(args, " "))
 
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
 		logger.Info("Starting multi-log kubectl",
 			"item", item.Name,
@@ -549,7 +549,7 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 
 		args = append(args, "--timestamps")
 
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
@@ -652,7 +652,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		args = append(args, "--timestamps")
 
 		kubeconfigEnv := "KUBECONFIG=" + kubeconfigPaths
-		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), kubeconfigEnv)
 
 		output, err := cmd.Output()
@@ -774,7 +774,7 @@ func (m *Model) saveAllLogs() tea.Cmd {
 			args = append(args, "--previous")
 		}
 
-		cmd := exec.CommandContext(context.Background(), kubectlPath, args...)
+		cmd := exec.CommandContext(context.Background(), kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		// Match commands_exec.go convention: log every kubectl invocation
 		// before running so the slog file records what we actually ran.

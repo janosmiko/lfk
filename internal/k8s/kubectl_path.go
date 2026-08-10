@@ -37,3 +37,18 @@ func KubectlPath() (string, error) {
 	}
 	return exec.LookPath("kubectl")
 }
+
+// DemoKubectlArgs prepends the hidden __demo-kubectl subcommand name to args
+// when demo-mode kubectl resolution is active. KubectlPath returns this
+// process's own executable in that mode, but the re-exec'd binary is still a
+// full lfk CLI: kubectl-shaped argv (e.g. "edit pod foo --context demo")
+// would otherwise be parsed by the root command itself (matching its own
+// --context/--namespace flags) and launch a second TUI instead of routing
+// into the demo kubectl emulation in internal/democli. Every call site that
+// builds an exec.Command(kubectlPath, ...) must wrap its args with this.
+func DemoKubectlArgs(args []string) []string {
+	if !demoMode {
+		return args
+	}
+	return append([]string{"__demo-kubectl"}, args...)
+}

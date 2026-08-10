@@ -54,7 +54,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 	deleteArgs := forceDeleteArgs(rt, name, m.kubectlContext(ctx), ns, cascade)
 
 	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
-		cmd := exec.Command(kubectlPath, deleteArgs...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(deleteArgs)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -88,7 +88,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 	}
 
 	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Remove finalizers: %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
-		cmd := exec.Command(kubectlPath, patchArgs...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(patchArgs)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -244,7 +244,7 @@ func (m Model) drainNodeCmd(nodeName string) tea.Cmd {
 		"--ignore-daemonsets", "--delete-emptydir-data",
 	}
 
-	cmd := exec.Command(kubectlPath, args...)
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
 	logExecCmd("Running kubectl command", cmd)
 
