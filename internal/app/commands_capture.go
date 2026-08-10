@@ -153,6 +153,17 @@ func (m Model) launchKubeshark(target model.Item) tea.Cmd {
 	mgr := m.portForwardMgr
 	ctx := m.reqCtx
 	return func() tea.Msg {
+		// Demo mode never seeds a kubeshark-hub Service, so DetectKubeshark
+		// already turns this away before any subprocess would spawn — but
+		// that's an implicit guard resting on absent seed data. Refuse
+		// explicitly, matching resolveHelmPath, rather than rely on it: in
+		// demo mode k8s.KubectlPath() returns this process's own
+		// executable, and a future demo-seeded kubeshark-hub Service would
+		// otherwise turn this into a real subprocess launch of "this
+		// binary" as kubectl.
+		if client.IsDemo() {
+			return kubesharkLaunchedMsg{err: fmt.Errorf("kubeshark is not available in demo mode")}
+		}
 		kubectlPath, err := k8s.KubectlPath()
 		if err != nil {
 			return kubesharkLaunchedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
