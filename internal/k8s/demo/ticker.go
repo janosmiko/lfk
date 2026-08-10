@@ -263,7 +263,7 @@ func (t *Ticker) appendRestartEvent(ctx context.Context, tick uint64) error {
 
 	name := fmt.Sprintf("web-crash-restart-%d", tick)
 	uid := fmt.Sprintf("e0000000-0000-4000-8000-%012d", tick)
-	now := time.Now().UTC()
+	now := demoEpoch.Add(time.Duration(tick) * t.interval)
 	message := fmt.Sprintf("Back-off restarting failed container web in pod %s_%s(%s)",
 		PodWebCrashLoop, NamespaceDemo, uidPodWebCrash)
 	evt := podWarningEvent(name, uid, PodWebCrashLoop, uidPodWebCrash, "BackOff", message, 1, now, now)

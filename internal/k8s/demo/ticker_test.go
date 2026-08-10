@@ -14,6 +14,20 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
+// gcd and lcm let tests derive an exact cycle length from the ticker's own
+// per-field cycle constants, instead of hardcoding a value that would go
+// stale silently if those constants change.
+func gcd(a, b int) int {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
+}
+
+func lcm(a, b int) int {
+	return a / gcd(a, b) * b
+}
+
 func crashLoopContainerStatus(t *testing.T, dyn *dynamicfake.FakeDynamicClient) map[string]any {
 	t.Helper()
 	obj, err := dyn.Resource(podGVR).Namespace(NamespaceDemo).Get(t.Context(), PodWebCrashLoop, metav1.GetOptions{})
@@ -62,7 +76,9 @@ func TestTicker_FullCycleInvariants(t *testing.T) {
 	tk := NewTicker(dyn, time.Hour)
 	ctx := t.Context()
 
-	const cycleLen = 30 // lcm(5, 2, 3)
+	// cycleLen must stay the LCM of every per-field cycle length so the loop
+	// below always covers a full cycle, even if those constants change.
+	cycleLen := lcm(lcm(healthyPodFlipEvery, len(waitingReasons)), len(deploymentReadyReplicaCycle))
 
 	deployClient := dyn.Resource(deploymentGVR).Namespace(NamespaceDemo)
 	deployObj, err := deployClient.Get(ctx, DeploymentWeb, metav1.GetOptions{})
@@ -164,6 +180,38 @@ func TestTicker_EachTickAppendsWarningEventAndStaysUnderCap(t *testing.T) {
 	assert.LessOrEqual(t, afterMany, before+maxTickerEvents,
 		"event count must stay bounded even after many ticks")
 	assert.Greater(t, afterMany, before, "ticks should still be producing events")
+}
+
+// TestTicker_EventTimestampsAreDeterministic drives two independent Tickers
+// through the same tick and asserts they produce identical Warning Event
+// timestamps -- the ticker's doc comment promises every mutation is a
+// deterministic function of the tick count, which time.Now() would break.
+func TestTicker_EventTimestampsAreDeterministic(t *testing.T) {
+	ctx := t.Context()
+
+	tickEvent := func(dyn *dynamicfake.FakeDynamicClient) map[string]any {
+		t.Helper()
+		// restartCrashLoopPod's tick-0 event is always named "web-crash-restart-0".
+		obj, err := dyn.Resource(eventGVR).Namespace(NamespaceDemo).Get(ctx, "web-crash-restart-0", metav1.GetOptions{})
+		require.NoError(t, err)
+		return obj.Object
+	}
+
+	dynA := NewDynamicClient()
+	tkA := NewTicker(dynA, time.Hour)
+	require.NoError(t, tkA.Tick(ctx))
+	firstA, _, err := unstructured.NestedString(tickEvent(dynA), "firstTimestamp")
+	require.NoError(t, err)
+
+	time.Sleep(1100 * time.Millisecond) // cross a second boundary; metav1.Time truncates to seconds
+
+	dynB := NewDynamicClient()
+	tkB := NewTicker(dynB, time.Hour)
+	require.NoError(t, tkB.Tick(ctx))
+	firstB, _, err := unstructured.NestedString(tickEvent(dynB), "firstTimestamp")
+	require.NoError(t, err)
+
+	assert.Equal(t, firstA, firstB, "tick 0 on two fresh tickers must produce identical event timestamps")
 }
 
 // TestTicker_TickClearsActionLogAndStaysBounded drives many ticks and
