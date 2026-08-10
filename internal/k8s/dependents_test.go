@@ -198,6 +198,9 @@ func TestPluralKind(t *testing.T) {
 		{"Ingress", 2, "ingresses"},
 		{"NetworkPolicy", 2, "networkpolicies"},
 		{"Gateway", 2, "gateways"},
+		// Kinds the API already spells as a plural must not gain a second one.
+		{"Endpoints", 2, "endpoints"},
+		{"Endpoints", 1, "endpoints"},
 		{"y", 2, "ys"},
 	}
 	for _, tt := range tests {

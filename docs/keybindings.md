@@ -231,7 +231,7 @@ The dialog also states what the action costs, as three labelled rows. Each row i
 
 Deleting a Deployment with four ReplicaSets under it:
 
-```
+```text
 Cascade:      Background
 Scope:        4 replicasets, 3 pods
 Availability: 0 of 3 ready after
@@ -240,7 +240,7 @@ Risk:         kyverno allows 2 at once, this removes 3
 
 Press `Tab` for `Orphan` and every row is rewritten in place:
 
-```
+```text
 Cascade:      Orphan
 Scope:        the deployment only
 Availability: unchanged, the 3 pods keep running
@@ -251,7 +251,7 @@ A row with nothing to say is left out, so deleting a bare pod shows `Availabilit
 
 Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
 
-`Scope` walks `ownerReferences` down from the target, so a deep chain is counted in full: deleting a Deployment counts its ReplicaSets and their pods. Countable owners are Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, and Service. For any other kind the row is left out rather than showing a zero it cannot stand behind. The walk asks the server only for the children the target's own selector matches, so counting one small workload in a namespace of ten thousand pods stays cheap.
+`Scope` walks `ownerReferences` down from the target, so a deep chain is counted in full: deleting a Deployment counts its ReplicaSets and their pods. Countable owners are Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, and Service. For any other kind the row is left out rather than showing a zero it cannot stand behind. Where Kubernetes guarantees that the children carry the owner's labels, the walk narrows the list to that selector, so counting one small workload in a namespace of ten thousand pods stays cheap. That covers pods, ReplicaSets and ControllerRevisions under a workload, and EndpointSlices under a Service. A StatefulSet's PersistentVolumeClaims, a CronJob's Jobs, and every bulk selection are listed unnarrowed, because no selector there is promised to match.
 
 Both fetches share one placeholder, `working out what this costs...`, so no row renders against a half-loaded answer. Bulk delete shows one figure for the whole selection, at one pod list and one list per child kind per namespace. A row nothing can be resolved for, a ConfigMap say, is reported as `N rows not counted`.
 

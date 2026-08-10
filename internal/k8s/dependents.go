@@ -115,11 +115,15 @@ func (d DependentCount) Summary() string {
 	return strings.Join(parts, ", ")
 }
 
+// alreadyPluralKinds are Kinds the API spells as a plural already. Adding the
+// usual suffix to one of these produces "endpointses".
+var alreadyPluralKinds = map[string]bool{"endpoints": true}
+
 // pluralKind renders a Kubernetes Kind the way the resource name reads:
 // lowercase, and pluralized the way the API does it.
 func pluralKind(kind string, n int) string {
 	lower := strings.ToLower(kind)
-	if n == 1 {
+	if n == 1 || alreadyPluralKinds[lower] {
 		return lower
 	}
 	// Matches the API's own plural forms: ingresses, not ingresss.
