@@ -13,65 +13,75 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func TestBlastRadiusNotes_LoadingShowsAPlaceholder(t *testing.T) {
-	notes := blastRadiusNotes(nil, true, false)
+// costNotes builds the confirm rows for an action that does not cascade,
+// which is what every case below measures. A cascading delete is covered by
+// the row matrix in confirm_cost_test.go.
+func costNotes(r *k8s.BlastRadius, loading bool) []ui.ConfirmNote {
+	return confirmCostNotes(confirmCost{radius: r, loading: loading})
+}
+
+func TestCostNotes_LoadingShowsAPlaceholder(t *testing.T) {
+	notes := costNotes(nil, true)
 
 	require.Len(t, notes, 1)
-	assert.Contains(t, notes[0].Text, "checking")
+	assert.Contains(t, notes[0].Text, "working out")
 	assert.False(t, notes[0].Warn, "waiting is not a warning")
 }
 
-func TestBlastRadiusNotes_NothingYetAndNotLoadingIsSilent(t *testing.T) {
-	assert.Empty(t, blastRadiusNotes(nil, false, false),
+func TestCostNotes_NothingYetAndNotLoadingIsSilent(t *testing.T) {
+	assert.Empty(t, costNotes(nil, false),
 		"a dialog that never asked for a blast radius must look untouched")
 }
 
-func TestBlastRadiusNotes_WorkloadShowsReplicasRemaining(t *testing.T) {
+func TestCostNotes_WorkloadShowsReplicasRemaining(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 2, ReadyBefore: 5, ReadyAfter: 3}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.Contains(t, notes[0].Text, "2 pods")
-	assert.Contains(t, notes[0].Text, "3 of 5 ready after")
+	assert.Contains(t, notes[1].Text, "3 of 5 ready after")
 }
 
-func TestBlastRadiusNotes_DrainOmitsTheReplicaCount(t *testing.T) {
+func TestCostNotes_DrainOmitsTheReplicaCount(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 12, ReadyBefore: 0, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	require.Len(t, notes, 2)
+	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "12 pods")
 	assert.NotContains(t, notes[0].Text, "ready after",
 		"a node drain has no single workload to count replicas for")
 }
 
-func TestBlastRadiusNotes_NoBudgetSaysSo(t *testing.T) {
+func TestCostNotes_NoBudgetSaysSo(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 1, ReadyBefore: 3, ReadyAfter: 2}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	assert.Equal(t, "Budget", notes[1].Label)
-	assert.Contains(t, notes[1].Text, "none covers these pods")
+	// An absent constraint is not a risk, so the row is left out entirely.
+	for _, n := range notes {
+		assert.NotEqual(t, "Risk", n.Label, "no budget covers these pods")
+	}
 }
 
-func TestBlastRadiusNotes_SingleBudgetShowsBeforeAndAfter(t *testing.T) {
+func TestCostNotes_SingleBudgetShowsBeforeAndAfter(t *testing.T) {
 	r := &k8s.BlastRadius{
 		Evicting: 2, ReadyBefore: 5, ReadyAfter: 3,
 		PDBs: []k8s.PDBImpact{{Namespace: "prod", Name: "web-pdb", AllowedBefore: 2, AllowedAfter: 0, Evicting: 2}},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	require.Len(t, notes, 2)
-	assert.Contains(t, notes[1].Text, "web-pdb allows 2 at once")
-	assert.False(t, notes[1].Warn)
+	require.Len(t, notes, 3)
+	assert.Contains(t, notes[2].Text, "web-pdb allows 2 at once")
+	assert.False(t, notes[2].Warn)
 }
 
-func TestBlastRadiusNotes_SeveralBudgetsAreCounted(t *testing.T) {
+func TestCostNotes_SeveralBudgetsAreCounted(t *testing.T) {
 	r := &k8s.BlastRadius{
 		Evicting: 12,
 		PDBs: []k8s.PDBImpact{
@@ -80,14 +90,14 @@ func TestBlastRadiusNotes_SeveralBudgetsAreCounted(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.Contains(t, notes[1].Text, "2 budgets, all within their limits",
 		"naming every budget would not fit the box")
 }
 
-func TestBlastRadiusNotes_ViolationGetsItsOwnWarningLine(t *testing.T) {
+func TestCostNotes_ViolationGetsItsOwnWarningLine(t *testing.T) {
 	r := &k8s.BlastRadius{
 		Evicting: 2, ReadyBefore: 2, ReadyAfter: 0, Violation: true,
 		PDBs: []k8s.PDBImpact{
@@ -95,15 +105,15 @@ func TestBlastRadiusNotes_ViolationGetsItsOwnWarningLine(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	require.Len(t, notes, 2)
+	require.Len(t, notes, 3)
 	assert.False(t, notes[0].Warn)
-	assert.True(t, notes[1].Warn, "AC: a violation is marked by color, not only by words")
-	assert.Contains(t, notes[1].Text, "web-pdb allows 1 at once, this removes 2")
+	assert.True(t, notes[2].Warn, "AC: a violation is marked by color, not only by words")
+	assert.Contains(t, notes[2].Text, "web-pdb allows 1 at once, this removes 2")
 }
 
-func TestBlastRadiusNotes_SeveralViolationsAreListedOnOneLine(t *testing.T) {
+func TestCostNotes_SeveralViolationsAreListedOnOneLine(t *testing.T) {
 	r := &k8s.BlastRadius{
 		Evicting: 4, Violation: true,
 		PDBs: []k8s.PDBImpact{
@@ -112,29 +122,29 @@ func TestBlastRadiusNotes_SeveralViolationsAreListedOnOneLine(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.True(t, notes[1].Warn)
 	assert.Contains(t, notes[1].Text, "2 budgets, 2 exceeded")
 }
 
-func TestBlastRadiusNotes_NothingToEvictIsStated(t *testing.T) {
+func TestCostNotes_NothingToEvictIsStated(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 0, ReadyBefore: 0, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "no running pods")
-	assert.Equal(t, "Removes", notes[0].Label)
+	assert.Equal(t, "Availability", notes[0].Label)
 }
 
-func TestBlastRadiusNotes_OnePodReadsAsSingular(t *testing.T) {
+func TestCostNotes_OnePodReadsAsSingular(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 1, ReadyBefore: 1, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	assert.Contains(t, notes[0].Text, "1 pod,")
+	assert.Equal(t, "1 pod", notes[0].Text)
 	assert.NotContains(t, notes[0].Text, "1 pods")
 }
 
@@ -300,12 +310,12 @@ func TestBulkPodTargets_CountsRowsItCannotResolve(t *testing.T) {
 		"a workload row carries no labels, so it cannot be resolved without a call per row")
 }
 
-func TestBlastRadiusNotes_UncountedRowsAreStated(t *testing.T) {
+func TestCostNotes_UncountedRowsAreStated(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 3, ReadyBefore: 0, ReadyAfter: 0, Uncounted: 2}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	require.Len(t, notes, 2)
+	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "2 rows not counted")
 }
 
@@ -506,19 +516,19 @@ func TestHandleConfirmOverlayKey_ConfirmingReleasesTheBlastRadius(t *testing.T) 
 		"the next confirm must not open showing the last one's figures")
 }
 
-func TestBlastRadiusNotes_ZeroReadyBeforeDropsThePhrase(t *testing.T) {
+func TestCostNotes_ZeroReadyBeforeDropsThePhrase(t *testing.T) {
 	// Bulk and drain have no single workload, so readyBefore is 0 and
 	// "0 of 0 ready after" says nothing.
 	r := &k8s.BlastRadius{Evicting: 5, ReadyBefore: 0, ReadyAfter: 0}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
-	require.Len(t, notes, 2)
+	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Text, "5 pods")
 	assert.NotContains(t, notes[0].Text, "ready after")
 }
 
-func TestBlastRadiusNotes_ViolationDoesNotRepeatTheBudgetName(t *testing.T) {
+func TestCostNotes_ViolationDoesNotRepeatTheBudgetName(t *testing.T) {
 	// The line above already names the budget in full. Repeating a long
 	// namespace/name pair wraps the box and reads as noise.
 	r := &k8s.BlastRadius{
@@ -529,7 +539,7 @@ func TestBlastRadiusNotes_ViolationDoesNotRepeatTheBudgetName(t *testing.T) {
 		}},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.True(t, notes[1].Warn)
@@ -538,7 +548,7 @@ func TestBlastRadiusNotes_ViolationDoesNotRepeatTheBudgetName(t *testing.T) {
 		"the name belongs in the budget row and nowhere else")
 }
 
-func TestBlastRadiusNotes_SeveralViolationsStillNameThem(t *testing.T) {
+func TestCostNotes_SeveralViolationsStillNameThem(t *testing.T) {
 	// With more than one budget the first line only counts them, so the
 	// warning line has to say which ones.
 	r := &k8s.BlastRadius{
@@ -549,7 +559,7 @@ func TestBlastRadiusNotes_SeveralViolationsStillNameThem(t *testing.T) {
 		},
 	}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 2)
 	assert.Contains(t, notes[1].Text, "2 budgets, 2 exceeded")
@@ -602,14 +612,14 @@ func TestBudgetRow_ManyBudgetsCountTheBlockers(t *testing.T) {
 		"with four budgets the count of blockers is the fact that matters")
 }
 
-func TestBlastRadiusNotes_RowsAreLabelled(t *testing.T) {
+func TestCostNotes_RowsAreLabelled(t *testing.T) {
 	r := &k8s.BlastRadius{Evicting: 3, PDBs: []k8s.PDBImpact{{Name: "web-pdb", AllowedBefore: 2}}}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.Len(t, notes, 2)
-	assert.Equal(t, "Removes", notes[0].Label)
-	assert.Equal(t, "Budget", notes[1].Label)
+	assert.Equal(t, "Scope", notes[0].Label)
+	assert.Equal(t, "Risk", notes[1].Label)
 }
 
 func TestUsesNodePods(t *testing.T) {
@@ -665,12 +675,12 @@ func TestBulkPodTargets_CountsOnlyRowsItTrulyCannotResolve(t *testing.T) {
 	assert.Len(t, byNS["prod"].selectors, 1)
 }
 
-func TestBlastRadiusNotes_NoPodsStillReportsUncountedRows(t *testing.T) {
+func TestCostNotes_NoPodsStillReportsUncountedRows(t *testing.T) {
 	// The zero-pods shortcut used to return early and silently drop the
 	// count of rows the figures leave out.
 	r := &k8s.BlastRadius{Evicting: 0, Uncounted: 2}
 
-	notes := blastRadiusNotes(r, false, false)
+	notes := costNotes(r, false)
 
 	require.NotEmpty(t, notes)
 	assert.Contains(t, notes[0].Text, "2 rows not counted")

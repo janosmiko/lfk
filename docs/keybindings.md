@@ -221,19 +221,39 @@ Cascade controls what happens to dependent objects (a Job's pods, a Deployment's
 
 Set the starting policy with `delete_propagation_policy` in the config. Bulk delete uses the policy shown in the dialog.
 
-The dialog also states what the action costs, as two labelled rows:
+The dialog also states what the action costs, as three labelled rows. Each row is built from the selected cascade policy, so no two rows can contradict each other.
 
-| Row | Says |
+| Row | Answers |
 |---|---|
-| `Removes` | Pods removed, and ready replicas left where there is a workload |
-| `Budget` | Which PodDisruptionBudget covers them, and whether this exceeds it |
-| `Dependents` | What the selected cascade policy does to the owned objects |
+| `Scope` | What else stops existing |
+| `Availability` | What stops serving |
+| `Risk` | What refuses the action, or what it leaves with no owner |
 
-A budget the action would breach is shown in the warning color. Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
+Deleting a Deployment with four ReplicaSets under it:
 
-Bulk delete shows one line for the whole selection, resolved from the rows themselves at one pod list per namespace. A row that owns no pods, a ConfigMap say, is reported as `N rows not counted`.
+```
+Cascade:      Background
+Scope:        4 replicasets, 3 pods
+Availability: 0 of 3 ready after
+Risk:         kyverno allows 2 at once, this removes 3
+```
 
-The `Dependents` row walks `ownerReferences` down from the target, so a deep chain is counted in full: deleting a Deployment counts its ReplicaSets and their pods. `Tab` restates the same set under the new policy without closing the dialog — `also removed` under Background and Foreground, `stay in the cluster` under Orphan, `may stay (server decides)` under None. The row reads `counting...` until the walk returns, and is left out entirely for a kind whose children lfk cannot follow, rather than showing a zero it cannot stand behind. Countable owners are Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, and Service. The walk asks the server only for the children the target's own selector matches, so counting one small workload in a namespace of ten thousand pods stays cheap. Bulk delete shows one total, at one list call per child kind per namespace.
+Press `Tab` for `Orphan` and every row is rewritten in place:
+
+```
+Cascade:      Orphan
+Scope:        the deployment only
+Availability: unchanged, the 3 pods keep running
+Risk:         4 replicasets, 3 pods left with no owner
+```
+
+A row with nothing to say is left out, so deleting a bare pod shows `Availability` alone. `Risk` names risks only: no budget covering the pods means no row, not a row saying that none applies. `Risk` is never more than one line, because a policy that keeps dependents evicts nothing, so a budget breach and an orphan hazard cannot both apply.
+
+Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
+
+`Scope` walks `ownerReferences` down from the target, so a deep chain is counted in full: deleting a Deployment counts its ReplicaSets and their pods. Countable owners are Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, and Service. For any other kind the row is left out rather than showing a zero it cannot stand behind. The walk asks the server only for the children the target's own selector matches, so counting one small workload in a namespace of ten thousand pods stays cheap.
+
+Both fetches share one placeholder, `working out what this costs...`, so no row renders against a half-loaded answer. Bulk delete shows one figure for the whole selection, at one pod list and one list per child kind per namespace. A row nothing can be resolved for, a ConfigMap say, is reported as `N rows not counted`.
 
 ### Force delete confirm dialog
 
