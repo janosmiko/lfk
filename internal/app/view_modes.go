@@ -78,6 +78,9 @@ func (m Model) viewDescribe() string {
 		hint = ui.RenderHintBar(hints, m.width)
 	}
 
+	// describeView.content is sanitized once by its producer (see
+	// sanitizeDescribeContent) before it lands here, so this View function
+	// - which bubbletea calls every frame - does no per-frame work.
 	lines := strings.Split(m.describeView.content, "\n")
 
 	maxLines := max(m.height-4, 3)

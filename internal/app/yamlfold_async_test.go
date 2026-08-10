@@ -78,6 +78,30 @@ func TestBuildPreviewYAMLLoadedMsgError(t *testing.T) {
 	assert.Empty(t, msg.content)
 }
 
+// TestBuildYAMLLoadedMsgSanitizesControlBytes guards the missing sink found
+// in review: Secret data and annotations are cluster-controlled and were
+// rendered raw, so a hostile value carrying a C1 control or a bidi override
+// reached the screen unfiltered.
+func TestBuildYAMLLoadedMsgSanitizesControlBytes(t *testing.T) {
+	raw := "apiVersion: v1\nkind: Secret\ndata:\n  password: \x9b31mHACKED\x9b0m\n"
+	msg := buildYAMLLoadedMsg(raw, nil)
+	assert.NotContains(t, msg.content, "\x9b")
+
+	withBidi := "apiVersion: v1\nkind: ConfigMap\ndata:\n  note: \u202eevil\u202c\n"
+	msg = buildYAMLLoadedMsg(withBidi, nil)
+	assert.NotContains(t, msg.content, "\u202e")
+	assert.NotContains(t, msg.content, "\u202c")
+}
+
+// TestBuildPreviewYAMLLoadedMsgSanitizesControlBytes is the preview
+// counterpart to TestBuildYAMLLoadedMsgSanitizesControlBytes.
+func TestBuildPreviewYAMLLoadedMsgSanitizesControlBytes(t *testing.T) {
+	raw := "apiVersion: v1\nkind: Secret\ndata:\n  token: \x9d52;c;SGVsbG8=\x9c\n"
+	msg := buildPreviewYAMLLoadedMsg(raw, nil, 1)
+	assert.NotContains(t, msg.content, "\x9d")
+	assert.NotContains(t, msg.content, "\x9c")
+}
+
 // TestUpdateYamlLoadedDoesNotReprocess is the core regression guard for the
 // freeze fix: the message handler must NOT call indentYAMLListItems or
 // parseYAMLSections. It only assigns pre-computed fields from the message.

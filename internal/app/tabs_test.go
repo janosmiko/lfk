@@ -668,6 +668,32 @@ func TestSetStatusMessage(t *testing.T) {
 	assert.Equal(t, "ERR", m.errorLog[1].Level)
 }
 
+// TestSetStatusMessage_SanitizesErrorLog guards the second of three siblings
+// writing m.errorLog: addLogEntry sanitized its own append, but
+// setStatusMessage appended msg raw, so the same overlay still reaches the
+// screen unsanitized through this door.
+func TestSetStatusMessage_SanitizesErrorLog(t *testing.T) {
+	m := Model{}
+
+	m.setStatusMessage("boom \x9d52;c;SGVsbG8=\x9c tail", false)
+	require.Len(t, m.errorLog, 1)
+	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
+	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
+
+	m.setStatusMessage("evil\u202etxt", true)
+	require.Len(t, m.errorLog, 2)
+	assert.NotContains(t, m.errorLog[1].Message, "\u202e")
+}
+
+// TestSetStatusMessage_OrdinaryContentUnaffected guards against sanitizing
+// legitimate non-ASCII status messages into mush.
+func TestSetStatusMessage_OrdinaryContentUnaffected(t *testing.T) {
+	m := Model{}
+	m.setStatusMessage("café RÉSUMÉ déployé", false)
+	require.Len(t, m.errorLog, 1)
+	assert.Equal(t, "café RÉSUMÉ déployé", m.errorLog[0].Message)
+}
+
 func TestHasStatusMessageExpired(t *testing.T) {
 	m := Model{
 		statusMessage:    "expired",
@@ -691,6 +717,43 @@ func TestAddLogEntry(t *testing.T) {
 		m.addLogEntry("DBG", "entry")
 	}
 	assert.Len(t, m.errorLog, 500)
+}
+
+// TestAddLogEntry_SanitizesTerminalEscapes guards the missing sink found in
+// review: command-bar output and err.Error() reach addLogEntry unsanitized
+// and are rendered raw by WrapEventLine in the error-log overlay, even
+// though the same values are sanitized separately before landing in the
+// describe view. Fixing this once inside addLogEntry covers every one of
+// its ~80 non-test call sites instead of patching each one.
+func TestAddLogEntry_SanitizesTerminalEscapes(t *testing.T) {
+	m := Model{}
+
+	m.addLogEntry("ERR", "boom \x9d52;c;SGVsbG8=\x9c tail")
+	require.Len(t, m.errorLog, 1)
+	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
+	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
+
+	m.addLogEntry("ERR", "boom \x9b31m tail")
+	require.Len(t, m.errorLog, 2)
+	assert.NotContains(t, m.errorLog[1].Message, "\x9b")
+}
+
+// TestAddLogEntry_OrdinaryContentUnaffected guards against fixing the
+// injection issue by mangling legitimate log entries, including non-ASCII
+// content.
+func TestAddLogEntry_OrdinaryContentUnaffected(t *testing.T) {
+	m := Model{}
+	cases := []string{
+		"$ kubectl get pods -n default",
+		"café RÉSUMÉ déployé",
+		"日本語のログメッセージ",
+	}
+	for _, s := range cases {
+		m.addLogEntry("DBG", s)
+	}
+	for i, s := range cases {
+		assert.Equal(t, s, m.errorLog[i].Message)
+	}
 }
 
 // --- tabLabels ---
@@ -951,6 +1014,17 @@ func TestSetErrorFromErr(t *testing.T) {
 	assert.Len(t, m.errorLog, 1)
 	assert.Equal(t, "ERR", m.errorLog[0].Level)
 	assert.Contains(t, m.errorLog[0].Message, "fetch error: connection refused")
+}
+
+// TestSetErrorFromErr_SanitizesErrorLog guards the third of three siblings
+// writing m.errorLog: setErrorFromErr appended prefix+full raw, bypassing
+// the sanitizing boundary addLogEntry uses for the same overlay.
+func TestSetErrorFromErr_SanitizesErrorLog(t *testing.T) {
+	m := Model{width: 100}
+	m.setErrorFromErr("prefix: ", errors.New("boom \x9d52;c;SGVsbG8=\x9c tail"))
+	require.Len(t, m.errorLog, 1)
+	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
+	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
 }
 
 // --- setStatusMessage log capping ---

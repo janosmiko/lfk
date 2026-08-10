@@ -1,9 +1,11 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,6 +46,117 @@ func TestBuildEventTimelineLinesEmpty(t *testing.T) {
 	m := Model{eventTimelineData: nil}
 	lines := m.buildEventTimelineLines()
 	assert.Empty(t, lines)
+}
+
+// TestBuildEventTimelineLinesSanitizesControlBytes guards the missing sink
+// found in review: Event Reason, Message, and Source are attacker-influenced
+// (any principal that can create an Event in the namespace controls them)
+// and reached the fullscreen event viewer unfiltered.
+func TestBuildEventTimelineLinesSanitizesControlBytes(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "Warning",
+			Reason:  "Hacked\x9b31m",
+			Message: "\x1b]52;c;SGVsbG8=\x07payload",
+			Source:  "evil\x9c",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+	assert.NotContains(t, lines[0], "\x9b")
+	assert.NotContains(t, lines[0], "\x1b")
+	assert.NotContains(t, lines[0], "\x07")
+	assert.NotContains(t, lines[0], "\x9c")
+}
+
+// TestBuildEventTimelineLinesSanitizesType guards a second missed field on
+// the same line: Reason, Message, and Source were sanitized, but Type was
+// printed raw in the same fmt.Sprintf call. Type is just as attacker-
+// influenced - an unconstrained string on the Event API, settable by any
+// principal with create-events permission in the namespace.
+func TestBuildEventTimelineLinesSanitizesType(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "\x9d52;c;SGVsbG8=\x9c",
+			Reason:  "Scheduled",
+			Message: "ok",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+	assert.NotContains(t, lines[0], "\x9d")
+	assert.NotContains(t, lines[0], "\x9c")
+
+	m2 := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "\x9b31m",
+			Reason:  "Scheduled",
+			Message: "ok",
+		}},
+	}
+	lines2 := m2.buildEventTimelineLines()
+	require.Len(t, lines2, 1)
+	assert.NotContains(t, lines2[0], "\x9b")
+}
+
+// TestBuildEventTimelineLinesOrdinaryTypeUnaffected guards against fixing
+// the injection issue by mangling legitimate event types.
+func TestBuildEventTimelineLinesOrdinaryTypeUnaffected(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "Warning",
+			Reason:  "Scheduled",
+			Message: "ok",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "Warning")
+}
+
+// TestBuildEventTimelineLinesWideUnicodeColumnsAligned guards against
+// padding Type/Reason by rune count (fmt.Sprintf %-Ns): a wide Unicode
+// character counts as one rune but two terminal columns, so rune-based
+// padding shifts the message column right of where eventTimelineMessageColumn
+// expects it. Padding must use display width (lipgloss.Width), matching
+// ordinary ASCII content byte-for-byte.
+func TestBuildEventTimelineLinesWideUnicodeColumnsAligned(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{
+			{Type: "Normal", Reason: "Scheduled", Message: "ascii message"},
+			{Type: "普通", Reason: "スケジュール済み", Message: "wide message"},
+		},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 2)
+
+	for i, want := range []string{"ascii message", "wide message"} {
+		idx := strings.Index(lines[i], want)
+		require.Positive(t, idx, "line %d: %q not found in %q", i, want, lines[i])
+		prefixWidth := lipgloss.Width(lines[i][:idx])
+		assert.Equal(t, eventTimelineMessageColumn, prefixWidth,
+			"line %d: message column misaligned by wide Unicode in Type/Reason", i)
+	}
+}
+
+// TestBuildEventTimelineLinesTruncatesOverlongTypeAndReason guards the
+// column width contract when Type/Reason exceed their allotted display
+// width: they must be truncated to fit, not left to overflow into the
+// message column (fmt.Sprintf %-Ns never truncates).
+func TestBuildEventTimelineLinesTruncatesOverlongTypeAndReason(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "VeryLongEventTypeNameThatOverflows",
+			Reason:  "AnEvenLongerReasonStringThatDefinitelyExceedsTwentyColumns",
+			Message: "the message",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+
+	idx := strings.Index(lines[0], "the message")
+	require.Positive(t, idx, "message not found in %q", lines[0])
+	assert.Equal(t, eventTimelineMessageColumn, lipgloss.Width(lines[0][:idx]))
 }
 
 func TestEventContentHeight(t *testing.T) {

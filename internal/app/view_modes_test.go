@@ -407,6 +407,99 @@ func TestViewDescribe(t *testing.T) {
 	})
 }
 
+// --- viewDescribe: sanitizing ---
+//
+// describeView.content is fed by kubectl describe, helm values, command-bar
+// output, trivy scans, and gitops watch — none of it lfk-controlled. Each
+// producer sanitizes once via sanitizeDescribeContent (see
+// describe_sanitize_test.go for the injection/SGR/tab-expansion coverage)
+// before storing the content, so viewDescribe — a View function bubbletea
+// calls every frame — trusts its input and does no per-frame sanitizing.
+// These tests exercise the full producer -> view pipeline.
+
+func TestViewDescribe_RendersProducerSanitizedContent(t *testing.T) {
+	raw := "before\u202eafter\x1b[2Jgone\x1b]52;c;ZXZpbA==\x07tail"
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Command Output",
+			content: sanitizeDescribeContent(raw),
+		},
+	}
+	output := m.viewDescribe()
+	assert.NotContains(t, output, "\u202e", "bidi override must not survive")
+	assert.NotContains(t, output, "\x1b[2J", "raw CSI (screen erase) must not survive")
+	assert.NotContains(t, output, "\x1b]52", "OSC-52 clipboard sequence must not survive")
+	assert.NotContains(t, output, "\x07")
+}
+
+func TestViewDescribe_RendersProducerSanitizedContentInWrapMode(t *testing.T) {
+	raw := "before\u202eafter\x1b[2Jgone"
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Command Output",
+			content: sanitizeDescribeContent(raw),
+			wrap:    true,
+		},
+	}
+	output := m.viewDescribe()
+	assert.NotContains(t, output, "\u202e")
+	assert.NotContains(t, output, "\x1b[2J")
+}
+
+func TestViewDescribe_PreservesSGRColour(t *testing.T) {
+	// Realistic trivy-style coloured table output, as a producer would have
+	// stored it after sanitizeDescribeContent. SGR must survive so the
+	// severity colouring the scanner intended still renders.
+	trivyLine := sanitizeDescribeContent("\x1b[31mCRITICAL\x1b[0m CVE-2024-1234  openssl  1.1.1  1.1.1w")
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Vuln Scan: nginx:latest",
+			content: trivyLine,
+		},
+	}
+	output := m.viewDescribe()
+	assert.Contains(t, output, "\x1b[31m", "SGR red-severity colour must survive the describe path")
+}
+
+func TestViewDescribe_PreservesTabAlignment(t *testing.T) {
+	// kubectl describe output is tab-and-space aligned; a producer expands
+	// tabs via sanitizeDescribeContent before viewDescribe ever sees them.
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Describe: my-pod",
+			content: sanitizeDescribeContent("Name:\tmy-pod\nNamespace:\tdefault"),
+		},
+	}
+	output := m.viewDescribe()
+	stripped := stripANSI(output)
+	assert.Contains(t, stripped, "Name:   my-pod")
+	assert.Contains(t, stripped, "Namespace:      default")
+}
+
+func TestViewDescribe_OrdinaryContentUnaffected(t *testing.T) {
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Describe: my-pod",
+			content: "Name:         my-pod\nNamespace:    default\nStatus:       Running",
+		},
+	}
+	output := m.viewDescribe()
+	stripped := stripANSI(output)
+	assert.Contains(t, stripped, "Name:         my-pod")
+	assert.Contains(t, stripped, "Namespace:    default")
+	assert.Contains(t, stripped, "Status:       Running")
+}
+
 // --- viewDiff ---
 
 func TestViewDiff(t *testing.T) {

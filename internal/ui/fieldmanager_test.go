@@ -41,3 +41,14 @@ func TestSanitizeTerminalText_DropsControlsAndBidiOverrides(t *testing.T) {
 		"a plain direction mark is not an override")
 	assert.Equal(t, "kube-controller-manager", SanitizeTerminalText("kube-controller-manager"))
 }
+
+func TestStripBidiOverrides_DropsOnlyBidiChars(t *testing.T) {
+	// Unlike SanitizeTerminalText, ESC/TAB/SGR must survive - this is for
+	// sinks that already run the ANSI-aware body sanitizer and only need
+	// the bidi-reordering guard on top.
+	assert.Equal(t, "a\tb\x1b[31mc\x1b[0m", StripBidiOverrides("a\tb\x1b[31mc\x1b[0m"))
+	assert.Equal(t, "abc", StripBidiOverrides("ab\u202ec"))
+	assert.Equal(t, "abc", StripBidiOverrides("a\u2066b\u2069c"))
+	assert.Equal(t, "\u200eab", StripBidiOverrides("\u200eab"),
+		"a plain direction mark is not an override")
+}

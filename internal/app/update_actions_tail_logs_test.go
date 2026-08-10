@@ -109,6 +109,25 @@ func TestExecuteActionLogsFullTitleHasNoTailIndicator(t *testing.T) {
 	assert.NotContains(t, mdl.logView.title, "tail", "full Logs title must not contain 'tail'")
 }
 
+// TestExecuteActionLogsSanitizesContainerNameInTitle guards the missing sink
+// found in review: containerName was concatenated into the title after
+// resourceTitleLabel, so it skipped the sanitizing kind/namespace/name get.
+func TestExecuteActionLogsSanitizesContainerNameInTitle(t *testing.T) {
+	m := newTestModelWithClient(t)
+	m.actionCtx = actionContext{
+		kind:          "Pod",
+		name:          "my-pod",
+		containerName: "evil\x1b[2Jsidecar",
+		namespace:     "default",
+		context:       "test-ctx",
+	}
+
+	result, _ := m.executeAction("Logs")
+	mdl := result.(Model)
+
+	assert.NotContains(t, mdl.logView.title, "\x1b")
+}
+
 // TestExecuteActionTailLogsGroupResourceSetsPendingAction verifies that when a
 // group resource (e.g., Deployment) triggers Tail Logs, the pendingAction is
 // set to "Tail Logs" so the pod-select overlay can continue with the correct action.

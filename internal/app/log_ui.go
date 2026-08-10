@@ -61,12 +61,9 @@ func (m *Model) appendLoggerUIEntry(e logger.UIEntry) {
 	if extra := formatLoggerUIArgs(e.Args); extra != "" {
 		line = line + " " + extra
 	}
-	m.errorLog = append(m.errorLog, ui.ErrorLogEntry{
+	m.appendErrorLogEntry(ui.ErrorLogEntry{
 		Time:    e.Time,
 		Message: line,
 		Level:   e.Level,
-	})
-	if len(m.errorLog) > 500 {
-		m.errorLog = m.errorLog[len(m.errorLog)-500:]
-	}
+	}, 500)
 }

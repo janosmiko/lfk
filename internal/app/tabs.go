@@ -211,15 +211,11 @@ func (m *Model) setStatusMessage(msg string, isErr bool) {
 	} else {
 		logger.Info("Status message", "message", msg)
 	}
-	m.errorLog = append(m.errorLog, ui.ErrorLogEntry{
+	m.appendErrorLogEntry(ui.ErrorLogEntry{
 		Time:    time.Now(),
 		Message: msg,
 		Level:   level,
-	})
-	// Keep at most 200 entries (drop oldest).
-	if len(m.errorLog) > 200 {
-		m.errorLog = m.errorLog[len(m.errorLog)-200:]
-	}
+	}, 200)
 }
 
 // setErrorFromErr shows a sanitized error in the status bar and logs the
@@ -233,14 +229,11 @@ func (m *Model) setErrorFromErr(prefix string, err error) {
 	// Log the full untruncated error to the error log.
 	full := fullErrorMessage(err)
 	logger.Error("Application error", "message", full)
-	m.errorLog = append(m.errorLog, ui.ErrorLogEntry{
+	m.appendErrorLogEntry(ui.ErrorLogEntry{
 		Time:    time.Now(),
 		Message: prefix + full,
 		Level:   "ERR",
-	})
-	if len(m.errorLog) > 200 {
-		m.errorLog = m.errorLog[len(m.errorLog)-200:]
-	}
+	}, 200)
 }
 
 // hasStatusMessage checks whether there's a non-expired status message.
@@ -248,16 +241,39 @@ func (m *Model) hasStatusMessage() bool {
 	return m.statusMessage != "" && time.Now().Before(m.statusMessageExp)
 }
 
+// appendErrorLogEntry is the single choke point for every writer of
+// m.errorLog (addLogEntry, setStatusMessage, setErrorFromErr,
+// appendLoggerUIEntry in log_ui.go). It sanitizes entry.Message before
+// appending so a future writer can't add a new raw-append path by mistake -
+// this is the third time a sibling writer to an already-sanitized field
+// leaked unsanitized content, so the fix goes at the one place all of them
+// share rather than patching each call site again. maxEntries is the cap to
+// retain (oldest dropped first); callers pass their existing cap so
+// log_ui.go/addLogEntry's larger buffer isn't shrunk to match
+// setStatusMessage/setErrorFromErr's smaller one.
+func (m *Model) appendErrorLogEntry(entry ui.ErrorLogEntry, maxEntries int) {
+	entry.Message = ui.SanitizeTerminalText(entry.Message)
+	m.errorLog = append(m.errorLog, entry)
+	if len(m.errorLog) > maxEntries {
+		m.errorLog = m.errorLog[len(m.errorLog)-maxEntries:]
+	}
+}
+
 // addLogEntry appends an entry to the in-app error log at the given level.
+//
+// msg is sanitized here rather than at each of its ~80 call sites. Most
+// callers pass lfk-constructed strings (echoed kubectl commands), but a few
+// - command-bar output, err.Error() on a port-forward failure - carry
+// attacker-influenced content, and every entry renders through WrapEventLine
+// in the error-log overlay with no sanitizing of its own. SanitizeTerminalText
+// because an ErrorLogEntry.Message is a single log line, matching how
+// buildEventTimelineLines treats other single-line table/list values.
 func (m *Model) addLogEntry(level, msg string) {
-	m.errorLog = append(m.errorLog, ui.ErrorLogEntry{
+	m.appendErrorLogEntry(ui.ErrorLogEntry{
 		Time:    time.Now(),
 		Message: msg,
 		Level:   level,
-	})
-	if len(m.errorLog) > 500 {
-		m.errorLog = m.errorLog[len(m.errorLog)-500:]
-	}
+	}, 500)
 }
 
 // tabLabels builds a display label for each tab. Inactive tabs render from

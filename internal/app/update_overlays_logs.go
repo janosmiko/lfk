@@ -434,7 +434,7 @@ func (m *Model) restartLogStreamForContainerFilter() tea.Cmd {
 func (m *Model) buildLogTitle() string {
 	base := "Logs: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 	if len(m.logView.selectedContainers) > 0 && len(m.logView.selectedContainers) < len(m.logView.containers) {
-		base += " [" + strings.Join(m.logView.selectedContainers, ", ") + "]"
+		base += containerTitleSuffix(m.logView.selectedContainers...)
 	}
 	return base
 }

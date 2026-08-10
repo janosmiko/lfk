@@ -13,7 +13,7 @@ func (m Model) updateDescribeLoaded(msg describeLoadedMsg) (tea.Model, tea.Cmd) 
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeDescribe
-	m.describeView.content = msg.content
+	m.describeView.content = sanitizeDescribeContent(msg.content)
 	// Preserve scroll/cursor on auto-refresh, reset on first load.
 	if !m.describeView.autoRefresh {
 		m.describeView.scroll = 0
@@ -41,7 +41,7 @@ func (m Model) updateHelmValuesLoaded(msg helmValuesLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeDescribe
-	m.describeView.content = msg.content
+	m.describeView.content = sanitizeDescribeContent(msg.content)
 	m.describeView.scroll = 0
 	m.describeView.cursor = 0
 	m.describeView.cursorCol = 0

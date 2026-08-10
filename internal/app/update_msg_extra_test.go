@@ -402,6 +402,31 @@ func TestUpdateCommandBarResultErrorNoOutput(t *testing.T) {
 	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
+// TestUpdateCommandBarResultSanitizesOutput guards the describe view's
+// command-bar producer sink: shell/kubectl output is not lfk-controlled.
+func TestUpdateCommandBarResultSanitizesOutput(t *testing.T) {
+	m := baseModel()
+
+	result, _ := m.Update(commandBarResultMsg{output: "before\x1b[2Jgone\x9b31mHACKED"})
+	mdl := result.(Model)
+	assert.NotContains(t, mdl.describeView.content, "\x1b[2J")
+	assert.NotContains(t, mdl.describeView.content, "\x9b")
+}
+
+// TestUpdateCommandBarResultErrorSanitizesOutput mirrors
+// TestUpdateCommandBarResultSanitizesOutput for the error-with-output path.
+func TestUpdateCommandBarResultErrorSanitizesOutput(t *testing.T) {
+	m := baseModel()
+
+	result, _ := m.Update(commandBarResultMsg{
+		err:    errors.New("exit 1"),
+		output: "before\x1b[2Jgone\x9b31mHACKED",
+	})
+	mdl := result.(Model)
+	assert.NotContains(t, mdl.describeView.content, "\x1b[2J")
+	assert.NotContains(t, mdl.describeView.content, "\x9b")
+}
+
 // --- triggerCronJobMsg ---
 
 func TestUpdateTriggerCronJobSuccess(t *testing.T) {
@@ -535,6 +560,21 @@ func TestUpdateDescribeLoadedError(t *testing.T) {
 	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
+// TestUpdateDescribeLoadedSanitizesContent guards the describe view's
+// kubectl-describe producer sink: describe output (annotation values,
+// field-manager names, etc.) is not lfk-controlled.
+func TestUpdateDescribeLoadedSanitizesContent(t *testing.T) {
+	m := baseModel()
+
+	result, _ := m.Update(describeLoadedMsg{
+		content: "Name: my-pod\x1b[2Jgone\x9b31mHACKED",
+		title:   "Pod: my-pod",
+	})
+	mdl := result.(Model)
+	assert.NotContains(t, mdl.describeView.content, "\x1b[2J")
+	assert.NotContains(t, mdl.describeView.content, "\x9b")
+}
+
 // --- helmValuesLoadedMsg ---
 
 func TestUpdateHelmValuesLoadedSuccess(t *testing.T) {
@@ -562,6 +602,21 @@ func TestUpdateHelmValuesLoadedError(t *testing.T) {
 	assert.False(t, mdl.loading)
 	assert.True(t, mdl.statusMessageErr)
 	assert.NotNil(t, cmd) // scheduleStatusClear
+}
+
+// TestUpdateHelmValuesLoadedSanitizesContent guards the describe view's helm
+// values producer sink: a values.yaml key can carry attacker-influenced
+// strings (e.g. a chart pulled from an untrusted repo).
+func TestUpdateHelmValuesLoadedSanitizesContent(t *testing.T) {
+	m := baseModel()
+
+	result, _ := m.Update(helmValuesLoadedMsg{
+		content: "replicaCount: 3\x1b[2Jgone\x9b31mHACKED",
+		title:   "Values: my-release",
+	})
+	mdl := result.(Model)
+	assert.NotContains(t, mdl.describeView.content, "\x1b[2J")
+	assert.NotContains(t, mdl.describeView.content, "\x9b")
 }
 
 // --- diffLoadedMsg ---
