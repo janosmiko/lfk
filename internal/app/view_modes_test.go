@@ -407,6 +407,94 @@ func TestViewDescribe(t *testing.T) {
 	})
 }
 
+// --- viewDescribe: sanitizing ---
+//
+// describeView.content is fed by kubectl describe, helm values, command-bar
+// output, trivy scans, and gitops watch — none of it lfk-controlled. This
+// sink must run the ANSI-aware sanitizer (ui.SanitizeLogBody), not the
+// name/title one, or SGR colour and tab alignment break.
+
+func TestViewDescribe_StripsInjectedEscapesFromContent(t *testing.T) {
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Command Output",
+			content: "before‮after\x1b[2Jgone\x1b]52;c;ZXZpbA==\x07tail",
+		},
+	}
+	output := m.viewDescribe()
+	assert.NotContains(t, output, "‮", "bidi override must not survive")
+	assert.NotContains(t, output, "\x1b[2J", "raw CSI (screen erase) must not survive")
+	assert.NotContains(t, output, "\x1b]52", "OSC-52 clipboard sequence must not survive")
+	assert.NotContains(t, output, "\x07")
+}
+
+func TestViewDescribe_StripsInjectedEscapesInWrapMode(t *testing.T) {
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Command Output",
+			content: "before‮after\x1b[2Jgone",
+			wrap:    true,
+		},
+	}
+	output := m.viewDescribe()
+	assert.NotContains(t, output, "‮")
+	assert.NotContains(t, output, "\x1b[2J")
+}
+
+func TestViewDescribe_PreservesSGRColour(t *testing.T) {
+	// Realistic trivy-style coloured table output. SGR must survive so the
+	// severity colouring the scanner intended still renders — the guard
+	// against fixing the injection issue by breaking the feature.
+	trivyLine := "\x1b[31mCRITICAL\x1b[0m CVE-2024-1234  openssl  1.1.1  1.1.1w"
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Vuln Scan: nginx:latest",
+			content: trivyLine,
+		},
+	}
+	output := m.viewDescribe()
+	assert.Contains(t, output, "\x1b[31m", "SGR red-severity colour must survive the describe path")
+}
+
+func TestViewDescribe_PreservesTabAlignment(t *testing.T) {
+	// kubectl describe output is tab-and-space aligned; tabs must expand to
+	// the same column stops the log viewer uses, not vanish or collapse.
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Describe: my-pod",
+			content: "Name:\tmy-pod\nNamespace:\tdefault",
+		},
+	}
+	output := m.viewDescribe()
+	stripped := stripANSI(output)
+	assert.Contains(t, stripped, "Name:   my-pod")
+	assert.Contains(t, stripped, "Namespace:      default")
+}
+
+func TestViewDescribe_OrdinaryContentUnaffected(t *testing.T) {
+	m := Model{
+		width:  120,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Describe: my-pod",
+			content: "Name:         my-pod\nNamespace:    default\nStatus:       Running",
+		},
+	}
+	output := m.viewDescribe()
+	stripped := stripANSI(output)
+	assert.Contains(t, stripped, "Name:         my-pod")
+	assert.Contains(t, stripped, "Namespace:    default")
+	assert.Contains(t, stripped, "Status:       Running")
+}
+
 // --- viewDiff ---
 
 func TestViewDiff(t *testing.T) {

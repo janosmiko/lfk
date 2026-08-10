@@ -304,6 +304,23 @@ func SanitizeTerminalText(s string) string {
 	return b.String()
 }
 
+// StripBidiOverrides removes only the bidi embedding/override/isolate
+// characters SanitizeTerminalText drops (see its doc comment), leaving
+// everything else - including ESC, tabs, and SGR sequences - untouched.
+// For sinks that need SanitizeLogBody's ANSI/tab handling but still must
+// guard against a hostile value reordering the rendered text.
+func StripBidiOverrides(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if isBidiOverride(r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 func isBidiOverride(r rune) bool {
 	return (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069)
 }
