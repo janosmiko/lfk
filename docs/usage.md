@@ -78,7 +78,7 @@ KUBECONFIG_DIR=/path/to/configs/ lfk
 KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
 
-In `--demo`, exec, port-forward, drain, debug, and Helm are unavailable.
+In `--demo`, exec, port-forward, drain, debug, Helm, and vuln scan are unavailable.
 
 `KUBECONFIG` is exclusive by default, exactly like kubectl and k9s: when it is
 set, lfk loads only the files it lists and does **not** also add the default

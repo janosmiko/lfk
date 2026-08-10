@@ -100,6 +100,20 @@ func (m Model) removeFinalizers() tea.Cmd {
 }
 
 func (m Model) vulnScanImage(image string) tea.Cmd {
+	// trivy has no in-process demo stub (unlike kubectl) and no cluster
+	// context to refuse through, so demo mode is checked directly here,
+	// the same way resolveHelmPath refuses helm — before ever resolving a
+	// real trivy binary that would pull the image manifest and vuln DB
+	// over the network.
+	if k8s.DemoModeEnabled() {
+		return func() tea.Msg {
+			return describeLoadedMsg{
+				title: "Vulnerability Scan",
+				err:   fmt.Errorf("vuln scan is not available in demo mode"),
+			}
+		}
+	}
+
 	trivyPath, err := exec.LookPath("trivy")
 	if err != nil {
 		return func() tea.Msg {

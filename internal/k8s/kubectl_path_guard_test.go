@@ -3,6 +3,7 @@ package k8s
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -69,6 +70,79 @@ func TestNoBareKubectlLookPath(t *testing.T) {
 	if len(offenders) > 0 {
 		t.Errorf("found bare %s outside the shared resolver; route these through k8s.KubectlPath() instead:\n%s",
 			bannedKubectlLookup, strings.Join(offenders, "\n"))
+	}
+}
+
+// literalLookPathRE matches an exec.LookPath call with a literal binary
+// name, e.g. exec.LookPath("trivy"). A dynamic argument (exec.LookPath(name))
+// can't be checked this way and isn't matched.
+var literalLookPathRE = regexp.MustCompile(`exec\.LookPath\("([^"]+)"\)`)
+
+// externalBinaryLookupAllowlist is every literal exec.LookPath("name") call
+// site the module may contain, keyed by its path relative to the module
+// root. Adding an entry here is a deliberate signal: the binary it resolves
+// either can't run in demo mode, or is gated the way resolveHelmPath and
+// vulnScanImage gate helm and trivy — k8s.DemoModeEnabled() checked before
+// the binary is ever resolved. TASK-865 finding 2 found trivy resolving
+// unconditionally because the original sweep only covered kubectl; this
+// guard generalizes TestNoBareKubectlLookPath to every external binary so
+// the next one can't slip through the same way.
+var externalBinaryLookupAllowlist = map[string]string{
+	filepath.Join("internal", "k8s", "kubectl_path.go"):       "kubectl",
+	filepath.Join("internal", "app", "commands_exec_helm.go"): "helm",
+	filepath.Join("internal", "app", "commands_exec_misc.go"): "trivy",
+}
+
+// TestNoUnguardedExternalBinaryLookup walks the module for every literal
+// exec.LookPath("name") call outside of production _test.go files and
+// requires each one to be an already-reviewed entry in
+// externalBinaryLookupAllowlist. Test files are skipped: they exist to
+// exercise the guarded call sites (e.g. comparing resolveHelmPath's output
+// against a raw exec.LookPath("helm")) and never run as part of the shipped
+// binary.
+func TestNoUnguardedExternalBinaryLookup(t *testing.T) {
+	root := moduleRoot(t)
+
+	var offenders []string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case "vendor", ".git":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			rel = path
+		}
+		for _, m := range literalLookPathRE.FindAllStringSubmatch(string(data), -1) {
+			binary := m[1]
+			if want, ok := externalBinaryLookupAllowlist[rel]; ok && want == binary {
+				continue
+			}
+			offenders = append(offenders, rel+": exec.LookPath(\""+binary+"\")")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking module root: %v", err)
+	}
+	if len(offenders) > 0 {
+		t.Errorf("found exec.LookPath call(s) not in externalBinaryLookupAllowlist; "+
+			"confirm the binary can't reach a real cluster/network in demo mode (gate it with "+
+			"k8s.DemoModeEnabled() first if it can), then add it to the allowlist:\n%s",
+			strings.Join(offenders, "\n"))
 	}
 }
 

@@ -158,7 +158,7 @@ docker run -it --rm \
 lfk --demo
 ```
 
-Runs against a built-in fake cluster; no kubeconfig required. Exec, port-forward, drain, debug, and Helm are unavailable in demo mode.
+Runs against a built-in fake cluster; no kubeconfig required. Exec, port-forward, drain, debug, Helm, and vuln scan are unavailable in demo mode.
 
 ## External Dependencies
 
