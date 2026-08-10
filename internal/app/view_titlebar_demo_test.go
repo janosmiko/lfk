@@ -21,26 +21,16 @@ func TestRenderTitleBar_DemoBadge(t *testing.T) {
 	}
 
 	t.Run("shown in demo mode", func(t *testing.T) {
-		m := Model{
-			width:     120,
-			height:    30,
-			namespace: "default",
-			nav:       baseNav,
-			tabs:      []TabState{{}},
-			demoMode:  true,
-		}
+		m := basePush80Model()
+		m.nav = baseNav
+		m.demoMode = true
 		stripped := stripANSI(m.renderTitleBar())
 		assert.Contains(t, stripped, "DEMO")
 	})
 
 	t.Run("omitted outside demo mode", func(t *testing.T) {
-		m := Model{
-			width:     120,
-			height:    30,
-			namespace: "default",
-			nav:       baseNav,
-			tabs:      []TabState{{}},
-		}
+		m := basePush80Model()
+		m.nav = baseNav
 		stripped := stripANSI(m.renderTitleBar())
 		assert.NotContains(t, stripped, "DEMO")
 	})
