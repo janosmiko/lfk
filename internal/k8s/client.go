@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
@@ -369,6 +370,14 @@ func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespac
 		}
 		if obj.GetKind() == "" {
 			continue
+		}
+		// The fake dynamic client performs none of a real apiserver's admission
+		// validation, so a crafted metadata.name here would otherwise reach the
+		// tracker unchanged and later surface unescaped in generated output
+		// (e.g. democli/logs.go's pod-name prefix). Reject anything that isn't
+		// a valid RFC1123 subdomain before it is ever created or updated.
+		if errs := validation.IsDNS1123Subdomain(obj.GetName()); len(errs) > 0 {
+			return fmt.Errorf("invalid name %q for %s: %s", obj.GetName(), obj.GetKind(), strings.Join(errs, "; "))
 		}
 
 		gvk := obj.GroupVersionKind()

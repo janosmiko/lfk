@@ -8,6 +8,8 @@ import (
 	"io"
 	"math/rand"
 	"time"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // defaultTailLines is how many lines to emit when the caller passed no
@@ -78,6 +80,13 @@ func runLogs(ctx context.Context, args []string, stdout io.Writer) error {
 
 // writeLogLine renders and writes one line, adding the "[pod/name/container]"
 // prefix kubectl's --prefix flag adds when the app streams all containers.
+//
+// pod is attacker-controllable: the demo apply path builds it from
+// metadata.name in arbitrary user-supplied YAML with no RFC1123 validation
+// (see Client.ApplyManifest), so it can carry terminal escape sequences.
+// Sanitized here (not just at the write side) as defense in depth, the same
+// way listsummary and yamlblame guard their own sinks against
+// cluster-controlled strings.
 func writeLogLine(w io.Writer, rng *rand.Rand, a logArgs, pod string, ts time.Time) error {
 	line := generateLine(rng, pod, ts)
 	if a.prefix {
@@ -85,7 +94,7 @@ func writeLogLine(w io.Writer, rng *rand.Rand, a logArgs, pod string, ts time.Ti
 		if container == "" {
 			container = "app"
 		}
-		line = fmt.Sprintf("[pod/%s/%s] %s", pod, container, line)
+		line = fmt.Sprintf("[pod/%s/%s] %s", ui.SanitizeTerminalText(pod), ui.SanitizeTerminalText(container), line)
 	}
 	_, err := fmt.Fprintln(w, line)
 	return err

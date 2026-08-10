@@ -203,3 +203,27 @@ func TestRunLogs_FollowTerminatesOnContextCancel(t *testing.T) {
 		t.Errorf("goroutine count after cancel = %d, want <= baseline %d (leak)", got, baseline)
 	}
 }
+
+// TestRunLogs_SanitizesPodNameInPrefix guards TASK-865 finding 4: the demo
+// apply path accepts arbitrary YAML with no RFC1123 name validation, so a
+// crafted metadata.name can carry a terminal escape sequence. That name
+// reaches here unescaped, in the "[pod/name/container]" prefix generated
+// log lines carry. Fixing name validation on the write side (ApplyManifest)
+// is necessary but not sufficient defense in depth — this sink must also
+// sanitize before writing, the same way listsummary and yamlblame already
+// do via ui.SanitizeTerminalText.
+func TestRunLogs_SanitizesPodNameInPrefix(t *testing.T) {
+	const evilEscape = "\x1b[31m"
+	evilPod := "web" + evilEscape + "HACKED\x1b[0m"
+
+	var buf bytes.Buffer
+	args := []string{evilPod, "-n", "demo", "--context", "demo", "--prefix", "--tail=1"}
+
+	if err := runLogs(t.Context(), args, &buf); err != nil {
+		t.Fatalf("runLogs() error = %v", err)
+	}
+
+	if out := buf.String(); strings.Contains(out, evilEscape) {
+		t.Fatalf("expected the pod name's escape sequence to be sanitized out of the log prefix, got: %q", out)
+	}
+}
