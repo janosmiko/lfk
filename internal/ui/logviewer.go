@@ -613,6 +613,15 @@ func StripPodPrefix(line string) string {
 // into their shell would expect.
 const logTabWidth = 8
 
+// SanitizeLogBody is the exported entry point to sanitizeLogLine for sinks
+// outside this file (describe content, command-bar output) that render a
+// BODY rather than a name or title: unlike SanitizeTerminalText, it keeps
+// SGR colour sequences and expands tabs instead of dropping them. See
+// sanitizeLogLine for the full behaviour.
+func SanitizeLogBody(s string, renderAnsi bool) string {
+	return sanitizeLogLine(s, renderAnsi)
+}
+
 // sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
 // control range minus tab) with the Unicode replacement character and
 // expands tab characters to spaces using a logTabWidth-column tab stop.

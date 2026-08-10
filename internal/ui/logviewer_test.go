@@ -363,3 +363,16 @@ func TestSanitizeLogLine_RenderAnsiEnabled_PreservesMultibyte(t *testing.T) {
 	input := "\x1b[34m☂ rain \x1b[0m日本語"
 	assert.Equal(t, input, sanitizeLogLine(input, true))
 }
+
+// --- SanitizeLogBody ---
+
+func TestSanitizeLogBody_DelegatesToSanitizeLogLine(t *testing.T) {
+	// SanitizeLogBody is the exported entry point non-log sinks (describe
+	// viewer, command output) use to reach the same ANSI-aware sanitizer as
+	// the log viewer, without a second implementation to drift from.
+	assert.Equal(t, sanitizeLogLine("key\tvalue", false), SanitizeLogBody("key\tvalue", false))
+
+	input := "\x1b[0;33mWARNING\x1b[0m rest"
+	assert.Equal(t, input, SanitizeLogBody(input, true), "SGR sequences survive when renderAnsi is true")
+	assert.NotEqual(t, input, SanitizeLogBody(input, false), "ESC is replaced when renderAnsi is false")
+}
