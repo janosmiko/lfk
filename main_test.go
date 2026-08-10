@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/janosmiko/lfk/internal/app"
+	"github.com/janosmiko/lfk/internal/k8s"
 )
 
 // armForceQuit must, after the grace period, kill the program first (to
@@ -91,6 +92,7 @@ func TestResolveStartupClient_DemoSkipsKubeconfigResolution(t *testing.T) {
 	t.Setenv("HOME", emptyDir)
 	t.Setenv("KUBECONFIG", filepath.Join(emptyDir, "does-not-exist"))
 	t.Setenv("KUBECONFIG_DIR", "")
+	t.Cleanup(func() { k8s.SetDemoMode(false) })
 
 	client, err := resolveStartupClient(app.StartupOptions{Demo: true, Context: "no-such-context"})
 	if err != nil {
@@ -99,7 +101,17 @@ func TestResolveStartupClient_DemoSkipsKubeconfigResolution(t *testing.T) {
 	if client == nil {
 		t.Fatal("resolveStartupClient() returned nil client")
 	}
+	defer client.Shutdown()
 	if !client.IsDemo() {
 		t.Error("resolveStartupClient() client.IsDemo() = false, want true")
+	}
+}
+
+// TestDemoModeDoesNotLeakAcrossTests guards against k8s.SetDemoMode(true)
+// (set by a prior test's resolveStartupClient call) staying on for the rest
+// of this package's test binary.
+func TestDemoModeDoesNotLeakAcrossTests(t *testing.T) {
+	if k8s.DemoModeEnabled() {
+		t.Fatal("demoMode leaked from a prior test in package main")
 	}
 }
