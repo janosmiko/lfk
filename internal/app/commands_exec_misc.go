@@ -116,7 +116,7 @@ func (m Model) vulnScanImage(image string) tea.Cmd {
 		cmd.Env = os.Environ()
 		logExecCmd("Running trivy command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
-		content := cleanANSI(strings.TrimSpace(string(output)))
+		content := sanitizeDescribeContent(cleanANSI(strings.TrimSpace(string(output))))
 		if cmdErr != nil {
 			logger.Error("trivy scan failed", "image", image, "error", cmdErr)
 			if content == "" {

@@ -250,7 +250,7 @@ func (m Model) watchArgoWorkflow() tea.Cmd {
 			if err != nil {
 				return describeLoadedMsg{title: "Watch: " + name, err: err}
 			}
-			return describeLoadedMsg{title: "Watch: " + name, content: content}
+			return describeLoadedMsg{title: "Watch: " + name, content: sanitizeDescribeContent(content)}
 		},
 	)
 }

@@ -78,17 +78,10 @@ func (m Model) viewDescribe() string {
 		hint = ui.RenderHintBar(hints, m.width)
 	}
 
-	// Sanitize before any styling/highlighting is applied, never after, or
-	// lfk's own escapes get stripped along with an injected one. This sink
-	// is shared by kubectl describe, helm values, command-bar output,
-	// trivy/misc command output, and gitops watch — none of it lfk-
-	// controlled. Use the ANSI-aware body sanitizer (not
-	// ui.SanitizeTerminalText) so SGR colour and tab alignment survive.
-	rawLines := strings.Split(m.describeView.content, "\n")
-	lines := make([]string, len(rawLines))
-	for i, l := range rawLines {
-		lines[i] = ui.SanitizeLogBody(ui.StripBidiOverrides(l), true)
-	}
+	// describeView.content is sanitized once by its producer (see
+	// sanitizeDescribeContent) before it lands here, so this View function
+	// - which bubbletea calls every frame - does no per-frame work.
+	lines := strings.Split(m.describeView.content, "\n")
 
 	maxLines := max(m.height-4, 3)
 

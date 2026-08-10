@@ -410,17 +410,21 @@ func TestViewDescribe(t *testing.T) {
 // --- viewDescribe: sanitizing ---
 //
 // describeView.content is fed by kubectl describe, helm values, command-bar
-// output, trivy scans, and gitops watch — none of it lfk-controlled. This
-// sink must run the ANSI-aware sanitizer (ui.SanitizeLogBody), not the
-// name/title one, or SGR colour and tab alignment break.
+// output, trivy scans, and gitops watch — none of it lfk-controlled. Each
+// producer sanitizes once via sanitizeDescribeContent (see
+// describe_sanitize_test.go for the injection/SGR/tab-expansion coverage)
+// before storing the content, so viewDescribe — a View function bubbletea
+// calls every frame — trusts its input and does no per-frame sanitizing.
+// These tests exercise the full producer -> view pipeline.
 
-func TestViewDescribe_StripsInjectedEscapesFromContent(t *testing.T) {
+func TestViewDescribe_RendersProducerSanitizedContent(t *testing.T) {
+	raw := "before\u202eafter\x1b[2Jgone\x1b]52;c;ZXZpbA==\x07tail"
 	m := Model{
 		width:  120,
 		height: 30,
 		describeView: describeViewState{
 			title:   "Command Output",
-			content: "before\u202eafter\x1b[2Jgone\x1b]52;c;ZXZpbA==\x07tail",
+			content: sanitizeDescribeContent(raw),
 		},
 	}
 	output := m.viewDescribe()
@@ -430,13 +434,14 @@ func TestViewDescribe_StripsInjectedEscapesFromContent(t *testing.T) {
 	assert.NotContains(t, output, "\x07")
 }
 
-func TestViewDescribe_StripsInjectedEscapesInWrapMode(t *testing.T) {
+func TestViewDescribe_RendersProducerSanitizedContentInWrapMode(t *testing.T) {
+	raw := "before\u202eafter\x1b[2Jgone"
 	m := Model{
 		width:  120,
 		height: 30,
 		describeView: describeViewState{
 			title:   "Command Output",
-			content: "before\u202eafter\x1b[2Jgone",
+			content: sanitizeDescribeContent(raw),
 			wrap:    true,
 		},
 	}
@@ -446,10 +451,10 @@ func TestViewDescribe_StripsInjectedEscapesInWrapMode(t *testing.T) {
 }
 
 func TestViewDescribe_PreservesSGRColour(t *testing.T) {
-	// Realistic trivy-style coloured table output. SGR must survive so the
-	// severity colouring the scanner intended still renders — the guard
-	// against fixing the injection issue by breaking the feature.
-	trivyLine := "\x1b[31mCRITICAL\x1b[0m CVE-2024-1234  openssl  1.1.1  1.1.1w"
+	// Realistic trivy-style coloured table output, as a producer would have
+	// stored it after sanitizeDescribeContent. SGR must survive so the
+	// severity colouring the scanner intended still renders.
+	trivyLine := sanitizeDescribeContent("\x1b[31mCRITICAL\x1b[0m CVE-2024-1234  openssl  1.1.1  1.1.1w")
 	m := Model{
 		width:  120,
 		height: 30,
@@ -463,14 +468,14 @@ func TestViewDescribe_PreservesSGRColour(t *testing.T) {
 }
 
 func TestViewDescribe_PreservesTabAlignment(t *testing.T) {
-	// kubectl describe output is tab-and-space aligned; tabs must expand to
-	// the same column stops the log viewer uses, not vanish or collapse.
+	// kubectl describe output is tab-and-space aligned; a producer expands
+	// tabs via sanitizeDescribeContent before viewDescribe ever sees them.
 	m := Model{
 		width:  120,
 		height: 30,
 		describeView: describeViewState{
 			title:   "Describe: my-pod",
-			content: "Name:\tmy-pod\nNamespace:\tdefault",
+			content: sanitizeDescribeContent("Name:\tmy-pod\nNamespace:\tdefault"),
 		},
 	}
 	output := m.viewDescribe()

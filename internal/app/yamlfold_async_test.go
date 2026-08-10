@@ -87,10 +87,10 @@ func TestBuildYAMLLoadedMsgSanitizesControlBytes(t *testing.T) {
 	msg := buildYAMLLoadedMsg(raw, nil)
 	assert.NotContains(t, msg.content, "\x9b")
 
-	withBidi := "apiVersion: v1\nkind: ConfigMap\ndata:\n  note: ‮evil‬\n"
+	withBidi := "apiVersion: v1\nkind: ConfigMap\ndata:\n  note: \u202eevil\u202c\n"
 	msg = buildYAMLLoadedMsg(withBidi, nil)
-	assert.NotContains(t, msg.content, "‮")
-	assert.NotContains(t, msg.content, "‬")
+	assert.NotContains(t, msg.content, "\u202e")
+	assert.NotContains(t, msg.content, "\u202c")
 }
 
 // TestBuildPreviewYAMLLoadedMsgSanitizesControlBytes is the preview

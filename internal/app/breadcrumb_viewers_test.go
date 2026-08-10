@@ -52,8 +52,8 @@ func TestContainerTitleSuffix_SanitizesTerminalEscapes(t *testing.T) {
 	assert.NotContains(t, suffix, "\x1b")
 	assert.Equal(t, " [evil[2Jsidecar]", suffix)
 
-	suffix = containerTitleSuffix("app", "evil‮sidecar")
-	assert.NotContains(t, suffix, "‮", "bidi override must not survive")
+	suffix = containerTitleSuffix("app", "evil\u202esidecar")
+	assert.NotContains(t, suffix, "\u202e", "bidi override must not survive")
 	assert.Equal(t, " [app, evilsidecar]", suffix)
 
 	assert.Empty(t, containerTitleSuffix(), "no names means no suffix")

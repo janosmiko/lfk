@@ -385,16 +385,16 @@ func TestSanitizeLogLine_C1RawByteFormNoLongerSurvives(t *testing.T) {
 func TestSanitizeLogLine_C1UTF8EncodedFormNoLongerSurvives(t *testing.T) {
 	// Same two sequences, properly UTF-8 encoded (U+009D/U+009C/U+009B
 	// as their correct two-byte forms) rather than raw bytes.
-	osc52 := "52;c;SGVsbG8="
-	csi := "31m"
+	osc52 := "\u009d52;c;SGVsbG8=\u009c"
+	csi := "\u009b31m"
 
 	for _, renderAnsi := range []bool{false, true} {
 		outOSC := sanitizeLogLine(osc52, renderAnsi)
-		assert.NotContains(t, outOSC, "")
-		assert.NotContains(t, outOSC, "")
+		assert.NotContains(t, outOSC, "\u009d")
+		assert.NotContains(t, outOSC, "\u009c")
 
 		outCSI := sanitizeLogLine(csi, renderAnsi)
-		assert.NotContains(t, outCSI, "")
+		assert.NotContains(t, outCSI, "\u009b")
 	}
 }
 
@@ -405,8 +405,8 @@ func TestSanitizeLogLine_NonASCIIRoundTrip(t *testing.T) {
 	// byte that itself falls in 0x80-0x9F, so this exercises the exact
 	// case a byte-level filter gets wrong.
 	cases := []string{
-		"café RÉSUMÉ",         // accented Latin (É continuation byte 0x89)
-		"日本語のログ",              // CJK
+		"café RÉSUMÉ",        // accented Latin (É continuation byte 0x89)
+		"日本語のログ",             // CJK
 		"deploy succeeded 🎉", // emoji (continuation bytes include 0x8E)
 		"┌─status─┐",         // box drawing (continuation bytes 0x94/0x80)
 	}
