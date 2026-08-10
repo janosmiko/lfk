@@ -62,13 +62,26 @@ type Ticker struct {
 	cancel        context.CancelFunc
 	done          chan struct{}
 	restartEvents []string // FIFO of ticker-created event names, oldest first
+	extraClearers []actionClearer
+}
+
+// actionClearer matches the ClearActions method promoted from client-go's
+// embedded testing.Fake, satisfied by *dynamicfake.FakeDynamicClient and
+// *k8sfake.Clientset alike. Nothing else drains that log: every Get/List/
+// Create/Update/Delete against a fake client appends to it, so a
+// long-running demo session grows it without bound (see clearActionLogs).
+type actionClearer interface {
+	ClearActions()
 }
 
 // NewTicker returns a Ticker over dyn that, once started, mutates the demo
 // cluster every interval. It does not touch dyn until Start or Tick is
-// called.
-func NewTicker(dyn dynamic.Interface, interval time.Duration) *Ticker {
-	return &Ticker{dyn: dyn, interval: interval}
+// called. extraClearers are additional fake clients (e.g. the typed demo
+// clientset) whose action log gets cleared on the same cadence as dyn's,
+// even though the ticker itself never calls them — the app's own List/Get
+// calls share those fakes and grow their action log too.
+func NewTicker(dyn dynamic.Interface, interval time.Duration, extraClearers ...actionClearer) *Ticker {
+	return &Ticker{dyn: dyn, interval: interval, extraClearers: extraClearers}
 }
 
 // Start launches the ticker's goroutine, which calls Tick every interval
@@ -90,7 +103,21 @@ func (t *Ticker) Start(ctx context.Context) {
 }
 
 func (t *Ticker) run(ctx context.Context, done chan struct{}) {
-	defer close(done)
+	defer func() {
+		// A goroutine that exits because ctx was cancelled by something
+		// other than Stop (Stop cancels this same runCtx too, so this path
+		// also fires there) must clear running itself — otherwise a later
+		// Start call sees running still true and silently no-ops even
+		// though nothing is left mutating the demo cluster. Guarded by
+		// t.done == done so a concurrent Stop that already reset running
+		// (and possibly started a fresh run) is never clobbered.
+		t.mu.Lock()
+		if t.done == done {
+			t.running = false
+		}
+		t.mu.Unlock()
+		close(done)
+	}()
 
 	// time.NewTicker panics for a non-positive duration; treat a
 	// misconfigured interval as a no-op run instead of crashing the
@@ -146,6 +173,7 @@ func (t *Ticker) Stop() {
 func (t *Ticker) Tick(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	defer t.clearActionLogs()
 
 	tick := t.tick
 	t.tick++
@@ -163,6 +191,20 @@ func (t *Ticker) Tick(ctx context.Context) error {
 		return fmt.Errorf("demo ticker: drifting deployment ready replicas: %w", err)
 	}
 	return nil
+}
+
+// clearActionLogs drops the Actions() log accumulated on dyn and every
+// extra clearer since the last call. Runs at the end of every Tick
+// regardless of error, so a demo session left running overnight (about
+// 28,800 ticks a day at the 3s interval) never retains more than one tick's
+// worth of action history in memory.
+func (t *Ticker) clearActionLogs() {
+	if clearer, ok := t.dyn.(actionClearer); ok {
+		clearer.ClearActions()
+	}
+	for _, c := range t.extraClearers {
+		c.ClearActions()
+	}
 }
 
 // restartCrashLoopPod increments PodWebCrashLoop's restartCount and rotates

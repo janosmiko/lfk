@@ -166,6 +166,49 @@ func TestTicker_EachTickAppendsWarningEventAndStaysUnderCap(t *testing.T) {
 	assert.Greater(t, afterMany, before, "ticks should still be producing events")
 }
 
+// TestTicker_TickClearsActionLogAndStaysBounded drives many ticks and
+// asserts the dynamic fake client's Actions() log stays bounded instead of
+// growing linearly with tick count. Each tick performs roughly eight
+// Get/Update/Create/Delete calls against the fake, all recorded into
+// client-go's testing.Fake (embedded in FakeDynamicClient) with nothing to
+// clear it; left unbounded, a long demo session grows into the multi-GB
+// range (see TASK-865 finding 1).
+func TestTicker_TickClearsActionLogAndStaysBounded(t *testing.T) {
+	dyn := NewDynamicClient()
+	tk := NewTicker(dyn, time.Hour)
+	ctx := t.Context()
+
+	const manyTicks = 500
+	for range manyTicks {
+		require.NoError(t, tk.Tick(ctx))
+	}
+
+	actions := dyn.Actions()
+	assert.Less(t, len(actions), 20,
+		"expected the fake dynamic client's action log to be cleared each tick, not grow with tick count (%d actions after %d ticks)",
+		len(actions), manyTicks)
+}
+
+// TestTicker_TickClearsExtraClientActionLogs verifies NewTicker's extra
+// clearers (e.g. the typed demo clientset, which shares the same
+// unbounded-Actions() problem since the app's own List/Get calls run
+// against it too) get their action log cleared on the same cadence as the
+// dynamic client, independent of whether the ticker itself touched them.
+func TestTicker_TickClearsExtraClientActionLogs(t *testing.T) {
+	dyn := NewDynamicClient()
+	cs := NewClientset()
+	tk := NewTicker(dyn, time.Hour, cs)
+	ctx := t.Context()
+
+	_, err := cs.CoreV1().Pods(NamespaceDemo).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, cs.Actions(), "test setup: expected the List call to be recorded")
+
+	require.NoError(t, tk.Tick(ctx))
+
+	assert.Empty(t, cs.Actions(), "expected the extra clearer's action log to be cleared after a tick")
+}
+
 func TestTicker_StartStopExitsGoroutineCleanly(t *testing.T) {
 	baseline := runtime.NumGoroutine()
 
@@ -185,6 +228,44 @@ func TestTicker_StartStopExitsGoroutineCleanly(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("Stop did not drain the ticker goroutine: baseline=%d, after=%d", baseline, runtime.NumGoroutine())
+}
+
+// TestTicker_ExternalContextCancelResetsRunningState guards TASK-865
+// finding 6: if the context passed to Start is cancelled by anything other
+// than Stop, the goroutine exits but running stayed true forever (only
+// Stop ever cleared it), so a later Start call would silently no-op instead
+// of actually restarting the ticker.
+func TestTicker_ExternalContextCancelResetsRunningState(t *testing.T) {
+	dyn := NewDynamicClient()
+	tk := NewTicker(dyn, time.Millisecond)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	tk.Start(ctx)
+	cancel()
+
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		tk.mu.Lock()
+		running := tk.running
+		tk.mu.Unlock()
+		if !running {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	tk.mu.Lock()
+	running := tk.running
+	tk.mu.Unlock()
+	require.False(t, running, "expected running to reset to false after external context cancellation, not just after Stop")
+
+	// Prove the practical consequence: Start must actually relaunch the
+	// goroutine after an external cancellation, not silently no-op.
+	baseline := runtime.NumGoroutine()
+	tk.Start(t.Context())
+	defer tk.Stop()
+	assert.Greater(t, runtime.NumGoroutine(), baseline,
+		"expected Start to launch a new goroutine after external cancellation, not silently no-op")
 }
 
 func TestTicker_ContextCancelEndsGoroutine(t *testing.T) {

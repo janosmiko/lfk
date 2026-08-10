@@ -45,13 +45,18 @@ func NewTestClient(cs, dyn any) *Client {
 // kubeconfig, then marks itself IsDemo so the app layer can show a badge.
 func NewDemoClient() (*Client, error) {
 	dyn := demo.NewDynamicClient()
+	cs := demo.NewClientset()
 	// The Client sees a guarded dynamic.Interface (see demo.GuardListPanics)
 	// so a demo fixture gap degrades a List call to an error instead of
 	// panicking a scheduler worker goroutine. The ticker keeps the raw fake
 	// so it can still reach Tracker() to mutate seed data.
-	c := NewTestClient(demo.NewClientset(), demo.GuardListPanics(dyn))
+	c := NewTestClient(cs, demo.GuardListPanics(dyn))
 	c.demo = true
-	c.demoTicker = demo.NewTicker(dyn, demoTickerInterval)
+	// cs is passed as an extra clearer alongside dyn: both fakes' embedded
+	// testing.Fake accumulates every Get/List/Create/Update/Delete the app
+	// makes (not just the ticker's own writes) into an action log nothing
+	// else drains, so both need clearing on the same cadence.
+	c.demoTicker = demo.NewTicker(dyn, demoTickerInterval, cs)
 	c.demoTicker.Start(context.Background())
 	return c, nil
 }
