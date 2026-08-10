@@ -1,0 +1,142 @@
+package k8s
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	authorizationv1 "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
+)
+
+// allowVerbs makes the fake clientset answer SelfSubjectAccessReview with
+// Allowed=true for the listed verbs and false for every other verb.
+func allowVerbs(cs *k8sfake.Clientset, verbs ...string) {
+	allowed := make(map[string]bool, len(verbs))
+	for _, v := range verbs {
+		allowed[v] = true
+	}
+	cs.PrependReactor("create", "selfsubjectaccessreviews",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			create, ok := action.(clienttesting.CreateAction)
+			if !ok {
+				return false, nil, nil
+			}
+			sar, ok := create.GetObject().(*authorizationv1.SelfSubjectAccessReview)
+			if !ok {
+				return false, nil, nil
+			}
+			out := sar.DeepCopy()
+			out.Status.Allowed = allowed[sar.Spec.ResourceAttributes.Verb]
+			return true, out, nil
+		})
+}
+
+func TestPermissionQueryKey(t *testing.T) {
+	assert.Equal(t, "delete:pods", PermissionQuery{Resource: "pods", Verb: "delete"}.Key())
+	assert.Equal(t, "create:pods/exec", PermissionQuery{Resource: "pods", Subresource: "exec", Verb: "create"}.Key())
+}
+
+func TestCheckPermissions_AnswersEveryQuery(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	allowVerbs(cs, "get", "create")
+	c := newFakeClient(cs, nil)
+
+	got, err := c.CheckPermissions(t.Context(), "ctx", "default", []PermissionQuery{
+		{Resource: "pods", Verb: "delete"},
+		{Resource: "pods", Verb: "get"},
+		{Resource: "pods", Subresource: "exec", Verb: "create"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{
+		"delete:pods":      false,
+		"get:pods":         true,
+		"create:pods/exec": true,
+	}, got)
+}
+
+func TestCheckPermissions_DeduplicatesQueries(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	allowVerbs(cs, "delete")
+	c := newFakeClient(cs, nil)
+
+	got, err := c.CheckPermissions(t.Context(), "ctx", "default", []PermissionQuery{
+		{Resource: "pods", Verb: "delete"},
+		{Resource: "pods", Verb: "delete"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"delete:pods": true}, got)
+
+	reviews := 0
+	for _, a := range cs.Actions() {
+		if a.GetVerb() == "create" && a.GetResource().Resource == "selfsubjectaccessreviews" {
+			reviews++
+		}
+	}
+	assert.Equal(t, 1, reviews, "a repeated query must cost one review, not two")
+}
+
+func TestCheckPermissions_SendsNamespaceAndGroup(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	var spec authorizationv1.SelfSubjectAccessReviewSpec
+	cs.PrependReactor("create", "selfsubjectaccessreviews",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			sar := action.(clienttesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+			spec = sar.Spec
+			out := sar.DeepCopy()
+			out.Status.Allowed = true
+			return true, out, nil
+		})
+	c := newFakeClient(cs, nil)
+
+	_, err := c.CheckPermissions(t.Context(), "ctx", "kube-system", []PermissionQuery{
+		{Group: "apps", Resource: "deployments", Verb: "patch"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, spec.ResourceAttributes)
+	assert.Equal(t, "kube-system", spec.ResourceAttributes.Namespace)
+	assert.Equal(t, "apps", spec.ResourceAttributes.Group)
+	assert.Equal(t, "deployments", spec.ResourceAttributes.Resource)
+	assert.Equal(t, "patch", spec.ResourceAttributes.Verb)
+}
+
+func TestCheckPermissions_NoQueries(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	c := newFakeClient(cs, nil)
+
+	got, err := c.CheckPermissions(t.Context(), "ctx", "default", nil)
+	require.NoError(t, err)
+	assert.Empty(t, got)
+	assert.Empty(t, cs.Actions())
+}
+
+func TestCheckPermissions_ErrorIsReported(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	cs.PrependReactor("create", "selfsubjectaccessreviews",
+		func(clienttesting.Action) (bool, runtime.Object, error) {
+			return true, nil, assert.AnError
+		})
+	c := newFakeClient(cs, nil)
+
+	_, err := c.CheckPermissions(t.Context(), "ctx", "default", []PermissionQuery{
+		{Resource: "pods", Verb: "delete"},
+	})
+	require.Error(t, err)
+}
+
+func TestCheckPermissions_CapsQueryCount(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	allowVerbs(cs, "get")
+	c := newFakeClient(cs, nil)
+
+	queries := make([]PermissionQuery, maxPermissionQueries+5)
+	for i := range queries {
+		queries[i] = PermissionQuery{Resource: "pods", Subresource: string(rune('a' + i%26)), Verb: "get"}
+	}
+	got, err := c.CheckPermissions(t.Context(), "ctx", "default", queries)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(got), maxPermissionQueries)
+}

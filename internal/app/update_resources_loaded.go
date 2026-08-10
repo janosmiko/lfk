@@ -11,6 +11,12 @@ import (
 
 func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
+	if msg.reloaded {
+		// The kubeconfig was re-read, so a context name may now resolve to
+		// another cluster or another user. Drop the verdicts filed under
+		// those names instead of hiding actions the new identity may hold.
+		m.perms.clear()
+	}
 	if isContextCanceled(msg.err) {
 		return m, nil
 	}
@@ -506,7 +512,9 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	}
 	switch kind {
 	case "Pod":
-		cmds = append(cmds, m.loadPodMetricsForList())
+		// Review the Pod verbs for this namespace once, off the key path, so
+		// the action menu can drop entries the cluster would refuse.
+		cmds = append(cmds, m.loadPodMetricsForList(), m.loadPodPermissions())
 	case "Node":
 		cmds = append(cmds, m.loadNodeMetricsForList(), m.loadNodeUptimeForList())
 	}

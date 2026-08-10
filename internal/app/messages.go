@@ -24,6 +24,10 @@ type shutdownCompleteMsg struct{}
 type contextsLoadedMsg struct {
 	items []model.Item
 	err   error
+	// reloaded marks a list that came from a fresh read of the kubeconfig. A
+	// context name can then point at another cluster or another user, so
+	// per-context caches keyed by that name are no longer trustworthy.
+	reloaded bool
 }
 
 type resourceTypesMsg struct {

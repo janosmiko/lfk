@@ -264,6 +264,31 @@ context; it does not scope the read-only flag.
 The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
 can find the row toggle without reading docs.
 
+## Permission-Aware Actions
+
+Pod actions the current user cannot run are dropped from the action menu,
+so a delete you are not allowed to make no longer fails after the confirm
+dialog. The gate is the same one read-only mode uses.
+
+- **How it is decided**: a `SelfSubjectAccessReview` per verb, sent in one
+  bulk pass when a Pod list loads. Entering a namespace never waits on it.
+- **What is checked**: delete (Delete, Force Delete), patch (Edit), create
+  on `pods/exec`, `pods/attach`, `pods/portforward`, patch on
+  `pods/ephemeralcontainers`, create on pods (Debug Pod), get on
+  `pods/log` (Tail Logs, Logs, Log Top). Any other action is always shown.
+- **Cache**: per context and namespace, for the life of the process. A tab
+  on another cluster never reads another cluster's verdict.
+- **Fail open**: a review that errors or times out leaves every action
+  visible. An aggregated or webhook authorizer can also overrule a denial,
+  which is a second reason not to trust one too hard. A re-read of the
+  kubeconfig drops the cache, since a context name can then point at
+  another cluster or user.
+- **Not reviewed**: all-namespaces lists, multi-namespace selections, and
+  union lists. None of them has one context and namespace a single pass
+  could speak for, so every action stays visible there.
+
+Scoped to Pods. Other kinds keep the read-only gate alone.
+
 ## Node Shell
 
 From the Node action menu (`x` → `s`), lfk launches a privileged debug pod
