@@ -420,11 +420,11 @@ func TestViewDescribe_StripsInjectedEscapesFromContent(t *testing.T) {
 		height: 30,
 		describeView: describeViewState{
 			title:   "Command Output",
-			content: "before‮after\x1b[2Jgone\x1b]52;c;ZXZpbA==\x07tail",
+			content: "before\u202eafter\x1b[2Jgone\x1b]52;c;ZXZpbA==\x07tail",
 		},
 	}
 	output := m.viewDescribe()
-	assert.NotContains(t, output, "‮", "bidi override must not survive")
+	assert.NotContains(t, output, "\u202e", "bidi override must not survive")
 	assert.NotContains(t, output, "\x1b[2J", "raw CSI (screen erase) must not survive")
 	assert.NotContains(t, output, "\x1b]52", "OSC-52 clipboard sequence must not survive")
 	assert.NotContains(t, output, "\x07")
@@ -436,12 +436,12 @@ func TestViewDescribe_StripsInjectedEscapesInWrapMode(t *testing.T) {
 		height: 30,
 		describeView: describeViewState{
 			title:   "Command Output",
-			content: "before‮after\x1b[2Jgone",
+			content: "before\u202eafter\x1b[2Jgone",
 			wrap:    true,
 		},
 	}
 	output := m.viewDescribe()
-	assert.NotContains(t, output, "‮")
+	assert.NotContains(t, output, "\u202e")
 	assert.NotContains(t, output, "\x1b[2J")
 }
 
