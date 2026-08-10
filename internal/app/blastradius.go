@@ -8,7 +8,6 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // blastRadiusState is what one confirm dialog knows about the cost of the
@@ -28,11 +27,16 @@ type blastRadiusState struct {
 	pdbs []policyv1.PodDisruptionBudget
 }
 
+// reset clears the figures and retires the request they belong to. Bumping req
+// matters as much as clearing: a fetch started by the dialog being closed is
+// still running, and without a new number its answer lands on whatever dialog
+// the user opens next, describing a resource they are no longer looking at.
 func (s *blastRadiusState) reset() {
 	s.radius = nil
 	s.loading = false
 	s.pods = nil
 	s.pdbs = nil
+	s.req++
 }
 
 // scaleBlastRadius answers what scaling to target costs, from the pods already
@@ -57,49 +61,6 @@ func (s *blastRadiusState) scaleBlastRadius(target int) *k8s.BlastRadius {
 	}
 	radius := k8s.ComputeBlastRadius(s.pods[:going], s.pdbs, readyBefore)
 	return &radius
-}
-
-// blastRadiusNotes turns the computed cost into the lines the confirm box
-// shows. A violation is a second, warning-styled note rather than words inside
-// the first one, so the color carries the meaning on its own.
-//
-// Drain and bulk have no single workload, so they carry no replica count and
-// the phrase is left out rather than printed as "0 of 0".
-//
-// enforced says whether the budget can actually stop the action. Only the
-// eviction API honours a PodDisruptionBudget, so a drain can be blocked by
-// one. A direct pod delete, and a scale-down where the controller removes the
-// pods, both bypass budgets entirely: they still take the workload below its
-// stated availability, but nothing refuses them.
-func blastRadiusNotes(r *k8s.BlastRadius, loading, enforced bool) []ui.ConfirmNote {
-	if loading {
-		return []ui.ConfirmNote{{Label: "Removes", Text: "checking budgets..."}}
-	}
-	if r == nil {
-		return nil
-	}
-	if r.Evicting == 0 {
-		text := "no running pods"
-		if r.Uncounted > 0 {
-			text += fmt.Sprintf(" (%d %s not counted)",
-				r.Uncounted, plural(r.Uncounted, "row", "rows"))
-		}
-		return []ui.ConfirmNote{{Label: "Removes", Text: text}}
-	}
-
-	removes := fmt.Sprintf("%d %s", r.Evicting, plural(r.Evicting, "pod", "pods"))
-	if r.ReadyBefore > 0 {
-		removes += fmt.Sprintf(", %d of %d ready after", r.ReadyAfter, r.ReadyBefore)
-	}
-	if r.Uncounted > 0 {
-		removes += fmt.Sprintf(" (%d %s not counted)",
-			r.Uncounted, plural(r.Uncounted, "row", "rows"))
-	}
-	text, warn := budgetRow(r.PDBs, enforced)
-	return []ui.ConfirmNote{
-		{Label: "Removes", Text: removes},
-		{Label: "Budget", Text: text, Warn: warn},
-	}
 }
 
 // budgetRow states what the budgets say about this action, and whether that

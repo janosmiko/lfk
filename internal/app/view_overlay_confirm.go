@@ -24,18 +24,18 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 	}
 	w := min(50, m.width-10)
 	// The cascade row only shows for deletes that go through DeleteResource;
-	// it costs two extra rows when present.
-	// Only a drain goes through the eviction API, so only a drain can be
-	// stopped by a budget. Width is settled before anything is fitted to it.
-	notes := blastRadiusNotes(m.blast.radius, m.blast.loading, m.pendingAction == "Drain")
+	// it costs two extra rows when present. Width is settled before anything
+	// is fitted to it.
+	showsPolicy := m.deleteConfirmShowsPolicy()
+	notes := confirmCostNotes(m.buildConfirmCost(showsPolicy, m.pendingAction == "Drain"))
 	if len(notes) > 0 {
-		// The budget row carries a resource name, which does not fit the
+		// The risk row carries a resource name, which does not fit the
 		// 50-column box a plain y/n question needs.
 		w = min(64, m.width-10)
 	}
 	choiceLabel, choiceValue, h := "", "", min(8, m.height-6)
 	choiceWarn := false
-	if m.deleteConfirmShowsPolicy() {
+	if showsPolicy {
 		choiceLabel, choiceValue, choiceWarn = cascadeChoiceRow(m.deletePropagation(), w-4)
 		h = min(10, m.height-6)
 	}
@@ -100,18 +100,40 @@ func (m Model) renderOverlayConfirmType() (string, int, int, bool) {
 	w := min(55, m.width-10)
 	choiceLabel, choiceValue, h := "", "", min(10, m.height-6)
 	choiceWarn := false
+	var notes []ui.ConfirmNote
 	if m.forceDeleteConfirmShowsPolicy() {
-		choiceLabel, choiceValue, choiceWarn = cascadeChoiceRow(m.deletePropagation().Cascading(), w-4)
+		// Force delete never fetches a blast radius, so the box states the
+		// owner side alone. Cleared rather than trusted: whatever m.blast
+		// holds was fetched for some other dialog, and rendering it here would
+		// describe a resource the user is not looking at. Cascading() because
+		// kubectl cannot express None.
+		cost := m.buildConfirmCost(true, false)
+		cost.radius = nil
+		cost.policy = m.deletePropagation().Cascading()
+		notes = confirmCostNotes(cost)
+		if len(notes) > 0 {
+			// The cost rows do not fit the narrower box a bare
+			// type-to-confirm question needs.
+			w = min(64, m.width-10)
+		}
+		choiceLabel, choiceValue, choiceWarn = cascadeChoiceRow(cost.policy, w-4)
 		h = min(12, m.height-6)
 	}
-	return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+	content := ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
 		Title:       m.confirmTitle,
 		Warning:     m.confirmQuestion,
 		ChoiceLabel: choiceLabel,
 		ChoiceValue: choiceValue,
 		ChoiceWarn:  choiceWarn,
+		Notes:       notes,
 		TypeToken:   "DELETE",
 		Input:       m.confirmTypeInput.Value,
 		WrapWidth:   w - 4,
-	}), w, h, true
+	})
+	if len(notes) > 0 {
+		// Measured rather than guessed, for the same reason as the plain
+		// confirm box: a wrapped note is taller than a fixed base height.
+		h = min(max(h, lipgloss.Height(content)), m.height-6)
+	}
+	return content, w, h, true
 }

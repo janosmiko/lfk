@@ -221,16 +221,39 @@ Cascade controls what happens to dependent objects (a Job's pods, a Deployment's
 
 Set the starting policy with `delete_propagation_policy` in the config. Bulk delete uses the policy shown in the dialog.
 
-The dialog also states what the action costs, as two labelled rows:
+The dialog also states what the action costs, as three labelled rows. Each row is built from the selected cascade policy, so no two rows can contradict each other.
 
-| Row | Says |
+| Row | Answers |
 |---|---|
-| `Removes` | Pods removed, and ready replicas left where there is a workload |
-| `Budget` | Which PodDisruptionBudget covers them, and whether this exceeds it |
+| `Scope` | What else stops existing |
+| `Availability` | What stops serving |
+| `Risk` | What refuses the action, or what it leaves with no owner |
 
-A budget the action would breach is shown in the warning color. Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
+Deleting a Deployment with four ReplicaSets under it:
 
-Bulk delete shows one line for the whole selection, resolved from the rows themselves at one pod list per namespace. A row that owns no pods, a ConfigMap say, is reported as `N rows not counted`.
+```text
+Cascade:      Background
+Scope:        4 replicasets, 3 pods
+Availability: 0 of 3 ready after
+Risk:         kyverno allows 2 at once, this removes 3
+```
+
+Press `Tab` for `Orphan` and every row is rewritten in place:
+
+```text
+Cascade:      Orphan
+Scope:        the deployment only
+Availability: unchanged, the 3 pods keep running
+Risk:         4 replicasets, 3 pods left with no owner
+```
+
+A row with nothing to say is left out, so deleting a bare pod shows `Availability` alone. `Risk` names risks only: no budget covering the pods means no row, not a row saying that none applies. `Risk` is never more than one line, because a policy that keeps dependents evicts nothing, so a budget breach and an orphan hazard cannot both apply.
+
+Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
+
+`Scope` walks `ownerReferences` down from the target, so a deep chain is counted in full: deleting a Deployment counts its ReplicaSets and their pods. Countable owners are Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, and Service. For any other kind the row is left out rather than showing a zero it cannot stand behind. Where Kubernetes guarantees that the children carry the owner's labels, the walk narrows the list to that selector, so counting one small workload in a namespace of ten thousand pods stays cheap. That covers pods, ReplicaSets and ControllerRevisions under a workload, and EndpointSlices under a Service. A StatefulSet's PersistentVolumeClaims, a CronJob's Jobs, and every bulk selection are listed unnarrowed, because no selector there is promised to match.
+
+Both fetches share one placeholder, `working out what this costs...`, so no row renders against a half-loaded answer. Bulk delete shows one figure for the whole selection, at one pod list and one list per child kind per namespace. A row nothing can be resolved for, a ConfigMap say, is reported as `N rows not counted`.
 
 ### Force delete confirm dialog
 

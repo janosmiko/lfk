@@ -167,10 +167,10 @@ type Model struct {
 	// Port forward input state.
 	portForwardInput TextInput
 
-	// Confirm action label + the pending delete's cascade policy (see delete_propagation.go).
-	confirmAction      string
-	confirmPropagation model.DeletePropagation
-	blast              blastRadiusState // what the action costs (see blastradius.go)
+	confirmAction      string                  // confirm action label
+	confirmPropagation model.DeletePropagation // pending delete's cascade policy (delete_propagation.go)
+	blast              blastRadiusState        // what the action costs (blastradius.go)
+	deps               dependentsState         // what the cascade takes with it (dependents.go)
 
 	// Title and question for the type-to-confirm overlay.
 	confirmTitle, confirmQuestion string

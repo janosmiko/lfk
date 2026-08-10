@@ -715,7 +715,8 @@ func TestCovExecuteBulkActionForceDelete(t *testing.T) {
 	ret, cmd := m.executeBulkAction("Force Delete")
 	result := ret.(Model)
 	assert.Equal(t, overlayConfirmType, result.overlay)
-	assert.Nil(t, cmd)
+	// The only command is the dependent count for the dialog, not the delete.
+	assertDependentsOnlyCmd(t, cmd)
 }
 
 func TestCovExecuteBulkActionScale(t *testing.T) {
@@ -910,7 +911,7 @@ func TestCovExecuteActionForceDelete(t *testing.T) {
 	m := testModelExec()
 	result, cmd := m.executeAction("Force Delete")
 	rm := result.(Model)
-	assert.Nil(t, cmd)
+	assertDependentsOnlyCmd(t, cmd)
 	assert.False(t, rm.loading)
 	assert.Equal(t, overlayConfirmType, rm.overlay)
 	assert.Equal(t, "Force Delete", rm.pendingAction)
@@ -1806,7 +1807,7 @@ func TestFinalExecuteActionForceDelete(t *testing.T) {
 	// confirmation, not fire kubectl delete --force directly.
 	m := baseFinalModel()
 	result, cmd := m.executeAction("Force Delete")
-	assert.Nil(t, cmd)
+	assertDependentsOnlyCmd(t, cmd)
 	rm := result.(Model)
 	assert.False(t, rm.loading)
 	assert.Equal(t, overlayConfirmType, rm.overlay)

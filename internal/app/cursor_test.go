@@ -995,7 +995,7 @@ func TestPush2DirectActionForceDeleteWithSel(t *testing.T) {
 	result, cmd := m.directActionForceDelete()
 	rm := result.(Model)
 	assert.Equal(t, overlayConfirmType, rm.overlay)
-	assert.Nil(t, cmd)
+	assertDependentsOnlyCmd(t, cmd)
 }
 
 func TestPush3HandleKeyVimBindings(t *testing.T) {
@@ -2062,7 +2062,8 @@ func TestCov80DirectActionDeleteDeletingPod(t *testing.T) {
 	rm := result.(Model)
 	assert.Equal(t, overlayConfirmType, rm.overlay)
 	assert.Contains(t, rm.pendingAction, "Force Delete")
-	assert.Nil(t, cmd)
+	// The only command is the dependent count for the dialog, not the delete.
+	assertDependentsOnlyCmd(t, cmd)
 }
 
 func TestCov80DirectActionDeleteDeletingNonPod(t *testing.T) {

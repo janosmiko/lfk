@@ -62,6 +62,7 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	// path for Ctrl+C and the toggle key, which never reach the per-overlay
 	// handlers.
 	m.blast.reset()
+	m.deps.reset()
 	if m.previousOverlay != overlayNone {
 		m.overlay = m.previousOverlay
 		m.previousOverlay = overlayNone

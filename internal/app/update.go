@@ -153,6 +153,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case blastRadiusLoadedMsg:
 		mdl, cmd := m.updateBlastRadiusLoaded(msg)
 		return mdl, cmd, true
+	case dependentsLoadedMsg:
+		mdl, cmd := m.updateDependentsLoaded(msg)
+		return mdl, cmd, true
 	case yamlLoadedMsg:
 		mdl, cmd := m.updateYamlLoaded(msg)
 		return mdl, cmd, true

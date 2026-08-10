@@ -282,18 +282,26 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 		}
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
+		// This box opens without passing through a close path, so the figures
+		// of the previous confirm are still in the model. Retire them, or the
+		// cost rows describe the wrong resource.
+		m.blast.reset()
+		m.deps.reset()
 		if actionLabel == "Force Delete" {
 			// Pod/Job: offer force delete.
 			m.confirmAction = sel.Name + " (FORCE)"
 			m.confirmTitle = "Confirm Force Delete"
 			m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
 			m.resetForceDeletePropagation()
-		} else {
-			// Other kinds: offer force finalize (remove finalizers).
-			m.confirmAction = sel.Name
-			m.confirmTitle = "Confirm Force Finalize"
-			m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
+			m.pendingAction = actionLabel
+			m.beginDependents()
+			return m, m.loadDependents()
 		}
+		// Other kinds: offer force finalize (remove finalizers). Removing a
+		// finalizer cascades to nothing, so this box needs no cost rows.
+		m.confirmAction = sel.Name
+		m.confirmTitle = "Confirm Force Finalize"
+		m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
 		m.pendingAction = actionLabel
 		return m, nil
 	}
@@ -332,7 +340,8 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 	m.resetForceDeletePropagation()
 	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"
-	return m, nil
+	m.beginDependents()
+	return m, m.loadDependents()
 }
 
 func (m Model) directActionScale() (tea.Model, tea.Cmd) {
@@ -702,7 +711,8 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayConfirm
 		m.pendingAction = "Delete"
 		m.beginBlastRadius()
-		return m, m.loadBulkBlastRadius()
+		m.beginDependents()
+		return m, tea.Batch(m.loadBulkBlastRadius(), m.loadBulkDependents())
 	case "Force Delete":
 		m.confirmAction = fmt.Sprintf("%d resources (FORCE)%s", len(m.bulkItems), clustersSuffix)
 		m.confirmTitle = "Confirm Force Delete"
@@ -711,7 +721,8 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.resetForceDeletePropagation()
 		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Delete"
-		return m, nil
+		m.beginDependents()
+		return m, m.loadBulkDependents()
 	case "Scale":
 		m.scaleInput.Clear()
 		m.overlay = overlayScaleInput
