@@ -72,9 +72,9 @@ func renderDescribe(kind, name, namespace, kctx string) string {
 			"  Warning  BackOff  2m    Back-off restarting failed container=web\n")
 	case demo.PodDBMigrate:
 		fmt.Fprintf(&b, "Node:         %s\n", demo.NodeWorker1)
-		b.WriteString("Status:       Succeeded\n")
+		b.WriteString("Status:       Failed\n")
 		b.WriteString("Containers:\n  migrate:\n    State:          Terminated\n" +
-			"    Reason:         Completed\n    Exit Code:      0\n")
+			"    Reason:         Error\n    Exit Code:      1\n")
 	default:
 		fmt.Fprintf(&b, "Kind:         %s\n", kind)
 		b.WriteString("Status:       Running\n")
