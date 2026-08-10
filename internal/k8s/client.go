@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/sync/singleflight"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -412,11 +413,15 @@ func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespac
 			ri = res.Namespace(ns)
 		}
 
-		if existing, getErr := ri.Get(ctx, obj.GetName(), metav1.GetOptions{}); getErr == nil {
+		existing, getErr := ri.Get(ctx, obj.GetName(), metav1.GetOptions{})
+		switch {
+		case getErr == nil:
 			obj.SetResourceVersion(existing.GetResourceVersion())
 			_, err = ri.Update(ctx, &obj, metav1.UpdateOptions{FieldManager: applyFieldManager})
-		} else {
+		case apierrors.IsNotFound(getErr):
 			_, err = ri.Create(ctx, &obj, metav1.CreateOptions{FieldManager: applyFieldManager})
+		default:
+			return fmt.Errorf("checking existing %s/%s: %w", gvk.Kind, obj.GetName(), getErr)
 		}
 		if err != nil {
 			return fmt.Errorf("applying %s/%s: %w", gvk.Kind, obj.GetName(), err)
