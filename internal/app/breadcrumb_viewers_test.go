@@ -43,6 +43,22 @@ func TestResourceTitleLabel_SanitizesTerminalEscapes(t *testing.T) {
 		resourceTitleLabel("Pod", "argo-cd", "argocd-redis-ha-server-2"))
 }
 
+// containerTitleSuffix is the shared choke point for appending container
+// name(s) to a log title. Container names come from the same pod spec as
+// the resource name resourceTitleLabel already sanitizes, but were
+// concatenated after it, so a hostile container name skipped sanitizing.
+func TestContainerTitleSuffix_SanitizesTerminalEscapes(t *testing.T) {
+	suffix := containerTitleSuffix("evil\x1b[2Jsidecar")
+	assert.NotContains(t, suffix, "\x1b")
+	assert.Equal(t, " [evil[2Jsidecar]", suffix)
+
+	suffix = containerTitleSuffix("app", "evil‮sidecar")
+	assert.NotContains(t, suffix, "‮", "bidi override must not survive")
+	assert.Equal(t, " [app, evilsidecar]", suffix)
+
+	assert.Empty(t, containerTitleSuffix(), "no names means no suffix")
+}
+
 // The fullscreen viewers (logs, exec, describe, diff, events) must surface the
 // object they show in the top breadcrumb, the same way the YAML viewer and the
 // Object Explorer do. Each case is exercised through explorerDrillPath, which

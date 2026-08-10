@@ -30,6 +30,23 @@ func TestBuildLogTitleWithContainerFilter(t *testing.T) {
 	assert.Contains(t, title, "sidecar")
 }
 
+// TestBuildLogTitleSanitizesContainerNames guards the missing sink found in
+// review: selectedContainers was joined raw into the title after
+// resourceTitleLabel, so a hostile container name skipped the sanitizing
+// kind/namespace/name get.
+func TestBuildLogTitleSanitizesContainerNames(t *testing.T) {
+	m := Model{
+		namespace: "default",
+		actionCtx: actionContext{name: "my-pod", namespace: "default"},
+		logView: logViewState{
+			containers:         []string{"app", "sidecar", "init"},
+			selectedContainers: []string{"evil\x1b[2Japp", "sidecar"},
+		},
+	}
+	title := m.buildLogTitle()
+	assert.NotContains(t, title, "\x1b")
+}
+
 func TestBuildLogTitleAllContainersSelected(t *testing.T) {
 	m := Model{
 		namespace: "default",

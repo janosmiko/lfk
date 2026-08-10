@@ -20,6 +20,14 @@ const eventTimelineMessageColumn = 8 + 1 + 7 + 1 + 20 + 1
 // buildEventTimelineLines converts event timeline data into flat text lines
 // for cursor navigation. Each event becomes a single line with format:
 // {age}  {type}  {reason}  {message}
+//
+// Reason, Message, and Source are cluster-controlled - any principal that
+// can create an Event in the namespace sets them - so they are sanitized
+// here, the single place raw k8s.EventInfo values turn into displayed text
+// for this viewer. SanitizeTerminalText, not the ANSI-aware body sanitizer,
+// because these are short table-cell values with no legitimate reason to
+// carry colour or tabs (matches how resourceTitleLabel treats kind/
+// namespace/name).
 func (m *Model) buildEventTimelineLines() []string {
 	lines := make([]string, 0, len(m.eventTimelineData))
 	for _, e := range m.eventTimelineData {
@@ -28,12 +36,14 @@ func (m *Model) buildEventTimelineLines() []string {
 		if e.Count > 1 {
 			countStr = fmt.Sprintf(" (x%d)", e.Count)
 		}
+		reason := ui.SanitizeTerminalText(e.Reason)
+		message := ui.SanitizeTerminalText(e.Message)
 		src := ""
 		if e.Source != "" {
-			src = " [" + e.Source + "]"
+			src = " [" + ui.SanitizeTerminalText(e.Source) + "]"
 		}
 		line := fmt.Sprintf("%-8s %-7s %-20s %s%s%s",
-			ts, e.Type, e.Reason, e.Message, countStr, src)
+			ts, e.Type, reason, message, countStr, src)
 		lines = append(lines, line)
 	}
 	return lines

@@ -213,6 +213,23 @@ func resourceTitleLabel(kind, namespace, name string) string {
 	return label
 }
 
+// containerTitleSuffix formats a bracketed container-name suffix for log
+// titles, e.g. " [app, sidecar]", or "" when names is empty. Container
+// names come from the same pod spec as the resource name resourceTitleLabel
+// already sanitizes, but are appended after it at each log-title call site;
+// sanitizing once here, where the name(s) enter the title, covers every
+// site instead of requiring a fix at each concatenation.
+func containerTitleSuffix(names ...string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	sanitized := make([]string, len(names))
+	for i, n := range names {
+		sanitized[i] = ui.SanitizeTerminalText(n)
+	}
+	return " [" + strings.Join(sanitized, ", ") + "]"
+}
+
 // nameNotInNav returns name unless the nav breadcrumb already ends with it (as
 // ResourceName or OwnedName), in which case it returns "" so the drill path
 // does not duplicate a segment the breadcrumb already shows.

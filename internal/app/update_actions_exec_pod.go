@@ -108,7 +108,7 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	}
 	label := resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 	if m.actionCtx.containerName != "" {
-		label += " [" + m.actionCtx.containerName + "]"
+		label += containerTitleSuffix(m.actionCtx.containerName)
 	}
 	m.logView.title = verb + ": " + label
 	return m, m.startLogStream()

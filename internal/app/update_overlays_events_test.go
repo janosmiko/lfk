@@ -46,6 +46,27 @@ func TestBuildEventTimelineLinesEmpty(t *testing.T) {
 	assert.Empty(t, lines)
 }
 
+// TestBuildEventTimelineLinesSanitizesControlBytes guards the missing sink
+// found in review: Event Reason, Message, and Source are attacker-influenced
+// (any principal that can create an Event in the namespace controls them)
+// and reached the fullscreen event viewer unfiltered.
+func TestBuildEventTimelineLinesSanitizesControlBytes(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "Warning",
+			Reason:  "Hacked\x9b31m",
+			Message: "\x1b]52;c;SGVsbG8=\x07payload",
+			Source:  "evil\x9c",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+	assert.NotContains(t, lines[0], "\x9b")
+	assert.NotContains(t, lines[0], "\x1b")
+	assert.NotContains(t, lines[0], "\x07")
+	assert.NotContains(t, lines[0], "\x9c")
+}
+
 func TestEventContentHeight(t *testing.T) {
 	m := newEventModel(10)
 

@@ -3,6 +3,8 @@ package app
 import (
 	"strconv"
 	"strings"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // yamlSection represents a YAML section (a key with nested content below it).
@@ -58,32 +60,56 @@ func hasDeeperContent(lines []string, startLine, minIndent int) bool {
 	return nextIndent >= minIndent
 }
 
-// buildYAMLLoadedMsg constructs a yamlLoadedMsg with the content pre-indented
-// and sections pre-parsed, so the Bubble Tea message handler has no heavy
-// work to do when it lands on the main event loop. Called from inside
-// loader goroutines — never from the main thread — because parseYAMLSections
-// on very large CRD manifests (50k+ lines) can take multiple seconds.
+// sanitizeYAMLContent strips control bytes (including the C1 range) and
+// bidi overrides from raw YAML text before it is folded/indented and shown
+// on screen. YAML values (Secret data, annotations, ConfigMap entries) are
+// cluster-controlled and otherwise reach the viewer unfiltered. Sanitizing
+// here - the single producer both the full viewer and the preview pane load
+// from - keeps the render path (view_yaml.go) free of this work and keeps
+// line counts stable for the section/indent parsing that follows.
+//
+// sanitizeLogLine (via SanitizeLogBody) works one line at a time and would
+// otherwise treat an embedded newline as a stray control byte, so the
+// content is split and rejoined around it. renderAnsi is false: kubectl YAML
+// output has no legitimate reason to carry SGR colour, so any ESC is always
+// replaced rather than risking passing through an attacker-controlled
+// sequence.
+func sanitizeYAMLContent(content string) string {
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		lines[i] = ui.SanitizeLogBody(ui.StripBidiOverrides(line), false)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// buildYAMLLoadedMsg constructs a yamlLoadedMsg with the content sanitized,
+// pre-indented, and sections pre-parsed, so the Bubble Tea message handler
+// has no heavy work to do when it lands on the main event loop. Called from
+// inside loader goroutines — never from the main thread — because
+// parseYAMLSections on very large CRD manifests (50k+ lines) can take
+// multiple seconds.
 func buildYAMLLoadedMsg(content string, err error) yamlLoadedMsg {
 	if err != nil {
 		return yamlLoadedMsg{err: err}
 	}
-	indented := indentYAMLListItems(content)
+	indented := indentYAMLListItems(sanitizeYAMLContent(content))
 	return yamlLoadedMsg{
 		content:  indented,
 		sections: parseYAMLSections(indented),
 	}
 }
 
-// buildPreviewYAMLLoadedMsg constructs a previewYAMLLoadedMsg with the content
-// pre-indented, matching buildYAMLLoadedMsg. Preview mode does not need the
-// section tree (no fold indicators in the preview pane), so only the indent
-// pass is run — still non-trivial on huge documents.
+// buildPreviewYAMLLoadedMsg constructs a previewYAMLLoadedMsg with the
+// content sanitized and pre-indented, matching buildYAMLLoadedMsg. Preview
+// mode does not need the section tree (no fold indicators in the preview
+// pane), so only the sanitize and indent passes run — still non-trivial on
+// huge documents.
 func buildPreviewYAMLLoadedMsg(content string, err error, gen uint64) previewYAMLLoadedMsg {
 	if err != nil {
 		return previewYAMLLoadedMsg{err: err, gen: gen}
 	}
 	return previewYAMLLoadedMsg{
-		content: indentYAMLListItems(content),
+		content: indentYAMLListItems(sanitizeYAMLContent(content)),
 		gen:     gen,
 	}
 }
