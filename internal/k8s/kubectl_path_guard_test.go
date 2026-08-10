@@ -1,10 +1,15 @@
 package k8s
 
 import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -73,37 +78,39 @@ func TestNoBareKubectlLookPath(t *testing.T) {
 	}
 }
 
-// literalLookPathRE matches an exec.LookPath call with a literal binary
-// name, e.g. exec.LookPath("trivy"). A dynamic argument (exec.LookPath(name))
-// can't be checked this way and isn't matched.
-var literalLookPathRE = regexp.MustCompile(`exec\.LookPath\("([^"]+)"\)`)
-
-// externalBinaryLookupAllowlist is every literal exec.LookPath("name") call
-// site the module may contain, keyed by its path relative to the module
-// root. Adding an entry here is a deliberate signal: the binary it resolves
-// either can't run in demo mode, or is gated the way resolveHelmPath and
-// vulnScanImage gate helm and trivy — k8s.DemoModeEnabled() checked before
-// the binary is ever resolved. TASK-865 finding 2 found trivy resolving
-// unconditionally because the original sweep only covered kubectl; this
-// guard generalizes TestNoBareKubectlLookPath to every external binary so
-// the next one can't slip through the same way.
-var externalBinaryLookupAllowlist = map[string]string{
-	filepath.Join("internal", "k8s", "kubectl_path.go"):       "kubectl",
-	filepath.Join("internal", "app", "commands_exec_helm.go"): "helm",
-	filepath.Join("internal", "app", "commands_exec_misc.go"): "trivy",
+// execCallSite is one exec.LookPath or exec.Command call whose first
+// argument is a string literal, found by walking the module's AST.
+type execCallSite struct {
+	file   string // path relative to the module root
+	fn     string // "LookPath" or "Command"
+	binary string // the literal argument value
 }
 
-// TestNoUnguardedExternalBinaryLookup walks the module for every literal
-// exec.LookPath("name") call outside of production _test.go files and
-// requires each one to be an already-reviewed entry in
-// externalBinaryLookupAllowlist. Test files are skipped: they exist to
-// exercise the guarded call sites (e.g. comparing resolveHelmPath's output
-// against a raw exec.LookPath("helm")) and never run as part of the shipped
-// binary.
-func TestNoUnguardedExternalBinaryLookup(t *testing.T) {
-	root := moduleRoot(t)
+// collectLiteralExecCalls walks every non-test .go file under root and
+// returns each call to exec.LookPath or exec.Command whose first argument is
+// a string literal.
+//
+// An AST walk is used instead of a regex: a regex matching exec.LookPath("x")
+// or exec.Command("x", ...) is easy to write, but it only matches that exact
+// textual shape — it misses the call when it's spread across multiple lines,
+// and can't reliably tell a literal argument from one reached through a
+// method chain or a renamed import. Walking the parsed syntax tree instead
+// means the shape is checked structurally: a *ast.CallExpr on a selector
+// whose package identifier is exec and whose first argument is a
+// *ast.BasicLit. Formatting never matters, and a variable argument (the
+// pattern every guarded call site already uses) is never mistaken for a
+// literal.
+//
+// A call whose first argument is not a literal (i.e. a variable, like every
+// production exec.Command(kubectlPath, ...) call site) is not collected —
+// by design, since routing the binary name through a variable resolved by a
+// guarded function (KubectlPath, resolveHelmPath, ...) is exactly the
+// pattern this guard exists to enforce.
+func collectLiteralExecCalls(t *testing.T, root string) []execCallSite {
+	t.Helper()
 
-	var offenders []string
+	var sites []execCallSite
+	fset := token.NewFileSet()
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -118,30 +125,98 @@ func TestNoUnguardedExternalBinaryLookup(t *testing.T) {
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
+
+		astFile, parseErr := parser.ParseFile(fset, path, nil, 0)
+		if parseErr != nil {
+			return fmt.Errorf("parsing %s: %w", path, parseErr)
 		}
 		rel, relErr := filepath.Rel(root, path)
 		if relErr != nil {
 			rel = path
 		}
-		for _, m := range literalLookPathRE.FindAllStringSubmatch(string(data), -1) {
-			binary := m[1]
-			if want, ok := externalBinaryLookupAllowlist[rel]; ok && want == binary {
-				continue
+
+		ast.Inspect(astFile, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
 			}
-			offenders = append(offenders, rel+": exec.LookPath(\""+binary+"\")")
-		}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			pkgIdent, ok := sel.X.(*ast.Ident)
+			if !ok || pkgIdent.Name != "exec" {
+				return true
+			}
+			if sel.Sel.Name != "LookPath" && sel.Sel.Name != "Command" {
+				return true
+			}
+			if len(call.Args) == 0 {
+				return true
+			}
+			lit, ok := call.Args[0].(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			binary, unquoteErr := strconv.Unquote(lit.Value)
+			if unquoteErr != nil {
+				return true
+			}
+			sites = append(sites, execCallSite{file: rel, fn: sel.Sel.Name, binary: binary})
+			return true
+		})
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("walking module root: %v", err)
 	}
+	return sites
+}
+
+// externalBinaryLookupAllowlist is every literal-argument exec.LookPath or
+// exec.Command call site the module may contain, keyed by its path relative
+// to the module root and then by the literal binary/interpreter name.
+// Adding an entry here is a deliberate signal: the binary it resolves either
+// can't run in demo mode, or is gated the way resolveHelmPath and
+// vulnScanImage gate helm and trivy — k8s.DemoModeEnabled() checked before
+// the binary is ever resolved. The "sh" entries are the shell interpreter
+// invoked with an already-guarded command string (exec.Command("sh", "-c",
+// cmd)), not an external tool being resolved, so they carry no bypass risk
+// of their own.
+//
+// TASK-865 finding 2 found this guard only matched exec.LookPath, so a
+// direct exec.Command("literal", ...) — which skips LookPath entirely —
+// stayed invisible to it. This allowlist now covers both call shapes.
+var externalBinaryLookupAllowlist = map[string]map[string]bool{
+	filepath.Join("internal", "k8s", "kubectl_path.go"):       {"kubectl": true},
+	filepath.Join("internal", "app", "commands_exec_helm.go"): {"helm": true, "sh": true},
+	filepath.Join("internal", "app", "commands_exec_misc.go"): {"trivy": true, "sh": true},
+	filepath.Join("internal", "app", "commandbar_execute.go"): {"sh": true},
+	filepath.Join("internal", "app", "commands.go"):           {"sh": true},
+}
+
+// TestNoUnguardedExternalBinaryLookup walks the module for every
+// literal-argument exec.LookPath or exec.Command call outside of production
+// _test.go files and requires each one to be an already-reviewed entry in
+// externalBinaryLookupAllowlist. Test files are skipped: they exist to
+// exercise the guarded call sites (e.g. comparing resolveHelmPath's output
+// against a raw exec.LookPath("helm")) and never run as part of the shipped
+// binary.
+func TestNoUnguardedExternalBinaryLookup(t *testing.T) {
+	root := moduleRoot(t)
+
+	var offenders []string
+	for _, site := range collectLiteralExecCalls(t, root) {
+		if externalBinaryLookupAllowlist[site.file][site.binary] {
+			continue
+		}
+		offenders = append(offenders, fmt.Sprintf("%s: exec.%s(%q)", site.file, site.fn, site.binary))
+	}
+	sort.Strings(offenders)
 	if len(offenders) > 0 {
-		t.Errorf("found exec.LookPath call(s) not in externalBinaryLookupAllowlist; "+
-			"confirm the binary can't reach a real cluster/network in demo mode (gate it with "+
-			"k8s.DemoModeEnabled() first if it can), then add it to the allowlist:\n%s",
+		t.Errorf("found exec.LookPath/exec.Command call(s) with a literal binary name not in "+
+			"externalBinaryLookupAllowlist; confirm the binary can't reach a real cluster/network in "+
+			"demo mode (gate it with k8s.DemoModeEnabled() first if it can), then add it to the allowlist:\n%s",
 			strings.Join(offenders, "\n"))
 	}
 }
