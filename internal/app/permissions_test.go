@@ -277,6 +277,9 @@ func TestUpdateActionPermissions_ErrorFailsOpenSilently(t *testing.T) {
 }
 
 func TestActionQueries_LabelsExistInTheirMenu(t *testing.T) {
+	// Labels the menu builds at open time rather than listing statically:
+	// a deleting row has its Delete entry renamed to one of these.
+	generated := map[string]bool{"Force Delete": true, "Force Finalize": true}
 	for kind, byLabel := range actionQueries {
 		t.Run(kind, func(t *testing.T) {
 			menu := make(map[string]bool)
@@ -284,6 +287,9 @@ func TestActionQueries_LabelsExistInTheirMenu(t *testing.T) {
 				menu[a.Label] = true
 			}
 			for label := range byLabel {
+				if generated[label] {
+					continue
+				}
 				assert.True(t, menu[label], "mapped label %q is not in the %s action menu", label, kind)
 			}
 		})
@@ -339,6 +345,75 @@ func TestDeniedByRBAC_VerdictsDoNotCrossKinds(t *testing.T) {
 	m := podPermModel(t, map[string]bool{"delete:pods": false})
 	m.actionCtx.kind = "Deployment"
 	assert.False(t, m.deniedByRBAC("Deployment", "Delete"))
+}
+
+func TestDeniedByRBAC_ForceFinalizeFollowsPatch(t *testing.T) {
+	// A deleting row has its Delete entry renamed, so the generated label
+	// needs its own verdict or it would slip past the gate.
+	m := podPermModel(t, map[string]bool{"patch:pods": false})
+	assert.True(t, m.deniedByRBAC("Pod", "Force Finalize"))
+
+	m.actionCtx.kind = "Deployment"
+	m.perms.record(permScopeKey{context: "kind-ctx", namespace: "ns", kind: "Deployment"},
+		map[string]bool{"patch:deployments": false})
+	assert.True(t, m.deniedByRBAC("Deployment", "Force Finalize"))
+}
+
+func TestExecuteBulkAction_RBACDenied_Blocks(t *testing.T) {
+	m := podPermModel(t, map[string]bool{"delete:pods": false})
+	m.bulkMode = true
+	m.bulkItems = []model.Item{
+		{Name: "p1", Namespace: "ns"},
+		{Name: "p2", Namespace: "ns"},
+	}
+
+	ret, _ := m.executeBulkAction("Delete")
+	result := ret.(Model)
+	assert.Equal(t, rbacBlockedMessage("Delete"), result.statusMessage)
+	assert.True(t, result.statusMessageErr)
+	assert.NotEqual(t, overlayConfirm, result.overlay)
+}
+
+func TestExecuteBulkAction_MixedScopeFailsOpen(t *testing.T) {
+	// Rows from another namespace have no verdict, and one namespace's
+	// denial must not speak for them.
+	m := podPermModel(t, map[string]bool{"delete:pods": false})
+	m.bulkMode = true
+	m.bulkItems = []model.Item{
+		{Name: "p1", Namespace: "ns"},
+		{Name: "p2", Namespace: "other-ns"},
+	}
+
+	ret, _ := m.executeBulkAction("Delete")
+	result := ret.(Model)
+	assert.NotEqual(t, rbacBlockedMessage("Delete"), result.statusMessage)
+}
+
+func TestOpenBulkSelectionMenu_DropsRefusedEntries(t *testing.T) {
+	m := podPermModel(t, map[string]bool{"delete:pods": false})
+	m.nav = model.NavigationState{
+		Level:        model.LevelResources,
+		Context:      "kind-ctx",
+		Namespace:    "ns",
+		ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
+	}
+	m.setMiddleItems([]model.Item{
+		{Name: "p1", Namespace: "ns", Kind: "Pod"},
+		{Name: "p2", Namespace: "ns", Kind: "Pod"},
+	})
+	m.selectedItems = map[string]bool{
+		selectionKey(m.middleItems[0]): true,
+		selectionKey(m.middleItems[1]): true,
+	}
+
+	out := m.openBulkSelectionMenu()
+
+	labels := make(map[string]bool, len(out.overlayItems))
+	for _, item := range out.overlayItems {
+		labels[item.Name] = true
+	}
+	require.True(t, labels["Logs"], "the bulk menu was built")
+	assert.False(t, labels["Delete"], "a refused bulk delete must not be offered")
 }
 
 func TestLoadActionPermissions_UnmappedKindMakesNoCall(t *testing.T) {

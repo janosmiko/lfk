@@ -59,6 +59,9 @@ func (m Model) openBulkSelectionMenu() Model {
 		if targetReadOnly && isMutatingAction(a.Label) {
 			continue
 		}
+		if _, blocked := m.bulkActionBlockedReason(kind, a.Label); blocked {
+			continue
+		}
 		if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, a.Label) {
 			continue
 		}

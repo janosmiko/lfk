@@ -25,6 +25,8 @@ var actionQueries = map[string]map[string]k8s.PermissionQuery{
 		"Force Delete": {Resource: "pods", Verb: "delete"},
 		"Edit":         {Resource: "pods", Verb: "patch"},
 		"Debug":        {Resource: "pods", Subresource: "ephemeralcontainers", Verb: "patch"},
+		// Generated when a row is already deleting; see openResourceActionMenu.
+		"Force Finalize": {Resource: "pods", Verb: "patch"},
 	}),
 	"Deployment": mergeQueries(workloadQueries("deployments"), podRuntimeQueries(), map[string]k8s.PermissionQuery{
 		"Scale":    {Group: "apps", Resource: "deployments", Subresource: "scale", Verb: "update"},
@@ -57,12 +59,16 @@ func podRuntimeQueries() map[string]k8s.PermissionQuery {
 	}
 }
 
-// workloadQueries builds the three verbs every apps/v1 workload menu carries.
+// workloadQueries builds the verbs every apps/v1 workload menu carries. Force
+// Finalize is generated when a row is already deleting (see
+// openResourceActionMenu), and removing finalizers is a patch, so it costs no
+// extra review: it shares the key Edit and Restart already ask for.
 func workloadQueries(resource string) map[string]k8s.PermissionQuery {
 	return map[string]k8s.PermissionQuery{
-		"Delete":  {Group: "apps", Resource: resource, Verb: "delete"},
-		"Edit":    {Group: "apps", Resource: resource, Verb: "patch"},
-		"Restart": {Group: "apps", Resource: resource, Verb: "patch"},
+		"Delete":         {Group: "apps", Resource: resource, Verb: "delete"},
+		"Edit":           {Group: "apps", Resource: resource, Verb: "patch"},
+		"Restart":        {Group: "apps", Resource: resource, Verb: "patch"},
+		"Force Finalize": {Group: "apps", Resource: resource, Verb: "patch"},
 	}
 }
 
@@ -232,6 +238,37 @@ func (m Model) actionBlockedReason(kind, label string) (string, bool) {
 func (m Model) actionBlocked(kind, label string) bool {
 	_, blocked := m.actionBlockedReason(kind, label)
 	return blocked
+}
+
+// bulkActionBlockedReason is the RBAC half of the gate for a whole selection.
+// It answers only when every selected row sits in the context and namespace
+// the action targets; a mixed selection has no single verdict to apply, so the
+// gate stands aside and the API server decides row by row.
+//
+// Read-only is not repeated here: executeBulkAction checks it first, and it
+// treats a mixed selection as all-or-nothing, which RBAC deliberately does not.
+func (m Model) bulkActionBlockedReason(kind, label string) (string, bool) {
+	if len(m.bulkItems) == 0 || !m.bulkTargetsOneScope() {
+		return "", false
+	}
+	if m.deniedByRBAC(kind, label) {
+		return rbacBlockedMessage(label), true
+	}
+	return "", false
+}
+
+// bulkTargetsOneScope reports whether every selected row sits in the context
+// and namespace named by the action context.
+func (m Model) bulkTargetsOneScope() bool {
+	for _, item := range m.bulkItems {
+		if item.Namespace != "" && item.Namespace != m.actionCtx.namespace {
+			return false
+		}
+		if item.ClusterName != "" && item.ClusterName != m.actionCtx.context {
+			return false
+		}
+	}
+	return true
 }
 
 // rbacBlockedMessage returns the toast used when the cluster refuses an

@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -134,9 +135,11 @@ func TestCheckPermissions_CapsQueryCount(t *testing.T) {
 
 	queries := make([]PermissionQuery, maxPermissionQueries+5)
 	for i := range queries {
-		queries[i] = PermissionQuery{Resource: "pods", Subresource: string(rune('a' + i%26)), Verb: "get"}
+		// Every subresource is distinct, or dedupe would cut the set below
+		// the cap and the cap itself would go untested.
+		queries[i] = PermissionQuery{Resource: "pods", Subresource: fmt.Sprintf("sub-%d", i), Verb: "get"}
 	}
 	got, err := c.CheckPermissions(t.Context(), "ctx", "default", queries)
 	require.NoError(t, err)
-	assert.LessOrEqual(t, len(got), maxPermissionQueries)
+	assert.Len(t, got, maxPermissionQueries)
 }

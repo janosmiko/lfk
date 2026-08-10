@@ -289,7 +289,11 @@ dialog. The gate is the same one read-only mode uses.
   another cluster or user.
 - **Not reviewed**: all-namespaces lists, multi-namespace selections, and
   union lists. None of them has one context and namespace a single pass
-  could speak for, so every action stays visible there.
+  could speak for, so no review is sent. A row whose own namespace was
+  reviewed on an earlier visit still uses that verdict, since it was asked
+  about exactly that namespace and kind.
+- **Bulk actions**: gated only when every selected row sits in one context
+  and namespace. A mixed selection is left to the API server.
 
 ## Node Shell
 

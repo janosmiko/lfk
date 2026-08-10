@@ -687,6 +687,11 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 	if kind == "" {
 		kind = m.selectedResourceKind()
 	}
+	if reason, blocked := m.bulkActionBlockedReason(kind, actionLabel); blocked {
+		logger.Info("Blocked action (bulk)", "action", actionLabel, "kind", kind, "count", len(m.bulkItems), "reason", reason)
+		m.setStatusMessage(reason, true)
+		return m, scheduleStatusClear()
+	}
 	if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, actionLabel) {
 		logger.Info("Blocked by union view (bulk)", "action", actionLabel, "kind", kind, "count", len(m.bulkItems))
 		m.setStatusMessage(actionLabel+" is not available in union view", true)
