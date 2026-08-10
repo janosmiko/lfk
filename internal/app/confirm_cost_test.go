@@ -273,3 +273,42 @@ func TestConfirmCostNotesWarns(t *testing.T) {
 		})
 	}
 }
+
+func TestConfirmCostNotes_OrphanWithNothingOwnedStatesNoRisk(t *testing.T) {
+	// The walk could not follow this kind, so Orphan has no hazard to name.
+	notes := rows(confirmCostNotes(confirmCost{
+		radius:   &k8s.BlastRadius{Evicting: 2},
+		kind:     "Deployment",
+		cascades: true, policy: model.DeletePropagationOrphan,
+	}))
+
+	if _, ok := notes["Risk"]; ok {
+		t.Errorf("Risk = %q, want no row", notes["Risk"])
+	}
+	if notes["Availability"] != "unchanged, the 2 pods keep running" {
+		t.Errorf("Availability = %q", notes["Availability"])
+	}
+}
+
+func TestConfirmCost_BulkSelectionHasNoSingleKind(t *testing.T) {
+	m := Model{bulkMode: true, bulkItems: []model.Item{{Name: "a"}, {Name: "b"}}}
+	m.actionCtx.kind = "Deployment" // left over from the row the cursor sat on
+	m.confirmPropagation = model.DeletePropagationOrphan
+
+	if got := m.confirmCost(true, false).targetOnly(); got != "the selected rows only" {
+		t.Errorf("targetOnly() = %q, want the selected rows only", got)
+	}
+}
+
+func TestConfirmCost_HoldsUntilBothFetchesLand(t *testing.T) {
+	m := Model{}
+	m.blast.loading = false
+	m.deps.loading = true
+
+	if !m.confirmCost(true, false).loading {
+		t.Error("a cascading delete must wait for the owner walk")
+	}
+	if m.confirmCost(false, false).loading {
+		t.Error("a drain has no owner walk to wait for")
+	}
+}
