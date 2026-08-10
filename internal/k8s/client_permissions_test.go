@@ -39,6 +39,40 @@ func allowVerbs(cs *k8sfake.Clientset, verbs ...string) {
 func TestPermissionQueryKey(t *testing.T) {
 	assert.Equal(t, "delete:pods", PermissionQuery{Resource: "pods", Verb: "delete"}.Key())
 	assert.Equal(t, "create:pods/exec", PermissionQuery{Resource: "pods", Subresource: "exec", Verb: "create"}.Key())
+	assert.Equal(t, "delete:deployments.apps", PermissionQuery{Group: "apps", Resource: "deployments", Verb: "delete"}.Key())
+	assert.Equal(t, "update:deployments.apps/scale",
+		PermissionQuery{Group: "apps", Resource: "deployments", Subresource: "scale", Verb: "update"}.Key())
+}
+
+func TestPermissionQueryKey_GroupsDoNotCollide(t *testing.T) {
+	// A CRD may borrow a core resource name, and the two verdicts are not
+	// interchangeable.
+	core := PermissionQuery{Resource: "widgets", Verb: "delete"}
+	crd := PermissionQuery{Group: "example.com", Resource: "widgets", Verb: "delete"}
+	assert.NotEqual(t, core.Key(), crd.Key())
+}
+
+func TestCheckPermissions_KeepsBothGroupsApart(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	cs.PrependReactor("create", "selfsubjectaccessreviews",
+		func(action clienttesting.Action) (bool, runtime.Object, error) {
+			sar := action.(clienttesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+			out := sar.DeepCopy()
+			// Only the CRD group is allowed.
+			out.Status.Allowed = sar.Spec.ResourceAttributes.Group == "example.com"
+			return true, out, nil
+		})
+	c := newFakeClient(cs, nil)
+
+	got, err := c.CheckPermissions(t.Context(), "ctx", "default", []PermissionQuery{
+		{Resource: "widgets", Verb: "delete"},
+		{Group: "example.com", Resource: "widgets", Verb: "delete"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{
+		"delete:widgets":             false,
+		"delete:widgets.example.com": true,
+	}, got)
 }
 
 func TestCheckPermissions_AnswersEveryQuery(t *testing.T) {

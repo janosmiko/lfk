@@ -320,13 +320,13 @@ func TestDeniedByRBAC_WorkloadVerbs(t *testing.T) {
 		label   string
 		allowed map[string]bool
 	}{
-		{kind: "Deployment", label: "Scale", allowed: map[string]bool{"update:deployments/scale": false}},
-		{kind: "Deployment", label: "Restart", allowed: map[string]bool{"patch:deployments": false}},
-		{kind: "Deployment", label: "Rollback", allowed: map[string]bool{"patch:deployments": false}},
-		{kind: "Deployment", label: "Delete", allowed: map[string]bool{"delete:deployments": false}},
-		{kind: "StatefulSet", label: "Scale", allowed: map[string]bool{"update:statefulsets/scale": false}},
-		{kind: "DaemonSet", label: "Restart", allowed: map[string]bool{"patch:daemonsets": false}},
-		{kind: "ReplicaSet", label: "Delete", allowed: map[string]bool{"delete:replicasets": false}},
+		{kind: "Deployment", label: "Scale", allowed: map[string]bool{"update:deployments.apps/scale": false}},
+		{kind: "Deployment", label: "Restart", allowed: map[string]bool{"patch:deployments.apps": false}},
+		{kind: "Deployment", label: "Rollback", allowed: map[string]bool{"patch:deployments.apps": false}},
+		{kind: "Deployment", label: "Delete", allowed: map[string]bool{"delete:deployments.apps": false}},
+		{kind: "StatefulSet", label: "Scale", allowed: map[string]bool{"update:statefulsets.apps/scale": false}},
+		{kind: "DaemonSet", label: "Restart", allowed: map[string]bool{"patch:daemonsets.apps": false}},
+		{kind: "ReplicaSet", label: "Delete", allowed: map[string]bool{"delete:replicasets.apps": false}},
 		{kind: "Deployment", label: "Exec", allowed: map[string]bool{"create:pods/exec": false}},
 	}
 	for _, tc := range tests {
@@ -355,7 +355,7 @@ func TestDeniedByRBAC_ForceFinalizeFollowsPatch(t *testing.T) {
 
 	m.actionCtx.kind = "Deployment"
 	m.perms.record(permScopeKey{context: "kind-ctx", namespace: "ns", kind: "Deployment"},
-		map[string]bool{"patch:deployments": false})
+		map[string]bool{"patch:deployments.apps": false})
 	assert.True(t, m.deniedByRBAC("Deployment", "Force Finalize"))
 }
 

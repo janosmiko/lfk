@@ -19,9 +19,16 @@ type PermissionQuery struct {
 }
 
 // Key identifies a query in the map CheckPermissions returns, e.g.
-// "create:pods/exec".
+// "create:pods/exec" or "delete:deployments.apps".
+//
+// The group is part of the key, in the resource.group form kubectl uses. Two
+// groups can name the same resource, and a CRD that borrows a core name would
+// otherwise share a verdict with it.
 func (q PermissionQuery) Key() string {
 	res := q.Resource
+	if q.Group != "" {
+		res += "." + q.Group
+	}
 	if q.Subresource != "" {
 		res += "/" + q.Subresource
 	}
