@@ -668,6 +668,32 @@ func TestSetStatusMessage(t *testing.T) {
 	assert.Equal(t, "ERR", m.errorLog[1].Level)
 }
 
+// TestSetStatusMessage_SanitizesErrorLog guards the second of three siblings
+// writing m.errorLog: addLogEntry sanitized its own append, but
+// setStatusMessage appended msg raw, so the same overlay still reaches the
+// screen unsanitized through this door.
+func TestSetStatusMessage_SanitizesErrorLog(t *testing.T) {
+	m := Model{}
+
+	m.setStatusMessage("boom \x9d52;c;SGVsbG8=\x9c tail", false)
+	require.Len(t, m.errorLog, 1)
+	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
+	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
+
+	m.setStatusMessage("evil\u202etxt", true)
+	require.Len(t, m.errorLog, 2)
+	assert.NotContains(t, m.errorLog[1].Message, "\u202e")
+}
+
+// TestSetStatusMessage_OrdinaryContentUnaffected guards against sanitizing
+// legitimate non-ASCII status messages into mush.
+func TestSetStatusMessage_OrdinaryContentUnaffected(t *testing.T) {
+	m := Model{}
+	m.setStatusMessage("café RÉSUMÉ déployé", false)
+	require.Len(t, m.errorLog, 1)
+	assert.Equal(t, "café RÉSUMÉ déployé", m.errorLog[0].Message)
+}
+
 func TestHasStatusMessageExpired(t *testing.T) {
 	m := Model{
 		statusMessage:    "expired",
@@ -988,6 +1014,17 @@ func TestSetErrorFromErr(t *testing.T) {
 	assert.Len(t, m.errorLog, 1)
 	assert.Equal(t, "ERR", m.errorLog[0].Level)
 	assert.Contains(t, m.errorLog[0].Message, "fetch error: connection refused")
+}
+
+// TestSetErrorFromErr_SanitizesErrorLog guards the third of three siblings
+// writing m.errorLog: setErrorFromErr appended prefix+full raw, bypassing
+// the sanitizing boundary addLogEntry uses for the same overlay.
+func TestSetErrorFromErr_SanitizesErrorLog(t *testing.T) {
+	m := Model{width: 100}
+	m.setErrorFromErr("prefix: ", errors.New("boom \x9d52;c;SGVsbG8=\x9c tail"))
+	require.Len(t, m.errorLog, 1)
+	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
+	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
 }
 
 // --- setStatusMessage log capping ---
