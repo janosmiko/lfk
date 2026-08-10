@@ -56,6 +56,7 @@ users:
 func TestNewDemoClient_ListsPodsAndDeployments(t *testing.T) {
 	c, err := NewDemoClient()
 	require.NoError(t, err)
+	t.Cleanup(c.Shutdown)
 	require.True(t, c.IsDemo())
 
 	ctx := t.Context()
@@ -81,6 +82,7 @@ func TestNewDemoClient_NoKubeconfigNeeded(t *testing.T) {
 
 	c, err := NewDemoClient()
 	require.NoError(t, err)
+	t.Cleanup(c.Shutdown)
 	assert.NotNil(t, c)
 	assert.True(t, c.IsDemo())
 }
@@ -95,6 +97,7 @@ func TestNewDemoClient_NoKubeconfigNeeded(t *testing.T) {
 func TestNewDemoClient_DiscoverAPIResources_NoPanic(t *testing.T) {
 	c, err := NewDemoClient()
 	require.NoError(t, err)
+	t.Cleanup(c.Shutdown)
 
 	entries, err := c.DiscoverAPIResources(t.Context(), c.CurrentContext())
 	require.NoError(t, err)
@@ -110,6 +113,7 @@ func TestNewDemoClient_TickerLifetime(t *testing.T) {
 
 	c, err := NewDemoClient()
 	require.NoError(t, err)
+	t.Cleanup(c.Shutdown) // idempotent; covers a require failing before the explicit Shutdown below
 	require.NotNil(t, c.demoTicker, "NewDemoClient must start a demo ticker")
 
 	require.Eventually(t, func() bool {
