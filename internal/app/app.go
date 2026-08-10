@@ -79,10 +79,10 @@ type Model struct {
 	// the cursor when switching from the Object Explorer to the YAML viewer.
 	yamlPendingPath []string
 
-	// explainReturnMode is the mode the API Explorer returns to on q/esc.
-	// Defaults to modeExplorer; set to modeYAML or modeObjectExplorer when the
-	// Explorer is opened from those views (I key) so closing returns there.
-	explainReturnMode viewMode
+	// explainReturnMode is the mode the API Explorer returns to on q/esc. Defaults
+	// to modeExplorer; modeYAML or modeObjectExplorer when opened there (I key).
+	explainReturnMode   viewMode
+	explainSessionState // embedded - cancellation scope for the explain calls; see update_explain.go.
 
 	// explainPendingField, when set, is the field name the API Explorer should
 	// place its cursor on once the level finishes loading. Used to land on a
