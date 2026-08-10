@@ -15,7 +15,10 @@ import (
 //
 // The verbs mirror what the action actually sends: Scale calls UpdateScale
 // (update on the scale subresource), Restart and Rollback patch the object,
-// Edit runs kubectl edit, which patches.
+// Edit runs kubectl edit, which patches. Scale reads the scale subresource
+// before it writes, but only the write is asked about: a role holding update
+// without get is rare, and asking for both could hide an action the user can
+// in fact run.
 var actionQueries = map[string]map[string]k8s.PermissionQuery{
 	"Pod": mergeQueries(podRuntimeQueries(), map[string]k8s.PermissionQuery{
 		"Delete":       {Resource: "pods", Verb: "delete"},
