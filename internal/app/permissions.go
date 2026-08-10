@@ -1,38 +1,84 @@
 package app
 
 import (
+	"maps"
 	"time"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 )
 
-// podActionQueries maps a Pod action label to the authorization question that
-// decides it. Only actions whose verb is unambiguous are listed: an action
-// that is absent is always offered, which keeps the gate fail-open by
-// construction.
+// actionQueries maps a resource kind, then an action label, to the
+// authorization question that decides it. Only actions whose verb is
+// unambiguous are listed: a label that is absent is always offered, which
+// keeps the gate fail-open by construction. A kind that is absent keeps the
+// read-only gate alone.
 //
-// Scoped to Pods. Other kinds keep the read-only gate alone until their verb
-// map is written.
-var podActionQueries = map[string]k8s.PermissionQuery{
-	"Delete":       {Resource: "pods", Verb: "delete"},
-	"Force Delete": {Resource: "pods", Verb: "delete"},
-	"Edit":         {Resource: "pods", Verb: "patch"},
-	"Exec":         {Resource: "pods", Subresource: "exec", Verb: "create"},
-	"Attach":       {Resource: "pods", Subresource: "attach", Verb: "create"},
-	"Debug":        {Resource: "pods", Subresource: "ephemeralcontainers", Verb: "patch"},
-	"Debug Pod":    {Resource: "pods", Verb: "create"},
-	"Port Forward": {Resource: "pods", Subresource: "portforward", Verb: "create"},
-	"Tail Logs":    {Resource: "pods", Subresource: "log", Verb: "get"},
-	"Logs":         {Resource: "pods", Subresource: "log", Verb: "get"},
-	"Log Top":      {Resource: "pods", Subresource: "log", Verb: "get"},
+// The verbs mirror what the action actually sends: Scale calls UpdateScale
+// (update on the scale subresource), Restart and Rollback patch the object,
+// Edit runs kubectl edit, which patches.
+var actionQueries = map[string]map[string]k8s.PermissionQuery{
+	"Pod": mergeQueries(podRuntimeQueries(), map[string]k8s.PermissionQuery{
+		"Delete":       {Resource: "pods", Verb: "delete"},
+		"Force Delete": {Resource: "pods", Verb: "delete"},
+		"Edit":         {Resource: "pods", Verb: "patch"},
+		"Debug":        {Resource: "pods", Subresource: "ephemeralcontainers", Verb: "patch"},
+	}),
+	"Deployment": mergeQueries(workloadQueries("deployments"), podRuntimeQueries(), map[string]k8s.PermissionQuery{
+		"Scale":    {Group: "apps", Resource: "deployments", Subresource: "scale", Verb: "update"},
+		"Rollback": {Group: "apps", Resource: "deployments", Verb: "patch"},
+	}),
+	"StatefulSet": mergeQueries(workloadQueries("statefulsets"), podRuntimeQueries(), map[string]k8s.PermissionQuery{
+		"Scale": {Group: "apps", Resource: "statefulsets", Subresource: "scale", Verb: "update"},
+	}),
+	"DaemonSet": mergeQueries(workloadQueries("daemonsets"), podRuntimeQueries()),
+	// The ReplicaSet menu offers no pod-level action except Debug Pod, so it
+	// asks nothing about logs, exec or port-forward.
+	"ReplicaSet": mergeQueries(workloadQueries("replicasets"), map[string]k8s.PermissionQuery{
+		"Scale":     {Group: "apps", Resource: "replicasets", Subresource: "scale", Verb: "update"},
+		"Debug Pod": {Resource: "pods", Verb: "create"},
+	}),
 }
 
-// permScopeKey scopes a cached verdict to the cluster and namespace it was
-// asked about. Two tabs on different contexts never read each other's answer
-// because the context is part of the key.
+// podRuntimeQueries are the actions that reach the pods themselves. A
+// workload menu offers them too, and there they still ask about pods: lfk
+// resolves the workload to a pod and acts on that.
+func podRuntimeQueries() map[string]k8s.PermissionQuery {
+	return map[string]k8s.PermissionQuery{
+		"Tail Logs":    {Resource: "pods", Subresource: "log", Verb: "get"},
+		"Logs":         {Resource: "pods", Subresource: "log", Verb: "get"},
+		"Log Top":      {Resource: "pods", Subresource: "log", Verb: "get"},
+		"Exec":         {Resource: "pods", Subresource: "exec", Verb: "create"},
+		"Attach":       {Resource: "pods", Subresource: "attach", Verb: "create"},
+		"Port Forward": {Resource: "pods", Subresource: "portforward", Verb: "create"},
+		"Debug Pod":    {Resource: "pods", Verb: "create"},
+	}
+}
+
+// workloadQueries builds the three verbs every apps/v1 workload menu carries.
+func workloadQueries(resource string) map[string]k8s.PermissionQuery {
+	return map[string]k8s.PermissionQuery{
+		"Delete":  {Group: "apps", Resource: resource, Verb: "delete"},
+		"Edit":    {Group: "apps", Resource: resource, Verb: "patch"},
+		"Restart": {Group: "apps", Resource: resource, Verb: "patch"},
+	}
+}
+
+// mergeQueries folds the maps into the first one, later entries winning.
+func mergeQueries(into map[string]k8s.PermissionQuery, rest ...map[string]k8s.PermissionQuery) map[string]k8s.PermissionQuery {
+	for _, m := range rest {
+		maps.Copy(into, m)
+	}
+	return into
+}
+
+// permScopeKey scopes a cached verdict to the cluster, namespace and kind it
+// was asked about. Two tabs on different contexts never read each other's
+// answer because the context is part of the key; the kind is part of it
+// because each kind asks a different set of questions.
 type permScopeKey struct {
 	context   string
 	namespace string
+	kind      string
 }
 
 // permissionState caches the bulk review per scope for the life of the
@@ -109,11 +155,15 @@ func (s *permissionState) begin(key permScopeKey) bool {
 	return true
 }
 
-// podPermissionQueries is the set the bulk pass asks for, derived from the
+// permissionQueriesFor is the set the bulk pass asks for, derived from the
 // action map so a new action entry cannot be forgotten here.
-func podPermissionQueries() []k8s.PermissionQuery {
-	queries := make([]k8s.PermissionQuery, 0, len(podActionQueries))
-	for _, q := range podActionQueries {
+func permissionQueriesFor(kind string) []k8s.PermissionQuery {
+	byLabel, ok := actionQueries[kind]
+	if !ok {
+		return nil
+	}
+	queries := make([]k8s.PermissionQuery, 0, len(byLabel))
+	for _, q := range byLabel {
 		queries = append(queries, q)
 	}
 	return queries
@@ -123,18 +173,15 @@ func podPermissionQueries() []k8s.PermissionQuery {
 // would be refused.
 //
 // It answers false whenever the answer is not known: no review yet, the
-// review failed, an action with no mapped verb, or a kind outside the Pod
-// scope. A hidden action that would have worked is worse than an action that
-// fails, and an aggregated or webhook authorizer can also overrule a denial.
+// review failed, an action with no mapped verb, or a kind with no verb map. A
+// hidden action that would have worked is worse than an action that fails,
+// and an aggregated or webhook authorizer can also overrule a denial.
 func (m Model) deniedByRBAC(kind, label string) bool {
-	if kind != "Pod" {
-		return false
-	}
-	query, ok := podActionQueries[label]
+	query, ok := actionQueries[kind][label]
 	if !ok {
 		return false
 	}
-	scope, ok := m.permScopeFor(m.actionCtx.context, m.actionCtx.namespace)
+	scope, ok := m.permScopeFor(m.actionCtx.context, m.actionCtx.namespace, kind)
 	if !ok {
 		return false
 	}
@@ -150,13 +197,17 @@ func (m Model) deniedByRBAC(kind, label string) bool {
 }
 
 // permScopeFor builds the cache key for a target, refusing scopes the review
-// cannot speak for: the union sentinel spans several clusters, and an
-// all-namespaces list has no single namespace to review.
-func (m Model) permScopeFor(contextName, namespace string) (permScopeKey, bool) {
+// cannot speak for: the union sentinel spans several clusters, an
+// all-namespaces list has no single namespace to review, and a kind with no
+// verb map has nothing to ask.
+func (m Model) permScopeFor(contextName, namespace, kind string) (permScopeKey, bool) {
 	if contextName == "" || contextName == UnionContextSentinel || namespace == "" {
 		return permScopeKey{}, false
 	}
-	return permScopeKey{context: contextName, namespace: namespace}, true
+	if _, ok := actionQueries[kind]; !ok {
+		return permScopeKey{}, false
+	}
+	return permScopeKey{context: contextName, namespace: namespace, kind: kind}, true
 }
 
 // actionBlockedReason is the single gate in front of every action entry.

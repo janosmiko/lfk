@@ -20,10 +20,13 @@ func podPermModel(t *testing.T, allowed map[string]bool) Model {
 	m.cursorMemory = make(map[string]int)
 	m.actionCtx = actionContext{kind: "Pod", name: "p", namespace: "ns", context: "kind-ctx"}
 	if allowed != nil {
-		m.perms.record(permScopeKey{context: "kind-ctx", namespace: "ns"}, allowed)
+		m.perms.record(podScope, allowed)
 	}
 	return m
 }
+
+// podScope is the cache key podPermModel files its verdicts under.
+var podScope = permScopeKey{context: "kind-ctx", namespace: "ns", kind: "Pod"}
 
 func TestDeniedByRBAC_HidesRefusedAction(t *testing.T) {
 	m := podPermModel(t, map[string]bool{"delete:pods": false})
@@ -58,8 +61,8 @@ func TestDeniedByRBAC_FailsOpen(t *testing.T) {
 			allowed: map[string]bool{"delete:pods": false},
 		},
 		{
-			name:    "kind outside the Pod scope",
-			kind:    "Deployment",
+			name:    "kind with no verb map",
+			kind:    "ConfigMap",
 			label:   "Delete",
 			allowed: map[string]bool{"delete:pods": false},
 		},
@@ -159,7 +162,7 @@ func TestOpenResourceActionMenu_DropsRefusedEntries(t *testing.T) {
 
 func TestPermissionState_BeginRunsOnePassPerScope(t *testing.T) {
 	s := newPermissionState()
-	key := permScopeKey{context: "kind-ctx", namespace: "ns"}
+	key := podScope
 
 	assert.True(t, s.begin(key), "first entry starts the pass")
 	assert.False(t, s.begin(key), "a pass already in flight is not repeated")
@@ -180,7 +183,7 @@ func TestPermissionState_RetriesAPassTheSchedulerDropped(t *testing.T) {
 	t.Cleanup(func() { permNow = time.Now })
 
 	s := newPermissionState()
-	key := permScopeKey{context: "kind-ctx", namespace: "ns"}
+	key := podScope
 	require.True(t, s.begin(key))
 	require.False(t, s.begin(key), "a pass started a moment ago is not repeated")
 
@@ -190,7 +193,7 @@ func TestPermissionState_RetriesAPassTheSchedulerDropped(t *testing.T) {
 
 func TestPermissionState_FailReleasesTheScope(t *testing.T) {
 	s := newPermissionState()
-	key := permScopeKey{context: "kind-ctx", namespace: "ns"}
+	key := podScope
 	require.True(t, s.begin(key))
 
 	s.fail(key)
@@ -198,7 +201,7 @@ func TestPermissionState_FailReleasesTheScope(t *testing.T) {
 	assert.True(t, s.begin(key), "the next visit may retry")
 }
 
-func TestLoadPodPermissions_SkipsListsWithNoSingleScope(t *testing.T) {
+func TestLoadActionPermissions_SkipsListsWithNoSingleScope(t *testing.T) {
 	tests := []struct {
 		name   string
 		mutate func(*Model)
@@ -225,7 +228,7 @@ func TestLoadPodPermissions_SkipsListsWithNoSingleScope(t *testing.T) {
 			m.nav.Context = "kind-ctx"
 			tc.mutate(&m)
 
-			assert.Nil(t, m.loadPodPermissions(), "no pass for a list with no single scope")
+			assert.Nil(t, m.loadActionPermissions("Pod"), "no pass for a list with no single scope")
 			assert.Empty(t, m.perms.inflight, "and no scope is marked as under review")
 		})
 	}
@@ -249,12 +252,12 @@ func TestUpdateContextsLoaded_PlainListKeepsVerdicts(t *testing.T) {
 	assert.True(t, result.deniedByRBAC("Pod", "Delete"))
 }
 
-func TestUpdatePodPermissions_StoresVerdicts(t *testing.T) {
+func TestUpdateActionPermissions_StoresVerdicts(t *testing.T) {
 	m := podPermModel(t, nil)
-	key := permScopeKey{context: "kind-ctx", namespace: "ns"}
+	key := podScope
 	require.True(t, m.perms.begin(key))
 
-	ret := m.updatePodPermissions(podPermissionsMsg{
+	ret := m.updateActionPermissions(actionPermissionsMsg{
 		scope:   key,
 		allowed: map[string]bool{"delete:pods": false},
 	})
@@ -262,33 +265,87 @@ func TestUpdatePodPermissions_StoresVerdicts(t *testing.T) {
 	assert.True(t, result.deniedByRBAC("Pod", "Delete"))
 }
 
-func TestUpdatePodPermissions_ErrorFailsOpenSilently(t *testing.T) {
+func TestUpdateActionPermissions_ErrorFailsOpenSilently(t *testing.T) {
 	m := podPermModel(t, nil)
-	key := permScopeKey{context: "kind-ctx", namespace: "ns"}
+	key := podScope
 	require.True(t, m.perms.begin(key))
 
-	ret := m.updatePodPermissions(podPermissionsMsg{scope: key, err: assert.AnError})
+	ret := m.updateActionPermissions(actionPermissionsMsg{scope: key, err: assert.AnError})
 	result := ret.(Model)
 	assert.False(t, result.deniedByRBAC("Pod", "Delete"))
 	assert.Empty(t, result.statusMessage, "a review the user did not ask for stays quiet")
 }
 
-func TestPodActionQueries_LabelsExistInThePodMenu(t *testing.T) {
-	menu := make(map[string]bool)
-	for _, a := range model.ActionsForKind("Pod") {
-		menu[a.Label] = true
-	}
-	for label := range podActionQueries {
-		assert.True(t, menu[label], "mapped label %q is not in the Pod action menu", label)
+func TestActionQueries_LabelsExistInTheirMenu(t *testing.T) {
+	for kind, byLabel := range actionQueries {
+		t.Run(kind, func(t *testing.T) {
+			menu := make(map[string]bool)
+			for _, a := range model.ActionsForKind(kind) {
+				menu[a.Label] = true
+			}
+			for label := range byLabel {
+				assert.True(t, menu[label], "mapped label %q is not in the %s action menu", label, kind)
+			}
+		})
 	}
 }
 
-func TestPodPermissionQueries_CoverEveryMappedAction(t *testing.T) {
-	keys := make(map[string]bool)
-	for _, q := range podPermissionQueries() {
-		keys[q.Key()] = true
+func TestPermissionQueriesFor_CoverEveryMappedAction(t *testing.T) {
+	for kind, byLabel := range actionQueries {
+		t.Run(kind, func(t *testing.T) {
+			keys := make(map[string]bool)
+			for _, q := range permissionQueriesFor(kind) {
+				keys[q.Key()] = true
+			}
+			for label, q := range byLabel {
+				assert.True(t, keys[q.Key()], "no review is asked for %q", label)
+			}
+		})
 	}
-	for label, q := range podActionQueries {
-		assert.True(t, keys[q.Key()], "no review is asked for %q", label)
+}
+
+func TestPermissionQueriesFor_UnmappedKindAsksNothing(t *testing.T) {
+	assert.Nil(t, permissionQueriesFor("ConfigMap"))
+}
+
+func TestDeniedByRBAC_WorkloadVerbs(t *testing.T) {
+	tests := []struct {
+		kind    string
+		label   string
+		allowed map[string]bool
+	}{
+		{kind: "Deployment", label: "Scale", allowed: map[string]bool{"update:deployments/scale": false}},
+		{kind: "Deployment", label: "Restart", allowed: map[string]bool{"patch:deployments": false}},
+		{kind: "Deployment", label: "Rollback", allowed: map[string]bool{"patch:deployments": false}},
+		{kind: "Deployment", label: "Delete", allowed: map[string]bool{"delete:deployments": false}},
+		{kind: "StatefulSet", label: "Scale", allowed: map[string]bool{"update:statefulsets/scale": false}},
+		{kind: "DaemonSet", label: "Restart", allowed: map[string]bool{"patch:daemonsets": false}},
+		{kind: "ReplicaSet", label: "Delete", allowed: map[string]bool{"delete:replicasets": false}},
+		{kind: "Deployment", label: "Exec", allowed: map[string]bool{"create:pods/exec": false}},
 	}
+	for _, tc := range tests {
+		t.Run(tc.kind+"/"+tc.label, func(t *testing.T) {
+			m := podPermModel(t, nil)
+			m.actionCtx.kind = tc.kind
+			m.perms.record(permScopeKey{context: "kind-ctx", namespace: "ns", kind: tc.kind}, tc.allowed)
+			assert.True(t, m.deniedByRBAC(tc.kind, tc.label))
+		})
+	}
+}
+
+func TestDeniedByRBAC_VerdictsDoNotCrossKinds(t *testing.T) {
+	// The Pod pass and the Deployment pass ask different questions, so a
+	// Pod verdict must not answer for a Deployment menu.
+	m := podPermModel(t, map[string]bool{"delete:pods": false})
+	m.actionCtx.kind = "Deployment"
+	assert.False(t, m.deniedByRBAC("Deployment", "Delete"))
+}
+
+func TestLoadActionPermissions_UnmappedKindMakesNoCall(t *testing.T) {
+	m := podPermModel(t, nil)
+	m.namespace = "ns"
+	m.nav.Context = "kind-ctx"
+
+	assert.Nil(t, m.loadActionPermissions("ConfigMap"))
+	assert.Empty(t, m.perms.inflight)
 }

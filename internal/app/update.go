@@ -119,8 +119,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case resourcesLoadedMsg:
 		mdl, cmd := m.updateResourcesLoaded(msg)
 		return mdl, cmd, true
-	case podPermissionsMsg:
-		return m.updatePodPermissions(msg), nil, true
+	case actionPermissionsMsg:
+		return m.updateActionPermissions(msg), nil, true
 	case ownedLoadedMsg:
 		mdl, cmd := m.updateOwnedLoaded(msg)
 		return mdl, cmd, true

@@ -512,12 +512,14 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	}
 	switch kind {
 	case "Pod":
-		// Review the Pod verbs for this namespace once, off the key path, so
-		// the action menu can drop entries the cluster would refuse.
-		cmds = append(cmds, m.loadPodMetricsForList(), m.loadPodPermissions())
+		cmds = append(cmds, m.loadPodMetricsForList())
 	case "Node":
 		cmds = append(cmds, m.loadNodeMetricsForList(), m.loadNodeUptimeForList())
 	}
+	// Review this kind's verbs for the namespace once, off the key path, so
+	// the action menu can drop entries the cluster would refuse. Answers nil
+	// for a kind with no verb map.
+	cmds = append(cmds, m.loadActionPermissions(kind))
 	m.suppressBgtasks = savedSuppress
 	m.syncObjectExplorerLive()
 	return m, tea.Batch(cmds...)
