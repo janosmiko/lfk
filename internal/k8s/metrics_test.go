@@ -46,6 +46,32 @@ func TestSafeProxyGetRaw_LogsRecoveredPanicWithStack(t *testing.T) {
 	assert.Contains(t, logged, "goroutine", "expected a stack trace to be logged alongside the recovered panic")
 }
 
+// TestSafeProxyGetRaw_RedactsRecoveredPanicValue guards against a client-go
+// panic value carrying a bearer token or similar secret straight into the
+// log and the returned error -- the panic value comes from a live cluster
+// call and is not trusted content, same as any other log/error source.
+func TestSafeProxyGetRaw_RedactsRecoveredPanicValue(t *testing.T) {
+	buf := &bytes.Buffer{}
+	orig := logger.Logger
+	logger.Logger = slog.New(slog.NewTextHandler(buf, nil))
+	defer func() { logger.Logger = orig }()
+
+	const secret = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+	cs := k8sfake.NewClientset()
+	cs.PrependProxyReactor("services", func(_ k8stesting.Action) (bool, restclient.ResponseWrapper, error) {
+		panic(secret)
+	})
+
+	_, err := safeProxyGetRaw(t.Context(), cs, "monitoring", "prometheus", "9090", "/api/v1/query", nil)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), secret, "returned error must not carry the raw panic value")
+	assert.Contains(t, err.Error(), "[REDACTED", "returned error should show the redacted panic value")
+
+	logged := buf.String()
+	assert.NotContains(t, logged, secret, "log line must not carry the raw panic value")
+	assert.Contains(t, logged, "[REDACTED", "log line should show the redacted panic value")
+}
+
 // --- parsePodMetrics ---
 
 func TestParsePodMetrics(t *testing.T) {

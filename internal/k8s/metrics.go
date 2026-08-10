@@ -55,10 +55,11 @@ type promSvcEntry struct {
 func safeProxyGetRaw(ctx context.Context, cs kubernetes.Interface, ns, svc, port, path string, params map[string]string) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			redacted := logger.Redact(fmt.Sprintf("%v", r))
 			logger.Error("prometheus/alertmanager proxy request panicked",
 				"namespace", ns, "service", svc, "port", port, "path", path,
-				"panic", r, "stack", string(debug.Stack()))
-			err = fmt.Errorf("prometheus/alertmanager proxy request panicked: %v", r)
+				"panic", redacted, "stack", string(debug.Stack()))
+			err = fmt.Errorf("prometheus/alertmanager proxy request panicked: %s", redacted)
 		}
 	}()
 	result := cs.CoreV1().Services(ns).ProxyGet("http", svc, port, path, params)
