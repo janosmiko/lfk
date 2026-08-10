@@ -249,10 +249,18 @@ func (m *Model) hasStatusMessage() bool {
 }
 
 // addLogEntry appends an entry to the in-app error log at the given level.
+//
+// msg is sanitized here rather than at each of its ~80 call sites. Most
+// callers pass lfk-constructed strings (echoed kubectl commands), but a few
+// - command-bar output, err.Error() on a port-forward failure - carry
+// attacker-influenced content, and every entry renders through WrapEventLine
+// in the error-log overlay with no sanitizing of its own. SanitizeTerminalText
+// because an ErrorLogEntry.Message is a single log line, matching how
+// buildEventTimelineLines treats other single-line table/list values.
 func (m *Model) addLogEntry(level, msg string) {
 	m.errorLog = append(m.errorLog, ui.ErrorLogEntry{
 		Time:    time.Now(),
-		Message: msg,
+		Message: ui.SanitizeTerminalText(msg),
 		Level:   level,
 	})
 	if len(m.errorLog) > 500 {

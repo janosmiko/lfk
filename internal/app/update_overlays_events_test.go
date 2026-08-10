@@ -67,6 +67,51 @@ func TestBuildEventTimelineLinesSanitizesControlBytes(t *testing.T) {
 	assert.NotContains(t, lines[0], "\x9c")
 }
 
+// TestBuildEventTimelineLinesSanitizesType guards a second missed field on
+// the same line: Reason, Message, and Source were sanitized, but Type was
+// printed raw in the same fmt.Sprintf call. Type is just as attacker-
+// influenced - an unconstrained string on the Event API, settable by any
+// principal with create-events permission in the namespace.
+func TestBuildEventTimelineLinesSanitizesType(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "\x9d52;c;SGVsbG8=\x9c",
+			Reason:  "Scheduled",
+			Message: "ok",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+	assert.NotContains(t, lines[0], "\x9d")
+	assert.NotContains(t, lines[0], "\x9c")
+
+	m2 := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "\x9b31m",
+			Reason:  "Scheduled",
+			Message: "ok",
+		}},
+	}
+	lines2 := m2.buildEventTimelineLines()
+	require.Len(t, lines2, 1)
+	assert.NotContains(t, lines2[0], "\x9b")
+}
+
+// TestBuildEventTimelineLinesOrdinaryTypeUnaffected guards against fixing
+// the injection issue by mangling legitimate event types.
+func TestBuildEventTimelineLinesOrdinaryTypeUnaffected(t *testing.T) {
+	m := Model{
+		eventTimelineData: []k8s.EventInfo{{
+			Type:    "Warning",
+			Reason:  "Scheduled",
+			Message: "ok",
+		}},
+	}
+	lines := m.buildEventTimelineLines()
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "Warning")
+}
+
 func TestEventContentHeight(t *testing.T) {
 	m := newEventModel(10)
 

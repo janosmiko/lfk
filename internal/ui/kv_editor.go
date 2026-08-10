@@ -382,7 +382,13 @@ func stylePerLine(body string, w int, style lipgloss.Style) string {
 // Used by every K/V editor renderer for both the key and value cells:
 // passing raw multi-line content to lipgloss/table makes the entire
 // editor window resize to fit the tallest cell, which the user sees
-// as the editor "growing past the screen" instead of truncating.
+// as the editor "growing past the screen" instead of truncating. Every
+// caller renders a Secret, ConfigMap, or Label value straight from the
+// cluster - the highest-value case being a revealed Secret, which is
+// exactly when a user is looking at attacker-supplied bytes - so the
+// result also passes through SanitizeTerminalText to drop ESC/C1
+// control sequences (OSC-52 clipboard writes, CSI SGR/cursor moves)
+// and bidi overrides before they ever reach the terminal.
 func SingleLineCell(s string, maxW int) string {
 	if s == "" || maxW <= 0 {
 		return Truncate(s, maxW)
@@ -395,7 +401,7 @@ func SingleLineCell(s string, maxW int) string {
 		"\r", " ↵ ",
 		"\t", "    ",
 	).Replace(s)
-	return Truncate(flat, maxW)
+	return Truncate(SanitizeTerminalText(flat), maxW)
 }
 
 // FilterKVKeys narrows `keys` to entries that contain `query` as a

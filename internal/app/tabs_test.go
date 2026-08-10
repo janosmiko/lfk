@@ -693,6 +693,43 @@ func TestAddLogEntry(t *testing.T) {
 	assert.Len(t, m.errorLog, 500)
 }
 
+// TestAddLogEntry_SanitizesTerminalEscapes guards the missing sink found in
+// review: command-bar output and err.Error() reach addLogEntry unsanitized
+// and are rendered raw by WrapEventLine in the error-log overlay, even
+// though the same values are sanitized separately before landing in the
+// describe view. Fixing this once inside addLogEntry covers every one of
+// its ~80 non-test call sites instead of patching each one.
+func TestAddLogEntry_SanitizesTerminalEscapes(t *testing.T) {
+	m := Model{}
+
+	m.addLogEntry("ERR", "boom \x9d52;c;SGVsbG8=\x9c tail")
+	require.Len(t, m.errorLog, 1)
+	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
+	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
+
+	m.addLogEntry("ERR", "boom \x9b31m tail")
+	require.Len(t, m.errorLog, 2)
+	assert.NotContains(t, m.errorLog[1].Message, "\x9b")
+}
+
+// TestAddLogEntry_OrdinaryContentUnaffected guards against fixing the
+// injection issue by mangling legitimate log entries, including non-ASCII
+// content.
+func TestAddLogEntry_OrdinaryContentUnaffected(t *testing.T) {
+	m := Model{}
+	cases := []string{
+		"$ kubectl get pods -n default",
+		"café RÉSUMÉ déployé",
+		"日本語のログメッセージ",
+	}
+	for _, s := range cases {
+		m.addLogEntry("DBG", s)
+	}
+	for i, s := range cases {
+		assert.Equal(t, s, m.errorLog[i].Message)
+	}
+}
+
 // --- tabLabels ---
 
 func TestTabLabels(t *testing.T) {
