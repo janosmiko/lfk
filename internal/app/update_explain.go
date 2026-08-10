@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -63,6 +64,7 @@ func (m Model) openExplainBrowser() (tea.Model, tea.Cmd) {
 	}
 
 	m.loading = true
+	m.beginExplainSession()
 	m.explainReturnMode = modeExplorer
 	m.explainPendingField = ""
 	m.explainAncestors = nil
@@ -90,6 +92,7 @@ func (m Model) openExplainAtObjectPath(objPath []string, returnMode viewMode) (t
 	}
 	parentPath, field := explainTarget(objPath)
 	m.loading = true
+	m.beginExplainSession()
 	m.explainReturnMode = returnMode
 	m.explainPendingField = field
 	m.explainAncestors = nil
@@ -97,6 +100,53 @@ func (m Model) openExplainAtObjectPath(objPath []string, returnMode viewMode) (t
 	m.explainAPIVersion = apiVersion
 	m.setStatusMessage("Loading API Explorer...", false)
 	return m, m.execKubectlExplain(resource, apiVersion, parentPath)
+}
+
+// explainSessionState is the cancellation scope shared by every kubectl
+// explain of one API Explorer visit. It is set when the Explorer opens and
+// cancelled when it closes, so leaving the view stops the subprocesses instead
+// of leaving them to their deadlines. Deliberately outside the per-tab
+// snapshot: the fetches belong to the process, not to the tab that started
+// them.
+type explainSessionState struct {
+	explainCtx    context.Context
+	explainCancel context.CancelFunc
+}
+
+// beginExplainSession starts a fresh cancellation scope for the API Explorer.
+// Every explain fetch of this session hangs off it, so closing the view ends
+// them all. Any earlier session is cancelled first, which also releases its
+// child of m.reqCtx.
+func (m *Model) beginExplainSession() {
+	m.cancelExplainSession()
+	base := m.reqCtx
+	if base == nil {
+		base = context.Background()
+	}
+	m.explainCtx, m.explainCancel = context.WithCancel(base)
+}
+
+// cancelExplainSession stops the explain fetches still running, if any.
+func (m *Model) cancelExplainSession() {
+	if m.explainCancel != nil {
+		m.explainCancel()
+	}
+	m.explainCtx, m.explainCancel = nil, nil
+}
+
+// explainRequestCtx is the parent context for one explain fetch. It falls back
+// to m.reqCtx when no session is open, so a fetch is never left unbounded. A
+// session already cancelled falls back too: cancelAndReset kills the session as
+// a child of the old m.reqCtx, and every later fetch of that visit would fail
+// on the spot if it kept using it.
+func (m Model) explainRequestCtx() context.Context {
+	if m.explainCtx != nil && m.explainCtx.Err() == nil {
+		return m.explainCtx
+	}
+	if m.reqCtx != nil {
+		return m.reqCtx
+	}
+	return context.Background()
 }
 
 // explainTarget converts an object path into the kubectl-explain schema path of
@@ -192,6 +242,7 @@ func (m Model) explainGoBack() (tea.Model, tea.Cmd) {
 // Explorer was opened from (the explorer by default; the YAML viewer or
 // Object Explorer when opened from there via the I key).
 func (m *Model) exitExplainView() {
+	m.cancelExplainSession()
 	m.mode = m.explainReturnMode
 	m.explainReturnMode = modeExplorer
 	m.explainAncestors = nil

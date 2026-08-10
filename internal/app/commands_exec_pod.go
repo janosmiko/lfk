@@ -396,6 +396,28 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	return runInteractiveShellExec(cmd, title, "Node shell", true)
 }
 
+// explainFetchTimeout bounds one kubectl explain call, so an unreachable
+// cluster or a credential plugin waiting on input cannot hold a scheduler
+// worker for the rest of the session.
+const explainFetchTimeout = 15 * time.Second
+
+// explainWaitDelay is how long to wait for the output pipes to close after the
+// process is killed. Killing kubectl does not close a pipe a grandchild still
+// holds (a credential plugin, say), and CombinedOutput reads to EOF, so
+// without this the worker stays blocked on a process already dead.
+const explainWaitDelay = 2 * time.Second
+
+// newExplainCmd builds one bounded kubectl explain. The context ends the
+// process when the user leaves the API Explorer; the deadline ends a cluster
+// that never answers.
+func newExplainCmd(ctx context.Context, kubectlPath, kubeconfigPaths string, args []string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
+	cmd.WaitDelay = explainWaitDelay
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+	logExecCmd("Running kubectl command", cmd)
+	return cmd
+}
+
 func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cmd {
 	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
@@ -420,17 +442,23 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		title = title + " > " + strings.ReplaceAll(fieldPath, ".", " > ")
 	}
 
+	reqCtx := m.explainRequestCtx()
+
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain: "+target, kctx, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
+		defer cancel()
+
 		args := []string{"explain", target, "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logExecCmd("Running kubectl command", cmd)
+		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			logger.Error("kubectl explain failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
+			// The output stays out of the log: on an auth failure it carries
+			// whatever the credential plugin printed. It still reaches the
+			// view, where the user asked for it.
+			logger.Error("kubectl explain failed", "target", target, "apiVersion", apiVersion, "error", cmdErr)
 			return explainLoadedMsg{
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
@@ -457,14 +485,17 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 	kctx := m.effectiveContext()
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
+	reqCtx := m.explainRequestCtx()
+
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
+		defer cancel()
+
 		args := []string{"explain", resource, "--recursive", "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logExecCmd("Running kubectl command", cmd)
+		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			return explainRecursiveMsg{
@@ -496,14 +527,17 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 		target = resource + "." + fieldPath
 	}
 
+	reqCtx := m.explainRequestCtx()
+
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain (tree): "+target, kctx, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
+		defer cancel()
+
 		args := []string{"explain", target, "--recursive", "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logExecCmd("Running kubectl command", cmd)
+		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			return explainTreeLoadedMsg{
@@ -546,14 +580,17 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 		target = resource + "." + parentPath
 	}
 
+	reqCtx := m.explainRequestCtx()
+
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain (descriptions): "+target, kctx, func() tea.Msg {
+		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
+		defer cancel()
+
 		args := []string{"explain", target, "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
-		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logExecCmd("Running kubectl command", cmd)
+		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		msg := ident
 		if cmdErr != nil {
