@@ -364,6 +364,60 @@ func TestSanitizeLogLine_RenderAnsiEnabled_PreservesMultibyte(t *testing.T) {
 	assert.Equal(t, input, sanitizeLogLine(input, true))
 }
 
+func TestSanitizeLogLine_C1RawByteFormNoLongerSurvives(t *testing.T) {
+	// Reviewer-reported 8-bit C1 sequences as raw single bytes in the
+	// C1 range (0x80-0x9F): an OSC-52 clipboard write and a CSI SGR.
+	// Terminals honouring 8-bit C1 (VTE, Linux console) act on these if
+	// they reach the screen unfiltered.
+	osc52 := "\x9d52;c;SGVsbG8=\x9c"
+	csi := "\x9b31m"
+
+	for _, renderAnsi := range []bool{false, true} {
+		outOSC := sanitizeLogLine(osc52, renderAnsi)
+		assert.NotContains(t, outOSC, "\x9d")
+		assert.NotContains(t, outOSC, "\x9c")
+
+		outCSI := sanitizeLogLine(csi, renderAnsi)
+		assert.NotContains(t, outCSI, "\x9b")
+	}
+}
+
+func TestSanitizeLogLine_C1UTF8EncodedFormNoLongerSurvives(t *testing.T) {
+	// Same two sequences, properly UTF-8 encoded (U+009D/U+009C/U+009B
+	// as their correct two-byte forms) rather than raw bytes.
+	osc52 := "52;c;SGVsbG8="
+	csi := "31m"
+
+	for _, renderAnsi := range []bool{false, true} {
+		outOSC := sanitizeLogLine(osc52, renderAnsi)
+		assert.NotContains(t, outOSC, "")
+		assert.NotContains(t, outOSC, "")
+
+		outCSI := sanitizeLogLine(csi, renderAnsi)
+		assert.NotContains(t, outCSI, "")
+	}
+}
+
+func TestSanitizeLogLine_NonASCIIRoundTrip(t *testing.T) {
+	// Guards against the byte-range trap: a naive c>=0x80 && c<=0x9F
+	// byte filter mangles UTF-8 continuation bytes of ordinary
+	// non-ASCII text. Several of these characters have a continuation
+	// byte that itself falls in 0x80-0x9F, so this exercises the exact
+	// case a byte-level filter gets wrong.
+	cases := []string{
+		"café RÉSUMÉ",         // accented Latin (É continuation byte 0x89)
+		"日本語のログ",              // CJK
+		"deploy succeeded 🎉", // emoji (continuation bytes include 0x8E)
+		"┌─status─┐",         // box drawing (continuation bytes 0x94/0x80)
+	}
+	for _, s := range cases {
+		t.Run(s, func(t *testing.T) {
+			assert.Equal(t, s, sanitizeLogLine(s, false))
+			assert.Equal(t, s, sanitizeLogLine(s, true))
+		})
+	}
+}
+
 // --- colorizePodPrefix ---
 
 func TestColorizePodPrefix_SanitizesTerminalEscapes(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -627,10 +628,13 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 }
 
 // sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
-// control range minus tab) with the Unicode replacement character and
-// expands tab characters to spaces using a logTabWidth-column tab stop.
-// Binary data from processes like MySQL handshakes contains bytes that
-// break terminal width calculations and corrupt the viewer layout.
+// control range minus tab, and the C1 range U+0080-U+009F) with the
+// Unicode replacement character and expands tab characters to spaces
+// using a logTabWidth-column tab stop. Binary data from processes like
+// MySQL handshakes contains bytes that break terminal width calculations
+// and corrupt the viewer layout; C1 controls (raw or UTF-8-encoded, e.g.
+// U+009B "CSI") let a log line hijack the terminal on emulators that
+// honour 8-bit C1 (VTE, Linux console).
 //
 // Tab expansion is required because lipgloss.Width treats '\t' as
 // zero-width while the terminal renders it as a jump to the next tab
@@ -649,13 +653,24 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 // viewer and are still replaced. A bare ESC with no valid CSI introducer
 // is replaced too; leaving it would cause terminals to wait for a
 // follow-up byte and mis-interpret subsequent output.
+//
+// C1 detection is decode-aware, not a raw byte-range check: a byte-level
+// test for 0x80-0x9F would also catch UTF-8 continuation bytes of
+// ordinary non-ASCII runes (many common accented Latin, CJK, emoji, and
+// box-drawing characters have a continuation byte in that range) and
+// mangle them. Every non-ASCII byte is instead decoded to its full rune;
+// only a rune that actually equals U+0080-U+009F is replaced, whether it
+// arrived as a raw invalid byte or a valid two-byte UTF-8 encoding (e.g.
+// 0xC2 0x9B for U+009B). Anything else - including genuinely invalid
+// UTF-8 outside the C1 range - copies through as before.
 func sanitizeLogLine(s string, renderAnsi bool) string {
-	// Fast path: no control bytes (incl. tabs that need expansion) means
-	// no work to do.
+	// Fast path: no control bytes, tabs needing expansion, or non-ASCII
+	// bytes means no work to do. Any byte >= 0x80 must go through the
+	// slow path because it might decode to a C1 control character.
 	needsSanitize := false
 	for i := range len(s) {
 		c := s[i]
-		if c < 32 || c == 127 {
+		if c < 32 || c == 127 || c >= 0x80 {
 			needsSanitize = true
 			break
 		}
@@ -687,26 +702,49 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 			i++
 			continue
 		}
-		if c >= 32 && c != 127 {
-			// Printable ASCII or UTF-8 leading/continuation byte.
-			// UTF-8 continuation bytes are all >= 0x80 so they land
-			// here on subsequent iterations and copy through intact.
-			// Column tracking treats every UTF-8 leading byte and
-			// every ASCII printable as one cell; an approximation
-			// that is fine for tab-stop alignment (CJK in log lines
-			// is rare and the worst case is a 1-cell off-stop nudge,
-			// not a width undercount).
-			b.WriteByte(c)
-			if c < 0x80 || c >= 0xC0 {
+		if c < 0x80 {
+			if c >= 32 && c != 127 {
+				b.WriteByte(c)
 				col++
+			} else {
+				// Control byte (< 32 and not tab, or DEL).
+				b.WriteRune('\ufffd')
 			}
 			i++
 			continue
 		}
-		// Control byte (< 32 and not tab, or DEL). Emit the
-		// replacement character and advance one byte.
-		b.WriteRune('\ufffd')
-		i++
+		// Non-ASCII byte: decode the full rune so a C1 control encoded
+		// as two valid UTF-8 bytes is judged by its decoded value, not
+		// by the raw continuation byte (see the C1 detection note
+		// above).
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case r == utf8.RuneError && size <= 1:
+			// Invalid UTF-8. A lone byte in the C1 range is still a
+			// control character regardless of encoding; anything else
+			// invalid passes through unchanged, matching legacy
+			// behaviour for non-UTF-8 binary payloads. Column tracking
+			// mirrors the old approximation: only a would-be leading
+			// byte (>= 0xC0) counts as one cell.
+			if c >= 0x80 && c <= 0x9f {
+				b.WriteRune('\ufffd')
+			} else {
+				b.WriteByte(c)
+				if c >= 0xC0 {
+					col++
+				}
+			}
+			i++
+		case r >= 0x80 && r <= 0x9f:
+			// Valid UTF-8 encoding of a C1 control character.
+			b.WriteRune('\ufffd')
+			i += size
+		default:
+			// Ordinary multi-byte rune: copy through untouched.
+			b.WriteString(s[i : i+size])
+			col++
+			i += size
+		}
 	}
 	return b.String()
 }
