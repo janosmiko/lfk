@@ -170,6 +170,11 @@ func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
 // Client.ApplyManifest and cleans it up, mirroring applyTemplateFile's
 // kubectl path without shelling out.
 func (m Model) applyTemplateFileDemo(tmpFile, ctx, ns string) tea.Cmd {
+	applyCtx := m.reqCtx
+	if applyCtx == nil {
+		applyCtx = context.Background()
+	}
+
 	return func() tea.Msg {
 		defer func() { _ = os.Remove(tmpFile) }()
 
@@ -177,7 +182,7 @@ func (m Model) applyTemplateFileDemo(tmpFile, ctx, ns string) tea.Cmd {
 		if err != nil {
 			return actionResultMsg{err: fmt.Errorf("reading manifest: %w", err)}
 		}
-		if err := m.client.ApplyManifest(context.Background(), ctx, ns, string(content)); err != nil {
+		if err := m.client.ApplyManifest(applyCtx, ctx, ns, string(content)); err != nil {
 			return actionResultMsg{err: fmt.Errorf("apply: %w", err)}
 		}
 		return actionResultMsg{
