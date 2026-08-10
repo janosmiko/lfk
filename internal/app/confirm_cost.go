@@ -39,12 +39,12 @@ type confirmCost struct {
 	loading bool
 }
 
-// confirmCost gathers what the open confirm box states from the model.
+// buildConfirmCost gathers what the open confirm box states from the model.
 //
 // cascades marks a delete whose policy applies; enforced marks an action a
 // budget can refuse, which is only ever a drain. A bulk selection has no single
 // kind, so the Scope row names the rows instead of a kind.
-func (m Model) confirmCost(cascades, enforced bool) confirmCost {
+func (m Model) buildConfirmCost(cascades, enforced bool) confirmCost {
 	kind := m.actionCtx.kind
 	if m.bulkMode && len(m.bulkItems) > 0 {
 		kind = ""

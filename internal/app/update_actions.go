@@ -282,18 +282,26 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 		}
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
+		// This box opens without passing through a close path, so the figures
+		// of the previous confirm are still in the model. Retire them, or the
+		// cost rows describe the wrong resource.
+		m.blast.reset()
+		m.deps.reset()
 		if actionLabel == "Force Delete" {
 			// Pod/Job: offer force delete.
 			m.confirmAction = sel.Name + " (FORCE)"
 			m.confirmTitle = "Confirm Force Delete"
 			m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
 			m.resetForceDeletePropagation()
-		} else {
-			// Other kinds: offer force finalize (remove finalizers).
-			m.confirmAction = sel.Name
-			m.confirmTitle = "Confirm Force Finalize"
-			m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
+			m.pendingAction = actionLabel
+			m.beginDependents()
+			return m, m.loadDependents()
 		}
+		// Other kinds: offer force finalize (remove finalizers). Removing a
+		// finalizer cascades to nothing, so this box needs no cost rows.
+		m.confirmAction = sel.Name
+		m.confirmTitle = "Confirm Force Finalize"
+		m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
 		m.pendingAction = actionLabel
 		return m, nil
 	}

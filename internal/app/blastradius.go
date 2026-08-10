@@ -27,11 +27,16 @@ type blastRadiusState struct {
 	pdbs []policyv1.PodDisruptionBudget
 }
 
+// reset clears the figures and retires the request they belong to. Bumping req
+// matters as much as clearing: a fetch started by the dialog being closed is
+// still running, and without a new number its answer lands on whatever dialog
+// the user opens next, describing a resource they are no longer looking at.
 func (s *blastRadiusState) reset() {
 	s.radius = nil
 	s.loading = false
 	s.pods = nil
 	s.pdbs = nil
+	s.req++
 }
 
 // scaleBlastRadius answers what scaling to target costs, from the pods already

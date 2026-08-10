@@ -18,9 +18,13 @@ type dependentsState struct {
 	req uint64
 }
 
+// reset clears the count and retires the walk it belongs to, so a walk started
+// by the dialog being closed cannot answer into the next one. See
+// blastRadiusState.reset, which carries the same guarantee.
 func (s *dependentsState) reset() {
 	s.count = nil
 	s.loading = false
+	s.req++
 }
 
 // uncountedSuffix declares the rows the walk left out, so a bulk total never

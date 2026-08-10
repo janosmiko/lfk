@@ -160,7 +160,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		target, _ := strconv.Atoi(m.scaleInput.Value)
 		// A scale-down has its pods removed by the controller, which does not
 		// use the eviction API, so no budget can refuse it.
-		scaleCost := m.confirmCost(false, false)
+		scaleCost := m.buildConfirmCost(false, false)
 		scaleCost.radius = m.blast.scaleBlastRadius(target)
 		notes := confirmCostNotes(scaleCost)
 		if len(notes) > 0 {

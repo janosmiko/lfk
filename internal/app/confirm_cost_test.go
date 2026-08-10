@@ -295,7 +295,7 @@ func TestConfirmCost_BulkSelectionHasNoSingleKind(t *testing.T) {
 	m.actionCtx.kind = "Deployment" // left over from the row the cursor sat on
 	m.confirmPropagation = model.DeletePropagationOrphan
 
-	if got := m.confirmCost(true, false).targetOnly(); got != "the selected rows only" {
+	if got := m.buildConfirmCost(true, false).targetOnly(); got != "the selected rows only" {
 		t.Errorf("targetOnly() = %q, want the selected rows only", got)
 	}
 }
@@ -305,10 +305,10 @@ func TestConfirmCost_HoldsUntilBothFetchesLand(t *testing.T) {
 	m.blast.loading = false
 	m.deps.loading = true
 
-	if !m.confirmCost(true, false).loading {
+	if !m.buildConfirmCost(true, false).loading {
 		t.Error("a cascading delete must wait for the owner walk")
 	}
-	if m.confirmCost(false, false).loading {
+	if m.buildConfirmCost(false, false).loading {
 		t.Error("a drain has no owner walk to wait for")
 	}
 }

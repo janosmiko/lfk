@@ -27,7 +27,7 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 	// it costs two extra rows when present. Width is settled before anything
 	// is fitted to it.
 	showsPolicy := m.deleteConfirmShowsPolicy()
-	notes := confirmCostNotes(m.confirmCost(showsPolicy, m.pendingAction == "Drain"))
+	notes := confirmCostNotes(m.buildConfirmCost(showsPolicy, m.pendingAction == "Drain"))
 	if len(notes) > 0 {
 		// The risk row carries a resource name, which does not fit the
 		// 50-column box a plain y/n question needs.
@@ -103,8 +103,12 @@ func (m Model) renderOverlayConfirmType() (string, int, int, bool) {
 	var notes []ui.ConfirmNote
 	if m.forceDeleteConfirmShowsPolicy() {
 		// Force delete never fetches a blast radius, so the box states the
-		// owner side alone. Cascading() because kubectl cannot express None.
-		cost := m.confirmCost(true, false)
+		// owner side alone. Cleared rather than trusted: whatever m.blast
+		// holds was fetched for some other dialog, and rendering it here would
+		// describe a resource the user is not looking at. Cascading() because
+		// kubectl cannot express None.
+		cost := m.buildConfirmCost(true, false)
+		cost.radius = nil
 		cost.policy = m.deletePropagation().Cascading()
 		notes = confirmCostNotes(cost)
 		if len(notes) > 0 {
