@@ -227,10 +227,13 @@ The dialog also states what the action costs, as two labelled rows:
 |---|---|
 | `Removes` | Pods removed, and ready replicas left where there is a workload |
 | `Budget` | Which PodDisruptionBudget covers them, and whether this exceeds it |
+| `Dependents` | What the selected cascade policy does to the owned objects |
 
 A budget the action would breach is shown in the warning color. Only a drain is refused by a budget, because only the eviction API honours one; a direct delete or a scale-down exceeds the budget without being stopped, and the wording says so. Deleting a node uses the pods on that node, like a drain. The scale overlay updates the rows as you type.
 
 Bulk delete shows one line for the whole selection, resolved from the rows themselves at one pod list per namespace. A row that owns no pods, a ConfigMap say, is reported as `N rows not counted`.
+
+The `Dependents` row walks `ownerReferences` down from the target, so a deep chain is counted in full: deleting a Deployment counts its ReplicaSets and their pods. `Tab` restates the same set under the new policy without closing the dialog — `also removed` under Background and Foreground, `stay in the cluster` under Orphan, `may stay (server decides)` under None. The row reads `counting...` until the walk returns, and is left out entirely for a kind whose children lfk cannot follow, rather than showing a zero it cannot stand behind. Countable owners are Deployment, StatefulSet, DaemonSet, ReplicaSet, ReplicationController, Job, CronJob, and Service. The walk asks the server only for the children the target's own selector matches, so counting one small workload in a namespace of ten thousand pods stays cheap. Bulk delete shows one total, at one list call per child kind per namespace.
 
 ### Force delete confirm dialog
 

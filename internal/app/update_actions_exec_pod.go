@@ -211,7 +211,8 @@ func (m Model) executeActionDelete() (tea.Model, tea.Cmd) {
 	m.overlay = overlayConfirm
 	m.pendingAction = "Delete"
 	m.beginBlastRadius()
-	return m, m.loadBlastRadius(false)
+	m.beginDependents()
+	return m, tea.Batch(m.loadBlastRadius(false), m.loadDependents())
 }
 
 // executeActionEvictReplicas handles the "Evict Replicas" action on a
@@ -399,7 +400,7 @@ func (m Model) executeActionSimpleLoading(verb string, cmdFn func() tea.Cmd) (te
 // menu. Mirrors directActionForceDelete and the bulk Force Delete path: opens
 // a typed-confirmation overlay (user must type DELETE + Enter) so a stray
 // x->X cannot nuke a pod without explicit acknowledgement (#89).
-func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) {
 	m.confirmAction = m.actionCtx.name + " (FORCE)"
 	m.confirmTitle = "Confirm Force Delete"
 	m.confirmQuestion = fmt.Sprintf("Force delete %s?", m.actionCtx.name)
@@ -407,7 +408,8 @@ func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) { //nolint:unpara
 	m.resetForceDeletePropagation()
 	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"
-	return m, nil
+	m.beginDependents()
+	return m, m.loadDependents()
 }
 
 // executeActionForceFinalize handles the "Force Finalize" action.

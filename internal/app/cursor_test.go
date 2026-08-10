@@ -995,7 +995,7 @@ func TestPush2DirectActionForceDeleteWithSel(t *testing.T) {
 	result, cmd := m.directActionForceDelete()
 	rm := result.(Model)
 	assert.Equal(t, overlayConfirmType, rm.overlay)
-	assert.Nil(t, cmd)
+	assertDependentsOnlyCmd(t, cmd)
 }
 
 func TestPush3HandleKeyVimBindings(t *testing.T) {

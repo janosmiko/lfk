@@ -26,6 +26,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		if m.pendingActionBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.blast.reset()
+			m.deps.reset()
 			label := m.pendingAction
 			m.pendingAction = ""
 			m.confirmAction = ""
@@ -40,6 +41,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		// The figures belong to the action being committed here; a later
 		// confirm must not open showing them.
 		m.blast.reset()
+		m.deps.reset()
 		action := m.pendingAction
 		m.pendingAction = ""
 		m.confirmAction = ""
@@ -118,6 +120,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		m.confirmQuestion = ""
 		m.pendingAction = ""
 		m.blast.reset()
+		m.deps.reset()
 		m.resetBulkAction()
 		if returnToTaints {
 			m.overlay = overlayTaintEditor
@@ -147,6 +150,8 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.
 		m.pendingAction = ""
 		m.confirmTypeInput.Clear()
 		m.resetBulkAction()
+		m.blast.reset()
+		m.deps.reset()
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -241,6 +246,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		m.scaleInput.Clear()
 		m.blast.reset()
+		m.deps.reset()
 		m.resetBulkAction()
 		return m, nil
 	case "enter":
@@ -250,6 +256,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.blast.reset()
+			m.deps.reset()
 			m.resetBulkAction()
 			return m, scheduleStatusClear()
 		}
@@ -260,6 +267,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.blast.reset()
+			m.deps.reset()
 			m.resetBulkAction()
 			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
 			return m, scheduleStatusClear()
@@ -268,6 +276,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.loading = true
 		m.scaleInput.Clear()
 		m.blast.reset()
+		m.deps.reset()
 
 		// Bulk mode.
 		if m.bulkMode && len(m.bulkItems) > 0 {
@@ -317,6 +326,7 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		m.overlay = overlayNone
 		m.scaleInput.Clear()
 		m.blast.reset()
+		m.deps.reset()
 		return m, nil
 	case "enter":
 		newSize := strings.TrimSpace(m.scaleInput.Value)
@@ -325,12 +335,14 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.blast.reset()
+			m.deps.reset()
 			return m, scheduleStatusClear()
 		}
 		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.blast.reset()
+			m.deps.reset()
 			m.setStatusMessage(readOnlyBlockedMessage("Resize PVC"), true)
 			return m, scheduleStatusClear()
 		}
@@ -339,6 +351,7 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		m.addLogEntry("DBG", fmt.Sprintf("Resizing PVC %s to %s in %s", m.actionCtx.name, newSize, m.actionNamespace()))
 		m.scaleInput.Clear()
 		m.blast.reset()
+		m.deps.reset()
 		return m, m.resizePVC(newSize)
 	case "backspace":
 		if len(m.scaleInput.Value) > 0 {

@@ -332,7 +332,8 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 	m.resetForceDeletePropagation()
 	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"
-	return m, nil
+	m.beginDependents()
+	return m, m.loadDependents()
 }
 
 func (m Model) directActionScale() (tea.Model, tea.Cmd) {
@@ -702,7 +703,8 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayConfirm
 		m.pendingAction = "Delete"
 		m.beginBlastRadius()
-		return m, m.loadBulkBlastRadius()
+		m.beginDependents()
+		return m, tea.Batch(m.loadBulkBlastRadius(), m.loadBulkDependents())
 	case "Force Delete":
 		m.confirmAction = fmt.Sprintf("%d resources (FORCE)%s", len(m.bulkItems), clustersSuffix)
 		m.confirmTitle = "Confirm Force Delete"
@@ -711,7 +713,8 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.resetForceDeletePropagation()
 		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Delete"
-		return m, nil
+		m.beginDependents()
+		return m, m.loadBulkDependents()
 	case "Scale":
 		m.scaleInput.Clear()
 		m.overlay = overlayScaleInput
