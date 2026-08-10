@@ -456,9 +456,8 @@ func (m *Model) saveCurrentTab() {
 // it returns a tea.Cmd that fetches the tab's data; otherwise it returns nil.
 func (m *Model) loadTab(idx int) tea.Cmd {
 	m.wheel.dead = true // switching/reloading a tab empties the wheel momentum queue (#524)
-	// The explain fetches in flight belong to the tab being left, and their
-	// replies carry no tab of their own. Stop the processes here too, not just
-	// on q/esc, or a tab switch leaves them running to their deadline.
+	// The explain fetches in flight belong to the tab being left. Stop them
+	// here too, or a tab switch leaves them running to their deadline.
 	m.cancelExplainSession()
 	t := m.tabs[idx]
 	needsLoad := t.needsLoad
@@ -532,6 +531,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 
 	// Restore per-tab view mode and log state.
 	m.mode = t.mode
+	// A tab restored with the API Explorer open needs its own session, or
+	// closing the view could not stop the fetches it starts next.
+	if m.mode == modeExplain {
+		m.beginExplainSession()
+	}
 	m.logView.rawLines = append([]string(nil), t.logLines...)
 	m.logView.rawSev = nil
 	m.logView.filterQuery = t.logFilterQuery

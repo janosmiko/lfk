@@ -85,18 +85,64 @@ func TestExplainFetchesStopWhenTheViewCloses(t *testing.T) {
 // must not reach the log; the target and the exit status are what identify the
 // failure.
 func TestExplainFailureLogsNoCommandOutput(t *testing.T) {
-	fakeKubectl(t, `echo "token=s3cret-from-the-credential-plugin" >&2
+	cases := []struct {
+		name   string
+		run    func(m Model) tea.Cmd
+		target string
+	}{
+		{"explain", func(m Model) tea.Cmd { return m.execKubectlExplain("pods", "v1", "spec") }, "pods.spec"},
+		{"recursive", func(m Model) tea.Cmd { return m.execKubectlExplainRecursive("pods", "v1", "") }, "pods"},
+		{"tree", func(m Model) tea.Cmd { return m.execKubectlExplainTree("pods", "v1", "spec") }, "pods.spec"},
+		{"treeDesc", func(m Model) tea.Cmd { return m.execKubectlExplainTreeDesc("pods", "v1", "spec") }, "pods.spec"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeKubectl(t, `echo "token=s3cret-from-the-credential-plugin" >&2
 exit 1`)
-	buf := captureLogger(t)
+			buf := captureLogger(t)
+			m := explainExecModel(t)
+
+			tc.run(m)()
+
+			assert.NotContains(t, buf.String(), "s3cret-from-the-credential-plugin")
+			assert.Contains(t, buf.String(), "kubectl explain failed")
+			assert.Contains(t, buf.String(), tc.target, "the log still names the target that failed")
+			assert.Contains(t, buf.String(), "exit status 1")
+		})
+	}
+}
+
+// A tab restored with the API Explorer open gets a session of its own, so
+// closing the view still stops the fetch it started after the switch back.
+func TestExplainFetchesStopAfterSwitchingBack(t *testing.T) {
+	argvPath := fakeKubectl(t, "sleep 60 &\nwait")
 	m := explainExecModel(t)
+	m.mode = modeExplain
+	m.tabs = []TabState{{}, {}}
+	m.saveCurrentTab()
+	m.loadTab(1)
+	m.loadTab(0)
+	require.Equal(t, modeExplain, m.mode, "the restored tab is still on the API Explorer")
 
-	msg := m.execKubectlExplain("pods", "v1", "spec")()
+	done := make(chan tea.Msg, 1)
+	go func() { done <- m.execKubectlExplainTree("pods", "v1", "spec")() }()
 
-	got, ok := msg.(explainLoadedMsg)
-	require.True(t, ok)
-	require.Error(t, got.err)
-	assert.NotContains(t, buf.String(), "s3cret-from-the-credential-plugin")
-	assert.Contains(t, buf.String(), "pods.spec", "the log still names the target that failed")
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(argvPath)
+		return err == nil
+	}, 10*time.Second, 20*time.Millisecond, "the stub kubectl never started")
+
+	closedAt := time.Now()
+	m.exitExplainView()
+
+	select {
+	case <-done:
+		assert.Less(t, time.Since(closedAt), explainFetchTimeout/2,
+			"a restored tab must be able to cancel its own fetches")
+	case <-time.After(explainFetchTimeout / 2):
+		t.Fatal("closing the API Explorer on a restored tab did not stop the kubectl process")
+	}
 }
 
 // Switching tabs is the other way out of the API Explorer, and the reply of a

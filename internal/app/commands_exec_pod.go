@@ -407,6 +407,13 @@ const explainFetchTimeout = 15 * time.Second
 // without this the worker stays blocked on a process already dead.
 const explainWaitDelay = 2 * time.Second
 
+// logExplainFailure records a failed kubectl explain. The output stays out of
+// the log: on an auth failure it carries whatever the credential plugin
+// printed. It still reaches the view, where the user asked for it.
+func logExplainFailure(target, apiVersion string, cmdErr error) {
+	logger.Error("kubectl explain failed", "target", target, "apiVersion", apiVersion, "error", cmdErr)
+}
+
 // newExplainCmd builds one bounded kubectl explain. The context ends the
 // process when the user leaves the API Explorer; the deadline ends a cluster
 // that never answers.
@@ -455,10 +462,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			// The output stays out of the log: on an auth failure it carries
-			// whatever the credential plugin printed. It still reaches the
-			// view, where the user asked for it.
-			logger.Error("kubectl explain failed", "target", target, "apiVersion", apiVersion, "error", cmdErr)
+			logExplainFailure(target, apiVersion, cmdErr)
 			return explainLoadedMsg{
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
@@ -498,6 +502,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
+			logExplainFailure(resource, apiVersion, cmdErr)
 			return explainRecursiveMsg{
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
@@ -540,6 +545,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 		cmd := newExplainCmd(ctx, kubectlPath, kubeconfigPaths, args)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
+			logExplainFailure(target, apiVersion, cmdErr)
 			return explainTreeLoadedMsg{
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
@@ -594,6 +600,7 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 		output, cmdErr := cmd.CombinedOutput()
 		msg := ident
 		if cmdErr != nil {
+			logExplainFailure(target, apiVersion, cmdErr)
 			msg.err = fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))
 			return msg
 		}
