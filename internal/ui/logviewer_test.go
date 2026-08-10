@@ -364,6 +364,32 @@ func TestSanitizeLogLine_RenderAnsiEnabled_PreservesMultibyte(t *testing.T) {
 	assert.Equal(t, input, sanitizeLogLine(input, true))
 }
 
+// --- colorizePodPrefix ---
+
+func TestColorizePodPrefix_SanitizesTerminalEscapes(t *testing.T) {
+	// The bracketed "[pod/name/container]" prefix is a resource NAME, not
+	// log body text, and colorizePodPrefix re-emits it verbatim styled -
+	// it must go through SanitizeTerminalText, not the ANSI-aware body
+	// sanitizer, since a hostile pod name should not be able to reorder or
+	// hijack the terminal via the log viewer's own styling.
+	out := colorizePodPrefix("[evil\x1b[2Jpod] hello")
+	assert.NotContains(t, out, "\x1b[2J")
+	assert.Contains(t, out, "hello")
+
+	out = colorizePodPrefix("[evil\u202epod] hello")
+	assert.NotContains(t, out, "\u202e", "bidi override must not survive")
+
+	// colorizePodPrefix's own styling only ever emits SGR (ESC '['); an
+	// OSC introducer (ESC ']') or a bare BEL can only be leftover injection.
+	out = colorizePodPrefix("[evil\x1b]52;c;ZXZpbA==\x07pod] hello")
+	assert.NotContains(t, out, "\x1b]")
+	assert.NotContains(t, out, "\x07")
+
+	// Ordinary pod prefixes render identically (still styled/colored).
+	out = colorizePodPrefix("[web-1/app] hello world")
+	assert.Contains(t, out, "hello world")
+}
+
 // --- SanitizeLogBody ---
 
 func TestSanitizeLogBody_DelegatesToSanitizeLogLine(t *testing.T) {

@@ -198,6 +198,11 @@ func (m Model) explorerDrillPath() []string {
 // The namespace is dropped for cluster-scoped resources (empty namespace) and
 // the kind when it is unknown.
 func resourceTitleLabel(kind, namespace, name string) string {
+	// kind/namespace/name come from cluster-controlled resources; sanitize
+	// once here rather than at each of the nine call sites.
+	kind = ui.SanitizeTerminalText(kind)
+	namespace = ui.SanitizeTerminalText(namespace)
+	name = ui.SanitizeTerminalText(name)
 	label := name
 	if namespace != "" {
 		label = namespace + "/" + name

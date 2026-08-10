@@ -588,7 +588,11 @@ func colorizePodPrefix(line string) string {
 	if closeBracket < 0 {
 		return line
 	}
-	prefix := line[1:closeBracket] // "pod/name/container"
+	// The prefix is a resource NAME re-emitted verbatim below, unlike the
+	// rest of the line (already run through the ANSI-aware sanitizeLogLine
+	// upstream in RenderLogViewer) - use SanitizeTerminalText so a hostile
+	// pod/container name can't reorder or hijack the terminal via styling.
+	prefix := SanitizeTerminalText(line[1:closeBracket]) // "pod/name/container"
 	rest := line[closeBracket+2:]
 
 	style := lipgloss.NewStyle().Foreground(ThemeColor(podPrefixColor(prefix)))

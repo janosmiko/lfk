@@ -21,6 +21,28 @@ func TestResourceTitleLabel(t *testing.T) {
 	assert.Equal(t, "x", resourceTitleLabel("", "", "x"))
 }
 
+// resourceTitleLabel feeds seven fullscreen view titles (logs, describe,
+// exec, object explorer, YAML, event viewer, logtop) with kind/namespace/name
+// taken raw from cluster-controlled resources. A hostile name must not be
+// able to reorder or hijack the title bar; fixing it once here covers every
+// call site.
+func TestResourceTitleLabel_SanitizesTerminalEscapes(t *testing.T) {
+	label := resourceTitleLabel("Pod", "default", "evil\x1b[2Jpod")
+	assert.NotContains(t, label, "\x1b")
+	assert.Equal(t, "Pod default/evil[2Jpod", label)
+
+	label = resourceTitleLabel("Pod", "default", "evil\u202epod")
+	assert.NotContains(t, label, "\u202e", "bidi override must not survive")
+
+	label = resourceTitleLabel("Pod", "default", "evil\x1b]52;c;ZXZpbA==\x07pod")
+	assert.NotContains(t, label, "\x1b")
+	assert.NotContains(t, label, "\x07")
+
+	// Ordinary names render identically.
+	assert.Equal(t, "Pod argo-cd/argocd-redis-ha-server-2",
+		resourceTitleLabel("Pod", "argo-cd", "argocd-redis-ha-server-2"))
+}
+
 // The fullscreen viewers (logs, exec, describe, diff, events) must surface the
 // object they show in the top breadcrumb, the same way the YAML viewer and the
 // Object Explorer do. Each case is exercised through explorerDrillPath, which
