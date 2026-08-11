@@ -461,7 +461,7 @@ Press **`Shift+Z`** anywhere in the explorer (or type `:orphans` in the command 
 - `R` re-scans the cluster
 - `Esc`, `q`, or `Shift+Z` close the overlay
 
-Partial-RBAC denials surface as a warning banner at the top of the overlay; whatever could be listed is still shown.
+Partial-RBAC denials surface as a warning banner at the top of the overlay. A kind is shown only if every list its orphan check depends on loaded; a kind whose answer would depend on a denied list is omitted rather than risking a false "unused".
 
 ### Per-kind filter presets
 
