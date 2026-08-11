@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -692,5 +693,66 @@ func TestResolveIconAllModes(t *testing.T) {
 				t.Errorf("resolveIcon in %q = %q, want %q", tc.mode, got, tc.want)
 			}
 		})
+	}
+}
+
+// Emoji mode must not leave a row without an icon. A blank where every
+// neighbour has a glyph starts the name a column short, which is how the
+// Security sources rendered before they were given emoji of their own (#604).
+func TestResolveIconEmojiFallsBackToUnicode(t *testing.T) {
+	old := IconMode
+	IconMode = "emoji"
+	defer func() { IconMode = old }()
+
+	assert.Equal(t, "◉", resolveIcon(model.Icon{Unicode: "◉", Simple: "[He]"}),
+		"an icon with no emoji falls back to its unicode glyph")
+	assert.Equal(t, "\U0001f9e0", resolveIcon(model.Icon{Unicode: "◉", Emoji: "\U0001f9e0"}),
+		"an icon with an emoji still uses it")
+	assert.Equal(t, "", resolveIcon(model.Icon{}), "an empty icon stays empty")
+}
+
+// The bug in #604: a selector-dependent emoji measured two columns in lipgloss
+// and one in a terminal that had not announced grapheme clustering, so the row
+// ended a column short and the panel border landed early.
+func TestIconCellKeepsOneWidthAcrossGlyphs(t *testing.T) {
+	oldMode, oldCore := IconMode, UnicodeCoreActive
+	IconMode = "emoji"
+	defer func() { IconMode, UnicodeCoreActive = oldMode, oldCore }()
+
+	// Endpoints and Pods: one needs the selector to be two columns, one does not.
+	selectorDependent := model.Icon{Unicode: "→", Emoji: "\u27a1\ufe0f"} // right arrow + selector
+	intrinsicallyWide := model.Icon{Unicode: "□", Emoji: "\U0001f4e6"}   // package
+
+	t.Run("terminal measures with wcwidth", func(t *testing.T) {
+		UnicodeCoreActive = false
+		a, b := iconCell(selectorDependent), iconCell(intrinsicallyWide)
+
+		assert.NotContains(t, a, "\ufe0f",
+			"the selector must go, or lipgloss counts two columns where the terminal draws one")
+		assert.Equal(t, iconCellWidth, lipgloss.Width(a))
+		assert.Equal(t, iconCellWidth, lipgloss.Width(b))
+		assert.Equal(t, ansi.WcWidth.StringWidth(a), ansi.GraphemeWidth.StringWidth(a),
+			"both width methods must agree, whichever one the renderer picked")
+	})
+
+	t.Run("terminal announced grapheme clustering", func(t *testing.T) {
+		UnicodeCoreActive = true
+		a := iconCell(selectorDependent)
+
+		assert.Contains(t, a, "\ufe0f", "the emoji keeps its colour presentation here")
+		assert.Equal(t, iconCellWidth, lipgloss.Width(a))
+	})
+}
+
+// Other icon modes have glyphs of one known width and settled spacing, so the
+// emoji cell must not reach them.
+func TestIconCellLeavesOtherModesAlone(t *testing.T) {
+	oldMode := IconMode
+	defer func() { IconMode = oldMode }()
+
+	icon := model.Icon{Unicode: "→", Simple: "[EP]", Emoji: "\u27a1\ufe0f"}
+	for mode, want := range map[string]string{"unicode": "→", "simple": "[EP]", "none": ""} {
+		IconMode = mode
+		assert.Equal(t, want, iconCell(icon), "mode %q", mode)
 	}
 }

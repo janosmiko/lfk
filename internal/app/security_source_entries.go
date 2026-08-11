@@ -38,7 +38,7 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		return []model.SecuritySourceEntry{{
 			DisplayName: "(probing sources...)",
 			SourceName:  "",
-			Icon:        model.Icon{Unicode: "…", Simple: "[..]", NerdFont: "\U000f04bd"},
+			Icon:        model.Icon{Unicode: "…", Simple: "[..]", Emoji: "⌛", NerdFont: "\U000f04bd"},
 			Count:       -1,
 		}}
 	}
@@ -46,15 +46,15 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		display string
 		icon    model.Icon
 	}{
-		"heuristic":      {"Heuristic", model.Icon{Unicode: "◉", Simple: "[He]", NerdFont: "\U000f0483"}},
-		"advisor":        {"Advisor", model.Icon{Unicode: "◌", Simple: "[Ad]", NerdFont: "\U000f0483"}},
-		"rbac":           {"RBAC", model.Icon{Unicode: "◒", Simple: "[Rb]", NerdFont: "\U000f0483"}},
-		"trivy-operator": {"Trivy", model.Icon{Unicode: "◈", Simple: "[Tr]", NerdFont: "\U000f0483"}},
-		"policy-report":  {"Kyverno", model.Icon{Unicode: "◇", Simple: "[Ky]", NerdFont: "\U000f0483"}},
-		"falco":          {"Falco", model.Icon{Unicode: "◎", Simple: "[Fa]", NerdFont: "\U000f0483"}},
-		"kube-bench":     {"CIS", model.Icon{Unicode: "◆", Simple: "[CI]", NerdFont: "\U000f0483"}},
-		"gatekeeper":     {"Gatekeeper", model.Icon{Unicode: "◔", Simple: "[Gk]", NerdFont: "\U000f0483"}},
-		"kubescape":      {"Kubescape", model.Icon{Unicode: "◐", Simple: "[Ks]", NerdFont: "\U000f0483"}},
+		"heuristic":      {"Heuristic", model.Icon{Unicode: "◉", Simple: "[He]", Emoji: "🧠", NerdFont: "\U000f0483"}},
+		"advisor":        {"Advisor", model.Icon{Unicode: "◌", Simple: "[Ad]", Emoji: "💡", NerdFont: "\U000f0483"}},
+		"rbac":           {"RBAC", model.Icon{Unicode: "◒", Simple: "[Rb]", Emoji: "🔑", NerdFont: "\U000f0483"}},
+		"trivy-operator": {"Trivy", model.Icon{Unicode: "◈", Simple: "[Tr]", Emoji: "🔍", NerdFont: "\U000f0483"}},
+		"policy-report":  {"Kyverno", model.Icon{Unicode: "◇", Simple: "[Ky]", Emoji: "📃", NerdFont: "\U000f0483"}},
+		"falco":          {"Falco", model.Icon{Unicode: "◎", Simple: "[Fa]", Emoji: "🦅", NerdFont: "\U000f0483"}},
+		"kube-bench":     {"CIS", model.Icon{Unicode: "◆", Simple: "[CI]", Emoji: "✅", NerdFont: "\U000f0483"}},
+		"gatekeeper":     {"Gatekeeper", model.Icon{Unicode: "◔", Simple: "[Gk]", Emoji: "🚦", NerdFont: "\U000f0483"}},
+		"kubescape":      {"Kubescape", model.Icon{Unicode: "◐", Simple: "[Ks]", Emoji: "🔬", NerdFont: "\U000f0483"}},
 	}
 	var entries []model.SecuritySourceEntry
 	for _, src := range mgr.Sources() {
@@ -64,7 +64,7 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		meta, known := displayByName[src.Name()]
 		if !known {
 			meta.display = src.Name()
-			meta.icon = model.Icon{Unicode: "●", Simple: "[Se]", NerdFont: "\U000f0483"}
+			meta.icon = model.Icon{Unicode: "●", Simple: "[Se]", Emoji: "🔎", NerdFont: "\U000f0483"}
 		}
 		entries = append(entries, model.SecuritySourceEntry{
 			DisplayName: meta.display,

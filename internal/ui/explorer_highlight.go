@@ -112,6 +112,52 @@ func VimScrollOff(scroll, cursor, numEntries, height, scrollOff int, displayLine
 	return startEntry
 }
 
+// UnicodeCoreActive reports whether the terminal measures text by grapheme
+// cluster, which it announces by answering the mode 2027 query. Bubble Tea
+// sends that query at startup and switches its renderer to grapheme width only
+// when an answer comes back; until then the renderer measures with wcwidth.
+// lfk's own layout goes through lipgloss, which always measures by grapheme
+// cluster, so the renderer and the layout agree only while this is set.
+var UnicodeCoreActive bool
+
+// iconCellWidth is the column budget an emoji icon is rendered into. Emoji
+// differ in width once the variation selector is gone, so without a fixed cell
+// a one-column glyph would start its name where a two-column glyph's name ends.
+const iconCellWidth = 2
+
+// emojiVariationSelector asks for emoji presentation, which is what makes a
+// one-column base codepoint two columns wide.
+const emojiVariationSelector = "\ufe0f"
+
+// iconCell returns the icon glyph for the active IconMode, laid out so every
+// row of a column starts its name in the same place. Only emoji mode gets the
+// fixed cell: the other modes have glyphs of a single known width and their
+// spacing is already settled.
+func iconCell(icon model.Icon) string {
+	glyph := resolveIcon(icon)
+	if glyph == "" || IconMode != "emoji" {
+		return glyph
+	}
+	glyph = normalizeEmojiWidth(glyph)
+	if pad := iconCellWidth - lipgloss.Width(glyph); pad > 0 {
+		glyph += strings.Repeat(" ", pad)
+	}
+	return glyph
+}
+
+// normalizeEmojiWidth drops the variation selector when the terminal does not
+// measure by grapheme cluster. lipgloss counts a base codepoint plus the
+// selector as two columns; a terminal measuring with wcwidth draws one, so the
+// row ends a column short and the panel border lands early. Without the
+// selector both measures say one column, the glyph renders in text
+// presentation, and the row stays aligned (#604).
+func normalizeEmojiWidth(glyph string) string {
+	if UnicodeCoreActive {
+		return glyph
+	}
+	return strings.ReplaceAll(glyph, emojiVariationSelector, "")
+}
+
 // resolveIcon returns the glyph for the active IconMode, or empty string for
 // "none" and zero-value icons. Unknown IconMode values fall back to Unicode.
 func resolveIcon(icon model.Icon) string {
@@ -126,6 +172,12 @@ func resolveIcon(icon model.Icon) string {
 	case "simple":
 		return icon.Simple
 	case "emoji":
+		// An icon with no emoji of its own falls back to its unicode glyph.
+		// Returning nothing would drop the icon column for that row alone,
+		// which starts its name a column short of every neighbour (#604).
+		if icon.Emoji == "" {
+			return icon.Unicode
+		}
 		return icon.Emoji
 	default: // "unicode" and any unexpected value
 		return icon.Unicode

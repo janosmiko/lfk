@@ -307,7 +307,7 @@ func styledNameCell(item model.Item, nameW int, nameOverride *lipgloss.Style) st
 	if badgeW > 0 {
 		badgeReserve = badgeW + 1 // separator space
 	}
-	if resolvedIcon := resolveIcon(item.Icon); resolvedIcon != "" {
+	if resolvedIcon := iconCell(item.Icon); resolvedIcon != "" {
 		iconSt := IconStyle
 		if isDimmed {
 			iconSt = DimStyle

@@ -103,7 +103,7 @@ func FormatItemNameOnly(item model.Item, width int) string {
 		deprecationW = lipgloss.Width(deprecationSuffix)
 	}
 
-	resolvedIcon := resolveIcon(item.Icon)
+	resolvedIcon := iconCell(item.Icon)
 	if resolvedIcon != "" {
 		icon := IconStyle.Render(resolvedIcon + " ")
 		iconW := lipgloss.Width(icon)
@@ -128,7 +128,7 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 		deprecationW = lipgloss.Width(deprecationSuffix)
 	}
 
-	resolvedIcon := resolveIcon(item.Icon)
+	resolvedIcon := iconCell(item.Icon)
 	if resolvedIcon != "" {
 		icon := resolvedIcon + " "
 		iconW := lipgloss.Width(icon)
