@@ -1,6 +1,10 @@
 package app
 
-import "context"
+import (
+	"context"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // The API Explorer's cancellation scope and its generation counter. Split out
 // of update_explain.go to keep that file under the length cap.
@@ -47,6 +51,25 @@ func (m *Model) cancelExplainSession() {
 	}
 	m.explainCtx, m.explainCancel = nil, nil
 	m.explainGen++
+}
+
+// resumeExplainFetch re-issues the schema load of a tab that comes back with
+// the API Explorer open but no level in it. Switching away cancels the fetch
+// and the generation guard drops its reply, so the level the tab was waiting
+// for never arrives on its own. Nil when there is nothing to resume.
+//
+// An empty title is what marks a level as never delivered. The field list
+// cannot answer that: kubectl explain of a primitive field returns a
+// description and no FIELDS section, so a level that loaded perfectly well
+// holds zero fields, and keying off the list would refetch it on every visit.
+// Only a reply sets the title, exitExplainView clears it, and it is part of
+// the per-tab snapshot.
+func (m *Model) resumeExplainFetch() tea.Cmd {
+	if m.mode != modeExplain || m.explainTitle != "" || m.explainResource == "" {
+		return nil
+	}
+	m.loading = true
+	return m.execKubectlExplain(m.explainResource, m.explainAPIVersion, m.explainPath)
 }
 
 // explainRequestCtx is the parent context for one explain fetch. It falls back

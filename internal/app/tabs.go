@@ -452,8 +452,8 @@ func (m *Model) saveCurrentTab() {
 }
 
 // loadTab restores Model fields from the given tab index.
-// If the tab was restored from a session and has not been loaded yet (needsLoad),
-// it returns a tea.Cmd that fetches the tab's data; otherwise it returns nil.
+// It returns a tea.Cmd that fetches the tab's data when the tab was restored
+// from a session (needsLoad), and one that resumes an unfinished API Explorer.
 func (m *Model) loadTab(idx int) tea.Cmd {
 	m.wheel.dead = true // switching/reloading a tab empties the wheel momentum queue (#524)
 	// Stop the explain fetches of the tab being left, and their spinner too.
@@ -650,7 +650,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			m.setCursor(0)
 			m.loading = true
 			m.pendingTarget, m.pendingTargetNamespace = t.cursorName, t.cursorNamespace // quit-time row
-			return tea.Batch(securitySeedCmd, m.loadResources(false))
+			return tea.Batch(securitySeedCmd, m.resumeExplainFetch(), m.loadResources(false))
 		case model.LevelResourceTypes:
 			// At resource types level: left = contexts, middle = resource types.
 			m.leftItemsHistory = nil
@@ -659,14 +659,14 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			m.itemCache[m.navKey()] = m.middleItems
 			m.clearRight()
 			m.clampCursor()
-			return tea.Batch(securitySeedCmd, m.loadPreview())
+			return tea.Batch(securitySeedCmd, m.resumeExplainFetch(), m.loadPreview())
 		default:
 			// Clusters level or unknown: just load contexts.
 			m.loading = true
-			return tea.Batch(securitySeedCmd, m.refreshCurrentLevel())
+			return tea.Batch(securitySeedCmd, m.resumeExplainFetch(), m.refreshCurrentLevel())
 		}
 	}
-	return nil
+	return m.resumeExplainFetch()
 }
 
 // moveActiveTab reorders the active tab one slot in the given direction
