@@ -253,6 +253,15 @@ type yamlClipboardMsg struct {
 	err     error
 }
 
+// exportTemplateReadyMsg carries a manifest stripped to a template, ready for
+// the destination picker.
+type exportTemplateReadyMsg struct {
+	name     string
+	kind     string
+	manifest string
+	err      error
+}
+
 // exportDoneMsg carries the result of exporting a resource to a file.
 type exportDoneMsg struct {
 	path string

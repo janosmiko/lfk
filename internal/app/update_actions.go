@@ -508,6 +508,8 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Network Policies":
 		mdl, cmd := m.executeActionNetworkPolicies()
 		return mdl, cmd, true
+	case model.ActionLabelExportTemplate:
+		return m, m.exportTemplateCmd(), true
 	}
 	return m, nil, false
 }

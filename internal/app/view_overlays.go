@@ -222,6 +222,10 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		content := renderColorschemeOverlay(m, overlayH)
 		return content, min(50, m.width-10), overlayH, true
 	}
+	if m.overlay == overlayExportTemplate {
+		c, w, h := m.renderOverlayExportTemplate()
+		return c, w, h, true
+	}
 	return m.renderOverlayContentExtended()
 }
 

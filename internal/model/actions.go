@@ -51,6 +51,25 @@ func ActionsForBulk(kind string) []ActionMenuItem {
 // will land on a follow-up that distinguishes Service-by-APIGroup. Revision /
 // Configuration / Route are Knative-only kinds and route here.
 func ActionsForKind(kind string) []ActionMenuItem {
+	return append(actionsForKindBase(kind), exportTemplateAction())
+}
+
+// ActionLabelExportTemplate strips a live object down to a manifest that
+// applies elsewhere. Exported so the app-layer dispatcher can switch on it.
+const ActionLabelExportTemplate = "Export Template"
+
+// exportTemplateAction is appended to every kind's menu: any object can be
+// turned into a template, and the export writes nothing to the cluster, so it
+// is not gated by read-only mode.
+func exportTemplateAction() ActionMenuItem {
+	return ActionMenuItem{
+		Label:       ActionLabelExportTemplate,
+		Description: "Strip server-set fields and export as a template",
+		Key:         "x",
+	}
+}
+
+func actionsForKindBase(kind string) []ActionMenuItem {
 	if actions, ok := actionsForCoreKind(kind); ok {
 		return actions
 	}

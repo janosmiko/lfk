@@ -107,6 +107,7 @@ const (
 	overlayLogTopColumns      // show/hide and reorder column picker for Log Top
 	overlayTaintEditor        // node taint editor (action menu key t on a Node)
 	overlayTaintPresets       // common-taint picker over the taint editor (p key)
+	overlayExportTemplate     // destination picker for Export Template (clipboard / file / template list)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

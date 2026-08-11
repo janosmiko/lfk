@@ -24,6 +24,9 @@ func (m Model) handleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		return m.closeCurrentOverlay()
 	}
+	if m.overlay == overlayExportTemplate {
+		return m.handleExportTemplateKey(msg)
+	}
 	if mdl, cmd, ok := m.handleOverlayKeyPrimary(msg); ok {
 		return mdl, cmd
 	}
