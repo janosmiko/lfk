@@ -23,7 +23,7 @@ func TestMarshalJSONFailsLoudly(t *testing.T) {
 	out, err := json.Marshal(s)
 	assert.Error(t, err)
 	assert.NotContains(t, string(out), "\x1b]")
-	assert.NotContains(t, string(out), "‮")
+	assert.NotContains(t, string(out), "\u202e")
 }
 
 // No UnmarshalJSON test: encoding/json already refuses to decode a JSON
