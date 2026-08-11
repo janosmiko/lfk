@@ -456,9 +456,9 @@ func (m *Model) saveCurrentTab() {
 // it returns a tea.Cmd that fetches the tab's data; otherwise it returns nil.
 func (m *Model) loadTab(idx int) tea.Cmd {
 	m.wheel.dead = true // switching/reloading a tab empties the wheel momentum queue (#524)
-	// The explain fetches in flight belong to the tab being left. Stop them
-	// here too, or a tab switch leaves them running to their deadline.
+	// Stop the explain fetches of the tab being left, and their spinner too.
 	m.cancelExplainSession()
+	m.loading = false
 	t := m.tabs[idx]
 	needsLoad := t.needsLoad
 	m.activeTab = idx

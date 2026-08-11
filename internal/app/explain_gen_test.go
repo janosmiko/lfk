@@ -56,7 +56,32 @@ func TestExplainLoaded_StaleGenerationDoesNotHijackNewTab(t *testing.T) {
 	assert.Equal(t, modeExplorer, rm.mode, "a reply from the tab left behind must not open the Explorer here")
 	assert.Empty(t, rm.explainFields, "the new tab's schema must stay untouched")
 	assert.Empty(t, rm.explainTitle)
-	assert.False(t, rm.loading, "dropping the reply must still stop the spinner it started")
+	assert.False(t, rm.loading, "leaving the tab must stop the spinner of the fetch it abandoned")
+}
+
+func TestExplainLoaded_StaleReplyLeavesTheNewSpinnerUp(t *testing.T) {
+	m := explainGenTabsModel(t)
+	stale := m.explainGen
+
+	// The user leaves the Explorer and opens it again straight away. The
+	// first fetch answers while the second is still running.
+	m.exitExplainView()
+	m.beginExplainSession()
+	m.loading = true
+
+	result, _ := m.Update(explainLoadedMsg{gen: stale, path: "spec"})
+	rm := result.(Model)
+
+	assert.True(t, rm.loading, "a stale reply must not take down the spinner of the fetch that replaced it")
+}
+
+func TestExitExplainView_StopsTheSpinner(t *testing.T) {
+	m := explainGenTabsModel(t)
+	m.loading = true
+
+	m.exitExplainView()
+
+	assert.False(t, m.loading, "the abandoned fetch will never answer, so nothing else clears it")
 }
 
 func TestExplainLoaded_CurrentGenerationApplies(t *testing.T) {
@@ -124,7 +149,8 @@ func TestExplainTreeDesc_StaleGenerationDropped(t *testing.T) {
 	m.explainAPIVersion = "apps/v1"
 	m.explainTreeAll = []model.ExplainField{{Name: "replicas", Type: "<integer>", Path: "spec.replicas"}}
 	m.explainFields = m.explainTreeAll
-	m.explainTreeDescInflight = map[string]struct{}{"spec": {}}
+	// The stale batch's own marker, still waiting to be released.
+	m.explainTreeDescInflight = map[string]uint64{"spec": stale}
 
 	result, _ := m.Update(explainTreeDescMsg{
 		gen:        stale,
@@ -140,4 +166,30 @@ func TestExplainTreeDesc_StaleGenerationDropped(t *testing.T) {
 	assert.NotContains(t, rm.explainTreeDescFetched, "spec", "and must not mark the level described")
 	assert.NotContains(t, rm.explainTreeDescInflight, "spec",
 		"but the level must be released, or it can never be described again")
+}
+
+func TestExplainTreeDesc_StaleBatchKeepsALiveMarkerForTheSameLevel(t *testing.T) {
+	m := explainGenTabsModel(t)
+	stale := m.explainGen
+
+	// The new session asked for the same level, so its marker sits under the
+	// same key. Releasing it here would let a second subprocess start.
+	m.beginExplainSession()
+	m.explainTree = true
+	m.explainTreeAll = []model.ExplainField{{Name: "replicas", Type: "<integer>", Path: "spec.replicas"}}
+	m.explainFields = m.explainTreeAll
+	m.explainTreeDescInflight = map[string]uint64{"spec": m.explainGen}
+
+	result, _ := m.Update(explainTreeDescMsg{
+		gen:        stale,
+		resource:   "deployments",
+		apiVersion: "apps/v1",
+		kctx:       m.effectiveContext(),
+		parent:     "spec",
+		fields:     []model.ExplainField{{Name: "replicas", Path: "spec.replicas", Description: "stale text"}},
+	})
+	rm := result.(Model)
+
+	assert.Contains(t, rm.explainTreeDescInflight, "spec", "the live fetch's marker must survive")
+	assert.Empty(t, rm.explainTreeAll[0].Description)
 }

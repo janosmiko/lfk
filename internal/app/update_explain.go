@@ -195,6 +195,9 @@ func (m Model) explainGoBack() (tea.Model, tea.Cmd) {
 // Object Explorer when opened from there via the I key).
 func (m *Model) exitExplainView() {
 	m.cancelExplainSession()
+	// The fetches just abandoned will never answer, and m.loading is not
+	// per-tab, so nothing else would take the spinner down.
+	m.loading = false
 	m.mode = m.explainReturnMode
 	m.explainReturnMode = modeExplorer
 	m.explainAncestors = nil

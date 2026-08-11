@@ -85,13 +85,14 @@ func (m Model) updateExplainMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) updateExplainLoaded(msg explainLoadedMsg) (tea.Model, tea.Cmd) {
-	// The spinner is cleared even for a reply this view no longer wants -
-	// the fetch it belongs to is over either way, and m.loading is not
-	// per-tab, so leaving it set hangs a spinner on the screen forever.
-	m.loading = false
+	// Only the reply the view is waiting for stops the spinner. A stale one
+	// must leave it alone, or it hides the spinner of the fetch that
+	// replaced it. The paths that abandon a fetch - leaving the view,
+	// switching tabs - clear m.loading themselves.
 	if msg.gen != m.explainGen {
 		return m, nil
 	}
+	m.loading = false
 	if msg.err != nil {
 		m.setErrorFromErr("Explain failed: ", msg.err)
 		return m, scheduleStatusClear()
@@ -133,10 +134,10 @@ func (m *Model) applyExplainPendingField() {
 }
 
 func (m Model) updateExplainRecursive(msg explainRecursiveMsg) (tea.Model, tea.Cmd) {
-	m.loading = false // see updateExplainLoaded
 	if msg.gen != m.explainGen {
 		return m, nil
 	}
+	m.loading = false
 	if msg.err != nil {
 		m.setErrorFromErr("Recursive search failed: ", msg.err)
 		return m, scheduleStatusClear()
