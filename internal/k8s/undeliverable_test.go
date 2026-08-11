@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -10,7 +11,9 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func findUndeliverable(items []UndeliverableItem, ns, name string) *UndeliverableItem {
@@ -127,4 +130,39 @@ func TestDetectUndeliverable_SortStable(t *testing.T) {
 	require.Len(t, report.Pods, 2)
 	assert.Equal(t, "a", report.Pods[0].Namespace)
 	assert.Equal(t, "b", report.Pods[1].Namespace)
+}
+
+// TestDetectUndeliverable_EndpointSliceListFailureSkipsServices guards
+// against a failed EndpointSlice list reading as "no endpoints anywhere":
+// safeEndpointSliceItems turns the nil list into an empty index, and
+// without this guard every ClusterIP Service - including one with healthy
+// ready endpoints - would be reported as undeliverable.
+func TestDetectUndeliverable_EndpointSliceListFailureSkipsServices(t *testing.T) {
+	ready := true
+	liveSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "web", Name: "live"},
+		Spec:       corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP},
+	}
+	liveSlice := &discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "web", Name: "live-x",
+			Labels: map[string]string{discoveryv1.LabelServiceName: "live"},
+		},
+		Endpoints: []discoveryv1.Endpoint{
+			{Conditions: discoveryv1.EndpointConditions{Ready: &ready}},
+		},
+	}
+
+	cs := k8sfake.NewSimpleClientset(liveSvc, liveSlice)
+	cs.PrependReactor("list", "endpointslices", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("forbidden")
+	})
+	c := newFakeClient(cs, nil)
+
+	report, err := c.DetectUndeliverable(t.Context(), "", "")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "endpointslices")
+	assert.Empty(t, report.Services,
+		"a failed EndpointSlice list must not read as every Service having no endpoints")
 }

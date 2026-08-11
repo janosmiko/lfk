@@ -33,31 +33,53 @@ func fetchUndeliverableLists(
 	ctx context.Context, cs kubernetes.Interface, namespace string,
 ) (undeliverableLists, []error) {
 	var errs []error
-	collect := func(name string, err error) {
+	// client-go's generated List() always returns an allocated, empty-Items
+	// list even when the request errors - it never hands back a nil
+	// pointer. Nil the pointer ourselves on failure so a listing error
+	// reads as "no data available" instead of silently degrading to a
+	// zero-item list, which downstream detectors could mistake for
+	// "verified empty".
+	collect := func(name string, err error) bool {
 		if err != nil {
 			errs = append(errs, fmt.Errorf("listing %s: %w", name, err))
+			return true
 		}
+		return false
 	}
 	opts := metav1.ListOptions{}
 	out := undeliverableLists{}
 	var err error
 	out.pods, err = cs.CoreV1().Pods(namespace).List(ctx, opts)
-	collect("pods", err)
+	if collect("pods", err) {
+		out.pods = nil
+	}
 	out.events, err = cs.CoreV1().Events(namespace).List(ctx, opts)
-	collect("events", err)
+	if collect("events", err) {
+		out.events = nil
+	}
 	out.pvcs, err = cs.CoreV1().PersistentVolumeClaims(namespace).List(ctx, opts)
-	collect("pvcs", err)
+	if collect("pvcs", err) {
+		out.pvcs = nil
+	}
 	out.services, err = cs.CoreV1().Services(namespace).List(ctx, opts)
-	collect("services", err)
+	if collect("services", err) {
+		out.services = nil
+	}
 	out.slices, err = cs.DiscoveryV1().EndpointSlices(namespace).List(ctx, opts)
-	collect("endpointslices", err)
+	if collect("endpointslices", err) {
+		out.slices = nil
+	}
 	out.ingresses, err = cs.NetworkingV1().Ingresses(namespace).List(ctx, opts)
-	collect("ingresses", err)
+	if collect("ingresses", err) {
+		out.ingresses = nil
+	}
 	// Namespaces are cluster-scoped and a stuck-Terminating namespace is
 	// the single most common finalizer deadlock, so list them regardless
 	// of the namespace parameter.
 	out.namespaces, err = cs.CoreV1().Namespaces().List(ctx, opts)
-	collect("namespaces", err)
+	if collect("namespaces", err) {
+		out.namespaces = nil
+	}
 	return out, errs
 }
 
@@ -79,12 +101,10 @@ func (c *Client) DetectUndeliverable(
 
 	lists, errs := fetchUndeliverableLists(ctx, cs, namespace)
 	events := buildEventIndex(safeEventItems(lists.events))
-	sliceIdx := buildEndpointSliceIndex(safeEndpointSliceItems(lists.slices))
 
 	report := UndeliverableReport{}
 	pods := safePodItems(lists.pods)
 	pvcs := safePVCItems(lists.pvcs)
-	services := safeSvcItems(lists.services)
 	ingresses := safeIngressItems(lists.ingresses)
 
 	for _, p := range pods {
@@ -97,9 +117,16 @@ func (c *Client) DetectUndeliverable(
 			report.PVCs = append(report.PVCs, item)
 		}
 	}
-	for _, s := range services {
-		if item, ok := serviceUndeliverable(s, sliceIdx); ok {
-			report.Services = append(report.Services, item)
+	// A failed EndpointSlice list reads as an empty index, which would make
+	// every Service look endpoint-less. Skip the detector entirely rather
+	// than report a false positive for each one; the partial-scan error
+	// already surfaces the omission.
+	if lists.slices != nil {
+		sliceIdx := buildEndpointSliceIndex(safeEndpointSliceItems(lists.slices))
+		for _, s := range safeSvcItems(lists.services) {
+			if item, ok := serviceUndeliverable(s, sliceIdx); ok {
+				report.Services = append(report.Services, item)
+			}
 		}
 	}
 	for _, i := range ingresses {
