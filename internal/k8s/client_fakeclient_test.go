@@ -1989,9 +1989,9 @@ func TestGetResourceEvents(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, events, 2)
 	// Most recent first.
-	assert.Equal(t, "BackOff", events[0].Reason)
-	assert.Equal(t, "ScalingReplicaSet", events[1].Reason)
-	assert.Equal(t, "deployment-controller", events[1].Source)
+	assert.Equal(t, "BackOff", events[0].Reason.Raw())
+	assert.Equal(t, "ScalingReplicaSet", events[1].Reason.Raw())
+	assert.Equal(t, "deployment-controller", events[1].Source.Raw())
 }
 
 func TestGetResourceEvents_NoEvents(t *testing.T) {
@@ -2058,7 +2058,7 @@ func TestGetResourceEvents_ReportingComponentFallback(t *testing.T) {
 	events, err := c.GetResourceEvents(t.Context(), "", "default", "my-pod", "Pod")
 	require.NoError(t, err)
 	assert.Len(t, events, 1)
-	assert.Equal(t, "kubelet", events[0].Source)
+	assert.Equal(t, "kubelet", events[0].Source.Raw())
 }
 
 // --- GetPodsUsingPVC ---

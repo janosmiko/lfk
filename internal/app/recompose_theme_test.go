@@ -12,6 +12,8 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // themeA and themeB differ only in their Base background, which is enough for
@@ -45,7 +47,7 @@ func TestRecomposeThemedContentRerendersCachedPreviews(t *testing.T) {
 			memUsed: 256, memReq: 512, memLim: 1024,
 		},
 		previewEventsData: []ui.EventTimelineEntry{
-			{Timestamp: time.Time{}, Type: "Warning", Reason: "BackOff", Message: "boom", InvolvedName: "p", InvolvedKind: "Pod"},
+			{Timestamp: time.Time{}, Type: tainted.Wrap("Warning"), Reason: tainted.Wrap("BackOff"), Message: tainted.Wrap("boom"), InvolvedName: tainted.Wrap("p"), InvolvedKind: tainted.Wrap("Pod")},
 		},
 		monitoringData: map[string]monitoringData{
 			"ctx": {alerts: []k8s.AlertInfo{{Name: "HighCPU", State: "firing", Severity: "critical"}}},

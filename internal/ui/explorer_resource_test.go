@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // --- renderKV ---
@@ -235,16 +237,16 @@ func TestRenderPreviewEvents(t *testing.T) {
 		events := []EventTimelineEntry{
 			{
 				Timestamp: time.Now().Add(-5 * time.Minute),
-				Type:      "Normal",
-				Reason:    "Scheduled",
-				Message:   "Successfully assigned pod to node",
+				Type:      tainted.Wrap("Normal"),
+				Reason:    tainted.Wrap("Scheduled"),
+				Message:   tainted.Wrap("Successfully assigned pod to node"),
 				Count:     1,
 			},
 			{
 				Timestamp: time.Now().Add(-3 * time.Minute),
-				Type:      "Warning",
-				Reason:    "BackOff",
-				Message:   "Back-off restarting failed container",
+				Type:      tainted.Wrap("Warning"),
+				Reason:    tainted.Wrap("BackOff"),
+				Message:   tainted.Wrap("Back-off restarting failed container"),
 				Count:     5,
 			},
 		}
@@ -259,9 +261,9 @@ func TestRenderPreviewEvents(t *testing.T) {
 		events := []EventTimelineEntry{
 			{
 				Timestamp: time.Now(),
-				Type:      "Normal",
-				Reason:    "Pulled",
-				Message:   "Pulled image",
+				Type:      tainted.Wrap("Normal"),
+				Reason:    tainted.Wrap("Pulled"),
+				Message:   tainted.Wrap("Pulled image"),
 				Count:     1,
 			},
 		}
@@ -291,9 +293,9 @@ func TestRenderPreviewEvents(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				events := []EventTimelineEntry{{
 					Timestamp: now.Add(-2 * time.Hour),
-					Type:      "Warning",
-					Reason:    "FailedMount",
-					Message:   tc.msg,
+					Type:      tainted.Wrap("Warning"),
+					Reason:    tainted.Wrap("FailedMount"),
+					Message:   tainted.Wrap(tc.msg),
 					Count:     tc.count,
 				}}
 				result := RenderPreviewEvents(events, tc.width)
@@ -306,6 +308,31 @@ func TestRenderPreviewEvents(t *testing.T) {
 						tc.width, line, lipgloss.Width(line))
 				}
 			})
+		}
+	})
+
+	// Regression (TASK-874 CodeRabbit review): the reason-column width was
+	// measured with len(), which counts bytes. A CJK Reason has 3 bytes but
+	// 2 display cells per rune, so the byte count wildly overstates the
+	// column's visual width. That fed both the %-*s pad (rune-counted) and
+	// the byte-slicing truncateStr helper, which cut the string mid-rune
+	// and produced invalid UTF-8.
+	t.Run("multibyte reason column stays within width with valid UTF-8", func(t *testing.T) {
+		events := []EventTimelineEntry{{
+			Timestamp: time.Now().Add(-2 * time.Hour),
+			Type:      tainted.Wrap("Warning"),
+			Reason:    tainted.Wrap(strings.Repeat("日", 30)),
+			Message:   tainted.Wrap("volume mount failed"),
+			Count:     1,
+		}}
+		result := RenderPreviewEvents(events, 80)
+		for line := range strings.SplitSeq(result, "\n") {
+			if line == "" {
+				continue
+			}
+			assert.True(t, utf8.ValidString(line), "line must stay valid UTF-8: %q", line)
+			assert.LessOrEqual(t, lipgloss.Width(line), 80,
+				"event line exceeds width=80: %q (visible width %d)", line, lipgloss.Width(line))
 		}
 	})
 }
@@ -749,9 +776,9 @@ func TestRenderPreviewEvents_Sanitized(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			events := []EventTimelineEntry{{
 				Timestamp: time.Now(),
-				Type:      "Warning",
-				Reason:    "BackOff" + payload,
-				Message:   "Back-off restarting failed container" + payload,
+				Type:      tainted.Wrap("Warning"),
+				Reason:    tainted.Wrap("BackOff" + payload),
+				Message:   tainted.Wrap("Back-off restarting failed container" + payload),
 				Count:     1,
 			}}
 			out := RenderPreviewEvents(events, 100)

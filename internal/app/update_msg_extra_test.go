@@ -15,6 +15,8 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // --- helpers ---
@@ -1107,7 +1109,7 @@ func TestUpdateEventTimelineSuccess(t *testing.T) {
 	m.loading = true
 
 	events := []k8s.EventInfo{
-		{Reason: "Pulled", Message: "Container image pulled"},
+		{Reason: tainted.Wrap("Pulled"), Message: tainted.Wrap("Container image pulled")},
 	}
 	result, cmd := m.Update(eventTimelineMsg{events: events})
 	mdl := result.(Model)

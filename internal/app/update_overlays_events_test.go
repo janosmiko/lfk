@@ -10,15 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 func newEventModel(numEvents int) Model {
 	events := make([]k8s.EventInfo, numEvents)
 	for i := range events {
 		events[i] = k8s.EventInfo{
-			Type:    "Normal",
-			Reason:  "Scheduled",
-			Message: "event message",
+			Type:    tainted.Wrap("Normal"),
+			Reason:  tainted.Wrap("Scheduled"),
+			Message: tainted.Wrap("event message"),
 		}
 	}
 	m := Model{
@@ -55,10 +57,10 @@ func TestBuildEventTimelineLinesEmpty(t *testing.T) {
 func TestBuildEventTimelineLinesSanitizesControlBytes(t *testing.T) {
 	m := Model{
 		eventTimelineData: []k8s.EventInfo{{
-			Type:    "Warning",
-			Reason:  "Hacked\x9b31m",
-			Message: "\x1b]52;c;SGVsbG8=\x07payload",
-			Source:  "evil\x9c",
+			Type:    tainted.Wrap("Warning"),
+			Reason:  tainted.Wrap("Hacked\x9b31m"),
+			Message: tainted.Wrap("\x1b]52;c;SGVsbG8=\x07payload"),
+			Source:  tainted.Wrap("evil\x9c"),
 		}},
 	}
 	lines := m.buildEventTimelineLines()
@@ -77,9 +79,9 @@ func TestBuildEventTimelineLinesSanitizesControlBytes(t *testing.T) {
 func TestBuildEventTimelineLinesSanitizesType(t *testing.T) {
 	m := Model{
 		eventTimelineData: []k8s.EventInfo{{
-			Type:    "\x9d52;c;SGVsbG8=\x9c",
-			Reason:  "Scheduled",
-			Message: "ok",
+			Type:    tainted.Wrap("\x9d52;c;SGVsbG8=\x9c"),
+			Reason:  tainted.Wrap("Scheduled"),
+			Message: tainted.Wrap("ok"),
 		}},
 	}
 	lines := m.buildEventTimelineLines()
@@ -89,9 +91,9 @@ func TestBuildEventTimelineLinesSanitizesType(t *testing.T) {
 
 	m2 := Model{
 		eventTimelineData: []k8s.EventInfo{{
-			Type:    "\x9b31m",
-			Reason:  "Scheduled",
-			Message: "ok",
+			Type:    tainted.Wrap("\x9b31m"),
+			Reason:  tainted.Wrap("Scheduled"),
+			Message: tainted.Wrap("ok"),
 		}},
 	}
 	lines2 := m2.buildEventTimelineLines()
@@ -104,9 +106,9 @@ func TestBuildEventTimelineLinesSanitizesType(t *testing.T) {
 func TestBuildEventTimelineLinesOrdinaryTypeUnaffected(t *testing.T) {
 	m := Model{
 		eventTimelineData: []k8s.EventInfo{{
-			Type:    "Warning",
-			Reason:  "Scheduled",
-			Message: "ok",
+			Type:    tainted.Wrap("Warning"),
+			Reason:  tainted.Wrap("Scheduled"),
+			Message: tainted.Wrap("ok"),
 		}},
 	}
 	lines := m.buildEventTimelineLines()
@@ -123,8 +125,8 @@ func TestBuildEventTimelineLinesOrdinaryTypeUnaffected(t *testing.T) {
 func TestBuildEventTimelineLinesWideUnicodeColumnsAligned(t *testing.T) {
 	m := Model{
 		eventTimelineData: []k8s.EventInfo{
-			{Type: "Normal", Reason: "Scheduled", Message: "ascii message"},
-			{Type: "普通", Reason: "スケジュール済み", Message: "wide message"},
+			{Type: tainted.Wrap("Normal"), Reason: tainted.Wrap("Scheduled"), Message: tainted.Wrap("ascii message")},
+			{Type: tainted.Wrap("普通"), Reason: tainted.Wrap("スケジュール済み"), Message: tainted.Wrap("wide message")},
 		},
 	}
 	lines := m.buildEventTimelineLines()
@@ -146,9 +148,9 @@ func TestBuildEventTimelineLinesWideUnicodeColumnsAligned(t *testing.T) {
 func TestBuildEventTimelineLinesTruncatesOverlongTypeAndReason(t *testing.T) {
 	m := Model{
 		eventTimelineData: []k8s.EventInfo{{
-			Type:    "VeryLongEventTypeNameThatOverflows",
-			Reason:  "AnEvenLongerReasonStringThatDefinitelyExceedsTwentyColumns",
-			Message: "the message",
+			Type:    tainted.Wrap("VeryLongEventTypeNameThatOverflows"),
+			Reason:  tainted.Wrap("AnEvenLongerReasonStringThatDefinitelyExceedsTwentyColumns"),
+			Message: tainted.Wrap("the message"),
 		}},
 	}
 	lines := m.buildEventTimelineLines()

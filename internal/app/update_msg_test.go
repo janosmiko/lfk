@@ -14,6 +14,8 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // --- Update: tea.WindowSizeMsg ---
@@ -971,7 +973,7 @@ func TestPush3UpdatePreviewEventsLoadedMsg(t *testing.T) {
 	m.requestGen = 5
 	msg := previewEventsLoadedMsg{
 		events: []k8s.EventInfo{
-			{Type: "Normal", Reason: "Scheduled", Message: "pod assigned", Source: "scheduler"},
+			{Type: tainted.Wrap("Normal"), Reason: tainted.Wrap("Scheduled"), Message: tainted.Wrap("pod assigned"), Source: tainted.Wrap("scheduler")},
 		},
 		gen: 5,
 	}
@@ -2579,7 +2581,7 @@ func TestCovUpdateFinalizerSearch(t *testing.T) {
 func TestCovUpdateEventTimeline(t *testing.T) {
 	m := baseModelUpdate()
 	result, _ := m.Update(eventTimelineMsg{
-		events: []k8s.EventInfo{{Message: "event 1"}, {Message: "event 2"}},
+		events: []k8s.EventInfo{{Message: tainted.Wrap("event 1")}, {Message: tainted.Wrap("event 2")}},
 	})
 	rm := result.(Model)
 	assert.Equal(t, overlayEventTimeline, rm.overlay)
@@ -2588,7 +2590,7 @@ func TestCovUpdateEventTimeline(t *testing.T) {
 func TestCovUpdatePreviewEvents(t *testing.T) {
 	m := baseModelUpdate()
 	result, _ := m.Update(previewEventsLoadedMsg{
-		events: []k8s.EventInfo{{Message: "evt-1"}},
+		events: []k8s.EventInfo{{Message: tainted.Wrap("evt-1")}},
 	})
 	_ = result
 }

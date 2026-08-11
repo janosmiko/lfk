@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // SummaryBucket is one value group within a summary dimension (e.g. 12 "Healthy").
@@ -282,47 +283,19 @@ func sanitizeSummaryValue(s string) string {
 	return SanitizeTerminalText(s)
 }
 
-// SanitizeTerminalText strips the control characters described above from any
-// cluster-controlled string before it reaches the screen. Exported so every
-// such string passes through one implementation: the YAML blame gutter shows
-// field manager names, which a non-core apiserver can set to anything.
-//
-// It also drops the bidi embedding, override, and isolate characters
-// (U+202A-U+202E, U+2066-U+2069). Those reorder the text that follows them,
-// so a hostile name can make one value read as another on screen. The plain
-// direction marks U+200E and U+200F stay, because they only hint at direction
-// and legitimate right-to-left text uses them.
+// SanitizeTerminalText strips control characters and bidi overrides from a
+// cluster-controlled string before it reaches a single-line sink. Re-exported
+// from internal/tainted, which owns the implementation so the k8s and model
+// packages can reach it without importing internal/ui.
 func SanitizeTerminalText(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		if r < 0x20 || (r >= 0x7f && r <= 0x9f) || isBidiOverride(r) {
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
+	return tainted.SanitizeTerminalText(s)
 }
 
 // StripBidiOverrides removes only the bidi embedding/override/isolate
-// characters SanitizeTerminalText drops (see its doc comment), leaving
-// everything else - including ESC, tabs, and SGR sequences - untouched.
-// For sinks that need SanitizeLogBody's ANSI/tab handling but still must
-// guard against a hostile value reordering the rendered text.
+// characters, leaving ESC, tabs, and SGR sequences untouched. Re-exported
+// from internal/tainted.
 func StripBidiOverrides(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		if isBidiOverride(r) {
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}
-
-func isBidiOverride(r rune) bool {
-	return (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069)
+	return tainted.StripBidiOverrides(s)
 }
 
 const summaryBarCells = 14

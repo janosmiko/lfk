@@ -9,6 +9,8 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // PC-style navigation keys (Home/End/PgUp/PgDown) should behave the same as
@@ -551,9 +553,9 @@ func eventTimelineModel() Model {
 	events := make([]k8s.EventInfo, n)
 	for i := range n {
 		events[i] = k8s.EventInfo{
-			Type:    "Normal",
-			Reason:  "Scheduled",
-			Message: "event message",
+			Type:    tainted.Wrap("Normal"),
+			Reason:  tainted.Wrap("Scheduled"),
+			Message: tainted.Wrap("event message"),
 		}
 	}
 	m := Model{

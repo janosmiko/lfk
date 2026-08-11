@@ -43,13 +43,10 @@ func padColumn(s string, width int) string {
 // for cursor navigation. Each event becomes a single line with format:
 // {age}  {type}  {reason}  {message}
 //
-// Type, Reason, Message, and Source are cluster-controlled - any principal
-// that can create an Event in the namespace sets them - so they are
-// sanitized here, the single place raw k8s.EventInfo values turn into
-// displayed text for this viewer. SanitizeTerminalText, not the ANSI-aware
-// body sanitizer, because these are short table-cell values with no
-// legitimate reason to carry colour or tabs (matches how resourceTitleLabel
-// treats kind/namespace/name).
+// Type, Reason, Message, and Source are tainted.String, so the compiler
+// requires the unwrap below. Line, not the ANSI-aware Body, because these are
+// short table-cell values with no legitimate reason to carry colour or tabs
+// (matches how resourceTitleLabel treats kind/namespace/name).
 func (m *Model) buildEventTimelineLines() []string {
 	lines := make([]string, 0, len(m.eventTimelineData))
 	for _, e := range m.eventTimelineData {
@@ -58,12 +55,12 @@ func (m *Model) buildEventTimelineLines() []string {
 		if e.Count > 1 {
 			countStr = fmt.Sprintf(" (x%d)", e.Count)
 		}
-		typ := padColumn(ui.SanitizeTerminalText(e.Type), eventTimelineTypeWidth)
-		reason := padColumn(ui.SanitizeTerminalText(e.Reason), eventTimelineReasonWidth)
-		message := ui.SanitizeTerminalText(e.Message)
+		typ := padColumn(e.Type.Line(), eventTimelineTypeWidth)
+		reason := padColumn(e.Reason.Line(), eventTimelineReasonWidth)
+		message := e.Message.Line()
 		src := ""
-		if e.Source != "" {
-			src = " [" + ui.SanitizeTerminalText(e.Source) + "]"
+		if !e.Source.IsEmpty() {
+			src = " [" + e.Source.Line() + "]"
 		}
 		line := fmt.Sprintf("%-8s %s %s %s%s%s",
 			ts, typ, reason, message, countStr, src)
