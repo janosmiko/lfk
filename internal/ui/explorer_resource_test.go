@@ -310,6 +310,31 @@ func TestRenderPreviewEvents(t *testing.T) {
 			})
 		}
 	})
+
+	// Regression (TASK-874 CodeRabbit review): the reason-column width was
+	// measured with len(), which counts bytes. A CJK Reason has 3 bytes but
+	// 2 display cells per rune, so the byte count wildly overstates the
+	// column's visual width. That fed both the %-*s pad (rune-counted) and
+	// the byte-slicing truncateStr helper, which cut the string mid-rune
+	// and produced invalid UTF-8.
+	t.Run("multibyte reason column stays within width with valid UTF-8", func(t *testing.T) {
+		events := []EventTimelineEntry{{
+			Timestamp: time.Now().Add(-2 * time.Hour),
+			Type:      tainted.Wrap("Warning"),
+			Reason:    tainted.Wrap(strings.Repeat("日", 30)),
+			Message:   tainted.Wrap("volume mount failed"),
+			Count:     1,
+		}}
+		result := RenderPreviewEvents(events, 80)
+		for line := range strings.SplitSeq(result, "\n") {
+			if line == "" {
+				continue
+			}
+			assert.True(t, utf8.ValidString(line), "line must stay valid UTF-8: %q", line)
+			assert.LessOrEqual(t, lipgloss.Width(line), 80,
+				"event line exceeds width=80: %q (visible width %d)", line, lipgloss.Width(line))
+		}
+	})
 }
 
 // --- RenderResourceSummary ---

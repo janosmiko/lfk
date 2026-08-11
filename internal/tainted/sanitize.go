@@ -201,16 +201,18 @@ func parseSGRSequence(s string, i int) int {
 		return i
 	}
 	j := i + 2
-	// Parameter bytes: 0x30-0x3F (digits and ; : < = > ?).
-	for j < len(s) && s[j] >= 0x30 && s[j] <= 0x3F {
+	// Parameter bytes: digits, ';' and ':' only (truecolour uses both
+	// separators). This deliberately excludes the private markers < = > ?
+	// and the CSI intermediate bytes 0x20-0x2F: CSI > Ps ; Ps m is
+	// XTMODKEYS, which reprograms xterm's keyboard-modifier reporting, so
+	// forwarding a private marker let a cluster-controlled line change
+	// terminal state after rendering (TASK-885).
+	for j < len(s) && (s[j] == ';' || s[j] == ':' || (s[j] >= '0' && s[j] <= '9')) {
 		j++
 	}
-	// Intermediate bytes: 0x20-0x2F (space and ! " # $ % & ' ( ) * + , - . /).
-	for j < len(s) && s[j] >= 0x20 && s[j] <= 0x2F {
-		j++
-	}
-	// SGR final byte is lowercase 'm'. Anything else is a CSI we can't
-	// safely forward to an inline viewer.
+	// SGR final byte is lowercase 'm'. Anything else - including a private
+	// marker or intermediate byte that stopped the loop above - is a CSI
+	// we can't safely forward to an inline viewer.
 	if j < len(s) && s[j] == 'm' {
 		return j + 1
 	}

@@ -511,11 +511,11 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	maxReasonW := 0
 	maxCountW := 0
 	for _, e := range rendered {
-		if len(e.age) > maxAgeW {
-			maxAgeW = len(e.age)
+		if w := lipgloss.Width(e.age); w > maxAgeW {
+			maxAgeW = w
 		}
-		if len(e.reason) > maxReasonW {
-			maxReasonW = len(e.reason)
+		if w := lipgloss.Width(e.reason); w > maxReasonW {
+			maxReasonW = w
 		}
 		if e.count > 1 {
 			countStr := fmt.Sprintf(" (x%d)", e.count)
@@ -544,12 +544,15 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	for _, e := range rendered {
 		// Type indicator and styling.
 		var dot, reasonStr string
+		// padRight/Truncate measure visual columns, matching maxReasonW
+		// above; truncateStr and fmt's "%-*s" both count runes, which
+		// mismeasures a wide (e.g. CJK) or multibyte Reason.
 		if e.warning {
 			dot = errorStyle.Render("\u25cf")
-			reasonStr = errorStyle.Bold(true).Render(fmt.Sprintf("%-*s", maxReasonW, truncateStr(e.reason, maxReasonW)))
+			reasonStr = errorStyle.Bold(true).Render(padRight(Truncate(e.reason, maxReasonW), maxReasonW))
 		} else {
 			dot = normalStyle.Render("\u25cf")
-			reasonStr = reasonStyle.Render(fmt.Sprintf("%-*s", maxReasonW, truncateStr(e.reason, maxReasonW)))
+			reasonStr = reasonStyle.Render(padRight(Truncate(e.reason, maxReasonW), maxReasonW))
 		}
 
 		// Age.
