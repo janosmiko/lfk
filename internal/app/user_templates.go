@@ -1,24 +1,28 @@
 // Package app — user_templates.go
-// The user's own resource templates, saved from a live object by the Export
-// Template action.
+// The user's own resource templates: one YAML file per template in
+// <ConfigDir>/templates/, listed in the picker alongside BuiltinTemplates().
 //
-// Shape on disk: one YAML file, DataDir()/templates.yaml, holding a list of
-// {name, description, yaml}. A directory of loose manifests would be more
-// hand-editable, but each template also carries a name and a description that
-// a bare manifest has nowhere to put — and one file is one atomic rename.
-// A single marshalled list is also what every other lfk store does
-// (bookmarks.yaml, pinned.yaml).
+// The directory is a configuration surface, not application state: users hand
+// author these files, keep them in dotfiles, and edit them outside lfk. That is
+// why it lives under ConfigDir and why each file is a plain Kubernetes manifest
+// rather than a record in a combined list — adding a template is `cp` and
+// removing one is `rm`, with no envelope to re-indent into.
 //
-// DataDir rather than StateDir: these are authored documents the user would
-// want to keep and copy between machines, not derived runtime state.
+// The Export Template action writes into this same directory, so there is one
+// place to look for a template regardless of where it came from.
+//
+// The file name is the template name. A file that does not parse as a YAML
+// mapping is skipped and logged: a hand-edited directory will contain a broken
+// file sooner or later, and one broken file must not empty the picker.
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
 
-	"sigs.k8s.io/yaml"
+	yaml "gopkg.in/yaml.v3"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -26,103 +30,137 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// userTemplateCategory is the Category shown in the picker for every saved
-// template. It is what distinguishes a user template from a built-in of the
-// same name — see mergedTemplates.
+// userTemplateCategory is the Category every template in the directory gets.
+// Hand-authored files carry no category of their own, and this one value is
+// what distinguishes a user template from a built-in of the same name — see
+// mergedTemplates.
 const userTemplateCategory = "User"
 
-// storedTemplate is the on-disk record. Category is not stored: every entry in
-// this file is a user template by construction.
-type storedTemplate struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	YAML        string `json:"yaml"`
-}
+// errInvalidTemplateName rejects a name that would write outside the template
+// directory or produce an unreachable file.
+var errInvalidTemplateName = errors.New("invalid template name")
 
-func userTemplatesPath() string {
-	dir, err := paths.DataDir()
+func userTemplateDir() string {
+	dir, err := paths.ConfigDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(dir, "templates.yaml")
+	return filepath.Join(dir, "templates")
 }
 
-// loadUserTemplates reads the saved templates, sorted by name. A missing or
-// unparseable file yields nil so the picker falls back to the built-ins rather
-// than failing to open.
+// loadUserTemplates reads every *.yaml / *.yml file in the template directory.
+// os.ReadDir returns entries sorted by file name, and the file name is the
+// template name, so the picker order matches what the user sees in the
+// directory. A missing directory is the normal case and yields nil.
 func loadUserTemplates() []model.ResourceTemplate {
-	path := userTemplatesPath()
-	if path == "" {
+	dir := userTemplateDir()
+	if dir == "" {
 		return nil
 	}
-	data, err := os.ReadFile(path)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read user templates", "error", err, "path", path)
+			logger.Warn("Failed to read template directory", "error", err, "path", dir)
 		}
 		return nil
 	}
-	var stored []storedTemplate
-	if err := yaml.Unmarshal(data, &stored); err != nil {
-		logger.Warn("User templates file is corrupt; ignoring", "error", err, "path", path)
-		return nil
-	}
-	out := make([]model.ResourceTemplate, 0, len(stored))
-	for _, s := range stored {
-		if s.Name == "" {
+	var out []model.ResourceTemplate
+	for _, e := range entries {
+		if e.IsDir() || !isYAMLFile(e.Name()) {
 			continue
 		}
-		out = append(out, model.ResourceTemplate{
-			Name:        s.Name,
-			Description: s.Description,
-			Category:    userTemplateCategory,
-			YAML:        s.YAML,
-		})
+		tmpl, ok := readUserTemplate(filepath.Join(dir, e.Name()))
+		if !ok {
+			continue
+		}
+		out = append(out, tmpl)
 	}
 	if len(out) == 0 {
 		return nil
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 
-// saveUserTemplate writes tmpl to the user template file, replacing any entry
-// with the same name. The name and description come from cluster-sourced text,
-// so both are stripped of terminal control sequences before they reach disk —
-// the picker renders them.
-func saveUserTemplate(tmpl model.ResourceTemplate) error {
-	path := userTemplatesPath()
-	if path == "" {
-		return os.ErrNotExist
-	}
-	name := ui.SanitizeTerminalText(tmpl.Name)
-	if name == "" {
-		return os.ErrInvalid
-	}
-
-	existing := loadUserTemplates()
-	stored := make([]storedTemplate, 0, len(existing)+1)
-	for _, t := range existing {
-		if t.Name == name {
-			continue
-		}
-		stored = append(stored, storedTemplate{Name: t.Name, Description: t.Description, YAML: t.YAML})
-	}
-	stored = append(stored, storedTemplate{
-		Name:        name,
-		Description: ui.SanitizeTerminalText(tmpl.Description),
-		YAML:        tmpl.YAML,
-	})
-	sort.Slice(stored, func(i, j int) bool { return stored[i].Name < stored[j].Name })
-
-	data, err := yaml.Marshal(stored)
+// readUserTemplate turns one file into a template. The name comes from the file
+// name and the description from the manifest's kind. Both reach the picker as
+// rendered text and both are user-supplied, so both are sanitized here.
+func readUserTemplate(path string) (model.ResourceTemplate, bool) {
+	data, err := os.ReadFile(path) //nolint:gosec // path is an entry of the user's own template dir
 	if err != nil {
+		logger.Warn("Skipping unreadable template", "error", err, "path", path)
+		return model.ResourceTemplate{}, false
+	}
+	// Decode only the first document so a multi-document template still yields
+	// a kind for the description.
+	var obj map[string]any
+	if err := yaml.Unmarshal(data, &obj); err != nil {
+		if !decodeFirstDocument(data, &obj) {
+			logger.Warn("Skipping template that is not valid YAML", "error", err, "path", path)
+			return model.ResourceTemplate{}, false
+		}
+	}
+	if len(obj) == 0 {
+		logger.Warn("Skipping template that is not a Kubernetes object", "path", path)
+		return model.ResourceTemplate{}, false
+	}
+	base := filepath.Base(path)
+	name := ui.SanitizeTerminalText(strings.TrimSuffix(base, filepath.Ext(base)))
+	if name == "" {
+		return model.ResourceTemplate{}, false
+	}
+	kind, _ := obj["kind"].(string)
+	return model.ResourceTemplate{
+		Name:        name,
+		Description: ui.SanitizeTerminalText(kind),
+		Category:    userTemplateCategory,
+		YAML:        string(data),
+	}, true
+}
+
+// decodeFirstDocument retries a multi-document file, where a whole-file
+// Unmarshal fails on the second `---`.
+func decodeFirstDocument(data []byte, obj *map[string]any) bool {
+	dec := yaml.NewDecoder(strings.NewReader(string(data)))
+	return dec.Decode(obj) == nil
+}
+
+func isYAMLFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".yaml", ".yml":
+		return true
+	}
+	return false
+}
+
+// saveUserTemplate writes manifest to <template dir>/<name>.yaml, replacing any
+// file already under that name. The name is a resource name read from the
+// cluster, so it is sanitized and confined to a single path element before it
+// reaches the filesystem.
+func saveUserTemplate(name, manifest string) error {
+	dir := userTemplateDir()
+	if dir == "" {
+		return errInvalidTemplateName
+	}
+	clean := ui.SanitizeTerminalText(name)
+	if !isSafeTemplateName(clean) {
+		return errInvalidTemplateName
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
+	return writeFileDurable(filepath.Join(dir, clean+".yaml"), []byte(manifest))
+}
+
+// isSafeTemplateName reports whether name is a single path element that stays
+// inside the template directory.
+func isSafeTemplateName(name string) bool {
+	if name == "" || name == "." || name == ".." {
+		return false
 	}
-	return writeFileDurable(path, data)
+	if strings.ContainsAny(name, `/\`) || strings.ContainsRune(name, os.PathSeparator) {
+		return false
+	}
+	return name == filepath.Base(name)
 }
 
 // mergedTemplates is what the template picker lists: the user's templates

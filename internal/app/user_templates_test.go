@@ -11,65 +11,100 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-// withTempDataDir points paths.DataDir() at a scratch directory for the test.
-func withTempDataDir(t *testing.T) string {
+// withTempConfigDir points paths.ConfigDir() at a scratch directory and returns
+// the template directory inside it.
+func withTempConfigDir(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("LFK_DATA_DIR", dir)
-	return dir
+	t.Setenv("LFK_CONFIG_DIR", t.TempDir())
+	return userTemplateDir()
+}
+
+// writeTemplateFile drops a file straight into the template directory, the way
+// a user hand-authoring a template would.
+func writeTemplateFile(t *testing.T, dir, filename, body string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, filename), []byte(body), 0o600))
 }
 
 func TestSaveUserTemplate_RoundTrips(t *testing.T) {
-	withTempDataDir(t)
+	dir := withTempConfigDir(t)
 
-	require.NoError(t, saveUserTemplate(model.ResourceTemplate{
-		Name:        "web",
-		Description: "Deployment web",
-		YAML:        "kind: Deployment\n",
-	}))
+	require.NoError(t, saveUserTemplate("web", "apiVersion: apps/v1\nkind: Deployment\n"))
+
+	assert.FileExists(t, filepath.Join(dir, "web.yaml"))
 
 	got := loadUserTemplates()
 	require.Len(t, got, 1)
 	assert.Equal(t, "web", got[0].Name)
-	assert.Equal(t, "Deployment web", got[0].Description)
-	assert.Equal(t, "kind: Deployment\n", got[0].YAML)
 	assert.Equal(t, userTemplateCategory, got[0].Category)
+	assert.Equal(t, "apiVersion: apps/v1\nkind: Deployment\n", got[0].YAML)
+	assert.Contains(t, got[0].Description, "Deployment")
+}
+
+// TestLoadUserTemplates_ReadsHandAuthoredFile is the point of the directory:
+// a file the user drops in shows up next to the built-ins with no export step.
+func TestLoadUserTemplates_ReadsHandAuthoredFile(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "my-cronjob.yml", "apiVersion: batch/v1\nkind: CronJob\n")
+
+	got := loadUserTemplates()
+	require.Len(t, got, 1)
+	assert.Equal(t, "my-cronjob", got[0].Name, "the file name is the template name")
+	assert.Contains(t, got[0].Description, "CronJob")
 }
 
 func TestSaveUserTemplate_ReplacesSameName(t *testing.T) {
-	withTempDataDir(t)
+	dir := withTempConfigDir(t)
 
-	require.NoError(t, saveUserTemplate(model.ResourceTemplate{Name: "web", YAML: "kind: Pod\n"}))
-	require.NoError(t, saveUserTemplate(model.ResourceTemplate{Name: "web", YAML: "kind: Deployment\n"}))
+	require.NoError(t, saveUserTemplate("web", "kind: Pod\n"))
+	require.NoError(t, saveUserTemplate("web", "kind: Deployment\n"))
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "a second save under the same name replaces the file")
 
 	got := loadUserTemplates()
-	require.Len(t, got, 1, "a second save under the same name replaces the first")
+	require.Len(t, got, 1)
 	assert.Equal(t, "kind: Deployment\n", got[0].YAML)
 }
 
-func TestSaveUserTemplate_SortsByName(t *testing.T) {
-	withTempDataDir(t)
-
-	for _, n := range []string{"zeta", "alpha", "mid"} {
-		require.NoError(t, saveUserTemplate(model.ResourceTemplate{Name: n, YAML: "kind: Pod\n"}))
-	}
+// TestLoadUserTemplates_SkipsMalformedFile is the hand-editing guard: one file
+// with broken YAML must not empty the picker or hide its healthy siblings.
+func TestLoadUserTemplates_SkipsMalformedFile(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "good.yaml", "kind: Pod\n")
+	writeTemplateFile(t, dir, "broken.yaml", "kind: Pod\n  bad: [indent\n")
+	writeTemplateFile(t, dir, "notamap.yaml", "- just\n- a\n- list\n")
 
 	got := loadUserTemplates()
-	require.Len(t, got, 3)
-	assert.Equal(t, []string{"alpha", "mid", "zeta"}, []string{got[0].Name, got[1].Name, got[2].Name})
+	require.Len(t, got, 1)
+	assert.Equal(t, "good", got[0].Name)
 }
 
-// TestSaveUserTemplate_SanitizesClusterText covers the boundary: a template
-// name derived from a resource name is cluster-controlled text, and the picker
-// renders it. The escape must be gone in what lands on disk.
-func TestSaveUserTemplate_SanitizesClusterText(t *testing.T) {
-	withTempDataDir(t)
+func TestLoadUserTemplates_IgnoresNonYAMLEntries(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "good.yaml", "kind: Pod\n")
+	writeTemplateFile(t, dir, "README.md", "not a template\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "nested"), 0o700))
 
-	require.NoError(t, saveUserTemplate(model.ResourceTemplate{
-		Name:        "web\x1b[31mred",
-		Description: "kind\x1b]0;title\x07",
-		YAML:        "kind: Pod\n",
-	}))
+	got := loadUserTemplates()
+	require.Len(t, got, 1)
+	assert.Equal(t, "good", got[0].Name)
+}
+
+func TestLoadUserTemplates_MissingDirIsNotAnError(t *testing.T) {
+	withTempConfigDir(t)
+	assert.Nil(t, loadUserTemplates())
+	assert.Len(t, mergedTemplates(), len(model.BuiltinTemplates()))
+}
+
+// TestLoadUserTemplates_SanitizesUserSuppliedText covers the boundary: a
+// template pasted from the internet, and a file name chosen by whoever wrote
+// it, both reach the picker as rendered text.
+func TestLoadUserTemplates_SanitizesUserSuppliedText(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "web\x1b[31mred.yaml", "kind: \"Pod\\e[31m\"\n")
 
 	got := loadUserTemplates()
 	require.Len(t, got, 1)
@@ -78,11 +113,11 @@ func TestSaveUserTemplate_SanitizesClusterText(t *testing.T) {
 }
 
 // TestSaveUserTemplate_LeavesNoTempFile guards the atomic write: the temp file
-// the save writes before renaming must not survive the call.
+// written before the rename must not survive the call.
 func TestSaveUserTemplate_LeavesNoTempFile(t *testing.T) {
-	dir := withTempDataDir(t)
+	dir := withTempConfigDir(t)
 
-	require.NoError(t, saveUserTemplate(model.ResourceTemplate{Name: "web", YAML: "kind: Pod\n"}))
+	require.NoError(t, saveUserTemplate("web", "kind: Pod\n"))
 
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
@@ -90,16 +125,27 @@ func TestSaveUserTemplate_LeavesNoTempFile(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	assert.Equal(t, []string{filepath.Base(userTemplatesPath())}, names)
+	assert.Equal(t, []string{"web.yaml"}, names)
+}
+
+// TestSaveUserTemplate_RejectsPathEscape keeps a resource name from steering
+// the write outside the template directory.
+func TestSaveUserTemplate_RejectsPathEscape(t *testing.T) {
+	dir := withTempConfigDir(t)
+
+	for _, name := range []string{"../escape", "sub/web", "..", ""} {
+		assert.Error(t, saveUserTemplate(name, "kind: Pod\n"), "name %q must be rejected", name)
+	}
+	assert.NoDirExists(t, filepath.Join(dir, "sub"))
+	assert.NoFileExists(t, filepath.Join(filepath.Dir(dir), "escape.yaml"))
 }
 
 // TestMergedTemplates_UserFirstAndNeverShadows is the name-collision rule: a
 // user template named after a built-in does not replace it. Both rows stay in
 // the picker, the user one first, and the Category column tells them apart.
 func TestMergedTemplates_UserFirstAndNeverShadows(t *testing.T) {
-	withTempDataDir(t)
-
-	require.NoError(t, saveUserTemplate(model.ResourceTemplate{Name: "Pod", YAML: "kind: Pod # mine\n"}))
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "Pod.yaml", "kind: Pod # mine\n")
 
 	merged := mergedTemplates()
 	require.NotEmpty(t, merged)
@@ -115,9 +161,4 @@ func TestMergedTemplates_UserFirstAndNeverShadows(t *testing.T) {
 	}
 	assert.True(t, builtinKept, "the built-in Pod template must still be listed")
 	assert.Len(t, merged, len(model.BuiltinTemplates())+1)
-}
-
-func TestLoadUserTemplates_NoFileReturnsNil(t *testing.T) {
-	withTempDataDir(t)
-	assert.Nil(t, loadUserTemplates())
 }
