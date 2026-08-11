@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // --- renderKV ---
@@ -235,16 +237,16 @@ func TestRenderPreviewEvents(t *testing.T) {
 		events := []EventTimelineEntry{
 			{
 				Timestamp: time.Now().Add(-5 * time.Minute),
-				Type:      "Normal",
-				Reason:    "Scheduled",
-				Message:   "Successfully assigned pod to node",
+				Type:      tainted.Wrap("Normal"),
+				Reason:    tainted.Wrap("Scheduled"),
+				Message:   tainted.Wrap("Successfully assigned pod to node"),
 				Count:     1,
 			},
 			{
 				Timestamp: time.Now().Add(-3 * time.Minute),
-				Type:      "Warning",
-				Reason:    "BackOff",
-				Message:   "Back-off restarting failed container",
+				Type:      tainted.Wrap("Warning"),
+				Reason:    tainted.Wrap("BackOff"),
+				Message:   tainted.Wrap("Back-off restarting failed container"),
 				Count:     5,
 			},
 		}
@@ -259,9 +261,9 @@ func TestRenderPreviewEvents(t *testing.T) {
 		events := []EventTimelineEntry{
 			{
 				Timestamp: time.Now(),
-				Type:      "Normal",
-				Reason:    "Pulled",
-				Message:   "Pulled image",
+				Type:      tainted.Wrap("Normal"),
+				Reason:    tainted.Wrap("Pulled"),
+				Message:   tainted.Wrap("Pulled image"),
 				Count:     1,
 			},
 		}
@@ -291,9 +293,9 @@ func TestRenderPreviewEvents(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				events := []EventTimelineEntry{{
 					Timestamp: now.Add(-2 * time.Hour),
-					Type:      "Warning",
-					Reason:    "FailedMount",
-					Message:   tc.msg,
+					Type:      tainted.Wrap("Warning"),
+					Reason:    tainted.Wrap("FailedMount"),
+					Message:   tainted.Wrap(tc.msg),
 					Count:     tc.count,
 				}}
 				result := RenderPreviewEvents(events, tc.width)
@@ -749,9 +751,9 @@ func TestRenderPreviewEvents_Sanitized(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			events := []EventTimelineEntry{{
 				Timestamp: time.Now(),
-				Type:      "Warning",
-				Reason:    "BackOff" + payload,
-				Message:   "Back-off restarting failed container" + payload,
+				Type:      tainted.Wrap("Warning"),
+				Reason:    tainted.Wrap("BackOff" + payload),
+				Message:   tainted.Wrap("Back-off restarting failed container" + payload),
 				Count:     1,
 			}}
 			out := RenderPreviewEvents(events, 100)

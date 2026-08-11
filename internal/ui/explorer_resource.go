@@ -483,32 +483,42 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 		events = events[:maxEvents]
 	}
 
-	// Sanitize into a fresh slice (never mutate the caller's backing array)
-	// before either the width-measurement pass or the render pass reads
-	// Reason/Message — both derive column widths from these values.
-	sanitizedEvents := make([]EventTimelineEntry, len(events))
-	for i, e := range events {
-		e.Reason = SanitizeTerminalText(e.Reason)
-		e.Message = SanitizeLogBody(StripBidiOverrides(e.Message), false)
-		sanitizedEvents[i] = e
+	// Unwrap into plain strings once, up front: the width-measurement pass
+	// and the render pass both read Reason/Message, and both must see the
+	// same sanitized text or the computed column widths will not match what
+	// is drawn.
+	type renderEvent struct {
+		age     string
+		reason  string
+		message string
+		warning bool
+		count   int32
 	}
-	events = sanitizedEvents
+	rendered := make([]renderEvent, len(events))
+	for i, e := range events {
+		rendered[i] = renderEvent{
+			age:     RelativeTime(e.Timestamp),
+			reason:  e.Reason.Line(),
+			message: e.Message.Body(false),
+			warning: e.Type.Is("Warning"),
+			count:   e.Count,
+		}
+	}
 
 	// Calculate column widths for alignment.
 	// Format: AGE  TYPE  REASON  MESSAGE  (xCount)?
 	maxAgeW := 0
 	maxReasonW := 0
 	maxCountW := 0
-	for _, e := range events {
-		ageStr := RelativeTime(e.Timestamp)
-		if len(ageStr) > maxAgeW {
-			maxAgeW = len(ageStr)
+	for _, e := range rendered {
+		if len(e.age) > maxAgeW {
+			maxAgeW = len(e.age)
 		}
-		if len(e.Reason) > maxReasonW {
-			maxReasonW = len(e.Reason)
+		if len(e.reason) > maxReasonW {
+			maxReasonW = len(e.reason)
 		}
-		if e.Count > 1 {
-			countStr := fmt.Sprintf(" (x%d)", e.Count)
+		if e.count > 1 {
+			countStr := fmt.Sprintf(" (x%d)", e.count)
 			if len(countStr) > maxCountW {
 				maxCountW = len(countStr)
 			}
@@ -531,31 +541,28 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	// clipped off the screen.
 	msgWidth := max(width-maxAgeW-3-maxReasonW-4-maxCountW, 20) // 3 for " ● ", 4 for spacing
 
-	for _, e := range events {
-		ageStr := RelativeTime(e.Timestamp)
-
+	for _, e := range rendered {
 		// Type indicator and styling.
 		var dot, reasonStr string
-		switch e.Type {
-		case "Warning":
+		if e.warning {
 			dot = errorStyle.Render("\u25cf")
-			reasonStr = errorStyle.Bold(true).Render(fmt.Sprintf("%-*s", maxReasonW, truncateStr(e.Reason, maxReasonW)))
-		default:
+			reasonStr = errorStyle.Bold(true).Render(fmt.Sprintf("%-*s", maxReasonW, truncateStr(e.reason, maxReasonW)))
+		} else {
 			dot = normalStyle.Render("\u25cf")
-			reasonStr = reasonStyle.Render(fmt.Sprintf("%-*s", maxReasonW, truncateStr(e.Reason, maxReasonW)))
+			reasonStr = reasonStyle.Render(fmt.Sprintf("%-*s", maxReasonW, truncateStr(e.reason, maxReasonW)))
 		}
 
 		// Age.
-		ageFormatted := dimStyle.Render(fmt.Sprintf("%-*s", maxAgeW, ageStr))
+		ageFormatted := dimStyle.Render(fmt.Sprintf("%-*s", maxAgeW, e.age))
 
 		// Count suffix.
 		countStr := ""
-		if e.Count > 1 {
-			countStr = warningStyle.Render(fmt.Sprintf(" (x%d)", e.Count))
+		if e.count > 1 {
+			countStr = warningStyle.Render(fmt.Sprintf(" (x%d)", e.count))
 		}
 
 		// Message - wrap long messages rather than truncate.
-		msg := e.Message
+		msg := e.message
 		if len(msg) > msgWidth {
 			msg = msg[:msgWidth-3] + "..."
 		}

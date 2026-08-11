@@ -10,6 +10,8 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // baseOverlayModel returns a minimal Model for overlay rendering tests.
@@ -309,13 +311,13 @@ func TestRenderOverlayEventTimeline(t *testing.T) {
 	m.eventTimelineData = []k8s.EventInfo{
 		{
 			Timestamp:    time.Now(),
-			Type:         "Normal",
-			Reason:       "Created",
-			Message:      "Created container nginx",
-			Source:       "kubelet",
+			Type:         tainted.Wrap("Normal"),
+			Reason:       tainted.Wrap("Created"),
+			Message:      tainted.Wrap("Created container nginx"),
+			Source:       tainted.Wrap("kubelet"),
 			Count:        1,
-			InvolvedName: "my-pod",
-			InvolvedKind: "Pod",
+			InvolvedName: tainted.Wrap("my-pod"),
+			InvolvedKind: tainted.Wrap("Pod"),
 		},
 	}
 	m.actionCtx = actionContext{name: "my-pod"}

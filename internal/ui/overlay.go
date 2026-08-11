@@ -2,6 +2,8 @@ package ui
 
 import (
 	"time"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // overlayNsScroll is the persistent scroll position for the namespace overlay.
@@ -91,15 +93,17 @@ type QuotaResourceEntry struct {
 }
 
 // EventTimelineEntry holds event data for rendering in the timeline overlay.
+// It mirrors k8s.EventInfo so internal/ui does not depend on the k8s package,
+// and keeps the same tainted fields - see k8s.EventInfo for why.
 type EventTimelineEntry struct {
 	Timestamp    time.Time
-	Type         string // "Normal" or "Warning"
-	Reason       string
-	Message      string
-	Source       string
+	Type         tainted.String // "Normal" or "Warning"
+	Reason       tainted.String
+	Message      tainted.String
+	Source       tainted.String
 	Count        int32
-	InvolvedName string
-	InvolvedKind string
+	InvolvedName tainted.String
+	InvolvedKind tainted.String
 }
 
 // AlertEntry holds alert data for rendering in the overlay, decoupled from the k8s package.

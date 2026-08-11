@@ -19,6 +19,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // CheckRBAC checks what verbs the current user can perform on the given resource.
@@ -415,15 +417,20 @@ func computeQuotaPercent(_, hardStr, usedStr string) float64 {
 }
 
 // EventInfo holds a single Kubernetes event with its key fields.
+//
+// Every text field is tainted: any principal that can create an Event in the
+// namespace chooses Type, Reason, Message and Source, and the involved
+// object's name and kind come from the same object graph. Unwrap with Line
+// for a table cell, Body for a wrapped message pane.
 type EventInfo struct {
 	Timestamp    time.Time
-	Type         string // "Normal" or "Warning"
-	Reason       string
-	Message      string
-	Source       string // e.g. "kubelet", "scheduler"
+	Type         tainted.String // "Normal" or "Warning"
+	Reason       tainted.String
+	Message      tainted.String
+	Source       tainted.String // e.g. "kubelet", "scheduler"
 	Count        int32
-	InvolvedName string
-	InvolvedKind string
+	InvolvedName tainted.String
+	InvolvedKind tainted.String
 }
 
 // GetResourceEvents fetches events related to the named resource and its owned
@@ -508,13 +515,13 @@ func (c *Client) GetResourceEvents(ctx context.Context, kubeCtx, namespace, name
 
 		events = append(events, EventInfo{
 			Timestamp:    ts,
-			Type:         eventType,
-			Reason:       reason,
-			Message:      message,
-			Source:       source,
+			Type:         tainted.Wrap(eventType),
+			Reason:       tainted.Wrap(reason),
+			Message:      tainted.Wrap(message),
+			Source:       tainted.Wrap(source),
 			Count:        int32(countVal),
-			InvolvedName: involvedName,
-			InvolvedKind: involvedKind,
+			InvolvedName: tainted.Wrap(involvedName),
+			InvolvedKind: tainted.Wrap(involvedKind),
 		})
 	}
 

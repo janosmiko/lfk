@@ -13,7 +13,7 @@ import (
 // hostile carries every escape class the threat model cares about: OSC-52
 // clipboard write, a CSI screen erase, and a bidi override that reorders the
 // text after it.
-const hostile = "ok\x1b]52;c;aGF4\x07\x1b[2Jsafe‮txet"
+const hostile = "ok\x1b]52;c;aGF4\x07\x1b[2Jsafe\u202etxet"
 
 // TestFormatVerbsNeverEmitPayload is the core guarantee: a String that
 // reaches fmt without an unwrap must emit the marker, not the payload. It
@@ -24,7 +24,7 @@ func TestFormatVerbsNeverEmitPayload(t *testing.T) {
 	for _, verb := range []string{"%s", "%v", "%q", "%d", "%#v", "%+v"} {
 		out := fmt.Sprintf(verb, v)
 		assert.NotContains(t, out, "\x1b", "verb %s emitted a raw ESC", verb)
-		assert.NotContains(t, out, "‮", "verb %s emitted a bidi override", verb)
+		assert.NotContains(t, out, "\u202e", "verb %s emitted a bidi override", verb)
 		assert.Contains(t, out, "[tainted:unsanitized]", "verb %s should emit the marker", verb)
 	}
 }
@@ -43,7 +43,7 @@ func TestFormatInsideStructNeverEmitsPayload(t *testing.T) {
 	for _, verb := range []string{"%v", "%+v", "%d"} {
 		out := fmt.Sprintf(verb, s)
 		assert.NotContains(t, out, "\x1b", "verb %s leaked an ESC from a struct field", verb)
-		assert.NotContains(t, out, "‮", "verb %s leaked a bidi override from a struct field", verb)
+		assert.NotContains(t, out, "\u202e", "verb %s leaked a bidi override from a struct field", verb)
 	}
 }
 
@@ -56,7 +56,7 @@ func TestStringerEmitsMarker(t *testing.T) {
 func TestLineStripsEverySinkUnsafeRune(t *testing.T) {
 	out := tainted.Wrap(hostile).Line()
 	assert.NotContains(t, out, "\x1b")
-	assert.NotContains(t, out, "‮")
+	assert.NotContains(t, out, "\u202e")
 	assert.NotContains(t, out, "\x07")
 	assert.Contains(t, out, "safe")
 }
@@ -64,9 +64,9 @@ func TestLineStripsEverySinkUnsafeRune(t *testing.T) {
 // TestBodyStripsBidiAndKeepsSGR checks the body unwrap makes the other
 // trade-off: colour survives, reordering does not.
 func TestBodyStripsBidiAndKeepsSGR(t *testing.T) {
-	out := tainted.Wrap("\x1b[32mgreen\x1b[0m‮flip").Body(true)
+	out := tainted.Wrap("\x1b[32mgreen\x1b[0m\u202eflip").Body(true)
 	assert.Contains(t, out, "\x1b[32m", "SGR colour should survive the body unwrap")
-	assert.NotContains(t, out, "‮", "bidi override must not survive the body unwrap")
+	assert.NotContains(t, out, "\u202e", "bidi override must not survive the body unwrap")
 
 	plain := tainted.Wrap("\x1b[2Jerase").Body(false)
 	assert.NotContains(t, plain, "\x1b", "a non-SGR CSI must not survive even with renderAnsi off")
