@@ -129,7 +129,8 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 
 ### Resource Management
 
-- **Resource templates**: Create resources from 25+ built-in templates (`a`, `/` to search); includes a Custom Resource template as a starting point
+- **Resource templates**: Create resources from 25+ built-in templates plus your own (`a`, `/` to search); includes a Custom Resource template as a starting point. Drop manifests in `~/.config/lfk/templates/` or save one there with `x` -> Export Template
+- **Export as template**: `x` -> Export Template strips a live object down to an appliable manifest (no `status`, `uid`, `resourceVersion`, `nodeName`, `clusterIP`, injected token volume, ...) and sends it to the clipboard, a file, or the template list. Allowed in read-only mode
 - **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
 - **Network policy visualizer**: Visualize a NetworkPolicy's ingress/egress rules (`x` → `N` on a NetworkPolicy), or list every policy affecting a Pod or Service (`x` → "Network Policies" on the resource) — including which backing pods a policy covers. Supports CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy (entities, FQDNs, deny rules, L7 indicators) when the Cilium CRDs are installed. The dialog scrolls with the mouse wheel and is searchable (`/`, `n`/`N`)
 - **Clipboard support**: Copy resource name (`y`), open copy-as picker (`Y`: YAML / JSON / Table), copy a single field via a filterable picker (`Ctrl+Y`: visible columns by default, `Tab` for all manifest fields — e.g. a node's external IP), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
