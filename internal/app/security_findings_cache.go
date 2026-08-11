@@ -213,7 +213,7 @@ func saveSecurityFindingsCacheForHost(host, namespace string, findings []securit
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	if err := writeFileDurable(path, data, 0o600); err != nil {
+	if err := writeFileDurable(path, data); err != nil {
 		return err
 	}
 	// Best-effort: drop a pre-#387 YAML cache so the large legacy file does not

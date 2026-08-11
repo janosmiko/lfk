@@ -11,17 +11,17 @@ import (
 	"path/filepath"
 )
 
-// writeFileDurable atomically writes data to path with the given file mode:
-// write a unique temp file, fsync, chmod, rename, fsync parent dir. The caller
-// is responsible for creating the parent directory. The temp file is removed
-// on any failure before the rename.
+// writeFileDurable atomically writes data to path with owner-only (0600)
+// permissions: write a unique temp file, fsync, chmod, rename, fsync parent
+// dir. The caller is responsible for creating the parent directory. The temp
+// file is removed on any failure before the rename.
 //
 // A unique temp name (os.CreateTemp, not a fixed "path.tmp" sibling) is
 // required because these caches live in the shared kubectl cache dir: two lfk
 // instances saving the same host file would otherwise truncate each other's
 // in-flight temp write and promote a torn file via rename (see the same fix in
 // cluster_colors.go).
-func writeFileDurable(path string, data []byte, mode os.FileMode) error {
+func writeFileDurable(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	f, err := os.CreateTemp(dir, filepath.Base(path)+".tmp.*")
 	if err != nil {
@@ -29,9 +29,9 @@ func writeFileDurable(path string, data []byte, mode os.FileMode) error {
 	}
 	tmp := f.Name()
 	cleanup := func() { _ = os.Remove(tmp) }
-	// CreateTemp makes the file 0600; widen/narrow to the requested mode so
-	// callers control the final permissions (e.g. 0600 for sensitive findings).
-	if err := f.Chmod(mode); err != nil {
+	// CreateTemp already makes the file 0600; the explicit Chmod pins it so a
+	// permissive umask or a pre-existing file at path cannot widen the result.
+	if err := f.Chmod(0o600); err != nil {
 		_ = f.Close()
 		cleanup()
 		return err
