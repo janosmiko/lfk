@@ -259,12 +259,16 @@ type exportTemplateReadyMsg struct {
 	name     string
 	kind     string
 	manifest string
+	redacted bool // kind whose values StripToTemplate blanks (Secret)
 	err      error
 }
 
 // exportDoneMsg carries the result of exporting a resource to a file.
 type exportDoneMsg struct {
 	path string
+	// note is appended to the success line. Used by the template export to say
+	// that Secret values were redacted, so nobody finds out by pasting a blank.
+	note string
 	err  error
 }
 

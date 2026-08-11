@@ -61,14 +61,29 @@ type exportTemplateState struct {
 	name     string
 	kind     string
 	manifest string
+	redacted bool
 }
 
-func (m *Model) openExportTemplatePicker(name, kind, manifest string) {
+// secretRedactedNote is appended to every destination's success line so the
+// redaction is visible at export time, not at paste time.
+const secretRedactedNote = " (Secret values redacted, keys kept)"
+
+// redactionNote returns the suffix for the current export, empty for kinds
+// whose values pass through untouched.
+func (s exportTemplateState) redactionNote() string {
+	if s.redacted {
+		return secretRedactedNote
+	}
+	return ""
+}
+
+func (m *Model) openExportTemplatePicker(name, kind, manifest string, redacted bool) {
 	m.exportTemplatePicker = exportTemplateState{
 		active:   true,
 		name:     name,
 		kind:     kind,
 		manifest: manifest,
+		redacted: redacted,
 	}
 	m.previousOverlay = overlayNone
 	m.overlay = overlayExportTemplate
@@ -131,11 +146,11 @@ func (m Model) applyExportTemplatePicker() (tea.Model, tea.Cmd) {
 
 	switch dest {
 	case exportDestClipboard:
-		m.setStatusMessage("Copied template for "+state.name, false)
+		m.setStatusMessage("Copied template for "+state.name+state.redactionNote(), false)
 		return m, tea.Batch(copyToSystemClipboard(state.manifest), scheduleStatusClear())
 	case exportDestFile:
 		path := templateExportFilename(state.kind, state.name)
-		manifest := state.manifest
+		manifest, note := state.manifest, state.redactionNote()
 		return m, func() tea.Msg {
 			if err := writeSecureFile(path, []byte(manifest)); err != nil {
 				return exportDoneMsg{err: fmt.Errorf("writing file: %w", err)}
@@ -144,15 +159,15 @@ func (m Model) applyExportTemplatePicker() (tea.Model, tea.Cmd) {
 			if err != nil {
 				abs = path
 			}
-			return exportDoneMsg{path: abs}
+			return exportDoneMsg{path: abs, note: note}
 		}
 	case exportDestTemplateList:
-		name, manifest := state.name, state.manifest
+		name, manifest, note := state.name, state.manifest, state.redactionNote()
 		return m, func() tea.Msg {
 			if err := saveUserTemplate(name, manifest); err != nil {
 				return actionResultMsg{err: fmt.Errorf("saving template: %w", err)}
 			}
-			return actionResultMsg{message: "Saved template " + name}
+			return actionResultMsg{message: "Saved template " + name + note}
 		}
 	}
 	return m, nil

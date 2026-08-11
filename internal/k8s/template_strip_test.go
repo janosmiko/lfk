@@ -193,6 +193,49 @@ status:
   readyReplicas: 3
 `
 
+const liveCronJobYAML = `apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: report
+  namespace: prod
+  uid: 8c3b1f52-0000-4000-8000-000000000006
+  creationTimestamp: "2026-01-02T03:04:05Z"
+  labels:
+    team: payments
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      template:
+        metadata:
+          creationTimestamp: null
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: report
+              image: reporter:2.1
+status:
+  lastScheduleTime: "2026-01-02T03:05:00Z"
+`
+
+const liveSecretYAML = `apiVersion: v1
+kind: Secret
+metadata:
+  name: db-creds
+  namespace: prod
+  uid: 8c3b1f52-0000-4000-8000-000000000007
+  labels:
+    team: payments
+type: kubernetes.io/basic-auth
+data:
+  username: YWRtaW4=
+  password: aHVudGVyMi1zdXBlci1zZWNyZXQ=
+stringData:
+  token: plaintext-bearer-token
+`
+
 // TestStripToTemplate_PerKind asserts, for each kind that gets specific
 // handling, that the server-set fields are gone AND that a meaningful,
 // user-authored field survived. The "kept" half is what catches an
@@ -287,6 +330,43 @@ func TestStripToTemplate_PerKind(t *testing.T) {
 			},
 		},
 		{
+			name: "Secret",
+			in:   liveSecretYAML,
+			gone: [][]string{
+				{"status"},
+				{"metadata", "uid"},
+				{"metadata", "namespace"},
+			},
+			kept: [][]string{
+				// The shape of a Secret is its keys and its type. Both survive;
+				// only the values are blanked — see the redaction test below.
+				{"type"},
+				{"data", "username"},
+				{"data", "password"},
+				{"stringData", "token"},
+				{"metadata", "labels", "team"},
+			},
+		},
+		{
+			name: "CronJob",
+			in:   liveCronJobYAML,
+			gone: [][]string{
+				{"status"},
+				{"metadata", "uid"},
+				{"metadata", "creationTimestamp"},
+				{"metadata", "namespace"},
+				// Both ObjectMetas the serializer fills in: the JobTemplateSpec's
+				// own, and the pod template's inside it.
+				{"spec", "jobTemplate", "metadata", "creationTimestamp"},
+				{"spec", "jobTemplate", "spec", "template", "metadata", "creationTimestamp"},
+			},
+			kept: [][]string{
+				{"spec", "schedule"},
+				{"metadata", "labels", "team"},
+				{"spec", "jobTemplate", "spec", "template", "spec", "containers"},
+			},
+		},
+		{
 			name: "Deployment falls back to the generic strip",
 			in:   liveDeploymentYAML,
 			gone: [][]string{
@@ -368,6 +448,8 @@ func TestStripToTemplate_NoServerAssignedIdentifiersSurvive(t *testing.T) {
 		{"Service", liveServiceYAML, &corev1.Service{}},
 		{"PersistentVolumeClaim", livePVCYAML, &corev1.PersistentVolumeClaim{}},
 		{"Job", liveJobYAML, &batchv1.Job{}},
+		{"CronJob", liveCronJobYAML, &batchv1.CronJob{}},
+		{"Secret", liveSecretYAML, &corev1.Secret{}},
 		{"Deployment", liveDeploymentYAML, &appsv1.Deployment{}},
 	}
 	for _, tc := range tests {
@@ -406,4 +488,39 @@ data:
 func TestStripToTemplate_RejectsNonObject(t *testing.T) {
 	_, err := StripToTemplate("- just\n- a\n- list\n")
 	assert.Error(t, err)
+}
+
+// TestStripToTemplate_SecretKeepsKeysDropsValues: a template is a shape, not a
+// payload. All three export destinations persist, so the live credential must
+// not travel with the keys. The type is authored, not server-set, and stays —
+// a kubernetes.io/tls Secret is a different template from an Opaque one.
+func TestStripToTemplate_SecretKeepsKeysDropsValues(t *testing.T) {
+	out, err := StripToTemplate(liveSecretYAML)
+	require.NoError(t, err)
+
+	// Assert on the payload itself, not only on the decoded value: a value
+	// that reads as empty while the ciphertext lingers elsewhere in the
+	// document is a different failure from a value that was never blanked.
+	for _, secret := range []string{"YWRtaW4=", "aHVudGVyMi1zdXBlci1zZWNyZXQ=", "plaintext-bearer-token"} {
+		assert.NotContains(t, out, secret, "a live Secret value survived the strip")
+	}
+
+	var decoded corev1.Secret
+	require.NoError(t, sigsyaml.UnmarshalStrict([]byte(out), &decoded))
+
+	assert.Equal(t, corev1.SecretTypeBasicAuth, decoded.Type)
+	require.Len(t, decoded.Data, 2)
+	for key, value := range decoded.Data {
+		assert.Empty(t, value, "data[%s] must be blank", key)
+	}
+	require.Len(t, decoded.StringData, 1)
+	assert.Empty(t, decoded.StringData["token"])
+}
+
+// TestTemplateRedactsValues ties the caller-facing predicate to the strip: the
+// export tells the user its values were redacted based on this answer.
+func TestTemplateRedactsValues(t *testing.T) {
+	assert.True(t, TemplateRedactsValues("Secret"))
+	assert.False(t, TemplateRedactsValues("ConfigMap"))
+	assert.False(t, TemplateRedactsValues("Pod"))
 }

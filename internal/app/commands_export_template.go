@@ -38,7 +38,10 @@ func (m Model) exportTemplateCmd() tea.Cmd {
 			if err != nil {
 				return exportTemplateReadyMsg{err: fmt.Errorf("stripping manifest: %w", err)}
 			}
-			return exportTemplateReadyMsg{name: name, kind: kind, manifest: manifest}
+			return exportTemplateReadyMsg{
+				name: name, kind: kind, manifest: manifest,
+				redacted: k8s.TemplateRedactsValues(kind),
+			}
 		})
 }
 
@@ -102,6 +105,6 @@ func (m Model) updateExportTemplateReady(msg exportTemplateReadyMsg) (tea.Model,
 		m.setErrorFromErr("Export template failed: ", msg.err)
 		return m, scheduleStatusClear()
 	}
-	m.openExportTemplatePicker(msg.name, msg.kind, msg.manifest)
+	m.openExportTemplatePicker(msg.name, msg.kind, msg.manifest, msg.redacted)
 	return m, nil
 }

@@ -18,7 +18,16 @@ const strippedManifest = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n"
 func pickerModel(t *testing.T) Model {
 	t.Helper()
 	m := basePush80Model()
-	m.openExportTemplatePicker("web", "Pod", strippedManifest)
+	m.openExportTemplatePicker("web", "Pod", strippedManifest, false)
+	return m
+}
+
+// secretPickerModel is the picker as it opens for a Secret, whose values
+// StripToTemplate blanked.
+func secretPickerModel(t *testing.T) Model {
+	t.Helper()
+	m := basePush80Model()
+	m.openExportTemplatePicker("db-creds", "Secret", "kind: Secret\ndata:\n  password: \"\"\n", true)
 	return m
 }
 
@@ -162,4 +171,53 @@ func indexOfDestination(t *testing.T, want exportDestination) int {
 	}
 	t.Fatalf("destination %v is not in the picker", want)
 	return 0
+}
+
+// TestApplyExportTemplatePicker_SecretRedactionIsAnnounced: every destination
+// says the values were blanked. Discovering it by pasting an empty template is
+// the failure this guards.
+func TestApplyExportTemplatePicker_SecretRedactionIsAnnounced(t *testing.T) {
+	t.Run("clipboard", func(t *testing.T) {
+		m := secretPickerModel(t)
+		m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestClipboard)
+
+		ret, _ := m.applyExportTemplatePicker()
+		assert.Contains(t, ret.(Model).statusMessage, "Secret values redacted")
+	})
+
+	t.Run("file", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		m := secretPickerModel(t)
+		m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestFile)
+
+		_, cmd := m.applyExportTemplatePicker()
+		require.NotNil(t, cmd)
+		msg, ok := cmd().(exportDoneMsg)
+		require.True(t, ok)
+
+		ret, _ := basePush80Model().updateExportDone(msg)
+		assert.Contains(t, ret.(Model).statusMessage, "Secret values redacted")
+	})
+
+	t.Run("template list", func(t *testing.T) {
+		withTempConfigDir(t)
+		m := secretPickerModel(t)
+		m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestTemplateList)
+
+		_, cmd := m.applyExportTemplatePicker()
+		require.NotNil(t, cmd)
+		msg, ok := cmd().(actionResultMsg)
+		require.True(t, ok)
+		assert.Contains(t, msg.message, "Secret values redacted")
+	})
+}
+
+// TestApplyExportTemplatePicker_NoNoteForOtherKinds keeps the note off the
+// kinds whose values pass through untouched.
+func TestApplyExportTemplatePicker_NoNoteForOtherKinds(t *testing.T) {
+	m := pickerModel(t)
+	m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestClipboard)
+
+	ret, _ := m.applyExportTemplatePicker()
+	assert.NotContains(t, ret.(Model).statusMessage, "redacted")
 }

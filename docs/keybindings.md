@@ -1183,7 +1183,7 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 
 The action menu (`x` key) shows context-specific actions based on the resource type.
 
-Every kind also offers `x` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Available in read-only mode.
+Every kind also offers `x` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Secret values are blanked, keys kept. Available in read-only mode.
 
 ### Pod Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events

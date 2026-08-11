@@ -65,6 +65,30 @@ var jobControllerLabels = []string{
 	"batch.kubernetes.io/job-name",
 }
 
+// secretKind is the one kind whose values are redacted rather than kept.
+const secretKind = "Secret"
+
+// TemplateRedactsValues reports whether StripToTemplate blanks the values of
+// this kind, so an exporter can tell the user before they paste an empty
+// template. Tied to the switch in StripToTemplate by the shared constant.
+func TemplateRedactsValues(kind string) bool {
+	return kind == secretKind
+}
+
+// redactSecretValues blanks every value under data and stringData while keeping
+// the keys and the type. A template is a shape, not a payload: all three export
+// destinations persist, and a template directory tends to end up in dotfiles.
+// The keys and the type are what make the template useful — they say which
+// entries to fill in and what kind of Secret this is. Users who want the live
+// values already have the copy and YAML-view paths.
+func redactSecretValues(obj map[string]any) {
+	for _, field := range []string{"data", "stringData"} {
+		for key := range childMap(obj, field) {
+			childMap(obj, field)[key] = ""
+		}
+	}
+}
+
 // StripToTemplate rewrites a live object's YAML into a reusable template:
 // status and the server-set metadata go, then the server-set spec fields for
 // the kinds that have them. The result is meant to apply unchanged into an
@@ -80,7 +104,7 @@ func StripToTemplate(doc string) (string, error) {
 
 	delete(obj, "status")
 	stripObjectMeta(obj, annotationsAlwaysDropped)
-	stripPodTemplateMeta(obj)
+	stripEmbeddedTemplateMeta(obj)
 
 	kind, _ := obj["kind"].(string)
 	switch kind {
@@ -93,6 +117,8 @@ func StripToTemplate(doc string) (string, error) {
 		stripAnnotations(obj, pvcServerAnnotations)
 	case "Job":
 		stripJob(obj)
+	case secretKind:
+		redactSecretValues(obj)
 	}
 
 	out, err := marshalResourceYAML(obj)
@@ -121,27 +147,32 @@ func stripAnnotations(obj map[string]any, keys []string) {
 	pruneEmptyChild(md, "annotations")
 }
 
-// stripPodTemplateMeta drops the creationTimestamp the serializer emits inside
-// an embedded pod template. It is never author-written and renders as the
+// stripEmbeddedTemplateMeta drops the creationTimestamp the serializer emits
+// inside an embedded template. It is never author-written and renders as the
 // confusing `creationTimestamp: null`.
-func stripPodTemplateMeta(obj map[string]any) {
-	for _, tmpl := range podTemplates(obj) {
+func stripEmbeddedTemplateMeta(obj map[string]any) {
+	for _, tmpl := range embeddedTemplates(obj) {
 		md := childMap(tmpl, "metadata")
 		deleteKeys(md, "creationTimestamp")
 		pruneEmptyChild(tmpl, "metadata")
 	}
 }
 
-// podTemplates returns the embedded pod templates of a workload object:
-// spec.template for Deployment/StatefulSet/DaemonSet/ReplicaSet/Job, and
-// spec.jobTemplate.spec.template for CronJob.
-func podTemplates(obj map[string]any) []map[string]any {
+// embeddedTemplates returns every embedded template of a workload object that
+// carries an ObjectMeta of its own: spec.template for
+// Deployment/StatefulSet/DaemonSet/ReplicaSet/Job, and for CronJob both
+// spec.jobTemplate (the JobTemplateSpec) and the pod template nested inside it.
+func embeddedTemplates(obj map[string]any) []map[string]any {
 	spec := childMap(obj, "spec")
 	var out []map[string]any
 	if t := childMap(spec, "template"); t != nil {
 		out = append(out, t)
 	}
-	if t := childMap(childMap(childMap(spec, "jobTemplate"), "spec"), "template"); t != nil {
+	jobTmpl := childMap(spec, "jobTemplate")
+	if jobTmpl != nil {
+		out = append(out, jobTmpl)
+	}
+	if t := childMap(childMap(jobTmpl, "spec"), "template"); t != nil {
 		out = append(out, t)
 	}
 	return out
@@ -241,7 +272,7 @@ func stripJob(obj map[string]any) {
 	deleteKeys(childMap(md, "labels"), jobControllerLabels...)
 	pruneEmptyChild(md, "labels")
 
-	for _, tmpl := range podTemplates(obj) {
+	for _, tmpl := range embeddedTemplates(obj) {
 		tmplMeta := childMap(tmpl, "metadata")
 		deleteKeys(childMap(tmplMeta, "labels"), jobControllerLabels...)
 		pruneEmptyChild(tmplMeta, "labels")
