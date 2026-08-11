@@ -631,3 +631,181 @@ func TestRenderMinimalSummaryNoIdentity(t *testing.T) {
 	result := stripANSI(RenderResourceSummary(&model.Item{}, "", 60, 20))
 	assert.Contains(t, result, "No preview")
 }
+
+// --- sanitization: TASK-880 ---
+
+// resourceHostilePayloads mirrors the payload set used across the other
+// TASK-880 sanitization tests.
+var resourceHostilePayloads = map[string]string{
+	"bidi override": "ab\u202ecd",
+	"raw CSI":       "ab\x1b[2Jcd",
+	"OSC-52":        "ab\x1b]52;c;aGF4\x07cd",
+}
+
+func assertResourceClean(t *testing.T, out string) {
+	t.Helper()
+	assert.NotContains(t, out, "\u202e", "bidi override must not survive")
+	assert.NotContains(t, out, "\x1b[2J", "CSI erase display must not survive")
+	assert.NotContains(t, out, "\x1b]52", "OSC-52 clipboard write must not survive")
+}
+
+func TestRenderResourceSummary_IdentityRowsSanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{Name: "pod" + payload, Namespace: "ns" + payload, Deleting: true}
+			out := RenderResourceSummary(item, "", 80, 30)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderResourceSummary_DetailRowsSanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{
+				Name: "svc-1",
+				Columns: []model.KeyValue{
+					{Key: "Health" + payload, Value: "Healthy" + payload},
+					{Key: "Reason", Value: "Started" + payload},
+					{Key: "Message", Value: "back-off restarting" + payload},
+					{Key: "condition:Ready" + payload, Value: "True" + payload},
+				},
+			}
+			out := RenderResourceSummary(item, "", 100, 40)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderResourceSummary_MultiLineFieldsSanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{
+				Name: "svc-1",
+				Columns: []model.KeyValue{
+					{Key: "Labels", Value: "app=web" + payload + ", tier=frontend"},
+					{Key: "Endpoints", Value: "10.0.0.1:80" + payload + "\n10.0.0.2:80"},
+					{Key: "Taints", Value: "node-role.kubernetes.io/master" + payload},
+				},
+			}
+			out := RenderResourceSummary(item, "", 100, 40)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderResourceSummary_ConditionsSanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{
+				Name:    "deploy-1",
+				Columns: []model.KeyValue{{Key: "Node", Value: "node-1"}},
+				Conditions: []model.ConditionEntry{
+					{Type: "Available" + payload, Status: "True" + payload, Reason: "MinimumReplicas" + payload, Message: "Deployment has minimum availability" + payload},
+				},
+			}
+			out := RenderResourceSummary(item, "", 100, 40)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderResourceSummary_StepsSanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{
+				Name: "workflow-1",
+				Columns: []model.KeyValue{
+					{Key: "step:build" + payload, Value: "Succeeded" + payload},
+				},
+			}
+			out := RenderResourceSummary(item, "", 100, 40)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderResourceSummary_SecretDataSanitized(t *testing.T) {
+	prev := ActiveShowSecretValues
+	t.Cleanup(func() { ActiveShowSecretValues = prev })
+	ActiveShowSecretValues = true
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{
+				Name: "secret-1",
+				Columns: []model.KeyValue{
+					{Key: "secret:token" + payload, Value: "s3cr3t" + payload},
+					{Key: "data:config.yaml" + payload, Value: "line1\\nline2" + payload},
+				},
+			}
+			out := RenderResourceSummary(item, "", 100, 40)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderPreviewEvents_Sanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			events := []EventTimelineEntry{{
+				Timestamp: time.Now(),
+				Type:      "Warning",
+				Reason:    "BackOff" + payload,
+				Message:   "Back-off restarting failed container" + payload,
+				Count:     1,
+			}}
+			out := RenderPreviewEvents(events, 100)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+func TestRenderResourceTree_LabelsSanitized(t *testing.T) {
+	for name, payload := range resourceHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			root := &model.ResourceNode{
+				Name: "pod" + payload, Kind: "Pod", Namespace: "ns" + payload,
+				Status: "Running" + payload,
+				Children: []*model.ResourceNode{
+					{Name: "child" + payload, Kind: "Container", Namespace: "other-ns" + payload, Status: "Ready" + payload},
+				},
+			}
+			out := RenderResourceTree(root, 120, 30)
+			assertResourceClean(t, out)
+		})
+	}
+}
+
+// The preview pane deliberately does NOT keep SGR. Cluster metadata has no
+// business colouring the pane, and keeping the escape is what let the rune and
+// byte slicing further down count escape bytes as visible width, which broke
+// alignment in a narrow pane. The escape is replaced with U+FFFD, the same
+// marker the log viewer shows for any other non-printable byte, so the value
+// reads as suspect instead of being obeyed.
+//
+// Asserting on "[31m" alone would prove nothing: that printable tail survives
+// either way. The ESC is what matters.
+func TestPreviewBodyPathsDropTheEscape(t *testing.T) {
+	const red = "\x1b[31mFAILED\x1b[0m"
+	const escSGR = "\x1b[31m"
+
+	cases := map[string]*model.Item{
+		"condition message": {
+			Name:       "deploy-1",
+			Columns:    []model.KeyValue{{Key: "Node", Value: "node-1"}},
+			Conditions: []model.ConditionEntry{{Type: "Available", Status: "False", Message: red}},
+		},
+		"Labels entry": {
+			Name:    "svc-1",
+			Columns: []model.KeyValue{{Key: "Labels", Value: red}},
+		},
+	}
+
+	for name, item := range cases {
+		t.Run(name, func(t *testing.T) {
+			out := RenderResourceSummary(item, "", 100, 40)
+			assert.NotContains(t, out, escSGR, "the escape must not reach the pane")
+			assert.Contains(t, out, "\ufffd", "and the byte it stood for is marked, not dropped silently")
+		})
+	}
+}

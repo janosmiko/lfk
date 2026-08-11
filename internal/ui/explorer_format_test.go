@@ -631,3 +631,91 @@ func TestRenderStyledHeader_TruncatesToWidth(t *testing.T) {
 	assert.Equal(t, 6, lipgloss.Width(ansi.Strip(out)+""))
 	assert.LessOrEqual(t, lipgloss.Width(out), 6)
 }
+
+// --- sanitization: TASK-880 ---
+
+// formatHostilePayloads are cluster-controlled strings carrying a terminal attack:
+// a bidi override reorders rendered text, a raw CSI sequence can rewrite the
+// screen, and OSC-52 writes the operator's clipboard.
+var formatHostilePayloads = map[string]string{
+	"bidi override": "ab\u202ecd",
+	"raw CSI":       "ab\x1b[2Jcd",
+	"OSC-52":        "ab\x1b]52;c;aGF4\x07cd",
+}
+
+func TestPlainNameCellWithBadge_SanitizesName(t *testing.T) {
+	for name, payload := range formatHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			out := plainNameCellWithBadge(payload, nil, 40)
+			assert.NotContains(t, out, "\u202e")
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+			assert.Contains(t, out, "ab")
+			assert.Contains(t, out, "cd")
+		})
+	}
+	assert.Contains(t, plainNameCellWithBadge("nginx", nil, 40), "nginx")
+}
+
+func TestStyledNameCell_SanitizesName(t *testing.T) {
+	for name, payload := range formatHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := model.Item{Name: payload}
+			out := styledNameCell(item, 40, nil)
+			assert.NotContains(t, out, "\u202e")
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+		})
+	}
+	assert.Contains(t, stripANSI(styledNameCell(model.Item{Name: "nginx"}, 40, nil)), "nginx")
+}
+
+func TestPlainExtraCell_SanitizesValue(t *testing.T) {
+	ec := extraColumn{key: "IP", width: 20}
+	for name, payload := range formatHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{Columns: []model.KeyValue{{Key: "IP", Value: payload}}}
+			out := plainExtraCell(ec, item)
+			assert.NotContains(t, out, "\u202e")
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+		})
+	}
+	item := &model.Item{Columns: []model.KeyValue{{Key: "IP", Value: "10.0.0.1"}}}
+	assert.Contains(t, plainExtraCell(ec, item), "10.0.0.1")
+}
+
+func TestStyledExtraCell_SanitizesValue(t *testing.T) {
+	ec := extraColumn{key: "IP", width: 20}
+	for name, payload := range formatHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			item := &model.Item{Columns: []model.KeyValue{{Key: "IP", Value: payload}}}
+			out := styledExtraCell(ec, item)
+			assert.NotContains(t, out, "\u202e")
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+		})
+	}
+	item := &model.Item{Columns: []model.KeyValue{{Key: "IP", Value: "10.0.0.1"}}}
+	assert.Contains(t, stripANSI(styledExtraCell(ec, item)), "10.0.0.1")
+}
+
+func TestRestartsCells_SanitizeValue(t *testing.T) {
+	for name, payload := range formatHostilePayloads {
+		t.Run("styled/"+name, func(t *testing.T) {
+			item := model.Item{Restarts: "0" + payload}
+			out := styledRestartsCell(item, 20, false)
+			assert.NotContains(t, out, "\u202e")
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+		})
+		t.Run("plain/"+name, func(t *testing.T) {
+			item := model.Item{Restarts: "0" + payload}
+			out := plainRestartsCell(item, false)
+			assert.NotContains(t, out, "\u202e")
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+		})
+	}
+	assert.Contains(t, stripANSI(styledRestartsCell(model.Item{Restarts: "3"}, 20, false)), "3")
+}

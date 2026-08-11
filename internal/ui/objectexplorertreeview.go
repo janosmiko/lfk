@@ -26,19 +26,24 @@ func RenderObjectExplorerTreeView(rows []model.ObjectTreeRow, filtered bool, cur
 // objectTreeLabels computes each row's display label and guide prefix. In
 // filtered mode the label is the row's relative dotted path and the prefix is
 // empty.
+//
+// Labels are sanitized here, before any width measurement or truncation:
+// a label is a label/annotation key from a cluster-controlled object, and
+// sanitizing after Truncate/width math would leave stale widths since
+// stripping control bytes changes the string's rendered width.
 func objectTreeLabels(rows []model.ObjectTreeRow, filtered bool) (labels, prefixes []string) {
 	labels = make([]string, len(rows))
 	prefixes = make([]string, len(rows))
 	if filtered {
 		for i, r := range rows {
-			labels[i] = model.FormatObjectPath(r.Segs)
+			labels[i] = SanitizeTerminalText(model.FormatObjectPath(r.Segs))
 		}
 		return labels, prefixes
 	}
 	depths := make([]int, len(rows))
 	for i, r := range rows {
 		depths[i] = r.Depth
-		labels[i] = r.Field.Key
+		labels[i] = SanitizeTerminalText(r.Field.Key)
 	}
 	return labels, TreeGuidePrefixes(depths)
 }
@@ -77,7 +82,10 @@ func renderObjectTreeFieldList(rows []model.ObjectTreeRow, labels, prefixes []st
 		pad := max(nameWidth-prefixW-lipgloss.Width(label), 0)
 
 		valueWidth := max(width-nameWidth-6, 4)
-		value := Truncate(f.Preview, valueWidth)
+		// f.Preview is a cluster-controlled field value (e.g. an annotation
+		// value); sanitize before Truncate so width math runs on the
+		// visible-width string, not the pre-strip one.
+		value := Truncate(SanitizeTerminalText(f.Preview), valueWidth)
 
 		// A container row not followed by a deeper row has folded children
 		// (in pre-order a parent's children render right below it). Mark it

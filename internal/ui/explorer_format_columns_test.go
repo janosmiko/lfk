@@ -2,6 +2,7 @@ package ui
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -349,5 +350,29 @@ func TestCollectExtraColumns_NonCRDUnaffected(t *testing.T) {
 	cols := collectExtraColumns(items, 120, 20, "Service")
 	if !containsKey(cols, "Ports") || !containsKey(cols, "Replicas") {
 		t.Errorf("expected Ports and Replicas columns, got %v", keysOf(cols))
+	}
+}
+
+// --- ColumnHeaderLabel: TASK-880 ---
+
+// TestColumnHeaderLabel_SanitizesKey guards the one sink where a cluster
+// string (a CRD condition type or printer-column name) is promoted straight
+// into a table HEADER, rendered ahead of any Truncate/width measurement.
+func TestColumnHeaderLabel_SanitizesKey(t *testing.T) {
+	tests := map[string]string{
+		"bidi override": "cond\u202eType",
+		"raw CSI":       "cond\x1b[2JType",
+		"OSC-52":        "cond\x1b]52;c;aGF4\x07Type",
+	}
+	for name, key := range tests {
+		t.Run(name, func(t *testing.T) {
+			out := ColumnHeaderLabel(key)
+			if strings.Contains(out, "\u202e") || strings.Contains(out, "\x1b[2J") || strings.Contains(out, "\x1b]52") {
+				t.Errorf("hostile sequence survived ColumnHeaderLabel: %q", out)
+			}
+		})
+	}
+	if got := ColumnHeaderLabel("Ingress Class"); got != "CLASS" {
+		t.Errorf("alias lookup regressed: got %q, want CLASS", got)
 	}
 }

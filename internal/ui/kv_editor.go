@@ -113,6 +113,40 @@ func kvFieldBox(label, content string, active bool, outerW, contentH int) string
 	return strings.Join(lines, "\n")
 }
 
+// sanitizeMultilineBody sanitizes a multi-line cluster-controlled value
+// (ConfigMap/Secret data) line by line, mirroring sanitizeYAMLContent in
+// internal/app/yamlfold.go: SanitizeLogBody treats a bare newline as a stray
+// control byte, so the body is split and rejoined around embedded "\n".
+// renderAnsi is false - a Secret/ConfigMap value has no legitimate reason to
+// carry SGR colour, so any ESC is neutralised rather than risking a
+// passed-through attacker-controlled sequence.
+func sanitizeMultilineBody(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = SanitizeLogBody(StripBidiOverrides(line), false)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// sanitizeCursorText sanitizes s (single-line: the Key field) and remaps
+// cursor - a byte offset into the raw, unsanitized s - to the matching
+// offset in the sanitized result. The edit buffer is seeded straight from
+// the cluster value (a Secret/ConfigMap/annotation key or value), so this is
+// the last point before the live cursor overlay reaches the screen; mapping
+// the offset keeps the cursor on the same character instead of drifting once
+// bytes ahead of it are dropped.
+func sanitizeCursorText(s string, cursor int) (string, int) {
+	cursor = clampCursor(cursor, len(s))
+	return SanitizeTerminalText(s), len(SanitizeTerminalText(s[:cursor]))
+}
+
+// sanitizeCursorBody is sanitizeCursorText's multi-line counterpart, used
+// for the Value field. See sanitizeMultilineBody.
+func sanitizeCursorBody(s string, cursor int) (string, int) {
+	cursor = clampCursor(cursor, len(s))
+	return sanitizeMultilineBody(s), len(sanitizeMultilineBody(s[:cursor]))
+}
+
 // overlayCursor renders s with the character at `cursor` shown in
 // inverse video (active) or returns s unchanged (inactive). When
 // cursor is at len(s) a single space gets the inverse style so the
@@ -123,10 +157,11 @@ func kvFieldBox(label, content string, active bool, outerW, contentH int) string
 // every time the cursor moves, which the user reported as the text
 // "jumping around" while typing / navigating.
 func overlayCursor(s string, cursor int, active bool, maxW int) string {
+	s, cursor = sanitizeCursorText(s, cursor)
 	if !active {
 		return Truncate(s, maxW)
 	}
-	cursor = clampInt(cursor, 0, len(s))
+	cursor = clampCursor(cursor, len(s))
 	cursorStyle := lipgloss.NewStyle().Reverse(true).Background(BaseBg)
 	var head, ch, tail string
 	if cursor == len(s) {
@@ -158,8 +193,9 @@ func overlayCursorMultiline(s string, cursor int, active bool, scroll, maxW, max
 	if maxW <= 0 || maxH <= 0 {
 		return ""
 	}
+	s, cursor = sanitizeCursorBody(s, cursor)
 	cursorStyle := lipgloss.NewStyle().Reverse(true).Background(BaseBg)
-	cursor = clampInt(cursor, 0, len(s))
+	cursor = clampCursor(cursor, len(s))
 	if scroll < 0 {
 		scroll = 0
 	}
@@ -240,7 +276,7 @@ func CursorVisualLine(s string, cursor, maxW int) int {
 	if maxW <= 0 {
 		return 0
 	}
-	cursor = clampInt(cursor, 0, len(s))
+	cursor = clampCursor(cursor, len(s))
 	line := 0
 	visualCol := 0
 	i := 0
@@ -282,6 +318,11 @@ func AdjustEditValueScroll(value string, cursor, scroll, maxW, maxH int) int {
 	if scroll < 0 {
 		scroll = 0
 	}
+	// The renderer draws the sanitized text, so the line count has to be
+	// measured on that. Measuring the raw value counts the bytes a control
+	// sequence occupies, over-reports the line count, and can scroll the pane
+	// past the end of the value onto a blank view.
+	value, cursor = sanitizeCursorBody(value, cursor)
 	cursorLine := CursorVisualLine(value, cursor, maxW)
 	if cursorLine < scroll {
 		return cursorLine
@@ -349,15 +390,9 @@ func nextRuneEnd(s string, i int) int {
 	return end
 }
 
-// clampInt restricts v to [lo, hi] inclusive.
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
+// clampCursor restricts a cursor offset to the bounds of the string it indexes.
+func clampCursor(v, hi int) int {
+	return min(max(v, 0), hi)
 }
 
 // stylePerLine renders each line of `body` through `style.Width(w)`

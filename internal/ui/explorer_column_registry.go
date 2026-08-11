@@ -71,10 +71,10 @@ var builtinColumns = []builtinColumn{
 		width:  func(w builtinColWidths) int { return w.ns },
 		header: func(h builtinColHeaders) string { return h.ns },
 		plain: func(p plainCellInputs) string {
-			return padRight(Truncate(p.ns, p.widths.ns-1), p.widths.ns)
+			return padRight(Truncate(SanitizeTerminalText(p.ns), p.widths.ns-1), p.widths.ns)
 		},
 		styled: func(s styledCellInputs) string {
-			ns := s.item.Namespace
+			ns := SanitizeTerminalText(s.item.Namespace)
 			if ns == "" {
 				ns = "-"
 			}
@@ -86,10 +86,10 @@ var builtinColumns = []builtinColumn{
 		width:  func(w builtinColWidths) int { return w.ready },
 		header: func(h builtinColHeaders) string { return h.ready },
 		plain: func(p plainCellInputs) string {
-			return padRight(p.ready, p.widths.ready)
+			return padRight(SanitizeTerminalText(p.ready), p.widths.ready)
 		},
 		styled: func(s styledCellInputs) string {
-			return DimStyle.Render(padRight(s.item.Ready, s.widths.ready))
+			return DimStyle.Render(padRight(SanitizeTerminalText(s.item.Ready), s.widths.ready))
 		},
 	},
 	{
@@ -108,10 +108,12 @@ var builtinColumns = []builtinColumn{
 		width:  func(w builtinColWidths) int { return w.status },
 		header: func(h builtinColHeaders) string { return h.status },
 		plain: func(p plainCellInputs) string {
-			return padRight(Truncate(AbbreviateStatusForWidth(p.status, p.widths.status-1), p.widths.status-1), p.widths.status)
+			status := SanitizeTerminalText(p.status)
+			return padRight(Truncate(AbbreviateStatusForWidth(status, p.widths.status-1), p.widths.status-1), p.widths.status)
 		},
 		styled: func(s styledCellInputs) string {
-			val := AbbreviateStatusForWidth(s.item.Status, s.widths.status-1)
+			status := SanitizeTerminalText(s.item.Status)
+			val := AbbreviateStatusForWidth(status, s.widths.status-1)
 			return StatusStyle(val).Render(padRight(Truncate(val, s.widths.status-1), s.widths.status))
 		},
 	},

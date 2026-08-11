@@ -274,6 +274,10 @@ func buildCrashSummaryLines(entry CrashInvestigatorEntry) []string {
 	valueStyle := OverlayNormalStyle
 
 	kvLine := func(label, value string) string {
+		// Every Summary row funnels through here, so one guard covers Phase,
+		// Node, IP, QoS and Owner. These come from the cluster and are all
+		// single-line, so the blunt sanitizer is the right one.
+		value = SanitizeTerminalText(value)
 		if strings.TrimSpace(value) == "" {
 			value = "—"
 		}
@@ -307,20 +311,37 @@ func buildCrashSummaryLines(entry CrashInvestigatorEntry) []string {
 	// Last-terminated detail block for the active container.
 	if active := findCrashContainer(entry, entry.ActiveContainer); active != nil && active.HasLastTerm {
 		lines = append(lines, "")
-		lines = append(lines, "  "+crashSectionStyle.Render(fmt.Sprintf("Last termination of %s", active.Name)))
+		lines = append(lines, "  "+crashSectionStyle.Render(fmt.Sprintf("Last termination of %s", SanitizeTerminalText(active.Name))))
 		lines = append(lines, OverlayDimStyle.Render(fmt.Sprintf(
 			"    Reason: %s · ExitCode: %d · Signal: %d · Finished: %s",
-			fallbackCrashStr(active.LastReason),
+			fallbackCrashStr(SanitizeTerminalText(active.LastReason)),
 			active.LastExitCode,
 			active.LastSignal,
 			formatTimeAgo(active.LastFinished),
 		)))
-		if msg := strings.TrimSpace(active.LastMessage); msg != "" {
+		if msg := strings.TrimSpace(sanitizeCrashMessage(active.LastMessage)); msg != "" {
 			lines = append(lines, OverlayDimStyle.Render("    Message: "+truncateCrash(msg, 200)))
 		}
 	}
 
 	return lines
+}
+
+// sanitizeCrashBody guards the Logs and Describe tabs, whose content is the
+// least constrained in the app: raw container stdout and the verbatim text of
+// kubectl describe, which prints annotation values the API server does not
+// restrict at all. The log viewer guards the same bytes with sanitizeLogLine;
+// these tabs are a second render path to them and need the same guard.
+//
+// Line by line, because the body sanitizer treats a newline as a control byte
+// and would replace it, collapsing the whole body onto one row. SGR colour is
+// kept so a container that colours its own output still reads correctly.
+func sanitizeCrashBody(body string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		lines[i] = StripBidiOverrides(SanitizeLogBody(line, true))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // renderCrashContainerTableLines renders the container sub-table as one
@@ -353,14 +374,15 @@ func renderCrashContainerTableLines(containers []CrashContainerEntry, active str
 		if c.StateReason != "" {
 			state = c.StateReason
 		}
+		state = SanitizeTerminalText(state)
 		exit := "—"
 		reason := "—"
 		if c.HasLastTerm {
 			exit = fmt.Sprintf("%d", c.LastExitCode)
-			reason = fallbackCrashStr(c.LastReason)
+			reason = fallbackCrashStr(SanitizeTerminalText(c.LastReason))
 		}
 		row := marker + crashJoinRow(
-			crashCell(truncateCrash(c.Name, crashColContainer), crashColContainer),
+			crashCell(truncateCrash(SanitizeTerminalText(c.Name), crashColContainer), crashColContainer),
 			crashCell(truncateCrash(state, crashColState), crashColState),
 			crashCell(fmt.Sprintf("%d", c.RestartCount), crashColRestarts),
 			crashCell(exit, crashColLastExit),
@@ -529,10 +551,10 @@ func renderCrashEventsTab(entry CrashInvestigatorEntry, scroll, width, height in
 	msgPrefix := strings.Repeat(" ", indent+typeW+reasonW+ageW+gutters)
 
 	for _, ev := range entry.Events {
-		msgLines := wrapCrashText(ev.Message, msgW)
+		msgLines := wrapCrashText(sanitizeCrashMessage(ev.Message), msgW)
 		first := strings.Repeat(" ", indent) + crashJoinRow(
-			crashCell(truncateCrash(ev.Type, typeW), typeW),
-			crashCell(truncateCrash(ev.Reason, reasonW), reasonW),
+			crashCell(truncateCrash(SanitizeTerminalText(ev.Type), typeW), typeW),
+			crashCell(truncateCrash(SanitizeTerminalText(ev.Reason), reasonW), reasonW),
 			crashCell(truncateCrash(ev.Age, ageW), ageW),
 			msgLines[0],
 		)
@@ -565,7 +587,7 @@ func renderCrashLogsTab(entry CrashInvestigatorEntry, scroll, width, height int)
 		mode = "previous"
 	}
 	header := crashHeaderStyle.Render(fmt.Sprintf("LOGS · %s · container=%s",
-		mode, fallbackCrashStr(entry.ActiveContainer)))
+		mode, SanitizeTerminalText(fallbackCrashStr(entry.ActiveContainer))))
 	divider := OverlayDimStyle.Render(strings.Repeat("─", min(width, 80)))
 
 	var b strings.Builder
@@ -582,7 +604,7 @@ func renderCrashLogsTab(entry CrashInvestigatorEntry, scroll, width, height int)
 		return b.String()
 	}
 	if active.LogError != "" {
-		b.WriteString(OverlayWarningStyle.Render(fmt.Sprintf("  failed to load logs: %s", active.LogError)))
+		b.WriteString(OverlayWarningStyle.Render(fmt.Sprintf("  failed to load logs: %s", SanitizeTerminalText(active.LogError))))
 		return b.String()
 	}
 
@@ -590,7 +612,7 @@ func renderCrashLogsTab(entry CrashInvestigatorEntry, scroll, width, height int)
 	if entry.ShowPrevious {
 		body = active.PreviousLog
 	}
-	body = strings.TrimRight(body, "\n")
+	body = sanitizeCrashBody(strings.TrimRight(body, "\n"))
 	if body == "" {
 		if entry.ShowPrevious {
 			b.WriteString(OverlayDimStyle.Render(
@@ -623,14 +645,14 @@ func renderCrashLogsTab(entry CrashInvestigatorEntry, scroll, width, height int)
 // failed (e.g. kubectl not on PATH), we surface that as a warning
 // instead. Long output is clipped to the viewport via scroll.
 func renderCrashDescribeTab(entry CrashInvestigatorEntry, scroll, width, height int) string {
-	header := crashHeaderStyle.Render("DESCRIBE · pod=" + fallbackCrashStr(entry.PodName))
+	header := crashHeaderStyle.Render("DESCRIBE · pod=" + SanitizeTerminalText(fallbackCrashStr(entry.PodName)))
 	divider := OverlayDimStyle.Render(strings.Repeat("─", min(width, 80)))
 
 	if entry.DescribeError != "" {
 		return header + "\n" + divider + "\n\n" +
-			OverlayWarningStyle.Render("  describe failed: "+entry.DescribeError)
+			OverlayWarningStyle.Render("  describe failed: "+SanitizeTerminalText(entry.DescribeError))
 	}
-	body := strings.TrimRight(entry.Describe, "\n")
+	body := sanitizeCrashBody(strings.TrimRight(entry.Describe, "\n"))
 	if body == "" {
 		return header + "\n" + divider + "\n\n" + OverlayDimStyle.Render("  no describe output.")
 	}
@@ -653,6 +675,22 @@ func renderCrashDescribeTab(entry CrashInvestigatorEntry, scroll, width, height 
 	bodyHeight := max(height-3, 1)
 	visible := clipScrollLines(bodyLines, scroll, bodyHeight)
 	return strings.Join(append(stickyTop, visible...), "\n")
+}
+
+// sanitizeCrashMessage sanitizes a container/event message body that later
+// gets word-wrapped (wrapCrashText, which splits on whitespace including
+// embedded newlines). Lines are sanitized individually — SanitizeLogBody
+// treats a bare "\n" as a stray control byte — then rejoined with a space so
+// the existing whitespace-flattening the word-wrapper already does stays
+// intact instead of fusing lines together. renderAnsi is false: an event or
+// termination message from the cluster has no legitimate reason to carry
+// SGR colour.
+func sanitizeCrashMessage(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = SanitizeLogBody(StripBidiOverrides(line), false)
+	}
+	return strings.Join(lines, " ")
 }
 
 // fallbackCrashStr returns an em-dash placeholder when s is blank

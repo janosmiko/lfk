@@ -20,22 +20,23 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 	}
 	rows := make([]row, 0, 10)
 
-	rows = append(rows, row{"Name", item.Name, valueStyle})
+	rows = append(rows, row{"Name", SanitizeTerminalText(item.Name), valueStyle})
 	switch item.Category {
 	case "Init Containers":
 		rows = append(rows, row{"Type", "Init Container", DimStyle})
 	case "Sidecar Containers":
 		rows = append(rows, row{"Type", "Sidecar Container", DimStyle})
 	}
-	rows = append(rows, row{"Status", item.Status, StatusStyle(item.Status)})
+	status := SanitizeTerminalText(item.Status)
+	rows = append(rows, row{"Status", status, StatusStyle(status)})
 	if item.Extra != "" {
-		rows = append(rows, row{"Image", item.Extra, DimStyle})
+		rows = append(rows, row{"Image", SanitizeTerminalText(item.Extra), DimStyle})
 	}
 	if item.Ready != "" {
-		rows = append(rows, row{"Ready", item.Ready, valueStyle})
+		rows = append(rows, row{"Ready", SanitizeTerminalText(item.Ready), valueStyle})
 	}
 	if item.Restarts != "" {
-		rows = append(rows, row{"Restarts", item.Restarts, valueStyle})
+		rows = append(rows, row{"Restarts", SanitizeTerminalText(item.Restarts), valueStyle})
 	}
 	if age := LiveAge(*item); age != "" {
 		rows = append(rows, row{"Age", age, AgeStyle(age)})
@@ -45,13 +46,13 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 		if strings.HasPrefix(kv.Key, "__") || strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "secret:") || strings.HasPrefix(kv.Key, "data:") {
 			continue
 		}
-		rows = append(rows, row{kv.Key, kv.Value, valueStyle})
+		rows = append(rows, row{SanitizeTerminalText(kv.Key), SanitizeTerminalText(kv.Value), valueStyle})
 	}
 
 	maxKeyLen := 0
 	for _, r := range rows {
-		if len(r.key) > maxKeyLen {
-			maxKeyLen = len(r.key)
+		if w := lipgloss.Width(r.key); w > maxKeyLen {
+			maxKeyLen = w
 		}
 	}
 
@@ -62,7 +63,7 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 		if len(lines) >= height-1 {
 			break
 		}
-		padded := r.key + ": " + strings.Repeat(" ", maxKeyLen-len(r.key))
+		padded := r.key + ": " + strings.Repeat(" ", maxKeyLen-lipgloss.Width(r.key))
 		lines = append(lines, labelStyle.Render(padded)+r.style.Render(r.value))
 	}
 
@@ -91,6 +92,7 @@ func HighlightSearchInLine(line, query string, isCurrent bool) string {
 // in the parent would re-introduce the leading-padding alignment
 // problem that prompted this layout.
 func FormatItemNameOnly(item model.Item, width int) string {
+	item = sanitizeItemText(item)
 	displayName := item.Name
 	if item.Namespace != "" {
 		displayName = item.Namespace + "/" + displayName
@@ -116,6 +118,7 @@ func FormatItemNameOnly(item model.Item, width int) string {
 
 // FormatItemNameOnlyPlain formats an item showing only name and icon, without ANSI styling.
 func FormatItemNameOnlyPlain(item model.Item, width int) string {
+	item = sanitizeItemText(item)
 	displayName := item.Name
 	if item.Namespace != "" {
 		displayName = item.Namespace + "/" + displayName

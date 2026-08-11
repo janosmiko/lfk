@@ -480,10 +480,12 @@ func dashboardNodesSection(lines []string, data dashboardData, w dashboardWidths
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  NODES"))
 	lines = append(lines, "")
 
+	// Sanitize before measuring: a control character changes the width, and
+	// the old byte slice below could also cut a rune in half.
 	maxNameLen := 0
 	for _, n := range data.nodes {
-		if len(n.name) > maxNameLen {
-			maxNameLen = len(n.name)
+		if w := lipgloss.Width(ui.SanitizeTerminalText(n.name)); w > maxNameLen {
+			maxNameLen = w
 		}
 	}
 	if maxNameLen > 48 {
@@ -491,10 +493,7 @@ func dashboardNodesSection(lines []string, data dashboardData, w dashboardWidths
 	}
 
 	for _, n := range data.nodes {
-		name := n.name
-		if len(name) > maxNameLen {
-			name = name[:maxNameLen]
-		}
+		name := ui.Truncate(ui.SanitizeTerminalText(n.name), maxNameLen)
 		statusDot := nodeStatusDot(data.nodeItems, n.name)
 		roleStr := nodeRoleStr(data.nodeItems, n.name)
 
@@ -528,7 +527,7 @@ func nodeRoleStr(nodeItems []model.Item, name string) string {
 		if ni.Name == name {
 			for _, kv := range ni.Columns {
 				if kv.Key == "Role" && kv.Value != "" {
-					return " " + ui.DimStyle.Render("["+kv.Value+"]")
+					return " " + ui.DimStyle.Render("["+ui.SanitizeTerminalText(kv.Value)+"]")
 				}
 			}
 			return ""
@@ -564,8 +563,8 @@ func dashboardWarningBody(data dashboardData) []string {
 		for _, pw := range data.pdbWarnings {
 			out = append(out, fmt.Sprintf("  %s %s/%s",
 				ui.StatusProgressing.Render("⊘"),
-				ui.DimStyle.Render(pw.namespace),
-				ui.StatusProgressing.Render(pw.name)))
+				ui.DimStyle.Render(ui.SanitizeTerminalText(pw.namespace)),
+				ui.StatusProgressing.Render(ui.SanitizeTerminalText(pw.name))))
 			out = append(out, ui.DimStyle.Render(fmt.Sprintf("       MinAvail=%s  Healthy=%s  DisruptionsAllowed=%s",
 				pw.minAvailable, pw.currentHealthy, pw.disruptionsAllowed)))
 		}
@@ -623,18 +622,22 @@ type eventColumnFields struct {
 }
 
 // extractEventFields extracts common fields from an event's columns.
+// Reason/Object/Message come straight from a cluster Event resource and
+// render on a single dashboard line with no wrap support, so they're
+// sanitized here - the single place both dashboard event sections pull
+// from - before any caller truncates or measures their width.
 func extractEventFields(ev model.Item) eventColumnFields {
 	var f eventColumnFields
 	for _, kv := range ev.Columns {
 		switch kv.Key {
 		case "Reason":
-			f.reason = kv.Value
+			f.reason = ui.SanitizeTerminalText(kv.Value)
 		case "Object":
-			f.object = kv.Value
+			f.object = ui.SanitizeTerminalText(kv.Value)
 		case "Message":
-			f.message = kv.Value
+			f.message = ui.SanitizeTerminalText(kv.Value)
 		case "Count":
-			f.count = kv.Value
+			f.count = ui.SanitizeTerminalText(kv.Value)
 		}
 	}
 	return f
@@ -699,7 +702,7 @@ func dashboardEventsColumn(allWarningEvents []model.Item) []string {
 		}
 		nsLabel := ""
 		if ev.Namespace != "" {
-			nsLabel = ui.DimStyle.Render("[" + ev.Namespace + "] ")
+			nsLabel = ui.DimStyle.Render("[" + ui.SanitizeTerminalText(ev.Namespace) + "] ")
 		}
 		line := fmt.Sprintf("  %s %s %s%s%s %s",
 			ui.StatusProgressing.Render("⚠"),

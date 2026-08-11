@@ -691,24 +691,30 @@ func monitoringAlertTable(lines []string, alerts []k8s.AlertInfo) []string {
 
 // renderAlertRow renders a single alert's main row.
 func renderAlertRow(a k8s.AlertInfo) string {
+	// State and Severity are Prometheus labels, the same untrusted map the
+	// namespace column below reads. A value that matches none of the known
+	// cases reaches the default branch and would otherwise render raw.
+	state := ui.SanitizeTerminalText(a.State)
+	severity := ui.SanitizeTerminalText(a.Severity)
+
 	var stateStr string
-	switch a.State {
+	switch state {
 	case "firing":
-		stateStr = ui.StatusFailed.Render(fmt.Sprintf("%-10s", a.State))
+		stateStr = ui.StatusFailed.Render(fmt.Sprintf("%-10s", state))
 	case "pending":
-		stateStr = ui.StatusProgressing.Render(fmt.Sprintf("%-10s", a.State))
+		stateStr = ui.StatusProgressing.Render(fmt.Sprintf("%-10s", state))
 	default:
-		stateStr = ui.DimStyle.Render(fmt.Sprintf("%-10s", a.State))
+		stateStr = ui.DimStyle.Render(fmt.Sprintf("%-10s", state))
 	}
 
 	var sevStr string
-	switch a.Severity {
+	switch severity {
 	case "critical":
-		sevStr = ui.StatusFailed.Bold(true).Render(fmt.Sprintf("%-12s", a.Severity))
+		sevStr = ui.StatusFailed.Bold(true).Render(fmt.Sprintf("%-12s", severity))
 	case "warning":
-		sevStr = ui.StatusProgressing.Render(fmt.Sprintf("%-12s", a.Severity))
+		sevStr = ui.StatusProgressing.Render(fmt.Sprintf("%-12s", severity))
 	default:
-		sevStr = ui.DimStyle.Render(fmt.Sprintf("%-12s", a.Severity))
+		sevStr = ui.DimStyle.Render(fmt.Sprintf("%-12s", severity))
 	}
 
 	sinceStr := ""
@@ -716,7 +722,7 @@ func renderAlertRow(a k8s.AlertInfo) string {
 		sinceStr = formatTimeAgo(a.Since)
 	}
 	sinceCol := ui.DimStyle.Render(fmt.Sprintf("%-14s", sinceStr))
-	nsCol := ui.DimStyle.Render(fmt.Sprintf("%-12s", a.Labels["namespace"]))
+	nsCol := ui.DimStyle.Render(fmt.Sprintf("%-12s", ui.SanitizeTerminalText(a.Labels["namespace"])))
 
 	return fmt.Sprintf("  %s %s %s %s", stateStr, sevStr, sinceCol, nsCol)
 }
@@ -731,7 +737,11 @@ func renderAlertLabels(lines []string, labels map[string]string, exclude map[str
 	}
 	sort.Strings(labelKeys)
 	for _, k := range labelKeys {
-		lines = append(lines, ui.DimStyle.Render(fmt.Sprintf("      %s=%s", k, labels[k])))
+		// Prometheus alert labels are attacker-controllable (a rule author
+		// or the metric source can set arbitrary label keys/values), so
+		// sanitize both sides before they hit the screen.
+		lines = append(lines, ui.DimStyle.Render(fmt.Sprintf("      %s=%s",
+			ui.SanitizeTerminalText(k), ui.SanitizeTerminalText(labels[k]))))
 	}
 	return lines
 }
