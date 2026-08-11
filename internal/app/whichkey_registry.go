@@ -391,17 +391,17 @@ func wkTogglePreviewLogsAvailable(c *wkCtx) bool {
 // wkAPIExplorerAvailable mirrors openExplainBrowser's level switch
 // (update_explain.go): unavailable at LevelClusters; at LevelResourceTypes it
 // additionally needs a selected row that isn't a collapsed-group header or
-// one of the Dashboards-section pseudo-items (by Kind or by Extra);
-// LevelResources/Owned/Containers work off the navigated resource type and
-// need no row.
+// one of the dashboard pseudo-items (kind or Extra "__overview__" /
+// "__monitoring__"); LevelResources/Owned/Containers work off the navigated
+// resource type and need no row.
 func wkAPIExplorerAvailable(c *wkCtx) bool {
 	switch c.level {
 	case model.LevelResourceTypes:
 		if c.sel == nil {
 			return false
 		}
-		if c.sel.Kind == "__collapsed_group__" ||
-			model.IsDashboardPseudoItem(c.sel.Kind) || model.IsDashboardPseudoItem(c.sel.Extra) {
+		if c.sel.Kind == "__collapsed_group__" || c.sel.Kind == "__overview__" || c.sel.Kind == "__monitoring__" ||
+			c.sel.Extra == "__overview__" || c.sel.Extra == "__monitoring__" {
 			return false
 		}
 		return true
@@ -522,7 +522,6 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.APIExplorer }, Label: "API Explorer", Group: wkViews, Avail: wkAPIExplorerAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.RBACBrowser }, Label: "RBAC browser", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.OrphanOverlay }, Label: "Orphan overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},
-	{Key: func(kb ui.Keybindings) string { return kb.UndeliverableOverlay }, Label: "Undeliverable overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},
 	{Key: func(kb ui.Keybindings) string { return kb.SessionManager }, Label: "Session manager", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.ColumnToggle }, Label: "Column visibility", Group: wkViews, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.Monitoring }, Label: "Monitoring dashboard", Group: wkViews, Avail: func(c *wkCtx) bool { return c.level >= model.LevelResourceTypes }},

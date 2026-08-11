@@ -346,8 +346,6 @@ func (m Model) overlayHintBarMisc() string {
 			{Key: "R", Desc: "refresh"},
 			{Key: "q/esc", Desc: "close"},
 		})
-	case overlayUndeliverable:
-		return m.overlayHintBarUndeliverable()
 	}
 	return ""
 }
