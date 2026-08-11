@@ -20,6 +20,7 @@ import (
 type explainTreeLoadedMsg struct {
 	fields []model.ExplainField
 	path   string
+	gen    uint64 // explain session, see explainLoadedMsg
 	err    error
 }
 
@@ -34,6 +35,7 @@ type explainTreeDescMsg struct {
 	kctx       string
 	parent     string
 	fields     []model.ExplainField
+	gen        uint64 // explain session, see explainLoadedMsg
 	err        error
 }
 
@@ -52,7 +54,7 @@ type explainTreeState struct {
 	// explain of the cursor row's parent path) and caches which levels are
 	// done / in flight for the life of the tree.
 	explainTreeDescFetched  map[string]struct{} // levels whose descriptions are merged (or failed)
-	explainTreeDescInflight map[string]struct{} // levels with a fetch currently in flight
+	explainTreeDescInflight map[string]uint64   // levels with a fetch in flight, mapped to its explain generation
 }
 
 // toggleExplainTree flips the API Explorer between the flat field list and
@@ -109,6 +111,9 @@ func (m *Model) resetExplainTree() {
 // aside for the toggle-off restore. The cursor follows the flat selection
 // onto the matching tree row.
 func (m Model) updateExplainTreeLoaded(msg explainTreeLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.gen != m.explainGen {
+		return m, nil
+	}
 	m.loading = false
 	// Dropped silently when the user canceled tree mode while the fetch was
 	// in flight (every live tree load has explainTreeWanted set).
@@ -172,7 +177,18 @@ func seedExplainDescriptions(dst, src []model.ExplainField) {
 // retrying on every cursor move would spawn a kubectl process per keypress;
 // the cache resets with the next tree load.
 func (m Model) updateExplainTreeDescLoaded(msg explainTreeDescMsg) tea.Model {
-	delete(m.explainTreeDescInflight, msg.parent)
+	// Release the marker this batch was fetched under. The map outlives a
+	// session (only resetExplainTree clears it), so a stale batch that kept
+	// its marker would block that level from ever being described again.
+	// Matching on the generation as well leaves a live fetch for the same
+	// level alone, which would otherwise be free to start a second
+	// subprocess.
+	if g, ok := m.explainTreeDescInflight[msg.parent]; ok && g == msg.gen {
+		delete(m.explainTreeDescInflight, msg.parent)
+	}
+	if msg.gen != m.explainGen {
+		return m
+	}
 	if !m.explainTree || msg.resource != m.explainResource ||
 		msg.apiVersion != m.explainAPIVersion || msg.kctx != m.effectiveContext() {
 		return m
@@ -205,9 +221,9 @@ func (m *Model) maybeFetchExplainTreeDesc() tea.Cmd {
 		return nil
 	}
 	if m.explainTreeDescInflight == nil {
-		m.explainTreeDescInflight = make(map[string]struct{})
+		m.explainTreeDescInflight = make(map[string]uint64)
 	}
-	m.explainTreeDescInflight[parent] = struct{}{}
+	m.explainTreeDescInflight[parent] = m.explainGen
 	return m.execKubectlExplainTreeDesc(m.explainResource, m.explainAPIVersion, parent)
 }
 

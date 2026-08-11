@@ -619,12 +619,15 @@ type previewEventsLoadedMsg struct {
 	gen    uint64
 }
 
-// explainLoadedMsg carries the parsed output of kubectl explain.
+// explainLoadedMsg carries the parsed output of kubectl explain. gen is the
+// explain session it was started for; handlers drop a reply whose gen no
+// longer matches m.explainGen. See explainSessionState.
 type explainLoadedMsg struct {
 	fields      []model.ExplainField
 	description string // resource/field-level description
 	title       string // e.g., "deployments.v1.apps"
 	path        string // current field path
+	gen         uint64
 	err         error
 }
 
@@ -645,6 +648,7 @@ type logSaveAllMsg struct {
 type explainRecursiveMsg struct {
 	matches []model.ExplainField // matching fields with full paths
 	query   string
+	gen     uint64 // explain session, see explainLoadedMsg
 	err     error
 }
 

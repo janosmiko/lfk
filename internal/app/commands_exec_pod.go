@@ -429,7 +429,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
-			return explainLoadedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
+			return explainLoadedMsg{gen: m.explainGen, err: fmt.Errorf("kubectl not found: %w", err)}
 		}
 	}
 
@@ -450,6 +450,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 	}
 
 	reqCtx := m.explainRequestCtx()
+	gen := m.explainGen
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain: "+target, kctx, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
@@ -464,6 +465,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		if cmdErr != nil {
 			logExplainFailure(target, apiVersion, cmdErr)
 			return explainLoadedMsg{
+				gen: gen,
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
 		}
@@ -474,6 +476,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 			description: desc,
 			title:       title,
 			path:        fieldPath,
+			gen:         gen,
 		}
 	})
 }
@@ -482,7 +485,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
-			return explainRecursiveMsg{err: fmt.Errorf("kubectl not found: %w", err)}
+			return explainRecursiveMsg{gen: m.explainGen, err: fmt.Errorf("kubectl not found: %w", err)}
 		}
 	}
 
@@ -490,6 +493,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	reqCtx := m.explainRequestCtx()
+	gen := m.explainGen
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
@@ -504,12 +508,13 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		if cmdErr != nil {
 			logExplainFailure(resource, apiVersion, cmdErr)
 			return explainRecursiveMsg{
+				gen: gen,
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
 		}
 
 		matches := parseRecursiveExplainForSearch(string(output), query)
-		return explainRecursiveMsg{matches: matches, query: query}
+		return explainRecursiveMsg{matches: matches, query: query, gen: gen}
 	})
 }
 
@@ -520,7 +525,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
 		return func() tea.Msg {
-			return explainTreeLoadedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
+			return explainTreeLoadedMsg{gen: m.explainGen, err: fmt.Errorf("kubectl not found: %w", err)}
 		}
 	}
 
@@ -533,6 +538,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 	}
 
 	reqCtx := m.explainRequestCtx()
+	gen := m.explainGen
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain (tree): "+target, kctx, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(reqCtx, explainFetchTimeout)
@@ -547,6 +553,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 		if cmdErr != nil {
 			logExplainFailure(target, apiVersion, cmdErr)
 			return explainTreeLoadedMsg{
+				gen: gen,
 				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
 			}
 		}
@@ -557,7 +564,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 				fields[i].Path = fieldPath + "." + fields[i].Path
 			}
 		}
-		return explainTreeLoadedMsg{fields: fields, path: fieldPath}
+		return explainTreeLoadedMsg{fields: fields, path: fieldPath, gen: gen}
 	})
 }
 
@@ -568,7 +575,9 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 // lazily as the cursor visits each level.
 func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath string) tea.Cmd {
 	kctx := m.effectiveContext()
-	ident := explainTreeDescMsg{resource: resource, apiVersion: apiVersion, kctx: kctx, parent: parentPath}
+	ident := explainTreeDescMsg{
+		resource: resource, apiVersion: apiVersion, kctx: kctx, parent: parentPath, gen: m.explainGen,
+	}
 
 	kubectlPath, err := k8s.KubectlPath()
 	if err != nil {
