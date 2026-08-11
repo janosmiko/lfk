@@ -17,7 +17,7 @@ import (
 // cannot. Reason always originates from a first-class API field, a status
 // condition, or an Event on the object itself. A resource whose blockage
 // cannot be explained from one of those three sources is left out
-// entirely — a guessed reason is worse than a missing row.
+// entirely - a guessed reason is worse than a missing row.
 type UndeliverableItem struct {
 	Namespace string
 	Name      string
@@ -109,7 +109,7 @@ func (idx eventIndex) latestReason(kind, namespace, name string, reasons ...stri
 }
 
 // joinReason formats a reason/message pair, tolerating either half being
-// empty — a recorder is free to omit the message.
+// empty - a recorder is free to omit the message.
 func joinReason(reason, message string) string {
 	switch {
 	case reason == "":
@@ -218,7 +218,7 @@ func serviceUndeliverable(svc corev1.Service, idx endpointSliceIndex) (Undeliver
 	for _, s := range idx[nsName{namespace: svc.Namespace, name: svc.Name}] {
 		for _, ep := range s.Endpoints {
 			total++
-			// An unset Ready condition means ready — see the
+			// An unset Ready condition means ready - see the
 			// EndpointConditions API contract.
 			if ep.Conditions.Ready == nil || *ep.Conditions.Ready {
 				ready++
@@ -255,7 +255,7 @@ func ingressUndeliverable(ing networkingv1.Ingress) (UndeliverableItem, bool) {
 
 // terminatingUndeliverable reports an object whose deletion is waiting on
 // finalizers. Without a finalizer there is nothing to name as the
-// blocker, so those objects are skipped — they are mid-teardown, not stuck.
+// blocker, so those objects are skipped - they are mid-teardown, not stuck.
 func terminatingUndeliverable(kind string, meta metav1.ObjectMeta) (UndeliverableItem, bool) {
 	if meta.DeletionTimestamp == nil || len(meta.Finalizers) == 0 {
 		return UndeliverableItem{}, false

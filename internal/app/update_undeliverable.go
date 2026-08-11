@@ -191,7 +191,7 @@ func (m Model) jumpToUndeliverable() (Model, tea.Cmd) {
 	rt, ok := model.FindResourceTypeByKind(target.Kind, m.discoveredResources[m.nav.Context])
 	if !ok {
 		m.setStatusMessage(
-			fmt.Sprintf("Cannot jump to %s/%s — resource type not yet discovered, retry in a moment",
+			fmt.Sprintf("Cannot jump to %s/%s - resource type not yet discovered, retry in a moment",
 				target.Kind, target.Name), true)
 		return m, scheduleStatusClear()
 	}

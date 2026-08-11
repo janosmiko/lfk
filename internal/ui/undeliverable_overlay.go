@@ -109,7 +109,7 @@ func undeliverableSubtitle(n int, loading bool, partialError string) string {
 	}
 	s := fmt.Sprintf("%d stuck", n)
 	if partialError != "" {
-		s += " — partial result: " + SanitizeTerminalText(partialError)
+		s += " - partial result: " + SanitizeTerminalText(partialError)
 	}
 	return s
 }
