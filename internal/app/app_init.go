@@ -115,6 +115,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		filterMemory:               make(map[string]savedFilter),
 		itemCache:                  make(map[string][]model.Item),
 		cacheFingerprints:          make(map[string]string),
+		perms:                      newPermissionState(),
 		selectedItems:              make(map[string]bool),
 		selectionAnchor:            -1,
 		yamlView:                   yamlViewState{collapsed: make(map[string]bool), wrap: ui.ConfigYAMLViewerWrap},

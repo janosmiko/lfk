@@ -11,6 +11,12 @@ import (
 
 func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
+	if msg.reloaded {
+		// The kubeconfig was re-read, so a context name may now resolve to
+		// another cluster or another user. Drop the verdicts filed under
+		// those names instead of hiding actions the new identity may hold.
+		m.perms.clear()
+	}
 	if isContextCanceled(msg.err) {
 		return m, nil
 	}
@@ -510,6 +516,10 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	case "Node":
 		cmds = append(cmds, m.loadNodeMetricsForList(), m.loadNodeUptimeForList())
 	}
+	// Review this kind's verbs for the namespace once, off the key path, so
+	// the action menu can drop entries the cluster would refuse. Answers nil
+	// for a kind with no verb map.
+	cmds = append(cmds, m.loadActionPermissions(kind))
 	m.suppressBgtasks = savedSuppress
 	m.syncObjectExplorerLive()
 	return m, tea.Batch(cmds...)

@@ -74,11 +74,11 @@ func (m Model) openResourceActionMenu() Model {
 	}
 
 	items := make([]model.Item, 0, len(actions))
-	targetReadOnly := m.readOnlyForContext(m.actionCtx.context)
 	for _, a := range actions {
-		// Use the kind-aware variant so custom actions are filtered based
-		// on their ReadOnlySafe opt-in (defaults to false / mutating).
-		if targetReadOnly && isMutatingActionForKind(kind, a.Label) {
+		// One gate for read-only mode and RBAC. It is kind-aware, so custom
+		// actions are filtered on their ReadOnlySafe opt-in (defaults to
+		// false / mutating).
+		if m.actionBlocked(kind, a.Label) {
 			continue
 		}
 		if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, a.Label) {
@@ -398,9 +398,9 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		return m.executeBulkAction(actionLabel)
 	}
 
-	if isMutatingActionForKind(m.actionCtx.kind, actionLabel) && m.readOnlyForContext(m.actionCtx.context) {
-		logger.Info("Blocked by read-only mode", "action", actionLabel, "context", m.actionCtx.context)
-		m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+	if reason, blocked := m.actionBlockedReason(m.actionCtx.kind, actionLabel); blocked {
+		logger.Info("Blocked action", "action", actionLabel, "context", m.actionCtx.context, "reason", reason)
+		m.setStatusMessage(reason, true)
 		return m, scheduleStatusClear()
 	}
 
@@ -686,6 +686,11 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 	kind := m.actionCtx.kind
 	if kind == "" {
 		kind = m.selectedResourceKind()
+	}
+	if reason, blocked := m.bulkActionBlockedReason(kind, actionLabel); blocked {
+		logger.Info("Blocked action (bulk)", "action", actionLabel, "kind", kind, "count", len(m.bulkItems), "reason", reason)
+		m.setStatusMessage(reason, true)
+		return m, scheduleStatusClear()
 	}
 	if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, actionLabel) {
 		logger.Info("Blocked by union view (bulk)", "action", actionLabel, "kind", kind, "count", len(m.bulkItems))

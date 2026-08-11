@@ -42,10 +42,10 @@ func (m Model) loadContextsReload() tea.Cmd {
 		"",
 		func() tea.Msg {
 			if err := m.client.ReloadKubeconfig(); err != nil {
-				return contextsLoadedMsg{err: err}
+				return contextsLoadedMsg{err: err, reloaded: true}
 			}
 			items, err := m.client.GetContexts()
-			return contextsLoadedMsg{items: items, err: err}
+			return contextsLoadedMsg{items: items, err: err, reloaded: true}
 		},
 	)
 }

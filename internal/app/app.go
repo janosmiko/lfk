@@ -171,6 +171,7 @@ type Model struct {
 	confirmPropagation model.DeletePropagation // pending delete's cascade policy (delete_propagation.go)
 	blast              blastRadiusState        // what the action costs (blastradius.go)
 	deps               dependentsState         // what the cascade takes with it (dependents.go)
+	perms              permissionState         // what the user is allowed to run (permissions.go)
 
 	// Title and question for the type-to-confirm overlay.
 	confirmTitle, confirmQuestion string
@@ -767,8 +768,7 @@ type Model struct {
 	explainResource              string // resource name (e.g., "deployments")
 	explainAPIVersion            string // api version for kubectl explain (e.g., "apps/v1")
 	explainTitle                 string
-	explainCursor                int
-	explainScroll                int
+	explainCursor, explainScroll int
 	explainLineInput             string               // digit buffer for 123G jump-to-line
 	explainSearchActive          bool                 // true when typing in search bar
 	explainSearchInput           TextInput            // current search input

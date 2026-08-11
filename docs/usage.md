@@ -264,6 +264,37 @@ context; it does not scope the read-only flag.
 The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
 can find the row toggle without reading docs.
 
+## Permission-Aware Actions
+
+Actions the current user cannot run are dropped from the action menu, so a
+delete you are not allowed to make no longer fails after the confirm
+dialog. The gate is the same one read-only mode uses.
+
+- **Kinds covered**: Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet.
+  Every other kind keeps the read-only gate alone.
+- **How it is decided**: a `SelfSubjectAccessReview` per verb, sent in one
+  bulk pass when the list loads. Entering a namespace never waits on it.
+- **What is checked**: `delete` (Delete, Force Delete), `patch` (Edit,
+  Restart, Rollback), `update` on `<resource>/scale` (Scale), and on the
+  pods behind a workload: `create` on `pods/exec`, `pods/attach`,
+  `pods/portforward`, `patch` on `pods/ephemeralcontainers` (Debug),
+  `create` on pods (Debug Pod), `get` on `pods/log` (Tail Logs, Logs, Log
+  Top). Any other action is always shown.
+- **Cache**: per context, namespace and kind, for the life of the process.
+  A tab on another cluster never reads another cluster's verdict.
+- **Fail open**: a review that errors or times out leaves every action
+  visible. An aggregated or webhook authorizer can also overrule a denial,
+  which is a second reason not to trust one too hard. A re-read of the
+  kubeconfig drops the cache, since a context name can then point at
+  another cluster or user.
+- **Not reviewed**: all-namespaces lists, multi-namespace selections, and
+  union lists. None of them has one context and namespace a single pass
+  could speak for, so no review is sent. A row whose own namespace was
+  reviewed on an earlier visit still uses that verdict, since it was asked
+  about exactly that namespace and kind.
+- **Bulk actions**: gated only when every selected row sits in one context
+  and namespace. A mixed selection is left to the API server.
+
 ## Node Shell
 
 From the Node action menu (`x` → `s`), lfk launches a privileged debug pod
