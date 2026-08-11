@@ -413,12 +413,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
-	// Undeliverable's content is an overlay, not a preview pane, so it opens.
-	if sel.Extra == model.PseudoUndeliverable {
-		mdl, cmd := m.openUndeliverableOverlay()
-		return mdl, cmd
-	}
-	if sel.Extra == model.PseudoOverview || sel.Extra == model.PseudoMonitoring {
+	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
 		if m.isUnionSentinel() {
 			mode, ok := unionDashboardModeFromExtra(sel.Extra)
 			if !ok {

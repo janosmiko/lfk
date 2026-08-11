@@ -570,7 +570,6 @@ type Model struct {
 	orphanLoadInflight map[orphanCacheKey]orphanInflight
 	orphanGen          uint64 // monotonic counter; bumped per scan so a superseded result is dropped on arrival
 	orphans            orphanState
-	undeliverable      undeliverableState // "stuck waiting" overlay; see commands_undeliverable.go
 	// rightsizingCache stores GetRightsizing results keyed by ctx/ns/kind/name/strategy/headroom; see commands_load_overlays.go
 	rightsizingCache map[string]*model.Rightsizing
 	rightsizing      rightsizingState // overlay session state; see rightsizingState in app_types.go
@@ -785,8 +784,14 @@ type Model struct {
 	// canIState (embedded, not named) — Can-I/Who-Can RBAC explorer state; see cani_state.go.
 	canIState
 
-	// finalizerSearchState (embedded) — finalizer search overlay; see update_finalizer.go.
-	finalizerSearchState
+	// Finalizer search overlay state.
+	finalizerSearchPattern      string
+	finalizerSearchResults      []k8s.FinalizerMatch
+	finalizerSearchCursor       int
+	finalizerSearchSelected     map[string]bool // "ns/kind/name" keys
+	finalizerSearchLoading      bool
+	finalizerSearchFilter       string
+	finalizerSearchFilterActive bool
 	// Column toggle overlay state; see columnToggleState in update_column_toggle.go.
 	columnToggleState
 	// Easter egg state (Konami, nyan, credits, kubetris).

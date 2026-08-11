@@ -291,9 +291,6 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 	case "orphans":
 		return m.executeOrphansCommand(arg)
 
-	case "undeliverable":
-		return m.openUndeliverableOverlay()
-
 	case "dashboard":
 		return m.executeDashboardCommand()
 
@@ -502,7 +499,7 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 
 	for i, item := range m.middleItems {
 		// Skip dashboard pseudo-items — they are not real resource types.
-		if model.IsDashboardPseudoItem(item.Extra) {
+		if item.Extra == "__overview__" || item.Extra == "__monitoring__" {
 			continue
 		}
 		itemResource := strings.ToLower(resourceFromExtra(item.Extra))

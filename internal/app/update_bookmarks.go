@@ -217,7 +217,7 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Navigate to a resource type first", true)
 			return m, scheduleStatusClear()
 		}
-		if sel.Kind == "__collapsed_group__" || model.IsDashboardPseudoItem(sel.Extra) {
+		if sel.Kind == "__collapsed_group__" || sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
 			m.setStatusMessage("Select a resource type to bookmark", true)
 			return m, scheduleStatusClear()
 		}

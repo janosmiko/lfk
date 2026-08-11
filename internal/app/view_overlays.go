@@ -333,7 +333,7 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 		c, w, h := m.renderLogTopColumnsOverlay()
 		return c, w, h, true
 	}
-	return m.renderOverlayContentTail()
+	return "", 0, 0, false
 }
 
 func (m Model) renderOverlayPasteConfirm() (string, int, int) {

@@ -96,8 +96,6 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.ClusterColorPicker
 	case overlayOrphans:
 		return key == kb.OrphanOverlay
-	case overlayUndeliverable:
-		return key == kb.UndeliverableOverlay
 	case overlaySessions:
 		return key == kb.SessionManager
 	case overlayLocalClusters:
@@ -278,7 +276,7 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		mdl, cmd := m.handleTaintOverlayKey(msg)
 		return mdl, cmd, true
 	}
-	return m.handleOverlayKeyTertiary(msg)
+	return m, nil, false
 }
 
 // handlePasteConfirmKey handles the Enter/y / Esc/n confirmation for multiline paste.

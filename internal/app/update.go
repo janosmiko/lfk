@@ -432,7 +432,7 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case explainLoadedMsg, explainRecursiveMsg, explainTreeLoadedMsg, explainTreeDescMsg:
 		return m.updateExplainMsg(msg)
 	}
-	return m.updateActionResultMsgTail(msg)
+	return m, nil, false
 }
 
 // updateEditorResultMsg handles editor, revision, export, and exec-related messages.

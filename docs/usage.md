@@ -480,27 +480,6 @@ To avoid false positives, the detector excludes these system-managed resources:
 | ConfigMap   | Named `kube-root-ca.crt` (auto-injected per namespace)         |
 | Service     | Headless (`clusterIP=None`) or `type=ExternalName`             |
 
-## Undeliverable detection
-
-The mirror of orphan detection: orphans are resources nobody references, undeliverables are resources that want to reach a state and cannot. Every reason is read from a first-class field, a status condition, or an Event on the object, never guessed. A resource with no such explanation is left out, because a guessed reason is worse than no row.
-
-| Kind | Reported when | Reason source |
-| --- | --- | --- |
-| Pod | `Pending` | `FailedScheduling` Event, or the `PodScheduled=False` condition |
-| PersistentVolumeClaim | `Pending` | binding / provisioning Event, or `spec.storageClassName` when unset (no provisioner, no matching PV) |
-| Service | No ready endpoint across its EndpointSlices | EndpointSlice `conditions.ready` (excludes `type=ExternalName`) |
-| Ingress | No address published | `status.loadBalancer.ingress` |
-| Any fetched object | `deletionTimestamp` set with finalizers pending | `metadata.finalizers` |
-
-Press **`V`** in the explorer (single cluster only), type `:undeliverable` (or `:stuck`), or select **Undeliverable** under Dashboards:
-
-- `/` filters by kind, namespace, name, or reason
-- `Enter` jumps straight to the highlighted resource (the namespace switches automatically)
-- `R` re-scans the cluster
-- `Esc`, `q`, or `V` close the overlay
-
-Partial-RBAC denials are noted in the overlay subtitle; whatever could be listed is still shown.
-
 ## Traffic capture
 
 Press `c` on a Pod or Service to open the capture overlay. Backends
