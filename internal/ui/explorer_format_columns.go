@@ -591,5 +591,7 @@ func ColumnHeaderLabel(key string) string {
 	if alias, ok := columnHeaderAliases[key]; ok {
 		return strings.ToUpper(alias)
 	}
-	return strings.ToUpper(key)
+	// key can be a CRD condition type or printer-column name (cluster-sourced)
+	// promoted into a table HEADER; sanitize before it reaches the screen.
+	return strings.ToUpper(SanitizeTerminalText(key))
 }

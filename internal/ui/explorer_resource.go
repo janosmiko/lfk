@@ -91,7 +91,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "secret:") {
-			label := kv.Key[len("secret:"):]
+			label := SanitizeTerminalText(kv.Key[len("secret:"):])
 			if ActiveShowSecretValues {
 				dataLines = append(dataLines, renderDataKV(label, kv.Value, width)...)
 			} else {
@@ -101,14 +101,14 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "data:") {
-			label := kv.Key[len("data:"):]
+			label := SanitizeTerminalText(kv.Key[len("data:"):])
 			dataLines = append(dataLines, renderDataKV(label, kv.Value, width)...)
 			dataKeyCount++
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "condition:") {
-			label := kv.Key[len("condition:"):]
-			statusRows = append(statusRows, detailRow{strings.ToUpper(label), kv.Value})
+			label := SanitizeTerminalText(kv.Key[len("condition:"):])
+			statusRows = append(statusRows, detailRow{strings.ToUpper(label), SanitizeTerminalText(kv.Value)})
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "step:") {
@@ -133,7 +133,15 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 				val = FormatMemory(bytes)
 			}
 		}
-		row := detailRow{strings.ToUpper(kv.Key), val}
+		// Message/Reason/Health Message are free-text and may carry embedded
+		// SGR colour worth keeping; everything else is a short structured
+		// field value, so the plain single-line sanitizer is enough.
+		if messageKeys[kv.Key] {
+			val = SanitizeLogBody(StripBidiOverrides(val), true)
+		} else {
+			val = SanitizeTerminalText(val)
+		}
+		row := detailRow{strings.ToUpper(SanitizeTerminalText(kv.Key)), val}
 		switch {
 		case statusKeys[kv.Key]:
 			statusRows = append(statusRows, row)
@@ -240,10 +248,11 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		if kv.Key == "Endpoints" {
 			sep = "\n"
 		}
-		for entry := range strings.SplitSeq(kv.Value, sep) {
+		for rawEntry := range strings.SplitSeq(kv.Value, sep) {
 			if len(lines) >= height {
 				break
 			}
+			entry := SanitizeLogBody(StripBidiOverrides(rawEntry), true)
 			maxW := max(width-4, 10)
 			entryRunes := []rune(entry)
 			if len(entryRunes) <= maxW {
@@ -287,7 +296,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		// capped so a single long type can't push everything off-screen.
 		typeWidth := 0
 		for _, cond := range item.Conditions {
-			if w := len([]rune(cond.Type)); w > typeWidth {
+			if w := len([]rune(SanitizeTerminalText(cond.Type))); w > typeWidth {
 				typeWidth = w
 			}
 		}
@@ -301,24 +310,27 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			// Color the type/status by condition polarity (see ConditionStyle).
 			style := ConditionStyle(cond.Type, cond.Status)
 
-			status := cond.Status
+			condType := SanitizeTerminalText(cond.Type)
+			status := SanitizeTerminalText(cond.Status)
 			if status == "" {
 				status = "Unknown"
 			}
-			pad := max(typeWidth-len([]rune(cond.Type)), 0)
-			header := "  " + style.Render(cond.Type) + strings.Repeat(" ", pad+1) + style.Render(status)
+			pad := max(typeWidth-len([]rune(condType)), 0)
+			header := "  " + style.Render(condType) + strings.Repeat(" ", pad+1) + style.Render(status)
 			if age := FormatAge(cond.LastTransitionTime); age != "-" {
 				header += "  " + DimStyle.Render(age)
 			}
 			lines = append(lines, header)
 
-			if cond.Reason != "" && len(lines) < height {
-				lines = append(lines, "    "+DimStyle.Render(cond.Reason))
+			reason := SanitizeTerminalText(cond.Reason)
+			if reason != "" && len(lines) < height {
+				lines = append(lines, "    "+DimStyle.Render(reason))
 			}
 
-			if cond.Message != "" {
+			message := SanitizeLogBody(StripBidiOverrides(cond.Message), true)
+			if message != "" {
 				maxW := max(width-6, 10)
-				for _, seg := range wrapText(cond.Message, maxW) {
+				for _, seg := range wrapText(message, maxW) {
 					if len(lines) >= height {
 						break
 					}
@@ -342,8 +354,8 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			if len(lines) >= height {
 				break
 			}
-			stepName := kv.Key[len("step:"):]
-			phase := kv.Value
+			stepName := SanitizeTerminalText(kv.Key[len("step:"):])
+			phase := SanitizeTerminalText(kv.Value)
 			// Color based on phase.
 			phaseStyle := DimStyle
 			switch {
@@ -384,16 +396,16 @@ type identityRow struct {
 func identityRowsFor(item *model.Item) []identityRow {
 	var rows []identityRow
 	if item.Name != "" {
-		rows = append(rows, identityRow{"NAME", item.Name})
+		rows = append(rows, identityRow{"NAME", SanitizeTerminalText(item.Name)})
 	}
 	if item.Namespace != "" {
-		rows = append(rows, identityRow{"NAMESPACE", item.Namespace})
+		rows = append(rows, identityRow{"NAMESPACE", SanitizeTerminalText(item.Namespace)})
 	}
 	if item.Deleting {
 		val := "Terminating"
 		for _, kv := range item.Columns {
 			if kv.Key == "Deletion" || kv.Key == "DELETION" {
-				val = kv.Value
+				val = SanitizeTerminalText(kv.Value)
 				break
 			}
 		}
@@ -470,6 +482,17 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	if len(events) > maxEvents {
 		events = events[:maxEvents]
 	}
+
+	// Sanitize into a fresh slice (never mutate the caller's backing array)
+	// before either the width-measurement pass or the render pass reads
+	// Reason/Message — both derive column widths from these values.
+	sanitizedEvents := make([]EventTimelineEntry, len(events))
+	for i, e := range events {
+		e.Reason = SanitizeTerminalText(e.Reason)
+		e.Message = SanitizeLogBody(StripBidiOverrides(e.Message), true)
+		sanitizedEvents[i] = e
+	}
+	events = sanitizedEvents
 
 	// Calculate column widths for alignment.
 	// Format: AGE  TYPE  REASON  MESSAGE  (xCount)?
@@ -616,15 +639,18 @@ func renderDataKV(key, value string, width int) []string {
 	value = strings.ReplaceAll(value, `\t`, "\t")
 
 	if !strings.Contains(value, "\n") {
-		return []string{renderKV(key, value, width)}
+		return []string{renderKV(key, SanitizeLogBody(StripBidiOverrides(value), true), width)}
 	}
 	// Multiline: render key on its own line, then indented value lines.
+	// Sanitize per-line (post-split): the body sanitizer treats a bare '\n'
+	// as a stray control byte and would collapse the very newlines this
+	// branch just expanded, if run on the joined value.
 	header := HeaderStyle.Render(key + ":")
 	lines := []string{header}
 	indent := "  "
 	maxVal := max(width-len(indent)-1, 4)
 	for vline := range strings.SplitSeq(value, "\n") {
-		rendered := vline
+		rendered := SanitizeLogBody(StripBidiOverrides(vline), true)
 		if len(rendered) > maxVal {
 			rendered = rendered[:maxVal-3] + "..."
 		}
@@ -672,13 +698,17 @@ func RenderResourceTree(root *model.ResourceNode, width, height int) string {
 // parentNamespace is used to conditionally show the namespace when it differs
 // from the parent node.
 func renderTreeNodeLabel(node *model.ResourceNode, parentNamespace string) string {
+	name := SanitizeTerminalText(node.Name)
+	namespace := SanitizeTerminalText(node.Namespace)
+	parentNS := SanitizeTerminalText(parentNamespace)
+
 	// Use YamlKeyStyle (bold + primary + themed background) for the kind prefix.
 	// OverlayTitleStyle has bottom padding which breaks tree indentation.
-	label := YamlKeyStyle.Render(node.Kind+"/") + NormalStyle.Render(node.Name)
+	label := YamlKeyStyle.Render(node.Kind+"/") + NormalStyle.Render(name)
 
 	// Show namespace when it differs from the parent.
-	if node.Namespace != "" && node.Namespace != parentNamespace {
-		label += " " + DimStyle.Render("(ns: "+node.Namespace+")")
+	if namespace != "" && namespace != parentNS {
+		label += " " + DimStyle.Render("(ns: "+namespace+")")
 	}
 
 	// Show child count for nodes that have children. Pods can have a mix of
@@ -710,7 +740,8 @@ func renderTreeNodeLabel(node *model.ResourceNode, parentNamespace string) strin
 	}
 
 	if node.Status != "" {
-		label += " " + StatusStyle(node.Status).Render("["+node.Status+"]")
+		status := SanitizeTerminalText(node.Status)
+		label += " " + StatusStyle(status).Render("["+status+"]")
 	}
 	return label
 }

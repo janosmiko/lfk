@@ -88,7 +88,7 @@ func plainExtraCell(ec extraColumn, item *model.Item) string {
 	if item == nil {
 		val = ColumnHeaderLabel(ec.key) + sortIndicatorForColumn(ec.key)
 	} else {
-		val = GetExtraColumnValue(item, ec.key)
+		val = SanitizeTerminalText(GetExtraColumnValue(item, ec.key))
 	}
 	switch {
 	case strings.HasPrefix(val, "↑ ") || strings.HasPrefix(val, "↓ "):
@@ -104,7 +104,7 @@ func plainExtraCell(ec extraColumn, item *model.Item) string {
 
 // styledExtraCell builds the styled cell for a single extra column.
 func styledExtraCell(ec extraColumn, item *model.Item) string {
-	val := GetExtraColumnValue(item, ec.key)
+	val := SanitizeTerminalText(GetExtraColumnValue(item, ec.key))
 	style := resourceColumnStyle(ec.key, val)
 	switch {
 	case strings.HasPrefix(val, "↑ "):
@@ -160,19 +160,20 @@ func AbbreviateStatusForWidth(status string, w int) string {
 // an up-arrow; when any row in the table has a recent restart, rows without
 // one get a space prefix so values remain column-aligned.
 func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) string {
-	restartCount, _ := strconv.Atoi(item.Restarts)
+	restarts := SanitizeTerminalText(item.Restarts)
+	restartCount, _ := strconv.Atoi(restarts)
 	recentRestart := !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour
 	switch {
 	case restartCount > 0 && recentRestart:
-		restartText := "↑" + item.Restarts
+		restartText := "↑" + restarts
 		if restartCount >= 5 {
 			return ErrorStyle.Render(padRight(restartText, restartsW))
 		}
 		return StatusFailed.Render(padRight(restartText, restartsW))
 	case anyRecentRestart:
-		return DimStyle.Render(padRight(" "+item.Restarts, restartsW))
+		return DimStyle.Render(padRight(" "+restarts, restartsW))
 	default:
-		return DimStyle.Render(padRight(item.Restarts, restartsW))
+		return DimStyle.Render(padRight(restarts, restartsW))
 	}
 }
 
@@ -180,15 +181,16 @@ func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) s
 // (cursor row, tinted rows): an up-arrow tags the item's own recent restart,
 // and a space keeps alignment when any other row has one.
 func plainRestartsCell(item model.Item, anyRecentRestart bool) string {
-	restartCount, _ := strconv.Atoi(item.Restarts)
+	restarts := SanitizeTerminalText(item.Restarts)
+	restartCount, _ := strconv.Atoi(restarts)
 	recentRestart := !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour
 	switch {
 	case restartCount > 0 && recentRestart:
-		return "↑" + item.Restarts
+		return "↑" + restarts
 	case anyRecentRestart:
-		return " " + item.Restarts
+		return " " + restarts
 	default:
-		return item.Restarts
+		return restarts
 	}
 }
 
@@ -259,6 +261,7 @@ func formatTableRowStyledOrdered(item model.Item,
 // Used for cursor rows where the highlighted background must not collide
 // with ANSI styling embedded in the badge string.
 func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
+	name = SanitizeTerminalText(name)
 	badge := ""
 	if item != nil {
 		badge = securityBadgePlainForItem(item)
@@ -287,6 +290,8 @@ func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
 // truncated to make room). Gated callers (ActiveSecurityAvailable == false)
 // get an empty badge and the row renders identically to the pre-security UI.
 func styledNameCell(item model.Item, nameW int, nameOverride *lipgloss.Style) string {
+	// item is passed by value, so sanitizing in place is local to this cell.
+	item.Name = SanitizeTerminalText(item.Name)
 	// Ignored security findings (revealed by the show-ignored toggle, tagged
 	// __ignored__ by groupFindings / GetSecurityAffectedResources) are dimmed
 	// so they read as de-emphasized next to active findings.

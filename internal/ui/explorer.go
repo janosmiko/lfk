@@ -470,8 +470,25 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 	return b.String()
 }
 
+// sanitizeItemText strips terminal control sequences from the cluster-sourced
+// fields of a row. The list columns show every object in a namespace, so a
+// hostile name, namespace or status reaches the screen here before anywhere
+// else (TASK-880). It rewrites the local copy so every use below is covered
+// without a call at each one, and it runs before any width measurement,
+// because sanitizing changes how wide the value is.
+func sanitizeItemText(item model.Item) model.Item {
+	item.Name = SanitizeTerminalText(item.Name)
+	item.Namespace = SanitizeTerminalText(item.Namespace)
+	item.Status = SanitizeTerminalText(item.Status)
+	item.Ready = SanitizeTerminalText(item.Ready)
+	item.Restarts = SanitizeTerminalText(item.Restarts)
+	item.Extra = SanitizeTerminalText(item.Extra)
+	return item
+}
+
 // FormatItem formats a single item for display in a column.
 func FormatItem(item model.Item, width int) string {
+	item = sanitizeItemText(item)
 	displayName := item.Name
 
 	// Prepend namespace in all-namespaces mode.
@@ -596,6 +613,7 @@ func FormatItem(item model.Item, width int) string {
 // FormatItemPlain formats a single item for display WITHOUT any inner ANSI styling.
 // Used for the selected item so the selection background renders cleanly.
 func FormatItemPlain(item model.Item, width int) string {
+	item = sanitizeItemText(item)
 	displayName := item.Name
 
 	// Prepend namespace in all-namespaces mode.

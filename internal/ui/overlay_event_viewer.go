@@ -8,163 +8,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// RenderEventTimelineOverlay renders the event timeline overlay content.
-// Events are displayed with relative timestamps, type indicators, and scrolling support.
-func RenderEventTimelineOverlay(events []EventTimelineEntry, resourceName string, scroll, width, height int) string {
-	var b strings.Builder
-
-	title := fmt.Sprintf("Event Timeline - %s", resourceName)
-	b.WriteString(OverlayTitleStyle.Render(title))
-	b.WriteString("\n")
-
-	if len(events) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No events found"))
-		return b.String()
-	}
-
-	// Reserve lines for header, blank line before footer, footer.
-	maxLines := max(height-4, 1)
-
-	// Content width inside OverlayStyle Padding(1,2) = 2 left + 2 right.
-	contentWidth := width - 4
-
-	// Calculate available width for message wrapping.
-	msgIndent := "           "
-	msgMaxWidth := max(contentWidth-len(msgIndent), 20)
-	msgContIndent := msgIndent + "  "
-	msgContWidth := max(msgMaxWidth-2, 10)
-
-	// Calculate visual lines per event for scroll/viewport calculations.
-	msgLineCount := func(idx int) int {
-		msgLen := len([]rune(events[idx].Message))
-		if msgLen <= msgMaxWidth {
-			return 1
-		}
-		remaining := msgLen - msgMaxWidth
-		return 1 + (remaining+msgContWidth-1)/msgContWidth
-	}
-	eventLines := func(idx int) int {
-		return 1 + msgLineCount(idx) // 1 header line + message lines
-	}
-
-	// Clamp scroll: find max scroll where remaining events fill the viewport.
-	if scroll < 0 {
-		scroll = 0
-	}
-	if scroll >= len(events) {
-		scroll = max(len(events)-1, 0)
-	}
-	// Shrink scroll if there's empty space at the bottom.
-	for scroll > 0 {
-		lines := 0
-		for i := scroll; i < len(events); i++ {
-			lines += eventLines(i)
-		}
-		if lines >= maxLines {
-			break
-		}
-		scroll--
-	}
-
-	// Compute end index based on available visual lines.
-	// Separators between events just terminate the previous line (already
-	// counted in eventLines), they don't add extra visual lines.
-	usedLines := 0
-	end := scroll
-	for end < len(events) {
-		el := eventLines(end)
-		if usedLines+el > maxLines {
-			break
-		}
-		usedLines += el
-		end++
-	}
-	if end == scroll && end < len(events) {
-		usedLines += eventLines(end)
-		end++
-	}
-
-	// Styles for event type indicators.
-	normalDot := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(SurfaceBg).Render("●") // green filled circle
-	warningDot := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Background(SurfaceBg).Render("●")    // red filled circle
-	reasonStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorFile)).Background(SurfaceBg)
-	sourceStyle := OverlayDimStyle
-	countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning)).Background(SurfaceBg)
-
-	for i := scroll; i < end; i++ {
-		event := events[i]
-
-		// Relative timestamp.
-		ts := RelativeTime(event.Timestamp)
-		tsStr := OverlayDimStyle.Render(fmt.Sprintf("%-8s", ts))
-
-		// Type indicator.
-		dot := normalDot
-		if event.Type == "Warning" {
-			dot = warningDot
-		}
-
-		// Reason.
-		reason := reasonStyle.Render(event.Reason)
-
-		// Source.
-		src := ""
-		if event.Source != "" {
-			src = " " + sourceStyle.Render("["+event.Source+"]")
-		}
-
-		// Involved object info (show if different from the main resource).
-		involved := ""
-		if event.InvolvedName != resourceName {
-			involved = " " + OverlayDimStyle.Render(event.InvolvedKind+"/"+event.InvolvedName)
-		}
-
-		// Count.
-		countStr := ""
-		if event.Count > 1 {
-			countStr = " " + countStyle.Render(fmt.Sprintf("(x%d)", event.Count))
-		}
-
-		// First line: timestamp, dot, reason, source, involved, count.
-		line := fmt.Sprintf("  %s %s %s%s%s%s", tsStr, dot, reason, src, involved, countStr)
-		b.WriteString(line)
-		b.WriteString("\n")
-
-		// Message lines: wrap long messages instead of truncating.
-		// Continuation lines get extra indentation to distinguish them.
-		msg := event.Message
-		msgRunes := []rune(msg)
-		firstChunkEnd := min(msgMaxWidth, len(msgRunes))
-		fmt.Fprintf(&b, "%s%s", msgIndent, OverlayNormalStyle.Render(string(msgRunes[:firstChunkEnd])))
-		for start := firstChunkEnd; start < len(msgRunes); start += msgContWidth {
-			chunkEnd := min(start+msgContWidth, len(msgRunes))
-			chunk := string(msgRunes[start:chunkEnd])
-			b.WriteString("\n")
-			fmt.Fprintf(&b, "%s%s", msgContIndent, OverlayDimStyle.Render(chunk))
-		}
-
-		if i < end-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	// Pad to fixed height so the footer stays in place.
-	for usedLines < maxLines {
-		b.WriteString("\n")
-		usedLines++
-	}
-	b.WriteString("\n")
-
-	// Scroll info (hints moved to main status bar).
-	scrollInfo := fmt.Sprintf("%d events", len(events))
-	if scroll > 0 || end < len(events) {
-		scrollInfo += fmt.Sprintf(" | showing %d-%d", scroll+1, end)
-	}
-	b.WriteString(OverlayDimStyle.Render(scrollInfo))
-
-	return b.String()
-}
-
 // EventViewerParams holds state for the rich event viewer rendering.
 type EventViewerParams struct {
 	Lines        []string // flat text lines (one per event)
@@ -372,7 +215,10 @@ func RenderEventViewer(p EventViewerParams) string {
 	// Title with mode indicators.
 	title := "Event Timeline"
 	if p.ResourceName != "" {
-		title += " - " + p.ResourceName
+		// ResourceName is a cluster object name; the body lines (p.Lines)
+		// are already sanitized upstream, but the title is built here from
+		// the raw value.
+		title += " - " + SanitizeTerminalText(p.ResourceName)
 	}
 	var indicators []string
 	if p.Fullscreen {

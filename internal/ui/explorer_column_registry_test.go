@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // --- renderableBuiltin ---
@@ -95,4 +97,57 @@ func TestBuiltinColumnsRegistryHasExpectedKeys(t *testing.T) {
 	}
 	assert.Len(t, builtinColumns, len(expected), "registry entry count drifted from expected set")
 	assert.Equal(t, expected, got, "registry keys drifted from expected set")
+}
+
+// --- sanitization: TASK-880 ---
+
+// registryHostilePayloads mirrors explorer_format_test.go's hostilePayloads:
+// a bidi override, a raw CSI sequence, and an OSC-52 clipboard write.
+var registryHostilePayloads = map[string]string{
+	"bidi override": "ab\u202ecd",
+	"raw CSI":       "ab\x1b[2Jcd",
+	"OSC-52":        "ab\x1b]52;c;aGF4\x07cd",
+}
+
+func assertRegistryCellClean(t *testing.T, out string) {
+	t.Helper()
+	assert.NotContains(t, out, "\u202e")
+	assert.NotContains(t, out, "\x1b[2J")
+	assert.NotContains(t, out, "\x1b]52")
+}
+
+func TestBuiltinColumns_NamespaceCellSanitizes(t *testing.T) {
+	widths := builtinColWidths{ns: 20}
+	col := builtinColumnsByKey["Namespace"]
+	for name, payload := range registryHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			assertRegistryCellClean(t, col.plain(plainCellInputs{ns: payload, widths: widths}))
+			assertRegistryCellClean(t, col.styled(styledCellInputs{item: model.Item{Namespace: payload}, widths: widths}))
+		})
+	}
+	assert.Contains(t, col.plain(plainCellInputs{ns: "default", widths: widths}), "default")
+}
+
+func TestBuiltinColumns_ReadyCellSanitizes(t *testing.T) {
+	widths := builtinColWidths{ready: 10}
+	col := builtinColumnsByKey["Ready"]
+	for name, payload := range registryHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			assertRegistryCellClean(t, col.plain(plainCellInputs{ready: payload, widths: widths}))
+			assertRegistryCellClean(t, col.styled(styledCellInputs{item: model.Item{Ready: payload}, widths: widths}))
+		})
+	}
+	assert.Contains(t, col.plain(plainCellInputs{ready: "1/1", widths: widths}), "1/1")
+}
+
+func TestBuiltinColumns_StatusCellSanitizes(t *testing.T) {
+	widths := builtinColWidths{status: 20}
+	col := builtinColumnsByKey["Status"]
+	for name, payload := range registryHostilePayloads {
+		t.Run(name, func(t *testing.T) {
+			assertRegistryCellClean(t, col.plain(plainCellInputs{status: "Running" + payload, widths: widths}))
+			assertRegistryCellClean(t, col.styled(styledCellInputs{item: model.Item{Status: "Running" + payload}, widths: widths}))
+		})
+	}
+	assert.Contains(t, col.plain(plainCellInputs{status: "Running", widths: widths}), "Running")
 }
