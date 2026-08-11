@@ -544,7 +544,7 @@ func statusSeverity(status string) statusSev {
 var phraseSeverityWords = map[string]statusSev{
 	"failed": sevFailed, "failing": sevFailed, "error": sevFailed,
 	"errored": sevFailed, "degraded": sevFailed, "unhealthy": sevFailed,
-	"pending": sevProgressing, "waiting": sevProgressing, "creating": sevProgressing,
+	"pending": sevProgressing, "waiting": sevProgressing, "creating": sevProgressing, "unknown": sevProgressing,
 	"initializing": sevProgressing, "starting": sevProgressing, "setting": sevProgressing,
 	"upgrading": sevProgressing, "provisioning": sevProgressing, "progressing": sevProgressing,
 	"progress": sevProgressing, "reconciling": sevProgressing, "restarting": sevProgressing,

@@ -206,6 +206,18 @@ func TestStatusSeverity_FreeFormPhrases(t *testing.T) {
 	}
 }
 
+// --- statusSeverity: unknown health must not read as healthy ---
+
+// ArgoCD's "Unknown" health value combined with a sync status (e.g. a child
+// resource whose health was never persisted, TASK-888) must not classify as
+// sevRunning -- that would color the same green as a real "Healthy/Synced"
+// row and mislead a reader into thinking health is good.
+func TestStatusSeverity_UnknownHealthIsNotColoredHealthy(t *testing.T) {
+	assert.Equal(t, sevProgressing, statusSeverity("Unknown/Synced"))
+	assert.Equal(t, sevProgressing, statusSeverity("Unknown/OutOfSync"))
+	assert.NotEqual(t, StatusStyle("Unknown/Synced").GetForeground(), StatusStyle("Healthy/Synced").GetForeground())
+}
+
 // --- FillLinesBg ---
 
 // TestFillLinesBgReestablishesBgAfterShortReset guards issue #293's recurrence

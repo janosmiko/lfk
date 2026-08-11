@@ -67,6 +67,14 @@ func argoStatusResourcesToItems(resources []any) []model.Item {
 			healthStatus, _ = health["status"].(string)
 		}
 
+		// resourceHealthSource: appTree (ArgoCD's default) never writes a
+		// "health" key here, so a bare sync status would read as healthy.
+		// "Unknown" is a real ArgoCD health value, so it is the honest label.
+		healthKnown := healthStatus != ""
+		if !healthKnown {
+			healthStatus = "Unknown"
+		}
+
 		status := healthStatus
 		if syncStatus != "" && healthStatus != "" {
 			status = healthStatus + "/" + syncStatus
@@ -94,6 +102,12 @@ func argoStatusResourcesToItems(resources []any) []model.Item {
 				{Key: "KIND", Value: kind},
 				{Key: "APIVERSION", Value: apiVersion},
 			},
+		}
+		if !healthKnown {
+			ti.Columns = append(ti.Columns, model.KeyValue{
+				Key:   "Health Message",
+				Value: "ArgoCD is not persisting per-resource health on this cluster (resourceHealthSource: appTree)",
+			})
 		}
 		items = append(items, ti)
 	}

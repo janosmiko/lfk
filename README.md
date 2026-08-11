@@ -240,7 +240,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 - **StatefulSets / DaemonSets / Jobs** show their Pods directly
 - **CronJobs** show their Jobs
 - **Services** show Pods matching the service selector
-- **ArgoCD Applications** show managed resources (from status or label discovery)
+- **ArgoCD Applications** show managed resources (from status or label discovery); child health shows as `Unknown` unless the cluster sets `resourceHealthSource: resourceHealth`
 - **Helm Releases** show managed resources (via `app.kubernetes.io/instance` label)
 - **Pods** show their Containers
 - **ConfigMaps / Secrets / Ingresses / PVCs** show details preview (no children)

@@ -1203,10 +1203,15 @@ func TestGetArgoManagedResources_WithStatusResources(t *testing.T) {
 	items, err := c.getArgoManagedResources(t.Context(), dc, "", "argocd", "my-app")
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
-	// First should have combined status.
 	for _, item := range items {
-		if item.Name == "my-deploy" {
+		switch item.Name {
+		case "my-deploy":
+			// Health present: combined status, unchanged.
 			assert.Equal(t, "Healthy/Synced", item.Status)
+		case "my-svc":
+			// Health absent (ArgoCD's appTree default): must not read as
+			// healthy just because it's a bare "Synced".
+			assert.Equal(t, "Unknown/Synced", item.Status)
 		}
 	}
 }
