@@ -605,3 +605,66 @@ func TestDetectOrphans_PartialDenial(t *testing.T) {
 	require.Len(t, report.Pods, 1)
 	assert.Equal(t, "naked", report.Pods[0].Name)
 }
+
+// TestDetectOrphans_IngressListFailureSkipsSecrets guards against the
+// referencing-list version of the partial-scan bug: a Secret is only
+// referenced via an Ingress's spec.tls[].secretName, so if the Ingress
+// list fails, the detector cannot know the Secret is in use. Reporting
+// it as an orphan anyway would be a false positive next to a bulk-delete
+// action. ConfigMaps don't depend on the Ingress list at all, so a
+// ConfigMap with the same "unmounted" shape must still be reported —
+// this is the boundary between "too narrow" (only guard the kind whose
+// own list failed) and "too broad" (drop the whole report).
+func TestDetectOrphans_IngressListFailureSkipsSecrets(t *testing.T) {
+	tlsSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "tls-cert"}}
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "web"},
+		Spec: networkingv1.IngressSpec{
+			TLS: []networkingv1.IngressTLS{{SecretName: "tls-cert"}},
+		},
+	}
+	unmountedCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-config"}}
+
+	cs := k8sfake.NewSimpleClientset(tlsSecret, ingress, unmountedCM)
+	cs.PrependReactor("list", "ingresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("forbidden")
+	})
+
+	c := newFakeClient(cs, nil)
+	report, err := c.DetectOrphans(t.Context(), "", "")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ingresses")
+	assert.Empty(t, report.Secrets,
+		"tls-cert is referenced only via the unreadable Ingress list; it must not be reported as orphan")
+	require.Len(t, report.ConfigMaps, 1,
+		"ConfigMaps don't depend on the Ingress list and must still be reported")
+	assert.Equal(t, "stale-config", report.ConfigMaps[0].Name)
+}
+
+// TestDetectOrphans_RoleBindingListFailureSkipsRoleAndClusterRole covers
+// the RBAC group's mutual dependency: a Role's orphan status depends on
+// whether any RoleBinding references it, and a ClusterRole's depends on
+// both binding kinds. If the RoleBinding list fails, both Role and
+// ClusterRole answers become unsound and must be omitted — but
+// RoleBinding's own report (which depends on the Role/ClusterRole
+// lists, not on itself) is unaffected by this particular failure.
+func TestDetectOrphans_RoleBindingListFailureSkipsRoleAndClusterRole(t *testing.T) {
+	boundRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deployer"}}
+	boundClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "viewer"}}
+
+	cs := k8sfake.NewSimpleClientset(boundRole, boundClusterRole)
+	cs.PrependReactor("list", "rolebindings", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("forbidden")
+	})
+
+	c := newFakeClient(cs, nil)
+	report, err := c.DetectOrphans(t.Context(), "", "")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "rolebindings")
+	assert.Empty(t, report.Roles,
+		"a Role's bound/unbound status depends on the unreadable RoleBinding list")
+	assert.Empty(t, report.ClusterRoles,
+		"a ClusterRole's bound/unbound status also depends on the unreadable RoleBinding list")
+}
