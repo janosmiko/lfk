@@ -204,6 +204,31 @@ func TestHandleUndeliverableLoaded_ReleasesInflightSlotForForeignContext(t *test
 	assert.NotNil(t, cmd, "a later scan must still be possible")
 }
 
+// TestHandleUndeliverableLoaded_SanitizesPartialErrorIntoStatusBar covers the
+// scan error's second sink. The overlay subtitle sanitizes it, but with the
+// overlay closed the same string goes to the status bar instead, and that
+// sink only folds newlines and truncates - it never strips escapes. One field,
+// two sinks, and only one of them guarded is the exact shape of the bug
+// TASK-873 and TASK-880 chased through sixteen sites.
+func TestHandleUndeliverableLoaded_SanitizesPartialErrorIntoStatusBar(t *testing.T) {
+	m := undeliverableTestModel(0)
+	m.undeliverable.gen = 1
+	m.overlay = overlayNone // force the status-bar path, not the subtitle
+
+	hostile := errors.New("listing pvcs: \x1b]52;c;cHduZWQ=\a forbidden \u202e")
+	out, cmd := m.handleUndeliverableLoaded(undeliverableLoadedMsg{
+		kubeContext: "test", gen: 1, err: hostile,
+	})
+	require.NotNil(t, cmd, "a partial result still schedules the status clear")
+
+	for _, bad := range []string{"\x1b]", "\a", "\u202e"} {
+		assert.NotContains(t, out.statusMessage, bad, "status message leaked an escape")
+	}
+	// The printable remainder survives, so the message still names the failure.
+	assert.Contains(t, out.statusMessage, "listing pvcs")
+	assert.Contains(t, out.statusMessage, "forbidden")
+}
+
 func TestHandleUndeliverableLoaded_PartialErrorSurfacesInOverlay(t *testing.T) {
 	m := undeliverableTestModel(0)
 	m.undeliverable.gen = 1

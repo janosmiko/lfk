@@ -4,6 +4,8 @@ import (
 	"context"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // cmdLoadUndeliverable runs DetectUndeliverable for the given context.
@@ -61,7 +63,12 @@ func (m Model) handleUndeliverableLoaded(msg undeliverableLoadedMsg) (Model, tea
 	m = m.undeliverableClampCursor()
 
 	if msg.err != nil && m.overlay != overlayUndeliverable {
-		m.setStatusMessage("Undeliverable scan: partial result ("+msg.err.Error()+")", true)
+		// The scan error quotes apiserver text, so it is as cluster-controlled
+		// as anything on a row. Sanitize the interpolated half before it is
+		// concatenated: the status bar's own sink only folds newlines and
+		// truncates, so an escape reaching it is an escape on the screen.
+		detail := ui.SanitizeTerminalText(msg.err.Error())
+		m.setStatusMessage("Undeliverable scan: partial result ("+detail+")", true)
 		return m, scheduleStatusClear()
 	}
 	return m, nil
