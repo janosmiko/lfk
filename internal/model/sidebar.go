@@ -229,15 +229,39 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 	return categorized, crdGroups
 }
 
+// Extra / Kind values of the Dashboards-section entries. Sidebar rows
+// carrying one of these navigate to a view of their own instead of listing
+// a resource type.
+const (
+	PseudoOverview      = "__overview__"
+	PseudoMonitoring    = "__monitoring__"
+	PseudoUndeliverable = "__undeliverable__"
+)
+
+// IsDashboardPseudoItem reports whether a sidebar Extra names one of the
+// Dashboards-section entries. Callers use it to skip rows that have no
+// resource type behind them - completion candidates, bookmarks, explain
+// lookups, and the preview pane all need the same answer, and each one
+// spelling the comparison out by hand is how a new entry gets missed.
+func IsDashboardPseudoItem(extra string) bool {
+	switch extra {
+	case PseudoOverview, PseudoMonitoring, PseudoUndeliverable:
+		return true
+	}
+	return false
+}
+
 // injectPseudoCategoryHeaders returns navigation-only items that do not
-// correspond to any resource type: the cluster overview dashboard and the
-// monitoring dashboard. Helm releases and port forwards flow through the
-// discovered resource set via PseudoResources() and are rendered by the
-// normal metadata-overlay path, not by this function.
+// correspond to any resource type: the cluster overview dashboard, the
+// monitoring dashboard, and the Undeliverable overview. Helm releases and
+// port forwards flow through the discovered resource set via
+// PseudoResources() and are rendered by the normal metadata-overlay path,
+// not by this function.
 func injectPseudoCategoryHeaders() []Item {
 	return []Item{
-		{Name: "Cluster", Kind: "__overview__", Extra: "__overview__", Category: "Dashboards", Icon: Icon{Unicode: "⌂", Simple: "[Cd]", Emoji: "🏠", NerdFont: "\U000f0a07"}},
-		{Name: "Monitoring", Kind: "__monitoring__", Extra: "__monitoring__", Category: "Dashboards", Icon: Icon{Unicode: "⌖", Simple: "[Mo]", Emoji: "👁️", NerdFont: "\U000f13b4"}},
+		{Name: "Cluster", Kind: PseudoOverview, Extra: PseudoOverview, Category: "Dashboards", Icon: Icon{Unicode: "⌂", Simple: "[Cd]", Emoji: "🏠", NerdFont: "\U000f0a07"}},
+		{Name: "Monitoring", Kind: PseudoMonitoring, Extra: PseudoMonitoring, Category: "Dashboards", Icon: Icon{Unicode: "⌖", Simple: "[Mo]", Emoji: "👁️", NerdFont: "\U000f13b4"}},
+		{Name: "Undeliverable", Kind: PseudoUndeliverable, Extra: PseudoUndeliverable, Category: "Dashboards", Icon: Icon{Unicode: "⧗", Simple: "[Un]", Emoji: "⏳", NerdFont: "\U000f051f"}},
 	}
 }
 

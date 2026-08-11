@@ -10,6 +10,19 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// finalizerSearchState groups the finalizer-search overlay fields. Embedded
+// in Model so every existing m.finalizerSearchX reference keeps working -
+// same pattern as columnToggleState and canIState.
+type finalizerSearchState struct {
+	finalizerSearchPattern      string
+	finalizerSearchResults      []k8s.FinalizerMatch
+	finalizerSearchCursor       int
+	finalizerSearchSelected     map[string]bool // "ns/kind/name" keys
+	finalizerSearchLoading      bool
+	finalizerSearchFilter       string
+	finalizerSearchFilterActive bool
+}
+
 // handleFinalizerSearchKey handles keyboard input for the finalizer search overlay.
 func (m Model) handleFinalizerSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
