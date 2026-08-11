@@ -231,6 +231,7 @@ func TestLoadTab_ResumesAnExplainLeftUnfinished(t *testing.T) {
 func TestLoadTab_DoesNotRefetchAnExplainThatAlreadyLoaded(t *testing.T) {
 	m := explainLoadingTabsModel()
 	m.explainFields = []model.ExplainField{{Name: "replicas", Path: "spec.replicas"}}
+	m.explainTitle = "deployments (apps/v1) > spec"
 	m.loading = false
 
 	m.saveCurrentTab()
@@ -253,4 +254,32 @@ func TestLoadTab_LeavesANonExplainTabAlone(t *testing.T) {
 
 	assert.Nil(t, cmd)
 	assert.False(t, m.loading)
+}
+
+// kubectl explain of a primitive field answers with a description and no
+// FIELDS section, so a level that loaded holds zero fields. Deciding from the
+// field list would refetch it on every visit and flash a spinner over a level
+// that is already right.
+func TestLoadTab_DoesNotRefetchALevelThatLoadedWithNoFields(t *testing.T) {
+	m := explainLoadingTabsModel()
+
+	// The reply for spec.replicas: a description, no fields.
+	mdl, _ := m.updateExplainLoaded(explainLoadedMsg{
+		gen:         m.explainGen,
+		description: "Number of desired pods.",
+		title:       "deployments (apps/v1) > spec > replicas",
+		path:        "spec.replicas",
+	})
+	m = mdl.(Model)
+	require.Empty(t, m.explainFields, "a primitive field has no FIELDS section")
+	require.NotEmpty(t, m.explainTitle, "but the reply still names the level")
+
+	m.saveCurrentTab()
+	_ = m.loadTab(1)
+	m.saveCurrentTab()
+	cmd := m.loadTab(0)
+
+	assert.Nil(t, cmd, "the level arrived, so revisiting the tab must not refetch it")
+	assert.False(t, m.loading, "and must not flash a spinner over it")
+	assert.Equal(t, "Number of desired pods.", m.explainDesc, "the description stays on screen")
 }
