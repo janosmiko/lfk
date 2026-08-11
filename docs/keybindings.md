@@ -115,7 +115,7 @@ Your chosen sort is remembered per resource kind and per cluster context, and pe
 
 ### Cluster-wide overview
 
-Press **`Shift+O`** anywhere in the explorer (or type `:orphans` with no arguments in the command bar) to open the cluster-wide orphan overview overlay. Inside the overlay:
+Press **`Shift+Z`** anywhere in the explorer (or type `:orphans` with no arguments in the command bar) to open the cluster-wide orphan overview overlay. Inside the overlay:
 
 | Key | Action |
 | --- | ------ |
@@ -124,7 +124,7 @@ Press **`Shift+O`** anywhere in the explorer (or type `:orphans` with no argumen
 | `/` | Filter by namespace + name |
 | `Enter` | Jump to the highlighted resource (namespace switches automatically) |
 | `R` | Re-scan the cluster |
-| `Esc` / `q` / `Shift+O` | Close the overlay |
+| `Esc` / `q` / `Shift+Z` | Close the overlay |
 
 ### Per-kind presets
 
