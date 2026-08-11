@@ -44,6 +44,12 @@ func (m *Model) cmdLoadUndeliverable(kubeContext string) tea.Cmd {
 // that guard, plus the loadedFor check on open, is what makes a context switch
 // safe without cancelling the scan mid-flight. The scan is read-only, so
 // letting it finish and dropping it costs one wasted list round.
+//
+// Dropping a foreign result can leave the active context with no scan in
+// flight at all: the overlay may have been reopened for it while this one
+// was still running, and cmdLoadUndeliverable refused that request because
+// inflight was true. Restart the scan here so the overlay does not sit on a
+// stale or empty report with no spinner and nothing to follow.
 func (m Model) handleUndeliverableLoaded(msg undeliverableLoadedMsg) (Model, tea.Cmd) {
 	if msg.gen != m.undeliverable.gen {
 		return m, nil
@@ -55,6 +61,10 @@ func (m Model) handleUndeliverableLoaded(msg undeliverableLoadedMsg) (Model, tea
 	m.undeliverable.inflight = false
 	if msg.kubeContext != m.nav.Context {
 		m.undeliverable.loading = false
+		if m.overlay == overlayUndeliverable && m.undeliverable.loadedFor == m.nav.Context {
+			m.undeliverable.loading = true
+			return m, (&m).cmdLoadUndeliverable(m.nav.Context)
+		}
 		return m, nil
 	}
 	m.undeliverable.report = msg.report

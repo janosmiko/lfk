@@ -204,6 +204,28 @@ func TestHandleUndeliverableLoaded_ReleasesInflightSlotForForeignContext(t *test
 	assert.NotNil(t, cmd, "a later scan must still be possible")
 }
 
+// TestHandleUndeliverableLoaded_RestartsScanWhenOverlayOpenForNewContext
+// covers the sequence: open the overlay for context A (scan A starts),
+// switch to context B, reopen the overlay for B while scan A is still
+// inflight (cmdLoadUndeliverable refuses since inflight is true, but
+// loadedFor is now B). When scan A lands, its data is for the wrong
+// context and must be dropped - but without this fix nothing then starts a
+// scan for B, and the overlay is stuck showing stale or empty data.
+func TestHandleUndeliverableLoaded_RestartsScanWhenOverlayOpenForNewContext(t *testing.T) {
+	m := undeliverableTestModel(0)
+	m.overlay = overlayUndeliverable
+	m.nav.Context = "new"
+	m.undeliverable.loadedFor = "new"
+	m.undeliverable.gen = 1
+	m.undeliverable.inflight = true
+
+	out, cmd := m.handleUndeliverableLoaded(undeliverableLoadedMsg{kubeContext: "old", gen: 1})
+
+	require.NotNil(t, cmd, "a scan for the active context must be restarted")
+	assert.True(t, out.undeliverable.inflight, "the restarted scan must claim the inflight slot")
+	assert.True(t, out.undeliverable.loading, "the overlay must show a spinner for the restarted scan")
+}
+
 // TestHandleUndeliverableLoaded_SanitizesPartialErrorIntoStatusBar covers the
 // scan error's second sink. The overlay subtitle sanitizes it, but with the
 // overlay closed the same string goes to the status bar instead, and that
