@@ -80,11 +80,20 @@ func TestSanitizeCursorBody_StripsHostilePayloadsAndKeepsCursorOnChar(t *testing
 func TestOverlayCursor_SanitizesActiveAndInactive(t *testing.T) {
 	payload := "secret\x1b]52;c;aGF4\x07value"
 
+	// Assert on the OSC introducer, not the whole payload. The cursor's
+	// styling is inserted at offset 3, which splits the payload string, so a
+	// whole-payload check passes even when the sequence comes through intact.
+	// "\x1b]" opens an OS command and never belongs in rendered output, while
+	// the cursor's own reverse-video SGR legitimately carries ESC.
+	const oscIntroducer = "\x1b]"
+
 	active := overlayCursor(payload, 3, true, 80)
-	assert.NotContains(t, active, payload)
+	assert.NotContains(t, active, oscIntroducer)
+	assert.NotContains(t, active, "\a", "BEL terminates the sequence")
 
 	inactive := overlayCursor(payload, 3, false, 80)
-	assert.NotContains(t, inactive, payload)
+	assert.NotContains(t, inactive, oscIntroducer)
+	assert.NotContains(t, inactive, "\a")
 }
 
 // TestOverlayCursorMultiline_SanitizesHostilePayload guards the Value

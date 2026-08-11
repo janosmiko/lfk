@@ -67,3 +67,45 @@ func TestCrashBodySanitizerKeepsLineStructure(t *testing.T) {
 		t.Errorf("expected %d lines, got %q", want, got)
 	}
 }
+
+// The Summary tab's metadata rows are the pod's own identity: Phase, Node, IP,
+// QoS, Owner, and the container named in the last-termination heading. They sit
+// beside fields the same function already guarded, which is the shape of miss
+// this task keeps finding.
+func TestCrashSummaryMetadataDropsHostileSequences(t *testing.T) {
+	payloads := map[string]struct{ payload, marker string }{
+		"OSC-52 clipboard write": {"\x1b]52;c;aGF4\a", "\x1b]"},
+		"CSI erase display":      {"\x1b[2J", "\x1b[2J"},
+		"bidi override":          {"\u202e", "\u202e"},
+		"C1 control":             {"\u009b", "\u009b"},
+	}
+
+	for name, tc := range payloads {
+		t.Run(name, func(t *testing.T) {
+			entry := CrashInvestigatorEntry{
+				PodName:         "api" + tc.payload,
+				Namespace:       "prod" + tc.payload,
+				Phase:           "Running" + tc.payload,
+				Node:            "node-1" + tc.payload,
+				PodIP:           "10.0.0.1" + tc.payload,
+				QoSClass:        "Burstable" + tc.payload,
+				OwnerKind:       "ReplicaSet",
+				OwnerName:       "api-abc" + tc.payload,
+				ActiveContainer: "app" + tc.payload,
+				AppContainers: []CrashContainerEntry{{
+					Name:        "app" + tc.payload,
+					HasLastTerm: true,
+					LastReason:  "Error",
+				}},
+			}
+
+			out := strings.Join(buildCrashSummaryLines(entry), "\n")
+			if strings.Contains(out, tc.marker) {
+				t.Errorf("Summary tab: %s survived", name)
+			}
+			if strings.Contains(out, "\a") {
+				t.Errorf("%s: BEL survived", name)
+			}
+		})
+	}
+}

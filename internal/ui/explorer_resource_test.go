@@ -776,29 +776,36 @@ func TestRenderResourceTree_LabelsSanitized(t *testing.T) {
 	}
 }
 
-// TestBodySanitizerPathsKeepColour guards against closing these sinks with
-// the blunt single-line sanitizer where the ANSI-aware body sanitizer
-// belongs: SGR colour in a condition message and a Labels entry must still
-// render, or trivy/helm-style colored output turns to plain text.
-func TestBodySanitizerPathsKeepColour(t *testing.T) {
+// The preview pane deliberately does NOT keep SGR. Cluster metadata has no
+// business colouring the pane, and keeping the escape is what let the rune and
+// byte slicing further down count escape bytes as visible width, which broke
+// alignment in a narrow pane. The escape is replaced with U+FFFD, the same
+// marker the log viewer shows for any other non-printable byte, so the value
+// reads as suspect instead of being obeyed.
+//
+// Asserting on "[31m" alone would prove nothing: that printable tail survives
+// either way. The ESC is what matters.
+func TestPreviewBodyPathsDropTheEscape(t *testing.T) {
 	const red = "\x1b[31mFAILED\x1b[0m"
+	const escSGR = "\x1b[31m"
 
-	t.Run("condition message", func(t *testing.T) {
-		item := &model.Item{
+	cases := map[string]*model.Item{
+		"condition message": {
 			Name:       "deploy-1",
 			Columns:    []model.KeyValue{{Key: "Node", Value: "node-1"}},
 			Conditions: []model.ConditionEntry{{Type: "Available", Status: "False", Message: red}},
-		}
-		out := RenderResourceSummary(item, "", 100, 40)
-		assert.Contains(t, out, "[31m")
-	})
-
-	t.Run("Labels entry", func(t *testing.T) {
-		item := &model.Item{
+		},
+		"Labels entry": {
 			Name:    "svc-1",
 			Columns: []model.KeyValue{{Key: "Labels", Value: red}},
-		}
-		out := RenderResourceSummary(item, "", 100, 40)
-		assert.Contains(t, out, "[31m")
-	})
+		},
+	}
+
+	for name, item := range cases {
+		t.Run(name, func(t *testing.T) {
+			out := RenderResourceSummary(item, "", 100, 40)
+			assert.NotContains(t, out, escSGR, "the escape must not reach the pane")
+			assert.Contains(t, out, "\ufffd", "and the byte it stood for is marked, not dropped silently")
+		})
+	}
 }

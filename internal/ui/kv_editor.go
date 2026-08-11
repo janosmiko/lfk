@@ -318,6 +318,11 @@ func AdjustEditValueScroll(value string, cursor, scroll, maxW, maxH int) int {
 	if scroll < 0 {
 		scroll = 0
 	}
+	// The renderer draws the sanitized text, so the line count has to be
+	// measured on that. Measuring the raw value counts the bytes a control
+	// sequence occupies, over-reports the line count, and can scroll the pane
+	// past the end of the value onto a blank view.
+	value, cursor = sanitizeCursorBody(value, cursor)
 	cursorLine := CursorVisualLine(value, cursor, maxW)
 	if cursorLine < scroll {
 		return cursorLine

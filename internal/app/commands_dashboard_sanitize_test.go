@@ -123,3 +123,26 @@ func TestRenderAlertRow_SanitizesUnknownStateAndSeverity(t *testing.T) {
 		})
 	}
 }
+
+// Count is read from the same Columns map as Reason, Object and Message, and
+// both dashboard event layouts interpolate it into the count label.
+func TestExtractEventFields_SanitizesCount(t *testing.T) {
+	payloads := map[string]struct{ payload, marker string }{
+		"OSC-52 clipboard write": {"\x1b]52;c;aGF4\a", "\x1b]"},
+		"bidi override":          {"\u202e", "\u202e"},
+	}
+
+	for name, tc := range payloads {
+		t.Run(name, func(t *testing.T) {
+			f := extractEventFields(model.Item{Columns: []model.KeyValue{
+				{Key: "Count", Value: "12" + tc.payload},
+			}})
+			if strings.Contains(f.count, tc.marker) {
+				t.Errorf("%s survived the Count field", name)
+			}
+			if strings.Contains(f.count, "\a") {
+				t.Errorf("%s: BEL survived", name)
+			}
+		})
+	}
+}

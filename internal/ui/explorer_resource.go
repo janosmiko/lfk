@@ -137,7 +137,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		// SGR colour worth keeping; everything else is a short structured
 		// field value, so the plain single-line sanitizer is enough.
 		if messageKeys[kv.Key] {
-			val = SanitizeLogBody(StripBidiOverrides(val), true)
+			val = SanitizeLogBody(StripBidiOverrides(val), false)
 		} else {
 			val = SanitizeTerminalText(val)
 		}
@@ -252,7 +252,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			if len(lines) >= height {
 				break
 			}
-			entry := SanitizeLogBody(StripBidiOverrides(rawEntry), true)
+			entry := SanitizeLogBody(StripBidiOverrides(rawEntry), false)
 			maxW := max(width-4, 10)
 			entryRunes := []rune(entry)
 			if len(entryRunes) <= maxW {
@@ -327,7 +327,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 				lines = append(lines, "    "+DimStyle.Render(reason))
 			}
 
-			message := SanitizeLogBody(StripBidiOverrides(cond.Message), true)
+			message := SanitizeLogBody(StripBidiOverrides(cond.Message), false)
 			if message != "" {
 				maxW := max(width-6, 10)
 				for _, seg := range wrapText(message, maxW) {
@@ -489,7 +489,7 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	sanitizedEvents := make([]EventTimelineEntry, len(events))
 	for i, e := range events {
 		e.Reason = SanitizeTerminalText(e.Reason)
-		e.Message = SanitizeLogBody(StripBidiOverrides(e.Message), true)
+		e.Message = SanitizeLogBody(StripBidiOverrides(e.Message), false)
 		sanitizedEvents[i] = e
 	}
 	events = sanitizedEvents
@@ -639,7 +639,7 @@ func renderDataKV(key, value string, width int) []string {
 	value = strings.ReplaceAll(value, `\t`, "\t")
 
 	if !strings.Contains(value, "\n") {
-		return []string{renderKV(key, SanitizeLogBody(StripBidiOverrides(value), true), width)}
+		return []string{renderKV(key, SanitizeLogBody(StripBidiOverrides(value), false), width)}
 	}
 	// Multiline: render key on its own line, then indented value lines.
 	// Sanitize per-line (post-split): the body sanitizer treats a bare '\n'
@@ -650,7 +650,7 @@ func renderDataKV(key, value string, width int) []string {
 	indent := "  "
 	maxVal := max(width-len(indent)-1, 4)
 	for vline := range strings.SplitSeq(value, "\n") {
-		rendered := SanitizeLogBody(StripBidiOverrides(vline), true)
+		rendered := SanitizeLogBody(StripBidiOverrides(vline), false)
 		if len(rendered) > maxVal {
 			rendered = rendered[:maxVal-3] + "..."
 		}

@@ -51,8 +51,8 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 
 	maxKeyLen := 0
 	for _, r := range rows {
-		if len(r.key) > maxKeyLen {
-			maxKeyLen = len(r.key)
+		if w := lipgloss.Width(r.key); w > maxKeyLen {
+			maxKeyLen = w
 		}
 	}
 
@@ -63,7 +63,7 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 		if len(lines) >= height-1 {
 			break
 		}
-		padded := r.key + ": " + strings.Repeat(" ", maxKeyLen-len(r.key))
+		padded := r.key + ": " + strings.Repeat(" ", maxKeyLen-lipgloss.Width(r.key))
 		lines = append(lines, labelStyle.Render(padded)+r.style.Render(r.value))
 	}
 

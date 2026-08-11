@@ -637,7 +637,7 @@ func extractEventFields(ev model.Item) eventColumnFields {
 		case "Message":
 			f.message = ui.SanitizeTerminalText(kv.Value)
 		case "Count":
-			f.count = kv.Value
+			f.count = ui.SanitizeTerminalText(kv.Value)
 		}
 	}
 	return f

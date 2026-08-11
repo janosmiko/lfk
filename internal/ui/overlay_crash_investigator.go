@@ -274,6 +274,10 @@ func buildCrashSummaryLines(entry CrashInvestigatorEntry) []string {
 	valueStyle := OverlayNormalStyle
 
 	kvLine := func(label, value string) string {
+		// Every Summary row funnels through here, so one guard covers Phase,
+		// Node, IP, QoS and Owner. These come from the cluster and are all
+		// single-line, so the blunt sanitizer is the right one.
+		value = SanitizeTerminalText(value)
 		if strings.TrimSpace(value) == "" {
 			value = "—"
 		}
@@ -307,7 +311,7 @@ func buildCrashSummaryLines(entry CrashInvestigatorEntry) []string {
 	// Last-terminated detail block for the active container.
 	if active := findCrashContainer(entry, entry.ActiveContainer); active != nil && active.HasLastTerm {
 		lines = append(lines, "")
-		lines = append(lines, "  "+crashSectionStyle.Render(fmt.Sprintf("Last termination of %s", active.Name)))
+		lines = append(lines, "  "+crashSectionStyle.Render(fmt.Sprintf("Last termination of %s", SanitizeTerminalText(active.Name))))
 		lines = append(lines, OverlayDimStyle.Render(fmt.Sprintf(
 			"    Reason: %s · ExitCode: %d · Signal: %d · Finished: %s",
 			fallbackCrashStr(SanitizeTerminalText(active.LastReason)),
