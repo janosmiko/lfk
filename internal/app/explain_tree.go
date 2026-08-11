@@ -20,6 +20,7 @@ import (
 type explainTreeLoadedMsg struct {
 	fields []model.ExplainField
 	path   string
+	gen    uint64 // explain session, see explainLoadedMsg
 	err    error
 }
 
@@ -34,6 +35,7 @@ type explainTreeDescMsg struct {
 	kctx       string
 	parent     string
 	fields     []model.ExplainField
+	gen        uint64 // explain session, see explainLoadedMsg
 	err        error
 }
 
@@ -109,7 +111,10 @@ func (m *Model) resetExplainTree() {
 // aside for the toggle-off restore. The cursor follows the flat selection
 // onto the matching tree row.
 func (m Model) updateExplainTreeLoaded(msg explainTreeLoadedMsg) (tea.Model, tea.Cmd) {
-	m.loading = false
+	m.loading = false // see updateExplainLoaded
+	if msg.gen != m.explainGen {
+		return m, nil
+	}
 	// Dropped silently when the user canceled tree mode while the fetch was
 	// in flight (every live tree load has explainTreeWanted set).
 	if !m.explainTreeWanted {
@@ -172,7 +177,14 @@ func seedExplainDescriptions(dst, src []model.ExplainField) {
 // retrying on every cursor move would spawn a kubectl process per keypress;
 // the cache resets with the next tree load.
 func (m Model) updateExplainTreeDescLoaded(msg explainTreeDescMsg) tea.Model {
+	// The level is no longer loading whatever session asked for it. The
+	// in-flight map outlives a session (only resetExplainTree clears it), so
+	// skipping this on a stale batch would block that level from ever being
+	// described again.
 	delete(m.explainTreeDescInflight, msg.parent)
+	if msg.gen != m.explainGen {
+		return m
+	}
 	if !m.explainTree || msg.resource != m.explainResource ||
 		msg.apiVersion != m.explainAPIVersion || msg.kctx != m.effectiveContext() {
 		return m
