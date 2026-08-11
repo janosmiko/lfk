@@ -333,3 +333,115 @@ func moduleRoot(t *testing.T) string {
 		dir = parent
 	}
 }
+
+// In demo mode KubectlPath returns lfk's own executable, so a call site that
+// spawns it with unwrapped kubectl argv re-enters the root command and opens
+// a second TUI instead of the demo kubectl emulation. Two call sites were
+// missed when the wrapping was rolled out (TASK-865, then TASK-875), because
+// only the binary lookup was guarded, not the arguments. This guards the
+// arguments.
+//
+// The check is per function, not per call: some call sites wrap the slice a
+// few lines earlier and pass the wrapped variable. A function that mentions
+// DemoKubectlArgs anywhere is therefore accepted. That is loose on purpose -
+// it catches every site that forgot the helper altogether, which is the
+// mistake that has actually happened, without failing on the assign-then-use
+// shape.
+func TestKubectlExecArgsGoThroughDemoHelper(t *testing.T) {
+	root := moduleRoot(t)
+
+	var offenders []string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case "vendor", ".git":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		fset := token.NewFileSet()
+		f, parseErr := parser.ParseFile(fset, path, nil, 0)
+		if parseErr != nil {
+			return fmt.Errorf("parsing %s: %w", path, parseErr)
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			rel = path
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			if !kubectlSpawnsInFunc(fn) || mentionsDemoKubectlArgs(fn) {
+				continue
+			}
+			offenders = append(offenders, fmt.Sprintf("%s: %s", rel, fn.Name.Name))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking module root: %v", err)
+	}
+	sort.Strings(offenders)
+	if len(offenders) > 0 {
+		t.Errorf("these functions spawn the kubectl path without k8s.DemoKubectlArgs;"+
+			" wrap the argument slice or demo mode re-enters lfk itself:\n%s",
+			strings.Join(offenders, "\n"))
+	}
+}
+
+// kubectlSpawnsInFunc reports whether fn calls exec.Command or
+// exec.CommandContext with the resolved kubectl path as the binary.
+func kubectlSpawnsInFunc(fn *ast.FuncDecl) bool {
+	found := false
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		pkg, ok := sel.X.(*ast.Ident)
+		if !ok || pkg.Name != "exec" {
+			return true
+		}
+		nameIdx, ok := execNameResolvers[sel.Sel.Name]
+		if !ok || sel.Sel.Name == "LookPath" || len(call.Args) <= nameIdx {
+			return true
+		}
+		if ident, ok := call.Args[nameIdx].(*ast.Ident); ok && strings.Contains(ident.Name, "kubectlPath") {
+			found = true
+		}
+		return true
+	})
+	return found
+}
+
+// mentionsDemoKubectlArgs reports whether fn calls the helper anywhere, in
+// either its own package (DemoKubectlArgs) or through k8s.
+func mentionsDemoKubectlArgs(fn *ast.FuncDecl) bool {
+	found := false
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.Ident:
+			if v.Name == "DemoKubectlArgs" {
+				found = true
+			}
+		case *ast.SelectorExpr:
+			if v.Sel.Name == "DemoKubectlArgs" {
+				found = true
+			}
+		}
+		return true
+	})
+	return found
+}

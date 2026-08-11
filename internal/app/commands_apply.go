@@ -147,7 +147,7 @@ func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
 		if ns != "" {
 			args = append(args, "-n", ns)
 		}
-		cmd := exec.Command(kubectlPath, args...)
+		cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(args)...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
