@@ -108,7 +108,7 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 	args := []string{"port-forward", target, portMapping, "-n", namespace, "--context", kubectlContext}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, kubectlPath, args...)
+	cmd := exec.CommandContext(ctx, kubectlPath, DemoKubectlArgs(args)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 
 	stdoutPipe, err := cmd.StdoutPipe()
