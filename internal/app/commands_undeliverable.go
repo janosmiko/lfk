@@ -1,0 +1,68 @@
+package app
+
+import (
+	"context"
+
+	tea "charm.land/bubbletea/v2"
+)
+
+// cmdLoadUndeliverable runs DetectUndeliverable for the given context.
+// Returns nil when a scan is already in flight, so opening the overlay twice
+// in one tick does not issue two cluster-wide scans.
+//
+// The scan carries a generation number and a cancel func so a result that
+// arrives after the user switched context is dropped rather than written back
+// over their newer scope - the same guard the orphan scan uses.
+func (m *Model) cmdLoadUndeliverable(kubeContext string) tea.Cmd {
+	if m.undeliverable.inflight {
+		return nil
+	}
+	m.undeliverable.gen++
+	gen := m.undeliverable.gen
+	ctx, cancel := context.WithCancel(context.Background())
+	m.undeliverable.inflight = true
+	m.undeliverable.cancel = cancel
+	client := m.client
+	return func() tea.Msg {
+		report, err := client.DetectUndeliverable(ctx, kubeContext, "")
+		return undeliverableLoadedMsg{
+			kubeContext: kubeContext, gen: gen, report: report, err: err,
+		}
+	}
+}
+
+// handleUndeliverableLoaded pushes a completed scan into the overlay state.
+//
+// The bookkeeping is cleared before the context check, not after: a scan that
+// finishes for a cluster the user has already left still has to release the
+// inflight slot, or cmdLoadUndeliverable would refuse every later scan and the
+// overlay would be stuck on its spinner forever.
+//
+// A result for another context is then discarded rather than written back -
+// that guard, plus the loadedFor check on open, is what makes a context switch
+// safe without cancelling the scan mid-flight. The scan is read-only, so
+// letting it finish and dropping it costs one wasted list round.
+func (m Model) handleUndeliverableLoaded(msg undeliverableLoadedMsg) (Model, tea.Cmd) {
+	if msg.gen != m.undeliverable.gen {
+		return m, nil
+	}
+	if m.undeliverable.cancel != nil {
+		m.undeliverable.cancel() // release the context now the scan is done
+		m.undeliverable.cancel = nil
+	}
+	m.undeliverable.inflight = false
+	if msg.kubeContext != m.nav.Context {
+		m.undeliverable.loading = false
+		return m, nil
+	}
+	m.undeliverable.report = msg.report
+	m.undeliverable.partial = msg.err
+	m.undeliverable.loading = false
+	m = m.undeliverableClampCursor()
+
+	if msg.err != nil && m.overlay != overlayUndeliverable {
+		m.setStatusMessage("Undeliverable scan: partial result ("+msg.err.Error()+")", true)
+		return m, scheduleStatusClear()
+	}
+	return m, nil
+}

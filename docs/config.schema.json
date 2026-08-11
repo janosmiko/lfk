@@ -457,6 +457,7 @@
         "column_toggle": { "type": "string" },
         "toggle_rare": { "type": "string" },
         "orphan_overlay": { "type": "string" },
+        "undeliverable_overlay": { "type": "string" },
         "session_manager": { "type": "string" },
         "namespace_selector": { "type": "string" },
         "all_namespaces": { "type": "string" },

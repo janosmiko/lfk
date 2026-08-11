@@ -76,7 +76,11 @@ type Keybindings struct {
 	ColumnToggle      string `json:"column_toggle" yaml:"column_toggle"`
 	ToggleRare        string `json:"toggle_rare" yaml:"toggle_rare"`
 	OrphanOverlay     string `json:"orphan_overlay" yaml:"orphan_overlay"`
-	SessionManager    string `json:"session_manager" yaml:"session_manager"`
+	// UndeliverableOverlay opens the cluster-wide list of resources that want
+	// to reach a state and cannot. Mirror of OrphanOverlay, which finds
+	// resources nobody references.
+	UndeliverableOverlay string `json:"undeliverable_overlay" yaml:"undeliverable_overlay"`
+	SessionManager       string `json:"session_manager" yaml:"session_manager"`
 
 	// Actions
 	NamespaceSelector string `json:"namespace_selector" yaml:"namespace_selector"`
@@ -243,8 +247,13 @@ func DefaultKeybindings() Keybindings {
 		QuotaDashboard: "Q", TasksOverlay: "`",
 		ExpandCollapse: "z", PinGroup: "p",
 		ColumnToggle: ",", ToggleRare: "H",
-		OrphanOverlay:  "Z",
-		SessionManager: "C",
+		OrphanOverlay: "Z",
+		// "V" joins the other cluster-wide overviews in the shift-letter
+		// family (Z orphans, Q quota, U RBAC) and is a free capital in the
+		// explorer. The text viewers' visual-line "V" cannot collide: this
+		// one only dispatches from the explorer.
+		UndeliverableOverlay: "V",
+		SessionManager:       "C",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",

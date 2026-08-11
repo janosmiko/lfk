@@ -22,10 +22,9 @@ func (m Model) openExplainBrowser() (tea.Model, tea.Cmd) {
 			m.setStatusMessage("No resource type selected", true)
 			return m, scheduleStatusClear()
 		}
-		// Skip virtual items (overview, monitoring, collapsed groups, etc.).
-		if sel.Kind == "__collapsed_group__" || sel.Kind == "__overview__" ||
-			sel.Kind == "__monitoring__" || sel.Extra == "__overview__" ||
-			sel.Extra == "__monitoring__" {
+		// Skip virtual items (the Dashboards entries, collapsed groups, etc.).
+		if sel.Kind == "__collapsed_group__" ||
+			model.IsDashboardPseudoItem(sel.Kind) || model.IsDashboardPseudoItem(sel.Extra) {
 			m.setStatusMessage("Cannot explain this item", true)
 			return m, scheduleStatusClear()
 		}
