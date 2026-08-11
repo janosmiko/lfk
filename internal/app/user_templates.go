@@ -40,6 +40,11 @@ const userTemplateCategory = "User"
 // directory or produce an unreachable file.
 var errInvalidTemplateName = errors.New("invalid template name")
 
+// errTemplateDirUnavailable reports that paths.ConfigDir() failed — an
+// environment problem (e.g. $HOME unset), not anything wrong with the
+// resource name being saved.
+var errTemplateDirUnavailable = errors.New("template directory unavailable")
+
 func userTemplateDir() string {
 	dir, err := paths.ConfigDir()
 	if err != nil {
@@ -139,7 +144,7 @@ func isYAMLFile(name string) bool {
 func saveUserTemplate(name, manifest string) error {
 	dir := userTemplateDir()
 	if dir == "" {
-		return errInvalidTemplateName
+		return errTemplateDirUnavailable
 	}
 	clean := ui.SanitizeTerminalText(name)
 	if !isSafeTemplateName(clean) {

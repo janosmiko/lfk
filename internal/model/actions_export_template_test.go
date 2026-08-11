@@ -29,6 +29,21 @@ func TestActionsForKind_OffersExportTemplate(t *testing.T) {
 	}
 }
 
+// TestActionsForContainer_OffersExportTemplate: resolveTemplateSource
+// resolves LevelContainers to the parent Pod's manifest, so the container
+// menu must offer the same Export Template entry as every other kind.
+func TestActionsForContainer_OffersExportTemplate(t *testing.T) {
+	var found bool
+	for _, a := range ActionsForContainer() {
+		if a.Label == ActionLabelExportTemplate {
+			found = true
+			assert.Equal(t, "x", a.Key)
+			assert.NotEmpty(t, a.Description)
+		}
+	}
+	require.True(t, found, "container menu is missing %q", ActionLabelExportTemplate)
+}
+
 // TestActionsForKind_ExportTemplateKeyIsFree guards the appended hotkey against
 // a per-kind entry that already uses it.
 func TestActionsForKind_ExportTemplateKeyIsFree(t *testing.T) {

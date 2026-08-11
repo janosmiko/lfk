@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,24 +11,14 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-// writeSecureFile writes data to path with owner-only (0600) permissions,
-// truncating any existing file. Unlike os.WriteFile it also tightens the mode
-// of a pre-existing file, so a resource export that may contain Secret data
-// (base64 tokens, TLS keys) never stays world-readable.
+// writeSecureFile writes data to path with owner-only (0600) permissions, so
+// a resource export that may contain Secret data (base64 tokens, TLS keys)
+// never stays world-readable. Delegates to writeFileDurable, which renames a
+// temp file onto path instead of truncating in place — required because the
+// export filename is predictable (<kind>_<name>.template.yaml) and a
+// pre-planted symlink at that path must be replaced, not written through.
 func writeSecureFile(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-	if err := f.Chmod(0o600); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if _, err := f.Write(data); err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
+	return writeFileDurable(path, data)
 }
 
 // copyYAMLToClipboard fetches the YAML for the selected resource and sends it for clipboard copy.

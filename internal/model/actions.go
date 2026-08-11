@@ -1,8 +1,13 @@
 package model
 
 // ActionsForContainer returns the action menu items for a container.
+//
+// Export Template is appended like every other kind's menu (see
+// ActionsForKind): resolveTemplateSource resolves LevelContainers to the
+// parent Pod's manifest, so exporting from a container is exporting that Pod
+// as a reusable template.
 func ActionsForContainer() []ActionMenuItem {
-	return []ActionMenuItem{
+	return append([]ActionMenuItem{
 		{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 		{Label: "Logs", Description: "View container logs", Key: "L"},
 		{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
@@ -12,7 +17,7 @@ func ActionsForContainer() []ActionMenuItem {
 		{Label: "Debug", Description: "Debug container with ephemeral container", Key: "b"},
 		{Label: "Describe", Description: "Describe parent pod", Key: "v"},
 		{Label: "Events", Description: "Show related events", Key: "e"},
-	}
+	}, exportTemplateAction())
 }
 
 // ActionsForBulk returns the action menu items available for bulk operations.

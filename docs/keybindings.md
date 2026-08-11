@@ -1185,6 +1185,8 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 
 Every kind also offers `x` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Secret values are blanked, keys kept. Available in read-only mode.
 
+The destination picker: `j`/`k` (or `↓`/`↑`, `Ctrl+N`/`Ctrl+P`) move the cursor, `c` clipboard, `f` file, `t` template list, `Enter` export to the highlighted destination, `Esc`/`q` cancel.
+
 ### Pod Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
 

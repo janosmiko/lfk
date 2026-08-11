@@ -92,9 +92,8 @@ func saveSecurityAvailabilityCacheForHost(host string, availability map[string]b
 	}
 	// 0700 dir to match the findings cache that shares this per-host
 	// directory: whichever cache creates it first sets the mode, so both use
-	// 0700 to keep the dir non-traversable on multi-user hosts. The
-	// availability file itself holds only booleans (which sources exist), so
-	// 0644 on the file is fine.
+	// 0700 to keep the dir non-traversable on multi-user hosts. The file
+	// itself is written by writeFileDurable, which forces 0600 regardless.
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}

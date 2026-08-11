@@ -23,6 +23,31 @@ func TestWriteSecureFileIsOwnerOnly(t *testing.T) {
 		"secret-bearing export must be 0600")
 }
 
+// A predictable export filename (<kind>_<name>.template.yaml) combined with
+// O_TRUNC following a pre-existing symlink lets an attacker who plants a
+// symlink at that path have the export overwrite whatever the symlink
+// targets. writeSecureFile must replace the symlink itself (rename onto the
+// path) rather than write through it.
+func TestWriteSecureFileDoesNotFollowSymlink(t *testing.T) {
+	dir := t.TempDir()
+	victim := filepath.Join(dir, "victim.yaml")
+	require.NoError(t, os.WriteFile(victim, []byte("ORIGINAL SECRET CONTENT"), 0o600))
+
+	link := filepath.Join(dir, "pod_web.template.yaml")
+	require.NoError(t, os.Symlink(victim, link))
+
+	require.NoError(t, writeSecureFile(link, []byte("manifest: exported")))
+
+	victimContent, err := os.ReadFile(victim)
+	require.NoError(t, err)
+	assert.Equal(t, "ORIGINAL SECRET CONTENT", string(victimContent),
+		"export through a symlink must not overwrite the symlink's target")
+
+	linkContent, err := os.ReadFile(link)
+	require.NoError(t, err)
+	assert.Equal(t, "manifest: exported", string(linkContent))
+}
+
 // Overwriting an export that already exists world-readable must tighten the
 // mode — os.WriteFile alone does not chmod a pre-existing file.
 func TestWriteSecureFileTightensExistingMode(t *testing.T) {

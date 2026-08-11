@@ -140,6 +140,22 @@ func TestSaveUserTemplate_RejectsPathEscape(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(filepath.Dir(dir), "escape.yaml"))
 }
 
+// TestSaveUserTemplate_ConfigDirUnavailableIsDistinctError guards against
+// blaming the resource name for an environment problem: when
+// paths.ConfigDir() cannot resolve (no override env vars, no home directory),
+// saveUserTemplate must report errTemplateDirUnavailable, not
+// errInvalidTemplateName.
+func TestSaveUserTemplate_ConfigDirUnavailableIsDistinctError(t *testing.T) {
+	t.Setenv("LFK_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", "")
+
+	err := saveUserTemplate("web", "kind: Pod\n")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errTemplateDirUnavailable)
+	assert.NotErrorIs(t, err, errInvalidTemplateName)
+}
+
 // TestMergedTemplates_UserFirstAndNeverShadows is the name-collision rule: a
 // user template named after a built-in does not replace it. Both rows stay in
 // the picker, the user one first, and the Category column tells them apart.

@@ -611,7 +611,7 @@ Templates listed in the create-from-template picker (`a`) come from two places: 
 | Rule | Behaviour |
 |---|---|
 | File name | The template name (`web.yaml` -> `web`) |
-| Content | A plain Kubernetes manifest — no wrapper, no metadata block |
+| Content | A plain Kubernetes manifest — no template-specific wrapper (keep the object's own `metadata`) |
 | Extensions | `.yaml` and `.yml`; anything else is ignored |
 | Category | Always `User`; user templates list before the built-ins |
 | Name collision | Both rows stay; the `User` category marks yours |
