@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // CrashTab is the active tab in the crash investigator overlay.
@@ -459,18 +460,24 @@ func wrapCrashText(s string, width int) []string {
 	}
 	var out []string
 	var cur strings.Builder
+	curWidth := 0
 	flush := func() {
 		out = append(out, cur.String())
 		cur.Reset()
+		curWidth = 0
 	}
 	for word := range strings.FieldsSeq(s) {
-		// Hard-break tokens longer than the column.
+		// Hard-break tokens longer than the column. Cut by display width
+		// (ansi.Truncate/TruncateLeft) rather than byte offset, so a
+		// multibyte rune or an SGR sequence (the Logs/Describe tabs pass
+		// renderAnsi=true) is never split across the wrap boundary.
 		for lipgloss.Width(word) > width {
-			room := width - cur.Len()
-			if cur.Len() > 0 && room > 1 {
+			room := width - curWidth
+			if curWidth > 0 && room > 1 {
 				cur.WriteByte(' ')
+				curWidth++
 				room--
-			} else if cur.Len() > 0 {
+			} else if curWidth > 0 {
 				flush()
 				room = width
 			}
@@ -478,19 +485,22 @@ func wrapCrashText(s string, width int) []string {
 				flush()
 				room = width
 			}
-			cur.WriteString(word[:room])
-			word = word[room:]
+			chunk := ansi.Truncate(word, room, "")
+			cur.WriteString(chunk)
+			word = ansi.TruncateLeft(word, room, "")
 			flush()
 		}
 		next := word
-		if cur.Len() > 0 {
+		if curWidth > 0 {
 			next = " " + word
 		}
-		if cur.Len()+lipgloss.Width(next) > width {
+		if curWidth+lipgloss.Width(next) > width {
 			flush()
 			cur.WriteString(word)
+			curWidth = lipgloss.Width(word)
 		} else {
 			cur.WriteString(next)
+			curWidth += lipgloss.Width(next)
 		}
 	}
 	if cur.Len() > 0 || len(out) == 0 {
