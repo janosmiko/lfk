@@ -181,6 +181,7 @@ func (m *Model) saveCurrentTab() {
 	t.explainResource = m.explainResource
 	t.explainAPIVersion = m.explainAPIVersion
 	t.explainTitle = m.explainTitle
+	t.explainPending = m.explainPending
 	t.explainCursor = m.explainCursor
 	t.explainScroll = m.explainScroll
 	t.explainSearchQuery = m.explainSearchQuery
@@ -332,6 +333,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.explainResource = t.explainResource
 	m.explainAPIVersion = t.explainAPIVersion
 	m.explainTitle = t.explainTitle
+	m.explainPending = t.explainPending
 	m.explainCursor = t.explainCursor
 	m.explainScroll = t.explainScroll
 	m.explainSearchQuery = t.explainSearchQuery

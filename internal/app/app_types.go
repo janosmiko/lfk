@@ -614,6 +614,7 @@ type TabState struct {
 	explainResource    string // resource name (e.g., "deployments")
 	explainAPIVersion  string // api version for kubectl explain (e.g., "apps/v1")
 	explainTitle       string
+	explainPending     bool // a flat-level fetch issued but not yet answered; see resumeExplainFetch
 	explainCursor      int
 	explainScroll      int
 	explainSearchQuery string // persisted search query for n/N navigation

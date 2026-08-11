@@ -762,24 +762,24 @@ type Model struct {
 	pfLoggedErrors            map[int]struct{} // port forward IDs whose failures have been logged to errorLog
 	pfOpenInBrowserAfterStart bool             // open localhost:<port> once the next forward resolves ("Port Forward & Open")
 	// Explain view state (API browser).
-	explainFields                []model.ExplainField
-	explainDesc                  string // resource/field-level description
-	explainPath                  string // current drill-down path (e.g., "spec.template")
-	explainResource              string // resource name (e.g., "deployments")
-	explainAPIVersion            string // api version for kubectl explain (e.g., "apps/v1")
-	explainTitle                 string
-	explainCursor, explainScroll int
-	explainLineInput             string               // digit buffer for 123G jump-to-line
-	explainSearchActive          bool                 // true when typing in search bar
-	explainSearchInput           TextInput            // current search input
-	explainSearchQuery           string               // persisted search query for n/N navigation
-	explainSearchPrevCursor      int                  // cursor position before search started
-	explainTreeState                                  // embedded — tree-mode state; see explain_tree.go
-	explainRecursiveResults      []model.ExplainField // results from recursive search
-	explainRecursiveCursor       int
-	explainRecursiveScroll       int
-	explainRecursiveFilter       TextInput // filter input for recursive search overlay
-	explainRecursiveFilterActive bool      // true when typing in filter
+	explainFields                                  []model.ExplainField
+	explainDesc                                    string // resource/field-level description
+	explainPath                                    string // current drill-down path (e.g., "spec.template")
+	explainResource                                string // resource name (e.g., "deployments")
+	explainAPIVersion                              string // api version for kubectl explain (e.g., "apps/v1")
+	explainTitle                                   string
+	explainPending                                 bool // flat-level fetch issued but not yet answered; see resumeExplainFetch
+	explainCursor, explainScroll                   int
+	explainLineInput                               string               // digit buffer for 123G jump-to-line
+	explainSearchActive                            bool                 // true when typing in search bar
+	explainSearchInput                             TextInput            // current search input
+	explainSearchQuery                             string               // persisted search query for n/N navigation
+	explainSearchPrevCursor                        int                  // cursor position before search started
+	explainTreeState                                                    // embedded — tree-mode state; see explain_tree.go
+	explainRecursiveResults                        []model.ExplainField // results from recursive search
+	explainRecursiveCursor, explainRecursiveScroll int
+	explainRecursiveFilter                         TextInput // filter input for recursive search overlay
+	explainRecursiveFilterActive                   bool      // true when typing in filter
 
 	// canIState (embedded, not named) — Can-I/Who-Can RBAC explorer state; see cani_state.go.
 	canIState

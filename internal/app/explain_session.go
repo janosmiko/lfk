@@ -54,18 +54,21 @@ func (m *Model) cancelExplainSession() {
 }
 
 // resumeExplainFetch re-issues the schema load of a tab that comes back with
-// the API Explorer open but no level in it. Switching away cancels the fetch
-// and the generation guard drops its reply, so the level the tab was waiting
-// for never arrives on its own. Nil when there is nothing to resume.
+// the API Explorer open and a fetch still outstanding. Switching away cancels
+// the fetch and the generation guard drops its reply, so the level the tab
+// was waiting for never arrives on its own. Nil when there is nothing to
+// resume.
 //
-// An empty title is what marks a level as never delivered. The field list
-// cannot answer that: kubectl explain of a primitive field returns a
-// description and no FIELDS section, so a level that loaded perfectly well
-// holds zero fields, and keying off the list would refetch it on every visit.
-// Only a reply sets the title, exitExplainView clears it, and it is part of
-// the per-tab snapshot.
+// explainPending, not an empty title, is what marks a fetch as outstanding.
+// A fetch can be issued while the previous level's title is still on screen -
+// drilling in, going back, or opening the Explorer on another resource all
+// start a fetch before clearing or replacing the title - so an empty-title
+// check misses a fetch left pending behind an old level. explainPending is
+// set at every execKubectlExplain call site and cleared by updateExplainLoaded
+// once a reply of the current generation lands, so it tracks the fetch
+// itself rather than what happens to be on screen.
 func (m *Model) resumeExplainFetch() tea.Cmd {
-	if m.mode != modeExplain || m.explainTitle != "" || m.explainResource == "" {
+	if m.mode != modeExplain || !m.explainPending || m.explainResource == "" {
 		return nil
 	}
 	m.loading = true

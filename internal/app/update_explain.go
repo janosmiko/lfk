@@ -63,6 +63,7 @@ func (m Model) openExplainBrowser() (tea.Model, tea.Cmd) {
 	}
 
 	m.loading = true
+	m.explainPending = true
 	m.beginExplainSession()
 	m.explainReturnMode = modeExplorer
 	m.explainPendingField = ""
@@ -91,6 +92,7 @@ func (m Model) openExplainAtObjectPath(objPath []string, returnMode viewMode) (t
 	}
 	parentPath, field := explainTarget(objPath)
 	m.loading = true
+	m.explainPending = true
 	m.beginExplainSession()
 	m.explainReturnMode = returnMode
 	m.explainPendingField = field
@@ -186,6 +188,7 @@ func (m Model) explainGoBack() (tea.Model, tea.Cmd) {
 		newPath = ""
 	}
 	m.loading = true
+	m.explainPending = true
 	m.setStatusMessage("Loading parent...", false)
 	return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, newPath)
 }
@@ -207,6 +210,7 @@ func (m *Model) exitExplainView() {
 	m.explainResource = ""
 	m.explainAPIVersion = ""
 	m.explainTitle = ""
+	m.explainPending = false
 	m.explainCursor = 0
 	m.explainScroll = 0
 	m.explainSearchQuery = ""
@@ -497,6 +501,7 @@ func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyPressMsg) (tea.Mod
 			m.explainRecursiveFilterActive = false
 			m.explainAncestors = nil // jumped to an arbitrary path; no cached chain
 			m.loading = true
+			m.explainPending = true
 			return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, parentPath)
 		}
 		return m, nil
@@ -623,6 +628,7 @@ func (m Model) handleExplainKeyDrill(fieldCount int) (tea.Model, tea.Cmd) {
 				})
 			}
 			m.loading = true
+			m.explainPending = true
 			m.setStatusMessage("Loading field...", false)
 			return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, f.Path)
 		}
