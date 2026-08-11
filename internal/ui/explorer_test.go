@@ -706,7 +706,7 @@ func TestResolveIconEmojiFallsBackToUnicode(t *testing.T) {
 
 	assert.Equal(t, "◉", resolveIcon(model.Icon{Unicode: "◉", Simple: "[He]"}),
 		"an icon with no emoji falls back to its unicode glyph")
-	assert.Equal(t, "🧠", resolveIcon(model.Icon{Unicode: "◉", Emoji: "🧠"}),
+	assert.Equal(t, "\U0001f9e0", resolveIcon(model.Icon{Unicode: "◉", Emoji: "\U0001f9e0"}),
 		"an icon with an emoji still uses it")
 	assert.Equal(t, "", resolveIcon(model.Icon{}), "an empty icon stays empty")
 }
@@ -720,14 +720,14 @@ func TestIconCellKeepsOneWidthAcrossGlyphs(t *testing.T) {
 	defer func() { IconMode, UnicodeCoreActive = oldMode, oldCore }()
 
 	// Endpoints and Pods: one needs the selector to be two columns, one does not.
-	selectorDependent := model.Icon{Unicode: "→", Emoji: "➡️"}
-	intrinsicallyWide := model.Icon{Unicode: "□", Emoji: "📦"}
+	selectorDependent := model.Icon{Unicode: "→", Emoji: "\u27a1\ufe0f"} // right arrow + selector
+	intrinsicallyWide := model.Icon{Unicode: "□", Emoji: "\U0001f4e6"}   // package
 
 	t.Run("terminal measures with wcwidth", func(t *testing.T) {
 		UnicodeCoreActive = false
 		a, b := iconCell(selectorDependent), iconCell(intrinsicallyWide)
 
-		assert.NotContains(t, a, "️",
+		assert.NotContains(t, a, "\ufe0f",
 			"the selector must go, or lipgloss counts two columns where the terminal draws one")
 		assert.Equal(t, iconCellWidth, lipgloss.Width(a))
 		assert.Equal(t, iconCellWidth, lipgloss.Width(b))
@@ -739,7 +739,7 @@ func TestIconCellKeepsOneWidthAcrossGlyphs(t *testing.T) {
 		UnicodeCoreActive = true
 		a := iconCell(selectorDependent)
 
-		assert.Contains(t, a, "️", "the emoji keeps its colour presentation here")
+		assert.Contains(t, a, "\ufe0f", "the emoji keeps its colour presentation here")
 		assert.Equal(t, iconCellWidth, lipgloss.Width(a))
 	})
 }
@@ -750,7 +750,7 @@ func TestIconCellLeavesOtherModesAlone(t *testing.T) {
 	oldMode := IconMode
 	defer func() { IconMode = oldMode }()
 
-	icon := model.Icon{Unicode: "→", Simple: "[EP]", Emoji: "➡️"}
+	icon := model.Icon{Unicode: "→", Simple: "[EP]", Emoji: "\u27a1\ufe0f"}
 	for mode, want := range map[string]string{"unicode": "→", "simple": "[EP]", "none": ""} {
 		IconMode = mode
 		assert.Equal(t, want, iconCell(icon), "mode %q", mode)

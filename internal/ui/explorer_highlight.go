@@ -127,7 +127,7 @@ const iconCellWidth = 2
 
 // emojiVariationSelector asks for emoji presentation, which is what makes a
 // one-column base codepoint two columns wide.
-const emojiVariationSelector = "️"
+const emojiVariationSelector = "\ufe0f"
 
 // iconCell returns the icon glyph for the active IconMode, laid out so every
 // row of a column starts its name in the same place. Only emoji mode gets the
