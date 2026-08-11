@@ -93,6 +93,7 @@ func (m Model) updateExplainLoaded(msg explainLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.loading = false
+	m.explainPending = false
 	if msg.err != nil {
 		m.setErrorFromErr("Explain failed: ", msg.err)
 		return m, scheduleStatusClear()

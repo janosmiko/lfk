@@ -209,6 +209,7 @@ func explainLoadingTabsModel() Model {
 	m.explainPath = "spec"
 	m.explainFields = nil
 	m.loading = true
+	m.explainPending = true
 	m.beginExplainSession()
 	return m
 }
@@ -232,6 +233,7 @@ func TestLoadTab_DoesNotRefetchAnExplainThatAlreadyLoaded(t *testing.T) {
 	m := explainLoadingTabsModel()
 	m.explainFields = []model.ExplainField{{Name: "replicas", Path: "spec.replicas"}}
 	m.explainTitle = "deployments (apps/v1) > spec"
+	m.explainPending = false
 	m.loading = false
 
 	m.saveCurrentTab()
@@ -241,6 +243,61 @@ func TestLoadTab_DoesNotRefetchAnExplainThatAlreadyLoaded(t *testing.T) {
 
 	assert.Nil(t, cmd, "the level is already on screen, so nothing needs fetching")
 	assert.False(t, m.loading)
+}
+
+// The title lags the fetch: drilling in, going back, or reopening the
+// Explorer on another resource issues a fetch while the previous level's
+// title is still on screen. A tab left in that window must resume the
+// fetch, not the level that happens to be showing (TASK-879).
+func TestLoadTab_ResumesPendingFetchEvenWithATitleStillOnScreen(t *testing.T) {
+	m := explainLoadingTabsModel()
+	m.explainFields = []model.ExplainField{{Name: "replicas", Path: "spec.replicas"}}
+	m.explainTitle = "deployments (apps/v1) > spec"
+	m.explainPending = true // a fetch for the next level was issued before the switch
+	m.loading = true
+
+	m.saveCurrentTab()
+	_ = m.loadTab(1)
+	require.False(t, m.loading, "the abandoned fetch takes its spinner with it")
+
+	m.saveCurrentTab()
+	cmd := m.loadTab(0)
+
+	assert.NotNil(t, cmd, "a pending fetch must resume even though a level is already on screen")
+	assert.True(t, m.loading)
+}
+
+// The pending marker is per-tab: a fetch left running on one tab must not
+// make a different tab - with its own resource and no pending fetch -
+// refetch when it is switched to (TASK-879).
+//
+// Tab 1's title is deliberately empty, not just non-matching: an empty
+// title is what the OLD (pre-TASK-879) check read as "resume". Giving tab 1
+// a non-empty title would make both the old and the new logic agree by
+// accident and the test would pass even with the fix reverted. Only an
+// empty title with explainPending=false tells the two implementations
+// apart: the old code resumes, the new code (correctly) does not.
+func TestLoadTab_PendingFetchOnOneTabDoesNotAffectAnother(t *testing.T) {
+	m := explainLoadingTabsModel()
+	m.tabs[1] = TabState{
+		nav:             m.nav,
+		mode:            modeExplain,
+		explainResource: "services",
+		explainTitle:    "", // never loaded, and no fetch is pending for it either
+		explainPending:  false,
+	}
+
+	m.saveCurrentTab()
+	cmd := m.loadTab(1)
+
+	assert.Nil(t, cmd, "tab 1 has no pending fetch of its own, so it must not refetch")
+	assert.False(t, m.loading)
+
+	m.saveCurrentTab()
+	cmd = m.loadTab(0)
+
+	assert.NotNil(t, cmd, "tab 0's own pending fetch must still resume")
+	assert.True(t, m.loading)
 }
 
 func TestLoadTab_LeavesANonExplainTabAlone(t *testing.T) {
