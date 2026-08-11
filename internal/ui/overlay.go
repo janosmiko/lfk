@@ -96,14 +96,12 @@ type QuotaResourceEntry struct {
 // It mirrors k8s.EventInfo so internal/ui does not depend on the k8s package,
 // and keeps the same tainted fields - see k8s.EventInfo for why.
 type EventTimelineEntry struct {
-	Timestamp    time.Time
-	Type         tainted.String // "Normal" or "Warning"
-	Reason       tainted.String
-	Message      tainted.String
-	Source       tainted.String
-	Count        int32
-	InvolvedName tainted.String
-	InvolvedKind tainted.String
+	Timestamp time.Time
+	Type      tainted.String // "Normal" or "Warning"
+	Reason    tainted.String
+	Message   tainted.String
+	Source    tainted.String
+	Count     int32
 }
 
 // AlertEntry holds alert data for rendering in the overlay, decoupled from the k8s package.

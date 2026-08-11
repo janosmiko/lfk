@@ -47,7 +47,7 @@ func TestRecomposeThemedContentRerendersCachedPreviews(t *testing.T) {
 			memUsed: 256, memReq: 512, memLim: 1024,
 		},
 		previewEventsData: []ui.EventTimelineEntry{
-			{Timestamp: time.Time{}, Type: tainted.Wrap("Warning"), Reason: tainted.Wrap("BackOff"), Message: tainted.Wrap("boom"), InvolvedName: tainted.Wrap("p"), InvolvedKind: tainted.Wrap("Pod")},
+			{Timestamp: time.Time{}, Type: tainted.Wrap("Warning"), Reason: tainted.Wrap("BackOff"), Message: tainted.Wrap("boom")},
 		},
 		monitoringData: map[string]monitoringData{
 			"ctx": {alerts: []k8s.AlertInfo{{Name: "HighCPU", State: "firing", Severity: "critical"}}},

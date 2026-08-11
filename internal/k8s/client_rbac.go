@@ -423,14 +423,12 @@ func computeQuotaPercent(_, hardStr, usedStr string) float64 {
 // object's name and kind come from the same object graph. Unwrap with Line
 // for a table cell, Body for a wrapped message pane.
 type EventInfo struct {
-	Timestamp    time.Time
-	Type         tainted.String // "Normal" or "Warning"
-	Reason       tainted.String
-	Message      tainted.String
-	Source       tainted.String // e.g. "kubelet", "scheduler"
-	Count        int32
-	InvolvedName tainted.String
-	InvolvedKind tainted.String
+	Timestamp time.Time
+	Type      tainted.String // "Normal" or "Warning"
+	Reason    tainted.String
+	Message   tainted.String
+	Source    tainted.String // e.g. "kubelet", "scheduler"
+	Count     int32
 }
 
 // GetResourceEvents fetches events related to the named resource and its owned
@@ -514,14 +512,12 @@ func (c *Client) GetResourceEvents(ctx context.Context, kubeCtx, namespace, name
 		}
 
 		events = append(events, EventInfo{
-			Timestamp:    ts,
-			Type:         tainted.Wrap(eventType),
-			Reason:       tainted.Wrap(reason),
-			Message:      tainted.Wrap(message),
-			Source:       tainted.Wrap(source),
-			Count:        int32(countVal),
-			InvolvedName: tainted.Wrap(involvedName),
-			InvolvedKind: tainted.Wrap(involvedKind),
+			Timestamp: ts,
+			Type:      tainted.Wrap(eventType),
+			Reason:    tainted.Wrap(reason),
+			Message:   tainted.Wrap(message),
+			Source:    tainted.Wrap(source),
+			Count:     int32(countVal),
 		})
 	}
 
