@@ -482,7 +482,7 @@ func FormatItem(item model.Item, width int) string {
 	name := NormalStyle.Render(displayName)
 
 	// Prepend icon if present (resolved based on IconMode).
-	icon := resolveIcon(item.Icon)
+	icon := iconCell(item.Icon)
 	if icon != "" {
 		name = IconStyle.Render(icon+" ") + name
 	}
@@ -509,7 +509,7 @@ func FormatItem(item model.Item, width int) string {
 		}
 		if ActiveHighlightQuery != "" {
 			name = NormalStyle.Render(highlightName(displayName, ActiveHighlightQuery))
-			if icon := resolveIcon(item.Icon); icon != "" {
+			if icon := iconCell(item.Icon); icon != "" {
 				name = IconStyle.Render(icon+" ") + name
 			}
 		}
@@ -606,7 +606,7 @@ func FormatItemPlain(item model.Item, width int) string {
 	name := displayName
 
 	// Prepend icon if present (plain text, no IconStyle; resolved based on IconMode).
-	icon := resolveIcon(item.Icon)
+	icon := iconCell(item.Icon)
 	if icon != "" {
 		name = icon + " " + name
 	}

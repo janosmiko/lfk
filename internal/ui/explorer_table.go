@@ -550,7 +550,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 
 		displayName := item.Name
-		if icon := resolveIcon(item.Icon); icon != "" {
+		if icon := iconCell(item.Icon); icon != "" {
 			displayName = icon + " " + item.Name
 		}
 

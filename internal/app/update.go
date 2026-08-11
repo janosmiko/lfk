@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/creack/pty"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -75,6 +76,8 @@ func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateFocus(msg)
 	case tea.BlurMsg:
 		return m.updateBlur(msg)
+	case tea.ModeReportMsg:
+		return m.updateModeReport(msg)
 	case spinner.TickMsg:
 		return m.updateTick(msg)
 	case stderrCapturedMsg:
@@ -562,4 +565,23 @@ func (m Model) updateTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, cmd
+}
+
+// updateModeReport records the terminal's answer to the mode 2027 query. Bubble
+// Tea sends the query at startup and switches its renderer to grapheme width on
+// any answer; a terminal that does not know the mode stays on wcwidth. lfk's
+// layout measures with lipgloss, which always counts grapheme clusters, so the
+// icons have to be normalized to whichever measure the renderer settled on
+// (#604).
+func (m Model) updateModeReport(msg tea.ModeReportMsg) (tea.Model, tea.Cmd) {
+	if msg.Mode != ansi.ModeUnicodeCore {
+		return m, nil
+	}
+	switch msg.Value {
+	case ansi.ModeSet, ansi.ModeReset, ansi.ModePermanentlySet:
+		ui.UnicodeCoreActive = true
+	default:
+		ui.UnicodeCoreActive = false
+	}
+	return m, nil
 }

@@ -125,6 +125,15 @@ choose between `nerdfont` and `unicode`:
 If detection guesses wrong for your setup, set `icons: nerdfont` (or the mode
 you want) in your config, or export `LFK_ICONS=nerdfont` in your shell.
 
+### Emoji width
+
+In `icons: emoji`, some emoji are two columns wide only because of a trailing
+variation selector (`U+FE0F`). A terminal shows that extra width only when it
+supports grapheme clustering (mode 2027) — kitty, WezTerm and Ghostty do,
+Konsole does not. lfk asks the terminal at startup and drops the selector when
+the answer says no, so those icons render in their narrow monochrome form and
+the columns stay aligned. Nothing to configure.
+
 ## Appearance
 
 Visual settings, grouped. The flat keys of the same name (`colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`, `row_status_tint`) are deprecated aliases; when both a flat key and its `appearance` equivalent are set, `appearance` wins. The `theme` object (custom color overrides) and per-cluster overrides remain top-level.
