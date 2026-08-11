@@ -452,14 +452,14 @@ session affinity, etc.), press `v` (Describe).
 
 ### Cluster-wide overview
 
-Press **`Shift+O`** anywhere in the explorer (or type `:orphans` in the command bar) to open the orphan overview overlay. It scans the cluster and lists every orphan in one table grouped by kind:
+Press **`Shift+Z`** anywhere in the explorer (or type `:orphans` in the command bar) to open the orphan overview overlay. It scans the cluster and lists every orphan in one table grouped by kind:
 
 - `Tab` / `Shift+Tab` cycle through every kind filter chip (All plus all supported orphan kinds rendered in the strip)
 - `s` toggles strict / lenient — strict (default) hides items referenced by workload templates (e.g. CronJob between firings, scaled-to-zero Deployment); lenient surfaces them
 - `/` filters by namespace + name
 - `Enter` jumps straight to the highlighted resource (the namespace switches automatically)
 - `R` re-scans the cluster
-- `Esc`, `q`, or `Shift+O` close the overlay
+- `Esc`, `q`, or `Shift+Z` close the overlay
 
 Partial-RBAC denials surface as a warning banner at the top of the overlay; whatever could be listed is still shown.
 
