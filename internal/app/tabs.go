@@ -190,12 +190,24 @@ func (m *Model) sanitizeMessage(s string) string {
 	return s
 }
 
-// setStatusMessage sets a temporary status bar message.
-// All messages are appended to the application log buffer with appropriate level.
-func (m *Model) setStatusMessage(msg string, isErr bool) {
+// setStatusMessageText is the only place that writes m.statusMessage. Both
+// setStatusMessage and setErrorFromErr route through it so a hostile string
+// - a cluster-controlled resource name, apiserver error text - cannot reach
+// the status bar via a second, forgotten direct write. Sanitizing here,
+// before the caller-specific log entry is built below, keeps that order
+// (sanitize before truncate/measure) automatic for both callers.
+func (m *Model) setStatusMessageText(msg string, isErr bool) string {
+	msg = ui.SanitizeTerminalText(msg)
 	m.statusMessage = msg
 	m.statusMessageErr = isErr
 	m.statusMessageExp = time.Now().Add(5 * time.Second)
+	return msg
+}
+
+// setStatusMessage sets a temporary status bar message.
+// All messages are appended to the application log buffer with appropriate level.
+func (m *Model) setStatusMessage(msg string, isErr bool) {
+	msg = m.setStatusMessageText(msg, isErr)
 
 	level := "INF"
 	if isErr {
@@ -215,9 +227,7 @@ func (m *Model) setStatusMessage(msg string, isErr bool) {
 // full untruncated error to the error log overlay.
 func (m *Model) setErrorFromErr(prefix string, err error) {
 	// Show truncated version in status bar.
-	m.statusMessage = prefix + m.sanitizeError(err)
-	m.statusMessageErr = true
-	m.statusMessageExp = time.Now().Add(5 * time.Second)
+	m.setStatusMessageText(prefix+m.sanitizeError(err), true)
 
 	// Log the full untruncated error to the error log.
 	full := fullErrorMessage(err)
