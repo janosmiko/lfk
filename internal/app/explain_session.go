@@ -1,6 +1,10 @@
 package app
 
-import "context"
+import (
+	"context"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 // The API Explorer's cancellation scope and its generation counter. Split out
 // of update_explain.go to keep that file under the length cap.
@@ -47,6 +51,18 @@ func (m *Model) cancelExplainSession() {
 	}
 	m.explainCtx, m.explainCancel = nil, nil
 	m.explainGen++
+}
+
+// resumeExplainFetch re-issues the schema load of a tab that comes back with
+// the API Explorer open but nothing in it. Switching away cancels the fetch
+// and the generation guard drops its reply, so the level the tab was waiting
+// for never arrives on its own. Nil when there is nothing to resume.
+func (m *Model) resumeExplainFetch() tea.Cmd {
+	if m.mode != modeExplain || len(m.explainFields) > 0 || m.explainResource == "" {
+		return nil
+	}
+	m.loading = true
+	return m.execKubectlExplain(m.explainResource, m.explainAPIVersion, m.explainPath)
 }
 
 // explainRequestCtx is the parent context for one explain fetch. It falls back

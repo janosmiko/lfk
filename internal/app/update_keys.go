@@ -112,10 +112,14 @@ func (m Model) handleTabSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 			}
 			m.saveCurrentTab()
 			next := (m.activeTab + 1) % len(m.tabs)
-			if cmd := m.loadTab(next); cmd != nil {
-				return m, cmd, true
-			}
+			cmd := m.loadTab(next)
+			// The log preview is a Model-level stream, so it has to be
+			// settled on every switch, including one that came back with
+			// work of its own.
 			m, logCmd := m.maybeRestartOrCancelPreviewLog()
+			if cmd != nil {
+				return m, tea.Batch(cmd, logCmd), true
+			}
 			return m, tea.Batch(m.postTabSwitchCmd(), logCmd), true
 		}
 	case kb.PrevTab:
@@ -125,10 +129,14 @@ func (m Model) handleTabSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 			}
 			m.saveCurrentTab()
 			prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
-			if cmd := m.loadTab(prev); cmd != nil {
-				return m, cmd, true
-			}
+			cmd := m.loadTab(prev)
+			// The log preview is a Model-level stream, so it has to be
+			// settled on every switch, including one that came back with
+			// work of its own.
 			m, logCmd := m.maybeRestartOrCancelPreviewLog()
+			if cmd != nil {
+				return m, tea.Batch(cmd, logCmd), true
+			}
 			return m, tea.Batch(m.postTabSwitchCmd(), logCmd), true
 		}
 	case kb.MoveTabLeft:

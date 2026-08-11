@@ -193,3 +193,64 @@ func TestExplainTreeDesc_StaleBatchKeepsALiveMarkerForTheSameLevel(t *testing.T)
 	assert.Contains(t, rm.explainTreeDescInflight, "spec", "the live fetch's marker must survive")
 	assert.Empty(t, rm.explainTreeAll[0].Description)
 }
+
+// A tab left with the API Explorer still loading comes back to an empty view:
+// the switch cancels the fetch and the generation guard drops its reply, so
+// nothing fills the level (TASK-878).
+
+// explainLoadingTabsModel returns a two-tab model whose tab 0 has the API
+// Explorer open with a fetch in flight and no fields yet.
+func explainLoadingTabsModel() Model {
+	m := basePush80Model()
+	m.tabs = []TabState{{nav: m.nav}, {nav: m.nav, mode: modeExplorer}}
+	m.mode = modeExplain
+	m.explainResource = "deployments"
+	m.explainAPIVersion = "apps/v1"
+	m.explainPath = "spec"
+	m.explainFields = nil
+	m.loading = true
+	m.beginExplainSession()
+	return m
+}
+
+func TestLoadTab_ResumesAnExplainLeftUnfinished(t *testing.T) {
+	m := explainLoadingTabsModel()
+
+	m.saveCurrentTab()
+	_ = m.loadTab(1)
+	require.False(t, m.loading, "the abandoned fetch takes its spinner with it")
+
+	m.saveCurrentTab()
+	cmd := m.loadTab(0)
+
+	require.Equal(t, modeExplain, m.mode)
+	assert.NotNil(t, cmd, "returning to the tab must re-issue the schema fetch")
+	assert.True(t, m.loading, "and show that it is loading again")
+}
+
+func TestLoadTab_DoesNotRefetchAnExplainThatAlreadyLoaded(t *testing.T) {
+	m := explainLoadingTabsModel()
+	m.explainFields = []model.ExplainField{{Name: "replicas", Path: "spec.replicas"}}
+	m.loading = false
+
+	m.saveCurrentTab()
+	_ = m.loadTab(1)
+	m.saveCurrentTab()
+	cmd := m.loadTab(0)
+
+	assert.Nil(t, cmd, "the level is already on screen, so nothing needs fetching")
+	assert.False(t, m.loading)
+}
+
+func TestLoadTab_LeavesANonExplainTabAlone(t *testing.T) {
+	m := explainLoadingTabsModel()
+	m.mode = modeExplorer
+
+	m.saveCurrentTab()
+	_ = m.loadTab(1)
+	m.saveCurrentTab()
+	cmd := m.loadTab(0)
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.loading)
+}
