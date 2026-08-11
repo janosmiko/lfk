@@ -160,7 +160,7 @@ Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason 
 
 ## Undeliverable overview
 
-Press **`V`** anywhere in the explorer, type `:undeliverable` (or `:stuck`), or select **Undeliverable** under Dashboards. Inside the overlay:
+Press **`V`** in the explorer (single cluster only), type `:undeliverable` (or `:stuck`), or select **Undeliverable** under Dashboards. Inside the overlay:
 
 | Key | Action |
 | --- | ------ |

@@ -391,7 +391,7 @@ All search and filter inputs support three modes, auto-detected from the query s
 - Copy the resource name with `y`; press `Y` to copy as YAML, JSON, or Table
 - Apply a manifest straight from your clipboard with `Ctrl+P`
 - Hunt down unused ConfigMaps, Secrets, PVCs and more with `Shift+Z` (orphan detection)
-- Find what is stuck waiting with `V` (undeliverable detection), each row carrying the reason from its own API object
+- Find what is stuck waiting with `V` (undeliverable detection), each row carrying the reason from the resource's API fields, status conditions, or Events
 - Run kubectl without leaving lfk (`:k get pods -o wide`) or any shell command (`:! curl ...`)
 - Investigate a crash-looping Pod with `x` -> `I`: restart history, events, previous logs, and describe in one tabbed view
 - Lock a session against destructive actions with `Ctrl+R` (read-only mode)

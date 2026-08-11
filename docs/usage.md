@@ -492,7 +492,7 @@ The mirror of orphan detection: orphans are resources nobody references, undeliv
 | Ingress | No address published | `status.loadBalancer.ingress` |
 | Any fetched object | `deletionTimestamp` set with finalizers pending | `metadata.finalizers` |
 
-Press **`V`** anywhere in the explorer, type `:undeliverable` (or `:stuck`), or select **Undeliverable** under Dashboards:
+Press **`V`** in the explorer (single cluster only), type `:undeliverable` (or `:stuck`), or select **Undeliverable** under Dashboards:
 
 - `/` filters by kind, namespace, name, or reason
 - `Enter` jumps straight to the highlighted resource (the namespace switches automatically)
