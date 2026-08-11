@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -129,6 +130,34 @@ func TestHandleOrphansLoaded_ReappliesActiveFilter(t *testing.T) {
 	assert.Equal(t, "naked", updated.middleItems[0].Name)
 	assert.Contains(t, updated.statusMessage, "Unmounted",
 		"status bar should announce the post-scan match count")
+}
+
+// TestHandleOrphansLoaded_SanitizesPartialErrorIntoStatusBar covers the
+// end-to-end path a security review proved leaky: msg.err.Error() is
+// interpolated straight into setStatusMessage with no sanitizing in
+// between, so a hostile scan error (a namespace/secret name an attacker
+// controls can end up embedded in an apiserver error string) put its raw
+// escape on screen. The fix lives in setStatusMessage itself, so this test
+// exercises the caller, not the sink, to prove the fix reaches this far.
+func TestHandleOrphansLoaded_SanitizesPartialErrorIntoStatusBar(t *testing.T) {
+	m := newTestModel()
+	key := orphanCacheKey{kubeContext: "test", namespace: ""}
+	m.nav.Context = "test"
+
+	require.NotNil(t, m.cmdLoadOrphans(key))
+	gen := m.orphanLoadInflight[key].gen
+
+	hostile := errors.New("listing pvcs: \x1b]52;c;SGVsbG8=\a forbidden \u202e")
+	msg := orphansLoadedMsg{key: key, gen: gen, err: hostile}
+
+	updated, cmd := m.handleOrphansLoaded(msg)
+	require.NotNil(t, cmd, "a partial result still schedules the status clear")
+
+	for _, bad := range []string{"\x1b]", "\a", "\u202e"} {
+		assert.NotContains(t, updated.statusMessage, bad, "status message leaked an escape")
+	}
+	assert.Contains(t, updated.statusMessage, "listing pvcs")
+	assert.Contains(t, updated.statusMessage, "forbidden")
 }
 
 func TestInvalidateOrphanCacheForNamespace(t *testing.T) {

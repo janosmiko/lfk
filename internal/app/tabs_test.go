@@ -685,6 +685,23 @@ func TestSetStatusMessage_SanitizesErrorLog(t *testing.T) {
 	assert.NotContains(t, m.errorLog[1].Message, "\u202e")
 }
 
+// TestSetStatusMessage_SanitizesStatusMessage guards the sink itself, not
+// just its errorLog side effect: appendErrorLogEntry already sanitized the
+// log copy, but setStatusMessage stored the raw msg into m.statusMessage,
+// which is what the status bar actually renders. An OSC-52 payload landing
+// here reaches the terminal with its introducer and terminator intact.
+func TestSetStatusMessage_SanitizesStatusMessage(t *testing.T) {
+	m := Model{}
+
+	m.setStatusMessage("Orphan scan: partial result (listing pvcs: \x1b]52;c;SGVsbG8=\a forbidden \u202e)", true)
+
+	for _, bad := range []string{"\x1b]", "\a", "\u202e"} {
+		assert.NotContains(t, m.statusMessage, bad, "status message leaked an escape")
+	}
+	assert.Contains(t, m.statusMessage, "listing pvcs")
+	assert.Contains(t, m.statusMessage, "forbidden")
+}
+
 // TestSetStatusMessage_OrdinaryContentUnaffected guards against sanitizing
 // legitimate non-ASCII status messages into mush.
 func TestSetStatusMessage_OrdinaryContentUnaffected(t *testing.T) {
@@ -1025,6 +1042,23 @@ func TestSetErrorFromErr_SanitizesErrorLog(t *testing.T) {
 	require.Len(t, m.errorLog, 1)
 	assert.NotContains(t, m.errorLog[0].Message, "\x9d")
 	assert.NotContains(t, m.errorLog[0].Message, "\x9c")
+}
+
+// TestSetErrorFromErr_SanitizesStatusMessage guards the second direct writer
+// of m.statusMessage. setStatusMessage sanitizes at its own sink, but
+// setErrorFromErr wrote m.statusMessage itself via sanitizeError, which only
+// folds newlines and truncates - it never strips escapes. A second direct
+// writer left unsanitized is not a sink fix, it is a caller fix wearing a
+// sink's clothes.
+func TestSetErrorFromErr_SanitizesStatusMessage(t *testing.T) {
+	m := Model{width: 100}
+	m.setErrorFromErr("scan: ", errors.New("listing pvcs: \x1b]52;c;SGVsbG8=\a forbidden \u202e"))
+
+	for _, bad := range []string{"\x1b]", "\a", "\u202e"} {
+		assert.NotContains(t, m.statusMessage, bad, "status message leaked an escape")
+	}
+	assert.Contains(t, m.statusMessage, "listing pvcs")
+	assert.Contains(t, m.statusMessage, "forbidden")
 }
 
 // --- setStatusMessage log capping ---
