@@ -3,6 +3,8 @@ package ui
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
 )
 
 func TestUndeliverableBodyHeight(t *testing.T) {
@@ -114,14 +116,57 @@ func TestRenderUndeliverableOverlayScrollsToCursor(t *testing.T) {
 	}
 }
 
-func TestUndeliverableScrollForCursorClampsToWindow(t *testing.T) {
-	// Cursor already visible: nothing moves.
-	if got := UndeliverableScrollForCursor(5, 7, 10, 40); got != 5 {
-		t.Errorf("in-view cursor moved scroll to %d, want 5", got)
+// TestUndeliverableScrollForCursorUsesVimScrollOff guards the repo
+// convention (CLAUDE.md: "any movable cursor must scroll to stay visible -
+// use ui.VimScrollOff") - a hand-rolled edge clamp gives the cursor no
+// scrolloff margin, unlike every other overlay's list.
+// TestUndeliverableItemsPadsByDisplayWidthNotRuneCount guards the KIND /
+// NAMESPACE / NAME column alignment against wide Unicode. "ab" and "文" both
+// occupy 2 display columns but differ in rune count (2 vs 1); padding by
+// rune count would give the "文" row one extra column and drift every
+// column after it.
+func TestUndeliverableItemsPadsByDisplayWidthNotRuneCount(t *testing.T) {
+	rows := []UndeliverableRow{
+		{Kind: "Pod", Namespace: "ab", Name: "x"},
+		{Kind: "Pod", Namespace: "文", Name: "x"},
 	}
-	// Cursor below the window: scroll just enough.
-	if got := UndeliverableScrollForCursor(5, 20, 10, 40); got != 11 {
-		t.Errorf("scroll = %d, want 11", got)
+	items := undeliverableItems(rows, 120)
+
+	w0, w1 := lipgloss.Width(items[0].Name), lipgloss.Width(items[1].Name)
+	if w0 != w1 {
+		t.Errorf("row display widths differ: ascii=%d wide=%d - wide namespace desynced the columns", w0, w1)
+	}
+}
+
+func TestUndeliverableScrollForCursorUsesVimScrollOff(t *testing.T) {
+	identity := func(from, to int) int { return to - from }
+	scroll, cursor, bodyHeight, total := 5, 8, 10, 40
+
+	want := VimScrollOff(scroll, cursor, total, bodyHeight, ConfigScrollOff, identity)
+	got := UndeliverableScrollForCursor(scroll, cursor, bodyHeight, total)
+
+	if got != want {
+		t.Errorf("UndeliverableScrollForCursor = %d, want %d (ui.VimScrollOff result)", got, want)
+	}
+}
+
+// TestUndeliverableScrollForCursorClampsToWindow pins the wrapper's
+// wiring (scroll/cursor/bodyHeight/total pass straight through to
+// ui.VimScrollOff) against the same inputs ui.VimScrollOff's own tests
+// cover with a scrolloff margin, plus the always-true edge case where the
+// whole list fits in the viewport.
+func TestUndeliverableScrollForCursorClampsToWindow(t *testing.T) {
+	identity := func(from, to int) int { return to - from }
+
+	// Cursor near the bottom edge: VimScrollOff's default margin (5) pulls
+	// the window forward rather than pinning the cursor to the last row.
+	want := VimScrollOff(5, 7, 40, 10, ConfigScrollOff, identity)
+	if got := UndeliverableScrollForCursor(5, 7, 10, 40); got != want {
+		t.Errorf("scroll = %d, want %d", got, want)
+	}
+	want = VimScrollOff(5, 20, 40, 10, ConfigScrollOff, identity)
+	if got := UndeliverableScrollForCursor(5, 20, 10, 40); got != want {
+		t.Errorf("scroll = %d, want %d", got, want)
 	}
 	// Whole list fits: pinned at the top.
 	if got := UndeliverableScrollForCursor(4, 2, 10, 8); got != 0 {

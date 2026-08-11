@@ -29,20 +29,12 @@ func UndeliverableBodyHeight(overlayH int) int {
 }
 
 // UndeliverableScrollForCursor returns the scroll offset that keeps `cursor`
-// visible in a viewport of `bodyHeight` rows. Vim semantics: leave an
-// in-view cursor alone, otherwise move just enough to put it on the nearest
-// visible edge. Mirrors OrphanScrollForCursor - keep them in sync.
+// visible in a viewport of `bodyHeight` rows, honouring the user's
+// scrolloff config. Every row here is exactly one display line, so the
+// displayLines callback is just entry count.
 func UndeliverableScrollForCursor(scroll, cursor, bodyHeight, total int) int {
-	if total <= bodyHeight {
-		return 0
-	}
-	if cursor < scroll {
-		return cursor
-	}
-	if cursor >= scroll+bodyHeight {
-		return cursor - bodyHeight + 1
-	}
-	return scroll
+	identity := func(from, to int) int { return to - from }
+	return VimScrollOff(scroll, cursor, total, bodyHeight, ConfigScrollOff, identity)
 }
 
 // UndeliverableClampScroll snaps a scroll offset back into range so the
@@ -125,12 +117,11 @@ func undeliverableItems(rows []UndeliverableRow, innerW int) []OverlayListItem {
 
 	out := make([]OverlayListItem, len(rows))
 	for i, r := range rows {
+		kind := padRight(Truncate(SanitizeTerminalText(r.Kind), undeliverableKindW), undeliverableKindW)
+		ns := padRight(Truncate(SanitizeTerminalText(r.Namespace), nsW), nsW)
+		name := padRight(Truncate(SanitizeTerminalText(r.Name), nameW), nameW)
 		out[i] = OverlayListItem{
-			Name: fmt.Sprintf("%-*s %-*s %-*s",
-				undeliverableKindW, Truncate(SanitizeTerminalText(r.Kind), undeliverableKindW),
-				nsW, Truncate(SanitizeTerminalText(r.Namespace), nsW),
-				nameW, Truncate(SanitizeTerminalText(r.Name), nameW),
-			),
+			Name:        kind + " " + ns + " " + name,
 			Description: Truncate(SanitizeTerminalText(r.Reason), reasonW),
 		}
 	}
