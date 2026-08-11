@@ -99,13 +99,7 @@ func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
 
 // loadPreviewResourceTypes handles preview loading at the resource types level.
 func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
-	// Undeliverable has no preview pane of its own - its content lives in an
-	// overlay, and Extra is not a resource ref, so falling through would send
-	// a list request for a resource type that does not exist.
-	if sel.Extra == model.PseudoUndeliverable {
-		return nil
-	}
-	if sel.Extra == model.PseudoOverview {
+	if sel.Extra == "__overview__" {
 		if m.isUnionSentinel() {
 			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardCluster, m.namespace)
 			gen := m.requestGen

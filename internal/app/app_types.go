@@ -93,8 +93,7 @@ const (
 	overlayBackgroundTasks
 	overlayClusterColor // pick a color tint for the highlighted cluster row
 	overlayCrashInvestigator
-	overlayOrphans       // cluster-wide orphan resource overview (Shift+O)
-	overlayUndeliverable // cluster-wide list of resources stuck waiting (V)
+	overlayOrphans // cluster-wide orphan resource overview (Shift+O)
 	overlayRightsizing
 	overlaySyncWave           // per-Application sync wave timeline (action menu key W)
 	overlayLocalClusters      // local-cluster manager (Ctrl+N at LevelClusters)

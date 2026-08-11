@@ -101,57 +101,201 @@ type orphanLists struct {
 // the pipeline runs unaffected.
 func fetchOrphanLists(ctx context.Context, cs kubernetes.Interface, namespace string) (orphanLists, []error) {
 	var errs []error
-	collect := func(name string, err error) {
+	// client-go's generated List() always returns an allocated,
+	// empty-Items list even when the request errors - it never hands
+	// back a nil pointer. Nil the pointer ourselves on failure so a
+	// listing error reads as "no data available" instead of a
+	// zero-item list, which every downstream orphan check would
+	// otherwise mistake for "verified nothing references this".
+	collect := func(name string, err error) bool {
 		if err != nil {
 			errs = append(errs, fmt.Errorf("listing %s: %w", name, err))
+			return true
 		}
+		return false
 	}
 	opts := metav1.ListOptions{}
 	out := orphanLists{}
 	var err error
 	out.pods, err = cs.CoreV1().Pods(namespace).List(ctx, opts)
-	collect("pods", err)
+	if collect("pods", err) {
+		out.pods = nil
+	}
 	out.ingresses, err = cs.NetworkingV1().Ingresses(namespace).List(ctx, opts)
-	collect("ingresses", err)
+	if collect("ingresses", err) {
+		out.ingresses = nil
+	}
 	out.serviceAccounts, err = cs.CoreV1().ServiceAccounts(namespace).List(ctx, opts)
-	collect("service accounts", err)
+	if collect("service accounts", err) {
+		out.serviceAccounts = nil
+	}
 	out.secrets, err = cs.CoreV1().Secrets(namespace).List(ctx, opts)
-	collect("secrets", err)
+	if collect("secrets", err) {
+		out.secrets = nil
+	}
 	out.configMaps, err = cs.CoreV1().ConfigMaps(namespace).List(ctx, opts)
-	collect("configmaps", err)
+	if collect("configmaps", err) {
+		out.configMaps = nil
+	}
 	out.services, err = cs.CoreV1().Services(namespace).List(ctx, opts)
-	collect("services", err)
+	if collect("services", err) {
+		out.services = nil
+	}
 	out.pvcs, err = cs.CoreV1().PersistentVolumeClaims(namespace).List(ctx, opts)
-	collect("pvcs", err)
+	if collect("pvcs", err) {
+		out.pvcs = nil
+	}
 	out.hpas, err = cs.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, opts)
-	collect("hpas", err)
+	if collect("hpas", err) {
+		out.hpas = nil
+	}
 	out.pdbs, err = cs.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, opts)
-	collect("pdbs", err)
+	if collect("pdbs", err) {
+		out.pdbs = nil
+	}
 	out.netpols, err = cs.NetworkingV1().NetworkPolicies(namespace).List(ctx, opts)
-	collect("networkpolicies", err)
+	if collect("networkpolicies", err) {
+		out.netpols = nil
+	}
 	out.deployments, err = cs.AppsV1().Deployments(namespace).List(ctx, opts)
-	collect("deployments", err)
+	if collect("deployments", err) {
+		out.deployments = nil
+	}
 	out.statefulSets, err = cs.AppsV1().StatefulSets(namespace).List(ctx, opts)
-	collect("statefulsets", err)
+	if collect("statefulsets", err) {
+		out.statefulSets = nil
+	}
 	out.daemonSets, err = cs.AppsV1().DaemonSets(namespace).List(ctx, opts)
-	collect("daemonsets", err)
+	if collect("daemonsets", err) {
+		out.daemonSets = nil
+	}
 	out.jobs, err = cs.BatchV1().Jobs(namespace).List(ctx, opts)
-	collect("jobs", err)
+	if collect("jobs", err) {
+		out.jobs = nil
+	}
 	out.cronJobs, err = cs.BatchV1().CronJobs(namespace).List(ctx, opts)
-	collect("cronjobs", err)
+	if collect("cronjobs", err) {
+		out.cronJobs = nil
+	}
 	out.roles, err = cs.RbacV1().Roles(namespace).List(ctx, opts)
-	collect("roles", err)
+	if collect("roles", err) {
+		out.roles = nil
+	}
 	out.roleBindings, err = cs.RbacV1().RoleBindings(namespace).List(ctx, opts)
-	collect("rolebindings", err)
+	if collect("rolebindings", err) {
+		out.roleBindings = nil
+	}
 	// ClusterRole(Binding)s are cluster-scoped — list cluster-wide
 	// regardless of the namespace parameter so a namespace-scoped run
 	// can still validate that a RoleBinding's roleRef pointing at a
 	// ClusterRole resolves.
 	out.clusterRoles, err = cs.RbacV1().ClusterRoles().List(ctx, opts)
-	collect("clusterroles", err)
+	if collect("clusterroles", err) {
+		out.clusterRoles = nil
+	}
 	out.clusterRoleBindings, err = cs.RbacV1().ClusterRoleBindings().List(ctx, opts)
-	collect("clusterrolebindings", err)
+	if collect("clusterrolebindings", err) {
+		out.clusterRoleBindings = nil
+	}
 	return out, errs
+}
+
+// orphanDeps flags, per orphan kind, whether every list its "is
+// anything referencing this" answer depends on was actually read. A
+// false flag means that kind's report is unsound this scan and must be
+// omitted entirely — a failed list must not silently read as "nothing
+// references this resource" next to a bulk-delete action.
+type orphanDeps struct {
+	secrets             bool
+	configMaps          bool
+	pvcs                bool
+	hpas                bool
+	pdbs                bool
+	netpols             bool
+	roles               bool
+	clusterRoles        bool
+	roleBindings        bool
+	clusterRoleBindings bool
+}
+
+// computeOrphanDeps derives orphanDeps from which lists in `l` failed
+// (nil pointer — see fetchOrphanLists). The dependency shape mirrors
+// buildRefSet/buildWorkloadIndex/collectTemplatePodLabels/buildRBACIndex
+// below: whatever those builders read from is what the corresponding
+// kind depends on.
+func computeOrphanDeps(l orphanLists) orphanDeps {
+	podsOK := l.pods != nil
+	workloadTemplatesOK := l.deployments != nil && l.statefulSets != nil &&
+		l.daemonSets != nil && l.jobs != nil && l.cronJobs != nil
+	return orphanDeps{
+		// buildRefSet walks Pods, Ingress TLS, ServiceAccounts, and
+		// every workload's PodTemplate for Secret references.
+		secrets: podsOK && l.ingresses != nil && l.serviceAccounts != nil && workloadTemplatesOK,
+		// ConfigMap/PVC references only ever come from a PodSpec
+		// (volumes/env) — Ingress and ServiceAccount never touch them.
+		configMaps: podsOK && workloadTemplatesOK,
+		pvcs:       podsOK && workloadTemplatesOK,
+		// buildWorkloadIndex only resolves Deployment/StatefulSet/
+		// DaemonSet scaleTargetRefs (Jobs/CronJobs aren't valid HPA
+		// targets, so they aren't a dependency here).
+		hpas: l.deployments != nil && l.statefulSets != nil && l.daemonSets != nil,
+		// PDB/NetworkPolicy selector matching walks live Pods plus every
+		// workload's PodTemplate labels.
+		pdbs:    podsOK && workloadTemplatesOK,
+		netpols: podsOK && workloadTemplatesOK,
+		// RBAC is a mutual dependency web: Role/ClusterRole "bound"
+		// status is computed from the binding lists; RoleBinding/
+		// ClusterRoleBinding roleRef validity is computed from the
+		// Role/ClusterRole lists. See buildRBACIndex.
+		roles:               l.roleBindings != nil,
+		clusterRoles:        l.roleBindings != nil && l.clusterRoleBindings != nil,
+		roleBindings:        l.roles != nil && l.clusterRoles != nil,
+		clusterRoleBindings: l.clusterRoles != nil,
+	}
+}
+
+// detectRBACOrphans runs all four RBAC orphan checks. Split out of
+// DetectOrphans to keep that function's cyclomatic complexity down —
+// the four dependency-gated loops here mirror the mutual-dependency web
+// documented in computeOrphanDeps.
+func detectRBACOrphans(
+	deps orphanDeps,
+	roles *rbacv1.RoleList, clusterRoles *rbacv1.ClusterRoleList,
+	roleBindings *rbacv1.RoleBindingList, clusterRoleBindings *rbacv1.ClusterRoleBindingList,
+) (rolesOut, clusterRolesOut, roleBindingsOut, clusterRoleBindingsOut []OrphanItem) {
+	rbacIdx := buildRBACIndex(
+		safeRoleItems(roles), safeClusterRoleItems(clusterRoles),
+		safeRoleBindingItems(roleBindings), safeClusterRoleBindingItems(clusterRoleBindings),
+	)
+	if deps.roles {
+		for _, r := range safeRoleItems(roles) {
+			if item, ok := roleOrphan(r, rbacIdx); ok {
+				rolesOut = append(rolesOut, item)
+			}
+		}
+	}
+	if deps.clusterRoles {
+		for _, cr := range safeClusterRoleItems(clusterRoles) {
+			if item, ok := clusterRoleOrphan(cr, rbacIdx); ok {
+				clusterRolesOut = append(clusterRolesOut, item)
+			}
+		}
+	}
+	if deps.roleBindings {
+		for _, rb := range safeRoleBindingItems(roleBindings) {
+			if item, ok := roleBindingOrphan(rb, rbacIdx); ok {
+				roleBindingsOut = append(roleBindingsOut, item)
+			}
+		}
+	}
+	if deps.clusterRoleBindings {
+		for _, crb := range safeClusterRoleBindingItems(clusterRoleBindings) {
+			if item, ok := clusterRoleBindingOrphan(crb, rbacIdx); ok {
+				clusterRoleBindingsOut = append(clusterRoleBindingsOut, item)
+			}
+		}
+	}
+	return rolesOut, clusterRolesOut, roleBindingsOut, clusterRoleBindingsOut
 }
 
 func (c *Client) DetectOrphans(ctx context.Context, kubeContext, namespace string) (OrphanReport, error) {
@@ -162,6 +306,7 @@ func (c *Client) DetectOrphans(ctx context.Context, kubeContext, namespace strin
 
 	report := OrphanReport{}
 	lists, errs := fetchOrphanLists(ctx, cs, namespace)
+	deps := computeOrphanDeps(lists)
 	pods := lists.pods
 	ingresses := lists.ingresses
 	serviceAccounts := lists.serviceAccounts
@@ -208,14 +353,18 @@ func (c *Client) DetectOrphans(ctx context.Context, kubeContext, namespace strin
 			report.Pods = append(report.Pods, item)
 		}
 	}
-	for _, s := range safeSecretItems(secrets) {
-		if item, ok := secretOrphan(s, lenientRefs, strictRefs); ok {
-			report.Secrets = append(report.Secrets, item)
+	if deps.secrets {
+		for _, s := range safeSecretItems(secrets) {
+			if item, ok := secretOrphan(s, lenientRefs, strictRefs); ok {
+				report.Secrets = append(report.Secrets, item)
+			}
 		}
 	}
-	for _, cm := range safeCMItems(configMaps) {
-		if item, ok := configMapOrphan(cm, lenientRefs, strictRefs); ok {
-			report.ConfigMaps = append(report.ConfigMaps, item)
+	if deps.configMaps {
+		for _, cm := range safeCMItems(configMaps) {
+			if item, ok := configMapOrphan(cm, lenientRefs, strictRefs); ok {
+				report.ConfigMaps = append(report.ConfigMaps, item)
+			}
 		}
 	}
 	for _, svc := range safeSvcItems(services) {
@@ -228,9 +377,11 @@ func (c *Client) DetectOrphans(ctx context.Context, kubeContext, namespace strin
 			report.Services = append(report.Services, item)
 		}
 	}
-	for _, p := range safePVCItems(pvcs) {
-		if item, ok := pvcOrphan(p, lenientRefs, strictRefs); ok {
-			report.PVCs = append(report.PVCs, item)
+	if deps.pvcs {
+		for _, p := range safePVCItems(pvcs) {
+			if item, ok := pvcOrphan(p, lenientRefs, strictRefs); ok {
+				report.PVCs = append(report.PVCs, item)
+			}
 		}
 	}
 
@@ -246,48 +397,29 @@ func (c *Client) DetectOrphans(ctx context.Context, kubeContext, namespace strin
 	livePods := safePodItems(pods)
 	templatePodLabels := collectTemplatePodLabels(strictInputs)
 
-	for _, h := range safeHPAItems(hpas) {
-		if item, ok := hpaOrphan(h, wlIdx); ok {
-			report.HPAs = append(report.HPAs, item)
+	if deps.hpas {
+		for _, h := range safeHPAItems(hpas) {
+			if item, ok := hpaOrphan(h, wlIdx); ok {
+				report.HPAs = append(report.HPAs, item)
+			}
 		}
 	}
-	for _, b := range safePDBItems(pdbs) {
-		if item, ok := pdbOrphan(b, livePods, templatePodLabels); ok {
-			report.PDBs = append(report.PDBs, item)
+	if deps.pdbs {
+		for _, b := range safePDBItems(pdbs) {
+			if item, ok := pdbOrphan(b, livePods, templatePodLabels); ok {
+				report.PDBs = append(report.PDBs, item)
+			}
 		}
 	}
-	for _, n := range safeNetPolItems(netpols) {
-		if item, ok := netpolOrphan(n, livePods, templatePodLabels); ok {
-			report.NetworkPolicies = append(report.NetworkPolicies, item)
+	if deps.netpols {
+		for _, n := range safeNetPolItems(netpols) {
+			if item, ok := netpolOrphan(n, livePods, templatePodLabels); ok {
+				report.NetworkPolicies = append(report.NetworkPolicies, item)
+			}
 		}
 	}
 
-	// RBAC orphans — Roles/ClusterRoles unbound by any binding;
-	// (Cluster)RoleBindings with empty subjects or a missing roleRef.
-	rbacIdx := buildRBACIndex(
-		safeRoleItems(roles), safeClusterRoleItems(clusterRoles),
-		safeRoleBindingItems(roleBindings), safeClusterRoleBindingItems(clusterRoleBindings),
-	)
-	for _, r := range safeRoleItems(roles) {
-		if item, ok := roleOrphan(r, rbacIdx); ok {
-			report.Roles = append(report.Roles, item)
-		}
-	}
-	for _, cr := range safeClusterRoleItems(clusterRoles) {
-		if item, ok := clusterRoleOrphan(cr, rbacIdx); ok {
-			report.ClusterRoles = append(report.ClusterRoles, item)
-		}
-	}
-	for _, rb := range safeRoleBindingItems(roleBindings) {
-		if item, ok := roleBindingOrphan(rb, rbacIdx); ok {
-			report.RoleBindings = append(report.RoleBindings, item)
-		}
-	}
-	for _, crb := range safeClusterRoleBindingItems(clusterRoleBindings) {
-		if item, ok := clusterRoleBindingOrphan(crb, rbacIdx); ok {
-			report.ClusterRoleBindings = append(report.ClusterRoleBindings, item)
-		}
-	}
+	report.Roles, report.ClusterRoles, report.RoleBindings, report.ClusterRoleBindings = detectRBACOrphans(deps, roles, clusterRoles, roleBindings, clusterRoleBindings)
 
 	sortOrphans(report.Pods)
 	sortOrphans(report.Secrets)

@@ -120,7 +120,6 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.ObjectExplorer, "Object Explorer (live object tree)"},
 				{kb.RBACBrowser, "RBAC permissions browser (can-i)"},
 				{kb.OrphanOverlay, "Cluster-wide Orphan overview"},
-				{kb.UndeliverableOverlay, "Cluster-wide Undeliverable overview"},
 				{kb.SessionManager, "Session manager"},
 				{kb.LocalClusterManager, "Local cluster manager (cluster picker only)"},
 				{kb.FinalizerSearch, "Finalizer search and remove"},

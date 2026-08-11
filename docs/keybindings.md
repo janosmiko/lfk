@@ -80,7 +80,6 @@ chords, which all start with `g`; re-point the ones you use at the new prefix.
 | `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
 | `U` | RBAC permissions browser (can-i) |
 | `Shift+Z` | Open the cluster-wide Orphan overview |
-| `V` | Open the cluster-wide Undeliverable overview |
 | `C` | Session manager (save/switch/delete named workspace sessions) |
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
@@ -157,21 +156,6 @@ Auto-excluded from Pod "Orphans":
 - Static / mirror pods (kubelet-managed via `kubernetes.io/config.mirror` annotation)
 
 Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason is `"no owner (terminal)"` to distinguish them from live workloads.
-
-## Undeliverable overview
-
-Press **`V`** in the explorer (single cluster only), type `:undeliverable` (or `:stuck`), or select **Undeliverable** under Dashboards. Inside the overlay:
-
-| Key | Action |
-| --- | ------ |
-| `j` / `k` | Move |
-| `g` / `G` | Top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Half page |
-| `Ctrl+F` / `Ctrl+B` | Page |
-| `/` | Filter by kind, namespace, name, or reason |
-| `Enter` | Jump to the highlighted resource |
-| `R` | Re-scan the cluster |
-| `Esc` / `q` / `V` | Close the overlay |
 
 ## Search and Filter
 

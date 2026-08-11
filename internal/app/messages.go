@@ -739,18 +739,6 @@ type orphansLoadedMsg struct {
 	err    error
 }
 
-// undeliverableLoadedMsg carries the result of a DetectUndeliverable run.
-// Err may be non-nil while Report holds partial data — the overlay notes
-// that in its subtitle and still shows what was returned. gen and
-// kubeContext are both checked on arrival so a scan the user has moved on
-// from cannot write itself back over their current cluster.
-type undeliverableLoadedMsg struct {
-	kubeContext string
-	gen         uint64
-	report      k8s.UndeliverableReport
-	err         error
-}
-
 // --- Local cluster manager messages ---
 
 // localClustersDetectedMsg is the result of a fan-out List() across
