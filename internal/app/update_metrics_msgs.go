@@ -72,14 +72,12 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 	entries := make([]ui.EventTimelineEntry, len(msg.events))
 	for i, e := range msg.events {
 		entries[i] = ui.EventTimelineEntry{
-			Timestamp:    e.Timestamp,
-			Type:         e.Type,
-			Reason:       e.Reason,
-			Message:      e.Message,
-			Source:       e.Source,
-			Count:        e.Count,
-			InvolvedName: e.InvolvedName,
-			InvolvedKind: e.InvolvedKind,
+			Timestamp: e.Timestamp,
+			Type:      e.Type,
+			Reason:    e.Reason,
+			Message:   e.Message,
+			Source:    e.Source,
+			Count:     e.Count,
 		}
 	}
 	// Retain the entries so a theme change / resize can re-render the footer in

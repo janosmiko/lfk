@@ -310,14 +310,12 @@ func TestRenderOverlayEventTimeline(t *testing.T) {
 	m.overlay = overlayEventTimeline
 	m.eventTimelineData = []k8s.EventInfo{
 		{
-			Timestamp:    time.Now(),
-			Type:         tainted.Wrap("Normal"),
-			Reason:       tainted.Wrap("Created"),
-			Message:      tainted.Wrap("Created container nginx"),
-			Source:       tainted.Wrap("kubelet"),
-			Count:        1,
-			InvolvedName: tainted.Wrap("my-pod"),
-			InvolvedKind: tainted.Wrap("Pod"),
+			Timestamp: time.Now(),
+			Type:      tainted.Wrap("Normal"),
+			Reason:    tainted.Wrap("Created"),
+			Message:   tainted.Wrap("Created container nginx"),
+			Source:    tainted.Wrap("kubelet"),
+			Count:     1,
 		},
 	}
 	m.actionCtx = actionContext{name: "my-pod"}
