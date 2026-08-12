@@ -30,9 +30,9 @@ func writeTemplateFile(t *testing.T, dir, filename, body string) {
 func TestSaveUserTemplate_RoundTrips(t *testing.T) {
 	dir := withTempConfigDir(t)
 
-	require.NoError(t, saveUserTemplate("web", "apiVersion: apps/v1\nkind: Deployment\n"))
+	require.NoError(t, saveUserTemplate("staging", "web", "apiVersion: apps/v1\nkind: Deployment\n"))
 
-	assert.FileExists(t, filepath.Join(dir, "web.yaml"))
+	assert.FileExists(t, filepath.Join(dir, "staging__web.yaml"))
 
 	got := loadUserTemplates()
 	require.Len(t, got, 1)
@@ -40,6 +40,43 @@ func TestSaveUserTemplate_RoundTrips(t *testing.T) {
 	assert.Equal(t, userTemplateCategory, got[0].Category)
 	assert.Equal(t, "apiVersion: apps/v1\nkind: Deployment\n", got[0].YAML)
 	assert.Contains(t, got[0].Description, "Deployment")
+	assert.Contains(t, got[0].Description, "staging")
+}
+
+// TestSaveUserTemplate_DifferentNamespacesSameNameBothSurvive is the bug this
+// naming scheme fixes: an nginx in staging and an nginx in prod used to write
+// the same file and silently overwrite each other.
+func TestSaveUserTemplate_DifferentNamespacesSameNameBothSurvive(t *testing.T) {
+	dir := withTempConfigDir(t)
+
+	require.NoError(t, saveUserTemplate("staging", "nginx", "kind: Deployment\nmetadata:\n  namespace: staging\n"))
+	require.NoError(t, saveUserTemplate("prod", "nginx", "kind: Deployment\nmetadata:\n  namespace: prod\n"))
+
+	assert.FileExists(t, filepath.Join(dir, "staging__nginx.yaml"))
+	assert.FileExists(t, filepath.Join(dir, "prod__nginx.yaml"))
+
+	got := loadUserTemplates()
+	require.Len(t, got, 2)
+	for _, tmpl := range got {
+		assert.Equal(t, "nginx", tmpl.Name)
+	}
+	assert.Contains(t, got[0].Description+got[1].Description, "staging")
+	assert.Contains(t, got[0].Description+got[1].Description, "prod")
+}
+
+// TestSaveUserTemplate_ClusterScoped covers a resource with no namespace:
+// the file name carries the "_cluster" marker instead of one.
+func TestSaveUserTemplate_ClusterScoped(t *testing.T) {
+	dir := withTempConfigDir(t)
+
+	require.NoError(t, saveUserTemplate("", "worker-1", "kind: Node\n"))
+
+	assert.FileExists(t, filepath.Join(dir, "_cluster__worker-1.yaml"))
+
+	got := loadUserTemplates()
+	require.Len(t, got, 1)
+	assert.Equal(t, "worker-1", got[0].Name)
+	assert.Equal(t, "Node", got[0].Description, "no namespace segment for a cluster-scoped save")
 }
 
 // TestLoadUserTemplates_ReadsHandAuthoredFile is the point of the directory:
@@ -57,8 +94,8 @@ func TestLoadUserTemplates_ReadsHandAuthoredFile(t *testing.T) {
 func TestSaveUserTemplate_ReplacesSameName(t *testing.T) {
 	dir := withTempConfigDir(t)
 
-	require.NoError(t, saveUserTemplate("web", "kind: Pod\n"))
-	require.NoError(t, saveUserTemplate("web", "kind: Deployment\n"))
+	require.NoError(t, saveUserTemplate("staging", "web", "kind: Pod\n"))
+	require.NoError(t, saveUserTemplate("staging", "web", "kind: Deployment\n"))
 
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
@@ -117,7 +154,7 @@ func TestLoadUserTemplates_SanitizesUserSuppliedText(t *testing.T) {
 func TestSaveUserTemplate_LeavesNoTempFile(t *testing.T) {
 	dir := withTempConfigDir(t)
 
-	require.NoError(t, saveUserTemplate("web", "kind: Pod\n"))
+	require.NoError(t, saveUserTemplate("staging", "web", "kind: Pod\n"))
 
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
@@ -125,7 +162,7 @@ func TestSaveUserTemplate_LeavesNoTempFile(t *testing.T) {
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
-	assert.Equal(t, []string{"web.yaml"}, names)
+	assert.Equal(t, []string{"staging__web.yaml"}, names)
 }
 
 // TestSaveUserTemplate_RejectsPathEscape keeps a resource name from steering
@@ -134,10 +171,21 @@ func TestSaveUserTemplate_RejectsPathEscape(t *testing.T) {
 	dir := withTempConfigDir(t)
 
 	for _, name := range []string{"../escape", "sub/web", "..", ""} {
-		assert.Error(t, saveUserTemplate(name, "kind: Pod\n"), "name %q must be rejected", name)
+		assert.Error(t, saveUserTemplate("staging", name, "kind: Pod\n"), "name %q must be rejected", name)
 	}
 	assert.NoDirExists(t, filepath.Join(dir, "sub"))
 	assert.NoFileExists(t, filepath.Join(filepath.Dir(dir), "escape.yaml"))
+}
+
+// TestSaveUserTemplate_RejectsNamespacePathEscape is the same guard on the
+// namespace segment: it reaches the file name too.
+func TestSaveUserTemplate_RejectsNamespacePathEscape(t *testing.T) {
+	dir := withTempConfigDir(t)
+
+	for _, namespace := range []string{"../escape", "sub/web", ".."} {
+		assert.Error(t, saveUserTemplate(namespace, "web", "kind: Pod\n"), "namespace %q must be rejected", namespace)
+	}
+	assert.NoDirExists(t, filepath.Join(dir, "sub"))
 }
 
 // TestSaveUserTemplate_ConfigDirUnavailableIsDistinctError guards against
@@ -150,7 +198,7 @@ func TestSaveUserTemplate_ConfigDirUnavailableIsDistinctError(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", "")
 
-	err := saveUserTemplate("web", "kind: Pod\n")
+	err := saveUserTemplate("staging", "web", "kind: Pod\n")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errTemplateDirUnavailable)
 	assert.NotErrorIs(t, err, errInvalidTemplateName)
@@ -177,4 +225,38 @@ func TestMergedTemplates_UserFirstAndNeverShadows(t *testing.T) {
 	}
 	assert.True(t, builtinKept, "the built-in Pod template must still be listed")
 	assert.Len(t, merged, len(model.BuiltinTemplates())+1)
+}
+
+// A file whose name ends in the separator has nothing after it to use as a
+// name. Dropping the row would hide a file the user can see in the directory.
+func TestLoadUserTemplates_TrailingSeparatorKeepsWholeBaseName(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "web__.yaml", "kind: Pod\n")
+
+	got := loadUserTemplates()
+
+	require.Len(t, got, 1, "the row must not disappear")
+	assert.Equal(t, "web__", got[0].Name)
+}
+
+// A missing config directory and a rejected name are different failures, and
+// the caller reports whichever it is told, so the two must not collapse.
+func TestTemplateSavePath_DistinguishesFailures(t *testing.T) {
+	t.Run("directory unavailable", func(t *testing.T) {
+		t.Setenv("LFK_CONFIG_DIR", "")
+		t.Setenv("HOME", "")
+		t.Setenv("XDG_CONFIG_HOME", "")
+
+		_, err := templateSavePath("staging", "web")
+
+		require.ErrorIs(t, err, errTemplateDirUnavailable)
+	})
+
+	t.Run("invalid name", func(t *testing.T) {
+		withTempConfigDir(t)
+
+		_, err := templateSavePath("staging", "../escape")
+
+		require.ErrorIs(t, err, errInvalidTemplateName)
+	})
 }

@@ -258,6 +258,8 @@ type yamlClipboardMsg struct {
 type exportTemplateReadyMsg struct {
 	name string
 	kind string
+	// namespace is "" for a cluster-scoped resource.
+	namespace string
 	// raw is the fetched document, stripped when the picker opens so a later
 	// category toggle can re-strip it.
 	raw string

@@ -49,6 +49,11 @@ var errTemplateNotFound = errors.New("template not found")
 // resource name being saved.
 var errTemplateDirUnavailable = errors.New("template directory unavailable")
 
+// clusterScopedSegment stands in for a namespace on a cluster-scoped save.
+// The cluster context is deliberately left out of the file name: EKS
+// contexts are ARNs containing ":" and "/".
+const clusterScopedSegment = "_cluster"
+
 func userTemplateDir() string {
 	dir, err := paths.ConfigDir()
 	if err != nil {
@@ -116,10 +121,11 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 	if name == "" {
 		return model.ResourceTemplate{}, false
 	}
+	namespace := ui.SanitizeTerminalText(templateNamespaceFromPath(path))
 	kind, _ := obj["kind"].(string)
 	return model.ResourceTemplate{
 		Name:        name,
-		Description: ui.SanitizeTerminalText(kind),
+		Description: templateDescription(ui.SanitizeTerminalText(kind), namespace),
 		Category:    userTemplateCategory,
 		YAML:        string(data),
 		Path:        path,
@@ -133,10 +139,49 @@ func decodeFirstDocument(data []byte, obj *map[string]any) bool {
 	return dec.Decode(obj) == nil
 }
 
-// templateNameFromPath maps a file to the name the picker shows for it.
-func templateNameFromPath(path string) string {
+func templateBaseFromPath(path string) string {
 	base := filepath.Base(path)
 	return strings.TrimSuffix(base, filepath.Ext(base))
+}
+
+// templateNameFromPath maps a file to the name the picker shows for it. "_" is
+// illegal in a DNS-1123 object name or namespace, so splitting on the LAST "__"
+// is unambiguous for a file lfk wrote. A hand-authored name is under no such
+// rule, so `my__template.yaml` does read as namespace `my` - wrong, but it only
+// affects the two columns the picker draws.
+//
+// A split that leaves nothing after the separator falls back to the whole
+// basename: a file the user can see in the directory must not vanish from the
+// list that claims to show it.
+func templateNameFromPath(path string) string {
+	base := templateBaseFromPath(path)
+	if idx := strings.LastIndex(base, "__"); idx >= 0 && idx+2 < len(base) {
+		return base[idx+2:]
+	}
+	return base
+}
+
+// templateNamespaceFromPath recovers the namespace saveUserTemplate encoded
+// into the file name, or "" for a hand-authored file or a cluster-scoped save.
+func templateNamespaceFromPath(path string) string {
+	base := templateBaseFromPath(path)
+	idx := strings.LastIndex(base, "__")
+	if idx < 0 {
+		return ""
+	}
+	if ns := base[:idx]; ns != clusterScopedSegment {
+		return ns
+	}
+	return ""
+}
+
+// templateDescription matches the "<namespace>/<name>" order used elsewhere
+// in the app (e.g. explorer.go) for the picker's Description column.
+func templateDescription(kind, namespace string) string {
+	if namespace == "" {
+		return kind
+	}
+	return namespace + "/" + kind
 }
 
 func isYAMLFile(name string) bool {
@@ -147,23 +192,54 @@ func isYAMLFile(name string) bool {
 	return false
 }
 
-// saveUserTemplate writes manifest to <template dir>/<name>.yaml, replacing any
-// file already under that name. The name is a resource name read from the
-// cluster, so it is sanitized and confined to a single path element before it
-// reaches the filesystem.
-func saveUserTemplate(name, manifest string) error {
+// templateFileBase sanitizes namespace and name before they reach the
+// filesystem: both are resource identifiers read from the cluster.
+func templateFileBase(namespace, name string) (string, bool) {
+	cleanName := ui.SanitizeTerminalText(name)
+	if !isSafeTemplateName(cleanName) {
+		return "", false
+	}
+	nsSegment := clusterScopedSegment
+	if namespace != "" {
+		nsSegment = ui.SanitizeTerminalText(namespace)
+		if !isSafeTemplateName(nsSegment) {
+			return "", false
+		}
+	}
+	return nsSegment + "__" + cleanName, true
+}
+
+// templateSavePath resolves where saveUserTemplate would write namespace and
+// name, without touching the filesystem — the export picker checks this path
+// for an existing file before it commits to an overwrite.
+func templateSavePath(namespace, name string) (string, error) {
+	dir := userTemplateDir()
+	if dir == "" {
+		return "", errTemplateDirUnavailable
+	}
+	base, ok := templateFileBase(namespace, name)
+	if !ok {
+		return "", errInvalidTemplateName
+	}
+	return filepath.Join(dir, base+".yaml"), nil
+}
+
+// saveUserTemplate writes manifest to <template dir>/<namespace>__<name>.yaml
+// (or _cluster__<name>.yaml for a cluster-scoped resource), replacing any
+// file already at that path.
+func saveUserTemplate(namespace, name, manifest string) error {
 	dir := userTemplateDir()
 	if dir == "" {
 		return errTemplateDirUnavailable
 	}
-	clean := ui.SanitizeTerminalText(name)
-	if !isSafeTemplateName(clean) {
+	base, ok := templateFileBase(namespace, name)
+	if !ok {
 		return errInvalidTemplateName
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	return writeFileDurable(filepath.Join(dir, clean+".yaml"), []byte(manifest))
+	return writeFileDurable(filepath.Join(dir, base+".yaml"), []byte(manifest))
 }
 
 // deleteUserTemplate removes one template file by path. Deleting by name would

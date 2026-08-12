@@ -29,7 +29,7 @@ func openedExportPicker(t *testing.T) Model {
 	// Toggling a category persists; keep it out of the developer's real state dir.
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 	m := basePush80Model()
-	m.openExportTemplatePicker("settings", "ConfigMap", exportPickerYAML)
+	m.openExportTemplatePicker("settings", "ConfigMap", "prod", exportPickerYAML)
 	require.Equal(t, overlayExportTemplate, m.overlay)
 	return m
 }

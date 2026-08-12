@@ -26,6 +26,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		if m.pendingAction == deleteTemplateAction {
 			return m.commitTemplateDelete()
 		}
+		if m.pendingAction == overwriteTemplateAction {
+			return m.commitTemplateOverwrite()
+		}
 		// Read-only safety net: if RO was toggled on while a confirm overlay
 		// was already showing, refuse to commit the mutation.
 		if m.pendingActionBlockedByReadOnly() {
@@ -118,6 +121,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	case "n", "N", "esc", "q":
 		if m.pendingAction == deleteTemplateAction {
 			return m.clearTemplateDeleteConfirm(), nil
+		}
+		if m.pendingAction == overwriteTemplateAction {
+			return m.cancelTemplateOverwrite(), nil
 		}
 		// A cancelled taint-apply returns to the still-alive editor so
 		// the staged marks are not lost.
