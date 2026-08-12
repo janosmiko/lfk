@@ -238,3 +238,25 @@ func TestLoadUserTemplates_TrailingSeparatorKeepsWholeBaseName(t *testing.T) {
 	require.Len(t, got, 1, "the row must not disappear")
 	assert.Equal(t, "web__", got[0].Name)
 }
+
+// A missing config directory and a rejected name are different failures, and
+// the caller reports whichever it is told, so the two must not collapse.
+func TestTemplateSavePath_DistinguishesFailures(t *testing.T) {
+	t.Run("directory unavailable", func(t *testing.T) {
+		t.Setenv("LFK_CONFIG_DIR", "")
+		t.Setenv("HOME", "")
+		t.Setenv("XDG_CONFIG_HOME", "")
+
+		_, err := templateSavePath("staging", "web")
+
+		require.ErrorIs(t, err, errTemplateDirUnavailable)
+	})
+
+	t.Run("invalid name", func(t *testing.T) {
+		withTempConfigDir(t)
+
+		_, err := templateSavePath("staging", "../escape")
+
+		require.ErrorIs(t, err, errInvalidTemplateName)
+	})
+}

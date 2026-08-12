@@ -26,8 +26,13 @@ func pressTemplateDeleteKey(m Model) Model {
 }
 
 func pressConfirmKey(m Model, key string) Model {
-	mdl, _ := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: rune(key[0]), Text: key})
-	return mdl.(Model)
+	got, _ := pressConfirmKeyWithCmd(m, key)
+	return got
+}
+
+func pressConfirmKeyWithCmd(m Model, key string) (Model, tea.Cmd) {
+	mdl, cmd := m.handleConfirmOverlayKey(tea.KeyPressMsg{Code: rune(key[0]), Text: key})
+	return mdl.(Model), cmd
 }
 
 func TestDeleteUserTemplate_RemovesFile(t *testing.T) {

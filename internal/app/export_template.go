@@ -201,11 +201,11 @@ func (m Model) applyExportTemplatePicker() (tea.Model, tea.Cmd) {
 // collision the filename scheme cannot resolve on its own — same namespace
 // and name, saved from two different clusters.
 func (m Model) applyExportToTemplateList(state exportTemplateState) (tea.Model, tea.Cmd) {
-	path, ok := templateSavePath(state.namespace, state.name)
-	if !ok {
+	path, pathErr := templateSavePath(state.namespace, state.name)
+	if pathErr != nil {
 		m.closeExportTemplatePicker()
 		return m, func() tea.Msg {
-			return actionResultMsg{err: fmt.Errorf("saving template: %w", errInvalidTemplateName)}
+			return actionResultMsg{err: fmt.Errorf("saving template: %w", pathErr)}
 		}
 	}
 	if _, err := os.Stat(path); err == nil {

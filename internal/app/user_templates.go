@@ -212,16 +212,16 @@ func templateFileBase(namespace, name string) (string, bool) {
 // templateSavePath resolves where saveUserTemplate would write namespace and
 // name, without touching the filesystem — the export picker checks this path
 // for an existing file before it commits to an overwrite.
-func templateSavePath(namespace, name string) (string, bool) {
+func templateSavePath(namespace, name string) (string, error) {
 	dir := userTemplateDir()
 	if dir == "" {
-		return "", false
+		return "", errTemplateDirUnavailable
 	}
 	base, ok := templateFileBase(namespace, name)
 	if !ok {
-		return "", false
+		return "", errInvalidTemplateName
 	}
-	return filepath.Join(dir, base+".yaml"), true
+	return filepath.Join(dir, base+".yaml"), nil
 }
 
 // saveUserTemplate writes manifest to <template dir>/<namespace>__<name>.yaml

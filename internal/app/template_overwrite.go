@@ -3,6 +3,8 @@
 package app
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -11,16 +13,19 @@ import (
 // deleteTemplateAction: the file is local configuration.
 const overwriteTemplateAction = "Overwrite Template"
 
+// commitTemplateOverwrite hands the write to a command rather than doing it
+// here: saveUserTemplate fsyncs the file and the directory, and this runs
+// inside key handling, where a slow filesystem would stall the whole UI.
 func (m Model) commitTemplateOverwrite() (tea.Model, tea.Cmd) {
 	state := m.exportTemplatePicker
 	namespace, name, manifest, note := state.namespace, state.name, state.manifest, state.redactionNote()
 	m = m.clearTemplateOverwriteConfirm()
-	if err := saveUserTemplate(namespace, name, manifest); err != nil {
-		m.setStatusMessage("Failed to save template "+name+": "+err.Error(), true)
-		return m, scheduleStatusClear()
+	return m, func() tea.Msg {
+		if err := saveUserTemplate(namespace, name, manifest); err != nil {
+			return actionResultMsg{err: fmt.Errorf("saving template: %w", err)}
+		}
+		return actionResultMsg{message: "Saved template " + name + note}
 	}
-	m.setStatusMessage("Saved template "+name+note, false)
-	return m, scheduleStatusClear()
 }
 
 func (m Model) clearTemplateOverwriteConfirm() Model {

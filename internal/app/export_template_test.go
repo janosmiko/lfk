@@ -120,14 +120,21 @@ func TestConfirmOverlayKey_AcceptedOverwriteReplacesFile(t *testing.T) {
 	retTeaModel, _ := m.applyExportTemplatePicker()
 	m = retTeaModel.(Model)
 
-	got := pressConfirmKey(m, "y")
+	got, cmd := pressConfirmKeyWithCmd(m, "y")
+
+	assert.Equal(t, overlayNone, got.overlay)
+	assert.False(t, got.exportTemplatePicker.active)
+	// The write is deferred so a slow fsync cannot stall key handling, so the
+	// file only exists once the command has run.
+	require.NotNil(t, cmd, "the overwrite must be committed through a command")
+	msg, ok := cmd().(actionResultMsg)
+	require.True(t, ok)
+	require.NoError(t, msg.err)
+	assert.Contains(t, msg.message, "Saved template web")
 
 	saved, err := os.ReadFile(filepath.Join(dir, "staging__web.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, strippedManifest, string(saved), "the confirmed overwrite replaces the old content")
-	assert.Equal(t, overlayNone, got.overlay)
-	assert.False(t, got.exportTemplatePicker.active)
-	assert.Contains(t, got.statusMessage, "Saved template web")
 }
 
 func TestConfirmOverlayKey_CancelledOverwriteKeepsFile(t *testing.T) {
