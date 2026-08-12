@@ -25,6 +25,8 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg { return actionResultMsg{err: fmt.Errorf("kubectl not found: %w", err)} }
 	}
 
+	previousMode := m.mode
+
 	// Initialize log viewer state.
 	m.mode = modeLogs
 	m.resetLogBuffer()
@@ -55,6 +57,8 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	ns := m.resolveNamespace()
 
 	var wg sync.WaitGroup
+	started := 0
+	var lastErr error
 	for _, item := range items {
 		itemCtx := kctx
 		if item.ClusterName != "" {
@@ -108,15 +112,18 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			logger.Error("Failed to create stdout pipe for multi-log", "item", item.Name, "error", err)
+			lastErr = err
 			continue
 		}
 		cmd.Stderr = cmd.Stdout
 
 		if err := cmd.Start(); err != nil {
 			logger.Error("Failed to start kubectl logs for multi-log", "item", item.Name, "error", err)
+			lastErr = err
 			continue
 		}
 
+		started++
 		wg.Go(func() {
 			defer cmd.Wait() //nolint:errcheck
 			scanner := bufio.NewScanner(stdout)
@@ -136,6 +143,17 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		wg.Wait()
 		close(ch)
 	}()
+
+	if started == 0 {
+		cancel()
+		m.mode = previousMode
+		msg := fmt.Sprintf("Failed to start logs for %d resources", len(items))
+		if lastErr != nil {
+			msg = fmt.Sprintf("%s: %v", msg, lastErr)
+		}
+		m.setStatusMessage(msg, true)
+		return m, scheduleStatusClear()
+	}
 
 	return m, m.waitForLogLine()
 }
