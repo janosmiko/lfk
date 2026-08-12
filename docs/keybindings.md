@@ -1185,7 +1185,20 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 
 Every kind also offers `x` → `T` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Secret values are blanked, keys kept. Available in read-only mode.
 
-The destination picker: `j`/`k` (or `↓`/`↑`, `Ctrl+N`/`Ctrl+P`) move the cursor, `c` clipboard, `f` file, `t` template list, `Enter` export to the highlighted destination, `Esc`/`q` cancel.
+The destination picker: `j`/`k` (or `↓`/`↑`, `Ctrl+N`/`Ctrl+P`) move the cursor, `c` clipboard, `f` file, `t` template list, `Enter` export to the highlighted destination, `s` fields to remove, `Esc`/`q` cancel.
+
+The field picker (`s` from the destination picker) chooses which categories the export removes. `j`/`k` move, `space` toggles, `r` restores the defaults, `Esc` returns to the destinations. Choices persist across restarts in `export_strip_prefs.yaml` in the state directory.
+
+| Category | Default | Removes |
+|---|---|---|
+| Namespace | removed | `metadata.namespace` |
+| Labels | kept | every author-written label |
+| Annotations | kept | every author-written annotation |
+| Helm ownership | removed | `helm.sh/chart`, `meta.helm.sh/*`, `heritage`, `release`, `chart`, and `app.kubernetes.io/managed-by` when its value is `Helm` |
+| Vendor runtime annotations | removed | `cni.projectcalico.org/*`, `field.cattle.io/*`, `management.cattle.io/*` |
+| Secret values | removed | Secret values; keys and `type` kept |
+
+Locked rows offer no choice — keeping them yields a manifest that will not apply: `status` and the server-set metadata (`uid`, `resourceVersion`, `generation`, `creationTimestamp`, `managedFields`, `selfLink`, `ownerReferences`), `last-applied-configuration`, finalizers, and controller-generated labels (`pod-template-hash`, `controller-uid`, `job-name`).
 
 ### Pod Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events

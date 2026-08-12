@@ -11,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
-	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -38,14 +37,7 @@ func (m Model) exportTemplateCmd() (Model, tea.Cmd) {
 			if err != nil {
 				return exportTemplateReadyMsg{err: fmt.Errorf("fetching resource: %w", err)}
 			}
-			manifest, err := k8s.StripToTemplate(doc)
-			if err != nil {
-				return exportTemplateReadyMsg{err: fmt.Errorf("stripping manifest: %w", err)}
-			}
-			return exportTemplateReadyMsg{
-				name: name, kind: kind, manifest: manifest,
-				redacted: k8s.TemplateRedactsValues(kind, k8s.DefaultTemplateStripSet()),
-			}
+			return exportTemplateReadyMsg{name: name, kind: kind, raw: doc}
 		})
 }
 
@@ -109,6 +101,6 @@ func (m Model) updateExportTemplateReady(msg exportTemplateReadyMsg) (tea.Model,
 		m.setErrorFromErr("Export template failed: ", msg.err)
 		return m, scheduleStatusClear()
 	}
-	m.openExportTemplatePicker(msg.name, msg.kind, msg.manifest, msg.redacted)
+	m.openExportTemplatePicker(msg.name, msg.kind, msg.raw)
 	return m, nil
 }

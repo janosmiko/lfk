@@ -27,6 +27,9 @@ func (m Model) handleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.overlay == overlayExportTemplate {
 		return m.handleExportTemplateKey(msg)
 	}
+	if m.overlay == overlayExportStrip {
+		return m.handleExportStripKey(msg)
+	}
 	if mdl, cmd, ok := m.handleOverlayKeyPrimary(msg); ok {
 		return mdl, cmd
 	}

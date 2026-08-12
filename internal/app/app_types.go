@@ -108,6 +108,7 @@ const (
 	overlayTaintEditor        // node taint editor (action menu key t on a Node)
 	overlayTaintPresets       // common-taint picker over the taint editor (p key)
 	overlayExportTemplate     // destination picker for Export Template (clipboard / file / template list)
+	overlayExportStrip        // field-category picker over the Export Template destinations (s key)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

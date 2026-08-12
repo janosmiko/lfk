@@ -18,7 +18,7 @@ const strippedManifest = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n"
 func pickerModel(t *testing.T) Model {
 	t.Helper()
 	m := basePush80Model()
-	m.openExportTemplatePicker("web", "Pod", strippedManifest, false)
+	m.openExportTemplatePicker("web", "Pod", strippedManifest)
 	return m
 }
 
@@ -27,7 +27,7 @@ func pickerModel(t *testing.T) Model {
 func secretPickerModel(t *testing.T) Model {
 	t.Helper()
 	m := basePush80Model()
-	m.openExportTemplatePicker("db-creds", "Secret", "kind: Secret\ndata:\n  password: \"\"\n", true)
+	m.openExportTemplatePicker("db-creds", "Secret", "kind: Secret\ndata:\n  password: \"hunter2\"\n")
 	return m
 }
 
@@ -49,7 +49,7 @@ func TestUpdateExportTemplateReady_OpensDestinationPicker(t *testing.T) {
 	m := basePush80Model()
 
 	ret, _ := m.updateExportTemplateReady(exportTemplateReadyMsg{
-		name: "web", kind: "Pod", manifest: strippedManifest,
+		name: "web", kind: "Pod", raw: strippedManifest,
 	})
 	got := ret.(Model)
 

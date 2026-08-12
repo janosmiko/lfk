@@ -10,6 +10,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -56,12 +58,30 @@ func (d exportDestination) ShortcutKey() string {
 // manifest it will deliver. The manifest is captured when the picker opens, so
 // a watch refresh between fetch and choice cannot change what is exported.
 type exportTemplateState struct {
-	active   bool
-	cursor   int
-	name     string
-	kind     string
-	manifest string
-	redacted bool
+	active bool
+	cursor int
+	name   string
+	kind   string
+	// raw is the fetched document. Kept so a category toggle in the field
+	// picker can re-strip it rather than trying to unpick the stripped copy.
+	raw         string
+	manifest    string
+	redacted    bool
+	strip       k8s.TemplateStripSet
+	stripCursor int
+}
+
+// restrip recomputes the manifest after a category toggle. A strip that fails
+// leaves the previous manifest in place: the picker always has something to
+// deliver, and the raw document already parsed once to produce it.
+func (s *exportTemplateState) restrip() {
+	manifest, err := k8s.StripToTemplateWith(s.raw, s.strip)
+	if err != nil {
+		logger.Warn("Re-stripping the export template failed", "error", err)
+		return
+	}
+	s.manifest = manifest
+	s.redacted = k8s.TemplateRedactsValues(s.kind, s.strip)
 }
 
 // secretRedactedNote is appended to every destination's success line so the
@@ -77,14 +97,15 @@ func (s exportTemplateState) redactionNote() string {
 	return ""
 }
 
-func (m *Model) openExportTemplatePicker(name, kind, manifest string, redacted bool) {
+func (m *Model) openExportTemplatePicker(name, kind, raw string) {
 	m.exportTemplatePicker = exportTemplateState{
-		active:   true,
-		name:     name,
-		kind:     kind,
-		manifest: manifest,
-		redacted: redacted,
+		active: true,
+		name:   name,
+		kind:   kind,
+		raw:    raw,
+		strip:  loadExportStripPrefs(),
 	}
+	m.exportTemplatePicker.restrip()
 	m.previousOverlay = overlayNone
 	m.overlay = overlayExportTemplate
 }
@@ -121,6 +142,9 @@ func (m Model) handleExportTemplateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		return m, nil
 	case "enter":
 		return m.applyExportTemplatePicker()
+	case exportStripKey:
+		m.openExportStripPicker()
+		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
@@ -196,6 +220,7 @@ func exportTemplateHints() []ui.HintEntry {
 		{Key: "j/k", Desc: "navigate"},
 		{Key: strings.Join(keys, "/"), Desc: "shortcut"},
 		{Key: "enter", Desc: "export"},
+		{Key: exportStripKey, Desc: "fields to remove"},
 		{Key: "esc", Desc: "cancel"},
 	}
 }

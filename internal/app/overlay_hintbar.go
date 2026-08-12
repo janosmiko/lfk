@@ -139,6 +139,8 @@ func (m Model) overlayHintBarSelector() string {
 		return m.renderHints(m.copyFormatPickerHints())
 	case overlayExportTemplate:
 		return m.renderHints(exportTemplateHints())
+	case overlayExportStrip:
+		return m.renderHints(exportStripHints())
 	case overlayCopyField:
 		return m.renderHints(copyFieldPickerHints())
 	case overlayTaintEditor:

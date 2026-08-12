@@ -163,7 +163,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.ForceDelete, "Force delete (Pod/Job only)"},
 				{kb.Scale, "Scale (Deployment/StatefulSet/ReplicaSet/HPA)"},
 				{kb.CreateTemplate, "Create new resource from template (built-in + your own)"},
-				{kb.ActionMenu + " T", "Export selected resource as a template"},
+				{kb.ActionMenu + " T", "Export selected resource as a template (s: fields to remove)"},
 				{kb.SaveResource, "Save resource to file (Events: warnings-only)"},
 				{kb.CopyName, "Copy resource name"},
 				{kb.CopyYAML, "Copy-as picker (YAML/JSON/Table)"},

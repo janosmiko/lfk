@@ -256,11 +256,12 @@ type yamlClipboardMsg struct {
 // exportTemplateReadyMsg carries a manifest stripped to a template, ready for
 // the destination picker.
 type exportTemplateReadyMsg struct {
-	name     string
-	kind     string
-	manifest string
-	redacted bool // kind whose values StripToTemplate blanks (Secret)
-	err      error
+	name string
+	kind string
+	// raw is the fetched document, stripped when the picker opens so a later
+	// category toggle can re-strip it.
+	raw string
+	err error
 }
 
 // exportDoneMsg carries the result of exporting a resource to a file.

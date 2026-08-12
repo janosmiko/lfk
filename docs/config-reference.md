@@ -617,7 +617,7 @@ Templates listed in the create-from-template picker (`a`) come from two places: 
 | Name collision | Both rows stay; the `User` category marks yours |
 | Broken file | Skipped and logged; the other templates still load |
 
-`x` -> Export Template writes into this same directory, so exported and hand-written templates live together. Exporting a Secret keeps the keys and the `type` but blanks every value — use `y` or the YAML view when you want the live values.
+`x` -> Export Template writes into this same directory, so exported and hand-written templates live together. Exporting a Secret keeps the keys and the `type` but blanks every value — press `s` on the destination picker to keep the values, or use `y` / the YAML view. See [keybindings.md](keybindings.md#action-menu-items) for the full category list.
 
 ```yaml
 # ~/.config/lfk/templates/web.yaml
