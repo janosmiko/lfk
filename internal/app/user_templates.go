@@ -40,6 +40,10 @@ const userTemplateCategory = "User"
 // directory or produce an unreachable file.
 var errInvalidTemplateName = errors.New("invalid template name")
 
+// errTemplateNotFound reports that the picker offered a name with no file
+// behind it, which means the directory changed under a stale list.
+var errTemplateNotFound = errors.New("template not found")
+
 // errTemplateDirUnavailable reports that paths.ConfigDir() failed — an
 // environment problem (e.g. $HOME unset), not anything wrong with the
 // resource name being saved.
@@ -108,8 +112,7 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 		logger.Warn("Skipping template that is not a Kubernetes object", "path", path)
 		return model.ResourceTemplate{}, false
 	}
-	base := filepath.Base(path)
-	name := ui.SanitizeTerminalText(strings.TrimSuffix(base, filepath.Ext(base)))
+	name := ui.SanitizeTerminalText(templateNameFromPath(path))
 	if name == "" {
 		return model.ResourceTemplate{}, false
 	}
@@ -119,6 +122,7 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 		Description: ui.SanitizeTerminalText(kind),
 		Category:    userTemplateCategory,
 		YAML:        string(data),
+		Path:        path,
 	}, true
 }
 
@@ -127,6 +131,12 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 func decodeFirstDocument(data []byte, obj *map[string]any) bool {
 	dec := yaml.NewDecoder(strings.NewReader(string(data)))
 	return dec.Decode(obj) == nil
+}
+
+// templateNameFromPath maps a file to the name the picker shows for it.
+func templateNameFromPath(path string) string {
+	base := filepath.Base(path)
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
 func isYAMLFile(name string) bool {
@@ -154,6 +164,26 @@ func saveUserTemplate(name, manifest string) error {
 		return err
 	}
 	return writeFileDurable(filepath.Join(dir, clean+".yaml"), []byte(manifest))
+}
+
+// deleteUserTemplate removes one template file by path. Deleting by name would
+// take web.yaml and web.yml together, and the picker lists those as two rows.
+// The path arrives through Model state, so the directory is re-checked here.
+func deleteUserTemplate(path string) error {
+	dir := userTemplateDir()
+	if dir == "" {
+		return errTemplateDirUnavailable
+	}
+	if path == "" || filepath.Dir(path) != dir || !isSafeTemplateName(filepath.Base(path)) {
+		return errInvalidTemplateName
+	}
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return errTemplateNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // isSafeTemplateName reports whether name is a single path element that stays

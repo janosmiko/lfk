@@ -6,6 +6,10 @@ type ResourceTemplate struct {
 	Description string
 	Category    string // "Workloads", "Networking", "Config", etc.
 	YAML        string
+	// Path is the file a user template was read from. Empty for built-ins.
+	// Two files can share a base name (web.yaml and web.yml), so the name
+	// alone does not identify which file a row stands for.
+	Path string
 }
 
 // BuiltinTemplates returns the list of predefined resource templates.

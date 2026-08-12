@@ -21,6 +21,11 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		}
 		return m, nil
 	case "enter", "y", "Y":
+		// A saved template is a local file, so it needs neither the read-only
+		// net below nor the loading spinner that waits on a cluster call.
+		if m.pendingAction == deleteTemplateAction {
+			return m.commitTemplateDelete()
+		}
 		// Read-only safety net: if RO was toggled on while a confirm overlay
 		// was already showing, refuse to commit the mutation.
 		if m.pendingActionBlockedByReadOnly() {
@@ -111,6 +116,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		}
 		return m, m.deleteResource()
 	case "n", "N", "esc", "q":
+		if m.pendingAction == deleteTemplateAction {
+			return m.clearTemplateDeleteConfirm(), nil
+		}
 		// A cancelled taint-apply returns to the still-alive editor so
 		// the staged marks are not lost.
 		returnToTaints := m.pendingAction == "Apply Taints" && m.taintEditor.active
