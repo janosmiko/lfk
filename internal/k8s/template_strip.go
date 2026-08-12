@@ -38,9 +38,6 @@ var metadataServerFields = []string{
 	// until some controller removes it — never, if that controller is absent
 	// in the target cluster.
 	"finalizers",
-	// Dropped so the template is portable: without it, `kubectl apply -n <ns>`
-	// decides where the object lands instead of the namespace it was read from.
-	"namespace",
 }
 
 // annotationsAlwaysDropped are written by kubectl or a controller, never by the
@@ -63,11 +60,55 @@ var pvcServerAnnotations = []string{
 // secretKind is the one kind whose values are redacted rather than kept.
 const secretKind = "Secret"
 
-// TemplateRedactsValues reports whether StripToTemplate blanks the values of
-// this kind, so an exporter can tell the user before they paste an empty
-// template. Tied to the switch in StripToTemplate by the shared constant.
-func TemplateRedactsValues(kind string) bool {
-	return kind == secretKind
+// TemplateRedactsValues reports whether the strip blanks the values of this
+// kind, so an exporter can tell the user before they paste an empty template.
+func TemplateRedactsValues(kind string, strip TemplateStripSet) bool {
+	return kind == secretKind && strip[TemplateSecretValues]
+}
+
+// stripKindSpec removes the server-set spec fields of the kinds whose are
+// unambiguous. Kinds without an entry get the generic strip only — leaving a
+// field in is recoverable, removing a meaningful one is not.
+func stripKindSpec(obj map[string]any) {
+	kind, _ := obj["kind"].(string)
+	switch kind {
+	case "Pod":
+		stripPodSpec(childMap(obj, "spec"))
+	case "Service":
+		deleteKeys(childMap(obj, "spec"), "clusterIP", "clusterIPs", "ipFamilies", "ipFamilyPolicy")
+	case "PersistentVolumeClaim":
+		deleteKeys(childMap(obj, "spec"), "volumeName")
+		stripAnnotations(obj, pvcServerAnnotations)
+	case "Job":
+		stripJob(obj)
+	}
+}
+
+// applyTemplateCategories runs the optional strips the user left ticked.
+func applyTemplateCategories(obj map[string]any, strip TemplateStripSet) {
+	if strip[TemplateHelmOwnership] {
+		stripHelmOwnership(obj)
+	}
+	if strip[TemplateVendorRuntime] {
+		stripVendorRuntimeAnnotations(obj)
+	}
+	if strip[TemplateLabels] {
+		stripAllLabels(obj)
+	}
+	if strip[TemplateAnnotations] {
+		stripAllAnnotations(obj)
+	}
+	if strip[TemplateNamespace] {
+		// Without this the template is not portable: `kubectl apply -n <ns>`
+		// no longer decides where the object lands.
+		delete(childMap(obj, "metadata"), "namespace")
+	}
+	if strip[TemplateSecretValues] {
+		kind, _ := obj["kind"].(string)
+		if kind == secretKind {
+			redactSecretValues(obj)
+		}
+	}
 }
 
 // redactSecretValues blanks every value under data and stringData while keeping
@@ -84,11 +125,15 @@ func redactSecretValues(obj map[string]any) {
 	}
 }
 
-// StripToTemplate rewrites a live object's YAML into a reusable template:
-// status and the server-set metadata go, then the server-set spec fields for
-// the kinds that have them. The result is meant to apply unchanged into an
-// empty namespace.
+// StripToTemplate rewrites a live object's YAML into a reusable template using
+// the default category set — the two-keystroke export path.
 func StripToTemplate(doc string) (string, error) {
+	return StripToTemplateWith(doc, DefaultTemplateStripSet())
+}
+
+// StripToTemplateWith is StripToTemplate with the optional categories chosen by
+// the caller. The result is meant to apply unchanged into an empty namespace.
+func StripToTemplateWith(doc string, strip TemplateStripSet) (string, error) {
 	var obj map[string]any
 	if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
 		return "", fmt.Errorf("parsing YAML: %w", err)
@@ -101,23 +146,8 @@ func StripToTemplate(doc string) (string, error) {
 	stripObjectMeta(obj, annotationsAlwaysDropped)
 	stripEmbeddedTemplateMeta(obj)
 	stripControllerLabels(obj)
-	stripHelmOwnership(obj)
-	stripVendorRuntimeAnnotations(obj)
-
-	kind, _ := obj["kind"].(string)
-	switch kind {
-	case "Pod":
-		stripPodSpec(childMap(obj, "spec"))
-	case "Service":
-		deleteKeys(childMap(obj, "spec"), "clusterIP", "clusterIPs", "ipFamilies", "ipFamilyPolicy")
-	case "PersistentVolumeClaim":
-		deleteKeys(childMap(obj, "spec"), "volumeName")
-		stripAnnotations(obj, pvcServerAnnotations)
-	case "Job":
-		stripJob(obj)
-	case secretKind:
-		redactSecretValues(obj)
-	}
+	stripKindSpec(obj)
+	applyTemplateCategories(obj, strip)
 
 	out, err := marshalResourceYAML(obj)
 	if err != nil {

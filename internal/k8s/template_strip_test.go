@@ -520,7 +520,7 @@ func TestStripToTemplate_SecretKeepsKeysDropsValues(t *testing.T) {
 // TestTemplateRedactsValues ties the caller-facing predicate to the strip: the
 // export tells the user its values were redacted based on this answer.
 func TestTemplateRedactsValues(t *testing.T) {
-	assert.True(t, TemplateRedactsValues("Secret"))
-	assert.False(t, TemplateRedactsValues("ConfigMap"))
-	assert.False(t, TemplateRedactsValues("Pod"))
+	assert.True(t, TemplateRedactsValues("Secret", DefaultTemplateStripSet()))
+	assert.False(t, TemplateRedactsValues("ConfigMap", DefaultTemplateStripSet()))
+	assert.False(t, TemplateRedactsValues("Pod", DefaultTemplateStripSet()))
 }

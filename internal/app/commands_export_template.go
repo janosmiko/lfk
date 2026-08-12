@@ -44,7 +44,7 @@ func (m Model) exportTemplateCmd() (Model, tea.Cmd) {
 			}
 			return exportTemplateReadyMsg{
 				name: name, kind: kind, manifest: manifest,
-				redacted: k8s.TemplateRedactsValues(kind),
+				redacted: k8s.TemplateRedactsValues(kind, k8s.DefaultTemplateStripSet()),
 			}
 		})
 }
