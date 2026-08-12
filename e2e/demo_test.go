@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/janosmiko/lfk/internal/k8s/demo"
 )
 
 const (
@@ -85,10 +86,11 @@ func waitFor(t *testing.T, out *output, substr string, timeout time.Duration) {
 	t.Fatalf("timed out after %s waiting for %q; captured output:\n%s", timeout, substr, out.String())
 }
 
-// TestDemoModeStartup launches `lfk --demo` under a pty with HOME and
-// KUBECONFIG pointed at an empty temp dir, then checks it renders the DEMO
-// badge and a seeded workload without panicking.
-func TestDemoModeStartup(t *testing.T) {
+// startDemoUnderPty builds lfk, launches it under --demo inside a pty, and
+// registers cleanup that kills the process. Startup is already confirmed
+// (DEMO badge rendered, no panic) by the time it returns.
+func startDemoUnderPty(t *testing.T) (ptmx *os.File, out, stderr *output) {
+	t.Helper()
 	binPath := buildBinary(t)
 
 	home := t.TempDir()
@@ -105,16 +107,16 @@ func TestDemoModeStartup(t *testing.T) {
 		"TERM=xterm-256color",
 	}
 
-	stderr := &output{}
+	stderr = &output{}
 	cmd.Stderr = stderr // stdout must stay on the pty, or bubbletea's terminal handshake hangs
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 200})
+	var err error
+	ptmx, err = pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 200})
 	if err != nil {
 		t.Fatalf("starting lfk under pty: %v", err)
 	}
-	defer func() { _ = ptmx.Close() }()
 
-	out := &output{}
+	out = &output{}
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
@@ -132,7 +134,8 @@ func TestDemoModeStartup(t *testing.T) {
 
 	// Always kill the process, however the test ends -- it's a TUI that
 	// otherwise sits waiting for input forever.
-	defer func() {
+	t.Cleanup(func() {
+		_ = ptmx.Close()
 		_ = cmd.Process.Kill()
 
 		waitErr := make(chan error, 1)
@@ -152,12 +155,20 @@ func TestDemoModeStartup(t *testing.T) {
 		if s := stderr.String(); s != "" {
 			t.Logf("lfk stderr:\n%s", s)
 		}
-	}()
+	})
 
 	waitFor(t, out, "DEMO", startupTimeout)
 	if strings.Contains(out.String(), "panic:") {
 		t.Fatalf("lfk panicked during startup:\n%s", out.String())
 	}
+
+	return ptmx, out, stderr
+}
+
+// TestDemoModeStartup checks lfk --demo renders a seeded workload without
+// panicking.
+func TestDemoModeStartup(t *testing.T) {
+	ptmx, out, stderr := startDemoUnderPty(t)
 
 	// Drill into the (only) context, then jump to the Deployments resource
 	// type via search rather than counting arrow-key presses: the
@@ -173,6 +184,30 @@ func TestDemoModeStartup(t *testing.T) {
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
 		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())
+	}
+}
+
+// TestDemoModeCronJobLogs opens the seeded CronJob's logs (TASK-896) - a
+// wiring check only, since internal/democli hand-crafts its kubectl
+// responses. Real label selector semantics need the e2e-cluster CI job.
+func TestDemoModeCronJobLogs(t *testing.T) {
+	ptmx, out, stderr := startDemoUnderPty(t)
+
+	sendKeys(t, ptmx, "\r")
+	time.Sleep(300 * time.Millisecond)
+	sendKeys(t, ptmx, "/CronJobs\r")
+	time.Sleep(300 * time.Millisecond)
+	sendKeys(t, ptmx, "\r")
+	time.Sleep(300 * time.Millisecond)
+	sendKeys(t, ptmx, "\x0c") // ctrl+l: open the fullscreen log viewer
+
+	waitFor(t, out, demo.JobNightlyBackupRun, startupTimeout)
+
+	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
+		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())
+	}
+	if strings.Contains(out.String(), "No runs yet") {
+		t.Fatalf("CronJob log resolution reported no runs; pty output:\n%s", out.String())
 	}
 }
 

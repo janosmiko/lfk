@@ -30,6 +30,12 @@ const (
 
 	JobDBMigrate = "db-migrate-28472913"
 	PodDBMigrate = "db-migrate-28472913-9f2lk"
+
+	// CronJobNightlyBackup -> JobNightlyBackupRun -> PodNightlyBackupRun is
+	// the ownership chain internal/democli/get_cronjob.go answers.
+	CronJobNightlyBackup = "nightly-backup"
+	JobNightlyBackupRun  = "nightly-backup-28571940"
+	PodNightlyBackupRun  = "nightly-backup-28571940-h4qtz"
 )
 
 // uids are fixed so ownerReferences and event involvedObject links stay
@@ -52,6 +58,12 @@ const (
 
 	uidJobDBMigrate = "c0000000-0000-4000-8000-000000000001"
 	uidPodDBMigrate = "c0000000-0000-4000-8000-000000000002"
+
+	// Exported (unlike the uid* consts above): internal/democli/get_cronjob.go
+	// needs these to answer `kubectl get cronjob`/`get jobs` consistently.
+	UIDCronJobNightlyBackup = "c0000000-0000-4000-8000-000000000003"
+	UIDJobNightlyBackupRun  = "c0000000-0000-4000-8000-000000000004"
+	uidPodNightlyBackupRun  = "c0000000-0000-4000-8000-000000000005"
 
 	uidEventPodCrashBackOff   = "d0000000-0000-4000-8000-000000000001"
 	uidEventPodCrashUnhealthy = "d0000000-0000-4000-8000-000000000002"

@@ -59,10 +59,11 @@ func seedMetrics(dyn *dynamicfake.FakeDynamicClient) {
 // typedObjects returns every seed object as its typed API type — what the
 // fake clientset's tracker and Discovery() need.
 func typedObjects() []runtime.Object {
-	objs := make([]runtime.Object, 0, 17)
+	objs := make([]runtime.Object, 0, 20)
 	objs = append(objs,
 		buildDeployment(), buildReplicaSet(), buildService(), buildConfigMap(),
 		buildJob(), buildJobPod(),
+		buildCronJob(), buildCronJobOwnedJob(), buildCronJobOwnedPod(),
 	)
 	for _, ns := range buildNamespaces() {
 		objs = append(objs, ns)
