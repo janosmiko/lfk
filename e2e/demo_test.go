@@ -86,27 +86,10 @@ func waitFor(t *testing.T, out *output, substr string, timeout time.Duration) {
 	t.Fatalf("timed out after %s waiting for %q; captured output:\n%s", timeout, substr, out.String())
 }
 
-// startDemoUnderPty builds lfk, launches it under --demo inside a pty, and
-// registers cleanup that kills the process. Startup is already confirmed
-// (DEMO badge rendered, no panic) by the time it returns.
-func startDemoUnderPty(t *testing.T) (ptmx *os.File, out, stderr *output) {
+// runUnderPty starts cmd inside a pty and registers cleanup that kills it -
+// lfk is a TUI that otherwise sits waiting for input forever.
+func runUnderPty(t *testing.T, cmd *exec.Cmd) (ptmx *os.File, out, stderr *output) {
 	t.Helper()
-	binPath := buildBinary(t)
-
-	home := t.TempDir()
-	kubeconfig := filepath.Join(home, "kubeconfig")
-
-	cmd := exec.Command(binPath, "--demo")
-	// An explicit, minimal env -- not os.Environ() plus overrides -- so a
-	// developer's own XDG_CONFIG_HOME, LFK_CONFIG_DIR, or KUBECONFIG_DIR
-	// can never leak a real config or kubeconfig into the demo run.
-	cmd.Env = []string{
-		"HOME=" + home,
-		"KUBECONFIG=" + kubeconfig,
-		"PATH=" + os.Getenv("PATH"),
-		"TERM=xterm-256color",
-	}
-
 	stderr = &output{}
 	cmd.Stderr = stderr // stdout must stay on the pty, or bubbletea's terminal handshake hangs
 
@@ -132,8 +115,6 @@ func startDemoUnderPty(t *testing.T) (ptmx *os.File, out, stderr *output) {
 		}
 	}()
 
-	// Always kill the process, however the test ends -- it's a TUI that
-	// otherwise sits waiting for input forever.
 	t.Cleanup(func() {
 		_ = ptmx.Close()
 		_ = cmd.Process.Kill()
@@ -156,6 +137,31 @@ func startDemoUnderPty(t *testing.T) (ptmx *os.File, out, stderr *output) {
 			t.Logf("lfk stderr:\n%s", s)
 		}
 	})
+
+	return ptmx, out, stderr
+}
+
+// startDemoUnderPty builds lfk and launches it under --demo. Startup is
+// already confirmed (DEMO badge rendered, no panic) by the time it returns.
+func startDemoUnderPty(t *testing.T) (ptmx *os.File, out, stderr *output) {
+	t.Helper()
+	binPath := buildBinary(t)
+
+	home := t.TempDir()
+	kubeconfig := filepath.Join(home, "kubeconfig")
+
+	cmd := exec.Command(binPath, "--demo")
+	// An explicit, minimal env -- not os.Environ() plus overrides -- so a
+	// developer's own XDG_CONFIG_HOME, LFK_CONFIG_DIR, or KUBECONFIG_DIR
+	// can never leak a real config or kubeconfig into the demo run.
+	cmd.Env = []string{
+		"HOME=" + home,
+		"KUBECONFIG=" + kubeconfig,
+		"PATH=" + os.Getenv("PATH"),
+		"TERM=xterm-256color",
+	}
+
+	ptmx, out, stderr = runUnderPty(t, cmd)
 
 	waitFor(t, out, "DEMO", startupTimeout)
 	if strings.Contains(out.String(), "panic:") {

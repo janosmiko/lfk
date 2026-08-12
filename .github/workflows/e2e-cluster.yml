@@ -1,0 +1,144 @@
+name: E2E (real cluster)
+
+# Runs the e2e suite against a real kind apiserver instead of the --demo
+# fake, so the CronJob log label selectors validate for real (TASK-896).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-cluster:
+    name: e2e against a kind cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LFK_E2E_REAL_CLUSTER: "1"
+      LFK_E2E_LOG_MARKER: lfk-e2e-cronjob-log-marker
+      LFK_NAMESPACE: lfk-e2e
+      LFK_CRONJOB: nightly-backup
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Cleanup (kind delete cluster) is this action's own post step, which
+      # GitHub Actions runs regardless of job outcome - no separate
+      # always()-guarded teardown step needed.
+      - name: Create kind cluster
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          cluster_name: lfk-e2e
+
+      - name: Apply CronJob/Job/Pod fixture
+        run: |
+          set -euo pipefail
+          kubectl create namespace "${LFK_NAMESPACE}"
+
+          # Suspended so the CronJob's own controller never creates a
+          # competing Job - the Job below is applied directly instead, with
+          # ownerReferences filled in from the CronJob's server-assigned uid.
+          kubectl apply -n "${LFK_NAMESPACE}" -f - <<EOF
+          apiVersion: batch/v1
+          kind: CronJob
+          metadata:
+            name: ${LFK_CRONJOB}
+          spec:
+            schedule: "0 2 * * *"
+            suspend: true
+            jobTemplate:
+              spec:
+                template:
+                  spec:
+                    restartPolicy: Never
+                    containers:
+                      - name: backup
+                        image: busybox:1.36
+                        command: ["sh", "-c", "echo backup"]
+          EOF
+
+          cronjob_uid=$(kubectl get cronjob "${LFK_CRONJOB}" -n "${LFK_NAMESPACE}" -o jsonpath='{.metadata.uid}')
+
+          kubectl apply -n "${LFK_NAMESPACE}" -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${LFK_CRONJOB}-run
+            ownerReferences:
+              - apiVersion: batch/v1
+                kind: CronJob
+                name: ${LFK_CRONJOB}
+                uid: ${cronjob_uid}
+                controller: true
+                blockOwnerDeletion: true
+          spec:
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: backup
+                    image: busybox:1.36
+                    command: ["sh", "-c", "echo backup"]
+          EOF
+
+          job_uid=$(kubectl get job "${LFK_CRONJOB}-run" -n "${LFK_NAMESPACE}" -o jsonpath='{.metadata.uid}')
+
+          # Only the legacy job-name/controller-uid labels, no
+          # batch.kubernetes.io/ prefix, so resolveCronJobPodSelector's
+          # fallback candidate is what actually matches pods (AC#3).
+          kubectl apply -n "${LFK_NAMESPACE}" -f - <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: ${LFK_CRONJOB}-run-pod
+            labels:
+              job-name: ${LFK_CRONJOB}-run
+              controller-uid: ${job_uid}
+            ownerReferences:
+              - apiVersion: batch/v1
+                kind: Job
+                name: ${LFK_CRONJOB}-run
+                uid: ${job_uid}
+                controller: true
+                blockOwnerDeletion: true
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: backup
+                image: busybox:1.36
+                command: ["sh", "-c", "echo ${LFK_E2E_LOG_MARKER} && sleep 120"]
+          EOF
+
+          kubectl wait --for=jsonpath='{.status.phase}'=Running \
+            "pod/${LFK_CRONJOB}-run-pod" -n "${LFK_NAMESPACE}" --timeout=60s
+
+          # The pod can report Running before its container has written
+          # anything - poll logs until the marker line actually shows up.
+          for _ in $(seq 1 30); do
+            if kubectl logs "${LFK_CRONJOB}-run-pod" -n "${LFK_NAMESPACE}" 2>/dev/null | grep -qF "${LFK_E2E_LOG_MARKER}"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "marker never appeared in pod logs" >&2
+          kubectl logs "${LFK_CRONJOB}-run-pod" -n "${LFK_NAMESPACE}" >&2 || true
+          exit 1
+
+      - name: Run e2e against the real cluster
+        run: go test -tags e2e -count=1 -timeout 5m -run TestClusterModeCronJobLogs -v ./e2e/...
+
+      - name: Collect cluster state on failure
+        if: failure()
+        run: |
+          kubectl get all -n "${LFK_NAMESPACE}" -o wide || true
+          kubectl describe pod "${LFK_CRONJOB}-run-pod" -n "${LFK_NAMESPACE}" || true
+          kubectl logs "${LFK_CRONJOB}-run-pod" -n "${LFK_NAMESPACE}" || true
