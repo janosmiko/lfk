@@ -65,8 +65,13 @@ func podEffectivelyRunning(obj map[string]any) bool {
 	return false
 }
 
-// TestTicker_FullCycleInvariants checks Running pods stay a majority within
-// NamespaceDemo across a full cycle - Jobs-namespace pods sit fixed and would only dilute the ratio.
+// TestTicker_FullCycleInvariants drives the ticker across a full cycle and
+// asserts both demo-polish invariants: Running pods stay a strict majority at
+// every tick, and the web Deployment reports fully ready for a majority of the
+// cycle.
+//
+// Pods are counted in NamespaceDemo only. The ticker mutates nothing outside
+// it, so the fixed Jobs-namespace pods would dilute a ratio they cannot move.
 func TestTicker_FullCycleInvariants(t *testing.T) {
 	dyn := NewDynamicClient()
 	tk := NewTicker(dyn, time.Hour)
