@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -25,6 +26,7 @@ func TestStartMultiLogStream_AllFail_ReportsStatusAndKeepsMode(t *testing.T) {
 
 	assert.Equal(t, modeExplorer, mdl.mode, "must not enter the log viewer when every stream fails")
 	assert.True(t, mdl.statusMessageErr)
-	assert.Contains(t, mdl.statusMessage, "3")
+	assert.True(t, strings.HasPrefix(mdl.statusMessage, "Failed to start logs for 3 resources:"),
+		"the count and the appended cause both belong in the message, got %q", mdl.statusMessage)
 	require.NotNil(t, cmd)
 }
