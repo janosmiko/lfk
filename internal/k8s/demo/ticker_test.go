@@ -65,12 +65,13 @@ func podEffectivelyRunning(obj map[string]any) bool {
 	return false
 }
 
-// TestTicker_FullCycleInvariants drives the ticker across a full cycle
-// (the LCM of every per-field cycle length: healthyPodFlipEvery, len(
-// waitingReasons), len(deploymentReadyReplicaCycle)) and asserts the two
-// demo-polish invariants: Running pods stay a strict majority of all pods at
-// every tick, and the web Deployment reports fully ready for a majority of
-// the ticks in the cycle.
+// TestTicker_FullCycleInvariants drives the ticker across a full cycle and
+// asserts both demo-polish invariants: Running pods stay a strict majority at
+// every tick, and the web Deployment reports fully ready for a majority of the
+// cycle.
+//
+// Pods are counted in NamespaceDemo only. The ticker mutates nothing outside
+// it, so the fixed Jobs-namespace pods would dilute a ratio they cannot move.
 func TestTicker_FullCycleInvariants(t *testing.T) {
 	dyn := NewDynamicClient()
 	tk := NewTicker(dyn, time.Hour)
@@ -91,7 +92,7 @@ func TestTicker_FullCycleInvariants(t *testing.T) {
 	for i := range cycleLen {
 		require.NoError(t, tk.Tick(ctx))
 
-		podList, err := dyn.Resource(podGVR).Namespace("").List(ctx, metav1.ListOptions{})
+		podList, err := dyn.Resource(podGVR).Namespace(NamespaceDemo).List(ctx, metav1.ListOptions{})
 		require.NoError(t, err)
 
 		var running int

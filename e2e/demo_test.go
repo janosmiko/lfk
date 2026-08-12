@@ -26,10 +26,14 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/janosmiko/lfk/internal/k8s/demo"
 )
 
 const (
-	startupTimeout  = 15 * time.Second
+	// A pty wait is wall-clock, so a loaded machine eats the budget rather than
+	// the app being slow. 15s failed on a laptop running three test suites at
+	// once, and a shared CI runner is no less contended.
+	startupTimeout  = 45 * time.Second
 	shutdownTimeout = 5 * time.Second
 )
 
@@ -85,36 +89,59 @@ func waitFor(t *testing.T, out *output, substr string, timeout time.Duration) {
 	t.Fatalf("timed out after %s waiting for %q; captured output:\n%s", timeout, substr, out.String())
 }
 
-// TestDemoModeStartup launches `lfk --demo` under a pty with HOME and
-// KUBECONFIG pointed at an empty temp dir, then checks it renders the DEMO
-// badge and a seeded workload without panicking.
-func TestDemoModeStartup(t *testing.T) {
-	binPath := buildBinary(t)
+// waitForThenSend waits for substr before sending keys - a fixed sleep
+// between keystrokes is a timing guess that only holds on a fast, unloaded
+// machine (TASK-896: it failed against a real apiserver's slower startup).
+//
+// It searches only output produced after the previous step, because the buffer
+// is never cleared and a marker that appeared once would satisfy every later
+// wait for free. A real case: the startup dashboard lists an UnexpectedJob
+// warning naming the CronJob, so a whole-buffer wait for that name passes
+// before any key is sent.
+func waitForThenSend(t *testing.T, out *output, substr string, f *os.File, keys string, timeout time.Duration) int {
+	t.Helper()
+	return waitForNewThenSend(t, out, 0, substr, f, keys, timeout)
+}
 
-	home := t.TempDir()
-	kubeconfig := filepath.Join(home, "kubeconfig")
+// waitForNewThenSend is waitForThenSend scoped to output after offset. It
+// returns the buffer length at the moment the keys were sent, to pass as the
+// next step's offset.
+func waitForNewThenSend(t *testing.T, out *output, offset int, substr string, f *os.File, keys string, timeout time.Duration) int {
+	t.Helper()
+	waitForAfter(t, out, offset, substr, timeout)
+	sent := len(out.String())
+	sendKeys(t, f, keys)
+	return sent
+}
 
-	cmd := exec.Command(binPath, "--demo")
-	// An explicit, minimal env -- not os.Environ() plus overrides -- so a
-	// developer's own XDG_CONFIG_HOME, LFK_CONFIG_DIR, or KUBECONFIG_DIR
-	// can never leak a real config or kubeconfig into the demo run.
-	cmd.Env = []string{
-		"HOME=" + home,
-		"KUBECONFIG=" + kubeconfig,
-		"PATH=" + os.Getenv("PATH"),
-		"TERM=xterm-256color",
+// waitForAfter polls for substr in the output written after offset.
+func waitForAfter(t *testing.T, out *output, offset int, substr string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if s := out.String(); len(s) > offset && strings.Contains(s[offset:], substr) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
+	t.Fatalf("timed out after %s waiting for %q in output past byte %d; captured output:\n%s",
+		timeout, substr, offset, out.String())
+}
 
-	stderr := &output{}
+// runUnderPty starts cmd inside a pty and registers cleanup that kills it -
+// lfk is a TUI that otherwise sits waiting for input forever.
+func runUnderPty(t *testing.T, cmd *exec.Cmd) (ptmx *os.File, out, stderr *output) {
+	t.Helper()
+	stderr = &output{}
 	cmd.Stderr = stderr // stdout must stay on the pty, or bubbletea's terminal handshake hangs
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 200})
+	var err error
+	ptmx, err = pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 200})
 	if err != nil {
 		t.Fatalf("starting lfk under pty: %v", err)
 	}
-	defer func() { _ = ptmx.Close() }()
 
-	out := &output{}
+	out = &output{}
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
@@ -130,9 +157,8 @@ func TestDemoModeStartup(t *testing.T) {
 		}
 	}()
 
-	// Always kill the process, however the test ends -- it's a TUI that
-	// otherwise sits waiting for input forever.
-	defer func() {
+	t.Cleanup(func() {
+		_ = ptmx.Close()
 		_ = cmd.Process.Kill()
 
 		waitErr := make(chan error, 1)
@@ -152,12 +178,45 @@ func TestDemoModeStartup(t *testing.T) {
 		if s := stderr.String(); s != "" {
 			t.Logf("lfk stderr:\n%s", s)
 		}
-	}()
+	})
+
+	return ptmx, out, stderr
+}
+
+// startDemoUnderPty builds lfk and launches it under --demo. Startup is
+// already confirmed (DEMO badge rendered, no panic) by the time it returns.
+func startDemoUnderPty(t *testing.T) (ptmx *os.File, out, stderr *output) {
+	t.Helper()
+	binPath := buildBinary(t)
+
+	home := t.TempDir()
+	kubeconfig := filepath.Join(home, "kubeconfig")
+
+	cmd := exec.Command(binPath, "--demo")
+	// An explicit, minimal env -- not os.Environ() plus overrides -- so a
+	// developer's own XDG_CONFIG_HOME, LFK_CONFIG_DIR, or KUBECONFIG_DIR
+	// can never leak a real config or kubeconfig into the demo run.
+	cmd.Env = []string{
+		"HOME=" + home,
+		"KUBECONFIG=" + kubeconfig,
+		"PATH=" + os.Getenv("PATH"),
+		"TERM=xterm-256color",
+	}
+
+	ptmx, out, stderr = runUnderPty(t, cmd)
 
 	waitFor(t, out, "DEMO", startupTimeout)
 	if strings.Contains(out.String(), "panic:") {
 		t.Fatalf("lfk panicked during startup:\n%s", out.String())
 	}
+
+	return ptmx, out, stderr
+}
+
+// TestDemoModeStartup checks lfk --demo renders a seeded workload without
+// panicking.
+func TestDemoModeStartup(t *testing.T) {
+	ptmx, out, stderr := startDemoUnderPty(t)
 
 	// Drill into the (only) context, then jump to the Deployments resource
 	// type via search rather than counting arrow-key presses: the
@@ -173,6 +232,28 @@ func TestDemoModeStartup(t *testing.T) {
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
 		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())
+	}
+}
+
+// TestDemoModeCronJobLogs opens the seeded CronJob's logs (TASK-896) - a
+// wiring check only, since internal/democli hand-crafts its kubectl
+// responses. Real label selector semantics need the e2e-cluster CI job.
+func TestDemoModeCronJobLogs(t *testing.T) {
+	ptmx, out, stderr := startDemoUnderPty(t)
+
+	sendKeys(t, ptmx, "\r")
+	at := waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", startupTimeout)
+	at = waitForNewThenSend(t, out, at, demo.CronJobNightlyBackup, ptmx, "\r", startupTimeout)
+	// ctrl+l opens the fullscreen log viewer.
+	at = waitForNewThenSend(t, out, at, demo.CronJobNightlyBackup, ptmx, "\x0c", startupTimeout)
+
+	waitForAfter(t, out, at, demo.JobNightlyBackupRun, startupTimeout)
+
+	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
+		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())
+	}
+	if strings.Contains(out.String(), "No runs yet") {
+		t.Fatalf("CronJob log resolution reported no runs; pty output:\n%s", out.String())
 	}
 }
 

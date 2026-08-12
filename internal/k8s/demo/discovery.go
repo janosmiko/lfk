@@ -31,7 +31,8 @@ func ListKinds() map[schema.GroupVersionResource]string {
 		{Group: "apps", Version: "v1", Resource: "replicasets"}:  "ReplicaSetList",
 		{Group: "apps", Version: "v1", Resource: "statefulsets"}: "StatefulSetList",
 
-		{Group: "batch", Version: "v1", Resource: "jobs"}: "JobList",
+		{Group: "batch", Version: "v1", Resource: "jobs"}:     "JobList",
+		{Group: "batch", Version: "v1", Resource: "cronjobs"}: "CronJobList",
 
 		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"}:  "PodMetricsList",
 		{Group: "metrics.k8s.io", Version: "v1", Resource: "pods"}:       "PodMetricsList",
@@ -90,6 +91,7 @@ func APIResourceLists() []*metav1.APIResourceList {
 			GroupVersion: "batch/v1",
 			APIResources: []metav1.APIResource{
 				{Name: "jobs", Namespaced: true, Kind: "Job", Verbs: rw},
+				{Name: "cronjobs", Namespaced: true, Kind: "CronJob", Verbs: rw},
 			},
 		},
 		{

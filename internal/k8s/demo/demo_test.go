@@ -27,6 +27,7 @@ func seededGVRs() []schema.GroupVersionResource {
 		{Group: "apps", Version: "v1", Resource: "deployments"},
 		{Group: "apps", Version: "v1", Resource: "replicasets"},
 		{Group: "batch", Version: "v1", Resource: "jobs"},
+		{Group: "batch", Version: "v1", Resource: "cronjobs"},
 		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"},
 		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"},
 	}
@@ -217,6 +218,40 @@ func TestOwnerReferences_JobPodResolvesToJob(t *testing.T) {
 	assert.Equal(t, string(owners[0].UID), string(job.GetUID()))
 }
 
+// The CronJob -> Job -> Pod chain and the Pod's labels are what
+// resolveCronJobPodSelector (internal/app/commands_logs_cronjob.go) and its
+// demo-mode kubectl emulation (internal/democli/get_cronjob.go) both walk.
+func TestOwnerReferences_CronJobOwnedPodResolvesToCronJob(t *testing.T) {
+	dyn := NewDynamicClient()
+	ctx := t.Context()
+
+	pod, err := dyn.Resource(schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}).
+		Namespace(NamespaceJobs).Get(ctx, PodNightlyBackupRun, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, JobNightlyBackupRun, pod.GetLabels()["batch.kubernetes.io/job-name"])
+	assert.Equal(t, UIDJobNightlyBackupRun, pod.GetLabels()["batch.kubernetes.io/controller-uid"])
+
+	podOwners := pod.GetOwnerReferences()
+	require.Len(t, podOwners, 1)
+	assert.Equal(t, "Job", podOwners[0].Kind)
+	assert.Equal(t, JobNightlyBackupRun, podOwners[0].Name)
+
+	job, err := dyn.Resource(schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}).
+		Namespace(NamespaceJobs).Get(ctx, JobNightlyBackupRun, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, string(podOwners[0].UID), string(job.GetUID()))
+
+	jobOwners := job.GetOwnerReferences()
+	require.Len(t, jobOwners, 1)
+	assert.Equal(t, "CronJob", jobOwners[0].Kind)
+	assert.Equal(t, CronJobNightlyBackup, jobOwners[0].Name)
+
+	cronJob, err := dyn.Resource(schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}).
+		Namespace(NamespaceJobs).Get(ctx, CronJobNightlyBackup, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, string(jobOwners[0].UID), string(cronJob.GetUID()))
+}
+
 func TestSeedObjects_CarryManagedFields(t *testing.T) {
 	dyn := NewDynamicClient()
 	ctx := t.Context()
@@ -265,6 +300,7 @@ func TestNewClientset_DiscoveryReportsSeededKinds(t *testing.T) {
 	assert.Contains(t, kinds, "Pod")
 	assert.Contains(t, kinds, "Deployment")
 	assert.Contains(t, kinds, "Job")
+	assert.Contains(t, kinds, "CronJob")
 	assert.Contains(t, kinds, "Service")
 	assert.Contains(t, kinds, "ConfigMap")
 	assert.Contains(t, kinds, "Node")
