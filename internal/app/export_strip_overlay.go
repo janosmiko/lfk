@@ -88,6 +88,14 @@ func (m Model) handleExportStripKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.exportStripStep(1)
 	case "k", "up", "ctrl+p":
 		m.exportStripStep(-1)
+	case "ctrl+d", "shift+down":
+		m.exportStripStep(len(k8s.TemplateCategories) / 2)
+	case "ctrl+u", "shift+up":
+		m.exportStripStep(-len(k8s.TemplateCategories) / 2)
+	case "ctrl+f", "pgdown":
+		m.exportStripStep(len(k8s.TemplateCategories))
+	case "ctrl+b", "pgup":
+		m.exportStripStep(-len(k8s.TemplateCategories))
 	case "g":
 		m.exportStripStep(-len(k8s.TemplateCategories))
 	case "G":
@@ -105,6 +113,7 @@ func (m Model) handleExportStripKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func exportStripHints() []ui.HintEntry {
 	return []ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
+		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "space", Desc: "toggle"},
 		{Key: "r", Desc: "defaults"},
 		{Key: "esc", Desc: "back"},
