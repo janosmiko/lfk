@@ -144,12 +144,18 @@ func templateBaseFromPath(path string) string {
 	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
-// templateNameFromPath maps a file to the name the picker shows for it. "_"
-// is illegal in a DNS-1123 object name or namespace, so splitting on the
-// LAST "__" is unambiguous. A basename with none is unchanged.
+// templateNameFromPath maps a file to the name the picker shows for it. "_" is
+// illegal in a DNS-1123 object name or namespace, so splitting on the LAST "__"
+// is unambiguous for a file lfk wrote. A hand-authored name is under no such
+// rule, so `my__template.yaml` does read as namespace `my` - wrong, but it only
+// affects the two columns the picker draws.
+//
+// A split that leaves nothing after the separator falls back to the whole
+// basename: a file the user can see in the directory must not vanish from the
+// list that claims to show it.
 func templateNameFromPath(path string) string {
 	base := templateBaseFromPath(path)
-	if idx := strings.LastIndex(base, "__"); idx >= 0 {
+	if idx := strings.LastIndex(base, "__"); idx >= 0 && idx+2 < len(base) {
 		return base[idx+2:]
 	}
 	return base

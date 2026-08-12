@@ -226,3 +226,15 @@ func TestMergedTemplates_UserFirstAndNeverShadows(t *testing.T) {
 	assert.True(t, builtinKept, "the built-in Pod template must still be listed")
 	assert.Len(t, merged, len(model.BuiltinTemplates())+1)
 }
+
+// A file whose name ends in the separator has nothing after it to use as a
+// name. Dropping the row would hide a file the user can see in the directory.
+func TestLoadUserTemplates_TrailingSeparatorKeepsWholeBaseName(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "web__.yaml", "kind: Pod\n")
+
+	got := loadUserTemplates()
+
+	require.Len(t, got, 1, "the row must not disappear")
+	assert.Equal(t, "web__", got[0].Name)
+}
