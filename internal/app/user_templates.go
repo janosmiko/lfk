@@ -182,11 +182,14 @@ func deleteUserTemplate(name string) error {
 			failure = err
 		}
 	}
+	// A failure outranks a partial success. Reporting the removed file and
+	// staying quiet about the one left behind would put the picker and the
+	// directory out of step with no sign of it.
 	switch {
-	case removed:
-		return nil
 	case failure != nil:
 		return failure
+	case removed:
+		return nil
 	}
 	return errTemplateNotFound
 }

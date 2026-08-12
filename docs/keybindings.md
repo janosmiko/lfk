@@ -1200,6 +1200,8 @@ The field picker (`s` from the destination picker) chooses which categories the 
 
 Locked rows offer no choice — keeping them yields a manifest that will not apply: `status` and the server-set metadata (`uid`, `resourceVersion`, `generation`, `creationTimestamp`, `managedFields`, `selfLink`, `ownerReferences`), `last-applied-configuration`, finalizers, and controller-generated labels (`pod-template-hash`, `controller-uid`, `job-name`).
 
+The template picker (`a`): `Enter` create, `/` filter, `d` delete the highlighted saved template after a confirmation, `Esc`/`q` close. `d` works on your own templates only — the built-ins have no file behind them.
+
 ### Pod Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
 

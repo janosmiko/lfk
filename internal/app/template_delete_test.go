@@ -128,4 +128,6 @@ func TestConfirmOverlayKey_TemplateDeleteRemovesFileAndRefreshesPicker(t *testin
 		assert.NotEqual(t, userTemplateCategory, tmpl.Category, "the deleted row is gone from the picker")
 	}
 	assert.False(t, got.loading, "removing a local file starts no cluster work")
+	assert.Empty(t, got.confirmAction, "a stale name would title the next confirm")
+	assert.Empty(t, got.pendingAction)
 }
