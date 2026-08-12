@@ -17,6 +17,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 	prevPrefixes := ConfigLogShowPrefixes
 	prevTimestamps := ConfigLogShowTimestamps
 	prevMaxLines := ConfigLogMaxLines
+	prevWrap := ConfigLogWrap
 	t.Cleanup(func() {
 		ConfigLogTailLines = prevTail
 		ConfigLogTailLinesShort = prevShort
@@ -25,6 +26,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 		ConfigLogShowPrefixes = prevPrefixes
 		ConfigLogShowTimestamps = prevTimestamps
 		ConfigLogMaxLines = prevMaxLines
+		ConfigLogWrap = prevWrap
 	})
 	// Reset to compiled defaults before each test.
 	ConfigLogTailLines = 100
@@ -34,6 +36,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 	ConfigLogShowPrefixes = true
 	ConfigLogShowTimestamps = false
 	ConfigLogMaxLines = LogMaxLinesDefault
+	ConfigLogWrap = false
 }
 
 // TestLogViewer_GroupAppliesAllFields verifies the canonical log_viewer group
@@ -48,6 +51,7 @@ func TestLogViewer_GroupAppliesAllFields(t *testing.T) {
   show_preview: false
   show_prefixes: false
   show_timestamps: true
+  wrap: false
 `)
 	LoadConfig(path)
 
@@ -57,6 +61,7 @@ func TestLogViewer_GroupAppliesAllFields(t *testing.T) {
 	assert.False(t, ConfigLogShowPreview, "show_preview")
 	assert.False(t, ConfigLogShowPrefixes, "show_prefixes")
 	assert.True(t, ConfigLogShowTimestamps, "show_timestamps")
+	assert.False(t, ConfigLogWrap, "wrap")
 }
 
 // TestLogViewer_MaxLinesAppliesAndClamps verifies the buffer cap is wired and

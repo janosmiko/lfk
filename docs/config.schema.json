@@ -762,6 +762,11 @@
           "type": "integer",
           "description": "Maximum streamed log lines retained per tab; once exceeded, the oldest lines are dropped so a long-running follow does not grow memory without bound. Clamped to [1000, 1000000].",
           "default": 50000
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "Startup default for log line wrapping (runtime toggle: >). Set true to start with wrapped lines.",
+          "default": false
         }
       }
     },

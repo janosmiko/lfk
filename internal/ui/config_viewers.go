@@ -23,6 +23,10 @@ var ConfigLogShowTimestamps = false
 // logs streaming in the right pane for the selected pod. Default false.
 var ConfigLogPreviewLive = false
 
+// ConfigLogWrap is the startup default for log line wrapping.
+// Default false (unwrapped). Toggle with >.
+var ConfigLogWrap = false
+
 // ConfigYAMLViewerWrap is the startup default for YAML viewer line wrapping
 // (runtime toggle: z). Default false.
 var ConfigYAMLViewerWrap = false

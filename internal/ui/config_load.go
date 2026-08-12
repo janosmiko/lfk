@@ -386,6 +386,8 @@ type LogViewerConfig struct {
 	// (runtime toggle: L). When true the explorer opens with live logs streaming
 	// in the right pane for the selected pod. Default false.
 	PreviewLive *bool `json:"preview_live" yaml:"preview_live"`
+	// Wrap: startup default for line wrapping (runtime toggle: >). Default false.
+	Wrap *bool `json:"wrap" yaml:"wrap"`
 }
 
 // YAMLViewerConfig is the on-disk schema for the yaml_viewer section. Every

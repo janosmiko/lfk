@@ -42,6 +42,7 @@ log_viewer:
   show_timestamps: true
   max_lines: 12345
   preview_live: true
+  wrap: false
 yaml_viewer:
   wrap: true
 diff_viewer:
@@ -221,6 +222,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigLogShowTimestamps, "log_viewer.show_timestamps")
 	assert.Equal(t, 12345, ConfigLogMaxLines, "log_viewer.max_lines")
 	assert.True(t, ConfigLogPreviewLive, "log_viewer.preview_live")
+	assert.False(t, ConfigLogWrap, "log_viewer.wrap")
 	assert.True(t, ConfigYAMLViewerWrap, "yaml_viewer.wrap")
 	assert.True(t, ConfigDiffViewerWrap, "diff_viewer.wrap")
 	assert.False(t, ConfigDiffViewerLineNumbers, "diff_viewer.line_numbers")

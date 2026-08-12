@@ -286,7 +286,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logView.scroll = t.logScroll
 	m.logView.wrapTopSkip = t.logWrapTopSkip
 	m.logView.follow = t.logFollow
-	m.logView.wrap = t.logWrap
+	m.logView.wrap = ui.ConfigLogWrap
 	m.logView.lineNumbers = t.logLineNumbers
 	m.logView.timestamps = t.logTimestamps
 	m.logView.previous = t.logPrevious

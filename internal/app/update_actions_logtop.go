@@ -24,7 +24,7 @@ func (m Model) executeActionLogTop() (tea.Model, tea.Cmd) {
 	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.follow = true
-	m.logView.wrap = false
+	m.logView.wrap = ui.ConfigLogWrap
 	m.logView.timestamps = true // Log Top needs timestamps for REQ/s calculation
 	m.logView.hidePrefixes = !ui.ConfigLogShowPrefixes
 	m.logView.previous = false

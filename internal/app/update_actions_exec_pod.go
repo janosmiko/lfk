@@ -80,7 +80,7 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.follow = true
-	m.logView.wrap = false
+	m.logView.wrap = ui.ConfigLogWrap
 	m.logView.lineNumbers = true
 	m.logView.timestamps = ui.ConfigLogShowTimestamps
 	m.logView.hidePrefixes = !ui.ConfigLogShowPrefixes
