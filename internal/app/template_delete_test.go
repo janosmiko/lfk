@@ -34,7 +34,7 @@ func TestDeleteUserTemplate_RemovesFile(t *testing.T) {
 	dir := withTempConfigDir(t)
 	writeTemplateFile(t, dir, "web.yaml", "kind: Deployment\n")
 
-	require.NoError(t, deleteUserTemplate("web"))
+	require.NoError(t, deleteUserTemplate(filepath.Join(dir, "web.yaml")))
 
 	assert.NoFileExists(t, filepath.Join(dir, "web.yaml"))
 	assert.Empty(t, loadUserTemplates())
@@ -46,9 +46,28 @@ func TestDeleteUserTemplate_RemovesYmlFile(t *testing.T) {
 	dir := withTempConfigDir(t)
 	writeTemplateFile(t, dir, "cron.yml", "kind: CronJob\n")
 
-	require.NoError(t, deleteUserTemplate("cron"))
+	require.NoError(t, deleteUserTemplate(filepath.Join(dir, "cron.yml")))
 
 	assert.NoFileExists(t, filepath.Join(dir, "cron.yml"))
+}
+
+// web.yaml and web.yml are two templates the picker lists as two rows. Deleting
+// the row the cursor sits on must not take the other one with it.
+func TestTemplateDelete_SameBaseNameKeepsTheOtherFile(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "web.yaml", "kind: Deployment\n")
+	writeTemplateFile(t, dir, "web.yml", "kind: Service\n")
+	rows := loadUserTemplates()
+	require.Len(t, rows, 2)
+	require.Equal(t, "Deployment", rows[0].Description, "the .yaml row sorts first")
+
+	m := templateModel(rows)
+	got := pressConfirmKey(pressTemplateDeleteKey(m), "y")
+
+	assert.NoFileExists(t, filepath.Join(dir, "web.yaml"), "the selected row is gone")
+	assert.FileExists(t, filepath.Join(dir, "web.yml"), "the unselected row survives")
+	require.Len(t, got.templateItems, len(model.BuiltinTemplates())+1)
+	assert.Equal(t, "Service", got.templateItems[0].Description, "the surviving row is the .yml one")
 }
 
 func TestDeleteUserTemplate_RejectsPathTraversal(t *testing.T) {
@@ -57,28 +76,29 @@ func TestDeleteUserTemplate_RejectsPathTraversal(t *testing.T) {
 	outside := filepath.Join(filepath.Dir(dir), "victim.yaml")
 	require.NoError(t, os.WriteFile(outside, []byte("kind: Pod\n"), 0o600))
 
-	err := deleteUserTemplate("../victim")
+	err := deleteUserTemplate(filepath.Join(dir, "..", "victim.yaml"))
 
 	require.ErrorIs(t, err, errInvalidTemplateName)
 	assert.FileExists(t, outside, "a name that escapes the directory must not delete anything")
 }
 
 func TestDeleteUserTemplate_ReportsMissingTemplate(t *testing.T) {
-	withTempConfigDir(t)
+	dir := withTempConfigDir(t)
 
-	require.ErrorIs(t, deleteUserTemplate("absent"), errTemplateNotFound)
+	require.ErrorIs(t, deleteUserTemplate(filepath.Join(dir, "absent.yaml")), errTemplateNotFound)
 }
 
 func TestTemplateOverlayKey_DConfirmsUserTemplate(t *testing.T) {
+	path := filepath.Join(withTempConfigDir(t), "web.yaml")
 	m := templateModel([]model.ResourceTemplate{
-		{Name: "web", Category: userTemplateCategory},
+		{Name: "web", Category: userTemplateCategory, Path: path},
 	})
 
 	got := pressTemplateDeleteKey(m)
 
 	assert.Equal(t, overlayConfirm, got.overlay)
 	assert.Equal(t, deleteTemplateAction, got.pendingAction)
-	assert.Equal(t, "web", got.confirmAction)
+	assert.Equal(t, path, got.confirmAction, "the file, not the name: two files can share one name")
 	assert.Contains(t, got.confirmQuestion, "web")
 }
 
@@ -102,7 +122,7 @@ func TestConfirmOverlayKey_CancelledTemplateDeleteReturnsToPicker(t *testing.T) 
 	dir := withTempConfigDir(t)
 	writeTemplateFile(t, dir, "web.yaml", "kind: Deployment\n")
 	m := templateModel([]model.ResourceTemplate{
-		{Name: "web", Category: userTemplateCategory},
+		{Name: "web", Category: userTemplateCategory, Path: filepath.Join(dir, "web.yaml")},
 	})
 	m = pressTemplateDeleteKey(m)
 

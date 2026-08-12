@@ -112,8 +112,7 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 		logger.Warn("Skipping template that is not a Kubernetes object", "path", path)
 		return model.ResourceTemplate{}, false
 	}
-	base := filepath.Base(path)
-	name := ui.SanitizeTerminalText(strings.TrimSuffix(base, filepath.Ext(base)))
+	name := ui.SanitizeTerminalText(templateNameFromPath(path))
 	if name == "" {
 		return model.ResourceTemplate{}, false
 	}
@@ -123,6 +122,7 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 		Description: ui.SanitizeTerminalText(kind),
 		Category:    userTemplateCategory,
 		YAML:        string(data),
+		Path:        path,
 	}, true
 }
 
@@ -131,6 +131,12 @@ func readUserTemplate(path string) (model.ResourceTemplate, bool) {
 func decodeFirstDocument(data []byte, obj *map[string]any) bool {
 	dec := yaml.NewDecoder(strings.NewReader(string(data)))
 	return dec.Decode(obj) == nil
+}
+
+// templateNameFromPath maps a file to the name the picker shows for it.
+func templateNameFromPath(path string) string {
+	base := filepath.Base(path)
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
 func isYAMLFile(name string) bool {
@@ -160,38 +166,24 @@ func saveUserTemplate(name, manifest string) error {
 	return writeFileDurable(filepath.Join(dir, clean+".yaml"), []byte(manifest))
 }
 
-// deleteUserTemplate removes the file behind a template. Both extensions are
-// tried because loadUserTemplates lists .yaml and .yml alike, and a
-// hand-authored .yml has to be removable from the list that shows it.
-func deleteUserTemplate(name string) error {
+// deleteUserTemplate removes one template file by path. Deleting by name would
+// take web.yaml and web.yml together, and the picker lists those as two rows.
+// The path arrives through Model state, so the directory is re-checked here.
+func deleteUserTemplate(path string) error {
 	dir := userTemplateDir()
 	if dir == "" {
 		return errTemplateDirUnavailable
 	}
-	clean := ui.SanitizeTerminalText(name)
-	if !isSafeTemplateName(clean) {
+	if path == "" || filepath.Dir(path) != dir || !isSafeTemplateName(filepath.Base(path)) {
 		return errInvalidTemplateName
 	}
-	removed := false
-	var failure error
-	for _, ext := range []string{".yaml", ".yml"} {
-		switch err := os.Remove(filepath.Join(dir, clean+ext)); {
-		case err == nil:
-			removed = true
-		case !os.IsNotExist(err):
-			failure = err
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return errTemplateNotFound
 		}
+		return err
 	}
-	// A failure outranks a partial success. Reporting the removed file and
-	// staying quiet about the one left behind would put the picker and the
-	// directory out of step with no sign of it.
-	switch {
-	case failure != nil:
-		return failure
-	case removed:
-		return nil
-	}
-	return errTemplateNotFound
+	return nil
 }
 
 // isSafeTemplateName reports whether name is a single path element that stays

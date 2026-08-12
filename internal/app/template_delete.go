@@ -25,7 +25,8 @@ func (m Model) beginTemplateDelete(filtered []model.ResourceTemplate) (tea.Model
 		m.setStatusMessage("Only your own templates can be deleted", true)
 		return m, scheduleStatusClear()
 	}
-	m.confirmAction = tmpl.Name
+	// The path, not the name: two files can share a base name.
+	m.confirmAction = tmpl.Path
 	m.pendingAction = deleteTemplateAction
 	m.confirmTitle = "Confirm Delete"
 	m.confirmQuestion = fmt.Sprintf("Delete the saved template %s?", tmpl.Name)
@@ -38,9 +39,10 @@ func (m Model) beginTemplateDelete(filtered []model.ResourceTemplate) (tea.Model
 }
 
 func (m Model) commitTemplateDelete() (tea.Model, tea.Cmd) {
-	name := m.confirmAction
+	path := m.confirmAction
+	name := templateNameFromPath(path)
 	m = m.clearTemplateDeleteConfirm()
-	if err := deleteUserTemplate(name); err != nil {
+	if err := deleteUserTemplate(path); err != nil {
 		m.setStatusMessage("Failed to delete template "+name+": "+err.Error(), true)
 		return m, scheduleStatusClear()
 	}
