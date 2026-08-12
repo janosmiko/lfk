@@ -118,14 +118,15 @@ type Model struct {
 	// Current view mode.
 	mode viewMode
 
-	overlay             overlayKind  // active overlay kind (see overlayKind enum)
-	overlayItems        []model.Item // full list (e.g., all namespaces)
-	overlayFilter       TextInput    // typed filter text
-	overlayCursor       int
-	copyFormatPicker    copyFormatPickerState      // Y-key copy-as picker — see openCopyFormatPicker
-	copyFieldPicker     copyFieldPickerState       // ctrl+y field picker — see updateCopyFieldManifests
-	lastCopyFieldByKind map[string]copyFieldMemory // last entry copied per kind (ctrl+y preselect; session-only, all tabs)
-	taintEditor         taintEditorState           // node taint editor — see openTaintEditor
+	overlay              overlayKind  // active overlay kind (see overlayKind enum)
+	overlayItems         []model.Item // full list (e.g., all namespaces)
+	overlayFilter        TextInput    // typed filter text
+	overlayCursor        int
+	copyFormatPicker     copyFormatPickerState      // Y-key copy-as picker — see openCopyFormatPicker
+	exportTemplatePicker exportTemplateState        // Export Template destination picker — see openExportTemplatePicker
+	copyFieldPicker      copyFieldPickerState       // ctrl+y field picker — see updateCopyFieldManifests
+	lastCopyFieldByKind  map[string]copyFieldMemory // last entry copied per kind (ctrl+y preselect; session-only, all tabs)
+	taintEditor          taintEditorState           // node taint editor — see openTaintEditor
 
 	namespace string // current namespace (not a navigation level; displayed in top-right)
 
@@ -754,7 +755,6 @@ type Model struct {
 	portForwardMgr                    *k8s.PortForwardManager
 	captureMgr                        *k8s.CaptureManager // tracks active packet capture processes
 	captureOverlay                    captureOverlayState
-
 	// Port forward overlay state: discovered ports for the selected resource.
 	pfAvailablePorts          []ui.PortInfo
 	pfPortCursor              int              // cursor in the available ports list (-1 = manual input)

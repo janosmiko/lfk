@@ -1,9 +1,12 @@
 // Package app — atomic_write.go
 // Durable atomic file write shared by the per-host caches (security
-// availability, security findings). Writes to a unique temp file, fsyncs the
-// file and its parent directory, then renames — so a crash mid-write can never
-// leave a half-written file the loaders would have to defend against, and two
-// concurrent writers can never collide on the temp path.
+// availability, security findings), the user template directory
+// (<ConfigDir>/templates/), and resource exports. Writes to a unique temp
+// file, fsyncs the file and its parent directory, then renames — so a crash
+// mid-write can never leave a half-written file the loaders would have to
+// defend against, two concurrent writers can never collide on the temp path,
+// and a pre-existing symlink at path gets replaced rather than written
+// through.
 package app
 
 import (
@@ -11,17 +14,20 @@ import (
 	"path/filepath"
 )
 
-// writeFileDurable atomically writes data to path with the given file mode:
-// write a unique temp file, fsync, chmod, rename, fsync parent dir. The caller
-// is responsible for creating the parent directory. The temp file is removed
-// on any failure before the rename.
+// writeFileDurable atomically writes data to path with owner-only (0600)
+// permissions: write a unique temp file, fsync, chmod, rename, fsync parent
+// dir. The caller is responsible for creating the parent directory. The temp
+// file is removed on any failure before the rename.
 //
 // A unique temp name (os.CreateTemp, not a fixed "path.tmp" sibling) is
-// required because these caches live in the shared kubectl cache dir: two lfk
-// instances saving the same host file would otherwise truncate each other's
-// in-flight temp write and promote a torn file via rename (see the same fix in
-// cluster_colors.go).
-func writeFileDurable(path string, data []byte, mode os.FileMode) error {
+// required because the kubectl cache dir this shares is not exclusive to one
+// lfk instance: two instances saving the same host file would otherwise
+// truncate each other's in-flight temp write and promote a torn file via
+// rename (see the same fix in cluster_colors.go). The rename-onto-path step
+// also means writing through a symlink replaces the symlink itself instead of
+// truncating its target — required for callers like the resource-export path
+// that write to a predictable filename in a directory the user controls.
+func writeFileDurable(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	f, err := os.CreateTemp(dir, filepath.Base(path)+".tmp.*")
 	if err != nil {
@@ -29,9 +35,9 @@ func writeFileDurable(path string, data []byte, mode os.FileMode) error {
 	}
 	tmp := f.Name()
 	cleanup := func() { _ = os.Remove(tmp) }
-	// CreateTemp makes the file 0600; widen/narrow to the requested mode so
-	// callers control the final permissions (e.g. 0600 for sensitive findings).
-	if err := f.Chmod(mode); err != nil {
+	// CreateTemp already makes the file 0600; the explicit Chmod pins it so a
+	// permissive umask or a pre-existing file at path cannot widen the result.
+	if err := f.Chmod(0o600); err != nil {
 		_ = f.Close()
 		cleanup()
 		return err

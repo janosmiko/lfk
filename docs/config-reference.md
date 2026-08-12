@@ -604,6 +604,42 @@ resource_columns:
 
 Keys are resource Kind names and are case-insensitive (e.g., `Pod`, `pod`, `POD` all work).
 
+## Resource Templates
+
+Templates listed in the create-from-template picker (`a`) come from two places: the built-ins, and one YAML file per template in `~/.config/lfk/templates/`.
+
+| Rule | Behaviour |
+|---|---|
+| File name | The template name (`web.yaml` -> `web`) |
+| Content | A plain Kubernetes manifest — no template-specific wrapper (keep the object's own `metadata`) |
+| Extensions | `.yaml` and `.yml`; anything else is ignored |
+| Category | Always `User`; user templates list before the built-ins |
+| Name collision | Both rows stay; the `User` category marks yours |
+| Broken file | Skipped and logged; the other templates still load |
+
+`x` -> Export Template writes into this same directory, so exported and hand-written templates live together. Exporting a Secret keeps the keys and the `type` but blanks every value — press `s` on the destination picker to keep the values, or use `y` / the YAML view. See [keybindings.md](keybindings.md#action-menu-items) for the full category list.
+
+```yaml
+# ~/.config/lfk/templates/web.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: app
+          image: nginx:latest
+```
+
 ## Abbreviations
 
 Search abbreviations allow typing short names to jump to resource types. The default abbreviations include all standard kubectl short names.

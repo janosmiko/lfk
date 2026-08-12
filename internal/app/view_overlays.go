@@ -222,6 +222,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		content := renderColorschemeOverlay(m, overlayH)
 		return content, min(50, m.width-10), overlayH, true
 	}
+	if c, w, h, ok := m.renderOverlayExportPickers(); ok {
+		return c, w, h, true
+	}
 	return m.renderOverlayContentExtended()
 }
 

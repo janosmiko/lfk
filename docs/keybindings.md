@@ -565,7 +565,7 @@ Auto-reconnect across init containers: when viewing logs for a single Pod in all
 
 ## Log Top
 
-Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `T`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `t`) or press `T` in the open log viewer. Offered for Pods, Services, Deployments, StatefulSets and DaemonSets; not for Jobs or CronJobs, whose batch output does not carry the access-log shape this view parses. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
 
 | Key | Action |
 |---|---|
@@ -1181,7 +1181,24 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 
 ## Action Menu Items
 
-The action menu (`x` key) shows context-specific actions based on the resource type:
+The action menu (`x` key) shows context-specific actions based on the resource type.
+
+Every kind also offers `x` → `T` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Secret values are blanked, keys kept. Available in read-only mode.
+
+The destination picker: `j`/`k` (or `↓`/`↑`, `Ctrl+N`/`Ctrl+P`) move the cursor, `c` clipboard, `f` file, `t` template list, `Enter` export to the highlighted destination, `s` fields to remove, `Esc`/`q` cancel.
+
+The field picker (`s` from the destination picker) chooses which categories the export removes. `j`/`k` move, `space` toggles, `r` restores the defaults, `Esc` returns to the destinations. Choices persist across restarts in `export_strip_prefs.yaml` in the state directory.
+
+| Category | Default | Removes |
+|---|---|---|
+| Namespace | removed | `metadata.namespace` |
+| Labels | kept | every author-written label |
+| Annotations | kept | every author-written annotation |
+| Helm ownership | removed | `helm.sh/chart`, `meta.helm.sh/*`, `heritage`, `release`, `chart`, and `app.kubernetes.io/managed-by` when its value is `Helm` |
+| Vendor runtime annotations | removed | `cni.projectcalico.org/*`, `field.cattle.io/*`, `management.cattle.io/*` |
+| Secret values | removed | Secret values; keys and `type` kept |
+
+Locked rows offer no choice — keeping them yields a manifest that will not apply: `status` and the server-set metadata (`uid`, `resourceVersion`, `generation`, `creationTimestamp`, `managedFields`, `selfLink`, `ownerReferences`), `last-applied-configuration`, finalizers, and controller-generated labels (`pod-template-hash`, `controller-uid`, `job-name`).
 
 ### Pod Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
@@ -1223,7 +1240,7 @@ The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas sch
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
 ### CronJob Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### ArgoCD Application Actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events

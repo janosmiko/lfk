@@ -33,7 +33,7 @@ func (m Model) updateExportDone(msg exportDoneMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		m.setErrorFromErr("Export failed: ", msg.err)
 	} else {
-		m.setStatusMessage("Exported to "+msg.path, false)
+		m.setStatusMessage("Exported to "+msg.path+msg.note, false)
 	}
 	return m, scheduleStatusClear()
 }

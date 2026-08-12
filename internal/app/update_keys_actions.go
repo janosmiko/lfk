@@ -619,7 +619,7 @@ func (m Model) handleExplorerActionKeyCreateTemplate() (tea.Model, tea.Cmd, bool
 		m.setStatusMessage("Create from template requires a single cluster", true)
 		return m, scheduleStatusClear(), true
 	}
-	templates := model.BuiltinTemplates()
+	templates := mergedTemplates()
 	currentKind := m.nav.ResourceType.Kind
 	if currentKind != "" {
 		sort.SliceStable(templates, func(i, j int) bool {

@@ -1,18 +1,23 @@
 package model
 
 // ActionsForContainer returns the action menu items for a container.
+//
+// Export Template is appended like every other kind's menu (see
+// ActionsForKind): resolveTemplateSource resolves LevelContainers to the
+// parent Pod's manifest, so exporting from a container is exporting that Pod
+// as a reusable template.
 func ActionsForContainer() []ActionMenuItem {
-	return []ActionMenuItem{
+	return append([]ActionMenuItem{
 		{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 		{Label: "Logs", Description: "View container logs", Key: "L"},
-		{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
+		{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 		{Label: "Exec", Description: "Execute command in container", Key: "s"},
 		{Label: "Attach", Description: "Attach to running container", Key: "A"},
 		{Label: "Vuln Scan", Description: "Scan container image for vulnerabilities", Key: "V"},
 		{Label: "Debug", Description: "Debug container with ephemeral container", Key: "b"},
 		{Label: "Describe", Description: "Describe parent pod", Key: "v"},
 		{Label: "Events", Description: "Show related events", Key: "e"},
-	}
+	}, exportTemplateAction())
 }
 
 // ActionsForBulk returns the action menu items available for bulk operations.
@@ -51,6 +56,34 @@ func ActionsForBulk(kind string) []ActionMenuItem {
 // will land on a follow-up that distinguishes Service-by-APIGroup. Revision /
 // Configuration / Route are Knative-only kinds and route here.
 func ActionsForKind(kind string) []ActionMenuItem {
+	return append(actionsForKindBase(kind), exportTemplateAction())
+}
+
+// ActionLabelExportTemplate strips a live object down to a manifest that
+// applies elsewhere. Exported so the app-layer dispatcher can switch on it.
+const ActionLabelExportTemplate = "Export Template"
+
+// exportTemplateAction is appended to every kind's menu: any object can be
+// turned into a template, and the export writes nothing to the cluster, so it
+// is not gated by read-only mode.
+//
+// Key is "T" for Template, not "x" for eXport: "x" is kb.ActionMenu, the key
+// that opens this very menu, so isOverlayToggleKey
+// (internal/app/update_overlays.go) closes the overlay on that keypress
+// before any chip matcher runs — the chip would be unreachable (TASK-891).
+// "T" was freed by moving Log Top, Terminate Sync, and Terminate Workflow to
+// lowercase "t" (their menus had no lowercase "t" of their own); CronJob's
+// existing "t" Trigger moved to "r" to avoid colliding with the relocated
+// Log Top.
+func exportTemplateAction() ActionMenuItem {
+	return ActionMenuItem{
+		Label:       ActionLabelExportTemplate,
+		Description: "Strip server-set fields and export as a template",
+		Key:         "T",
+	}
+}
+
+func actionsForKindBase(kind string) []ActionMenuItem {
 	if actions, ok := actionsForCoreKind(kind); ok {
 		return actions
 	}
@@ -82,7 +115,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View pod logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Execute command in container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Debug", Description: "Debug pod with ephemeral container", Key: "B"},
@@ -116,7 +149,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Exec into pod behind service", Key: "s"},
 			{Label: "Attach", Description: "Attach to pod behind service", Key: "A"},
 			{Label: "Port Forward", Description: "Forward local port to service", Key: "p"},
@@ -193,7 +226,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Scale", Description: "Scale replica count", Key: "S"},
@@ -231,7 +264,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Scale", Description: "Scale replica count", Key: "S"},
@@ -249,7 +282,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
+			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Restart", Description: "Rolling restart", Key: "r"},
@@ -266,7 +299,6 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View job logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
@@ -282,7 +314,6 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View cronjob logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "T"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Trigger", Description: "Create a Job from this CronJob", Key: "t"},
@@ -322,7 +353,7 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Suspend Workflow", Description: "Pause workflow execution", Key: "s"},
 			{Label: "Resume Workflow", Description: "Resume paused workflow", Key: "r"},
 			{Label: "Stop Workflow", Description: "Stop workflow (allow exit handlers)", Key: "S"},
-			{Label: "Terminate Workflow", Description: "Immediately terminate workflow", Key: "T"},
+			{Label: "Terminate Workflow", Description: "Immediately terminate workflow", Key: "t"},
 			{Label: "Resubmit Workflow", Description: "Create new workflow from this spec", Key: "R"},
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View workflow pod logs", Key: "L"},
@@ -363,7 +394,7 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Configure AutoSync", Description: "Toggle autosync, self-heal, prune", Key: "A"},
 			{Label: "Sync", Description: "Sync application", Key: "s"},
 			{Label: "Sync (Apply Only)", Description: "Sync application without hooks", Key: "a"},
-			{Label: "Terminate Sync", Description: "Terminate running sync operation", Key: "T"},
+			{Label: "Terminate Sync", Description: "Terminate running sync operation", Key: "t"},
 			{Label: "Refresh", Description: "Hard refresh application", Key: "R"},
 			{Label: "Sync Wave Timeline", Description: "Visualize sync wave order and status", Key: "W"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},

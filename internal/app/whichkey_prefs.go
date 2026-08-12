@@ -112,7 +112,7 @@ func saveWhichKeyGrouping(grouped bool) {
 		logger.Error("Failed to create which-key prefs directory", "error", err, "path", path)
 		return
 	}
-	if err := writeFileDurable(path, data, 0o600); err != nil {
+	if err := writeFileDurable(path, data); err != nil {
 		logger.Error("Failed to persist which-key prefs", "error", err, "path", path)
 	}
 }

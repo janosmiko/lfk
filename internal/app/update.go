@@ -332,6 +332,10 @@ func (m Model) updateEasterEggMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 
 // updateResultMsg handles action results, editor operations, and other response messages.
 func (m Model) updateResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if msg, ok := msg.(exportTemplateReadyMsg); ok {
+		mdl, cmd := m.updateExportTemplateReady(msg)
+		return mdl, cmd, true
+	}
 	if mdl, cmd, ok := m.updateActionResultMsg(msg); ok {
 		return mdl, cmd, true
 	}
