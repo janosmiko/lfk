@@ -135,10 +135,10 @@ func (m *Model) startLogStream() tea.Cmd {
 		}
 		switch kind {
 		case "CronJob":
-			selector, ok := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
-			if !ok {
+			selector, err := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
+			if err != nil {
 				select {
-				case ch <- cronJobNoRunsSentinel + name:
+				case ch <- cronJobSentinelLine(name, err):
 				case <-ctx.Done():
 				}
 				return
@@ -410,9 +410,9 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		var args []string //nolint:prealloc
 		switch kind {
 		case "CronJob":
-			selector, ok := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
-			if !ok {
-				return logHistoryMsg{err: errCronJobNoRuns, prevTotal: prevTotal}
+			selector, err := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
+			if err != nil {
+				return logHistoryMsg{err: err, prevTotal: prevTotal}
 			}
 			args = []string{
 				"logs", "-l", selector, "--all-containers=true", "--prefix",
@@ -542,9 +542,9 @@ func (m *Model) saveAllLogs() tea.Cmd {
 		var args []string
 		switch kind {
 		case "CronJob":
-			selector, ok := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
-			if !ok {
-				return logSaveAllMsg{err: errCronJobNoRuns}
+			selector, err := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
+			if err != nil {
+				return logSaveAllMsg{err: err}
 			}
 			args = []string{
 				"logs", "-l", selector, "--all-containers=true", "--prefix",

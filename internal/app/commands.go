@@ -221,9 +221,9 @@ func (m Model) loadPodsForLogAction() tea.Cmd {
 	return func() tea.Msg {
 		var selector string
 		if kind == "CronJob" {
-			resolved, ok := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
-			if !ok {
-				return podLogSelectMsg{err: errCronJobNoRuns}
+			resolved, err := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
+			if err != nil {
+				return podLogSelectMsg{err: err}
 			}
 			selector = resolved
 		} else {

@@ -65,6 +65,21 @@ func (m Model) updateExecPTYStart(msg execPTYStartMsg) (tea.Model, tea.Cmd) {
 	return m, m.scheduleExecTick()
 }
 
+// applyCronJobSentinelLine turns a CronJob no-runs/error marker into a status
+// message, false for an ordinary line. Called before either branch of
+// updateLogLine buffers a line, so the raw marker never reaches a log buffer.
+func (m *Model) applyCronJobSentinelLine(line string) bool {
+	if name, ok := strings.CutPrefix(line, cronJobNoRunsSentinel); ok {
+		m.setStatusMessage(fmt.Sprintf("No runs yet for CronJob %s", name), true)
+		return true
+	}
+	if errMsg, ok := strings.CutPrefix(line, cronJobErrorSentinel); ok {
+		m.setStatusMessage("Failed to resolve CronJob logs: "+errMsg, true)
+		return true
+	}
+	return false
+}
+
 func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 	// The reader that produced this message has exited (it does one receive then
 	// returns). Mark the channel idle; the branches below re-arm exactly one
@@ -83,6 +98,9 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		for i := range m.tabs {
 			if m.tabs[i].logCh == msg.ch {
 				if !msg.done {
+					if m.applyCronJobSentinelLine(msg.line) {
+						return m, tea.Batch(m.readLogChannel(msg.ch), scheduleStatusClear())
+					}
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
 					// Bound the background tab's buffer; shift its saved
 					// offsets so restoring the tab lands on the same content.
@@ -103,8 +121,7 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if name, ok := strings.CutPrefix(msg.line, cronJobNoRunsSentinel); ok {
-		m.setStatusMessage(fmt.Sprintf("No runs yet for CronJob %s", name), true)
+	if m.applyCronJobSentinelLine(msg.line) {
 		return m, tea.Batch(m.waitForLogLine(), scheduleStatusClear())
 	}
 	if msg.done {
@@ -232,8 +249,12 @@ func (m Model) updateLogHistory(msg logHistoryMsg) (Model, tea.Cmd) {
 	m.logView.loadingHistory = false
 	if msg.err != nil {
 		m.logView.hasMoreHistory = false
-		if errors.Is(msg.err, errCronJobNoRuns) {
+		switch {
+		case errors.Is(msg.err, errCronJobNoRuns):
 			m.setStatusMessage("No runs yet for CronJob "+m.actionCtx.name, true)
+			return m, scheduleStatusClear()
+		case m.actionCtx.kind == "CronJob":
+			m.setErrorFromErr("Failed to resolve CronJob logs: ", msg.err)
 			return m, scheduleStatusClear()
 		}
 		return m, nil
