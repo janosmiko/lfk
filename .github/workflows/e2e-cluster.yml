@@ -85,13 +85,20 @@ jobs:
                 controller: true
                 blockOwnerDeletion: true
           spec:
+            # Suspended so the Job controller creates no pod of its own. Its
+            # pod would carry the modern batch.kubernetes.io/ labels and would
+            # be the one lfk resolves, leaving the legacy-label pod below
+            # unused and the fallback branch untested. The command still emits
+            # the marker, so a cluster that ignores suspend does not turn this
+            # into a silent timeout.
+            suspend: true
             template:
               spec:
                 restartPolicy: Never
                 containers:
                   - name: backup
                     image: busybox:1.36
-                    command: ["sh", "-c", "echo backup"]
+                    command: ["sh", "-c", "echo ${LFK_E2E_LOG_MARKER} && sleep 120"]
           EOF
 
           job_uid=$(kubectl get job "${LFK_CRONJOB}-run" -n "${LFK_NAMESPACE}" -o jsonpath='{.metadata.uid}')
