@@ -37,12 +37,13 @@ func TestClusterModeCronJobLogs(t *testing.T) {
 	// Same navigation as TestDemoModeCronJobLogs, but each keystroke waits
 	// for its target's own text first - a real apiserver's context and
 	// discovery lists populate too slowly for a fixed sleep to outlast.
-	waitForThenSend(t, out, "kind-lfk-e2e", ptmx, "\r", clusterStartupTimeout)
-	waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", clusterStartupTimeout)
-	waitForThenSend(t, out, "nightly-backup", ptmx, "\r", clusterStartupTimeout)
-	waitForThenSend(t, out, "nightly-backup", ptmx, "\x0c", clusterStartupTimeout) // ctrl+l: open the fullscreen log viewer
+	at := waitForThenSend(t, out, "kind-lfk-e2e", ptmx, "\r", clusterStartupTimeout)
+	at = waitForNewThenSend(t, out, at, "CronJobs", ptmx, "/CronJobs\r", clusterStartupTimeout)
+	at = waitForNewThenSend(t, out, at, "nightly-backup", ptmx, "\r", clusterStartupTimeout)
+	// ctrl+l opens the fullscreen log viewer.
+	at = waitForNewThenSend(t, out, at, "nightly-backup", ptmx, "\x0c", clusterStartupTimeout)
 
-	waitFor(t, out, marker, clusterStartupTimeout)
+	waitForAfter(t, out, at, marker, clusterStartupTimeout)
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
 		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())

@@ -92,10 +92,40 @@ func waitFor(t *testing.T, out *output, substr string, timeout time.Duration) {
 // waitForThenSend waits for substr before sending keys - a fixed sleep
 // between keystrokes is a timing guess that only holds on a fast, unloaded
 // machine (TASK-896: it failed against a real apiserver's slower startup).
-func waitForThenSend(t *testing.T, out *output, substr string, f *os.File, keys string, timeout time.Duration) {
+//
+// It searches only output produced after the previous step, because the buffer
+// is never cleared and a marker that appeared once would satisfy every later
+// wait for free. A real case: the startup dashboard lists an UnexpectedJob
+// warning naming the CronJob, so a whole-buffer wait for that name passes
+// before any key is sent.
+func waitForThenSend(t *testing.T, out *output, substr string, f *os.File, keys string, timeout time.Duration) int {
 	t.Helper()
-	waitFor(t, out, substr, timeout)
+	return waitForNewThenSend(t, out, 0, substr, f, keys, timeout)
+}
+
+// waitForNewThenSend is waitForThenSend scoped to output after offset. It
+// returns the buffer length at the moment the keys were sent, to pass as the
+// next step's offset.
+func waitForNewThenSend(t *testing.T, out *output, offset int, substr string, f *os.File, keys string, timeout time.Duration) int {
+	t.Helper()
+	waitForAfter(t, out, offset, substr, timeout)
+	sent := len(out.String())
 	sendKeys(t, f, keys)
+	return sent
+}
+
+// waitForAfter polls for substr in the output written after offset.
+func waitForAfter(t *testing.T, out *output, offset int, substr string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if s := out.String(); len(s) > offset && strings.Contains(s[offset:], substr) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("timed out after %s waiting for %q in output past byte %d; captured output:\n%s",
+		timeout, substr, offset, out.String())
 }
 
 // runUnderPty starts cmd inside a pty and registers cleanup that kills it -
@@ -212,11 +242,12 @@ func TestDemoModeCronJobLogs(t *testing.T) {
 	ptmx, out, stderr := startDemoUnderPty(t)
 
 	sendKeys(t, ptmx, "\r")
-	waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", startupTimeout)
-	waitForThenSend(t, out, demo.CronJobNightlyBackup, ptmx, "\r", startupTimeout)
-	waitForThenSend(t, out, demo.CronJobNightlyBackup, ptmx, "\x0c", startupTimeout) // ctrl+l: open the fullscreen log viewer
+	at := waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", startupTimeout)
+	at = waitForNewThenSend(t, out, at, demo.CronJobNightlyBackup, ptmx, "\r", startupTimeout)
+	// ctrl+l opens the fullscreen log viewer.
+	at = waitForNewThenSend(t, out, at, demo.CronJobNightlyBackup, ptmx, "\x0c", startupTimeout)
 
-	waitFor(t, out, demo.JobNightlyBackupRun, startupTimeout)
+	waitForAfter(t, out, at, demo.JobNightlyBackupRun, startupTimeout)
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
 		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())
