@@ -440,6 +440,8 @@ func (m Model) handleTemplateOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 			return m, m.applyTemplate(tmpl)
 		}
 		return m, nil
+	case "d":
+		return m.beginTemplateDelete(filtered)
 	case "up", "k", "ctrl+p":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, -1, len(filtered)-1)
 		return m, nil

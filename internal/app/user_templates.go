@@ -40,6 +40,10 @@ const userTemplateCategory = "User"
 // directory or produce an unreachable file.
 var errInvalidTemplateName = errors.New("invalid template name")
 
+// errTemplateNotFound reports that the picker offered a name with no file
+// behind it, which means the directory changed under a stale list.
+var errTemplateNotFound = errors.New("template not found")
+
 // errTemplateDirUnavailable reports that paths.ConfigDir() failed — an
 // environment problem (e.g. $HOME unset), not anything wrong with the
 // resource name being saved.
@@ -154,6 +158,37 @@ func saveUserTemplate(name, manifest string) error {
 		return err
 	}
 	return writeFileDurable(filepath.Join(dir, clean+".yaml"), []byte(manifest))
+}
+
+// deleteUserTemplate removes the file behind a template. Both extensions are
+// tried because loadUserTemplates lists .yaml and .yml alike, and a
+// hand-authored .yml has to be removable from the list that shows it.
+func deleteUserTemplate(name string) error {
+	dir := userTemplateDir()
+	if dir == "" {
+		return errTemplateDirUnavailable
+	}
+	clean := ui.SanitizeTerminalText(name)
+	if !isSafeTemplateName(clean) {
+		return errInvalidTemplateName
+	}
+	removed := false
+	var failure error
+	for _, ext := range []string{".yaml", ".yml"} {
+		switch err := os.Remove(filepath.Join(dir, clean+ext)); {
+		case err == nil:
+			removed = true
+		case !os.IsNotExist(err):
+			failure = err
+		}
+	}
+	switch {
+	case removed:
+		return nil
+	case failure != nil:
+		return failure
+	}
+	return errTemplateNotFound
 }
 
 // isSafeTemplateName reports whether name is a single path element that stays

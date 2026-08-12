@@ -477,6 +477,7 @@ func (m Model) overlayHintBarOverlayTemplates() string {
 	return m.renderHints([]ui.HintEntry{
 		{Key: "enter", Desc: "select"},
 		{Key: "/", Desc: "filter"},
+		{Key: "d", Desc: "delete saved"},
 		{Key: "esc", Desc: "close"},
 	})
 }
