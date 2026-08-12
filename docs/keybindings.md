@@ -565,7 +565,7 @@ Auto-reconnect across init containers: when viewing logs for a single Pod in all
 
 ## Log Top
 
-Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `T`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `t`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
 
 | Key | Action |
 |---|---|
@@ -1183,7 +1183,7 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 
 The action menu (`x` key) shows context-specific actions based on the resource type.
 
-Every kind also offers `x` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Secret values are blanked, keys kept. Available in read-only mode.
+Every kind also offers `x` → `T` Export Template: strips server-set fields, then asks for a destination (clipboard, file, or template list). Secret values are blanked, keys kept. Available in read-only mode.
 
 The destination picker: `j`/`k` (or `↓`/`↑`, `Ctrl+N`/`Ctrl+P`) move the cursor, `c` clipboard, `f` file, `t` template list, `Enter` export to the highlighted destination, `Esc`/`q` cancel.
 
@@ -1227,7 +1227,7 @@ The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas sch
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
 ### CronJob Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### ArgoCD Application Actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events

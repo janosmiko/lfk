@@ -20,7 +20,7 @@ func TestActionsForKind_OffersExportTemplate(t *testing.T) {
 			for _, a := range ActionsForKind(kind) {
 				if a.Label == ActionLabelExportTemplate {
 					found = true
-					assert.Equal(t, "x", a.Key)
+					assert.Equal(t, "T", a.Key)
 					assert.NotEmpty(t, a.Description)
 				}
 			}
@@ -37,7 +37,7 @@ func TestActionsForContainer_OffersExportTemplate(t *testing.T) {
 	for _, a := range ActionsForContainer() {
 		if a.Label == ActionLabelExportTemplate {
 			found = true
-			assert.Equal(t, "x", a.Key)
+			assert.Equal(t, "T", a.Key)
 			assert.NotEmpty(t, a.Description)
 		}
 	}

@@ -16,18 +16,22 @@ import (
 )
 
 // exportTemplateCmd builds the fetch-and-strip command for the row under the
-// cursor. Returns nil when the current level has no manifest behind it.
-func (m Model) exportTemplateCmd() tea.Cmd {
+// cursor. Reports a status message and returns a nil command when the
+// current level has no manifest behind it, so the "M" chip never fails
+// silently.
+func (m Model) exportTemplateCmd() (Model, tea.Cmd) {
 	// Synthetic security rows have no manifest.
 	if onSecurityView(&m) {
-		return nil
+		m.setStatusMessage("Export Template: security findings have no manifest to export", true)
+		return m, scheduleStatusClear()
 	}
 	fetch, name, kind, ok := m.resolveTemplateSource()
 	if !ok {
-		return nil
+		m.setStatusMessage("Export Template: nothing selected to export", true)
+		return m, scheduleStatusClear()
 	}
 	kctx := m.effectiveContext()
-	return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+	return m, m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
 		"Export template: "+name, bgtaskTarget(kctx, m.resolveNamespace()),
 		func(ctx context.Context) tea.Msg {
 			doc, err := fetch(ctx)
