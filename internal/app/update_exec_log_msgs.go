@@ -1,6 +1,9 @@
 package app
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -99,6 +102,10 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	}
+	if name, ok := strings.CutPrefix(msg.line, cronJobNoRunsSentinel); ok {
+		m.setStatusMessage(fmt.Sprintf("No runs yet for CronJob %s", name), true)
+		return m, tea.Batch(m.waitForLogLine(), scheduleStatusClear())
 	}
 	if msg.done {
 		// When following all containers of a single Pod, the stream ends as
@@ -221,14 +228,18 @@ func (m Model) updateLogStreamRestart(msg logStreamRestartMsg) (tea.Model, tea.C
 	return m, cmd
 }
 
-func (m Model) updateLogHistory(msg logHistoryMsg) Model {
+func (m Model) updateLogHistory(msg logHistoryMsg) (Model, tea.Cmd) {
 	m.logView.loadingHistory = false
 	if msg.err != nil {
 		m.logView.hasMoreHistory = false
-		return m
+		if errors.Is(msg.err, errCronJobNoRuns) {
+			m.setStatusMessage("No runs yet for CronJob "+m.actionCtx.name, true)
+			return m, scheduleStatusClear()
+		}
+		return m, nil
 	}
 	if m.mode != modeLogs {
-		return m
+		return m, nil
 	}
 
 	// The fetched history is the last <tail> lines of the resource; the current
@@ -238,7 +249,7 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 
 	if len(newOlderLines) == 0 {
 		m.logView.hasMoreHistory = false
-		return m
+		return m, nil
 	}
 
 	// Prepend and adjust scroll to maintain view position — unless the user
@@ -272,10 +283,14 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 		m.logView.hasMoreHistory = false
 	}
 
-	return m
+	return m, nil
 }
 
 func (m Model) updateLogSaveAll(msg logSaveAllMsg) (tea.Model, tea.Cmd) {
+	if errors.Is(msg.err, errCronJobNoRuns) {
+		m.setStatusMessage("No runs yet for CronJob "+m.actionCtx.name, true)
+		return m, scheduleStatusClear()
+	}
 	if msg.err != nil {
 		m.setErrorFromErr("Log save failed: ", msg.err)
 		return m, scheduleStatusClear()

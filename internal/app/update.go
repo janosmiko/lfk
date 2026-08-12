@@ -524,8 +524,8 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateLogStreamRestart(msg)
 		return mdl, cmd, true
 	case logHistoryMsg:
-		mdl := m.updateLogHistory(msg)
-		return mdl, nil, true
+		mdl, cmd := m.updateLogHistory(msg)
+		return mdl, cmd, true
 	case logSaveAllMsg:
 		mdl, cmd := m.updateLogSaveAll(msg)
 		return mdl, cmd, true

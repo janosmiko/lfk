@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
@@ -47,7 +48,11 @@ func (m Model) updatePodSelect(msg podSelectMsg) (tea.Model, tea.Cmd) {
 func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
 	if msg.err != nil {
-		m.setErrorFromErr("Error: ", msg.err)
+		if errors.Is(msg.err, errCronJobNoRuns) {
+			m.setStatusMessage("No runs yet for CronJob "+m.actionCtx.name, true)
+		} else {
+			m.setErrorFromErr("Error: ", msg.err)
+		}
 		m.pendingAction = ""
 		// If in log mode, restart the previous log stream on error.
 		if m.mode == modeLogs && m.logView.savedPodName != "" {
