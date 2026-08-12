@@ -219,10 +219,18 @@ func (m Model) loadPodsForLogAction() tea.Cmd {
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	return func() tea.Msg {
-		// Get the selector for this parent resource.
-		selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, m.kubectlContext(kctx))
-		if selector == "" {
-			return podLogSelectMsg{err: fmt.Errorf("could not determine pod selector for %s/%s", kind, name)}
+		var selector string
+		if kind == "CronJob" {
+			resolved, err := resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, m.kubectlContext(kctx))
+			if err != nil {
+				return podLogSelectMsg{err: err}
+			}
+			selector = resolved
+		} else {
+			selector = kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, m.kubectlContext(kctx))
+			if selector == "" {
+				return podLogSelectMsg{err: fmt.Errorf("could not determine pod selector for %s/%s", kind, name)}
+			}
 		}
 
 		// Fetch pods matching the selector.
