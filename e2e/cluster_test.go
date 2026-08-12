@@ -13,7 +13,7 @@ import (
 // clusterStartupTimeout is longer than startupTimeout: a real apiserver
 // connection and RBAC self-check are slower than the demo fake's in-memory
 // client.
-const clusterStartupTimeout = 30 * time.Second
+const clusterStartupTimeout = 90 * time.Second
 
 // TestClusterModeCronJobLogs opens the seeded CronJob's logs (TASK-896)
 // against a real cluster, unlike TestDemoModeCronJobLogs's fake selectors.

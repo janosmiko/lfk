@@ -30,7 +30,10 @@ import (
 )
 
 const (
-	startupTimeout  = 15 * time.Second
+	// A pty wait is wall-clock, so a loaded machine eats the budget rather than
+	// the app being slow. 15s failed on a laptop running three test suites at
+	// once, and a shared CI runner is no less contended.
+	startupTimeout  = 45 * time.Second
 	shutdownTimeout = 5 * time.Second
 )
 

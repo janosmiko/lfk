@@ -36,8 +36,19 @@ func TestRun_GetCronJob_UnknownName_ReturnsEmptyUID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if strings.Contains(stdout.String(), demo.UIDCronJobNightlyBackup) {
-		t.Errorf("stdout = %q, want no uid for an unseeded CronJob name", stdout.String())
+	// Rejecting only the seeded UID would pass on any other non-empty value,
+	// and a non-empty UID is what makes an unknown CronJob look real to the
+	// resolver.
+	var obj struct {
+		Metadata struct {
+			UID string `json:"uid"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &obj); err != nil {
+		t.Fatalf("stdout is not JSON: %v (%q)", err, stdout.String())
+	}
+	if obj.Metadata.UID != "" {
+		t.Errorf("metadata.uid = %q, want empty for an unseeded CronJob name", obj.Metadata.UID)
 	}
 }
 
