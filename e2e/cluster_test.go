@@ -34,15 +34,13 @@ func TestClusterModeCronJobLogs(t *testing.T) {
 
 	ptmx, out, stderr := runUnderPty(t, cmd)
 
-	// Same navigation as TestDemoModeCronJobLogs: select the (only) context,
-	// jump to the CronJobs resource type, select the (only) row, open logs.
-	sendKeys(t, ptmx, "\r")
-	time.Sleep(300 * time.Millisecond)
-	sendKeys(t, ptmx, "/CronJobs\r")
-	time.Sleep(300 * time.Millisecond)
-	sendKeys(t, ptmx, "\r")
-	time.Sleep(300 * time.Millisecond)
-	sendKeys(t, ptmx, "\x0c") // ctrl+l: open the fullscreen log viewer
+	// Same navigation as TestDemoModeCronJobLogs, but each keystroke waits
+	// for its target's own text first - a real apiserver's context and
+	// discovery lists populate too slowly for a fixed sleep to outlast.
+	waitForThenSend(t, out, "kind-lfk-e2e", ptmx, "\r", clusterStartupTimeout)
+	waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", clusterStartupTimeout)
+	waitForThenSend(t, out, "nightly-backup", ptmx, "\r", clusterStartupTimeout)
+	waitForThenSend(t, out, "nightly-backup", ptmx, "\x0c", clusterStartupTimeout) // ctrl+l: open the fullscreen log viewer
 
 	waitFor(t, out, marker, clusterStartupTimeout)
 

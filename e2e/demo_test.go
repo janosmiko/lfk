@@ -89,6 +89,15 @@ func waitFor(t *testing.T, out *output, substr string, timeout time.Duration) {
 	t.Fatalf("timed out after %s waiting for %q; captured output:\n%s", timeout, substr, out.String())
 }
 
+// waitForThenSend waits for substr before sending keys - a fixed sleep
+// between keystrokes is a timing guess that only holds on a fast, unloaded
+// machine (TASK-896: it failed against a real apiserver's slower startup).
+func waitForThenSend(t *testing.T, out *output, substr string, f *os.File, keys string, timeout time.Duration) {
+	t.Helper()
+	waitFor(t, out, substr, timeout)
+	sendKeys(t, f, keys)
+}
+
 // runUnderPty starts cmd inside a pty and registers cleanup that kills it -
 // lfk is a TUI that otherwise sits waiting for input forever.
 func runUnderPty(t *testing.T, cmd *exec.Cmd) (ptmx *os.File, out, stderr *output) {
@@ -203,12 +212,9 @@ func TestDemoModeCronJobLogs(t *testing.T) {
 	ptmx, out, stderr := startDemoUnderPty(t)
 
 	sendKeys(t, ptmx, "\r")
-	time.Sleep(300 * time.Millisecond)
-	sendKeys(t, ptmx, "/CronJobs\r")
-	time.Sleep(300 * time.Millisecond)
-	sendKeys(t, ptmx, "\r")
-	time.Sleep(300 * time.Millisecond)
-	sendKeys(t, ptmx, "\x0c") // ctrl+l: open the fullscreen log viewer
+	waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", startupTimeout)
+	waitForThenSend(t, out, demo.CronJobNightlyBackup, ptmx, "\r", startupTimeout)
+	waitForThenSend(t, out, demo.CronJobNightlyBackup, ptmx, "\x0c", startupTimeout) // ctrl+l: open the fullscreen log viewer
 
 	waitFor(t, out, demo.JobNightlyBackupRun, startupTimeout)
 
