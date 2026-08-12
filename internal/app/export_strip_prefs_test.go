@@ -73,7 +73,7 @@ func TestExportStripPrefs_ToggleSurvivesANewExport(t *testing.T) {
 	require.False(t, m.exportTemplatePicker.strip[k8s.TemplateNamespace])
 
 	next := basePush80Model()
-	next.openExportTemplatePicker("settings", "ConfigMap", exportPickerYAML)
+	next.openExportTemplatePicker("settings", "ConfigMap", "prod", exportPickerYAML)
 
 	assert.False(t, next.exportTemplatePicker.strip[k8s.TemplateNamespace])
 	assert.Contains(t, next.exportTemplatePicker.manifest, "namespace: prod")

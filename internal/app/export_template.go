@@ -5,6 +5,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -62,6 +63,8 @@ type exportTemplateState struct {
 	cursor int
 	name   string
 	kind   string
+	// namespace is "" for a cluster-scoped resource.
+	namespace string
 	// raw is the fetched document. Kept so a category toggle in the field
 	// picker can re-strip it rather than trying to unpick the stripped copy.
 	raw         string
@@ -97,13 +100,14 @@ func (s exportTemplateState) redactionNote() string {
 	return ""
 }
 
-func (m *Model) openExportTemplatePicker(name, kind, raw string) {
+func (m *Model) openExportTemplatePicker(name, kind, namespace, raw string) {
 	m.exportTemplatePicker = exportTemplateState{
-		active: true,
-		name:   name,
-		kind:   kind,
-		raw:    raw,
-		strip:  loadExportStripPrefs(),
+		active:    true,
+		name:      name,
+		kind:      kind,
+		namespace: namespace,
+		raw:       raw,
+		strip:     loadExportStripPrefs(),
 	}
 	m.exportTemplatePicker.restrip()
 	m.previousOverlay = overlayNone
@@ -159,13 +163,17 @@ func (m Model) handleExportTemplateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 }
 
 // applyExportTemplatePicker delivers the captured manifest to the highlighted
-// destination and closes the picker.
+// destination. The template-list destination may detour through a confirm
+// overlay, so it alone keeps the picker state alive and closes it itself.
 func (m Model) applyExportTemplatePicker() (tea.Model, tea.Cmd) {
 	state := m.exportTemplatePicker
 	if !state.active || state.cursor >= len(exportDestinations) {
 		return m, nil
 	}
 	dest := exportDestinations[state.cursor]
+	if dest == exportDestTemplateList {
+		return m.applyExportToTemplateList(state)
+	}
 	m.closeExportTemplatePicker()
 
 	switch dest {
@@ -185,16 +193,40 @@ func (m Model) applyExportTemplatePicker() (tea.Model, tea.Cmd) {
 			}
 			return exportDoneMsg{path: abs, note: note}
 		}
-	case exportDestTemplateList:
-		name, manifest, note := state.name, state.manifest, state.redactionNote()
-		return m, func() tea.Msg {
-			if err := saveUserTemplate(name, manifest); err != nil {
-				return actionResultMsg{err: fmt.Errorf("saving template: %w", err)}
-			}
-			return actionResultMsg{message: "Saved template " + name + note}
-		}
 	}
 	return m, nil
+}
+
+// applyExportToTemplateList confirms first on an existing file: the
+// collision the filename scheme cannot resolve on its own — same namespace
+// and name, saved from two different clusters.
+func (m Model) applyExportToTemplateList(state exportTemplateState) (tea.Model, tea.Cmd) {
+	path, ok := templateSavePath(state.namespace, state.name)
+	if !ok {
+		m.closeExportTemplatePicker()
+		return m, func() tea.Msg {
+			return actionResultMsg{err: fmt.Errorf("saving template: %w", errInvalidTemplateName)}
+		}
+	}
+	if _, err := os.Stat(path); err == nil {
+		m.confirmAction = path
+		m.pendingAction = overwriteTemplateAction
+		m.confirmTitle = "Confirm Overwrite"
+		m.confirmQuestion = fmt.Sprintf("Overwrite the saved template %s?", state.name)
+		// A stale blast/deps fetch belongs to a cluster delete, not this file save.
+		m.blast.reset()
+		m.deps.reset()
+		m.overlay = overlayConfirm
+		return m, nil
+	}
+	namespace, name, manifest, note := state.namespace, state.name, state.manifest, state.redactionNote()
+	m.closeExportTemplatePicker()
+	return m, func() tea.Msg {
+		if err := saveUserTemplate(namespace, name, manifest); err != nil {
+			return actionResultMsg{err: fmt.Errorf("saving template: %w", err)}
+		}
+		return actionResultMsg{message: "Saved template " + name + note}
+	}
 }
 
 // templateExportFilename builds "<kind>_<name>.template.yaml" in the working

@@ -18,7 +18,7 @@ const strippedManifest = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: web\n"
 func pickerModel(t *testing.T) Model {
 	t.Helper()
 	m := basePush80Model()
-	m.openExportTemplatePicker("web", "Pod", strippedManifest)
+	m.openExportTemplatePicker("web", "Pod", "staging", strippedManifest)
 	return m
 }
 
@@ -27,7 +27,7 @@ func pickerModel(t *testing.T) Model {
 func secretPickerModel(t *testing.T) Model {
 	t.Helper()
 	m := basePush80Model()
-	m.openExportTemplatePicker("db-creds", "Secret", "kind: Secret\ndata:\n  password: \"hunter2\"\n")
+	m.openExportTemplatePicker("db-creds", "Secret", "staging", "kind: Secret\ndata:\n  password: \"hunter2\"\n")
 	return m
 }
 
@@ -84,9 +84,68 @@ func TestApplyExportTemplatePicker_TemplateListSavesFile(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, msg.err)
 
-	saved, err := os.ReadFile(filepath.Join(dir, "web.yaml"))
+	saved, err := os.ReadFile(filepath.Join(dir, "staging__web.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, strippedManifest, string(saved))
+}
+
+// TestApplyExportTemplatePicker_ExistingFileOpensConfirm is the residual
+// collision the filename scheme cannot resolve on its own: the same
+// namespace and name, saved a second time (e.g. from a different cluster).
+func TestApplyExportTemplatePicker_ExistingFileOpensConfirm(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "staging__web.yaml", "kind: Pod # old\n")
+	m := pickerModel(t)
+	m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestTemplateList)
+
+	ret, cmd := m.applyExportTemplatePicker()
+	got := ret.(Model)
+
+	assert.Nil(t, cmd)
+	assert.Equal(t, overlayConfirm, got.overlay)
+	assert.Equal(t, overwriteTemplateAction, got.pendingAction)
+	assert.Contains(t, got.confirmQuestion, "web")
+	assert.True(t, got.exportTemplatePicker.active, "the picker state survives to commit on confirm")
+
+	saved, err := os.ReadFile(filepath.Join(dir, "staging__web.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "kind: Pod # old\n", string(saved), "nothing is written before the confirm")
+}
+
+func TestConfirmOverlayKey_AcceptedOverwriteReplacesFile(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "staging__web.yaml", "kind: Pod # old\n")
+	m := pickerModel(t)
+	m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestTemplateList)
+	retTeaModel, _ := m.applyExportTemplatePicker()
+	m = retTeaModel.(Model)
+
+	got := pressConfirmKey(m, "y")
+
+	saved, err := os.ReadFile(filepath.Join(dir, "staging__web.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, strippedManifest, string(saved), "the confirmed overwrite replaces the old content")
+	assert.Equal(t, overlayNone, got.overlay)
+	assert.False(t, got.exportTemplatePicker.active)
+	assert.Contains(t, got.statusMessage, "Saved template web")
+}
+
+func TestConfirmOverlayKey_CancelledOverwriteKeepsFile(t *testing.T) {
+	dir := withTempConfigDir(t)
+	writeTemplateFile(t, dir, "staging__web.yaml", "kind: Pod # old\n")
+	m := pickerModel(t)
+	m.exportTemplatePicker.cursor = indexOfDestination(t, exportDestTemplateList)
+	retTeaModel, _ := m.applyExportTemplatePicker()
+	m = retTeaModel.(Model)
+
+	got := pressConfirmKey(m, "n")
+
+	saved, err := os.ReadFile(filepath.Join(dir, "staging__web.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "kind: Pod # old\n", string(saved), "cancelling keeps the existing file")
+	assert.Equal(t, overlayNone, got.overlay)
+	assert.Empty(t, got.pendingAction)
+	assert.False(t, got.exportTemplatePicker.active)
 }
 
 // TestApplyExportTemplatePicker_FileWritesStrippedManifest covers AC #5's file
@@ -121,7 +180,7 @@ func TestHandleExportTemplateKey_ShortcutAppliesThatDestination(t *testing.T) {
 	assert.False(t, ret.(Model).exportTemplatePicker.active)
 	cmd()
 
-	assert.FileExists(t, filepath.Join(dir, "web.yaml"))
+	assert.FileExists(t, filepath.Join(dir, "staging__web.yaml"))
 }
 
 func TestHandleExportTemplateKey_EscCloses(t *testing.T) {
