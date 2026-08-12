@@ -123,7 +123,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 			return m.clearTemplateDeleteConfirm(), nil
 		}
 		if m.pendingAction == overwriteTemplateAction {
-			return m.clearTemplateOverwriteConfirm(), nil
+			return m.cancelTemplateOverwrite(), nil
 		}
 		// A cancelled taint-apply returns to the still-alive editor so
 		// the staged marks are not lost.

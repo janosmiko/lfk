@@ -143,9 +143,9 @@ func TestConfirmOverlayKey_CancelledOverwriteKeepsFile(t *testing.T) {
 	saved, err := os.ReadFile(filepath.Join(dir, "staging__web.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, "kind: Pod # old\n", string(saved), "cancelling keeps the existing file")
-	assert.Equal(t, overlayNone, got.overlay)
 	assert.Empty(t, got.pendingAction)
-	assert.False(t, got.exportTemplatePicker.active)
+	assert.Equal(t, overlayExportTemplate, got.overlay, "declining the overwrite returns to the destinations")
+	assert.True(t, got.exportTemplatePicker.active, "the export stays staged, so clipboard and file need no re-export")
 }
 
 // TestApplyExportTemplatePicker_FileWritesStrippedManifest covers AC #5's file

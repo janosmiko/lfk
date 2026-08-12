@@ -24,11 +24,25 @@ func (m Model) commitTemplateOverwrite() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) clearTemplateOverwriteConfirm() Model {
+	m = m.clearOverwriteConfirmFields()
+	m.closeExportTemplatePicker()
+	m.overlay = overlayNone
+	return m
+}
+
+// cancelTemplateOverwrite returns to the destination picker with the export
+// still staged, so declining the overwrite leaves clipboard and file reachable
+// without exporting again.
+func (m Model) cancelTemplateOverwrite() Model {
+	m = m.clearOverwriteConfirmFields()
+	m.overlay = overlayExportTemplate
+	return m
+}
+
+func (m Model) clearOverwriteConfirmFields() Model {
 	m.confirmAction = ""
 	m.pendingAction = ""
 	m.confirmTitle = ""
 	m.confirmQuestion = ""
-	m.closeExportTemplatePicker()
-	m.overlay = overlayNone
 	return m
 }
