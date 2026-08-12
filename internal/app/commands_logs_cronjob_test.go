@@ -9,18 +9,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The third Job here has the latest timestamp but a different owner UID -
+// it must never win the pick, proving the ownership filter still runs.
 const cronJobFakeJobsList = `
-if [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
+if [ "$1" = "get" ] && [ "$2" = "cronjob" ] && [ "$3" = "my-cron" ]; then
+  echo '{"metadata":{"uid":"cron-uid-1"}}'
+elif [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
 cat <<'EOF'
 {"items":[
-  {"metadata":{"name":"my-cron-100","uid":"uid-100","creationTimestamp":"2026-08-10T00:00:00Z","ownerReferences":[{"kind":"CronJob","name":"my-cron"}]}},
-  {"metadata":{"name":"my-cron-200","uid":"uid-200","creationTimestamp":"2026-08-11T00:00:00Z","ownerReferences":[{"kind":"CronJob","name":"my-cron"}]}}
+  {"metadata":{"name":"my-cron-100","uid":"uid-100","creationTimestamp":"2026-08-10T00:00:00Z","ownerReferences":[{"kind":"CronJob","uid":"cron-uid-1"}]}},
+  {"metadata":{"name":"my-cron-200","uid":"uid-200","creationTimestamp":"2026-08-11T00:00:00Z","ownerReferences":[{"kind":"CronJob","uid":"cron-uid-1"}]}},
+  {"metadata":{"name":"other-cron-999","uid":"uid-999","creationTimestamp":"2026-08-12T00:00:00Z","ownerReferences":[{"kind":"CronJob","uid":"cron-uid-OTHER"}]}}
 ]}
 EOF
 fi
 `
 
-// --- resolveCronJobPodSelector ---
+// cronJobFakeNoJobs answers `get cronjob my-cron` but returns an empty Jobs list.
+const cronJobFakeNoJobs = `
+if [ "$1" = "get" ] && [ "$2" = "cronjob" ] && [ "$3" = "my-cron" ]; then
+  echo '{"metadata":{"uid":"cron-uid-1"}}'
+elif [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
+  echo '{"items":[]}'
+fi
+`
+
+// --- resolveCronJobPodSelector / latestOwnedJob ---
 
 func TestResolveCronJobPodSelector_PicksNewestJobAndPrefixedLabel(t *testing.T) {
 	fakeKubectl(t, cronJobFakeJobsList+`
@@ -49,11 +63,7 @@ fi
 }
 
 func TestResolveCronJobPodSelector_NoOwnedJobs(t *testing.T) {
-	fakeKubectl(t, `
-if [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
-  echo '{"items":[]}'
-fi
-`)
+	fakeKubectl(t, cronJobFakeNoJobs)
 	selector, ok := resolveCronJobPodSelector("kubectl", "", "default", "my-cron", "test-ctx")
 	assert.False(t, ok)
 	assert.Empty(t, selector)
@@ -64,6 +74,51 @@ func TestResolveCronJobPodSelector_JobExistsButPodsCleanedUp(t *testing.T) {
 	selector, ok := resolveCronJobPodSelector("kubectl", "", "default", "my-cron", "test-ctx")
 	assert.False(t, ok)
 	assert.Empty(t, selector)
+}
+
+// The fixture's third Job has the latest creationTimestamp but a different
+// owner UID. Deleting the `!owned { continue }` filter makes this test fail:
+// that Job would win the pick instead of my-cron-200.
+func TestLatestOwnedJob_IgnoresJobOwnedByDifferentCronJob(t *testing.T) {
+	fakeKubectl(t, cronJobFakeJobsList)
+	jobName, jobUID, found := latestOwnedJob("kubectl", "", "default", "my-cron", "test-ctx")
+	require.True(t, found)
+	assert.Equal(t, "my-cron-200", jobName)
+	assert.Equal(t, "uid-200", jobUID)
+}
+
+// A Job left behind by a deleted CronJob still carries the OLD CronJob's UID
+// in its ownerReferences. A replacement CronJob with the same name but a new
+// UID must not inherit that orphaned Job's run.
+func TestLatestOwnedJob_OrphanedJobSameNameDifferentUID_NotMatched(t *testing.T) {
+	fakeKubectl(t, `
+if [ "$1" = "get" ] && [ "$2" = "cronjob" ] && [ "$3" = "my-cron" ]; then
+  echo '{"metadata":{"uid":"cron-uid-NEW"}}'
+elif [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
+  echo '{"items":[{"metadata":{"name":"my-cron-100","uid":"uid-100","creationTimestamp":"2026-08-10T00:00:00Z","ownerReferences":[{"kind":"CronJob","name":"my-cron","uid":"cron-uid-OLD"}]}}]}'
+fi
+`)
+	_, _, found := latestOwnedJob("kubectl", "", "default", "my-cron", "test-ctx")
+	assert.False(t, found, "an orphaned Job's UID must not match the replacement CronJob's UID")
+}
+
+// Two Jobs sharing an exact creationTimestamp must resolve deterministically
+// (higher name wins) rather than by whatever order the API returned them in.
+func TestLatestOwnedJob_TiebreakOnEqualTimestamp(t *testing.T) {
+	fakeKubectl(t, `
+if [ "$1" = "get" ] && [ "$2" = "cronjob" ] && [ "$3" = "my-cron" ]; then
+  echo '{"metadata":{"uid":"cron-uid-1"}}'
+elif [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
+  echo '{"items":[
+    {"metadata":{"name":"my-cron-100","uid":"uid-100","creationTimestamp":"2026-08-11T00:00:00Z","ownerReferences":[{"kind":"CronJob","name":"my-cron","uid":"cron-uid-1"}]}},
+    {"metadata":{"name":"my-cron-200","uid":"uid-200","creationTimestamp":"2026-08-11T00:00:00Z","ownerReferences":[{"kind":"CronJob","name":"my-cron","uid":"cron-uid-1"}]}}
+  ]}'
+fi
+`)
+	jobName, jobUID, found := latestOwnedJob("kubectl", "", "default", "my-cron", "test-ctx")
+	require.True(t, found)
+	assert.Equal(t, "my-cron-200", jobName)
+	assert.Equal(t, "uid-200", jobUID)
 }
 
 // --- startLogStream / kind=CronJob ---
@@ -96,11 +151,7 @@ fi
 }
 
 func TestStartLogStream_CronJob_NoRuns_SendsSentinelInsteadOfKubectlLogs(t *testing.T) {
-	fakeKubectl(t, `
-if [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
-  echo '{"items":[]}'
-fi
-`)
+	fakeKubectl(t, cronJobFakeNoJobs)
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-cron", "default", "CronJob", model.ResourceTypeEntry{})
 
@@ -120,11 +171,7 @@ fi
 // --- fetchOlderLogs / saveAllLogs no-runs handling ---
 
 func TestFetchOlderLogs_CronJob_NoRuns_ReturnsSentinelError(t *testing.T) {
-	fakeKubectl(t, `
-if [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
-  echo '{"items":[]}'
-fi
-`)
+	fakeKubectl(t, cronJobFakeNoJobs)
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-cron", "default", "CronJob", model.ResourceTypeEntry{})
 	m.scheduler.StartWorkers()
@@ -143,11 +190,7 @@ fi
 }
 
 func TestSaveAllLogs_CronJob_NoRuns_ReturnsSentinelError(t *testing.T) {
-	fakeKubectl(t, `
-if [ "$1" = "get" ] && [ "$2" = "jobs" ]; then
-  echo '{"items":[]}'
-fi
-`)
+	fakeKubectl(t, cronJobFakeNoJobs)
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-cron", "default", "CronJob", model.ResourceTypeEntry{})
 	m.scheduler.StartWorkers()

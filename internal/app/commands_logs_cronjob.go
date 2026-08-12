@@ -18,6 +18,8 @@ const cronJobNoRunsSentinel = "\x00lfk:cronjob-no-runs\x00"
 
 var errCronJobNoRuns = errors.New("no runs yet")
 
+var errCronJobUIDMissing = errors.New("cronjob uid missing")
+
 // resolveCronJobPodSelector resolves a CronJob to the pod selector for its
 // newest owned Job. *v1.CronJob has no pod selector of its own. ok is false
 // when the CronJob has never run or its newest Job's pods are already gone.
@@ -38,9 +40,15 @@ func resolveCronJobPodSelector(kubectlPath, kubeconfigPaths, ns, name, kctx stri
 	return "", false
 }
 
-// latestOwnedJob returns the name and UID of the most recently created Job
-// whose ownerReferences point at the named CronJob.
+// latestOwnedJob matches ownership by UID - an orphaned Job keeps the OLD
+// CronJob's UID, so name matching would leak its run to a same-named replacement.
 func latestOwnedJob(kubectlPath, kubeconfigPaths, ns, cronJobName, kctx string) (jobName, jobUID string, found bool) {
+	cronJobUID, err := getCronJobUID(kubectlPath, kubeconfigPaths, ns, cronJobName, kctx)
+	if err != nil {
+		logger.Error("Failed to read CronJob UID", "cronjob", cronJobName, "error", err)
+		return "", "", false
+	}
+
 	getArgs := []string{"get", "jobs", "-n", ns, "--context", kctx, "-o", "json"}
 	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(getArgs)...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
@@ -59,7 +67,7 @@ func latestOwnedJob(kubectlPath, kubeconfigPaths, ns, cronJobName, kctx string) 
 				CreationTimestamp time.Time `json:"creationTimestamp"`
 				OwnerReferences   []struct {
 					Kind string `json:"kind"`
-					Name string `json:"name"`
+					UID  string `json:"uid"`
 				} `json:"ownerReferences"`
 			} `json:"metadata"`
 		} `json:"items"`
@@ -73,7 +81,7 @@ func latestOwnedJob(kubectlPath, kubeconfigPaths, ns, cronJobName, kctx string) 
 	for _, item := range list.Items {
 		owned := false
 		for _, ref := range item.Metadata.OwnerReferences {
-			if ref.Kind == "CronJob" && ref.Name == cronJobName {
+			if ref.Kind == "CronJob" && ref.UID == cronJobUID {
 				owned = true
 				break
 			}
@@ -81,7 +89,12 @@ func latestOwnedJob(kubectlPath, kubeconfigPaths, ns, cronJobName, kctx string) 
 		if !owned {
 			continue
 		}
-		if !found || item.Metadata.CreationTimestamp.After(latestTS) {
+		// On an exact timestamp tie, the higher Job name wins so the pick
+		// stays deterministic regardless of API return order.
+		newer := !found ||
+			item.Metadata.CreationTimestamp.After(latestTS) ||
+			(item.Metadata.CreationTimestamp.Equal(latestTS) && item.Metadata.Name > jobName)
+		if newer {
 			jobName = item.Metadata.Name
 			jobUID = item.Metadata.UID
 			latestTS = item.Metadata.CreationTimestamp
@@ -89,6 +102,32 @@ func latestOwnedJob(kubectlPath, kubeconfigPaths, ns, cronJobName, kctx string) 
 		}
 	}
 	return jobName, jobUID, found
+}
+
+// getCronJobUID reads the live CronJob's UID via kubectl, so ownership can be
+// matched by UID rather than name (see latestOwnedJob).
+func getCronJobUID(kubectlPath, kubeconfigPaths, ns, name, kctx string) (string, error) {
+	getArgs := []string{"get", "cronjob", name, "-n", ns, "--context", kctx, "-o", "json"}
+	cmd := exec.Command(kubectlPath, k8s.DemoKubectlArgs(getArgs)...)
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+	logExecCmd("Running kubectl command", cmd)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	var obj struct {
+		Metadata struct {
+			UID string `json:"uid"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal(out, &obj); err != nil {
+		return "", err
+	}
+	if obj.Metadata.UID == "" {
+		return "", errCronJobUIDMissing
+	}
+	return obj.Metadata.UID, nil
 }
 
 // podSelectorHasPods reports whether at least one pod currently matches
