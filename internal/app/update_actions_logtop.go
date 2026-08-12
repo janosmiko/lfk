@@ -14,8 +14,11 @@ import (
 // parsed and aggregated rather than displayed verbatim.
 func (m Model) executeActionLogTop() (tea.Model, tea.Cmd) {
 	kind := m.actionCtx.kind
+	// Job and CronJob are absent on purpose: batch workloads do not emit the
+	// HTTP access-log shape this view aggregates, and a CronJob has no pod
+	// selector at all, so Log Top is not offered for either kind.
 	isGroupResource := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
-		kind == "Job" || kind == "CronJob" || kind == "Service"
+		kind == "Service"
 
 	m.mode = modeLogTop
 	m.resetLogBuffer()

@@ -299,7 +299,6 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View job logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
@@ -315,14 +314,9 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 			{Label: "Logs", Description: "View cronjob logs", Key: "L"},
-			{Label: "Log Top", Description: "Aggregate logs by method/host/path/status", Key: "t"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
-			// Key "r" not "t": Log Top moved onto "t" (TASK-891, freeing "T" for
-			// Export Template) and this menu already had Trigger on "t".
-			// "r" fits the file's "run it" family (Restart, Resume Workflow,
-			// Reconcile, ...).
-			{Label: "Trigger", Description: "Create a Job from this CronJob", Key: "r"},
+			{Label: "Trigger", Description: "Create a Job from this CronJob", Key: "t"},
 			{Label: "Suspend/Resume", Description: "Suspend or resume the schedule (spec.suspend)", Key: "S"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},

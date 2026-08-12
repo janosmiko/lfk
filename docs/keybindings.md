@@ -565,7 +565,7 @@ Auto-reconnect across init containers: when viewing logs for a single Pod in all
 
 ## Log Top
 
-Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `t`) or press `T` in the open log viewer. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
+Log Top aggregates a resource's logs into a table grouped by parsed attributes (e.g. method + path for HTTP, or any JSON/logfmt keys). Columns auto-fit the terminal width - wider terminals show more (up to all of REQ, REQ/s, ERR%, %, ERR, 4XX, 5XX, AVG, P50/P95/P99, MAX); narrower ones show the highest-priority columns. `,` toggles/reorders columns explicitly. Launch from the resource action menu ("Log Top", quick-key `t`) or press `T` in the open log viewer. Offered for Pods, Services, Deployments, StatefulSets and DaemonSets; not for Jobs or CronJobs, whose batch output does not carry the access-log shape this view parses. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined (nginx, Apache, Traefik default access logs), JSON, and logfmt. Config: `log_top_default_profile` (`auto` | `traefik-json` | `ingress-nginx` | `nginx-combined` | `envoy` | `json` | `logfmt`).
 
 | Key | Action |
 |---|---|
