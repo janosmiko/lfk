@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.17.0](https://github.com/janosmiko/lfk/compare/v0.16.1...v0.17.0) (2026-08-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* action-menu keys changed. Export Template is "T"; Log Top, Terminate Sync and Terminate Workflow move from "T" to "t". Log Top is no longer offered on Jobs or CronJobs.
+
+### Features
+
+* add a built-in demo cluster behind --demo (TASK-865) ([#594](https://github.com/janosmiko/lfk/issues/594)) ([63793e5](https://github.com/janosmiko/lfk/commit/63793e53d2f7ac34b4ae5c60d00297602e331185))
+* add a tainted-string type for cluster-sourced fields (TASK-874) ([#610](https://github.com/janosmiko/lfk/issues/610)) ([4598a69](https://github.com/janosmiko/lfk/commit/4598a69f6123cfa8fc9f5795d408a113b47c20bf))
+* add an Undeliverable view for resources stuck waiting (TASK-855) ([#609](https://github.com/janosmiko/lfk/issues/609)) ([6688498](https://github.com/janosmiko/lfk/commit/6688498ff79d7db4e6d2008a468e2378e6a8c791))
+* delete saved user templates from the template picker ([#619](https://github.com/janosmiko/lfk/issues/619)) ([6333f47](https://github.com/janosmiko/lfk/commit/6333f47dd0fbb17c939077ca441361a38784bb62))
+* export a live resource as a reusable template (TASK-866) ([#618](https://github.com/janosmiko/lfk/issues/618)) ([3bae421](https://github.com/janosmiko/lfk/commit/3bae42198137f630dd562dc7a6fa0d656a8c1742))
+* hide actions the current user is not allowed to run (TASK-872) ([#600](https://github.com/janosmiko/lfk/issues/600)) ([347e39e](https://github.com/janosmiko/lfk/commit/347e39e2e9c9d450a42e78bbdebcd96f688def0d))
+* name the person on every lfk write ([#586](https://github.com/janosmiko/lfk/issues/586)) ([5230859](https://github.com/janosmiko/lfk/commit/5230859decf190c67a405e2d375af1b85a1a37a6))
+* show field-manager blame in the YAML viewer ([#584](https://github.com/janosmiko/lfk/issues/584)) ([8fffe94](https://github.com/janosmiko/lfk/commit/8fffe9499b11fe5cace68937c20691af1d6cc388))
+* show the blast radius in destructive confirm dialogs ([#589](https://github.com/janosmiko/lfk/issues/589)) ([2e2a875](https://github.com/janosmiko/lfk/commit/2e2a87542796c775cfdb93d33265407fc51649a2))
+* show the cluster schema description of the field under the cursor ([#588](https://github.com/janosmiko/lfk/issues/588)) ([b0fbbbf](https://github.com/janosmiko/lfk/commit/b0fbbbf0353553bc6ef8427a79e3951fe3c4be58))
+* state the cost of a destructive action as Scope, Availability and Risk (TASK-862, TASK-877) ([#599](https://github.com/janosmiko/lfk/issues/599)) ([8349246](https://github.com/janosmiko/lfk/commit/8349246e37bf62f5fccf8d5328aff74d83752194))
+
+
+### Bug Fixes
+
+* bound and redact the kubectl explain subprocesses (TASK-869) ([#596](https://github.com/janosmiko/lfk/issues/596)) ([f57406e](https://github.com/janosmiko/lfk/commit/f57406e6880b8b80ffb8920652611bef3d6bcdfc))
+* correct orphan overview keybinding from Shift+O to Shift+Z in docs ([#611](https://github.com/janosmiko/lfk/issues/611)) ([d2d0b4e](https://github.com/janosmiko/lfk/commit/d2d0b4eae748de28b5e693198156caecac2e64e4))
+* drop API Explorer replies from an older session (TASK-876) ([#601](https://github.com/janosmiko/lfk/issues/601)) ([098c1b8](https://github.com/janosmiko/lfk/commit/098c1b8c7cb2191a74f0d320a61d239fa860f869))
+* fail loudly on a marshalled tainted.String, drop dead event fields (TASK-887) ([#615](https://github.com/janosmiko/lfk/issues/615)) ([efbba3e](https://github.com/janosmiko/lfk/commit/efbba3e3a0ac7152019a716e3a6c7fb8aa2761f0))
+* key saved templates by namespace, not just name ([#621](https://github.com/janosmiko/lfk/issues/621)) ([fa80fcd](https://github.com/janosmiko/lfk/commit/fa80fcd602b8bb39e44edafc02e7b6cda9a55e36))
+* measure emoji icons the way the terminal does ([#604](https://github.com/janosmiko/lfk/issues/604)) ([#605](https://github.com/janosmiko/lfk/issues/605)) ([6b9a83b](https://github.com/janosmiko/lfk/commit/6b9a83b48cc0a0b4e1f4c0ab9607505f45b2752e))
+* measure wrapCrashText by display width (TASK-882) ([#607](https://github.com/janosmiko/lfk/issues/607)) ([3f4d614](https://github.com/janosmiko/lfk/commit/3f4d61454a4d647ebd668533de496e13ddb515df))
+* open a restored session on its saved view ([#593](https://github.com/janosmiko/lfk/issues/593)) ([9554cf7](https://github.com/janosmiko/lfk/commit/9554cf7a37f3c8452979413107a5df49b21ca907))
+* report a status message when every multi-log stream fails to start ([#622](https://github.com/janosmiko/lfk/issues/622)) ([34c562a](https://github.com/janosmiko/lfk/commit/34c562ad547e577aba9b8041a5b950dfa6a8ca7a))
+* resolve CronJob logs through its newest Job's pods ([#620](https://github.com/janosmiko/lfk/issues/620)) ([de31d3a](https://github.com/janosmiko/lfk/commit/de31d3a30a55a6d23705a57da3a02ecfa29e5630))
+* resume the API Explorer schema load on tab restore (TASK-878) ([#602](https://github.com/janosmiko/lfk/issues/602)) ([5d55a3f](https://github.com/janosmiko/lfk/commit/5d55a3f1f82db1cb5944e1ebc45b3649d3893eb8))
+* resume the API Explorer's pending fetch, not its last level (TASK-879) ([#608](https://github.com/janosmiko/lfk/issues/608)) ([537a844](https://github.com/janosmiko/lfk/commit/537a8449f48b25df3c40f39807a474166f06e526))
+* route port-forward and apply argv through the demo helper (TASK-875) ([#603](https://github.com/janosmiko/lfk/issues/603)) ([59d9ca1](https://github.com/janosmiko/lfk/commit/59d9ca148cff1af0fde5f8905acf649f91fa6a8e))
+* sanitize every status-bar message at its shared sink (TASK-884) ([#612](https://github.com/janosmiko/lfk/issues/612)) ([e44c5cd](https://github.com/janosmiko/lfk/commit/e44c5cd8bbd50d324e348a860cf1afeb0671a123))
+* sanitize terminal escapes in describe, YAML, event and editor sinks (TASK-873) ([#595](https://github.com/janosmiko/lfk/issues/595)) ([a390fd2](https://github.com/janosmiko/lfk/commit/a390fd2a0bc6ab05b7e9cf7c2d31da72aed21965))
+* sanitize the render sinks TASK-873 did not reach (TASK-880) ([#606](https://github.com/janosmiko/lfk/issues/606)) ([2f79f42](https://github.com/janosmiko/lfk/commit/2f79f422f7816db34fa1e5151bb60c001ecb86f1))
+* stop the orphan scanner reporting a kind whose referencing lists failed (TASK-886) ([#614](https://github.com/janosmiko/lfk/issues/614)) ([aa19af3](https://github.com/janosmiko/lfk/commit/aa19af3827c0c969390b0f494147726846655f39))
+
 ## [0.16.1](https://github.com/janosmiko/lfk/compare/v0.16.0...v0.16.1) (2026-08-06)
 
 
