@@ -172,6 +172,7 @@ log_viewer:
   show_prefixes: true
   show_timestamps: false
   preview_live: false
+  wrap: false
 ```
 
 | Field | Type | Default | Description |
@@ -184,6 +185,7 @@ log_viewer:
 | `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `toggle_timestamps` (`s`). |
 | `preview_live` | bool | `false` | Startup default for the right-pane live-log preview. When true the explorer opens with live logs streaming in the right pane for the selected pod. Runtime toggle: `toggle_preview_logs` (`L`). |
 | `max_lines` | int | `50000` | Max streamed log lines retained per tab; once exceeded, the oldest lines are dropped so a long-running follow stays bounded in memory. Clamped to `[1000, 1000000]`. |
+| `wrap` | bool | `false` | Startup default for log line wrapping. Runtime toggle: `toggle_wrap` (`>`). |
 
 The deprecated flat keys `log_tail_lines`, `log_tail_lines_short`, and `log_render_ansi` are still accepted as aliases; when both a flat key and its `log_viewer` equivalent are set, `log_viewer` wins.
 

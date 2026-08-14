@@ -74,6 +74,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			previewVisible: ui.ConfigLogShowPreview,
 			hidePrefixes:   !ui.ConfigLogShowPrefixes,
 			timestamps:     ui.ConfigLogShowTimestamps,
+			wrap:           ui.ConfigLogWrap,
 		},
 		pinnedState:             pinnedSt,
 		pinnedSummariesState:    pinnedSummariesSt,

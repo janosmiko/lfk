@@ -336,6 +336,7 @@ func applyLogViewerConfig(cfg configFile) {
 	applyBoolPtr(lv.ShowPrefixes, &ConfigLogShowPrefixes)
 	applyBoolPtr(lv.ShowTimestamps, &ConfigLogShowTimestamps)
 	applyBoolPtr(lv.PreviewLive, &ConfigLogPreviewLive)
+	applyBoolPtr(lv.Wrap, &ConfigLogWrap)
 	applyLogMaxLines(lv.MaxLines)
 }
 

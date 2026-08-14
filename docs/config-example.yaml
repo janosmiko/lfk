@@ -212,6 +212,7 @@ log_path: /tmp/lfk.log
 #   show_timestamps: false  # log line timestamps hidden on open
 #   preview_live: false     # right-pane live-log preview on explorer open (L to toggle)
 #   max_lines: 50000        # max retained log lines per tab (oldest dropped); clamped [1000, 1000000]
+#   wrap: false             # log lines wrapped on open (toggle: >)
 
 # ─── Viewer Defaults ─────────────────────────────────────────────────────────
 # Startup defaults for the fullscreen YAML / diff / describe viewers. A toggle

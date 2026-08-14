@@ -32,7 +32,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.follow = true
-	m.logView.wrap = false
+	m.logView.wrap = ui.ConfigLogWrap
 	m.logView.lineNumbers = true
 	m.logView.timestamps = ui.ConfigLogShowTimestamps
 	m.logView.hidePrefixes = !ui.ConfigLogShowPrefixes
