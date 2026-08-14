@@ -18,7 +18,7 @@ To cut a release manually (skipping `release-please`): `make release VERSION=X.Y
 | Channel | Account / Repo | Setup |
 |---|---|---|
 | Homebrew | `janosmiko/homebrew-tap` | Existing. PAT in `RELEASE_TAP_TOKEN`. |
-| Scoop | `janosmiko/scoop-bucket` | Empty repo with README + LICENSE. Same PAT. |
+| Scoop | `ScoopInstaller/Extras` | Manifest submitted as a one-time PR; the excavator bot auto-updates it. No owned repo. |
 | Winget | Fork of `microsoft/winget-pkgs` at `janosmiko/winget-pkgs` | PAT in `WINGET_TOKEN` with `contents:write` on the fork. |
 | AUR | aur.archlinux.org account `janosmiko` | SSH public key uploaded; `lfk-bin` reserved. Private key in `AUR_SSH_PRIVATE_KEY` (multi-line PEM). |
 | Chocolatey | chocolatey.org publisher `janosmiko` | API key in `CHOCOLATEY_API_KEY`. `lfk` package id reserved. |
@@ -32,7 +32,7 @@ To cut a release manually (skipping `release-please`): `make release VERSION=X.Y
 | `GITHUB_TOKEN` | release publish | auto, never rotate manually |
 | `RELEASE_PLEASE_TOKEN` | release-please CI | rotate annually |
 | `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` | Docker push | rotate annually |
-| `RELEASE_TAP_TOKEN` | Homebrew + Scoop | rotate annually |
+| `RELEASE_TAP_TOKEN` | Homebrew | rotate annually |
 | `WINGET_TOKEN` | Winget upstream PR | rotate annually |
 | `AUR_SSH_PRIVATE_KEY` | AUR push | rotate when key compromised |
 | `CHOCOLATEY_API_KEY` | choco push | rotate when key compromised |
@@ -50,7 +50,7 @@ goreleaser release --clean --config .goreleaser.yaml --skip=<comma-separated cha
 
 # Example: re-publish only Chocolatey (skip every other publisher; keep build, archive, sign, sbom).
 goreleaser release --clean --config .goreleaser.yaml \
-  --skip=brews,scoops,winget,aurs,nfpms,dockers,snapcrafts
+  --skip=brews,winget,aurs,nfpms,dockers,snapcrafts
 ```
 
 For Cloudsmith specifically, you can manually push:
@@ -65,7 +65,7 @@ cloudsmith push rpm janosmiko/lfk/any-distro/any-version dist/lfk_<version>_<arc
 Run after each release tag completes. Channels with classic Snap or first-time Chocolatey moderation may legitimately be "pending" — that's not a failure.
 
 - [ ] **Homebrew:** `brew update && brew upgrade lfk` on macOS or Linux; `lfk --version` matches.
-- [ ] **Scoop:** on Windows, `scoop update lfk && lfk --version`.
+- [ ] **Scoop:** the `ScoopInstaller/Extras` excavator bot auto-bumps the manifest within ~a day; then `scoop update lfk && lfk --version` on Windows.
 - [ ] **Winget:** check `https://github.com/microsoft/winget-pkgs/pulls?q=author%3Ajanosmiko` for the auto-PR. Once merged: `winget upgrade janosmiko.lfk`.
 - [ ] **AUR:** `https://aur.archlinux.org/packages/lfk-bin` shows the new version; `yay -Syu lfk-bin` on Arch.
 - [ ] **Chocolatey:** `https://chocolatey.org/packages/lfk` shows the new version (may say "Pending" for first submission). `choco upgrade lfk`.

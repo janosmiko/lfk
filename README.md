@@ -173,7 +173,8 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 brew install janosmiko/tap/lfk
 
 # Windows: Scoop
-scoop bucket add janosmiko https://github.com/janosmiko/scoop-bucket && scoop install lfk
+scoop bucket add extras
+scoop install lfk
 # or: winget install janosmiko.lfk
 # or: choco install lfk
 

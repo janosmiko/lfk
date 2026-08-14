@@ -98,19 +98,6 @@ brews:
     test: |
       system "#{bin}/lfk", "--version"
 
-scoops:
-  - repository:
-      owner: janosmiko
-      name: scoop-bucket
-      branch: main
-      token: "{{ .Env.RELEASE_TAP_TOKEN }}"
-    directory: bucket
-    name: lfk
-    homepage: "https://github.com/janosmiko/lfk"
-    description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
-    license: Apache-2.0
-    commit_msg_template: "chore: bump lfk to {{ .Tag }}"
-
 winget:
   - name: lfk
     publisher: janosmiko
