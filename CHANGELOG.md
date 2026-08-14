@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/janosmiko/lfk/compare/v0.17.0...v0.17.1) (2026-08-14)
+
+
+### Features
+
+* **logviewer:** add config setting for log wrap ([#624](https://github.com/janosmiko/lfk/issues/624)) ([7b15e2c](https://github.com/janosmiko/lfk/commit/7b15e2c6e32d36873bb4d5cb25414e86c4cf59a6))
+
 ## [0.17.0](https://github.com/janosmiko/lfk/compare/v0.16.1...v0.17.0) (2026-08-12)
 
 
