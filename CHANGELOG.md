@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.2](https://github.com/janosmiko/lfk/compare/v0.17.1...v0.17.2) (2026-08-15)
+
+
+### Bug Fixes
+
+* **test:** make the suite pass the way packagers build it ([#628](https://github.com/janosmiko/lfk/issues/628)) ([4c49389](https://github.com/janosmiko/lfk/commit/4c493891745dda0f71b1515de20efeedfd8c8e87))
+
 ## [0.17.1](https://github.com/janosmiko/lfk/compare/v0.17.0...v0.17.1) (2026-08-14)
 
 
