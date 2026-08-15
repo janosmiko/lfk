@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+
+	"github.com/janosmiko/lfk/internal/version"
 )
 
 func TestBuildFieldManager(t *testing.T) {
@@ -120,6 +122,7 @@ func TestFieldManager_DefaultsToTheOSUser(t *testing.T) {
 func TestUserAgent_NamesTheToolAndVersion(t *testing.T) {
 	got := UserAgent()
 
-	assert.True(t, strings.HasPrefix(got, "lfk/"), "got %q", got)
-	assert.Contains(t, got, "dev")
+	// Packagers inject the version with -ldflags, so "dev" only holds for a
+	// plain `go build`. Assert against the version compiled in.
+	assert.True(t, strings.HasPrefix(got, "lfk/"+version.Short()+" "), "got %q", got)
 }
