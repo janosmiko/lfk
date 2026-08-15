@@ -30,6 +30,13 @@ jobs:
         run: |
           go test -coverprofile=coverage.out -json ./... > test-report.json
 
+      # Packagers build with a version injected and expand packages one by one.
+      # Plain `go test ./...` passes both ways, so it misses those breaks (#627).
+      - name: Test as a packager builds
+        run: |
+          go test -ldflags "-X github.com/janosmiko/lfk/internal/version.Version=v9.9.9" ./...
+          go test ./e2e
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
         with:
