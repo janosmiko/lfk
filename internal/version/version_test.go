@@ -6,7 +6,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFull_DefaultValues(t *testing.T) {
+// Set the placeholders rather than trusting them: a packager build injects
+// real values with -ldflags, so the compiled-in defaults are not "dev".
+func TestFull_PlaceholderValues(t *testing.T) {
+	origVersion := Version
+	origCommit := GitCommit
+	origDate := BuildDate
+
+	t.Cleanup(func() {
+		Version = origVersion
+		GitCommit = origCommit
+		BuildDate = origDate
+	})
+
+	Version = "dev"
+	GitCommit = "unknown"
+	BuildDate = "unknown"
+
 	got := Full()
 	expected := "lfk dev (commit: unknown, built: unknown)"
 
@@ -34,7 +50,15 @@ func TestFull_CustomValues(t *testing.T) {
 	assert.Equal(t, expected, got)
 }
 
-func TestShort_DefaultValue(t *testing.T) {
+func TestShort_PlaceholderValue(t *testing.T) {
+	origVersion := Version
+
+	t.Cleanup(func() {
+		Version = origVersion
+	})
+
+	Version = "dev"
+
 	got := Short()
 
 	assert.Equal(t, "dev", got)
