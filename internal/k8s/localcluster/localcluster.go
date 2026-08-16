@@ -187,7 +187,7 @@ func ByName(name string) Provider {
 // --- providers ---
 //
 // Each provider type has a runner field for the os/exec seam. Real
-// lifecycle implementations live in kind.go, k3d.go, and minikube.go;
+// lifecycle implementations live in kind.go, k3d.go, and minikube.go.
 // k3d and minikube also satisfy LifecycleProvider via Start/Stop
 // methods declared in their respective files. The trivial Name and
 // Installed methods stay here (provider-uniform shape).

@@ -18,8 +18,8 @@ import (
 const tickerFieldManager = "lfk-demo-ticker"
 
 // maxTickerEvents caps how many Warning Events the ticker keeps appending
-// for the crashlooping pod. A demo session left running ticks indefinitely;
-// without a cap the Event list would grow without bound.
+// for the crashlooping pod. A demo session left running ticks indefinitely.
+// Without a cap the Event list would grow without bound.
 const maxTickerEvents = 20
 
 // healthyPodFlipEvery is how many ticks pass between phase flips on
@@ -43,12 +43,12 @@ var waitingReasons = []string{"CrashLoopBackOff", "Error"}
 var deploymentReadyReplicaCycle = []int64{6, 6, 5}
 
 // Ticker mutates a demo cluster's fake dynamic client on a fixed interval so
-// its informer-backed watchers see live changes: the crashlooping pod
-// restarts and its waiting reason rotates, a matching Warning Event lands, a
-// healthy pod's phase flips occasionally, and the web Deployment's
+// its informer-backed watchers see live changes. The crashlooping pod
+// restarts and its waiting reason rotates, and a matching Warning Event
+// lands. A healthy pod's phase flips occasionally, and the web Deployment's
 // readyReplicas drifts. Every mutation is a deterministic function of the
 // tick count, so driving a fresh Ticker N times always reaches the same
-// state — tests and screenshots stay stable.
+// state. Tests and screenshots stay stable.
 //
 // Ticker only touches the dynamic client passed to NewTicker. It is not
 // wired into any client lifecycle here.
@@ -77,8 +77,8 @@ type actionClearer interface {
 // NewTicker returns a Ticker over dyn that, once started, mutates the demo
 // cluster every interval. It does not touch dyn until Start or Tick is
 // called. extraClearers are additional fake clients (e.g. the typed demo
-// clientset) whose action log gets cleared on the same cadence as dyn's,
-// even though the ticker itself never calls them — the app's own List/Get
+// clientset). Their action log gets cleared on the same cadence as dyn's,
+// even though the ticker itself never calls them. The app's own List/Get
 // calls share those fakes and grow their action log too.
 func NewTicker(dyn dynamic.Interface, interval time.Duration, extraClearers ...actionClearer) *Ticker {
 	return &Ticker{dyn: dyn, interval: interval, extraClearers: extraClearers}
@@ -105,9 +105,9 @@ func (t *Ticker) Start(ctx context.Context) {
 func (t *Ticker) run(ctx context.Context, done chan struct{}) {
 	defer func() {
 		// A goroutine that exits because ctx was cancelled by something
-		// other than Stop (Stop cancels this same runCtx too, so this path
-		// also fires there) must clear running itself — otherwise a later
-		// Start call sees running still true and silently no-ops even
+		// other than Stop must clear running itself. Stop cancels this same
+		// runCtx too, so this path also fires there. Otherwise a later
+		// Start call sees running still true and silently no-ops, even
 		// though nothing is left mutating the demo cluster. Guarded by
 		// t.done == done so a concurrent Stop that already reset running
 		// (and possibly started a fresh run) is never clobbered.
@@ -134,7 +134,7 @@ func (t *Ticker) run(ctx context.Context, done chan struct{}) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Best-effort: a single failed mutation should not take down
+			// Best-effort: a single failed mutation must not take down
 			// the background loop. The caller wiring this in decides
 			// whether failures need surfacing.
 			_ = t.Tick(ctx)
@@ -146,7 +146,7 @@ func (t *Ticker) run(ctx context.Context, done chan struct{}) {
 // Idempotent and safe to call even if Start was never called. Concurrent
 // Stop calls all wait for the same goroutine to exit before any of them
 // return. Start and Stop are not safe to call concurrently with each
-// other — serialize lifecycle calls at the call site.
+// other. Serialize lifecycle calls at the call site.
 func (t *Ticker) Stop() {
 	t.mu.Lock()
 	if !t.running {
@@ -195,9 +195,9 @@ func (t *Ticker) Tick(ctx context.Context) error {
 
 // clearActionLogs drops the Actions() log accumulated on dyn and every
 // extra clearer since the last call. Runs at the end of every Tick
-// regardless of error, so a demo session left running overnight (about
-// 28,800 ticks a day at the 3s interval) never retains more than one tick's
-// worth of action history in memory.
+// regardless of error. A demo session left running overnight ticks about
+// 28,800 times a day at the 3s interval. So it never retains more than one
+// tick's worth of action history in memory.
 func (t *Ticker) clearActionLogs() {
 	if clearer, ok := t.dyn.(actionClearer); ok {
 		clearer.ClearActions()

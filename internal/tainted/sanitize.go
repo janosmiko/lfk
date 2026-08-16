@@ -54,14 +54,14 @@ func isBidiOverride(r rune) bool {
 }
 
 // logTabWidth is the column step used when expanding tab characters in
-// log lines. 8 matches the default tab stop on virtually every terminal,
-// so the post-expansion text aligns the way a user pasting the same line
-// into their shell would expect.
+// log lines. 8 matches the default tab stop on virtually every terminal.
+// The post-expansion text then aligns the way a user pasting the same
+// line into their shell would expect.
 const logTabWidth = 8
 
 // SanitizeLogBody is the exported entry point to sanitizeLogLine for sinks
-// outside this file (describe content, command-bar output) that render a
-// BODY rather than a name or title: unlike SanitizeTerminalText, it keeps
+// outside this file (describe content, command-bar output). It renders a
+// BODY rather than a name or title. Unlike SanitizeTerminalText, it keeps
 // SGR colour sequences and expands tabs instead of dropping them. See
 // sanitizeLogLine for the full behaviour.
 func SanitizeLogBody(s string, renderAnsi bool) string {
@@ -70,12 +70,12 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 
 // sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
 // control range minus tab, and the C1 range U+0080-U+009F) with the
-// Unicode replacement character and expands tab characters to spaces
-// using a logTabWidth-column tab stop. Binary data from processes like
-// MySQL handshakes contains bytes that break terminal width calculations
-// and corrupt the viewer layout. C1 controls (raw or UTF-8-encoded, e.g.
-// U+009B "CSI") let a log line hijack the terminal on emulators that
-// honour 8-bit C1 (VTE, Linux console).
+// Unicode replacement character. It also expands tab characters to
+// spaces using a logTabWidth-column tab stop. Binary data from processes
+// like MySQL handshakes contains bytes that break terminal width
+// calculations and corrupt the viewer layout. C1 controls (raw or
+// UTF-8-encoded, e.g. U+009B "CSI") let a log line hijack the terminal
+// on emulators that honour 8-bit C1 (VTE, Linux console).
 //
 // Tab expansion is required because lipgloss.Width treats '\t' as
 // zero-width while the terminal renders it as a jump to the next tab
@@ -87,23 +87,24 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 // logs in particular - those use tabs to separate timestamp / level /
 // logger / message.
 //
-// When renderAnsi is true, valid CSI SGR sequences (ESC [ params m — the
-// ones that set colour, bold, underline, etc.) are preserved verbatim so
-// log producers that emit ANSI colours render as intended. Non-SGR CSI
-// sequences (cursor movement, screen erase) remain unsafe for an inline
-// viewer and are still replaced. A bare ESC with no valid CSI introducer
-// is replaced too. Leaving it would cause terminals to wait for a
-// follow-up byte and mis-interpret subsequent output.
+// When renderAnsi is true, valid CSI SGR sequences (ESC [ params m, the
+// ones that set colour, bold, underline, etc.) are preserved verbatim.
+// So log producers that emit ANSI colours render as intended. Non-SGR
+// CSI sequences (cursor movement, screen erase) remain unsafe for an
+// inline viewer and are still replaced. A bare ESC with no valid CSI
+// introducer is replaced too. Leaving it would cause terminals to wait
+// for a follow-up byte and mis-interpret subsequent output.
 //
-// C1 detection is decode-aware, not a raw byte-range check: a byte-level
+// C1 detection is decode-aware, not a raw byte-range check. A byte-level
 // test for 0x80-0x9F would also catch UTF-8 continuation bytes of
-// ordinary non-ASCII runes (many common accented Latin, CJK, emoji, and
-// box-drawing characters have a continuation byte in that range) and
-// mangle them. Every non-ASCII byte is instead decoded to its full rune;
-// only a rune that actually equals U+0080-U+009F is replaced, whether it
-// arrived as a raw invalid byte or a valid two-byte UTF-8 encoding (e.g.
-// 0xC2 0x9B for U+009B). Anything else - including genuinely invalid
-// UTF-8 outside the C1 range - copies through as before.
+// ordinary non-ASCII runes. Many common accented Latin, CJK, emoji, and
+// box-drawing characters have a continuation byte in that range, and the
+// test would mangle them. Every non-ASCII byte is instead decoded to its
+// full rune. Only a rune that actually equals U+0080-U+009F is replaced,
+// regardless of whether it arrived as a raw invalid byte or a valid
+// two-byte UTF-8 encoding. For example, 0xC2 0x9B stands for U+009B.
+// Anything else - including genuinely invalid UTF-8 outside the C1
+// range - copies through as before.
 func sanitizeLogLine(s string, renderAnsi bool) string {
 	// Fast path: no control bytes, tabs needing expansion, or non-ASCII
 	// bytes means no work to do. Any byte >= 0x80 must go through the
@@ -154,10 +155,10 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 			i++
 			continue
 		}
-		// Non-ASCII byte: decode the full rune so a C1 control encoded
+		// Non-ASCII byte: decode the full rune. A C1 control encoded
 		// as two valid UTF-8 bytes is judged by its decoded value, not
-		// by the raw continuation byte (see the C1 detection note
-		// above).
+		// by the raw continuation byte. See the C1 detection note
+		// above.
 		r, size := utf8.DecodeRuneInString(s[i:])
 		switch {
 		case r == utf8.RuneError && size <= 1:
@@ -194,7 +195,7 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 // starting at s[i], or i if no valid sequence is present. Only SGR
 // (Select Graphic Rendition) finals are accepted because they set
 // colour and text attributes without moving the cursor or clearing the
-// screen — preserving them is safe in an inline viewer, whereas other
+// screen. Preserving them is safe in an inline viewer, whereas other
 // CSI finals would corrupt the layout.
 func parseSGRSequence(s string, i int) int {
 	if i+1 >= len(s) || s[i] != 0x1b || s[i+1] != '[' {
@@ -203,16 +204,16 @@ func parseSGRSequence(s string, i int) int {
 	j := i + 2
 	// Parameter bytes: digits, ';' and ':' only (truecolour uses both
 	// separators). This deliberately excludes the private markers < = > ?
-	// and the CSI intermediate bytes 0x20-0x2F: `CSI > Ps ; Ps m` is
-	// XTMODKEYS, which reprograms xterm's keyboard-modifier reporting, so
-	// forwarding a private marker let a cluster-controlled line change
-	// terminal state after rendering (TASK-885).
+	// and the CSI intermediate bytes 0x20-0x2F. `CSI > Ps ; Ps m` is
+	// XTMODKEYS, which reprograms xterm's keyboard-modifier reporting.
+	// So forwarding a private marker let a cluster-controlled line
+	// change terminal state after rendering (TASK-885).
 	for j < len(s) && (s[j] == ';' || s[j] == ':' || (s[j] >= '0' && s[j] <= '9')) {
 		j++
 	}
-	// SGR final byte is lowercase 'm'. Anything else - including a private
-	// marker or intermediate byte that stopped the loop above - is a CSI
-	// we can't safely forward to an inline viewer.
+	// SGR final byte is lowercase 'm'. Anything else, including a private
+	// marker or intermediate byte that stopped the loop above, is a CSI.
+	// We can't safely forward it to an inline viewer.
 	if j < len(s) && s[j] == 'm' {
 		return j + 1
 	}

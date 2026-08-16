@@ -63,7 +63,7 @@ func (p *k3dProvider) List(ctx context.Context) ([]Cluster, error) {
 		}
 		// Nodes counts only servers + agents. k3d also adds a default
 		// load-balancer container per cluster, but that's implementation
-		// detail, not topology — the manager UI's "node count" should
+		// detail, not topology. The manager UI's "node count" should
 		// reflect what the user asked for, not container count.
 		out = append(out, Cluster{
 			Provider:    "k3d",

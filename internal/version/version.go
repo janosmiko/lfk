@@ -19,12 +19,12 @@ var (
 	BuildDate = "unknown"
 )
 
-// Full returns a human-readable multi-line version string.
+// Full returns a human-readable version string.
 func Full() string {
 	return fmt.Sprintf("lfk %s (commit: %s, built: %s)", Version, GitCommit, BuildDate)
 }
 
-// Short returns just the version tag (e.g., "dev" or "v1.2.3").
+// Short returns the version tag (e.g., "dev" or "v1.2.3").
 func Short() string {
 	return Version
 }

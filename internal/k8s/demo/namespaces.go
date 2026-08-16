@@ -10,8 +10,9 @@ import (
 
 // buildNamespaces returns a Namespace object for every namespace the seed
 // data uses (NamespaceDemo, NamespaceJobs), plus the two namespaces every
-// real cluster has (default, kube-system), so the namespace picker and
-// GetNamespaces count reflect a coherent cluster instead of reporting zero.
+// real cluster has (default, kube-system). This way the namespace picker
+// and GetNamespaces count reflect a coherent cluster instead of reporting
+// zero.
 func buildNamespaces() []*corev1.Namespace {
 	return []*corev1.Namespace{
 		namespace(NamespaceDemo, uidNamespaceDemo, demoEpoch.Add(-30*24*time.Hour)),

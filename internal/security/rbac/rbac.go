@@ -1,8 +1,7 @@
-// Package rbac implements a zero-dependency security.SecuritySource that
-// audits Roles, ClusterRoles, and their bindings for privilege-escalation
-// paths and over-broad grants: wildcard rules, impersonation, bind/escalate,
-// exec/attach/port-forward, kubelet and webhook control, CSR approval,
-// cluster-wide secret reads, and bindings to anonymous users,
+// Package rbac implements a zero-dependency security.SecuritySource that audits Roles, ClusterRoles,
+// and their bindings for privilege-escalation paths and over-broad grants. Checks cover wildcard
+// rules, impersonation, bind/escalate, exec/attach/port-forward, kubelet and webhook control, and CSR
+// approval. They also cover cluster-wide secret reads, and bindings to anonymous users,
 // system:masters, cluster-admin, or the default ServiceAccount.
 //
 // Kubernetes bootstrap objects (label kubernetes.io/bootstrapping:
@@ -67,8 +66,8 @@ type rbacData struct {
 // built-in set: bootstrap-labeled (kubeadm defaults, aggregated admin/edit/
 // view) or system:-prefixed. Built-ins legitimately hold broad grants.
 //
-// Known tradeoff: the API server does not reserve the system: prefix, so a
-// principal who can already write RBAC objects could name one "system:..."
+// Known tradeoff: the API server does not reserve the system: prefix. A
+// principal who can already write RBAC objects can name one "system:..."
 // to evade this audit. The source is a misconfiguration finder, not an
 // intrusion detector — an attacker with RBAC write access is already past
 // what it can see. Documented in docs/security.md.

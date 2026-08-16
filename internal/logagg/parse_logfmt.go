@@ -25,10 +25,8 @@ func (logfmtParser) Parse(line string) (Fields, bool) {
 		// m[3] is the content within quotes (empty if unquoted)
 		var val string
 		if m[2][0] == '"' {
-			// Quoted value: use the unquoted content from group 3
 			val = m[3]
 		} else {
-			// Unquoted value: use the raw value from group 2
 			val = m[2]
 		}
 		if norm, ok := jsonKeyAliases[key]; ok {

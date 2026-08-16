@@ -74,8 +74,8 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists pods in the given namespace (empty = all namespaces) and runs
-// every registered check against every container, then the best-effort
-// non-pod scans (Services, namespaces, ConfigMaps, Ingresses).
+// every registered check against every container. Then it runs the
+// best-effort non-pod scans (Services, namespaces, ConfigMaps, Ingresses).
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil

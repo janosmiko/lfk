@@ -158,9 +158,9 @@ func (sc *StderrCapture) readLoop() {
 			if msg != "" {
 				// Redact tokens/credentials before logging or surfacing to the
 				// TUI. Exec credential plugins (AWS SSO, gke-gcloud-auth-plugin,
-				// OIDC helpers) routinely emit short-lived tokens to stderr,
-				// and the TUI message also flows through setStatusMessage which
-				// re-logs it — so we must redact at the source.
+				// OIDC helpers) routinely emit short-lived tokens to stderr, and
+				// the TUI message also flows through setStatusMessage which
+				// re-logs it. So we must redact at the source.
 				redacted := Redact(msg)
 				// Dedup identical lines per rolling window. A wedged exec
 				// credential plugin (expired SSO, missing VPN) emits the
@@ -179,8 +179,8 @@ func (sc *StderrCapture) readLoop() {
 				// A kubeconfig exec credential plugin (AWS SSO, gke auth) writes
 				// its credential error here with no cluster context. The failing
 				// in-process API call is tagged with the context separately (see
-				// internal/k8s credTaggingRoundTripper), so demote this contextless
-				// duplicate to Debug and keep it out of the in-app overlay rather
+				// internal/k8s credTaggingRoundTripper). So demote this contextless
+				// duplicate to Debug and keep it out of the in-app overlay, rather
 				// than surfacing an unactionable "which cluster?" line.
 				if looksLikeExecCredentialStderr(redacted) {
 					Logger.Debug(redacted, args...)

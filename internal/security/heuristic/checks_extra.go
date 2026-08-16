@@ -9,10 +9,9 @@ import (
 	"github.com/janosmiko/lfk/internal/security"
 )
 
-// checkEnvFromSecret flags containers importing entire Secrets into their
-// environment via envFrom. Unlike secret_env (which inspects literal env
-// values by name and never sees envFrom), this exposes every key of the
-// Secret to the whole process environment, where it leaks via
+// checkEnvFromSecret flags containers importing entire Secrets via envFrom.
+// Unlike secret_env (name-based, doesn't see envFrom), this exposes every
+// Secret key to the whole process environment, leaking via
 // /proc/<pid>/environ, crash dumps, and child processes. The summary lists
 // Secret names only — never values.
 func checkEnvFromSecret(pod *corev1.Pod, c corev1.Container) []security.Finding {

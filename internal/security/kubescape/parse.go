@@ -10,8 +10,8 @@ import (
 )
 
 // parseSeverity converts Kubescape's numeric severity (1-10 scale) into
-// our coarser bucketed Severity. Kubescape uses 1=info ... 10=critical;
-// we collapse to the four UI buckets the rest of the explorer renders.
+// our coarser bucketed Severity. Kubescape uses 1=info ... 10=critical.
+// We collapse that to the four UI buckets the rest of the explorer renders.
 func parseSeverity(score float64) security.Severity {
 	switch {
 	case score >= 9:
@@ -26,19 +26,18 @@ func parseSeverity(score float64) security.Severity {
 	return security.SeverityUnknown
 }
 
-// targetRefFromName parses the WorkloadConfigurationScan name into a
-// ResourceRef. Kubescape names scans as "<kind-lower>-<workload-name>"
-// (e.g., "deployment-api"); when the leading kind isn't recognised we
-// fall back to using the entire name as the resource Name and leave Kind
-// empty so shortResource renders "(unknown resource)" rather than
-// fabricating a wrong Kind. Namespace comes from the CR itself.
+// targetRefFromName parses the WorkloadConfigurationScan name into a ResourceRef. Kubescape names
+// scans as "<kind-lower>-<workload-name>" (e.g., "deployment-api"). When the leading kind is not
+// recognised, we fall back to using the entire name as the resource Name and leave Kind empty.
+// shortResource then renders "(unknown resource)" rather than fabricating a wrong Kind. Namespace
+// comes from the CR itself.
 func targetRefFromName(name, namespace string) security.ResourceRef {
 	parts := strings.SplitN(name, "-", 2)
 	if len(parts) != 2 {
 		return security.ResourceRef{Namespace: namespace, Name: name}
 	}
 	kind, rest := parts[0], parts[1]
-	// Kubescape lower-cases the kind in the scan name; restore the
+	// Kubescape lower-cases the kind in the scan name. Restore the
 	// canonical capitalisation for common workload kinds. Unknown kinds
 	// fall through with the lower-cased value preserved so the row still
 	// surfaces the real workload name.
@@ -121,7 +120,7 @@ func parseWorkloadConfigurationScan(u *unstructured.Unstructured) []security.Fin
 
 // isFailingStatus reports whether a control's status string indicates a
 // finding worth surfacing. Kubescape uses "passed" / "failed" / "skipped"
-// / "irrelevant"; only "failed" produces a Finding.
+// / "irrelevant". Only "failed" produces a Finding.
 func isFailingStatus(s string) bool {
 	return strings.EqualFold(s, "failed")
 }

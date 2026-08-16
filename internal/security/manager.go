@@ -44,11 +44,10 @@ type Manager struct {
 	cachedIndex   *FindingIndex
 
 	// fetchGroup coalesces concurrent FetchAll calls for the same
-	// (kubeCtx, namespace). On navigation the middle list, the SEC-badge
-	// index, and the right-pane preview each call FetchAll near-
-	// simultaneously. Without this they ran the full multi-source scan
-	// independently — tripling API load and leaving the right pane
-	// spinning on its own slow fetch after the list had resolved.
+	// (kubeCtx, namespace): navigation, the SEC-badge index, and the
+	// right-pane preview all call FetchAll near-simultaneously. Without
+	// it, each ran the full scan independently, tripling API load and
+	// leaving the right pane spinning on its own slow fetch.
 	fetchGroup singleflight.Group
 
 	availCache map[string]availEntry // key = kubeCtx
@@ -59,15 +58,15 @@ type Manager struct {
 	// the hint directly. The probe inside FetchAll is the dominant
 	// non-Fetch API cost on slow / throttled clusters. The app-level
 	// loadSecurityAvailability already performed the same probe with a
-	// 3s budget per source, so re-doing it inside FetchAll doubles the
+	// 3s budget per source. So re-doing it inside FetchAll doubles the
 	// API load on every navigation. SetAvailability populates this map.
 	perSourceAvail map[string]map[string]bool
 
 	ignoredNamespaces map[string]bool // global namespace filter applied to all sources
 
 	// labelResolver resolves a finding resource's Kubernetes labels by
-	// (kubeCtx, namespace, kind, name) for findings whose source did not
-	// expose them (e.g. Trivy CVEs keyed by a workload). nil disables
+	// (kubeCtx, namespace, kind, name). It covers findings whose source did
+	// not expose them (e.g. Trivy CVEs keyed by a workload). nil disables
 	// resolution — the app only installs it when label-match ignore patterns
 	// exist, so the lookups are pure overhead otherwise. Returns nil on any
 	// failure so a finding simply stays visible.
@@ -86,7 +85,7 @@ type availEntry struct {
 //
 // errorTTL defaults to 30s — the shorter window applied when every
 // source errored. Without it, slow / throttled clusters fall into a
-// hammering loop: each navigation tick re-fires the same failing list
+// hammering loop. Each navigation tick re-fires the same failing list
 // requests, the API server applies more aggressive rate limits, and the
 // right pane stays in "Scanning..." indefinitely. 30s is short enough
 // that genuine recovery feels responsive but long enough to break the
@@ -206,7 +205,7 @@ func (m *Manager) Refresh(ctx context.Context, kubeCtx, namespace string) (Fetch
 // user pressed `r` to refresh).
 //
 // Clearing cachedIndex matters because Index() is consulted by the SEC
-// badge renderer on every explorer paint — without clearing it, badges
+// badge renderer on every explorer paint. Without clearing it, badges
 // keep showing pre-invalidate per-resource counts until the next
 // FetchAll lands.
 func (m *Manager) Invalidate() {
@@ -224,8 +223,8 @@ func (m *Manager) Register(s SecuritySource) {
 	m.sources = append(m.sources, s)
 }
 
-// SetAvailability records the per-source availability map for kubeCtx
-// so subsequent FetchAll calls can skip their IsAvailable probe and go
+// SetAvailability records the per-source availability map for kubeCtx.
+// So subsequent FetchAll calls can skip their IsAvailable probe and go
 // straight to Fetch (or skip the source altogether). Pass the result of
 // the app-level availability probe (loadSecurityAvailability) here.
 //
@@ -311,9 +310,9 @@ func (m *Manager) AnyAvailable(ctx context.Context, kubeCtx string) (bool, error
 
 // FetchAll runs Fetch concurrently across all available sources. Per-source
 // errors do not cancel other sources. They are collected in result.Errors.
-// Results are cached by (kubeCtx, namespace) for refreshTTL on success
-// and for errorTTL when every source erred (negative cache, breaks the
-// throttling spiral on slow clusters).
+// Results are cached by (kubeCtx, namespace) for refreshTTL on success.
+// They are cached for errorTTL when every source erred (negative cache,
+// breaks the throttling spiral on slow clusters).
 func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (FetchResult, error) {
 	cacheKey := kubeCtx + "|" + namespace
 
@@ -325,18 +324,18 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	// is deliberate: callers run inside the app's per-context scheduler
 	// worker pool, which preempts and times out work via context
 	// cancellation. A worker blocked on the uncancellable Do would ignore
-	// its ctx and stay stuck for the whole scan, starving the pod/dashboard
+	// its ctx and stay stuck for the whole scan. That starves the pod/dashboard
 	// loads that share the pool. With DoChan each caller selects on its own
 	// ctx and returns promptly when cancelled.
 	//
-	// The scan itself runs on a detached, bounded context — not the caller's
-	// — so it completes and populates the cache even if the caller that
+	// The scan itself runs on a detached, bounded context — not the caller's.
+	// So it completes and populates the cache even if the caller that
 	// started it navigates away. Tying the scan to one caller's ctx would
 	// let a preempted caller abort the shared scan and hand every waiter a
 	// premature empty result.
-	// Capture scanTimeout under the lock before the closure: the DoChan
+	// Capture scanTimeout under the lock before the closure. The DoChan
 	// goroutine reads it on a separate goroutine, and SetScanTimeout writes it
-	// under m.mu — reading m.scanTimeout directly inside the closure would be
+	// under m.mu. Reading m.scanTimeout directly inside the closure would be
 	// an unsynchronized read racing that write.
 	scanTimeout := m.ScanTimeout()
 	ch := m.fetchGroup.DoChan(cacheKey, func() (any, error) {
@@ -395,9 +394,9 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 	results := make(chan sourceResult, len(sources))
 
 	// Per-source errors flow into res.Errors via the results channel and
-	// goroutines never return an error worth cancelling siblings on, so
+	// goroutines never return an error worth cancelling siblings on. So
 	// errgroup's WithContext semantics added dead weight without any
-	// benefit. A buffered semaphore caps simultaneous Fetch calls — the
+	// benefit. A buffered semaphore caps simultaneous Fetch calls. The
 	// default cap of 2 keeps a 6-source cluster from issuing six large
 	// list responses in parallel and stressing etcd. The semaphore is
 	// taken AFTER the IsAvailable hint check so unavailable sources cost
@@ -452,7 +451,7 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 		// with Available=false so the cache decision sees them as
 		// "no successful fetch happened". Without this they'd fall into
 		// the success branch below and be reported as Available:true
-		// with 0 findings — making anySourceSucceeded return true on a
+		// with 0 findings. That would make anySourceSucceeded return true on a
 		// cluster with zero installed security tools.
 		if r.unavailable {
 			res.Sources = append(res.Sources, SourceStatus{Name: r.name})
@@ -500,10 +499,10 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 	m.resolveWorkloadLabels(ctx, kubeCtx, res.Findings)
 
 	m.mu.Lock()
-	// Cache the result regardless of success — a clean cluster with zero
+	// Cache the result regardless of success. A clean cluster with zero
 	// findings is a valid full-TTL outcome (anySourceSucceeded=true,
-	// just empty), and an all-errored cluster gets the shorter errorTTL
-	// negative cache so the next navigation tick doesn't re-fire the
+	// just empty). An all-errored cluster gets the shorter errorTTL
+	// negative cache, so the next navigation tick doesn't re-fire the
 	// same failing requests and dig the throttle hole even deeper.
 	// SetErrorTTL(0) disables negative caching for callers (tests) that
 	// need the old "always retry on error" behavior.
@@ -602,14 +601,14 @@ func (i *FindingIndex) CountBySource(name string) int {
 // BuildFindingIndex constructs an index from a slice of findings.
 // Per-resource severity counts deduplicate by (resource, Title) so the
 // SEC badge shows unique checks (e.g., "privileged", "run_as_root")
-// rather than raw per-container counts: a pod with 3 containers all
+// rather than raw per-container counts. A pod with 3 containers all
 // running privileged contributes 1 to its severity bucket, not 3.
 //
 // bySource counts every emission without deduplication so callers like
 // CountBySource see the true per-source contribution. Deduplicating
 // bySource by (resource, Title) silently undercounts when two sources
-// (e.g., Trivy + policy-report) overlap on the same misconfiguration —
-// the second source got skipped before its bySource increment.
+// (e.g., Trivy + policy-report) overlap on the same misconfiguration.
+// The second source got skipped before its bySource increment.
 func BuildFindingIndex(findings []Finding) *FindingIndex {
 	idx := &FindingIndex{
 		counts:   make(map[string]SeverityCounts),
@@ -617,7 +616,7 @@ func BuildFindingIndex(findings []Finding) *FindingIndex {
 	}
 	// Pick the highest severity per (resource, Title) pair before counting.
 	// Two-pass keeps the per-source totals accurate (every finding increments
-	// bySource in the first pass) while ensuring a later duplicate that
+	// bySource in the first pass). It also ensures a later duplicate that
 	// reports a higher severity isn't lost to first-write-wins iteration
 	// order, which would silently under-color the SEC badge.
 	maxSev := make(map[string]Severity)
@@ -669,7 +668,7 @@ func (m *Manager) Index() *FindingIndex {
 
 // SetIndex overrides the cached FindingIndex. Used by callers that produce
 // findings outside of FetchAll (e.g., async message paths in internal/app
-// that receive a FetchResult via a tea.Msg and bypass the cache).
+// that receive a FetchResult via a tea.Msg). Those paths bypass the cache.
 func (m *Manager) SetIndex(idx *FindingIndex) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

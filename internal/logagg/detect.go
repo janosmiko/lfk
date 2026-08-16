@@ -26,8 +26,8 @@ func ParserFor(kind ProfileKind) Parser {
 }
 
 // structuredHTTPKinds are the strict HTTP access-log profiles. They are
-// structurally demanding (traefik-json requires DownstreamStatus/RequestMethod;
-// envoy/nginx/ingress require a specific line shape), so a non-HTTP app log
+// structurally demanding (traefik-json requires DownstreamStatus/RequestMethod,
+// and envoy/nginx/ingress require a specific line shape), so a non-HTTP app log
 // cannot accidentally match them. When one matches even a few sample lines it is
 // preferred over the loose logfmt/json matchers — see DetectKind.
 var structuredHTTPKinds = []ProfileKind{ProfileTraefikJSON, ProfileIngressNginx, ProfileEnvoy, ProfileNginx}
@@ -35,14 +35,14 @@ var structuredHTTPKinds = []ProfileKind{ProfileTraefikJSON, ProfileIngressNginx,
 // structuredDetectMinHits is how many sample lines a structured HTTP profile
 // must match to be preferred over a generic matcher that scores higher. It is a
 // small absolute count because the structured parsers are strict (no false
-// positives), so a handful of real access-log lines reliably identifies the
+// positives). So a handful of real access-log lines reliably identifies the
 // format even amid a flood of console/error lines.
 const structuredDetectMinHits = 3
 
 // DetectKind picks the log format for a sample. A structured HTTP access-log
 // profile (traefik-json / ingress-nginx / envoy / nginx) is preferred whenever
-// it matches at least structuredDetectMinHits lines, EVEN IF the generic
-// logfmt/json matchers match more lines. This handles mixed deployments (e.g.
+// it matches at least structuredDetectMinHits lines. This holds EVEN IF the
+// generic logfmt/json matchers match more lines. This handles mixed deployments (e.g.
 // Traefik emitting JSON access logs alongside ANSI console error lines that the
 // logfmt matcher loosely catches): the access logs are the data the Top view
 // exists for, so they win over the noise. When no structured profile is present,

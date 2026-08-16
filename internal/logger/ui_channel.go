@@ -23,10 +23,9 @@ func UIChan() <-chan UIEntry {
 	return uiChan
 }
 
-// publishUI sends to the UI channel without blocking. Drops on full;
-// the on-disk log already has the line, and dropping is preferable to
-// stalling the emit path (or growing the channel unbounded in the
-// presence of a wedged UI).
+// publishUI sends to the UI channel without blocking, and drops the entry
+// when the channel is full. The on-disk log already has the line. A wedged
+// UI must not stall the emit path or grow the channel unbounded.
 func publishUI(level, msg string, args []any) {
 	e := UIEntry{Time: time.Now(), Level: level, Message: msg, Args: args}
 	select {

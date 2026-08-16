@@ -194,11 +194,10 @@ func auditRules(ns, kind, name string, rules []rbacv1.PolicyRule) []security.Fin
 	return out
 }
 
-// boundClusterRoles returns the set of ClusterRole names referenced by at
-// least one ClusterRoleBinding (including built-in bindings — a custom role
-// bound by any binding is live). RoleBindings are deliberately not indexed:
-// a RoleBinding referencing a ClusterRole scopes its grant to one namespace,
-// which is not a cluster-wide exposure.
+// boundClusterRoles returns the set of ClusterRole names referenced by at least one ClusterRoleBinding
+// (including built-in bindings). A custom role bound by any binding is live. RoleBindings are deliberately
+// not indexed: a RoleBinding referencing a ClusterRole scopes its grant to one namespace, which is not a
+// cluster-wide exposure.
 func (d *rbacData) boundClusterRoles() map[string]bool {
 	bound := make(map[string]bool, len(d.clusterRoleBindings))
 	for i := range d.clusterRoleBindings {

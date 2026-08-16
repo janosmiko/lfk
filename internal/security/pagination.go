@@ -2,9 +2,9 @@
 // Paginated list helper for the dynamic-client list calls every CRD-based
 // security source makes. Wrapping client-go's tools/pager keeps the
 // per-page response size bounded (etcd doesn't have to materialise the
-// whole list in memory) and recovers from continue-token expiration on
+// whole list in memory). It also recovers from continue-token expiration on
 // long lists. Without pagination, a single FetchAll on a busy cluster
-// can produce 10s of MB of JSON per source — enough to stress small
+// can produce 10s of MB of JSON per source. That is enough to stress small
 // control planes (we've seen one freeze on a 746-PolicyReport list).
 package security
 
@@ -18,13 +18,11 @@ import (
 	"k8s.io/client-go/tools/pager"
 )
 
-// DefaultListPageSize is the per-page Limit used by ListPaginated. 200
-// is a compromise: kubectl defaults to 500 (optimised for fast machines
-// against fat API servers), but security-source list responses are
-// unusually large per object (Trivy's VulnerabilityReport.report
-// carries the full vuln list, Kyverno's PolicyReport carries
-// .results[]), so 200 keeps each page response under a few MB on
-// realistic clusters.
+// DefaultListPageSize is the per-page Limit used by ListPaginated. 200 is a
+// compromise. Kubectl defaults to 500 for fast machines against fat API
+// servers. Security-source responses are unusually large per object
+// (Trivy's VulnerabilityReport.report carries the full vuln list, Kyverno's
+// PolicyReport carries .results[]). So 200 keeps each page under a few MB.
 const DefaultListPageSize = 200
 
 // DynamicLister is the subset of k8s.io/client-go/dynamic/Resource
@@ -40,7 +38,7 @@ type DynamicLister interface {
 // single combined UnstructuredList of all items. We use pager's
 // EachListItem rather than its List because List wraps results in a
 // *metainternalversion.List (a runtime container that doesn't preserve
-// the concrete UnstructuredList type), which is awkward to convert
+// the concrete UnstructuredList type). That is awkward to convert
 // back. EachListItem hands us the page items one at a time and lets us
 // build the UnstructuredList directly.
 //

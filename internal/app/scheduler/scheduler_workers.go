@@ -7,9 +7,9 @@ import (
 )
 
 // workerClass selects which priority lane a worker prefers when picking the
-// next task. General workers honor strict priority (with aging). The reserved
-// classes bias toward one end of the range but always fall back so a reserved
-// slot is never wasted when its preferred lane is empty.
+// next task. General workers honor strict priority (with aging). The
+// reserved classes bias toward one end of the range but always fall back.
+// A reserved slot is never wasted when its preferred lane is empty.
 type workerClass int
 
 const (
@@ -20,7 +20,7 @@ const (
 
 // StartWorkers enables worker dispatch. Idempotent. Workers are spawned
 // per cluster context on first Submit AND retroactively for any
-// queues that already exist when StartWorkers is called — this lets
+// queues that already exist when StartWorkers is called. This lets
 // tests Submit before starting workers to set up a deterministic
 // dequeue scenario.
 //
@@ -48,9 +48,9 @@ func (r *Registry) StartWorkers() {
 }
 
 // StopWorkers signals all workers to exit and waits for them. Idempotent.
-// In-flight Fns continue but their Futures receive nothing further;
-// Close (or CancelContext, in a later commit) is what drains pending
-// Futures with ErrContextSwitched.
+// In-flight Fns continue but their Futures receive nothing further.
+// Close (or CancelContext, in a later commit) drains pending Futures
+// with ErrContextSwitched.
 func (r *Registry) StopWorkers() {
 	if r == nil {
 		return
@@ -164,7 +164,7 @@ func (r *Registry) workerLoop(q *ctxQueue, class workerClass) {
 		case <-q.stop:
 			return
 		case <-q.wake:
-			// Re-check stop before picking — between the wake signal
+			// Re-check stop before picking. Between the wake signal
 			// and now, StopWorkers / CancelContext could have closed
 			// q.stop, and we must not start new work past that point.
 			if shutdownPending(r.stopAll, q.stop) {
@@ -172,13 +172,13 @@ func (r *Registry) workerLoop(q *ctxQueue, class workerClass) {
 			}
 			// Try to pick a task for this worker class. pickTask returns
 			// (nil, false) only when the queue is genuinely empty (a race
-			// between the wake signal and a concurrent pick) — a reserved
+			// between the wake signal and a concurrent pick). A reserved
 			// worker no longer idles on a non-empty queue since it falls
-			// back to non-Critical work. Re-signal so a sibling retries, but
-			// ONLY when work is actually pending: a stale wake left over from
-			// the inner drain loop below would otherwise feed itself (this
-			// worker re-signals, wins the receive race, fails pickTask again,
-			// re-signals, ad infinitum — issue #206).
+			// back to non-Critical work. Re-signal so a sibling retries,
+			// but ONLY when work is actually pending. A stale wake left
+			// over from the inner drain loop below would otherwise feed
+			// itself. This worker re-signals, wins the receive race,
+			// fails pickTask again, re-signals, ad infinitum (issue #206).
 			task, ok := r.pickTask(q, class)
 			if !ok {
 				if q.hasPendingWork() {
@@ -190,17 +190,18 @@ func (r *Registry) workerLoop(q *ctxQueue, class workerClass) {
 				continue
 			}
 			// Wake a sibling before running: runTask blocks for the whole
-			// duration of the (potentially slow) Fn, so without this a burst
-			// of submits whose wake signals collapsed into the size-1 buffer
-			// would be drained by THIS worker serially while siblings stay
-			// parked — the lost-wakeup jam (one task runs, the rest queue
-			// behind a single blocked worker). Re-signalling on every
-			// successful pick cascades the wake across the pool so queued
-			// work runs in parallel up to WorkersPerContext.
+			// duration of the (potentially slow) Fn. Without this, a burst
+			// of submits whose wake signals collapsed into the size-1
+			// buffer would be drained by THIS worker serially while
+			// siblings stay parked. This is the lost-wakeup jam: one task
+			// runs, the rest queue behind a single blocked worker.
+			// Re-signalling on every successful pick cascades the wake
+			// across the pool so queued work runs in parallel up to
+			// WorkersPerContext.
 			r.wakeSibling(q)
 			r.runTask(task)
 			// Drain remaining work for this worker class after running
-			// one — but bail at every iteration if shutdown has been
+			// one. But bail at every iteration if shutdown has been
 			// signalled, so an in-flight Stop doesn't have to wait for
 			// the queue to drain.
 			for {
@@ -220,10 +221,10 @@ func (r *Registry) workerLoop(q *ctxQueue, class workerClass) {
 
 // wakeSibling re-signals q.wake when work is still queued, so another parked
 // worker engages instead of leaving the current (about-to-block) worker to
-// drain the burst serially. Guarded by hasPendingWork so it never spins on an
-// empty queue (issue #206): the non-blocking send + size-1 buffer cap the
-// signal at one outstanding wake, and a spurious wake just parks the receiver
-// again after a failed pick.
+// drain the burst serially. Guarded by hasPendingWork so it never spins on
+// an empty queue (issue #206). The non-blocking send + size-1 buffer cap
+// the signal at one outstanding wake. A spurious wake just parks the
+// receiver again after a failed pick.
 func (r *Registry) wakeSibling(q *ctxQueue) {
 	if q.hasPendingWork() {
 		select {
@@ -252,9 +253,9 @@ func shutdownPending(stopAll, stop chan struct{}) bool {
 // A Critical-class worker takes Critical first. A Low-class worker takes Low
 // first. When the preferred lane is empty, BOTH fall through to
 // dequeueByPriorityLocked (priority + aging) rather than idling while other
-// work waits — the reservation guarantees a slot is biased toward that lane,
+// work waits. The reservation guarantees a slot is biased toward that lane,
 // not that the worker sits idle. This is what gives background (Low) work a
-// guaranteed floor: under a flood of High submissions the Low-class workers
+// guaranteed floor. Under a flood of High submissions the Low-class workers
 // still drain the Low lane, so metrics/events/dashboards keep running instead
 // of queueing behind the foreground backlog. A General worker always honors
 // strict priority (with aging). The Critical preempt poker still makes a
@@ -323,8 +324,8 @@ func (r *Registry) unregisterRunning(kctx string, rt *runningTask) {
 // preempted something.
 //
 // Critical can never be preempted because nothing has a strictly worse
-// priority below Critical except by the same logic, but Submit only
-// invokes pokePreempt for the new request's priority — and a Submit
+// priority below Critical except by the same logic. But Submit only
+// invokes pokePreempt for the new request's priority, and a Submit
 // of priority X only preempts tasks of priority > X.
 func (r *Registry) pokePreempt(kctx string, newPrio Priority) bool {
 	r.mu.Lock()
@@ -337,7 +338,7 @@ func (r *Registry) pokePreempt(kctx string, newPrio Priority) bool {
 	worstPrio := newPrio
 	for _, rt := range list {
 		// Skip tasks already being torn down (preempted, or superseded by
-		// CancelStaleByGen): preempting one wastes this submission's single
+		// CancelStaleByGen). Preempting one wastes this submission's single
 		// preemption on a worker slot that is already being reclaimed.
 		if rt.preempted.Load() || rt.superseded.Load() {
 			continue
@@ -387,7 +388,7 @@ func (r *Registry) runTask(task *queuedTask) {
 		return
 	}
 
-	// Superseded is checked before preempted: a stale-cancelled task must
+	// Superseded is checked before preempted. A stale-cancelled task must
 	// resolve as ErrSuperseded and NOT be requeued (the preempt path would
 	// re-run it), since a newer generation already owns the result.
 	if rt.superseded.Load() {

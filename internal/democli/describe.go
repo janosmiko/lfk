@@ -44,9 +44,9 @@ func runDescribe(args []string, stdout io.Writer) error {
 }
 
 // renderDescribe builds a plain-text kubectl-describe-shaped body for the
-// known demo pods, falling back to a minimal generic body for anything else
-// (namespace/context are still echoed so the caller sees the object it
-// asked about, rather than an error).
+// known demo pods, falling back to a minimal generic body for anything
+// else. Namespace/context are still echoed, so the caller sees the
+// object it asked about, rather than an error.
 func renderDescribe(kind, name, namespace, kctx string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Name:         %s\n", name)

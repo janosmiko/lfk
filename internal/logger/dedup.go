@@ -21,9 +21,9 @@ var (
 
 // dedupPruneEvery is how often (in ShouldEmit calls) we sweep stale
 // entries. Tuned high enough that the O(N) scan cost is amortized to
-// near zero, low enough that a high-cardinality key space (varying
-// stderr lines, per-pod tags across many namespaces) can't accumulate
-// for long. Exposed via a var so tests can lower it.
+// near zero. Also tuned low enough that a high-cardinality key space
+// (varying stderr lines, per-pod tags across many namespaces) can't
+// accumulate for long. Exposed via a var so tests can lower it.
 var dedupPruneEvery = 1024
 
 type dedupEntry struct {
@@ -33,10 +33,10 @@ type dedupEntry struct {
 
 // ShouldEmit reports whether a deduplicated log event identified by
 // (tag, contextKey) should be emitted right now. If the window has
-// elapsed since the previous emission, it returns true plus the count
-// of events suppressed during that window (so callers can surface
-// "(suppressed 142x)" in the next line). If still inside the window,
-// it returns false and increments the suppressed counter.
+// elapsed since the previous emission, it returns true. It also returns
+// the count of events suppressed during that window, so callers can
+// surface "(suppressed 142x)" in the next line. If still inside the
+// window, it returns false and increments the suppressed counter.
 //
 // The (tag, contextKey) pair is the dedup key. Use a stable tag per
 // call site ("node-metrics-load", "stderr-aws-sso") and a contextKey
@@ -105,8 +105,8 @@ func ErrorOnce(tag, contextKey, msg string, args ...any) {
 // pruneDedupStateLocked evicts entries whose window has fully elapsed
 // AND have no suppressed events still owed an emission. The 2x window
 // margin keeps an entry around long enough that a flapping failure
-// (down, up, down) still emits once-per-window rather than re-emitting
-// the first occurrence as "new". Caller must hold dedupMu.
+// (down, up, down) still emits once-per-window. It doesn't re-emit the
+// first occurrence as "new". Caller must hold dedupMu.
 func pruneDedupStateLocked(now time.Time) {
 	cutoff := now.Add(-2 * dedupWindow)
 	for k, v := range dedupState {
@@ -117,7 +117,7 @@ func pruneDedupStateLocked(now time.Time) {
 }
 
 // ResetDedupForTest clears the dedup state AND restores every
-// Set*ForTest override to its production default, so tests can't leak
+// Set*ForTest override to its production default. So tests can't leak
 // state into each other via a forgotten window/clock/prune setting.
 // Test-only.
 func ResetDedupForTest() {

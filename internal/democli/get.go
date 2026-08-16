@@ -29,13 +29,13 @@ func runGet(args []string, stdout io.Writer) error {
 }
 
 // parseGetArgs collects every positional argument (in order) and the "-l"
-// selector value, if any, skipping the values of flags this stub never
+// selector value, if any. It skips the values of flags this stub never
 // inspects otherwise (-n, --context, -o).
 func parseGetArgs(args []string) (positional []string, selector string, hasSelector bool) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "-n", "--context", "-o":
-			i++ // skip the flag's value; unused by this stub
+			i++ // skip the flag's value, unused by this stub
 		case "-l":
 			i++
 			if i < len(args) {

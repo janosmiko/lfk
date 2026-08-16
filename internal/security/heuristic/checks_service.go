@@ -27,7 +27,7 @@ func makeServiceFinding(svc *corev1.Service, check string, sev security.Severity
 
 // checkServiceExternalIPs flags Services with spec.externalIPs set. Anyone
 // who can create or update such a Service can intercept traffic to that IP
-// from any node (CVE-2020-8554 MITM); most clusters never need the field.
+// from any node (CVE-2020-8554 MITM). Most clusters never need the field.
 func checkServiceExternalIPs(svc *corev1.Service) []security.Finding {
 	if len(svc.Spec.ExternalIPs) == 0 {
 		return nil

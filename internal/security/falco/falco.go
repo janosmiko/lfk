@@ -135,7 +135,6 @@ func (s *Source) fetchFromLogs(ctx context.Context, namespace string) []security
 
 	for i := range falcoPods {
 		pod := &falcoPods[i]
-		// Read logs from the falco container.
 		logOpts := &corev1.PodLogOptions{
 			TailLines: &tail,
 			Container: "falco",

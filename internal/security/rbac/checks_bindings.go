@@ -72,8 +72,8 @@ func auditBinding(meta *metav1.ObjectMeta, ns, kind string, ref rbacv1.RoleRef, 
 }
 
 // nonSystemSubject reports whether a subject is outside the system:
-// namespace of identities — ServiceAccounts always count; Users and Groups
-// count unless system:-prefixed.
+// namespace of identities. ServiceAccounts always count. Users and Groups
+// count unless the name has a system: prefix.
 func nonSystemSubject(s *rbacv1.Subject) bool {
 	if s.Kind == rbacv1.ServiceAccountKind {
 		return true

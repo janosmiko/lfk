@@ -1,6 +1,6 @@
 // Package scheduler tracks the in-flight async operations lfk is currently
-// running (resource list fetches, YAML loads, metrics enrichment, etc.) so
-// the title bar can show an ambient indicator and the :tasks overlay can
+// running (resource list fetches, YAML loads, metrics enrichment, etc.).
+// That lets the title bar show an ambient indicator and the :tasks overlay
 // list them with elapsed time. Long-lived sessions like port forwards and
 // log streams are deliberately excluded — they have their own surfaces.
 package scheduler
@@ -152,10 +152,10 @@ type Registry struct {
 	cancels map[uint64]context.CancelFunc // cancel funcs for cancellable tasks
 	// disowned holds the UIDs of closed tabs. Work already queued when a
 	// tab closes registers later, so the owner is stripped at Start time
-	// too — otherwise it would come back owned by a tab that is gone.
-	// Entries are never evicted: a queued task can register at any later
-	// point, and there is no moment where that becomes impossible (it may
-	// sit behind arbitrarily long work). Growth is one 8-byte key per tab
+	// too. Otherwise it would come back owned by a tab that is gone.
+	// Entries are never evicted. A queued task can register at any later
+	// point, with no moment where that becomes impossible (it may sit
+	// behind arbitrarily long work). Growth is one 8-byte key per tab
 	// the user closes, so even an extreme session stays well under 100 KB.
 	disowned       map[uint64]struct{}
 	order          []uint64 // insertion order for stable Snapshot output
@@ -225,17 +225,17 @@ func (r *Registry) SetLingerDurationForTest(d time.Duration) {
 // completes, regardless of success/error/cancel.
 //
 // If the registry already contains a task with the same (Kind, Name,
-// Target) signature, that earlier entry is removed first so only the
-// most recent attempt is visible. The earlier task's goroutine keeps
-// running — its deferred Finish will become a no-op because the id is
-// no longer in the map. This dedupes the common case where the user
-// cursor-hovers across the sidebar, generating a fresh preview load
-// for each row while the previous one is still in flight.
+// Target) signature, that earlier entry is removed first. Only the most
+// recent attempt is visible. The earlier task's goroutine keeps running
+// — its deferred Finish becomes a no-op because the id is no longer in
+// the map. This dedupes the common case where the user cursor-hovers
+// across the sidebar. Each hover generates a fresh preview load for
+// each row while the previous one is still in flight.
 //
-// A nil receiver is treated as an untracked no-op and returns 0, so call
-// sites in loaders do not have to guard against a Model constructed
-// without a registry (e.g. minimal test fixtures). Finish(0) is already
-// a no-op, so the standard defer pattern still works.
+// A nil receiver is treated as an untracked no-op and returns 0. So
+// call sites in loaders do not have to guard against a Model
+// constructed without a registry (e.g. minimal test fixtures).
+// Finish(0) is already a no-op, so the standard defer pattern works.
 func (r *Registry) Start(kind Kind, name, target string) uint64 {
 	return r.StartOwned(0, kind, name, target)
 }
@@ -249,8 +249,8 @@ func (r *Registry) StartOwned(owner uint64, kind Kind, name, target string) uint
 
 // startWithPriority is the internal variant of Start that lets scheduler
 // workers override the priority lookup with the submission's explicit
-// choice and mark routine work as silent. External callers use Start
-// and get DefaultPriorityFor(kind), Silent=false.
+// choice. It also lets them mark routine work as silent. External
+// callers use Start and get DefaultPriorityFor(kind), Silent=false.
 func (r *Registry) startWithPriority(kind Kind, prio Priority, name, target string, silent bool, owner uint64) uint64 {
 	if r == nil {
 		return 0
@@ -398,8 +398,8 @@ func (r *Registry) CancelMutationsOwnedBy(owner uint64) {
 
 // HasActiveMutationsOwnedBy returns true if the given tab has in-flight
 // KindMutation tasks. Used by the key handler to decide whether Ctrl+C/Esc
-// should cancel bulk operations instead of closing the tab/quitting — work
-// started on another tab must not swallow the key.
+// should cancel bulk operations instead of closing the tab/quitting.
+// Work started on another tab must not swallow the key.
 func (r *Registry) HasActiveMutationsOwnedBy(owner uint64) bool {
 	if r == nil {
 		return false
@@ -418,9 +418,9 @@ func (r *Registry) HasActiveMutationsOwnedBy(owner uint64) bool {
 
 // Finish removes the task with the given ID and appends it to the
 // completed-history ring (newest-first, capped at completedCap).
-// Finishing 0 or an unknown ID is a no-op (idempotent — important
+// Finishing 0 or an unknown ID is a no-op (idempotent). That matters
 // because cancel + late Finish can race, and dedupe eviction also
-// leaves stale IDs behind). A nil receiver is also a no-op to mirror
+// leaves stale IDs behind. A nil receiver is also a no-op to mirror
 // Start's nil behavior.
 func (r *Registry) Finish(id uint64) {
 	if r == nil || id == 0 {
@@ -517,11 +517,11 @@ func (r *Registry) Snapshot() []Task {
 // finished-lingering entries.
 //
 // The result may differ from len(Snapshot()) by at most one task when a
-// task's age is crossing the threshold between the two calls, because
-// each method reads time.Now() independently. This is acceptable for the
-// render loop: a one-frame flicker is invisible, and callers that need
-// strict consistency should call Snapshot() once and cache the slice.
-// A nil receiver returns 0.
+// task's age is crossing the threshold between the two calls. Each
+// method reads time.Now() independently. That is acceptable for the
+// render loop, since a one-frame flicker is invisible. Callers that
+// need strict consistency should call Snapshot() once and cache the
+// slice. A nil receiver returns 0.
 func (r *Registry) Len() int {
 	if r == nil {
 		return 0
@@ -636,8 +636,8 @@ func (r *Registry) InjectCompletedForTest(c CompletedTask) {
 // Submit re-spawns them lazily.
 //
 // Called from app code when the user switches away from a cluster
-// context (cluster picker change, tab close on the last tab for that
-// context, etc.).
+// context. Examples: cluster picker change, tab close on the last
+// tab for that context, etc.
 func (r *Registry) CancelContext(kctx string) {
 	if r == nil {
 		return
@@ -663,18 +663,19 @@ func (r *Registry) CancelContext(kctx string) {
 }
 
 // CancelStaleByGen reclaims background work on kctx that a newer
-// requestGen has made irrelevant: it drops queued Low-priority tasks and
+// requestGen has made irrelevant. It drops queued Low-priority tasks and
 // cancels in-flight Low-priority tasks whose Gen predates keepGen,
 // delivering ErrSuperseded to their Futures.
 //
 // Scoped to Low priority on purpose. Cursor moves bump requestGen only to
-// invalidate the preview pane, so the user's current view (High-priority
+// invalidate the preview pane. So the user's current view (High-priority
 // resource list, YAML, containers) and foundational/mutation work
-// (Critical) must survive a gen bump — only the decorative Low lane
+// (Critical) must survive a gen bump. Only the decorative Low lane
 // (dashboard sections, metrics, preview events) is safe to reclaim and
-// cheap to re-issue. Called from navigation paths right after the bump so
-// superseded dashboard/preview fetches stop blocking fresh work in the
-// shared Low lane instead of running to completion only to be discarded.
+// cheap to re-issue. Called from navigation paths right after the bump.
+// So superseded dashboard/preview fetches stop blocking fresh work in
+// the shared Low lane instead of running to completion only to be
+// discarded.
 func (r *Registry) CancelStaleByGen(kctx string, keepGen uint64) {
 	if r == nil {
 		return

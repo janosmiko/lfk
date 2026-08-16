@@ -31,9 +31,9 @@ var demoMethods = []string{"GET", "GET", "GET", "POST", "PUT", "DELETE"}
 
 // runLogs emulates `kubectl logs`. Non-follow requests emit `tail` (or
 // defaultTailLines) historical lines and return. Follow requests replay the
-// same backlog, then keep emitting new lines on demoLineInterval until ctx is
-// cancelled — mirroring a real `-f` stream that only ends when the caller
-// tears down the process.
+// same backlog, then keep emitting new lines on demoLineInterval until ctx
+// is cancelled. That mirrors a real `-f` stream that only ends when the
+// caller tears down the process.
 func runLogs(ctx context.Context, args []string, stdout io.Writer) error {
 	a := parseLogArgs(args)
 	pod := a.podName()
@@ -83,7 +83,7 @@ func runLogs(ctx context.Context, args []string, stdout io.Writer) error {
 //
 // pod is attacker-controllable: the demo apply path builds it from
 // metadata.name in arbitrary user-supplied YAML with no RFC1123 validation
-// (see Client.ApplyManifest), so it can carry terminal escape sequences.
+// (see Client.ApplyManifest). So it can carry terminal escape sequences.
 // Sanitized here (not just at the write side) as defense in depth, the same
 // way listsummary and yamlblame guard their own sinks against
 // cluster-controlled strings.

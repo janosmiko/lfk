@@ -93,9 +93,8 @@ func parsePolicyReport(u *unstructured.Unstructured) []security.Finding {
 		return nil
 	}
 
-	// Skip entire reports created by falcosidekick. Match only on explicit
-	// metadata labels — substring "falco" in the name is too broad and
-	// drops legitimate Kyverno reports whose policy or resource name
+	// Skip entire reports created by falcosidekick. Match only on explicit metadata labels. The substring
+	// "falco" in the name is too broad and drops legitimate Kyverno reports whose policy or resource name
 	// happens to contain that token.
 	labels := u.GetLabels()
 	if isFalcoSource(labels["app.kubernetes.io/managed-by"]) ||

@@ -16,7 +16,7 @@ import (
 	"github.com/janosmiko/lfk/internal/security"
 )
 
-// systemNamespaces are skipped by the namespace-level checks: kube-system
+// systemNamespaces are skipped by the namespace-level checks. kube-system
 // requires privileged pods (no PSA enforce label fits) and securing it is
 // the distribution's job, not the user's.
 var systemNamespaces = map[string]bool{

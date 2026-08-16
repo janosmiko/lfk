@@ -17,8 +17,8 @@ var demoEpoch = time.Now().UTC()
 
 // mustToUnstructured converts a typed API object into the unstructured form
 // the dynamic fake client serves. It panics on conversion failure, which can
-// only happen here if one of the static builders below is malformed — a
-// programming error the package's own tests catch immediately.
+// only happen here if one of the static builders below is malformed. That is
+// a programming error the package's own tests catch immediately.
 func mustToUnstructured(obj runtime.Object) *unstructured.Unstructured {
 	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {

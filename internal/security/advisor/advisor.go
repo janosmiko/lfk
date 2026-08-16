@@ -82,10 +82,9 @@ type workload struct {
 	// updateStrategy: OnDelete. An empty type is NOT OnDelete — the API
 	// server defaults it to RollingUpdate.
 	onDeleteUpdate bool
-	// staticReplicasOwner is the field manager that owns .spec.replicas
-	// through a whole-object write per managedFields (scale-subresource
-	// writers like the HPA are excluded) — empty when no manifest pins
-	// the replica count.
+	// staticReplicasOwner is the field manager that owns .spec.replicas through
+	// a whole-object write per managedFields (scale-subresource writers like
+	// the HPA are excluded). It is empty when no manifest pins the replica count.
 	staticReplicasOwner string
 	// stsServiceName is the StatefulSet's spec.serviceName (governing
 	// headless Service). Empty for other kinds.
@@ -118,8 +117,8 @@ func templateSpreads(tmpl *corev1.PodTemplateSpec) bool {
 type clusterData struct {
 	workloads []workload
 	// workloadsOK is true only when every workload list (Deployments,
-	// StatefulSets, DaemonSets) succeeded — required by checks that reason
-	// about the absence of a matching workload (orphan_pdb).
+	// StatefulSets, DaemonSets) succeeded. It is required by checks that
+	// reason about the absence of a matching workload (orphan_pdb).
 	workloadsOK bool
 	pdbs        []policyv1.PodDisruptionBudget
 	pdbsOK      bool

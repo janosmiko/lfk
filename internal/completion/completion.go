@@ -31,7 +31,7 @@ func NewCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 		Short: "Generate shell completion script",
 		Long: `Generate a shell completion script for lfk.
 
-		For zsh:
+For zsh:
   source <(lfk completion zsh)`,
 		Args: cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		ValidArgs: []string{
@@ -62,7 +62,7 @@ func NewCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 func completeUnionContextFlag(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	kubeconfig, _ := cmd.Flags().GetString("kubeconfig")
 	kubeconfigDirs, _ := cmd.Flags().GetStringArray("kubeconfig-dir")
-	// Completion runs without the config file; resolve exclusivity from
+	// Completion runs without the config file. Resolve exclusivity from
 	// the flag and env only, defaulting to exclusive like the app.
 	exclusiveFlag, _ := cmd.Flags().GetBool("kubeconfig-exclusive")
 	kubeconfigExclusive := k8s.ResolveKubeconfigExclusive(

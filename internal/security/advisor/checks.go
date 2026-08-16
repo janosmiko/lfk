@@ -155,10 +155,11 @@ func (d *clusterData) workloadFindings() []security.Finding {
 }
 
 // badRolloutStrategy returns a non-empty reason when a multi-replica
-// Deployment's rollout takes every replica down: strategy Recreate, or a
+// Deployment's rollout takes down every replica: strategy Recreate, or a
 // RollingUpdate that allows 100% (or >= replicas) unavailable. An empty
-// strategy Type (possible only pre-API-defaulting, e.g. fakes) falls through
-// to the RollingUpdate branch, matching the API server's default.
+// strategy Type is possible only pre-API-defaulting, for example in fakes.
+// It falls through to the RollingUpdate branch, matching the API server's
+// default.
 func badRolloutStrategy(w *workload) string {
 	if w.strategy == nil || w.replicas < 2 {
 		return ""
@@ -194,7 +195,7 @@ func unboundedEmptyDirs(volumes []corev1.Volume) []string {
 }
 
 // containersWithIdenticalProbes returns names of containers whose liveness
-// and readiness probes are exactly equal — the readiness failure mode
+// and readiness probes are exactly equal. The readiness failure mode
 // (shed traffic) is replaced by the liveness one (restart).
 func containersWithIdenticalProbes(containers []corev1.Container) []string {
 	var names []string
@@ -292,7 +293,7 @@ func pdbBlocksDrain(p *policyv1.PodDisruptionBudget, workloads []workload) strin
 }
 
 // hpaFindings flags HPAs scaling on resource utilization while the target
-// workload's containers set no request for that resource — the HPA cannot
+// workload's containers set no request for that resource. The HPA cannot
 // compute utilization and never scales.
 func (d *clusterData) hpaFindings() []security.Finding {
 	if !d.hpasOK {

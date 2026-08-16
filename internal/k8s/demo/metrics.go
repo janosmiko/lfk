@@ -9,10 +9,10 @@ import (
 // buildPodMetrics and buildNodeMetrics seed the metrics.k8s.io/v1beta1
 // PodMetrics/NodeMetrics objects internal/k8s.getPodMetricsFromAPI and
 // getNodeMetricsFromAPI read. They are unstructured because no typed Go
-// package for metrics.k8s.io is vendored here — internal/k8s reads them as
+// package for metrics.k8s.io is vendored here. internal/k8s reads them as
 // unstructured too, so the shape only needs to match what parsePodMetrics
-// and getNodeMetricsFromAPI expect: a top-level "containers[].usage" map for
-// pods, a top-level "usage" map for nodes.
+// and getNodeMetricsFromAPI expect. The shape is a top-level
+// "containers[].usage" map for pods, a top-level "usage" map for nodes.
 
 func buildPodMetrics() []*unstructured.Unstructured {
 	ts := demoEpoch.Add(-30 * time.Second).Format(time.RFC3339)

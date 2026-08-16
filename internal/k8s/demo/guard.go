@@ -13,14 +13,14 @@ import (
 // GuardListPanics wraps a dynamic.Interface so a List call against an
 // unregistered GVR degrades to an error instead of panicking. The fake
 // dynamic client (dynamicfake.NewSimpleDynamicClientWithCustomListKinds)
-// panics rather than errors when its ListKinds map is missing an entry —
-// see ListKinds for the registration this guards against ever missing
-// again. DiscoverAPIResources and similar calls run on a scheduler worker
-// goroutine with nothing upstream able to recover a panic, so a fixture
-// gap here would otherwise crash the whole app instead of degrading one
-// feature. This wrapper is demo-only: a real cluster's dynamic client talks
-// to an API server and never panics on List, so production code paths
-// never carry this guard.
+// panics rather than errors when its ListKinds map is missing an entry. See
+// ListKinds for the registration this guards against ever missing again.
+// DiscoverAPIResources and similar calls run on a scheduler worker goroutine
+// with nothing upstream able to recover a panic. A fixture gap here would
+// otherwise crash the whole app instead of degrading one feature. This
+// wrapper is demo-only: a real cluster's dynamic client talks to an API
+// server and never panics on List. So production code paths never carry
+// this guard.
 func GuardListPanics(dyn dynamic.Interface) dynamic.Interface {
 	return recoveringDynamicClient{Interface: dyn}
 }
