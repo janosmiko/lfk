@@ -400,7 +400,7 @@ func renderCrashContainerTableLines(containers []CrashContainerEntry, active str
 
 // crashCell returns s padded (or truncated) to width using lipgloss.
 // Using lipgloss.Width handles Unicode rune width correctly and is
-// transparent to ANSI escapes. Fmt.Sprintf("%-Ns", ...) miscounts both.
+// transparent to ANSI escapes, and fmt.Sprintf("%-Ns", ...) miscounts both.
 func crashCell(s string, width int) string {
 	return lipgloss.NewStyle().Width(width).Render(s)
 }

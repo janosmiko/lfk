@@ -156,7 +156,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 - Groups: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
 - Discovered CRDs grouped by API group, for example `argoproj.io`, `longhorn.io`
-- Pin a type with `p`: [config-reference.md](docs/config-reference.md#pinned-groups)
+- Pin a type with `p`: [keybindings.md](docs/keybindings.md#navigation)
 - Pin a type's dashboard summary with `x`: [config-reference.md](docs/config-reference.md#top-level-fields)
 - Hide or show a single type with `x`, reveal hidden ones with `H`: [config-reference.md](docs/config-reference.md#top-level-fields)
 - Rarely used types (CSI internals, webhooks, APF, leases) hidden until `H`: [config-reference.md](docs/config-reference.md#top-level-fields)
@@ -196,7 +196,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 - Filter with `f`, search with `/`, in substring, regex, fuzzy, or literal mode
 - Abbreviated jumps such as `pvc`, `hpa`, `deploy`: [config-reference.md](docs/config-reference.md#abbreviations)
-- Command bar `:` for resource jumps, built-ins, kubectl, and shell: [commands.md](docs/commands.md)
+- Command bar `:` for resource jumps, built-ins, kubectl, and shell: [commands.md](docs/commands.md), autocomplete in [features.md](docs/features.md#command-bar-autocomplete)
 - Quick filter presets with `.`: [config-reference.md](docs/config-reference.md#filter-presets)
 - Sorting with `>` / `<` / `=` / `-`, remembered per kind: [keybindings.md](docs/keybindings.md#sorting)
 - Bookmarks with `m<slot>` and `'<slot>`: [keybindings.md](docs/keybindings.md#bookmarks)

@@ -4,7 +4,7 @@
 
 Security fixes apply to the latest release on the `main` branch only. Older
 tagged releases are not maintained. Upgrade to the latest version to receive
-patches (LFK is under active development).
+patches.
 
 | Version          | Supported          |
 | ---------------- | ------------------ |

@@ -518,7 +518,7 @@ func scrollWindowStart(cursor, windowH, total int) int {
 
 // kvSelColumnW is the visible width (without padding) of the leading
 // "selection marker" column shared by every K/V editor. Wide enough
-// for the "✓" glyph plus no trailing space. Lipgloss/table's per-cell
+// for the "✓" glyph plus no trailing space, and lipgloss/table's per-cell
 // padding (1,1) supplies the gap to the KEY column on either side.
 const kvSelColumnW = 1
 

@@ -104,8 +104,8 @@ type informerEntry struct {
 	synced   chan struct{} // closed when the informer's first LIST has completed
 
 	// memoMu guards memo. Keys are "<namespace>/<name>" (or "/<name>"
-	// for cluster-scoped resources). Entries grow over the cache's
-	// lifetime. Entries for deleted pods linger until Stop. At typical
+	// for cluster-scoped resources). Entries outside the current list's
+	// scope are pruned on each applyMemo call. At typical
 	// scales (a few thousand items, hours-long sessions) this is a
 	// negligible memory footprint relative to the indexer itself.
 	memoMu sync.Mutex

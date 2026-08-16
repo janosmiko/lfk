@@ -203,7 +203,7 @@ func parseSGRSequence(s string, i int) int {
 	j := i + 2
 	// Parameter bytes: digits, ';' and ':' only (truecolour uses both
 	// separators). This deliberately excludes the private markers < = > ?
-	// and the CSI intermediate bytes 0x20-0x2F: CSI > Ps . Ps m is
+	// and the CSI intermediate bytes 0x20-0x2F: `CSI > Ps ; Ps m` is
 	// XTMODKEYS, which reprograms xterm's keyboard-modifier reporting, so
 	// forwarding a private marker let a cluster-controlled line change
 	// terminal state after rendering (TASK-885).

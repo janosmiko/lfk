@@ -24,7 +24,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 
 In the Events list, `z` toggles event grouping instead of expand/collapse.
 
-`x`, at the resource types level, also lets you pin or unpin the selected type's dashboard summary through the action menu. The choice is saved per cluster context, or per union set.
+`x`, at the resource types level, also lets you pin or unpin the selected type's dashboard summary through the action menu. Pin, hide, and summary choices are saved per cluster context, or per union set.
 
 Teleport history records owner, port-forward, orphan, finding, and mark jumps. Hierarchical `h`/`l` navigation does not push a history entry.
 
@@ -876,7 +876,7 @@ The editor picks one of two modes based on the value being edited:
 
 `T`'s tree view shows the whole field subtree with ASCII-art guides, and stays on while drilling in or going back, until you toggle it off again.
 
-`Space` / `z` folding applies only in tree view (configurable via `toggle_fold`).
+`Space` / `z` folding applies only in tree view (`z` is configurable via `toggle_fold`).
 
 ## Can-I Browser
 

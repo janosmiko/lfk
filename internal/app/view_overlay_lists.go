@@ -43,7 +43,7 @@ func overlayListScroll(prev *int, cursor, total, maxVisible int) int {
 // overlayListChromeFilterable returns the number of non-item rows the
 // OverlayList block occupies for a filterable overlay (Filterable=true):
 // title (1) + title's bottom padding row (1) + filter prompt (1) +
-// blank separator below filter (1) = 4 rows. Lipgloss's 1+1 vertical
+// blank separator below filter (1) = 4 rows, and lipgloss's 1+1 vertical
 // padding around the block is handled by the caller subtracting 2 from
 // the outer overlay height before passing the result as cfg.Height —
 // so this helper returns the chrome INSIDE the block only.
@@ -657,7 +657,7 @@ func renderClusterColorOverlay(m Model, innerW, contentH int) string {
 }
 
 // padRight returns s padded with spaces to at least width visual cells.
-// Used to align the badge column across rows in OverlayList. Lipgloss
+// Used to align the badge column across rows in OverlayList, because lipgloss
 // handles overflow truncation for us, so this only adds — never trims.
 //
 //nolint:unparam // intentionally generic; current callers happen to share width=14 but each picks its own

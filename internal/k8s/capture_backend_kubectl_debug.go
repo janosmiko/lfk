@@ -169,7 +169,7 @@ func terminateRemoteCapture(req CaptureRequest, kubectlPath, debugContainer stri
 //     from.
 //   - `--profile=netadmin` is required for tcpdump to open AF_PACKET. This
 //     was added to kubectl in 1.30. Older versions surface "unknown flag:
-//     --profile" via stderr. TranslateKubectlDebugErr maps that to a
+//     --profile" via stderr, and translateKubectlDebugErr maps that to a
 //     friendly message.
 //   - tcpdump runs inside `sh -c "sleep 1; exec timeout 30m tcpdump ..."`.
 //     The leading sleep is REQUIRED to defeat kubectl-debug's attach race:

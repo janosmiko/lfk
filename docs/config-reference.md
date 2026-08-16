@@ -897,7 +897,7 @@ Press `.` on any resource list to see the presets available for that kind. The b
 
 | Kind | Presets (key) |
 |---|---|
-| Pod | Failing (`f`), Pending (`p`), Not Ready (`n`), **Not Running (`x`)** |
+| Pod | Failing (`f`), Pending (`p`), Not Ready (`n`), Restarting (`r`), High Restarts (`R`), **Not Running (`x`)** |
 | Deployment / StatefulSet / DaemonSet | Not Ready (`n`), Failing (`f`), **Not Running (`x`)** |
 | Job | Failed (`f`), **Not Running (`x`)** |
 | PersistentVolume | Available (`a`), Released (`r`), Failed (`f`), **Not Bound (`x`)** |
@@ -910,7 +910,7 @@ Press `.` on any resource list to see the presets available for that kind. The b
 | Flux HelmRelease / Kustomization | Suspended (`s`), Not Ready (`n`) |
 | Event | Warnings (`w`) |
 
-The `x` key (Not Running / Not Bound) is the shared "show me anything not in a healthy state" mnemonic across the kinds where it applies — k9s `Ctrl-Z` equivalent. Universal presets `Old (>30d)` (`o`) and `Recent (<1h)` (`h`) are also available on every list. Pod also has Restarting (`r`) and High Restarts (`R`) presets for crash-loop triage.
+The `x` key (Not Running / Not Bound) is the shared "show me anything not in a healthy state" mnemonic across the kinds where it applies — k9s `Ctrl-Z` equivalent. Universal presets `Old (>30d)` (`o`) and `Recent (<1h)` (`h`) are also available on every list.
 
 ## Secret lazy loading
 
