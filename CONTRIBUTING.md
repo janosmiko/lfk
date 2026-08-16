@@ -9,7 +9,7 @@ Setup, build, and release steps for `lfk` contributors.
 - `kubectl` configured and working
 - `golangci-lint`
 
-## Development Setup
+## Development setup
 
 ```bash
 # Clone the repository
@@ -27,7 +27,7 @@ make build
 ./lfk
 ```
 
-## Building and Testing
+## Building and testing
 
 ```bash
 # Build
@@ -43,7 +43,7 @@ go test -race ./...
 golangci-lint run
 ```
 
-## Project Structure
+## Project structure
 
 - `main.go` - Entry point, initializes the Kubernetes client, loads config, and starts the Bubbletea program
 - `internal/app/` - Core application logic: the Bubbletea model, update loop, async commands, and bookmarks
@@ -52,7 +52,7 @@ golangci-lint run
 - `internal/ui/` - All rendering: columns, overlays, styles, themes, help screen, and log viewer
 - `internal/logger/` - Application logging
 
-## Submitting Changes
+## Submitting changes
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-feature`)

@@ -1,4 +1,4 @@
-# Keybindings Reference
+# Keybindings reference
 
 Complete list of all keybindings in `lfk`. All keybindings can be overridden in `~/.config/lfk/config.yaml` under the `keybindings` section. Only `esc`, `ctrl+c`, and `q` (quit) are hardcoded.
 
@@ -28,7 +28,7 @@ In the Events list, `z` toggles event grouping instead of expand/collapse.
 
 Teleport history records owner, port-forward, orphan, finding, and mark jumps. Hierarchical `h`/`l` navigation does not push a history entry.
 
-## Goto Navigation
+## Goto navigation
 
 Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the goto which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
 
@@ -67,7 +67,7 @@ looks up `jump_top` + the next keypress. A chord that does not is reported at
 startup and ignored. Rebinding `jump_top` therefore disables the built-in
 chords, which all start with `g`; re-point the ones you use at the new prefix.
 
-## Views and Tools
+## Views and tools
 
 | Key | Action |
 |---|---|
@@ -109,7 +109,7 @@ chords, which all start with `g`; re-point the ones you use at the new prefix.
 
 Your chosen sort is remembered per resource kind and per cluster context, and persists across restarts (stored in `~/.local/state/lfk/sort_memory.yaml`), so leaving a list and returning — or quitting and reopening lfk — keeps your sort instead of resetting. Use `-` (reset) to drop a remembered sort.
 
-## Modes & Settings
+## Modes and settings
 
 | Key | Action |
 |---|---|
@@ -171,7 +171,7 @@ Auto-excluded from Pod "Orphans":
 
 Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason is `"no owner (terminal)"` to distinguish them from live workloads.
 
-## Search and Filter
+## Search and filter
 
 | Key | Action | Config key |
 |---|---|---|
@@ -776,7 +776,7 @@ overlay interprets it as "reset to defaults for this kind" rather than
 leaving the table empty. To render only built-ins with zero extras, keep
 at least one built-in column checked when you press Enter.
 
-## Inline Editors (Secret / ConfigMap / Labels & Annotations)
+## Inline Editors (Secret / ConfigMap / labels and annotations)
 
 The Secret, ConfigMap, and Labels/Annotations editors use a shared key-value
 overlay. The list view supports vim-like navigation; pressing `e` or `a`
@@ -929,7 +929,7 @@ has access.
 ClusterRoleBindings always count regardless of namespace scope (cluster-wide
 grants apply everywhere); RoleBindings outside the active scope are excluded.
 
-## Can-I Subject Selector
+## Can-I subject selector
 
 | Key | Action |
 |---|---|
@@ -1058,7 +1058,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 
 `Ctrl+C` cancels an in-progress bulk action on the current tab first, rather than closing it. It only cancels a bulk action started on that tab, not one running in another tab.
 
-## Read-Only Mode
+## Read-only mode
 
 | Key | Action |
 |---|---|
@@ -1075,7 +1075,7 @@ mode: X disabled" toast. See [Read-Only Mode](usage.md#read-only-mode)
 for the full precedence rules across the CLI flag, per-context config,
 and global config.
 
-## Cluster Color Coding
+## Cluster color coding
 
 | Key | Action |
 |---|---|
@@ -1213,7 +1213,7 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 | `q` | Quit application (with confirmation) |
 | `Esc` | Go back one level / close overlay / quit |
 
-## Action Menu Items
+## Action Menu items
 
 The action menu (`x` key) shows context-specific actions based on the resource type.
 
@@ -1238,64 +1238,64 @@ Locked rows offer no choice — keeping them yields a manifest that will not app
 
 The template picker (`a`): `Enter` create, `/` filter, `d` delete the highlighted saved template after a confirmation, `Esc`/`q` close. `d` works on your own templates only — the built-ins have no file behind them.
 
-### Pod Actions
+### Pod actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
 
-### Deployment Actions
+### Deployment actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### StatefulSet Actions
+### StatefulSet actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### DaemonSet Actions
+### DaemonSet actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### HorizontalPodAutoscaler Actions
+### HorizontalPodAutoscaler actions
 `S` Scale (edit min/max bounds & target replicas), `E` Edit, `D` Delete, `v` Describe, `b` Debug Pod, `V` Events
 
 The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the HPA keeps autoscaling within the new range) and, optionally, scales the target workload directly. Fields prefill from the HPA's current values. `j`/`k` (or `↓`/`↑`) move between the three fields; `h`/`-` and `l`/`+` decrement/increment the active field; `←`/`→` move the cursor within the field; digits type a value directly. Target replica changes may be reverted by the HPA on its next reconcile. The same `h`/`-`/`l`/`+` steppers work in the workload Scale overlay.
 
-### Service Actions
+### Service actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `O` Port Forward & Open (forward a port and open it in the browser), `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
-### Secret Actions
+### Secret actions
 `e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
-### ConfigMap Actions
+### ConfigMap actions
 `e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
-### Node Actions
+### Node actions
 `c` Cordon/Uncordon (toggle schedulability), `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, pick a common taint with `p`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 Drain streams the eviction progress live: in PTY terminal mode (default on macOS/Linux) the `kubectl drain` output renders in lfk's embedded scrollable terminal; in Exec mode the host terminal is handed over. The same applies to Drain Node on a Karpenter NodeClaim.
 
-### Longhorn Node Actions
+### Longhorn Node actions
 `e` Evict Replicas, `C` Cancel Eviction, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events, `P` Permissions
 
 The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas scheduled on each node. Force Delete disables scheduling, then deletes (the `validator.longhorn.io` webhook rejects deleting a still-schedulable node). Evict Replicas disables scheduling and sets `spec.evictionRequested`, so Longhorn rebuilds each replica on another node before removing it.
 
-### Job Actions
+### Job actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
-### CronJob Actions
+### CronJob actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### ArgoCD Application Actions
+### ArgoCD Application actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
-### Helm Release Actions
+### Helm Release actions
 `u` Values, `A` All Values, `E` Edit Values, `d` Diff, `U` Upgrade, `R` Rollback, `h` History, `v` Describe, `D` Delete, `b` Debug Pod, `V` Events
 
-### Ingress Actions
+### Ingress actions
 `o` Open in Browser, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
-### PVC Actions
+### PVC actions
 `g` Go to Pod, `b` Debug Mount, `B` Debug Pod, `v` Describe, `E` Edit, `D` Delete, `V` Events
 
-### Default Actions (all other resources)
+### Default actions (all other resources)
 `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
-### Bulk Actions (when items multi-selected)
+### Bulk actions (when items multi-selected)
 `D` Delete, `X` Force Delete, `S` Scale, `r` Restart
 
 ArgoCD Application bulk actions (when Application resources are multi-selected):
@@ -1303,7 +1303,7 @@ ArgoCD Application bulk actions (when Application resources are multi-selected):
 
 Custom actions defined in the config file appear after the built-in actions.
 
-## Configuring Keybindings
+## Configuring keybindings
 
 All keybindings can be overridden in `~/.config/lfk/config.yaml`. Only specify the keys you want to change — defaults apply for everything else.
 

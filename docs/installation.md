@@ -164,7 +164,7 @@ lfk --demo
 
 Runs against a built-in fake cluster. No kubeconfig required. Exec, port-forward, drain, debug, Helm, and vuln scan are unavailable in demo mode.
 
-## External Dependencies
+## External dependencies
 
 **Required:**
 - `kubectl` - Kubernetes CLI (must be configured and in PATH)

@@ -103,7 +103,7 @@ Restoring a session takes two steps:
 Press a key or click during that gap and lfk gives up the saved row, so an
 arriving list cannot pull the cursor away from where you went.
 
-## Mouse Support
+## Mouse support
 
 Disable mouse capture to get native terminal text selection (for example,
 shift+click):
@@ -163,7 +163,7 @@ click. Press `Esc` to close them.
 > capture is active. Use `--no-mouse` or switch to a terminal that handles this
 > correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
 
-## No-Color Mode
+## No-color mode
 
 Disable all foreground and background colors. Selection and other highlights
 stay visible via bold, underline, and reverse-video SGR codes. Useful for
@@ -176,7 +176,7 @@ monochrome terminals, piped output, or lower CPU usage.
 
 Precedence: `--no-color` flag > `NO_COLOR` env var > config file.
 
-## Kubeconfig Directory
+## Kubeconfig directory
 
 Override or merge the directories lfk scans for kubeconfig files, via CLI,
 environment variable, or config:
@@ -195,7 +195,7 @@ Precedence (replacement, not merge): `--kubeconfig-dir` flag > `KUBECONFIG_DIR` 
 
 lfk validates every directory exists at startup and errors out loudly on a typo. The `--kubeconfig` flag bypasses all directory discovery entirely.
 
-## Read-Only Mode
+## Read-only mode
 
 Read-only mode disables every action that changes cluster state — delete,
 edit, scale, restart, rollback, exec, attach, port-forward, drain, cordon,
@@ -273,7 +273,7 @@ context. It does not scope the read-only flag.
 The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
 can find the row toggle without reading docs.
 
-## Permission-Aware Actions
+## Permission-aware actions
 
 Actions the current user cannot run are dropped from the action menu, so a
 delete you are not allowed to make no longer fails after the confirm
@@ -304,7 +304,7 @@ dialog. The gate is the same one read-only mode uses.
 - **Bulk actions**: gated only when every selected row sits in one context
   and namespace. A mixed selection is left to the API server.
 
-## Node Shell
+## Node shell
 
 From the Node action menu (`x` → `s`), lfk launches a privileged debug pod
 that `nsenter`s into PID 1 on the selected node, giving an interactive shell
@@ -317,7 +317,7 @@ is removed when the shell exits.
 
 Node shell is a mutating action and is gated by the read-only check.
 
-## Cluster Color Coding
+## Cluster color coding
 
 Tag any cluster with a background color so the title bar tints the
 moment you enter it — useful for "I am unmistakably in prod" feedback
@@ -356,7 +356,7 @@ bright codes so they look the same regardless of which lfk theme is
 active — useful when none of the theme accent colors fit a particular
 cluster's identity.
 
-## Watch-Mode Interval
+## Watch-mode interval
 
 Watch mode (toggle with `w`) polls the current resource list on an interval.
 The default 2-second interval is a good balance between freshness and API
@@ -381,7 +381,7 @@ Set `watch_throttle: false` to disable this throttling entirely.
 
 Flags: `--background-watch-interval`, `--foreground-idle-timeout`.
 
-## Discovery Cache
+## Discovery cache
 
 API discovery (the list of resource types and CRDs the server exposes) is
 cached on disk under `~/.kube/cache/discovery/<host>/` with a 5-minute TTL.
@@ -399,7 +399,7 @@ discovery round-trips on the API server and reduces startup time.
 - **TTL:** 5 minutes. Stale entries are refetched automatically on the
   next discovery request.
 
-## Endpoint Visibility
+## Endpoint visibility
 
 The right-pane preview for the **Endpoints** and **EndpointSlices** kinds
 shows every endpoint individually, with target pod, node, and ready state:
@@ -524,7 +524,7 @@ listed [Read-Only](#read-only-mode) `port-forward` block applies to the
 user-triggered Port Forward action, not to the kubeshark backend's
 read-only tunnel to its in-cluster hub.
 
-## Secret Lazy Loading
+## Secret lazy loading
 
 Enable lazy loading to fetch only metadata for the Secrets list and defer
 decoded values to hover:

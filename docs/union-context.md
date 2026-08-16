@@ -22,7 +22,7 @@ This opens the chosen resource type from namespace `cloud-cd` across all three c
 
 Configured union sets also appear at the top of the cluster picker under a **Union Sets** heading — pick one to enter union view without passing any flags.
 
-## The Context column
+## The context column
 
 Every merged row carries a **Context** column naming its source cluster. It behaves like any other column: sort by it, reorder it, or hide it from the column toggle (`,`). Rows are sorted by name first and context second, so the same resource lines up across clusters.
 

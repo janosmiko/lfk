@@ -1,4 +1,4 @@
-# Views and Overlays
+# Views and overlays
 
 Reference list of every view, fullscreen flag, and overlay lfk renders.
 
@@ -103,7 +103,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | ------------------ | -------------------- | ------------------------------------ |
 | `overlayBookmarks` | `'`, `:bookmarks`    | Saved navigation slots, with filter. |
 
-### Editors / Forms
+### Editors / forms
 
 | Overlay                  | Default trigger                | Purpose                                            |
 | ------------------------ | ------------------------------ | -------------------------------------------------- |

@@ -1,4 +1,4 @@
-# Configuration Reference
+# Configuration reference
 
 The configuration file is located at `~/.config/lfk/config.yaml`. All fields are optional — only the values you specify will override the defaults.
 
@@ -12,7 +12,7 @@ A JSON Schema is published at [`docs/config.schema.json`](config.schema.json). A
 
 Prefer a local copy? Point `$schema` at a relative or absolute path instead of the URL.
 
-## Top-Level Fields
+## Top-level fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -199,7 +199,7 @@ log_viewer:
 
 The deprecated flat keys `log_tail_lines`, `log_tail_lines_short`, and `log_render_ansi` are still accepted as aliases; when both a flat key and its `log_viewer` equivalent are set, `log_viewer` wins.
 
-## Viewer Defaults
+## Viewer defaults
 
 Startup defaults for the fullscreen YAML / diff / describe viewers, so display toggles you always want don't need re-pressing on every open. Each viewer mirrors the `log_viewer` group.
 
@@ -273,7 +273,7 @@ monitoring:
       services: ["prometheus-server", "prometheus"]
 ```
 
-### Monitoring Entry Fields
+### Monitoring entry fields
 
 Each monitoring entry accepts the following top-level fields:
 
@@ -285,7 +285,7 @@ Each monitoring entry accepts the following top-level fields:
 
 When `node_metrics` is empty, lfk uses Prometheus if a `prometheus` endpoint is configured, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus.
 
-### Node Uptime Column
+### Node uptime column
 
 The nodes list shows an `Uptime` column (how long since each node last booted)
 when Prometheus is the configured monitoring source — that is, a `prometheus`
@@ -303,7 +303,7 @@ auto-discovered from the well-known namespaces and services listed below.
 Clusters without node_exporter never show the column. A node missing from the
 query result shows `n/a`, as does every node if Prometheus stops responding.
 
-### Monitoring Endpoint Fields
+### Monitoring endpoint fields
 
 Each endpoint (`prometheus` and `alertmanager`) accepts:
 
@@ -600,7 +600,7 @@ views:
 
 Per-cluster overrides follow the same format under `clusters.<name>.views` and win over global `views` for matching keys.
 
-## Resource Columns (Deprecated)
+## Resource columns (deprecated)
 
 > **Deprecated.** Use [`views`](#views) instead. `resource_columns` is bridged automatically — each entry becomes a `views` entry with the same columns and no `sort_column`. A one-time warning is logged when bridging occurs. When `views` is set for the same Kind, `views` wins.
 
@@ -635,7 +635,7 @@ resource_columns:
 
 Keys are resource Kind names and are case-insensitive (e.g., `Pod`, `pod`, `POD` all work).
 
-## Resource Templates
+## Resource templates
 
 Templates listed in the create-from-template picker (`a`) come from two places: the built-ins, and one YAML file per template in `~/.config/lfk/templates/`.
 
@@ -694,7 +694,7 @@ abbreviations:
   myapp: myapplication.example.com
 ```
 
-### Default Abbreviations
+### Default abbreviations
 
 | Abbreviation | Resource Type |
 |---|---|
@@ -733,7 +733,7 @@ abbreviations:
 | `netpol` | networkpolicy |
 | `rc` | replicationcontroller |
 
-## Custom Actions
+## Custom actions
 
 Define custom shell commands for specific resource types. Custom actions appear in the action menu (`x` key) after the built-in actions.
 
@@ -757,7 +757,7 @@ custom_actions:
       read_only_safe: true
 ```
 
-### Custom Action Fields
+### Custom action fields
 
 | Field | Required | Description |
 |---|---|---|
@@ -769,7 +769,7 @@ custom_actions:
 
 Set `read_only_safe: true` for view-only commands (e.g. `kubectl describe`, `kubectl logs`).
 
-### Template Variables
+### Template variables
 
 Template variables are substituted before execution:
 
@@ -785,7 +785,7 @@ Custom action commands are executed via `sh -c` with `KUBECONFIG` set in the env
 
 Substituted values are shell-quoted before insertion, so cluster data (context names, labels, image strings) containing shell metacharacters is passed literally and cannot inject commands. Quoting is transparent for normal argument use — `ssh {Node}` and `/tmp/{name}.log` work as written.
 
-## Pinned Groups
+## Pinned groups
 
 Pin CRD API groups so they appear right after the built-in categories (Workloads, Networking, etc.) instead of being sorted alphabetically under Custom Resources.
 
@@ -802,7 +802,7 @@ Pinning a type's dashboard summary is a separate action (the action menu's "Pin 
 
 When nothing is pinned anywhere (config or state), the dashboard shows a built-in default set instead: `batch/jobs`, `apps/deployments`, `argoproj.io/applications`, `kustomize.toolkit.fluxcd.io/kustomizations`, `cert-manager.io/certificates`. CRD-backed defaults are silently skipped when the cluster doesn't have the type. Your first interactive pin copies the currently-active defaults into your pinned list, then adds (or removes) the selected type, so the defaults you already see are kept, not replaced. Setting `pinned_summaries` in config is still a full explicit list and replaces the defaults outright. Set `pinned_summaries: []` in config to disable the defaults and show none.
 
-## Union Sets
+## Union sets
 
 Define named groups of clusters that the `--union-set <name>` CLI flag expands into a merged ("union") view. Avoids retyping long `--union-context` lists for the same recurring groups (blue/green/canary, region triplets, etc.). The flag is mutually exclusive with `--union-context` and `--context`.
 
@@ -850,7 +850,7 @@ When a cluster entry has a `color:` set, every row sourced from that cluster get
 
 The colors live inside the `union_sets` definition (not the global `cluster_colors` state file used by the cluster picker) so you can pick deliberate "traffic light" semantics per view — for example, the same kubeconfig context can be tinted blue here and untinted in another set, without affecting how it appears in the cluster picker. The textual `Context` column remains the source of truth for unambiguous reads (sortable, copyable, fits screen-readers); the tile is purely visual shorthand.
 
-## Filter Presets
+## Filter presets
 
 Define custom quick filter presets per resource type. These appear alongside the built-in presets when you press `.` at the resource level.
 
@@ -870,7 +870,7 @@ filter_presets:
         column_value: "1"
 ```
 
-### Filter Preset Fields
+### Filter preset fields
 
 | Field | Required | Description |
 |---|---|---|
@@ -878,7 +878,7 @@ filter_presets:
 | `key` | Yes | Single-character shortcut key (must not conflict with built-in presets) |
 | `match` | Yes | Filter criteria object (all fields are AND-ed) |
 
-### Match Criteria
+### Match criteria
 
 | Field | Description |
 |---|---|
@@ -891,7 +891,7 @@ filter_presets:
 
 `invert: true` flips the final AND result — useful for "anything except X" filters, e.g. `status: Bound` + `invert: true` matches every PVC that is NOT Bound.
 
-### Built-in Presets
+### Built-in presets
 
 Press `.` on any resource list to see the presets available for that kind. The built-ins are:
 
@@ -1006,7 +1006,7 @@ informer_cache: auto
 # informer_cache: off
 ```
 
-## Minimum Contrast Ratio
+## Minimum contrast ratio
 
 `min_contrast_ratio` is a normalized knob in `[0.0, 1.0]` that makes lfk
 automatically adjust foreground colors to be more readable against their
@@ -1071,7 +1071,7 @@ AA); raise toward `0.3` if still too dim.
 min_contrast_ratio: 0.175
 ```
 
-## Terminal Mode
+## Terminal mode
 
 Controls how interactive shells (`exec`, `attach`, `debug`, debug pods,
 node shell) run.
@@ -1124,7 +1124,7 @@ are forwarded to the new pane via inline shell variable assignments,
 since neither tmux nor zellij propagate parent env reliably across
 their spawn APIs.
 
-## PTY Scrollback
+## PTY scrollback
 
 `scrollback_lines` sets the per-tab capacity of the embedded PTY
 scrollback ring buffer (in lines). Only applies to `pty` mode — `exec`
@@ -1158,7 +1158,7 @@ page), `Ctrl+]` `Ctrl+B`/`Ctrl+F` (full page), `Ctrl+]` `g`/`G`
 If the Service isn't found in this namespace, the kubeshark chip is
 omitted from the backend picker.
 
-## Color Schemes
+## Color schemes
 
 Over 460 built-in color schemes are available, generated from [ghostty terminal themes](https://github.com/ghostty-org/ghostty). Sample list:
 
@@ -1168,7 +1168,7 @@ Switch themes at runtime with `T` to browse all available themes interactively w
 
 To regenerate themes from the latest ghostty source, run `make generate-themes`.
 
-## Session Persistence
+## Session persistence
 
 The application automatically saves and restores the last visited context, namespace, and resource type across restarts (per tab, including the active tab). It also restores the active list filter (including the `Tab` broad-match mode) and the highlighted row, so you reopen lfk on the same resource you were looking at. The session state is stored at `~/.local/state/lfk/session.yaml`.
 

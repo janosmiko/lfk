@@ -1,4 +1,4 @@
-# Feature Details
+# Feature details
 
 Detail for the README feature list. Features documented elsewhere link straight to their own page.
 

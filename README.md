@@ -98,7 +98,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 | Pods | <img src="./docs/imgs/pods.png" alt="Pods" width="600"> |
 | Pods fullscreen | <img src="./docs/imgs/pods-fullscreen.png" alt="Pods fullscreen" width="600"> |
 | Pod action menu | <img src="./docs/imgs/pods-actions.png" alt="Pod actions" width="600"> |
-| Cluster dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster dashboard" width="600"> |
+| Cluster Dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster Dashboard" width="600"> |
 | Object Explorer | <img src="./docs/imgs/object-explorer.png" alt="Object Explorer" width="600"> |
 | API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
 
@@ -106,8 +106,8 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 | Feature | |
 | --- | --- |
-| YAML viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML viewer" width="600"> |
-| Log viewer | <img src="./docs/imgs/log-viewer.png" alt="Log viewer" width="600"> |
+| YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
+| Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
 | Log Top | <img src="./docs/imgs/log-top.png" alt="Log Top" width="600"> |
 
 ### Integrations
@@ -123,7 +123,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 | Feature | |
 | --- | --- |
-| Security dashboard | <img src="./docs/imgs/security-heuristics.png" alt="Built-in security heuristics" width="600"> |
+| Security Dashboard | <img src="./docs/imgs/security-heuristics.png" alt="Built-in security heuristics" width="600"> |
 | Crash Investigator | <img src="./docs/imgs/crash-investigator.png" alt="Crash Investigator" width="600"> |
 | Pod Startup Analysis | <img src="./docs/imgs/startup-analysis.png" alt="Pod Startup Analysis" width="600"> |
 | Can-I RBAC permissions browser | <img src="./docs/imgs/can-i.png" alt="Can-I viewer" width="600"> |
@@ -167,7 +167,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 - Multi-tab workspace with `t` / `]` / `[`: [keybindings.md](docs/keybindings.md#tabs)
 - Merged kubeconfig from `~/.kube/config`, `~/.kube/config.d/*`, and `KUBECONFIG_DIR`: [usage.md](docs/usage.md#kubeconfig-directory)
 - Union view merging several clusters into one table: [union-context.md](docs/union-context.md)
-- Cluster dashboard on entering a context: [config-reference.md](docs/config-reference.md#top-level-fields)
+- Cluster Dashboard on entering a context: [config-reference.md](docs/config-reference.md#top-level-fields)
 - Monitoring dashboard with Prometheus and Alertmanager alerts, `@`: [config-reference.md](docs/config-reference.md#monitoring)
 - Local kind, k3d, and minikube clusters with `Ctrl+N`: [keybindings.md](docs/keybindings.md#local-clusters-manager)
 - Named sessions with `C`: [keybindings.md](docs/keybindings.md#named-sessions)
@@ -188,7 +188,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 - Multi-select with `Space`, range with `Ctrl+Space`, then bulk delete, scale, or restart: [keybindings.md](docs/keybindings.md#multi-selection)
 - Custom shell actions per resource type: [config-reference.md](docs/config-reference.md#custom-actions)
 - Port forwarding, with active forwards listed under the Networking group: [keybindings.md](docs/keybindings.md#action-menu-items)
-- Right-sizing advisor with `x` -> `z`: [keybindings.md](docs/keybindings.md#right-sizing-advisor)
+- Right-sizing Advisor with `x` -> `z`: [keybindings.md](docs/keybindings.md#right-sizing-advisor)
 - Network policy visualizer with `x` -> `N`, Cilium aware: [keybindings.md](docs/keybindings.md#network-policy-visualizer)
 - Traffic capture with `c` on a Pod or Service: [usage.md](docs/usage.md#traffic-capture)
 
@@ -205,7 +205,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 ### Viewers
 
 - YAML preview in the right column, details summary with `Shift+P`
-- Fullscreen YAML viewer with search, folding, and in-place editing: [keybindings.md](docs/keybindings.md#yaml-view)
+- Fullscreen YAML Viewer with search, folding, and in-place editing: [keybindings.md](docs/keybindings.md#yaml-view)
 - Field-manager blame with `m`, writes stamped `lfk:<os-user>`: [config-reference.md](docs/config-reference.md#top-level-fields)
 - Schema side pane with `Ctrl+K`: [features.md](docs/features.md#schema-side-pane)
 - Object Explorer with `O` for the live object: [keybindings.md](docs/keybindings.md#object-explorer)
@@ -255,7 +255,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 - Column visibility and order with `,`, remembered per kind: [keybindings.md](docs/keybindings.md#column-toggle-overlay)
 - Configurable columns globally, per resource type, and per cluster: [config-reference.md](docs/config-reference.md#views)
-- CPU and memory bars on the cluster dashboard: [features.md](docs/features.md#resource-usage-metrics)
+- CPU and memory bars on the Cluster Dashboard: [features.md](docs/features.md#resource-usage-metrics)
 - Node uptime column: [config-reference.md](docs/config-reference.md#node-uptime-column)
 - Namespace resource quota dashboard with `Q`
 - Watch mode auto-refresh with `w`: [usage.md](docs/usage.md#watch-mode-interval)
@@ -296,7 +296,7 @@ Inside the namespace selector:
 
 ## Keybindings
 
-[docs/keybindings.md](docs/keybindings.md) is the complete reference, including the YAML view, log viewer, describe, diff, exec mode, and every sub-mode. Press `F1` in-app for the help screen, `?` for the which-key action panel.
+[docs/keybindings.md](docs/keybindings.md) is the complete reference, including the YAML view, Log Viewer, describe, diff, exec mode, and every sub-mode. Press `F1` in-app for the help screen, `?` for the which-key action panel.
 
 ### Move
 
@@ -359,7 +359,7 @@ Inside the namespace selector:
 | Key | Action |
 |---|---|
 | `x` | Action menu (logs, exec, describe, edit, delete, scale, port-forward) |
-| `v` / `L` / `Ctrl+L` | Describe / live-log preview / fullscreen log viewer |
+| `v` / `L` / `Ctrl+L` | Describe / live-log preview / fullscreen Log Viewer |
 | `D` / `X` | Delete / force delete |
 | `y` / `Y` / `Ctrl+Y` | Copy name / copy-as picker / copy a single field |
 | `Ctrl+P` / `W` | Apply from clipboard / save the manifest to a file |
@@ -429,7 +429,7 @@ Every search and filter input auto-detects the mode from the query string:
 
 All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A multiline paste shows a confirmation dialog.
 
-`Up` / `Down` recall previous queries. `/` and `f` share one history, the log viewer's `/` and the `:` command bar keep their own. All three survive restarts under `$XDG_STATE_HOME/lfk/`: [keybindings.md](docs/keybindings.md#log-viewer).
+`Up` / `Down` recall previous queries. `/` and `f` share one history, the Log Viewer's `/` and the `:` command bar keep their own. All three survive restarts under `$XDG_STATE_HOME/lfk/`: [keybindings.md](docs/keybindings.md#log-viewer).
 
 ## Tips and tricks
 
@@ -458,14 +458,14 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 - Peek at Pod or Deployment logs with `L`, open the fullscreen viewer with `Ctrl+L`
 - Make noisy logs readable with `P`: the structured preview parses JSON, logfmt, klog, zap, nginx, envoy, Java, and postgres lines
 - Save logs to a file with `S` (loaded lines) or `Ctrl+S` (full history), the path lands on your clipboard
-- Switch pods or filter containers without leaving the log viewer: press `\`
+- Switch pods or filter containers without leaving the Log Viewer: press `\`
 - Investigate a crash-looping Pod with `x` -> `I`: restart history, events, previous logs, and describe in one tabbed view
 
 ### Inspecting
 
 - Walk any resource's live object with `O`: `r` finds keys recursively, `T` expands an ASCII tree, `y` copies the field path
 - Forget `kubectl explain`, `I` opens the API Explorer and `n` / `N` auto-drill into nested fields
-- In the YAML viewer, press `O` on a line to open the Object Explorer at that attribute, or `I` to see its schema
+- In the YAML Viewer, press `O` on a line to open the Object Explorer at that attribute, or `I` to see its schema
 - `Ctrl+K` opens a side pane with the schema description of the field under the cursor, and keeps it in step as you move
 - Fold YAML sections with `z` (`Z` folds all), edit the resource in your `$EDITOR` with `Ctrl+E`
 - Replay a resource's event history as a timeline with `V`
@@ -488,7 +488,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 - Spin up a throwaway kind, k3d, or minikube cluster with `Ctrl+N` at the cluster list
 - Capture a Pod's network traffic with `c`: live decode plus pcap export
 - Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can, every subject allowed to run a verb on a resource
-- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing advisor, VPA-backed when available)
+- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
 - Watch an ArgoCD Application roll out wave by wave: `x` -> `W` opens the Sync Wave Timeline
 - Try a new look without restarting: `T` live-previews 460+ themes
 - Waiting for a rollout? `:nyan` and `:kubetris` are real commands

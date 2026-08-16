@@ -1,8 +1,8 @@
-# Release Process
+# Release process
 
 Operational reference for the maintainer. The release pipeline is fully automated on tag push (see `.github/workflows/release.yml`). This document covers one-time bootstrap, secret management, and recovery procedures.
 
-## Trigger a Release
+## Trigger a release
 
 Releases are driven by `release-please`:
 
@@ -13,7 +13,7 @@ Releases are driven by `release-please`:
 
 To cut a release manually (skipping `release-please`): `make release VERSION=X.Y.Z` then `git push && git push --tags`.
 
-## External Accounts (one-time bootstrap)
+## External accounts (one-time bootstrap)
 
 | Channel | Account / Repo | Setup |
 |---|---|---|
@@ -25,7 +25,7 @@ To cut a release manually (skipping `release-please`): `make release VERSION=X.Y
 | Snap | snapcraft.io publisher | Snap name `lfk` registered. Classic confinement justification approved. Macaroon in `SNAPCRAFT_STORE_CREDENTIALS` (run `snapcraft export-login --snaps=lfk --acls=package_access,package_push,package_update,package_release - 2>&1 \| tail -n +2`). |
 | Cloudsmith | cloudsmith.io account `janosmiko` | Repository `janosmiko/lfk` with DEB + RPM enabled. API key in `CLOUDSMITH_API_KEY`. |
 
-## GitHub Secrets
+## GitHub secrets
 
 | Secret | Used by | Rotation |
 |---|---|---|

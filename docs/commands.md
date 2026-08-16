@@ -1,4 +1,4 @@
-# Command Bar Reference
+# Command Bar reference
 
 Press `:` to open the command bar. Input is classified by the first word:
 
