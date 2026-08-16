@@ -20,7 +20,7 @@ paru -S lfk-bin
 git clone https://aur.archlinux.org/lfk-bin.git && cd lfk-bin && makepkg -si
 ```
 
-The `lfk-bin` package installs the prebuilt binary from the GitHub release. There is no source-build (`lfk` AUR) package; if you want to build from source, use `go install github.com/janosmiko/lfk@latest`.
+The `lfk-bin` package installs the prebuilt binary from the GitHub release. There is no source-build (`lfk` AUR) package. To build from source, use `go install github.com/janosmiko/lfk@latest`.
 
 ### Debian / Ubuntu (Cloudsmith APT)
 
@@ -109,7 +109,11 @@ choco install lfk
 
 ### Manual binary
 
-Download `lfk_<version>_windows_<arch>.zip` from [GitHub Releases](https://github.com/janosmiko/lfk/releases), extract `lfk.exe` into a directory in your `PATH`, and verify with `lfk --version`. Each archive is covered by the same cosign Sigstore bundle as Linux/macOS builds.
+1. Download `lfk_<version>_windows_<arch>.zip` from [GitHub Releases](https://github.com/janosmiko/lfk/releases).
+2. Extract `lfk.exe` into a directory in your `PATH`.
+3. Verify with `lfk --version`.
+
+Each archive is covered by the same cosign Sigstore bundle as Linux/macOS builds.
 
 ## From source
 
@@ -158,7 +162,7 @@ docker run -it --rm \
 lfk --demo
 ```
 
-Runs against a built-in fake cluster; no kubeconfig required. Exec, port-forward, drain, debug, Helm, and vuln scan are unavailable in demo mode.
+Runs against a built-in fake cluster. No kubeconfig required. Exec, port-forward, drain, debug, Helm, and vuln scan are unavailable in demo mode.
 
 ## External Dependencies
 

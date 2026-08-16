@@ -73,9 +73,9 @@ their checks instead of failing the source, and the `kube-system`,
 `kube-public`, and `kube-node-lease` namespaces are always excluded.
 
 The heuristic `secret_env` check (plaintext credential-looking env vars) is
-tunable with `security.heuristic.secret_env_include` / `secret_env_exclude` —
+tunable with `security.heuristic.secret_env_include` / `secret_env_exclude`,
 case-insensitive env-var name globs added on top of the built-in keyword and
-exemption lists (exclude wins); the same patterns also drive the
+exemption lists (exclude wins). The same patterns also drive the
 `configmap_secret_keys` check. The Secret-listing checks
 (`legacy_sa_token_secret`, `tls_secret_expiry`, and Secret-reference
 verification) can be turned off with `security.heuristic.scan_secrets: false`
@@ -99,7 +99,7 @@ security:
 
 - `enabled: false` removes the Security category, hides the SEC badge, and runs
   no source probes.
-- `sources.<name>: false` disables one source; any source omitted from the map
+- `sources.<name>: false` disables one source. Any source omitted from the map
   stays enabled. Disabling **every** source leaves the Security category empty
   (same as `enabled: false`).
 
@@ -156,16 +156,16 @@ clusters:
 - **Low priority**: security scans run as a low-priority background task and on a
   dedicated, throttled API client (QPS 10 / burst 20, separate from the
   foreground budget), so a multi-source scan never starves foreground resource
-  lists. The foreground client rate is configurable; see
+  lists. The foreground client rate is configurable, see
   [API client rate limits](config-reference.md#api-client-rate-limits).
 - **Drill-down**: open the Security category, pick a source to list finding
   groups (one per check/CVE), then drill into a group to see affected
-  resources. `Enter` on an affected resource jumps to the real object;
+  resources. `Enter` on an affected resource jumps to the real object.
   `Backspace` jumps back.
 - **Per-resource findings**: the `Security Findings` action (`x` on a resource
   row) opens a finding-group list filtered to that resource **and its owners**
   across all sources — the same set the SEC badge counts (e.g. a Pod row
-  includes its Deployment's trivy CVEs). Rows carry a `Source` column;
+  includes its Deployment's trivy CVEs). Rows carry a `Source` column.
   `Enter` drills into a group's affected resources as usual, and `Backspace`
   jumps back to the originating list.
 
@@ -200,7 +200,7 @@ persists across sessions.
 
 `security.ignore_patterns` in the config file defines glob-based rules applied
 at startup — useful for org-wide accepted findings. Each field is a glob (`*`,
-`?`); an empty field matches anything. A finding is ignored when every non-empty
+`?`). An empty field matches anything. A finding is ignored when every non-empty
 field matches it.
 
 ```yaml
@@ -222,7 +222,7 @@ empty is ignored (it would otherwise hide everything).
 The optional `labels` field matches the target resource's Kubernetes labels —
 the right tool for silencing whole classes of infrastructure pods (CNI, CSI,
 storage) without naming each one. Each entry is a label key mapped to a glob
-value (`*`, `?`); **all** entries must match (AND). `labels` combines with the
+value (`*`, `?`). **All** entries must match (AND). `labels` combines with the
 other fields, so you can still scope by source, namespace, or cluster.
 
 Semantics:
@@ -236,7 +236,7 @@ Semantics:
   object — but only when at least one `labels` pattern is configured, and only
   for the standard workload kinds (Pod, Deployment, ReplicaSet, StatefulSet,
   DaemonSet, Job, CronJob). The lookups run on the throttled security client and
-  are capped per scan; other kinds (and CRDs) resolve to no labels.
+  are capped per scan. Other kinds (and CRDs) resolve to no labels.
 - A resource with no resolvable labels is never hidden by a label pattern.
 - **Cached badges**: labels are not persisted to the on-disk findings cache, so
   on reopen the cached badges paint before the live scan re-stamps labels — a
@@ -263,5 +263,5 @@ security:
 
 > Label ignores hide privileged host-level pods, which is usually the intent for
 > CNI/CSI. Add them deliberately — a compromised infrastructure pod then
-> produces no finding. They are opt-in for exactly this reason; lfk ships no
+> produces no finding. They are opt-in for exactly this reason. lfk ships no
 > default ignores.

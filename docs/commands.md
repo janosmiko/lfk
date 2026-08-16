@@ -13,7 +13,7 @@ Press `:` to open the command bar. Input is classified by the first word:
 
 | Command | Description |
 |---|---|
-| `:namespace <ns>…` &nbsp;·&nbsp; `:ns <ns>…` | Switch namespace(s); no args opens the Namespaces list |
+| `:namespace <ns>…` &nbsp;·&nbsp; `:ns <ns>…` | Switch namespace(s). No args opens the Namespaces list |
 | `:context <ctx>` &nbsp;·&nbsp; `:ctx <ctx>` | Switch kube context |
 | `:sort <column>` | Sort the current list by column name |
 | `:set <option>` | Toggle log viewer option (see below) |
@@ -62,7 +62,16 @@ Repeated completed tasks collapse with a `×N` suffix.
 
 ### `:sessions`
 
-Session manager: `Enter` switches, `s` saves the current workspace as a new session, `d` deletes, `/` filters. The active session auto-saves on quit. Start on a given session with `lfk --session <name>` or `LFK_SESSION`.
+Session manager.
+
+| Key | Action |
+|---|---|
+| `Enter` | Switch to the session |
+| `s` | Save the current workspace as a new session |
+| `d` | Delete the session |
+| `/` | Filter |
+
+The active session auto-saves on quit. Start on a given session with `lfk --session <name>` or `LFK_SESSION`.
 
 ## Shell commands
 
@@ -85,7 +94,7 @@ Session manager: `Enter` switches, `s` saves the current workspace as a new sess
 
 Autocomplete offers subcommands, flags, resource types, and namespaces. Typing `:k` or `:kubectl` alone surfaces the subcommand list. Value positions (namespace, resource name, output format) accept fuzzy matches — exact > prefix > substring > subsequence — while command names themselves stay on prefix.
 
-Namespace suggestions come from a per-context cache warmed when the context is opened and refreshed on a 60s TTL. In-app mutations — `:k create ns`, `:k delete ns`, or a template apply — invalidate the cache immediately so new namespaces appear in completions without waiting for the TTL; changes made outside the TUI (CI, cloud console, `kubectl` in another shell) surface on the next refresh. The existing list stays visible during refreshes so completions never blank out.
+Namespace suggestions come from a per-context cache warmed when the context is opened and refreshed on a 60s TTL. In-app mutations (`:k create ns`, `:k delete ns`, or a template apply) invalidate the cache immediately, so new namespaces appear in completions without waiting for the TTL. Changes made outside the TUI (CI, cloud console, `kubectl` in another shell) surface on the next refresh. The existing list stays visible during refreshes so completions never blank out.
 
 ## Resource jumps
 

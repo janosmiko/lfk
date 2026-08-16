@@ -1,6 +1,6 @@
 # Contributing to lfk
 
-Contributions are welcome! Here is how to get started.
+Setup, build, and release steps for `lfk` contributors.
 
 ## Prerequisites
 
@@ -69,7 +69,12 @@ Typical flow:
 
 1. Land conventional commits on `main` (`feat:`, `fix:`, `perf:`, `refactor:`, etc.).
 2. The `release-please` workflow opens or updates a Release PR with the next version, an updated `flake.nix` `baseVersion`, and a `CHANGELOG.md` entry.
-3. If `go.sum` changed since the last release, check out the Release PR locally and run `make refresh-vendor-hash` so `vendorHash` matches the new vendored module set, then push the change to the PR branch. (`verify-flake-build` in `release.yml` will catch a stale hash if you forget.)
+3. If `go.sum` changed since the last release:
+   1. Check out the Release PR locally.
+   2. Run `make refresh-vendor-hash` so `vendorHash` matches the new vendored module set.
+   3. Push the change to the PR branch.
+
+   (`verify-flake-build` in `release.yml` catches a stale hash if you forget this step.)
 4. Merge the Release PR. release-please tags the merge commit (e.g. `v0.9.33`), and `release.yml` takes over to publish the release.
 
-For emergency manual releases (skipping the bot), `make bump-version VERSION=X.Y.Z` and `make release VERSION=X.Y.Z` remain available; the `verify-flake-version` job in `release.yml` is the safety net that prevents a tag/`flake.nix` mismatch.
+For emergency manual releases (skipping the bot), `make bump-version VERSION=X.Y.Z` and `make release VERSION=X.Y.Z` remain available. The `verify-flake-version` job in `release.yml` is the safety net that prevents a tag/`flake.nix` mismatch.

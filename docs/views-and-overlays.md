@@ -12,12 +12,12 @@ lfk's UI is built from three layered concepts:
   per tab on `TabState.mode` and mirrored to `Model.mode`.
 - **Fullscreen flag** — boolean on `Model` (and sometimes `TabState`)
   that lets a sub-pane take the whole screen *without* leaving
-  `modeExplorer`. Multiple flags can coexist; precedence is decided in
+  `modeExplorer`. Multiple flags can coexist. Precedence is decided in
   `viewExplorerColumns` (see [`internal/app/view.go`](../internal/app/view.go)).
 - **Overlay** — modal panel that floats over the current view. The
   underlying view is dimmed but stays mounted. Overlays own the keyboard
   while open and dismiss back to the view they appeared over. Most are
-  typed via `overlayKind` and mutually exclusive; a few live as
+  typed via `overlayKind` and mutually exclusive. A few live as
   independent boolean fields on `Model` so they can stack on top of an
   `overlayKind` overlay (see [Boolean overlays](#boolean-overlays)).
 
@@ -26,11 +26,11 @@ Source of truth for the enums:
 and `overlayKind`. When those enums change, update this doc and the help
 catalog in
 [`internal/ui/help_sections.go`](../internal/ui/help_sections.go)
-(`internal/ui/help.go` renders that catalog; it holds no per-view rows).
+(`internal/ui/help.go` renders that catalog and holds no per-view rows).
 
 Default trigger keys below come from
-[`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go);
-users can rebind any of them — see [keybindings.md](./keybindings.md)
+[`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go).
+Users can rebind any of them, see [keybindings.md](./keybindings.md)
 for the full reference.
 
 ## Views (`viewMode`)
@@ -63,7 +63,7 @@ wins.
 
 | Flag                      | Scope    | Default trigger                       | What it shows                                                                                                                |
 | ------------------------- | -------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `fullscreenMiddle`        | per-tab  | `F`                                   | Hides left and right columns; the middle resource list takes the whole screen.                                                |
+| `fullscreenMiddle`        | per-tab  | `F`                                   | Hides left and right columns. The middle resource list takes the whole screen.                                                |
 | `fullscreenDashboard`     | per-tab  | `Enter` on `[Dashboard]`, `@`         | Cluster or monitoring dashboard (see Note below).                                                                            |
 | `errorLogFullscreen`      | global   | inside the error-log overlay (`F`)    | Promotes the error-log overlay to a full-screen log buffer.                                                                   |
 | `eventTimelineFullscreen` | global   | inside the event-timeline overlay     | Promotes the event timeline overlay to a full-screen viewer (also reachable via the `modeEventViewer` drill).                 |
@@ -129,7 +129,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayConfirm`     | delete / drain                   | y/n confirmation for reversible actions. Delete shows a cascade policy row (`Tab` cycles it). |
 | `overlayConfirmType` | force delete / force finalize    | Requires typing `DELETE` for destructive ops. Force delete shows a cascade policy row (`Tab` cycles it). |
 | `overlayQuitConfirm` | `q`                              | Confirm before exiting lfk.                                   |
-| `overlayShuttingDown`| after confirming quit            | Notice shown while background processes drain; force quits after 10s if it hangs. |
+| `overlayShuttingDown`| after confirming quit            | Notice shown while background processes drain. Force quits after 10s if it hangs. |
 | `overlayPasteConfirm`| paste into search / filter       | Confirm multi-line paste.                                     |
 
 ### Information panels

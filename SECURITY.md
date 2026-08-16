@@ -2,9 +2,9 @@
 
 ## Supported Versions
 
-LFK is under active development. Security fixes are applied to the latest
-release on the `main` branch. Older tagged releases are not maintained — please
-upgrade to the latest version to receive security patches.
+Security fixes apply to the latest release on the `main` branch only. Older
+tagged releases are not maintained. Upgrade to the latest version to receive
+patches (LFK is under active development).
 
 | Version          | Supported          |
 | ---------------- | ------------------ |
