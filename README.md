@@ -98,7 +98,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 | Pods | <img src="./docs/imgs/pods.png" alt="Pods" width="600"> |
 | Pods fullscreen | <img src="./docs/imgs/pods-fullscreen.png" alt="Pods fullscreen" width="600"> |
 | Pod action menu | <img src="./docs/imgs/pods-actions.png" alt="Pod actions" width="600"> |
-| Cluster Dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster Dashboard" width="600"> |
+| Cluster dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster dashboard" width="600"> |
 | Object Explorer | <img src="./docs/imgs/object-explorer.png" alt="Object Explorer" width="600"> |
 | API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
 
@@ -106,8 +106,8 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 | Feature | |
 | --- | --- |
-| YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
-| Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
+| YAML viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML viewer" width="600"> |
+| Log viewer | <img src="./docs/imgs/log-viewer.png" alt="Log viewer" width="600"> |
 | Log Top | <img src="./docs/imgs/log-top.png" alt="Log Top" width="600"> |
 
 ### Integrations
@@ -261,7 +261,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 - Watch mode auto-refresh with `w`: [usage.md](docs/usage.md#watch-mode-interval)
 - Random startup tips: [config-reference.md](docs/config-reference.md#top-level-fields)
 
-## Navigation Hierarchy
+## Navigation hierarchy
 
 ```
 Clusters (kubeconfig contexts)
@@ -271,9 +271,19 @@ Clusters (kubeconfig contexts)
                     +-- Containers (for Pods)
 ```
 
-Namespaces are **not** a navigation level. The current namespace is shown in the top-right corner and can be changed by pressing `\`, which opens a selector that filters as you type. All-namespaces mode is enabled by default (toggle with `A`). Inside the namespace selector, press `Space` to include namespaces, `Tab` to exclude them (negative selection shows all except the marked namespaces, each prefixed with `!`), `A` to reset to all-namespaces mode, or `R` to refresh the list from the cluster. Press `.` to quick-filter straight to the namespace of the resource highlighted behind the overlay.
+Namespaces are **not** a navigation level. The top-right corner shows the current namespace. Press `\` to open the selector, which filters as you type. All-namespaces mode is on by default, and `A` toggles it.
 
-### Owner Resolution
+Inside the namespace selector:
+
+| Key | Action |
+|---|---|
+| `Space` | Include a namespace |
+| `Tab` | Exclude a namespace (shows all except the marked ones, each prefixed with `!`) |
+| `A` | Reset to all-namespaces mode |
+| `R` | Refresh the list from the cluster |
+| `.` | Quick-filter to the namespace of the resource behind the overlay |
+
+### Owner resolution
 
 - **Deployments** show their Pods (resolved through ReplicaSets, flattened)
 - **StatefulSets / DaemonSets / Jobs** show their Pods directly
@@ -406,7 +416,7 @@ abbreviations:
 
 [docs/config-reference.md](docs/config-reference.md) is the full reference, [docs/config-example.yaml](docs/config-example.yaml) a commented example of every field.
 
-### Search Modes
+### Search modes
 
 Every search and filter input auto-detects the mode from the query string:
 
@@ -421,7 +431,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 
 `Up` / `Down` recall previous queries. `/` and `f` share one history, the log viewer's `/` and the `:` command bar keep their own. All three survive restarts under `$XDG_STATE_HOME/lfk/`: [keybindings.md](docs/keybindings.md#log-viewer).
 
-## Tips and Tricks
+## Tips and tricks
 
 ### Navigating
 
@@ -478,7 +488,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 - Spin up a throwaway kind, k3d, or minikube cluster with `Ctrl+N` at the cluster list
 - Capture a Pod's network traffic with `c`: live decode plus pcap export
 - Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can, every subject allowed to run a verb on a resource
-- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
+- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing advisor, VPA-backed when available)
 - Watch an ArgoCD Application roll out wave by wave: `x` -> `W` opens the Sync Wave Timeline
 - Try a new look without restarting: `T` live-previews 460+ themes
 - Waiting for a rollout? `:nyan` and `:kubetris` are real commands
@@ -491,7 +501,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, bui
 
 Apache License 2.0, see [LICENSE](LICENSE).
 
-## Star History
+## Star history
 
 <a href="https://www.star-history.com/?repos=janosmiko%2Flfk&type=date&legend=top-left">
  <picture>
