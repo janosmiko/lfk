@@ -31,7 +31,7 @@ type discoveryCacheLoadedMsg struct {
 // in a single file) this re-parses the kubeconfig ~1200× and serialises the
 // whole startup behind a multi-second clientcmd loop. Running it as a tea.Cmd
 // lets NewModel return immediately so the first frame renders with seed
-// resources; the cache then lands and overlays the seed list when ready.
+// resources. The cache then lands and overlays the seed list when ready.
 //
 // reqCtx lets a user-initiated quit short-circuit the loop instead of
 // waiting for the full walk to finish. Without this plumbing a Ctrl+C
@@ -107,7 +107,7 @@ type DiscoveryCacheHostState struct {
 // discoveryCacheFilePathForHost returns the per-host cache file path:
 // $KUBECACHEDIR/discovery/<host>/lfk-enriched.yaml (with $KUBECACHEDIR
 // defaulting to ~/.kube/cache). Returns "" for an empty host or an
-// unresolvable home dir; callers treat that as "skip caching".
+// unresolvable home dir. Callers treat that as "skip caching".
 func discoveryCacheFilePathForHost(host string) string {
 	if host == "" {
 		return ""

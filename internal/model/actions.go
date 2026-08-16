@@ -72,7 +72,7 @@ const ActionLabelExportTemplate = "Export Template"
 // (internal/app/update_overlays.go) closes the overlay on that keypress
 // before any chip matcher runs — the chip would be unreachable (TASK-891).
 // "T" was freed by moving Log Top, Terminate Sync, and Terminate Workflow to
-// lowercase "t" (their menus had no lowercase "t" of their own); CronJob's
+// lowercase "t" (their menus had no lowercase "t" of their own). CronJob's
 // existing "t" Trigger moved to "r" to avoid colliding with the relocated
 // Log Top.
 func exportTemplateAction() ActionMenuItem {
@@ -546,7 +546,7 @@ func actionsForKarpenterKind(kind string) ([]ActionMenuItem, bool) {
 // kinds. Revision exposes Activate — patching the parent Service's
 // spec.traffic to send 100% of traffic to the selected revision, the
 // canonical Knative rollback / promotion gesture. Configuration and
-// Route stay on the standard surface; their CRD printer columns (URL,
+// Route stay on the standard surface. Their CRD printer columns (URL,
 // LatestReady, Ready) carry the operationally useful state and the
 // generic Describe/Edit/Delete/Events covers the rest.
 //
@@ -591,7 +591,7 @@ func actionsForKnativeKind(kind string) ([]ActionMenuItem, bool) {
 // kubectl node verbs that do not apply here): a longhorn.io node is managed
 // through its spec. Evict Replicas / Cancel Eviction toggle
 // spec.evictionRequested so Longhorn rebuilds replicas elsewhere before
-// removing them; Force Delete disables scheduling then deletes past the
+// removing them. Force Delete disables scheduling then deletes past the
 // validating webhook (which rejects deletion of a still-schedulable node).
 func ActionsForLonghornNode() []ActionMenuItem {
 	return []ActionMenuItem{
@@ -646,7 +646,7 @@ type ClusterPickerKeys struct {
 // the Local clusters action. Hardcoded because (a) action-menu
 // dispatch routes single keypresses, not chords, and (b) the global
 // LocalClusterManager binding (ctrl+n) opens the manager from
-// anywhere; the action-menu chip is a separate discoverability
+// anywhere. The action-menu chip is a separate discoverability
 // channel and need not echo it.
 const localClustersMenuChip = "n"
 

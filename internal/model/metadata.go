@@ -8,7 +8,7 @@ import "slices"
 var CoreCategories = []string{
 	"Dashboards",
 	"Security", // dynamically populated via model.SecuritySourcesFn
-	"Pinned",   // user-pinned resource types; section hidden when empty
+	"Pinned",   // user-pinned resource types. Section hidden when empty
 	"Cluster",
 	"Workloads",
 	"Config",
@@ -114,7 +114,7 @@ var GroupCategoryFallback = map[string]string{
 
 // GroupFallbackRank gives auto-categorized items a sort rank so they
 // slot into a predictable position within their category. All items
-// sharing a group use the same rank; ties fall back to alphabetical
+// sharing a group use the same rank. Ties fall back to alphabetical
 // by display name. Consulted by itemOrderRank when a key-level lookup
 // in BuiltInOrderRank misses.
 var GroupFallbackRank = map[string]int{
@@ -256,7 +256,7 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"longhorn.io/recurringjobs": {Category: "longhorn.io", DisplayName: "RecurringJobs", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"longhorn.io/settings":      {Category: "longhorn.io", DisplayName: "Settings", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// Istio — ecosystem CRDs; "⎈" is now Helm-specific.
+	// Istio — ecosystem CRDs. "⎈" is now Helm-specific.
 	"networking.istio.io/virtualservices":      {Category: "networking.istio.io", DisplayName: "VirtualServices", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"networking.istio.io/destinationrules":     {Category: "networking.istio.io", DisplayName: "DestinationRules", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"networking.istio.io/gateways":             {Category: "networking.istio.io", DisplayName: "Gateways", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
@@ -267,7 +267,7 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"security.istio.io/requestauthentications": {Category: "security.istio.io", DisplayName: "RequestAuthentications", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"telemetry.istio.io/telemetries":           {Category: "telemetry.istio.io", DisplayName: "Telemetries", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// Cloud provider — ecosystem CRDs; use the generic fallback.
+	// Cloud provider — ecosystem CRDs. Use the generic fallback.
 	"cloud.google.com/backendconfigs":                          {Category: "cloud.google.com", DisplayName: "BackendConfigs", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"networking.gke.io/managedcertificates":                    {Category: "networking.gke.io", DisplayName: "ManagedCertificates", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"vpcresources.k8s.aws/securitygrouppolicies":               {Category: "vpcresources.k8s.aws", DisplayName: "SecurityGroupPolicies", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
@@ -279,7 +279,7 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 
 	// Karpenter — kind-specific glyphs so node-provisioning CRDs read
 	// at a glance against the surrounding generic-CR rows. Core Node
-	// uses "⌹"; we deliberately stay distinct so a NodePool / NodeClaim
+	// uses "⌹". We deliberately stay distinct so a NodePool / NodeClaim
 	// row never gets confused with a real Node row.
 	"karpenter.sh/nodepools":           {Category: "karpenter.sh", DisplayName: "NodePools", Icon: Icon{Unicode: "⏣", Simple: "[NP]", Emoji: "🗄️", NerdFont: "\U000f048b"}},
 	"karpenter.sh/nodeclaims":          {Category: "karpenter.sh", DisplayName: "NodeClaims", Icon: Icon{Unicode: "⌬", Simple: "[NC]", Emoji: "📦", NerdFont: "\U000f048b"}},
@@ -293,23 +293,23 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"monitoring.coreos.com/prometheuses":    {Category: "monitoring.coreos.com", DisplayName: "Prometheuses", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"monitoring.coreos.com/thanosrulers":    {Category: "monitoring.coreos.com", DisplayName: "ThanosRulers", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// keda.sh — ecosystem CRDs; "⚡" is now /events.
+	// keda.sh — ecosystem CRDs. "⚡" is now /events.
 	"keda.sh/scaledobjects":                 {Category: "keda.sh", DisplayName: "ScaledObjects", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"keda.sh/scaledjobs":                    {Category: "keda.sh", DisplayName: "ScaledJobs", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"keda.sh/triggerauthentications":        {Category: "keda.sh", DisplayName: "TriggerAuthentications", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"keda.sh/clustertriggerauthentications": {Category: "keda.sh", DisplayName: "ClusterTriggerAuthentications", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// external-secrets.io — ecosystem CRDs; "⚿" is now RBAC roles.
+	// external-secrets.io — ecosystem CRDs. "⚿" is now RBAC roles.
 	"external-secrets.io/externalsecrets":        {Category: "external-secrets.io", DisplayName: "ExternalSecrets", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"external-secrets.io/clusterexternalsecrets": {Category: "external-secrets.io", DisplayName: "ClusterExternalSecrets", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"external-secrets.io/pushsecrets":            {Category: "external-secrets.io", DisplayName: "PushSecrets", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"external-secrets.io/secretstores":           {Category: "external-secrets.io", DisplayName: "SecretStores", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"external-secrets.io/clustersecretstores":    {Category: "external-secrets.io", DisplayName: "ClusterSecretStores", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// bitnami.com — ecosystem CRD; "⚿" is now RBAC roles.
+	// bitnami.com — ecosystem CRD. "⚿" is now RBAC roles.
 	"bitnami.com/sealedsecrets": {Category: "bitnami.com", DisplayName: "SealedSecrets", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// traefik.io — ecosystem CRDs; "⎈" is now Helm-specific.
+	// traefik.io — ecosystem CRDs. "⎈" is now Helm-specific.
 	"traefik.io/ingressroutes":    {Category: "traefik.io", DisplayName: "IngressRoutes", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"traefik.io/middlewares":      {Category: "traefik.io", DisplayName: "Middlewares", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"traefik.io/ingressroutetcps": {Category: "traefik.io", DisplayName: "IngressRouteTCPs", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},

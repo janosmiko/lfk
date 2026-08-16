@@ -18,7 +18,7 @@ import (
 // WorkloadConfigurationScanGVR is the primary CRD the kubescape-operator
 // emits — one object per scanned workload, listing the result of every
 // control it ran. Other Kubescape CRDs (vulnerability manifests, summary
-// objects) are out of scope for this MVP; they can be wired in later
+// objects) are out of scope for this MVP. They can be wired in later
 // without changing the public Source API.
 var WorkloadConfigurationScanGVR = schema.GroupVersionResource{
 	Group:    "spdx.softwarecomposition.kubescape.io",

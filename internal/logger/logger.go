@@ -109,7 +109,7 @@ type StderrCapture struct {
 }
 
 // NewStderrCapture creates a pipe-based stderr capture. The write end can
-// replace os.Stderr; a background goroutine reads from the pipe and logs
+// replace os.Stderr. A background goroutine reads from the pipe and logs
 // each line via the application logger.
 func NewStderrCapture() *StderrCapture {
 	r, w, err := os.Pipe()
@@ -164,7 +164,7 @@ func (sc *StderrCapture) readLoop() {
 				redacted := Redact(msg)
 				// Dedup identical lines per rolling window. A wedged exec
 				// credential plugin (expired SSO, missing VPN) emits the
-				// same error 20+ times/sec; without this gate, both the
+				// same error 20+ times/sec. Without this gate, both the
 				// on-disk log and the in-app overlay drown in repeats.
 				// Key on the redacted text itself so any change in the
 				// error surfaces immediately.

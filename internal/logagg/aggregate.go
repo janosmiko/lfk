@@ -8,7 +8,7 @@ import (
 )
 
 // durBucketsMs are ascending millisecond upper-bounds for the latency
-// histogram. A value falls in the first bucket whose bound is >= it; values
+// histogram. A value falls in the first bucket whose bound is >= it. Values
 // above the last bound fall in the overflow bucket (index len(durBucketsMs)).
 var durBucketsMs = []float64{
 	1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987,
@@ -65,11 +65,11 @@ type Row struct {
 	Count     int
 	ErrCount  int
 	Dims      map[string]string // per-dimension display string: uniform value, or "*N", or "*50+"
-	P50       float64           // approximate p50 latency in ms; -1 when no duration data
-	P95       float64           // approximate p95 latency in ms; -1 when no duration data
-	P99       float64           // approximate p99 latency in ms; -1 when no duration data
-	Avg       float64           // mean latency in ms; -1 when no duration data
-	Max       float64           // max latency in ms; -1 when no duration data
+	P50       float64           // approximate p50 latency in ms. -1 when no duration data
+	P95       float64           // approximate p95 latency in ms. -1 when no duration data
+	P99       float64           // approximate p99 latency in ms. -1 when no duration data
+	Avg       float64           // mean latency in ms. -1 when no duration data
+	Max       float64           // max latency in ms. -1 when no duration data
 	Status4xx int               // count of HTTP 4xx responses
 	Status5xx int               // count of HTTP 5xx responses
 	id        string            // cached "\x00"-joined Values, for a stable allocation-free sort tiebreak

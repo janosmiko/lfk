@@ -59,7 +59,7 @@ func followFieldDocCursor(mdl tea.Model, cmd tea.Cmd, path func(Model) []string)
 // Match highlights update on every keystroke so the user sees results land
 // in real time instead of having to commit with Enter just to see whether
 // the query matches anything. Enter still ends search-input mode and
-// scrolls to the first match -- it's the "commit" action; typing only
+// scrolls to the first match -- it's the "commit" action. Typing only
 // drives the live highlight overlay.
 func (m Model) handleYAMLSearchInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	viewportLines := m.yamlViewportLines()
@@ -117,7 +117,7 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // handleYAMLNormalCopy copies the original YAML line under the cursor to the
 // clipboard. A digit prefix (e.g. `123y`) yanks that many visible lines
-// starting at the cursor; an empty buffer falls back to a single line.
+// starting at the cursor. An empty buffer falls back to a single line.
 // Counts operate on the visible-line mapping, so folded children are simply
 // not in scope — a count that reaches a folded section jumps over its hidden
 // children and continues with the lines that follow.
@@ -397,7 +397,7 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 // handleYAMLNormalHalfPageDown handles ctrl+d (half page down) in normal YAML mode.
 //
 // Vim semantics via vimScrollStep: a counted press sets the sticky 'scroll'
-// option to min(count, viewport); plain presses reuse the sticky value
+// option to min(count, viewport). Plain presses reuse the sticky value
 // (defaulting to viewport/2). The same option is shared with ctrl+u.
 func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
 	step := vimScrollStep(&m.yamlView.lineInput, &m.yamlView.scrollOption, m.yamlViewportLines())
@@ -529,7 +529,7 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 		if curBytePos > 0 {
 			prefix := line[:curBytePos]
 			// For backward search, find the last match in the prefix.
-			// FindColumnInLine returns the first match; iterate to find the last.
+			// FindColumnInLine returns the first match. Iterate to find the last.
 			lastCol := -1
 			remaining := prefix
 			offset := 0
@@ -624,7 +624,7 @@ func (m Model) handleYAMLKeyCtrlV() (tea.Model, tea.Cmd) {
 
 // handleYAMLKeyObjectExplorer switches from the YAML viewer to the Object Explorer
 // browser (O), positioning the tree on the node under the YAML cursor. When the
-// viewer was opened from the tree, it reuses the preserved tree; otherwise
+// viewer was opened from the tree, it reuses the preserved tree. Otherwise
 // (opened via Enter) it opens a fresh tree for the current resource. The tree
 // returns to the YAML viewer with P (open full YAML), keeping the cursor in
 // sync in both directions.

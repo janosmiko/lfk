@@ -14,7 +14,7 @@ import (
 type WhoCanRow struct {
 	Kind      string // "User" / "Group" / "ServiceAccount"
 	Name      string
-	Namespace string // ServiceAccount namespace; empty for User/Group
+	Namespace string // ServiceAccount namespace. Empty for User/Group
 	Via       string // "ClusterRoleBinding/foo → ClusterRole/bar"
 }
 
@@ -125,7 +125,7 @@ func currentResource(resources []string, cursor int) string {
 }
 
 // renderWhoCanVerbs builds the verb-chip row. Each chip is a label
-// padded with a space; the cursor chip uses OverlaySelectedStyle so
+// padded with a space. The cursor chip uses OverlaySelectedStyle so
 // the highlight covers it cleanly across themes.
 func renderWhoCanVerbs(cursor int) string {
 	var b strings.Builder
@@ -157,7 +157,7 @@ func renderWhoCanVerbs(cursor int) string {
 // Scroll is taken as input (not derived from cursor) so vim-like
 // behavior holds: the viewport stays put when the cursor moves inside
 // it, and only scrolls when the cursor leaves an edge. The handlers
-// maintain the scroll offset; this function only clamps to a valid
+// maintain the scroll offset. This function only clamps to a valid
 // range and renders.
 func renderWhoCanResourcePicker(resources []string, cursor, scroll, width, height int) string {
 	header := renderWhoCanResourceHeader(len(resources), width)
@@ -214,7 +214,7 @@ func whoCanClampScroll(scroll, total, bodyHeight int) int {
 // WhoCanScrollForCursor returns the new scroll offset that keeps
 // `cursor` visible inside a viewport of `bodyHeight` rows starting at
 // `scroll`. Vim semantics: do nothing if the cursor is already in
-// view; otherwise scroll just enough to put the cursor on the nearest
+// view. Otherwise scroll just enough to put the cursor on the nearest
 // visible edge. Used by handlers that move the cursor.
 func WhoCanScrollForCursor(scroll, cursor, bodyHeight, total int) int {
 	if total <= bodyHeight {
@@ -254,7 +254,7 @@ func renderWhoCanSubjects(rows []WhoCanRow, scroll int, loading bool, resource s
 	}
 
 	// Column widths shrink with `width` so the row fits inside narrow
-	// overlays. Kind/Namespace are short; SUBJECT and VIA both can be
+	// overlays. Kind/Namespace are short. SUBJECT and VIA both can be
 	// long (full SA paths, full RBAC chains) so the leftover width is
 	// split evenly between them — no upper cap on SUBJECT, otherwise
 	// long ServiceAccount paths get truncated unnecessarily even when

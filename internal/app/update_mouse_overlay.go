@@ -120,7 +120,7 @@ func (m Model) dispatchOverlayWheel(button tea.MouseButton) (tea.Model, tea.Cmd)
 // update in one place.
 //
 // handled=false means the click was inside the box but not on a
-// clickable row; the caller should swallow it (no dismiss) so a stray
+// clickable row. The caller should swallow it (no dismiss) so a stray
 // click on the title or padding doesn't close the overlay.
 func (m Model) activateOverlayItemAt(innerY int) (tea.Model, tea.Cmd, bool) {
 	switch m.overlay {

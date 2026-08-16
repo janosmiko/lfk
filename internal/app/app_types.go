@@ -35,10 +35,10 @@ const (
 )
 
 // wheelBurst tracks a single mouse/trackpad wheel burst. Trackpad momentum
-// keeps emitting wheel ticks after the physical gesture ends; those queued
+// keeps emitting wheel ticks after the physical gesture ends. Those queued
 // ticks otherwise "play out" on whatever list is under the pointer once the
 // user has navigated away or moved the pointer (#524). A gesture is a run of
-// ticks less than wheelQuietGap apart; once it is marked dead (a boundary was
+// ticks less than wheelQuietGap apart. Once it is marked dead (a boundary was
 // reached, a left/right navigation happened, or the pointer moved to another
 // pane) the rest of the gesture is dropped until a real pause starts a new one.
 type wheelBurst struct {
@@ -180,7 +180,7 @@ type localClusterRow struct {
 }
 
 // localClusterWizard holds the staged input across wizard sub-screens.
-// Cleared every time the overlay closes; populated as the user advances.
+// Cleared every time the overlay closes. Populated as the user advances.
 type localClusterWizard struct {
 	provider     string
 	providerCur  int
@@ -199,8 +199,8 @@ type localClusterWizard struct {
 // file cap (mirrors whoCanState pattern).
 type localClusterState struct {
 	screen    localClusterScreen
-	gen       uint64             // race-guard token; bumps on every Detect request
-	clusters  []localClusterRow  // unified row list; .state distinguishes Real / InFlight / Failed
+	gen       uint64             // race-guard token. Bumps on every Detect request
+	clusters  []localClusterRow  // unified row list. .state distinguishes Real / InFlight / Failed
 	cursor    int                // selected row in the list view
 	loading   bool               // Detect in flight
 	info      string             // transient info banner ("Creating kind/dev...", "Created kind/dev")
@@ -250,7 +250,7 @@ type crashInvScrollKey struct {
 // crashInvState groups the CrashLoopBackOff-investigator fields together
 // so they live as a single field on Model. Mirrors whoCanState. The
 // scroll map persists per-(tab, container) viewport offsets so switching
-// tabs or containers preserves the reader's position; the renderer is
+// tabs or containers preserves the reader's position. The renderer is
 // responsible for clamping the offset when content shrinks.
 type crashInvState struct {
 	data            *k8s.CrashInvestigation
@@ -304,7 +304,7 @@ type syncWaveState struct {
 // rightsizingState groups the per-session right-sizing overlay fields
 // so they live together on Model without bloating the main struct over
 // the file-length cap. The cache (Model.rightsizingCache) is kept
-// separate because it survives across overlay opens; this struct is
+// separate because it survives across overlay opens. This struct is
 // reset (or its scroll/data swapped) every time the overlay is opened
 // for a different workload.
 //
@@ -397,7 +397,7 @@ const sortColEventLastSeen = "__event_last_seen__"
 
 // UnionContextSentinel is the value stored in nav.Context when the user is at
 // LevelResources in --union-context mode. It is never sent to the Kubernetes
-// API; effectiveContext() resolves it to a real cluster for API calls.
+// API. effectiveContext() resolves it to a real cluster for API calls.
 const UnionContextSentinel = "__union__"
 
 const (
@@ -419,11 +419,11 @@ type actionContext struct {
 	namespace     string // namespace of the target resource (captured at action time)
 	context       string // kubeconfig context name (captured at action time)
 	containerName string // container name (for exec/logs at container level)
-	os            string // pod OS ("windows"/"linux"/""); resolved before exec to pick the shell
+	os            string // pod OS ("windows"/"linux"/""). Resolved before exec to pick the shell
 	image         string // container image (for vuln scan at container level)
 	resourceType  model.ResourceTypeEntry
 	columns       []model.KeyValue // additional item columns (e.g., Node, IP) for custom action templates
-	raw           map[string]any   // full source object; used to prefill scale overlays from spec/status
+	raw           map[string]any   // full source object. Used to prefill scale overlays from spec/status
 }
 
 // hpaScaleState backs the HPA scale overlay. The overlay edits the HPA's
@@ -475,7 +475,7 @@ type TabState struct {
 	yamlContent        string
 	yamlScroll         int
 	yamlCursor         int // cursor position in visible lines (relative to scroll)
-	yamlScrollOption   int // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
+	yamlScrollOption   int // sticky vim 'scroll' option for [count]<C-d>/<C-u>. 0 = default (half viewport)
 	yamlSearchText     TextInput
 	yamlMatchLines     []int
 	yamlMatchIdx       int
@@ -576,7 +576,7 @@ type TabState struct {
 	logVisualType     rune // 'V' = line, 'v' = char, 'B' = block
 	logVisualCol      int  // character column of anchor (for char and block modes)
 	logVisualCurCol   int  // current cursor column (for char and block modes)
-	logScrollOption   int  // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
+	logScrollOption   int  // sticky vim 'scroll' option for [count]<C-d>/<C-u>. 0 = default (half viewport)
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string
@@ -607,7 +607,7 @@ type TabState struct {
 	execDone         *atomic.Bool
 	execMu           *sync.Mutex
 	execScrollback   *scrollback // line ring captured from the PTY byte stream
-	execScrollOffset int         // 0 = live; >0 = N rows scrolled back into history
+	execScrollOffset int         // 0 = live. >0 = N rows scrolled back into history
 
 	// Explain view state (per-tab).
 	explainFields      []model.ExplainField
@@ -616,7 +616,7 @@ type TabState struct {
 	explainResource    string // resource name (e.g., "deployments")
 	explainAPIVersion  string // api version for kubectl explain (e.g., "apps/v1")
 	explainTitle       string
-	explainPending     bool // a flat-level fetch issued but not yet answered; see resumeExplainFetch
+	explainPending     bool // a flat-level fetch issued but not yet answered. See resumeExplainFetch
 	explainCursor      int
 	explainScroll      int
 	explainSearchQuery string // persisted search query for n/N navigation

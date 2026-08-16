@@ -24,7 +24,7 @@ const wkNaturalDigits = 9
 //  0. group    — declared catalog group (whichKeyGroupOrder), ungrouped last
 //  1. modTier  — no modifier, then ctrl, then alt, then ctrl+alt, then any
 //     other modifier combination (see wkModTier below)
-//  2. order    — explicit per-entry override (whichKeyAction.Order); entries
+//  2. order    — explicit per-entry override (whichKeyAction.Order). Entries
 //     that don't set one fall through unchanged
 //  3. shape    — single-character alphanumerics, then single-character
 //     punctuation, then multi-character named keys (see wkKeyShapeRank)
@@ -139,7 +139,7 @@ func wkGroupRank(ranks map[whichKeyGroup]int, g whichKeyGroup) int {
 //
 // The shape is read from the key UNDER the modifiers, so the rule holds inside
 // every tier — "ctrl+space" trails "ctrl+z" exactly as "space" trails "z".
-// ui.IsNamedKey is the same table ui.IsSingleKeypress consults; the panel must
+// ui.IsNamedKey is the same table ui.IsSingleKeypress consults. The panel must
 // not grow a second opinion on what a key name is.
 //
 // Rank 3 covers what is not a keypress shape at all: a binding

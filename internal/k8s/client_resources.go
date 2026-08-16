@@ -19,7 +19,7 @@ import (
 var secretGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
 
 // GetResources lists resources of a given type. For namespaced resources it
-// scopes to the given namespace; for cluster-scoped resources it lists globally.
+// scopes to the given namespace. For cluster-scoped resources it lists globally.
 // When namespace is empty and the resource is namespaced, it lists across all namespaces.
 //
 // Secrets are fetched via the metadata-only API (PartialObjectMetadataList) to
@@ -44,7 +44,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// Secrets optionally use the metadata-only path to avoid transferring
 	// large base64 data payloads (especially Helm release secrets). Gated
 	// behind SetSecretLazyLoading so the default list behaviour stays
-	// consistent with every other resource type; decoded values are then
+	// consistent with every other resource type. Decoded values are then
 	// loaded on hover at LevelResources.
 	if c.secretLazyLoading.Load() && rt.APIGroup == "" && rt.Resource == "secrets" {
 		return c.listSecretsMetadata(ctx, contextName, namespace, rt)
@@ -57,7 +57,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	}
 
 	// Issue #86: route through the informer cache when it makes sense.
-	// "always" forces every list through the cache; "auto" promotes a
+	// "always" forces every list through the cache. "auto" promotes a
 	// (context, GVR) on the first large list and demotes it back to direct
 	// once cached size has stayed below the demote threshold for several
 	// calls. Cache miss (sync timeout) falls through to the direct path so
@@ -66,7 +66,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// listItems memoizes per-item by namespace/name + the object's own
 	// resourceVersion: items unchanged since the last call are reused
 	// without re-running buildResourceItem or copying anything. On a
-	// busy cluster only the few churning pods rebuild; the rest hit the
+	// busy cluster only the few churning pods rebuild. The rest hit the
 	// memo. That's what removes the residual ~300ms per-call cost on a
 	// 6k-pod list when the cluster has background churn.
 	mode, infs := c.informerSnapshot()
@@ -125,7 +125,7 @@ func cacheEnabled(mode InformerCacheMode, infs *informerCache) bool {
 
 // shouldUseCache decides — for the current call — whether to take the
 // informer-backed path or fall through to a direct list. Always-mode
-// short-circuits to true; auto-mode consults the per-(context, GVR) state
+// short-circuits to true. Auto-mode consults the per-(context, GVR) state
 // machine maintained by observeDirectListSize / observeCachedListSize.
 func shouldUseCache(mode InformerCacheMode, infs *informerCache, contextName string, gvr schema.GroupVersionResource) bool {
 	if mode == InformerCacheAlways {
@@ -140,7 +140,7 @@ func shouldUseCache(mode InformerCacheMode, infs *informerCache, contextName str
 // sortResourceItems applies the canonical row order GetResources uses
 // regardless of whether the items came from a fresh apiserver LIST or from
 // the informer cache. Events sort by most recent observation (LastSeen, not
-// CreatedAt) so a recurring incident's latest report stays on top; everything
+// CreatedAt) so a recurring incident's latest report stays on top. Everything
 // else sorts alphabetically by Name.
 func sortResourceItems(items []model.Item, kind string) []model.Item {
 	if kind == "Event" {

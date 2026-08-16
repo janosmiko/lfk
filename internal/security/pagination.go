@@ -44,7 +44,7 @@ type DynamicLister interface {
 // back. EachListItem hands us the page items one at a time and lets us
 // build the UnstructuredList directly.
 //
-// Cancellation: client-go's pager honours the supplied context; the
+// Cancellation: client-go's pager honours the supplied context. The
 // underlying dynamic-client List calls return promptly when ctx is
 // cancelled, and the loop exits without performing additional pages.
 //

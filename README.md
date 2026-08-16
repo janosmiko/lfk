@@ -20,7 +20,7 @@ Every contribution is appreciated and helps make LFK sustainable.
 **Thank you for your support!**
 
 Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
-Cloudsmith is the only fully hosted, cloud-native, universal package management solution, that enables your organization to create, store and share packages in any format, to any place, with total confidence.
+Cloudsmith is a hosted package management service that stores and serves packages in many formats.
 
 ## Screenshots
 
@@ -264,13 +264,13 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
 | `p` | Pin/unpin resource type (at resource types level) |
-| `x` | At resource types level: pin/unpin or hide/show the selected resource type (saved per cluster context / union set) |
-| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed |
+| `x` | Pin/unpin or hide/show resource type (at resource types level) |
+| `H` | Toggle rarely used + hidden resource types |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
-| `Backspace` | Jump back through teleport history (owner / port-forward / orphan / finding / mark jumps) |
-| `g`+`p/d/s/n/N/i/j/c/r/D/t/C/S/h/v/V/b` | Goto resource type: Pods / Deployments / Services / Nodes / Namespaces / Ingresses / Jobs / CronJobs / ReplicaSets / DaemonSets / StatefulSets / ConfigMaps / Secrets / HPAs / PVCs / PVs / PDBs (press `g` for which-key popup; add CRDs like ArgoCD via `goto_targets`) |
+| `Backspace` | Jump back through teleport history |
+| `g`+`p/d/s/n/N/i/j/c/r/D/t/C/S/h/v/V/b` | Goto resource type (press `g` for which-key popup) |
 
 ### Views and Modes
 
@@ -292,7 +292,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Ctrl+K` | Schema side pane for the field under the cursor (YAML viewer, Object Explorer) |
 | `U` | RBAC permissions browser (can-i) |
 | `T` | Open theme selector |
-| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl (`:k get pod`), shell (`:! cmd`) |
+| `:` | Command bar (resource jumps, built-ins, kubectl, shell) |
 | `w` | Toggle watch mode (auto-refresh) |
 | `,` | Column visibility toggle (show/hide and reorder columns) |
 | `>` / `<` | Sort by next / previous column |
@@ -317,7 +317,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
 | `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
-| `?` | Which-key action panel: hotkeys actionable right now, descriptions colored by category with a color legend at the bottom (scroll: `Ctrl+D`/`Ctrl+U`, close: `esc`; `?` again switches between category and key order, kept for the session). Also in every fullscreen viewer except exec mode, where it lists what that viewer supports in its current state. `F1` opens full help |
+| `?` | Which-key action panel: hotkeys actionable right now |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 | `}` / `{` | Move current tab right / left |

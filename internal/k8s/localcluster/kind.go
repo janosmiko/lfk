@@ -20,7 +20,7 @@ const (
 //   - err == nil with non-zero exit code: emits a plain error (no %!w)
 //   - empty stderr: omits the double-colon ": :"
 //
-// Both are theoretically reachable through FakeRunner; the production
+// Both are theoretically reachable through FakeRunner. The production
 // realRunner always pairs a non-zero exit with a non-nil ExitError.
 func kindCLIError(op string, code int, stderr string, err error) error {
 	base := fmt.Sprintf("kind: %s failed (exit %d)", op, code)
@@ -135,7 +135,7 @@ func (p *kindProvider) Delete(ctx context.Context, name string) error {
 
 // kindContainerStatus asks Docker for the control-plane container's
 // state. Multi-node kind clusters have additional worker containers
-// whose state is NOT polled here; if a partial-stop leaves only
+// whose state is NOT polled here. If a partial-stop leaves only
 // workers down, this function still reports ClusterStatusRunning.
 // That's a deliberate simplification: the manager UI's "is this cluster
 // roughly up" probe doesn't justify N docker-inspect calls per cluster.

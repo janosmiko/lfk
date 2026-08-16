@@ -41,7 +41,7 @@ Listed in `viewMode` declaration order.
 | ----------------- | ------------------------------------- | ---------------------------------------------------------------------- |
 | `modeExplorer`    | default                               | Three-column resource browser (clusters → resource types → resources). |
 | `modeYAML`        | `Enter` on a resource                 | Full-screen YAML preview with search and copy.                         |
-| `modeHelp`        | `F1`                                  | Searchable, filterable keybinding reference. `?` also opens it in the overlays and exec mode, where no which-key panel claims the key. |
+| `modeHelp`        | `F1`                                  | Searchable, filterable keybinding reference.                           |
 | `modeLogs`        | `L` on a pod / workload               | Log viewer with follow, wrap, search, visual selection.                |
 | `modeDescribe`    | `v` on a resource                     | `kubectl describe`-style detail view.                                  |
 | `modeDiff`        | `d` between two selected resources    | Side-by-side diff (e.g. ArgoCD live vs. desired).                      |
@@ -50,6 +50,9 @@ Listed in `viewMode` declaration order.
 | `modeEventViewer` | event timeline overlay → drill-in     | Full-screen event viewer with grouping.                                |
 | `modeKubetris`    | `:kubetris`                           | Easter-egg game.                                                       |
 | `modeCredits`     | `:credits`                            | Scrolling credits screen.                                              |
+
+> Note: `?` also opens `modeHelp` from the overlays and exec mode, where
+> no which-key panel claims the key.
 
 ## Fullscreen flags inside `modeExplorer`
 
@@ -162,7 +165,13 @@ and follow their own dismissal rules.
 | ------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `overlayErrorLog`  | `!`             | Application error log overlay (lfk's own error buffer). Has its own `errorLogFullscreen` toggle for full-screen mode. |
 | `commandBarActive` | `:`             | Bottom-of-screen `:command [args]` input with autocomplete, history, and ghost-text preview.                          |
-| `fieldDoc.on`      | `Ctrl+K`        | Schema side pane in the YAML viewer and Object Explorer. Shows the cluster's description of the field under the cursor and follows it as the cursor moves. Drawn like the log viewer's structured preview (`RenderLogPreviewPane`) and joined horizontally, so it takes columns rather than rows. `splitFieldDocWidth` sizes it and reports zero on a terminal too narrow for both. |
+| `fieldDoc.on`      | `Ctrl+K`        | Schema side pane in the YAML viewer and Object Explorer.                                                              |
+
+> Note: the field-doc pane shows the cluster's description of the field
+> under the cursor and follows it as the cursor moves. It is drawn like
+> the log viewer's structured preview (`RenderLogPreviewPane`) and joined
+> horizontally, so it takes columns rather than rows. `splitFieldDocWidth`
+> sizes it and reports zero on a terminal too narrow for both.
 
 ## Adding a new view, fullscreen flag, or overlay
 

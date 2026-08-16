@@ -45,7 +45,7 @@ type summaryDimension struct {
 
 // summaryDimensions returns the breakdown axes for a kind, in render order, or
 // nil when the kind has no meaningful status rollup. Curated kinds get a
-// hand-picked signal; any other kind falls back to a generic signal derived
+// hand-picked signal. Any other kind falls back to a generic signal derived
 // only from data the list already shows (issue #352 follow-up).
 //
 // The fallback never groups by raw Item.Status: that surfaces noise — e.g.
@@ -87,7 +87,7 @@ func summaryDimensions(kind string, items []model.Item) []summaryDimension {
 }
 
 // maxGenericPhaseValues caps the distinct phase strings a generic .status.phase
-// rollup may carry. Phase fields are inherently low-cardinality; a column with
+// rollup may carry. Phase fields are inherently low-cardinality. A column with
 // more distinct values is likely free-form text, not a status, so it is left
 // to a count-only band rather than rendering a noisy bar.
 const maxGenericPhaseValues = 8
@@ -389,7 +389,7 @@ func allocateCells(counts []int, total, cells int) []int {
 		used += out[i]
 	}
 
-	// The min-1 floor can overshoot; reclaim from the largest buckets (never
+	// The min-1 floor can overshoot. Reclaim from the largest buckets (never
 	// below 1) until we are back within budget.
 	for used > cells {
 		best := -1

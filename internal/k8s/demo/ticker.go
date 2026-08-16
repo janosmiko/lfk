@@ -50,7 +50,7 @@ var deploymentReadyReplicaCycle = []int64{6, 6, 5}
 // tick count, so driving a fresh Ticker N times always reaches the same
 // state — tests and screenshots stay stable.
 //
-// Ticker only touches the dynamic client passed to NewTicker; it is not
+// Ticker only touches the dynamic client passed to NewTicker. It is not
 // wired into any client lifecycle here.
 type Ticker struct {
 	dyn      dynamic.Interface
@@ -119,7 +119,7 @@ func (t *Ticker) run(ctx context.Context, done chan struct{}) {
 		close(done)
 	}()
 
-	// time.NewTicker panics for a non-positive duration; treat a
+	// time.NewTicker panics for a non-positive duration. Treat a
 	// misconfigured interval as a no-op run instead of crashing the
 	// process from a background goroutine.
 	if t.interval <= 0 {
@@ -143,7 +143,7 @@ func (t *Ticker) run(ctx context.Context, done chan struct{}) {
 }
 
 // Stop cancels the ticker's goroutine and blocks until it has exited.
-// Idempotent and safe to call even if Start was never called; concurrent
+// Idempotent and safe to call even if Start was never called. Concurrent
 // Stop calls all wait for the same goroutine to exit before any of them
 // return. Start and Stop are not safe to call concurrently with each
 // other — serialize lifecycle calls at the call site.
@@ -167,7 +167,7 @@ func (t *Ticker) Stop() {
 
 // Tick performs one deterministic mutation step against the tracked demo
 // objects. Exported so tests can drive the sequence precisely without
-// sleeping on real time; Start's internal loop calls it the same way. The
+// sleeping on real time. Start's internal loop calls it the same way. The
 // whole step runs under the Ticker's lock so a direct Tick call never races
 // against Start's background loop calling it concurrently.
 func (t *Ticker) Tick(ctx context.Context) error {

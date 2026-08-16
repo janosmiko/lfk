@@ -79,7 +79,7 @@ func FormatKVPairs(pairs []KVPair, format KVFormat) (string, string) {
 	case KVFormatDotenv:
 		// dotenv: always-quoted values so whitespace, =, and special
 		// chars survive `source` of the file. Conservative — over-
-		// quoting is safe; under-quoting silently breaks downstream.
+		// quoting is safe. Under-quoting silently breaks downstream.
 		var b strings.Builder
 		for _, p := range pairs {
 			fmt.Fprintf(&b, "%s=%q\n", p.Key, p.Value)
@@ -121,7 +121,7 @@ func FormatKVPairs(pairs []KVPair, format KVFormat) (string, string) {
 // — booleans, null, or a number — that would round-trip as a non-
 // string type if emitted unquoted. K/V editor values are always
 // strings (k8s configmap / secret / label data), so over-quoting is
-// safe; a missed case silently changes the user's clipboard from
+// safe. A missed case silently changes the user's clipboard from
 // `"true"` (string) to `true` (bool) when re-parsed.
 func needsYAMLQuote(v string) bool {
 	if v == "" {
@@ -164,7 +164,7 @@ func isYAMLNumber(v string) bool {
 // RenderKVFormatPicker paints the Shift+Y format chip row that sits
 // above the editor's table when formatActive is set. The cursor chip
 // uses OverlaySelectedStyle so the highlight is visible regardless
-// of theme; idle chips render flat on the editor's baseBg. Trailing
+// of theme. Idle chips render flat on the editor's baseBg. Trailing
 // hint reminds the user of the apply/cancel keys so they don't have
 // to leave the picker to look it up.
 func RenderKVFormatPicker(cursor int) string {

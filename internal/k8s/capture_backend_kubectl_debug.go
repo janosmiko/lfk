@@ -18,7 +18,7 @@ import (
 
 // netshootImage is the pinned image used for the ephemeral debug container.
 //
-// Pinned by tag rather than digest to keep the build self-contained; for
+// Pinned by tag rather than digest to keep the build self-contained. For
 // hardened deployments swap to a digest pin (e.g.
 // "nicolaka/netshoot@sha256:...") so registry tampering is detected.
 // Bumping this image needs a security review — the container runs with
@@ -29,7 +29,7 @@ type kubectlDebugBackend struct{}
 
 // debugContainerCounter feeds the suffix on the per-capture debug-container
 // name (lfk-trafcap-<n>). Atomic so concurrent Start calls don't collide on
-// the same name within a single process lifetime; combined with the
+// the same name within a single process lifetime. Combined with the
 // nanosecond timestamp prefix, collisions across lfk runs are also bounded.
 var debugContainerCounter atomic.Uint64
 
@@ -156,7 +156,7 @@ func terminateRemoteCapture(req CaptureRequest, kubectlPath, debugContainer stri
 //
 // Notes:
 //   - `--attach=true` is REQUIRED. kubectl debug's `--attach` defaults to
-//     false unless `-i`/`--stdin` is set; without it, kubectl creates the
+//     false unless `-i`/`--stdin` is set. Without it, kubectl creates the
 //     ephemeral container and exits cleanly, leaving our pcap reader
 //     observing an immediate EOF on kubectl's stdout. We don't want `-i`
 //     because it keeps stdin open on the container — irrelevant for tcpdump
@@ -169,7 +169,7 @@ func terminateRemoteCapture(req CaptureRequest, kubectlPath, debugContainer stri
 //     from.
 //   - `--profile=netadmin` is required for tcpdump to open AF_PACKET. This
 //     was added to kubectl in 1.30. Older versions surface "unknown flag:
-//     --profile" via stderr; translateKubectlDebugErr maps that to a
+//     --profile" via stderr. TranslateKubectlDebugErr maps that to a
 //     friendly message.
 //   - tcpdump runs inside `sh -c "sleep 1; exec timeout 30m tcpdump ..."`.
 //     The leading sleep is REQUIRED to defeat kubectl-debug's attach race:
@@ -205,7 +205,7 @@ func kubectlDebugArgv(req CaptureRequest, debugContainer string) []string {
 
 // kubectlDebugAttachDelay is the inline `sleep` value (in seconds) that runs
 // in the ephemeral container before tcpdump starts. See the kubectlDebugArgv
-// notes for why this is required. 1 second is enough for local clusters; if
+// notes for why this is required. 1 second is enough for local clusters. If
 // users on slow remote clusters report missing-header failures, bumping this
 // is the dial.
 const kubectlDebugAttachDelay = 1
@@ -284,7 +284,7 @@ type pcapPreambleSkipper struct {
 	rc       io.ReadCloser
 	found    bool
 	overflow []byte // bytes already read past the magic, waiting to flush
-	window   []byte // accumulated bytes waiting for a magic match; persists across Read calls
+	window   []byte // accumulated bytes waiting for a magic match. Persists across Read calls
 	// dumpPath, if non-empty, receives the buffered window when the preamble
 	// overflows without a pcap magic. Lets the user hexdump kubectl's actual
 	// stdout (which the in-overlay error message necessarily truncates).
@@ -359,8 +359,7 @@ func findPcapMagic(buf []byte) int {
 }
 
 // summarizePreamble returns the first ~120 bytes of `buf` for use in error
-// messages, with non-printable characters escaped. encoding/binary import
-// kept for future structured magic detection.
+// messages, with non-printable characters escaped.
 func summarizePreamble(buf []byte) string {
 	const cap = 120
 	if len(buf) > cap {

@@ -34,7 +34,7 @@ func (m Model) invalidateSecurityCache() {
 // those calls go through the kubeconfig's aws exec-credential plugin, which
 // surfaces "SSO session expired" noise when the session has lapsed even
 // though the foreground views work off a cached token. The per-context guard
-// stops a re-probe on every cursor move; refreshSecuritySources clears it on
+// stops a re-probe on every cursor move. refreshSecuritySources clears it on
 // context switch so each cluster is probed once on first Security focus.
 func (m *Model) maybeProbeSecurityOnFocus() tea.Cmd {
 	if m.nav.Level != model.LevelResourceTypes {
@@ -271,10 +271,10 @@ func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) (Mode
 	// Persist to disk for stale-while-revalidate on the next session — but OFF
 	// the Bubble Tea Update goroutine. Marshaling the full findings set to YAML
 	// and the durable write take multiple seconds on clusters with many
-	// findings; running them inline here froze the UI until the write finished
+	// findings. Running them inline here froze the UI until the write finished
 	// (the findings message lands on the Update loop exactly when a background
 	// scan completes). A fully clean scan with zero findings is still cached (a
-	// valid "nothing found"). Best-effort; a write failure never affects the
+	// valid "nothing found"). Best-effort. A write failure never affects the
 	// session. saveSecurityFindingsCacheForHost serializes concurrent writes.
 	client := m.client
 	ctx, ns, findings := msg.context, msg.namespace, msg.findings
@@ -299,7 +299,7 @@ func (m Model) updateSecurityFindingsSeed(msg securityFindingsSeedMsg) Model {
 		return m
 	}
 	if m.securityIndex != nil {
-		return m // a live scan already won; do not regress to stale data
+		return m // a live scan already won. Do not regress to stale data
 	}
 	if m.nav.Context != "" && msg.context != m.nav.Context {
 		return m
@@ -338,7 +338,7 @@ func (m Model) loadSecurityAffectedResources(forPreview bool) tea.Cmd {
 	rt := m.nav.ResourceType
 	// The per-resource findings view mixes sources, so its sentinel Kind
 	// carries no source. Rebuild a per-source RT from the row's source so
-	// the k8s getters scope the fetch correctly; without a source there is
+	// the k8s getters scope the fetch correctly. Without a source there is
 	// nothing to fetch.
 	if rt.Kind == model.SecurityResourceFindingsKind {
 		if sourceName == "" {

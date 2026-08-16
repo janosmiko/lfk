@@ -28,7 +28,7 @@ func (m Model) handleMouseToggleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 
 // toggleMouseCapture suspends or resumes mouse reporting at runtime. When
 // suspended the terminal regains the mouse, so the user can select text,
-// copy, and use native scrollback; resuming re-enables cell-motion capture
+// copy, and use native scrollback. Resuming re-enables cell-motion capture
 // (the same mode main.go installs at startup). It is a no-op with an
 // explanatory message when mouse capture was never available.
 func (m Model) toggleMouseCapture() (tea.Model, tea.Cmd) {
@@ -97,7 +97,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Object Explorer wheel: route by the pointer column. Over the right
-	// (preview) pane the wheel scrolls the YAML preview; over the left and
+	// (preview) pane the wheel scrolls the YAML preview. Over the left and
 	// middle panes it moves the tree cursor — mirroring the main explorer's
 	// per-pane wheel routing (#379). Non-wheel mouse falls through so
 	// tab-bar clicks keep working.
@@ -126,7 +126,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	// Handle tab bar clicks in any mode — but only when no centered
 	// overlay is open. A modal overlay covers the rest of the screen
-	// and owns mouse input; without this guard a click on row 1 would
+	// and owns mouse input. Without this guard a click on row 1 would
 	// switch tabs underneath the modal.
 	if m.overlay == overlayNone && len(m.tabs) > 1 && mouse.Button == tea.MouseLeft && isMousePress(msg) && mouse.Y == 1 {
 		if tab := m.tabAtX(mouse.X); tab >= 0 && tab != m.activeTab {
@@ -172,14 +172,14 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // decelerating trackpad-momentum stream (its sparse tail can be 150-300ms
 // apart), so the whole tail of a voided gesture stays suppressed until the
 // momentum actually stops — not just its dense head. Too small and the tail
-// revives on the wrong list (the #524 "jumps by 3 after navigating" case); too
+// revives on the wrong list (the #524 "jumps by 3 after navigating" case). Too
 // large and a deliberate re-scroll right after navigating feels laggy.
 const wheelQuietGap = 350 * time.Millisecond
 
 // beginWheelTick advances the wheel-burst state machine for a wheel tick at
 // pointer column x and reports whether the tick should be dropped. After
 // wheelQuietGap of silence the tick starts a brand-new gesture and always
-// scrolls; otherwise it is dropped once the gesture has been marked dead (a
+// scrolls. Otherwise it is dropped once the gesture has been marked dead (a
 // boundary was reached or a navigation happened) or when the pointer has moved
 // to a different target than the one the gesture started on. Dropped ticks keep
 // the gesture alive (lastAt advances), so a continuous momentum tail stays
@@ -204,7 +204,7 @@ func (m Model) beginWheelTick(x int) (Model, bool) {
 
 // wheelTargetID names what a wheel tick at pointer column x would currently
 // scroll. Its only job is to detect when the pointer (or the screen) has moved
-// off the target a momentum burst started on; the exact strings are internal.
+// off the target a momentum burst started on. The exact strings are internal.
 // It mirrors the routing in handleMouse so a burst is bound to one scroll
 // target.
 func (m Model) wheelTargetID(x int) string {
@@ -240,7 +240,7 @@ func (m Model) wheelTargetID(x int) string {
 }
 
 // handleExplorerWheel routes a wheel tick to the pane under the pointer
-// at x. The right pane scrolls its preview content; the left and middle
+// at x. The right pane scrolls its preview content. The left and middle
 // panes move the row cursor — the whole-window behaviour the wheel had
 // before per-pane routing existed (issue #319 b). delta is the signed
 // line count (negative scrolls up, positive scrolls down).
@@ -320,14 +320,14 @@ func (m *Model) markWheelBurstDeadIfClamped(before, after int) {
 
 // handleObjectExplorerWheel routes a wheel tick in the Object Explorer to
 // the pane under the pointer at x. Over the right (preview) pane it scrolls
-// the YAML preview, mirroring the J/K keys; over the left and middle panes
+// the YAML preview, mirroring the J/K keys. Over the left and middle panes
 // it moves the tree cursor, mirroring j/k. dir is -1 (up) or +1 (down);
 // each tick moves wheelStep lines to match the other viewers' wheel feel.
 func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 	const wheelStep = 3
 	rt := &m.objectExplorerView
 	if x >= m.objectExplorerRightPaneStart() {
-		// Scroll-up is a plain decrement with a zero floor; scroll-down
+		// Scroll-up is a plain decrement with a zero floor. Scroll-down
 		// increments and clamps to the preview content height (which
 		// re-marshals the node YAML, so only do it when scrolling down).
 		before := rt.previewScroll
@@ -351,7 +351,7 @@ func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 
 // handleLogsMouse routes a mouse event in the log viewer. The wheel scrolls
 // the pane under the pointer: over the preview side panel it scrolls the
-// structured preview (mirroring the J/K keys); over the log stream it scrolls
+// structured preview (mirroring the J/K keys). Over the log stream it scrolls
 // the log — the same per-pane routing as the explorers (#379). Non-wheel
 // mouse is a no-op.
 func (m Model) handleLogsMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
@@ -426,7 +426,7 @@ func (m Model) columnBoundaries() (leftEnd, middleEnd int) {
 		// Fullscreen: only middle column exists.
 		return 0, m.width
 	}
-	// Single source of truth for widths; hideLeftPane returns leftW=0
+	// Single source of truth for widths. hideLeftPane returns leftW=0
 	// so the left band collapses and the middle band starts at x=0.
 	leftW, middleW, _ := m.explorerColumnWidths()
 	leftEnd = leftW + 2
@@ -671,7 +671,7 @@ func isViewerMode(mode viewMode) bool {
 
 // dispatchWheelKey synthesizes 3 presses of key (typically "j" or "k")
 // through handleKey so each viewer mode's existing scroll logic runs
-// unchanged. The model is threaded between iterations; the last cmd is
+// unchanged. The model is threaded between iterations. The last cmd is
 // returned (per-mode scroll handlers are pure state mutations and
 // typically return nil, so dropping intermediate cmds is safe).
 func (m Model) dispatchWheelKey(key string) (tea.Model, tea.Cmd) {

@@ -21,7 +21,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `transparent_background` | bool | `false` | **Deprecated** — use `appearance.transparent_background`. Use the terminal's own background for bars. Selection highlights remain opaque. |
 | `icons` | string | `"auto"` | **Deprecated** — use `appearance.icons`. Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
-| `kubeconfig_dir` | string or list[string] | `"~/.kube/config.d"` | Directory (or list of directories) recursively scanned for kubeconfig files, in addition to `~/.kube/config` (unless `KUBECONFIG` is set, which is exclusive like kubectl). Tilde paths are expanded against `$HOME`. The `--kubeconfig-dir` CLI flag (repeatable) and `KUBECONFIG_DIR` env var (colon-separated) override this; the `--kubeconfig` flag bypasses directory discovery entirely. See [Kubeconfig Directory](usage.md#kubeconfig-directory). |
+| `kubeconfig_dir` | string or list[string] | `"~/.kube/config.d"` | Directory (or list of directories) recursively scanned for kubeconfig files, in addition to `~/.kube/config` (unless `KUBECONFIG` is set). See [Kubeconfig Directory](usage.md#kubeconfig-directory). |
 | `kubeconfig_exclusive` | bool | `true` | When `KUBECONFIG` is set, load only the files it lists (kubectl semantics), skipping `~/.kube/config` and the default `~/.kube/config.d` scan. Set `false` to merge everything like releases before 0.15. Overridden by `--kubeconfig-exclusive` and `LFK_KUBECONFIG_EXCLUSIVE`. |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"_global"`. See [Monitoring](#monitoring) section. |
@@ -74,12 +74,12 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `security.enabled` | bool | `true` | Enable the built-in security findings dashboard (Security category + SEC badge). `false` turns the dashboard and all source probing off. Per-context overrides under `clusters.<name>.security` take precedence. See [Security Dashboard](security.md). |
 | `security.hide_badges` | bool | `false` | Hide the per-resource SEC severity badge by default. The dashboard still scans; only the inline row badge is suppressed. Toggle at runtime with the security badge key (`B`). Per-context overrides under `clusters.<name>.security.hide_badges` take precedence. |
 | `security.sources.<name>` | bool | `true` | Enable/disable individual sources (`heuristic`, `advisor`, `rbac`, `trivy`, `kyverno`, `kubescape`, `falco`, `gatekeeper`). A source omitted from the map stays enabled. |
-| `security.ignore_patterns` | list | _(empty)_ | Declarative glob-based ignore rules applied at load. Each entry has `cluster`, `source`, `group`, `namespace` (globs; empty = any), an optional `labels` map (label key -> glob value; all entries must match), and an optional `comment`. A finding is hidden when every non-empty field matches. A `labels` entry is resource-scoped (hides matching resources, never the whole group) and matches when the finding's resource has resolvable labels (heuristic-observed pods and same-pod findings, plus workload labels resolved from the live object for standard kinds when a label pattern is set). See [Security Dashboard](security.md#label-matching) for coverage details. An all-empty entry is dropped. Read-only (not un-ignorable from the UI); the `i` toggle still reveals them. |
+| `security.ignore_patterns` | list | _(empty)_ | Declarative glob-based ignore rules applied at load. See [Security](#security) below for field details. |
 | `security.heuristic.secret_env_include` | list | _(empty)_ | Extra env-var name globs (`*`, `?`; case-insensitive) the heuristic `secret_env` check flags, on top of the built-in credential keywords. An explicit match overrides a built-in exemption. Top-level `security` section only. |
 | `security.heuristic.secret_env_exclude` | list | _(empty)_ | Env-var name globs the heuristic `secret_env` check never flags, on top of the built-in exemptions. Wins over `secret_env_include`. Top-level `security` section only. |
 | `security.heuristic.scan_secrets` | bool | `true` | Allow the heuristic source to list Secret objects, enabling the `legacy_sa_token_secret` and `tls_secret_expiry` checks and Secret-reference verification. `false` means the source never reads Secrets. Top-level `security` section only. |
 | `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled`, `hide_badges`, and/or `sources`). Wins over the global `security` settings for that context. |
-| `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
+| `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
 | `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
 | `min_contrast_ratio` | float | `0.0` | **Deprecated** — use `appearance.min_contrast_ratio`. Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 
@@ -152,12 +152,22 @@ appearance:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `colorscheme` | string | `"tokyonight-storm"` | Built-in color scheme name. Dual-mode `"dark:X,light:Y"` supported. |
-| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). Also decides how the which-key panel and the help screen's key column draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`). |
+| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). |
 | `no_color` | bool | `false` | Strip all colors (monochrome). `NO_COLOR` env var takes precedence. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars and surfaces. |
 | `min_contrast_ratio` | float | `0.0` | Readability knob in `[0.0, 1.0]`. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 | `dim_overlay` | bool | `true` | Fade the screen behind overlays. No-op when `no_color: true`. |
-| `row_status_tint` | string | `"foreground"` | Emphasize failed/progressing rows as a fallback for when the Status cell is not visible. `foreground`: color the row's **Name** cell in the status color (same color as the Status cell) only when the Status column is hidden — no change while the Status column is shown; when the Name column is also hidden, the whole row is tinted so the signal is not lost. `background`: a muted status-colored background across the whole row, always; the cursor row blends the status color toward the selection color so it stays visible. `off`: only the Status cell is colored. In `no_color` mode the tint degrades to bold (failed) / italic (progressing); a selected failed row uses underline, since the selection is already bold. |
+| `row_status_tint` | string | `"foreground"` | Emphasize failed/progressing rows as a fallback for when the Status cell is not visible. See [Row status tint](#row-status-tint) below. |
+
+`icons` also decides how the which-key panel and the help screen's key column draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
+
+### Row status tint
+
+- `foreground`: colors the row's **Name** cell in the status color (same color as the Status cell), only when the Status column is hidden — no change while the Status column is shown. When the Name column is also hidden, the whole row is tinted so the signal is not lost.
+- `background`: a muted status-colored background across the whole row, always. The cursor row blends the status color toward the selection color so it stays visible.
+- `off`: only the Status cell is colored.
+
+In `no_color` mode the tint degrades to bold (failed) / italic (progressing); a selected failed row uses underline, since the selection is already bold.
 
 ## Log Viewer
 
@@ -271,7 +281,9 @@ Each monitoring entry accepts the following top-level fields:
 |---|---|---|---|
 | `prometheus` | object | *(auto-discovery)* | Prometheus endpoint configuration. See endpoint fields below. |
 | `alertmanager` | object | *(auto-discovery)* | Alertmanager endpoint configuration. See endpoint fields below. |
-| `node_metrics` | string | *(auto-detect)* | Metrics source for node **and pod** usage: `"prometheus"` (use Prometheus queries), `"metrics-api"` (use metrics.k8s.io API). When empty, uses Prometheus if a prometheus endpoint is configured, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus. |
+| `node_metrics` | string | *(auto-detect)* | Metrics source for node **and pod** usage: `"prometheus"` or `"metrics-api"`. Empty auto-detects. |
+
+When `node_metrics` is empty, lfk uses Prometheus if a `prometheus` endpoint is configured, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus.
 
 ### Node Uptime Column
 
@@ -373,6 +385,17 @@ clusters:
       sources:
         trivy: false       # keep the dashboard, drop Trivy on staging only
 ```
+
+Each `ignore_patterns` entry matches on `cluster`, `source`, `group`, `namespace`
+(globs; empty = any), an optional `labels` map (label key -> glob value; all
+entries must match), and an optional `comment`. A finding is hidden when every
+non-empty field matches. A `labels` entry is resource-scoped — it hides
+matching resources, never the whole group — and matches when the finding's
+resource has resolvable labels (heuristic-observed pods and same-pod findings,
+plus workload labels resolved from the live object for standard kinds when a
+label pattern is set). See [Security Dashboard](security.md#label-matching)
+for coverage details. An all-empty entry is dropped. Ignore patterns are
+read-only from config; the `i` toggle still reveals hidden findings.
 
 Precedence: `clusters.<ctx>.security.*` overrides the global `security.*`. The
 interactive per-cluster ignore-list (action menu) and `ignore_patterns` are
@@ -492,17 +515,17 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `secret_editor` | `e` | Secret/ConfigMap editor |
 | `column_toggle` | `,` | Column visibility toggle |
 | `session_manager` | `C` | Open the session manager (save/switch/delete named workspace sessions). |
-| `toggle_wrap` | `>` | Toggle line wrapping in the YAML, diff, describe, log, and event viewers. Shares the `>` default with `sort_next`, but they apply in separate contexts (viewers vs. resource list). |
+| `toggle_wrap` | `>` | Toggle line wrapping in the YAML, diff, describe, log, and event viewers. |
 | `toggle_line_numbers` | `#` | Toggle line numbers (diff, log viewers). |
-| `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers; also folds tree-view branches in the Object/API Explorers, alongside `Space`). |
+| `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers). |
 | `toggle_fold_all` | `Z` | Toggle all folds (YAML, diff viewers). |
 | `toggle_follow` | `F` | Toggle follow / auto-scroll (log viewer). Moved from `f`, which now opens the log filter. |
 | `severity_up` | `o` | Raise the minimum log severity shown — cycles off → INFO+ → WARN+ → ERROR+ (log viewer). |
-| `severity_down` | `i` | Lower the minimum log severity shown (log viewer). Structured logs use the parsed level; plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO. Shares the `i` default with `label_editor` / `security_ignore_toggle`, but they apply in separate contexts (log viewer vs. resource list). |
+| `severity_down` | `i` | Lower the minimum log severity shown (log viewer). |
 | `toggle_timestamps` | `s` | Toggle timestamps (log viewer). |
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
-| `tree_view` | `T` | Toggle the ASCII-art tree view (Object Explorer, API Explorer). Shares the `T` default with `theme_selector`, but they apply in separate contexts (explorers vs. resource list). |
+| `tree_view` | `T` | Toggle the ASCII-art tree view (Object Explorer, API Explorer). |
 | `field_doc` | `ctrl+k` | Toggle the schema side pane for the field under the cursor (YAML viewer, Object Explorer). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
 | `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod or container (explorer; deeper levels only). |
@@ -516,6 +539,12 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `terminal_toggle` | `ctrl+t` | Cycle terminal mode (pty/exec/mux) |
 | `mouse_toggle` | `ctrl+alt+y` | Suspend/resume mouse capture (Ctrl+Option+Y) for native text selection |
 | `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
+
+### Keybinding notes
+
+- `toggle_fold` also folds tree-view branches in the Object/API Explorers, alongside `Space`.
+- `severity_up`/`severity_down` read the parsed level on structured logs; plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO.
+- Shared defaults across separate contexts: `>` (`toggle_wrap` in viewers vs. `sort_next` in the resource list), `T` (`tree_view` in explorers vs. `theme_selector` in the resource list), `i` (`severity_down` in the log viewer vs. `label_editor` / `security_ignore_toggle` in the resource list).
 
 ## Views
 
@@ -537,7 +566,7 @@ NAME[:.jsonpath][|flag]*
 | Form | Meaning |
 |---|---|
 | `Name` | Built-in column resolved by the renderer (Name, Age, Ready, REV, etc.) |
-| `Name:.jsonpath` | Custom column — JSONPath evaluated against the source object. Uses `k8s.io/client-go/util/jsonpath` (kubectl-flavored). |
+| `Name:.jsonpath` | Custom column — JSONPath evaluated against the source object. |
 | `Name:.jsonpath\|flag` | Custom column with one or more display flags (stackable with multiple `\|`). |
 
 **Flags** (case-insensitive):
@@ -736,7 +765,9 @@ custom_actions:
 | `command` | Yes | Shell command to execute (supports template variables) |
 | `key` | Yes | Shortcut key in the action menu |
 | `description` | No | Description shown next to the action |
-| `read_only_safe` | No | When `true`, available in read-only mode. Defaults to `false` (treated as mutating). Set `true` for view-only commands (e.g. `kubectl describe`, `kubectl logs`). |
+| `read_only_safe` | No | When `true`, available in read-only mode. Defaults to `false`. |
+
+Set `read_only_safe: true` for view-only commands (e.g. `kubectl describe`, `kubectl logs`).
 
 ### Template Variables
 
@@ -856,7 +887,9 @@ filter_presets:
 | `restarts_gt` | Match pods with restart count greater than this number |
 | `column` | Column key to check (case-insensitive, e.g., "Node", "IP") |
 | `column_value` | Substring match against the column value (case-insensitive) |
-| `invert` | `true` to negate the entire match. Other fields still AND together; the final boolean is flipped. Useful for "anything except X" filters, e.g., `status: Bound` + `invert: true` matches every PVC that is NOT Bound. |
+| `invert` | `true` to negate the entire match (fields still AND together first). |
+
+`invert: true` flips the final AND result — useful for "anything except X" filters, e.g. `status: Bound` + `invert: true` matches every PVC that is NOT Bound.
 
 ### Built-in Presets
 
@@ -864,7 +897,7 @@ Press `.` on any resource list to see the presets available for that kind. The b
 
 | Kind | Presets (key) |
 |---|---|
-| Pod | Failing (`f`), Pending (`p`), Not Ready (`n`), Restarting (`r`), High Restarts (`R`), **Not Running (`x`)** |
+| Pod | Failing (`f`), Pending (`p`), Not Ready (`n`), **Not Running (`x`)** |
 | Deployment / StatefulSet / DaemonSet | Not Ready (`n`), Failing (`f`), **Not Running (`x`)** |
 | Job | Failed (`f`), **Not Running (`x`)** |
 | PersistentVolume | Available (`a`), Released (`r`), Failed (`f`), **Not Bound (`x`)** |
@@ -877,7 +910,7 @@ Press `.` on any resource list to see the presets available for that kind. The b
 | Flux HelmRelease / Kustomization | Suspended (`s`), Not Ready (`n`) |
 | Event | Warnings (`w`) |
 
-The `x` key (Not Running / Not Bound) is the shared "show me anything not in a healthy state" mnemonic across the kinds where it applies — k9s `Ctrl-Z` equivalent. Universal presets `Old (>30d)` (`o`) and `Recent (<1h)` (`h`) are also available on every list.
+The `x` key (Not Running / Not Bound) is the shared "show me anything not in a healthy state" mnemonic across the kinds where it applies — k9s `Ctrl-Z` equivalent. Universal presets `Old (>30d)` (`o`) and `Recent (<1h)` (`h`) are also available on every list. Pod also has Restarting (`r`) and High Restarts (`R`) presets for crash-loop triage.
 
 ## Secret lazy loading
 

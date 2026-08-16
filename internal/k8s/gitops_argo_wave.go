@@ -24,7 +24,7 @@ import (
 const unknownWave = math.MinInt
 
 // SyncWaveTimeline is the immutable result of one fetch against an ArgoCD
-// Application. The renderer reads it; nothing in the data layer mutates it
+// Application. The renderer reads it. Nothing in the data layer mutates it
 // after Build returns.
 type SyncWaveTimeline struct {
 	AppName       string
@@ -120,7 +120,7 @@ func pluralFor(kind string) string {
 }
 
 // waveResourceWithWave pairs a SyncWaveResource with the wave it belongs
-// to. Used internally by the builder before bucketization; never exported.
+// to. Used internally by the builder before bucketization. Never exported.
 type waveResourceWithWave struct {
 	wave int
 	res  SyncWaveResource
@@ -184,7 +184,7 @@ func resourceSortKey(r SyncWaveResource) string {
 // parseHookResources reads operationState.syncResult.resources[] and
 // returns hook entries grouped by syncPhase. Non-hook entries (no
 // hookType) are skipped. Wave is unknownWave for hooks since they aren't
-// wave-bucketed; the renderer ignores wave for hook rows.
+// wave-bucketed. The renderer ignores wave for hook rows.
 func parseHookResources(syncResult map[string]any) map[string][]waveResourceWithWave {
 	if syncResult == nil {
 		return nil
@@ -458,7 +458,7 @@ func buildSyncWaveTimelineFromApp(app *unstructured.Unstructured, appName, names
 // parse only. All managed resources land at unknownWave so the overlay
 // can render the phase pipeline immediately while the slow per-resource
 // annotation fan-out runs in the background. The returned timeline has
-// Loading set to true; the renderer surfaces this as "Loading wave map…"
+// Loading set to true. The renderer surfaces this as "Loading wave map…"
 // in the header.
 func (c *Client) GetSyncWaveTimelineSkeleton(ctx context.Context, contextName, namespace, appName string) (*SyncWaveTimeline, error) {
 	app, err := c.fetchSyncWaveApplication(ctx, contextName, namespace, appName)

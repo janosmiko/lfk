@@ -28,7 +28,7 @@ import (
 const ConstraintsGroup = "constraints.gatekeeper.sh"
 
 // ConstraintsVersion is the API version Gatekeeper has shipped Constraints
-// under since v3.0. Newer versions (v1) are anticipated; for now we list
+// under since v3.0. Newer versions (v1) are anticipated. For now we list
 // only v1beta1 instances and accept that v1-only constraints would be
 // missed until this constant is updated.
 const ConstraintsVersion = "v1beta1"
@@ -37,7 +37,7 @@ const ConstraintsVersion = "v1beta1"
 // newest API version first. The probe avoids the Discovery API (which
 // client-go doesn't expose with a context, so a hung API server would
 // block the probe goroutine past the manager's 3s timeout). v1 has been
-// GA since Gatekeeper 3.10; clusters older than that serve
+// GA since Gatekeeper 3.10. Clusters older than that serve
 // ConstraintTemplate as v1beta1 only, so the probe falls back to it
 // before reporting Gatekeeper unavailable.
 var constraintTemplateGVRs = []schema.GroupVersionResource{
@@ -143,7 +143,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 // discoverConstraintKinds returns every API resource served under
 // constraints.gatekeeper.sh/v1beta1, bounded by ctx. client-go's
 // Discovery() ServerResourcesForGroupVersion has no Context-aware
-// variant, so we run it on a goroutine and select on ctx.Done(); the
+// variant, so we run it on a goroutine and select on ctx.Done(). The
 // goroutine may leak if the API server hangs forever, but the caller
 // returns promptly and the manager can move on.
 //
@@ -180,7 +180,7 @@ func discoverConstraintKinds(ctx context.Context, clientset kubernetes.Interface
 // parseConstraint walks a single Constraint object and converts every
 // status.violations entry into a security.Finding. constraintKind is
 // the Kubernetes Kind name of the parent constraint (e.g.,
-// "K8sRequiredLabels"); we surface it on the Finding so users can
+// "K8sRequiredLabels"). We surface it on the Finding so users can
 // distinguish "10 violations of K8sRequiredLabels" from "10 violations
 // of K8sBlockNodeport" in the group view.
 func parseConstraint(u *unstructured.Unstructured, constraintKind string) []security.Finding {

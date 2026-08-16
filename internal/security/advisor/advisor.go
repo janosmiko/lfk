@@ -88,10 +88,10 @@ type workload struct {
 	// the replica count.
 	staticReplicasOwner string
 	// stsServiceName is the StatefulSet's spec.serviceName (governing
-	// headless Service); empty for other kinds.
+	// headless Service). Empty for other kinds.
 	stsServiceName string
 	// stsVCTClasses holds the storageClassName of each StatefulSet
-	// volumeClaimTemplate ("" = the cluster default class); nil for other
+	// volumeClaimTemplate ("" = the cluster default class), nil for other
 	// kinds.
 	stsVCTClasses []string
 }
@@ -113,7 +113,7 @@ func templateSpreads(tmpl *corev1.PodTemplateSpec) bool {
 }
 
 // clusterData holds everything Fetch could list. Each OK flag records whether
-// the corresponding list succeeded; checks that depend on a failed list are
+// the corresponding list succeeded. Checks that depend on a failed list are
 // skipped entirely (best-effort RBAC) instead of emitting false positives.
 type clusterData struct {
 	workloads []workload

@@ -250,7 +250,7 @@ func (m Model) applySessionColumnsForKind(kind string) {
 	// CRD additionalPrinterColumns for the navigated resource type drive
 	// priority-aware, first-class printer-column rendering. Only applies when
 	// the rendered kind matches nav.ResourceType (the middle column at
-	// LevelResources); owned children/containers have their own kinds.
+	// LevelResources). Owned children/containers have their own kinds.
 	if rt := m.nav.ResourceType; len(rt.PrinterColumns) > 0 && rt.Kind != "" && strings.EqualFold(rt.Kind, kind) {
 		pcs := make(map[string]int, len(rt.PrinterColumns))
 		for _, pc := range rt.PrinterColumns {
@@ -272,7 +272,7 @@ func (m Model) applySessionColumnsForKind(kind string) {
 		ui.ActiveSessionColumns = nil
 	}
 	// Hidden built-in columns for this kind. Session toggles (from the
-	// column-toggle overlay) win over view-derived defaults; when neither is
+	// column-toggle overlay) win over view-derived defaults. When neither is
 	// set, fall back to the view's column list — any built-in not listed in
 	// views.<kind>.columns is hidden so the table doesn't render columns the
 	// user didn't ask for.
@@ -318,7 +318,7 @@ func (m Model) withSessionColumnsForKind(kind string, fn func() string) string {
 
 // rightColumnKind returns the lowercased kind that identifies the items
 // currently rendered in the right column (children pane). Derived from
-// the first rightItem when available; falls back to the empty string,
+// the first rightItem when available. Falls back to the empty string,
 // which applySessionColumnsForKind treats as "no overrides".
 func (m Model) rightColumnKind() string {
 	if len(m.rightItems) > 0 && m.rightItems[0].Kind != "" {
@@ -342,7 +342,7 @@ func (m Model) viewExplorer() string {
 	// Category bars only light up when the user opted into category
 	// matching via Tab — at LevelResourceTypes only, since that's
 	// where the bars actually render. Plain `/foo` or `f foo` thus
-	// stays a name-search both visually and behaviourally; Tab is
+	// stays a name-search both visually and behaviourally. Tab is
 	// the explicit "include groups" toggle in both senses.
 	ui.ActiveHighlightCategories = m.nav.Level == model.LevelResourceTypes &&
 		((m.searchInput.Value != "" && m.searchBroadMode) ||
@@ -649,7 +649,7 @@ func (m Model) leftColumnLoading() bool {
 // neither the left (parent context: resource-type categories,
 // kubeconfigs, …) nor the right (child preview) should light up just
 // because the user typed `/workload`. The middle was already rendered
-// upstream with ActiveHighlightQuery active; we clear it here before
+// upstream with ActiveHighlightQuery active. We clear it here before
 // touching either side column and restore at the end.
 func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rightInner, contentHeight int) string {
 	savedHighlight := ui.ActiveHighlightQuery
@@ -675,7 +675,7 @@ func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rig
 // viewExplorerTwoColMiddleRight renders the explorer with the left sidebar
 // hidden (the hide-sidebar phase of the kb.Fullscreen cycle). Same
 // right-column rendering as viewExplorerThreeCol
-// minus the left column; ActiveLeftScroll/HighlightQuery are still saved and
+// minus the left column. ActiveLeftScroll/HighlightQuery are still saved and
 // cleared so the right pane doesn't inherit middle-pane highlight state.
 func (m Model) viewExplorerTwoColMiddleRight(middle string, rightW, rightInner, contentHeight int) string {
 	savedHighlight := ui.ActiveHighlightQuery

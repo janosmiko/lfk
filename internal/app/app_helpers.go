@@ -42,7 +42,7 @@ const namespaceCacheTTL = 60 * time.Second
 
 // activeContext returns the kubectl context that queries on behalf of
 // the current tab should target. It prefers the tab-scoped nav.Context
-// and falls back to the client's current context; returns "" when the
+// and falls back to the client's current context. Returns "" when the
 // client has not been initialised yet (e.g. in pre-startup tests) so
 // callers never panic on a nil client.
 //
@@ -51,7 +51,7 @@ const namespaceCacheTTL = 60 * time.Second
 // caller of activeContext (cache key, GetNamespaces, completion) needs a
 // real cluster, so resolve it to unionContexts[0] here. The union assumes
 // homogeneous clusters, so any one of them is a representative source for
-// namespace listing and similar metadata; if clusters diverge, the user
+// namespace listing and similar metadata. If clusters diverge, the user
 // can drill into a specific cluster and re-run the operation.
 func (m Model) activeContext() string {
 	if m.isUnionSentinel() {
@@ -81,7 +81,7 @@ func (m Model) discoveryContext() string {
 
 // ensureNamespaceCacheFresh returns a command that refreshes the
 // namespace cache for the current context when the entry is missing,
-// empty, or older than namespaceCacheTTL; returns nil otherwise.
+// empty, or older than namespaceCacheTTL. Returns nil otherwise.
 // Context-open paths (drilling into a cluster, `:ctx`, bookmark
 // activation, session restore) batch it so the first `:` open in the
 // newly-opened context has completions ready without waiting for the
@@ -145,7 +145,7 @@ func (m *Model) cancelInFlightRequests() {
 // It also refreshes model.HiddenTypes via applyHiddenTypes, since hidden types
 // must recompute at exactly the same moments as pins. Callers that already call
 // applyPinnedTypes therefore need NOT call applyHiddenTypes separately (doing so
-// is harmless but redundant); a caller that needs only hidden types refreshed
+// is harmless but redundant). A caller that needs only hidden types refreshed
 // may call applyHiddenTypes directly.
 func (m *Model) applyPinnedTypes() {
 	discCtx := m.nav.Context

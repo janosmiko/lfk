@@ -82,7 +82,7 @@ type taintIdentity struct{ key, effect string }
 
 // ComputeFinalTaints returns existing minus removals plus additions,
 // matching by key+effect identity (never by position). Removals of
-// taints that no longer exist are no-ops; additions whose identity is
+// taints that no longer exist are no-ops. Additions whose identity is
 // already present are dropped (the server would reject them). Taints
 // present on the node but unknown to the caller — added concurrently —
 // survive untouched. Inputs are not mutated.

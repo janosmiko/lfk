@@ -95,7 +95,7 @@ type namespacesLoadedMsg struct {
 	// silent marks this load as a background cache refresh (e.g., fired
 	// by ensureNamespaceCacheFresh on session restore or context open).
 	// The handler must not flip m.loading in this mode because that flag
-	// belongs to the middle-column / resource-types load; clearing it
+	// belongs to the middle-column / resource-types load. Clearing it
 	// asynchronously while discovery is still in flight causes a "No
 	// items" flash between the loader and the populated list.
 	silent bool
@@ -188,7 +188,7 @@ type statusMessageExpiredMsg struct{}
 type startupTipMsg struct{ tip string }
 
 // watchTickMsg triggers a periodic refresh in watch mode. gen identifies the
-// tick chain; a tick whose gen != Model.watchTickGen is from a retired chain.
+// tick chain. A tick whose gen != Model.watchTickGen is from a retired chain.
 type watchTickMsg struct{ gen uint64 }
 
 type previewDebounceTickMsg struct{ gen uint64 }
@@ -205,13 +205,13 @@ type containerSelectMsg struct {
 // dashboardLoadedMsg carries the rendered dashboard content.
 type dashboardLoadedMsg struct {
 	data    dashboardData // composed into preview/events at the current width on receipt
-	content string        // optional pre-rendered override (e.g. "disabled"); used verbatim when non-empty
+	content string        // optional pre-rendered override (e.g. "disabled"). Used verbatim when non-empty
 	context string
 }
 
 // dashboardPartialMsg delivers one section of the dashboard fan-out to the
 // renderer, which accumulates sections per-(kctx, gen). key identifies the
-// section ("nodes", "pods", ..., or "pinned:<group/resource>"); total is the
+// section ("nodes", "pods", ..., or "pinned:<group/resource>"), total is the
 // number of sections this load fanned out to (6 fixed + one per pinned
 // summary), so the accumulator knows when the set is complete. Once all
 // expected sections have arrived, a dashboardLoadedMsg is dispatched for
@@ -310,7 +310,7 @@ type previewLogRestartMsg struct {
 
 // previewLogHistoryMsg carries a batch of older log lines fetched by a one-shot
 // kubectl logs (no -f). podKey correlates the result to the pod that was active
-// when the fetch was issued; stale results are dropped on receipt.
+// when the fetch was issued. Stale results are dropped on receipt.
 type previewLogHistoryMsg struct {
 	podKey string
 	lines  []string
@@ -427,7 +427,7 @@ type rightsizingLoadedMsg struct {
 // update loop freezes the UI on every overlay open.
 //
 // The handler reconciles available + the current strategy: if the
-// sticky strategy is still in the probe result it's kept; otherwise
+// sticky strategy is still in the probe result it's kept. Otherwise
 // the picker re-seeds via pickRightsizingStrategy and a fresh load is
 // dispatched (the in-memory data was for the wrong strategy).
 //
@@ -533,7 +533,7 @@ type templateApplyMsg struct {
 	tmpFile     string
 	context     string
 	ns          string
-	origModTime time.Time // modification time before editor opened; skip apply if unchanged
+	origModTime time.Time // modification time before editor opened. Skip apply if unchanged
 }
 
 // eventTimelineMsg carries event timeline data for the overlay.
@@ -636,7 +636,7 @@ type previewEventsLoadedMsg struct {
 }
 
 // explainLoadedMsg carries the parsed output of kubectl explain. gen is the
-// explain session it was started for; handlers drop a reply whose gen no
+// explain session it was started for. Handlers drop a reply whose gen no
 // longer matches m.explainGen. See explainSessionState.
 type explainLoadedMsg struct {
 	fields      []model.ExplainField
@@ -727,7 +727,7 @@ type previewServiceEndpointsLoadedMsg struct {
 }
 
 // orphanCacheKey identifies a slot in Model.orphanCache. namespace == ""
-// means cluster-wide (the overlay path); a non-empty namespace is the
+// means cluster-wide (the overlay path). A non-empty namespace is the
 // filter-preset path scoped to a single namespace.
 type orphanCacheKey struct {
 	kubeContext string
@@ -735,7 +735,7 @@ type orphanCacheKey struct {
 }
 
 // orphanInflight is the per-key bookkeeping for an in-flight scan.
-// gen lets handleOrphansLoaded drop a superseded result; cancel lets
+// gen lets handleOrphansLoaded drop a superseded result. Cancel lets
 // invalidators stop the scan immediately when the user switches
 // namespace/context or refreshes — without it, a stale scan could
 // repopulate the cache after invalidation.
@@ -769,7 +769,7 @@ type localClustersDetectedMsg struct {
 
 // localClusterCreatedMsg carries the result of a create-cluster wizard
 // submission. Emitted by createLocalClusterCmd after Provider.Create
-// returns; the handler reloads the manager table and contexts list.
+// returns. The handler reloads the manager table and contexts list.
 // gen guards against late results landing after the manager closed —
 // without it a 2-minute create that completes after the user navigated
 // away would silently mutate localClusterState.creating + .info.

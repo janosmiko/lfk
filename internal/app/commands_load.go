@@ -33,7 +33,7 @@ func (m Model) loadContexts() tea.Cmd {
 // loadContextsReload re-walks every kubeconfig file from disk before
 // listing. Use this only when you have reason to believe the kubeconfig
 // changed externally (kind/k3d/minikube create or delete from inside
-// lfk; explicit user-initiated refresh). Watch-mode auto-refresh and
+// lfk. Explicit user-initiated refresh). Watch-mode auto-refresh and
 // startup use the cheaper loadContexts.
 func (m Model) loadContextsReload() tea.Cmd {
 	return m.trackBgTask(
@@ -156,7 +156,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	// not exist` on every sidebar hover whose target rt isn't already in
 	// itemCache.
 	//
-	// Preview hovers serve from cache when fresh; main-list and watch
+	// Preview hovers serve from cache when fresh. Main-list and watch
 	// ticks always refetch so deleted pods don't linger and Age advances.
 	// This mirrors the non-union policy below — see the fresh-cache
 	// shortcut comment.
@@ -260,7 +260,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	// Critical first — starve the High preview work that renders pod details.
 	// High keeps the list ahead of Low background (dashboard/metrics/events)
 	// while sharing the general pool fairly with previews.
-	// Security findings reaching here have a cold cache; name the task so it
+	// Security findings reaching here have a cold cache. Name the task so it
 	// reads as the shared security scan (it triggers/awaits the one coalesced
 	// FetchAll that covers every source), not a per-source object listing.
 	listName := "List " + model.DisplayNameFor(rt)
@@ -348,7 +348,7 @@ func (m Model) loadResourceTree() tea.Cmd {
 			return nil
 		}
 		kind = "Pod"
-		// effectiveNamespace returns "" in all-namespaces mode; fall back
+		// effectiveNamespace returns "" in all-namespaces mode. Fall back
 		// to the navigation namespace so the typed Pod GET resolves —
 		// same pattern as loadContainers above.
 		if ns == "" && m.nav.Namespace != "" {
@@ -455,7 +455,7 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 }
 
 func (m Model) loadYAML() tea.Cmd {
-	// Synthetic security items have no YAML; defense in depth alongside
+	// Synthetic security items have no YAML. Defense in depth alongside
 	// the gate in enterFullView so any future caller stays safe.
 	if onSecurityView(&m) {
 		return nil
@@ -736,7 +736,7 @@ func (m Model) scheduleK8sCall(prio scheduler.Priority, kind scheduler.Kind, nam
 		// All three sentinels mean "this submission was intentionally
 		// abandoned" — coalesced by a newer one, context dropped, or
 		// superseded by a newer requestGen via CancelStaleByGen. Return nil
-		// so the UI ignores it; the surviving submission carries the result.
+		// so the UI ignores it. The surviving submission carries the result.
 		if errors.Is(res.Err, scheduler.ErrCoalesced) ||
 			errors.Is(res.Err, scheduler.ErrContextSwitched) ||
 			errors.Is(res.Err, scheduler.ErrSuperseded) {

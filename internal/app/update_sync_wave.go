@@ -18,7 +18,7 @@ const syncWaveRefreshInterval = 3 * time.Second
 // syncWaveSpinnerInterval is the cadence of the loading-spinner glyph
 // rotation. 100ms is the standard cadence for terminal spinners — fast
 // enough to feel responsive, slow enough not to burn CPU. Tighter than
-// 100ms looks jittery on most terminals; slower looks laggy.
+// 100ms looks jittery on most terminals. Slower looks laggy.
 const syncWaveSpinnerInterval = 100 * time.Millisecond
 
 // scheduleSyncWaveSpinnerTick fires the next spinner-rotation message.
@@ -49,7 +49,7 @@ func (m Model) updateSyncWaveTimeline(msg syncWaveTimelineMsg) (tea.Model, tea.C
 		m.setStatusMessage("Sync wave timeline returned no data", true)
 		return m, withSyncWaveAutoRefresh(m, scheduleStatusClear())
 	}
-	// Keep the loading flag set while we still await the wave map; the
+	// Keep the loading flag set while we still await the wave map. The
 	// skeleton message paints the phase structure but waves are not yet
 	// known.
 	m.loading = msg.info.Loading
@@ -139,7 +139,7 @@ func withSyncWaveAutoRefresh(m Model, base tea.Cmd) tea.Cmd {
 
 // applySmartDefaults sets the default collapsed state on first open:
 // empty fail/delete phases collapse so they don't visually clutter the
-// sidebar; non-empty phases stay expanded.
+// sidebar. Non-empty phases stay expanded.
 func applySmartDefaults(s *syncWaveState) {
 	if s.data == nil {
 		return
@@ -249,7 +249,7 @@ func clampBodyScrollForPhase(s *syncWaveState, phase k8s.SyncWavePhase) {
 // session, that the overlay is still open, and that the phase is still
 // Running. On any miss, returns no cmd. On match, issues the next
 // loadSyncWaveTimeline.
-func (m Model) handleSyncWaveTick(msg syncWaveTickMsg) (tea.Model, tea.Cmd) { //nolint:unparam // consistent message handler signature; tea.Model return is consumed by the dispatch wired in Task 13.
+func (m Model) handleSyncWaveTick(msg syncWaveTickMsg) (tea.Model, tea.Cmd) { //nolint:unparam // consistent message handler signature; tea.Model return is consumed by the central message dispatch.
 	if msg.token != m.syncWave.token {
 		return m, nil
 	}

@@ -89,7 +89,7 @@ type OverlayConfirmConfig struct {
 
 	// ChoiceLabel/ChoiceValue render a labeled, cycleable value row below the
 	// warning (e.g. "Cascade: Background"). An empty ChoiceValue omits the
-	// row; the hotkey that cycles it lives in the hint bar. ChoiceWarn styles
+	// row. The hotkey that cycles it lives in the hint bar. ChoiceWarn styles
 	// the value as a warning so a riskier selection is not visually
 	// interchangeable with a safe one.
 	ChoiceLabel string
@@ -102,13 +102,13 @@ type OverlayConfirmConfig struct {
 	Notes []ConfirmNote
 
 	// TypeToken triggers the type-to-confirm row. When non-empty, the
-	// overlay prompts the user to type the token verbatim; Input is the
+	// overlay prompts the user to type the token verbatim. Input is the
 	// current accumulator. An empty Input renders a dim placeholder.
 	TypeToken string
 	Input     string
 
 	// Centered mode renders Title alone, centered both axes inside a
-	// fixed-size box. Used by the Quit overlay; ignores Warning, Body,
+	// fixed-size box. Used by the Quit overlay. Ignores Warning, Body,
 	// and TypeToken when true.
 	Centered    bool
 	InnerWidth  int
@@ -223,7 +223,7 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 		labelWidth := confirmNoteLabelWidth(cfg.Notes)
 		for i, note := range cfg.Notes {
 			b.WriteString(renderConfirmNote(note, labelWidth, cfg.WrapWidth))
-			// Rows of the same block sit together; only the block is
+			// Rows of the same block sit together. Only the block is
 			// separated from what follows.
 			if i < len(cfg.Notes)-1 {
 				b.WriteString("\n")

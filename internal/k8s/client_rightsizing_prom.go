@@ -41,7 +41,7 @@ func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, names
 
 	for i := range out.Containers {
 		cr := &out.Containers[i]
-		// CPU value is in cores; convert to millicores.
+		// CPU value is in cores. Convert to millicores.
 		if cores, ok := cpuResult[cr.Name]; ok && cores > 0 {
 			milli := int64(cores * 1000.0 * headroom)
 			rec := SnapCPUMilliToCanonical(milli)
@@ -76,7 +76,7 @@ func promStrategyWindow(s model.RightsizingStrategy) string {
 // pods named in `pods` (escaped into a regex alternation).
 //
 // CPU uses container_cpu_usage_seconds_total wrapped in rate(...) over
-// a 5-minute window so the inner sample is cores/sec; the outer
+// a 5-minute window so the inner sample is cores/sec. The outer
 // aggregation (max_over_time / avg_over_time / quantile_over_time)
 // folds those samples across the strategy's window.
 //
@@ -140,7 +140,7 @@ func podsRegex(pods []string) string {
 
 // queryPromContainerMetric runs an instant PromQL query and returns a
 // map of container name -> raw float value. Tests inject the request
-// pipeline via Client.testPromQuery; production builds the proxy URL
+// pipeline via Client.testPromQuery. Production builds the proxy URL
 // from the configured Prometheus endpoint and calls Service.ProxyGet.
 func (c *Client) queryPromContainerMetric(ctx context.Context, contextName, query string) (map[string]float64, error) {
 	body, err := c.runPrometheusQuery(ctx, contextName, query)
@@ -208,7 +208,7 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 
 // parsePrometheusContainerResponse extracts the per-container value
 // vector from a PromQL instant query response. The "container" label
-// keys the result map; empty container labels are skipped (the cgroup
+// keys the result map. Empty container labels are skipped (the cgroup
 // "POD" pause container is filtered out by the query, but defensive
 // code here keeps a malformed metric from polluting the map).
 func parsePrometheusContainerResponse(data []byte) (map[string]float64, error) {

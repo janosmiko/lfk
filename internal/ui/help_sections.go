@@ -436,7 +436,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 			},
 		},
 		{
-			// Grouping and warnings-only used to be listed here; they are keys of
+			// Grouping and warnings-only used to be listed here. They are keys of
 			// the explorer's Events list (handleKeyExpandCollapse,
 			// handleExplorerActionKeySaveResource), not of the timeline, and are
 			// documented in Navigation and Actions where they dispatch.

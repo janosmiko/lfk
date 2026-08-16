@@ -50,7 +50,7 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // rbacData holds the four RBAC lists. Each OK flag records whether the list
-// succeeded; checks that depend on a failed list are skipped entirely
+// succeeded. Checks that depend on a failed list are skipped entirely
 // (best-effort RBAC) instead of emitting false positives.
 type rbacData struct {
 	roles               []rbacv1.Role
@@ -81,7 +81,7 @@ func skipObject(meta *metav1.ObjectMeta) bool {
 
 // Fetch lists Roles, ClusterRoles, RoleBindings, and ClusterRoleBindings
 // (best-effort per type) and runs the RBAC checks over them. Empty namespace
-// means all namespaces; cluster-scoped objects are always included because
+// means all namespaces. Cluster-scoped objects are always included because
 // their grants apply everywhere.
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {

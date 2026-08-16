@@ -107,7 +107,7 @@ type DiffVisualParams struct {
 // to surface status messages (copy feedback, errors) without resorting
 // to post-render line surgery.
 // currentMatchLine is the original diff line index of the current n/N match
-// (-1 means none); that line gets the distinct SelectedSearchHighlightStyle.
+// (-1 means none). That line gets the distinct SelectedSearchHighlightStyle.
 func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, currentMatchLine int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
@@ -247,7 +247,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 // with search highlighting and fold support. footerOverride behaves the
 // same as in RenderDiffView.
 // currentMatchLine is the original diff line index of the current n/N match
-// (-1 means none); that line gets the distinct SelectedSearchHighlightStyle.
+// (-1 means none). That line gets the distinct SelectedSearchHighlightStyle.
 func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, currentMatchLine int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)

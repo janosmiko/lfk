@@ -97,7 +97,7 @@ func appendPodRefs(podNode *model.ResourceNode, podObj map[string]any, namespace
 		add("ServiceAccount", saName, false)
 	}
 
-	// imagePullSecrets are required at pull time; treat as non-optional.
+	// imagePullSecrets are required at pull time. Treat as non-optional.
 	if pull, ok := spec["imagePullSecrets"].([]any); ok {
 		for _, p := range pull {
 			if m, ok := p.(map[string]any); ok {
@@ -190,7 +190,7 @@ func collectContainerRefs(c map[string]any, add func(kind, name string, optional
 }
 
 func collectVolumeRefs(v map[string]any, add func(kind, name string, optional bool)) {
-	// SecretVolumeSource uses secretName; SecretProjection uses name.
+	// SecretVolumeSource uses secretName. SecretProjection uses name.
 	if s, ok := v["secret"].(map[string]any); ok {
 		name, _ := s["secretName"].(string)
 		opt, _ := s["optional"].(bool)
@@ -235,11 +235,11 @@ func collectVolumeRefs(v map[string]any, add func(kind, name string, optional bo
 // a single tree build cost one GET. Errors other than IsNotFound are treated
 // as "exists" so transient RBAC/network failures don't false-flag refs.
 //
-// The provided ctx is reused for every kube GET the closure issues — it does
-// not impose its own timeout, so callers should pass a context with a
-// deadline or cancellation to avoid indefinite blocking on a slow apiserver.
+// The provided ctx is reused for every kube GET the closure issues. It does
+// not impose its own timeout: pass a context with a deadline or cancellation,
+// or a slow apiserver blocks indefinitely.
 //
-// The cache map is not safe for concurrent use; the closure assumes
+// The cache map is not safe for concurrent use. The closure assumes
 // sequential calls within a single tree build (which is how
 // build*Tree paths invoke it today).
 func newRefExistsFn(ctx context.Context, dynClient dynamic.Interface, namespace string) existsFn {

@@ -34,7 +34,7 @@ func minikubeCLIError(op string, code int, stderr string, err error) error {
 
 // minikubeProfileListJSONShape mirrors the subset of `minikube profile
 // list -o json` we care about. minikube's JSON has more fields than
-// these; anything we omit is ignored on Unmarshal.
+// these. Anything we omit is ignored on Unmarshal.
 type minikubeProfileListJSONShape struct {
 	Valid []minikubeProfile `json:"valid"`
 }
@@ -126,7 +126,7 @@ func (p *minikubeProvider) Create(ctx context.Context, spec CreateSpec) error {
 		// — `--extra-config` is for component knobs like
 		// `kubelet.foo=bar`, not a YAML file path. Rather than smuggle
 		// the path into the wrong flag, fail loud. The wizard's
-		// config-file escape hatch is deferred to v1.1; v1 keeps
+		// config-file escape hatch is deferred to v1.1. v1 keeps
 		// CreateSpec.ConfigFile as always-empty.
 		return fmt.Errorf("minikube: config-file is not supported (deferred to v1.1)")
 	}

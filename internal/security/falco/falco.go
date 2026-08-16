@@ -16,7 +16,7 @@ import (
 )
 
 // tailLines is the number of log lines to read from each Falco pod.
-// Falco outputs one JSON line per alert; 500 covers the recent history
+// Falco outputs one JSON line per alert. 500 covers the recent history
 // without pulling excessive data.
 const tailLines int64 = 500
 
@@ -156,7 +156,7 @@ func (s *Source) fetchFromLogs(ctx context.Context, namespace string) []security
 		func() {
 			defer func() { _ = stream.Close() }()
 			scanner := bufio.NewScanner(stream)
-			// Allow individual log lines up to maxScannerLineBytes; the
+			// Allow individual log lines up to maxScannerLineBytes. The
 			// default 64 KiB cap is small enough that a long JSON event
 			// (rule with deeply nested output_fields) can hit
 			// bufio.ErrTooLong and abort the scan silently.

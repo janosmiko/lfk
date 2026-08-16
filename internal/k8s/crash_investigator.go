@@ -22,8 +22,8 @@ import (
 // events, and a (possibly trimmed) describe blob.
 type CrashInvestigation struct {
 	Pod            PodSummary
-	InitContainers []ContainerCrash // declaration order; init containers
-	AppContainers  []ContainerCrash // declaration order; app containers
+	InitContainers []ContainerCrash // declaration order. Init containers
+	AppContainers  []ContainerCrash // declaration order. App containers
 	Events         []corev1.Event   // sorted by LastTimestamp desc
 	Describe       string
 	DescribeError  string
@@ -88,7 +88,7 @@ const crashLogStreamConcurrency = 8
 // + log info, pod-scoped events, and a kubectl describe blob. Events are
 // scoped to the current pod incarnation by UID so a recreated pod with the
 // same name does not surface old-incarnation events. Per-stream log errors
-// and a describe-fetch error do NOT fail the whole call; only a Pod Get
+// and a describe-fetch error do NOT fail the whole call. Only a Pod Get
 // failure does.
 func (c *Client) GetCrashInvestigation(ctx context.Context, contextName, namespace, podName string) (*CrashInvestigation, error) {
 	clientset, err := c.clientsetForContext(contextName)
@@ -157,7 +157,7 @@ func buildPodSummary(pod *corev1.Pod) PodSummary {
 }
 
 // buildContainerCrashes returns init + app ContainerCrash slices in the
-// pod's declaration order. Statuses are matched by name; spec containers
+// pod's declaration order. Statuses are matched by name. Spec containers
 // without a matching status get a zero-value entry (e.g. pods scheduled
 // but the kubelet hasn't reported yet).
 func buildContainerCrashes(pod *corev1.Pod) (initCC, appCC []ContainerCrash) {
@@ -234,7 +234,7 @@ func buildContainerCrash(spec corev1.Container, status *corev1.ContainerStatus, 
 // missing events are less harmful than denying the user the rest of the
 // diagnostic snapshot.
 //
-// FieldSelector is a server-side optimization; we still re-filter on the
+// FieldSelector is a server-side optimization. We still re-filter on the
 // client because (a) the fake clientset ignores FieldSelector and would
 // otherwise return cross-pod events in tests, and (b) production servers
 // occasionally return extra rows when watch-cached.
@@ -275,7 +275,7 @@ func fetchPodEvents(ctx context.Context, clientset kubernetes.Interface, namespa
 
 // fetchContainerLogs streams the previous + current tails for every container
 // in containers, in parallel. Per-stream errors are stored on the matching
-// container as LogError; a stream that returns no content but no error
+// container as LogError. A stream that returns no content but no error
 // (e.g. previous logs not available because container has not been
 // terminated yet) leaves both LogError and the corresponding *Log empty.
 func fetchContainerLogs(ctx context.Context, clientset kubernetes.Interface, namespace, podName string, containers []ContainerCrash) []ContainerCrash {

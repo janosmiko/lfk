@@ -60,12 +60,10 @@ func indexByExtra(items []model.Item, extra string) int {
 	return -1
 }
 
-// cursor returns the cursor position for the current level.
 func (m *Model) cursor() int {
 	return m.cursors[m.nav.Level]
 }
 
-// setCursor sets the cursor for the current level.
 func (m *Model) setCursor(v int) {
 	m.cursors[m.nav.Level] = v
 }
@@ -119,7 +117,7 @@ func (m *Model) restoreCursorToItem(name, namespace, extra, kind string) {
 // Every path that swaps middleItems (full replace, filter-and-replace,
 // append-and-replace, nil-out) must go through this helper so the
 // TableRenderer fingerprint invalidates. Slice reassignment alone is not
-// enough — itemsPtr is only a fast-path; rev is the authoritative signal.
+// enough — itemsPtr is only a fast-path. Rev is the authoritative signal.
 func (m *Model) setMiddleItems(items []model.Item) {
 	m.middleItems = items
 	m.middleItemsRev++
@@ -299,7 +297,7 @@ func (m *Model) middleColumnKind() string {
 // currently rendered in the middle column. Used to resolve view configs
 // keyed by GVR or Kind. At LevelOwned/LevelContainers the parent's GVR
 // does not match the rendered items, so only Kind is populated (matching
-// the kind returned by middleColumnKind); resolution then falls back to
+// the kind returned by middleColumnKind). Resolution then falls back to
 // Kind-only lookup. At shallower levels the full GVR is returned so views
 // keyed by `<group>/<version>/<resource>` resolve.
 func (m *Model) middleColumnRef() ui.ResourceRef {
@@ -525,12 +523,10 @@ func selectionKey(item model.Item) string {
 	return item.SelectionKey()
 }
 
-// isSelected returns true if the given item is in the multi-selection set.
 func (m *Model) isSelected(item model.Item) bool {
 	return m.selectedItems[selectionKey(item)]
 }
 
-// toggleSelection toggles the selection state of an item.
 func (m *Model) toggleSelection(item model.Item) {
 	key := selectionKey(item)
 	if m.selectedItems[key] {
@@ -541,14 +537,12 @@ func (m *Model) toggleSelection(item model.Item) {
 	m.selectionRev++
 }
 
-// clearSelection removes all items from the multi-selection set and resets the region anchor.
 func (m *Model) clearSelection() {
 	m.selectedItems = make(map[string]bool)
 	m.selectionAnchor = -1
 	m.selectionRev++
 }
 
-// hasSelection returns true if any items are selected.
 func (m *Model) hasSelection() bool {
 	return len(m.selectedItems) > 0
 }

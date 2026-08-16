@@ -34,7 +34,7 @@ type Manager struct {
 	refreshTTL          time.Duration
 	errorTTL            time.Duration // shorter TTL applied when no source succeeded
 	availabilityTTL     time.Duration
-	maxFetchConcurrency int           // upper bound on simultaneous source Fetches; 0 = unbounded
+	maxFetchConcurrency int           // upper bound on simultaneous source Fetches. 0 = unbounded
 	scanTimeout         time.Duration // hard ceiling on a single coalesced FetchAll scan
 
 	cacheKey      string // lastCtx + "|" + lastNamespace
@@ -46,7 +46,7 @@ type Manager struct {
 	// fetchGroup coalesces concurrent FetchAll calls for the same
 	// (kubeCtx, namespace). On navigation the middle list, the SEC-badge
 	// index, and the right-pane preview each call FetchAll near-
-	// simultaneously; without this they ran the full multi-source scan
+	// simultaneously. Without this they ran the full multi-source scan
 	// independently — tripling API load and leaving the right pane
 	// spinning on its own slow fetch after the list had resolved.
 	fetchGroup singleflight.Group
@@ -57,7 +57,7 @@ type Manager struct {
 	// hint, keyed by kubeCtx → sourceName → available. When present,
 	// FetchAll skips its own IsAvailable probe for that source and uses
 	// the hint directly. The probe inside FetchAll is the dominant
-	// non-Fetch API cost on slow / throttled clusters; the app-level
+	// non-Fetch API cost on slow / throttled clusters. The app-level
 	// loadSecurityAvailability already performed the same probe with a
 	// 3s budget per source, so re-doing it inside FetchAll doubles the
 	// API load on every navigation. SetAvailability populates this map.
@@ -148,7 +148,7 @@ func (m *Manager) SetErrorTTL(d time.Duration) {
 // fan-out behaviour on busy clusters with many CRD-backed sources
 // installed (Trivy + Kyverno + Gatekeeper + Kubescape can each list
 // hundreds of objects per call). Pass 0 to disable the cap (run every
-// source concurrently); useful in unit tests where the goroutines do
+// source concurrently). Useful in unit tests where the goroutines do
 // not actually hit a real API server.
 func (m *Manager) SetMaxFetchConcurrency(n int) {
 	m.mu.Lock()
@@ -170,7 +170,7 @@ func (m *Manager) ScanTimeout() time.Duration {
 }
 
 // SetScanTimeout overrides the per-scan hard ceiling. Clamped to a positive
-// value; non-positive is ignored so a misconfig can't disable the timeout.
+// value. Non-positive is ignored so a misconfig can't disable the timeout.
 func (m *Manager) SetScanTimeout(d time.Duration) {
 	if d <= 0 {
 		return
@@ -310,7 +310,7 @@ func (m *Manager) AnyAvailable(ctx context.Context, kubeCtx string) (bool, error
 }
 
 // FetchAll runs Fetch concurrently across all available sources. Per-source
-// errors do not cancel other sources; they are collected in result.Errors.
+// errors do not cancel other sources. They are collected in result.Errors.
 // Results are cached by (kubeCtx, namespace) for refreshTTL on success
 // and for errorTTL when every source erred (negative cache, breaks the
 // throttling spiral on slow clusters).
@@ -355,7 +355,7 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 		return res.Val.(FetchResult), nil
 	case <-ctx.Done():
 		// Caller cancelled / preempted / timed out. The detached scan keeps
-		// running and caches its result for the next call; this caller
+		// running and caches its result for the next call. This caller
 		// returns immediately so a scheduler worker is never stuck waiting.
 		return FetchResult{}, ctx.Err()
 	}
@@ -390,7 +390,7 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 		name        string
 		findings    []Finding
 		err         error
-		unavailable bool // source's IsAvailable returned false; skip status emission
+		unavailable bool // source's IsAvailable returned false. Skip status emission
 	}
 	results := make(chan sourceResult, len(sources))
 
@@ -471,7 +471,7 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 
 	// Apply global namespace filter. Snapshot the map under RLock so a
 	// concurrent SetIgnoredNamespaces can't race with the read. Build the
-	// filtered slice into a fresh backing array; an in-place `Findings[:0]`
+	// filtered slice into a fresh backing array. An in-place `Findings[:0]`
 	// trick aliases the backing memory that future cache hits return to
 	// callers, which we'd then overwrite from the next FetchAll's append.
 	m.mu.RLock()
@@ -489,7 +489,7 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 
 	// Propagate resource labels across same-resource findings so label-match
 	// ignore patterns reach every source. Sources that hold the live object
-	// (heuristic) stamp ResourceRef.Labels; this fills in findings on the same
+	// (heuristic) stamp ResourceRef.Labels. This fills in findings on the same
 	// resource from sources that don't (trivy, kyverno). In-memory only —
 	// labels are not persisted (ResourceRef.Labels is json:"-").
 	propagateResourceLabels(res.Findings)
@@ -606,7 +606,7 @@ func (i *FindingIndex) CountBySource(name string) int {
 // running privileged contributes 1 to its severity bucket, not 3.
 //
 // bySource counts every emission without deduplication so callers like
-// CountBySource see the true per-source contribution; deduplicating
+// CountBySource see the true per-source contribution. Deduplicating
 // bySource by (resource, Title) silently undercounts when two sources
 // (e.g., Trivy + policy-report) overlap on the same misconfiguration —
 // the second source got skipped before its bySource increment.

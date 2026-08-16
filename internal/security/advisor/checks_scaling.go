@@ -49,7 +49,7 @@ func (d *clusterData) pdbUnhealthyPolicyFindings() []security.Finding {
 // minReplicas of an HPA scaling the same workload: when the HPA scales to
 // its minimum, the PDB permits zero disruptions and drains deadlock.
 // minAvailable == minReplicas is deliberately not flagged (too common, and
-// pdb_blocks_drain covers the current-replica case); percentage minAvailable
+// pdb_blocks_drain covers the current-replica case). Percentage minAvailable
 // is skipped because its pod count depends on the live scale.
 func (d *clusterData) pdbVsHPAFindings() []security.Finding {
 	if !d.pdbsOK || !d.hpasOK {
@@ -124,7 +124,7 @@ func (d *clusterData) staticReplicasFindings() []security.Finding {
 // through the scale subresource (the HPA controller, kubectl scale) are
 // excluded by their Subresource field rather than by manager name, which
 // varies across Kubernetes versions (kube-controller-manager pre-1.24,
-// horizontal-pod-autoscaler later); both names are excluded as a fallback
+// horizontal-pod-autoscaler later). Both names are excluded as a fallback
 // for entries recorded before subresource tracking. Empty when no manifest
 // pins the field. Malformed managedFields entries are skipped — they must
 // not invent findings.

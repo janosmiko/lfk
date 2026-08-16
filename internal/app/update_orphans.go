@@ -166,7 +166,7 @@ func (m Model) handleOrphansKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m, nil
 	case "s":
 		// Toggle strict ↔ lenient. Strict (default) hides items with
-		// no live consumer but a workload-template ref; lenient
+		// no live consumer but a workload-template ref. Lenient
 		// surfaces them so the user can audit "what's currently idle"
 		// in addition to "what's truly unused". Visible-list size
 		// changes, so re-clamp the cursor afterwards.
@@ -228,7 +228,7 @@ func (m Model) handleOrphansFilterInput(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 // last looking at — not at the top of the list. Only filterActive is
 // forced to false so the next keypress drives navigation rather than
 // being captured as filter input. Context-switch invalidation (via
-// invalidateOrphanCacheForContext) blows away the cache; a fresh
+// invalidateOrphanCacheForContext) blows away the cache. A fresh
 // cmdLoadOrphans then arrives and orphansClampCursor pulls the cursor
 // into the new list.
 func (m Model) openOrphansOverlay() (Model, tea.Cmd) {

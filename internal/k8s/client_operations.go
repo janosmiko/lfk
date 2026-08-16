@@ -91,7 +91,7 @@ func marshalResourceYAML(obj map[string]any) (string, error) {
 
 // GetPodYAML returns the YAML for a pod.
 func (c *Client) GetPodYAML(ctx context.Context, contextName, namespace, podName string) (string, error) {
-	// Pods are namespaced; without Namespaced: true, GetResourceYAML
+	// Pods are namespaced. Without Namespaced: true, GetResourceYAML
 	// falls through to the cluster-scoped branch (dynClient.Resource(gvr)
 	// with no .Namespace(...)), which hits /api/v1/pods/<name> — an
 	// endpoint that does not exist on the API server. The API replies
@@ -156,7 +156,7 @@ func (c *Client) DeleteResource(contextName, namespace string, rt model.Resource
 
 // ToggleNodeSchedulable flips a node's spec.unschedulable and returns the new
 // value: true when the node is now cordoned, false when it is uncordoned.
-// Equivalent to `kubectl cordon`/`uncordon` (which patch the same field); the
+// Equivalent to `kubectl cordon`/`uncordon` (which patch the same field). The
 // live object is read first so the toggle stays authoritative.
 func (c *Client) ToggleNodeSchedulable(ctx context.Context, contextName, nodeName string) (bool, error) {
 	cs, err := c.clientsetForContext(contextName)
@@ -435,7 +435,7 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	// displayName is the lfk-side identifier (potentially disambiguated to
 	// "name (basename)"). The override below uses the *original* name from
 	// the source kubeconfig because that's what's recorded inside the file.
-	// Snapshot the kubeconfig-derived state under RLock; ReloadKubeconfig swaps
+	// Snapshot the kubeconfig-derived state under RLock. ReloadKubeconfig swaps
 	// c.contexts concurrently. Release before clientcmd I/O below — never hold
 	// configMu across the rest-config build.
 	c.configMu.RLock()

@@ -24,11 +24,6 @@ const (
 	ModeCompleted
 )
 
-// BackgroundTaskRow is the data shape consumed by the overlay renderer.
-// The internal/app package converts scheduler.Task and scheduler.CompletedTask
-// slices into this type so the renderer has zero dependencies on
-// internal/app.
-//
 // BackgroundTaskStatus distinguishes the three lifecycle states a row
 // can be in inside the active (ModeRunning) view.
 type BackgroundTaskStatus int
@@ -43,7 +38,7 @@ const (
 	TaskStatusQueued
 	// TaskStatusFinished is a task whose Fn has returned and which is in
 	// the post-completion linger window. The same task is also in the
-	// Completed history; it leaves the active view once the linger
+	// Completed history. It leaves the active view once the linger
 	// window expires.
 	TaskStatusFinished
 )
@@ -55,13 +50,13 @@ const (
 // single table with a STATUS column.
 //
 // Field semantics by Status:
-//   - TaskStatusRunning: StartedAt is set; Duration/FinishedAt/Position are zero.
+//   - TaskStatusRunning: StartedAt is set. Duration/FinishedAt/Position are zero.
 //     ELAPSED ticks from now-StartedAt.
-//   - TaskStatusQueued: StartedAt is zero; Position is the 1-based head-of-lane
+//   - TaskStatusQueued: StartedAt is zero. Position is the 1-based head-of-lane
 //     position. ELAPSED renders as a placeholder.
-//   - TaskStatusFinished: StartedAt and FinishedAt are set; Duration is the
+//   - TaskStatusFinished: StartedAt and FinishedAt are set. Duration is the
 //     completion duration. ELAPSED freezes at Duration.
-//   - ModeCompleted history rows: Duration is set; everything else is
+//   - ModeCompleted history rows: Duration is set. Everything else is
 //     informational. The renderer reads only Duration.
 type BackgroundTaskRow struct {
 	Status     BackgroundTaskStatus
@@ -70,13 +65,13 @@ type BackgroundTaskRow struct {
 	Name       string
 	Target     string
 	StartedAt  time.Time
-	FinishedAt time.Time     // zero while running; set when in linger window
+	FinishedAt time.Time     // zero while running. Set when in linger window
 	Duration   time.Duration // (FinishedAt - StartedAt) for finished rows
-	Position   int           // 1-based queue position; only for TaskStatusQueued
+	Position   int           // 1-based queue position. Only for TaskStatusQueued
 }
 
 // RenderBackgroundTasksOverlay renders the modal content for the :scheduler
-// overlay. width and height are the outer overlay dimensions; the caller
+// overlay. width and height are the outer overlay dimensions. The caller
 // wraps this string in ui.OverlayStyle (rounded border + padding), so
 // this function only emits the inner content: title, header row, data
 // rows, and footer summary. No border, no padding.
@@ -87,7 +82,7 @@ type BackgroundTaskRow struct {
 // will wrap onto a second line.
 //
 // mode picks between the Running view (live ELAPSED column, "Scheduler
-// — Running" title; rows show STATUS = Running / Queued #N / Finished)
+// — Running" title, rows show STATUS = Running / Queued #N / Finished)
 // and the Completed view (fixed DURATION column, "Scheduler — Completed"
 // title, "N completed" footer).
 //
@@ -263,7 +258,7 @@ func bgtFooter(rows []BackgroundTaskRow, mode BackgroundTaskOverlayMode, complet
 }
 
 // bgtStatusCell returns the STATUS column text and the style to render
-// it with. Queued shows the position; Finished gets a dim chip; Running
+// it with. Queued shows the position. Finished gets a dim chip. Running
 // keeps the primary colour so the eye lands on it first.
 func bgtStatusCell(r BackgroundTaskRow, statusW int, mode BackgroundTaskOverlayMode, dim lipgloss.Style) (string, lipgloss.Style) {
 	if mode == ModeCompleted {
@@ -325,7 +320,7 @@ const bgtOuterPadRows = 2
 // VisibleRowsBackgroundTasks returns the data-area height (max visible
 // rows) for the background-tasks overlay given the outer overlay
 // height. Exported so the keyboard handler can clamp scroll values
-// against the same viewport the renderer uses; otherwise scroll-down
+// against the same viewport the renderer uses. Otherwise scroll-down
 // past the end leaves a stale scroll value the user has to press
 // scroll-up many times to undo.
 func VisibleRowsBackgroundTasks(height int) int {
@@ -339,7 +334,7 @@ func bgtColumnWidthsUnified(rows []BackgroundTaskRow, innerW int) (int, int, int
 	const minStatus, minPrio, minKind, minName, minTarget = 8, 4, 6, 6, 6
 	const totalGaps = 10 // 5 gaps * 2
 
-	// "Queued #999" is 11 chars; cap at 11 to bound the column. Most
+	// "Queued #999" is 11 chars. Cap at 11 to bound the column. Most
 	// rows show "Running" (7) or "Finished" (8) or "Queued #N" (9-11).
 	statusW := minStatus
 	prioW := len("PRIORITY")

@@ -143,7 +143,7 @@ func parsePolicyReport(u *unstructured.Unstructured) []security.Finding {
 		id := fmt.Sprintf("policy-report/%s/%s/%s/%s/%s",
 			ref.Namespace, ref.Kind, ref.Name, policy, rule)
 
-		// Title is the rule name; falls back to policy name.
+		// Title is the rule name. Falls back to policy name.
 		title := rule
 		if title == "" {
 			title = policy

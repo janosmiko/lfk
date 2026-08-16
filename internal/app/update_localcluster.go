@@ -27,7 +27,7 @@ func (m Model) buildLocalClusterOverlayState() ui.LocalClusterOverlayState {
 	}
 	// Single source of truth: m.localClusterState.clusters carries
 	// every row, distinguished by .state (Real / InFlight / Failed).
-	// The renderer paints all three with the same column layout; the
+	// The renderer paints all three with the same column layout. The
 	// Mutating pill is what visually flags InFlight rows.
 	rows := make([]ui.LocalClusterRowView, 0, len(m.localClusterState.clusters))
 	for _, r := range m.localClusterState.clusters {
@@ -148,7 +148,7 @@ func (m Model) updateLocalClustersDetected(msg localClustersDetectedMsg) (Model,
 
 // refreshLocalClusterCache mirrors the manager's view into the on-Model
 // cache and persists it. Best-effort save: a write failure is logged
-// at the storage layer; the in-memory state stays authoritative.
+// at the storage layer. The in-memory state stays authoritative.
 //
 // IMPORTANT receiver semantics: this is a pointer receiver method
 // called from updateLocalClustersDetected, which has a value receiver.
@@ -214,7 +214,7 @@ func (m Model) updateLocalClusterCreated(msg localClusterCreatedMsg) (Model, tea
 				r.Mutating = ""
 				r.Status = "failed"
 			} else {
-				// Drop the InFlight row in place; Detect repopulates.
+				// Drop the InFlight row in place. Detect repopulates.
 				m.localClusterState.clusters = append(m.localClusterState.clusters[:i], m.localClusterState.clusters[i+1:]...)
 			}
 			break
@@ -263,8 +263,8 @@ func (m Model) updateLocalClusterKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool)
 	case localClusterScreenDeleteConfirm:
 		return m.updateDeleteConfirmKey(msg)
 	}
-	// Sub-screens added in later tasks consume keys without effect for now
-	// so half-typed wizard input doesn't leak through to the explorer.
+	// Unhandled sub-screens consume keys without effect so half-typed
+	// wizard input doesn't leak through to the explorer.
 	return m, nil, true
 }
 
@@ -409,7 +409,7 @@ func (m Model) handleListMutate(verb string) (Model, tea.Cmd, bool) {
 	}
 	// Type-assert to LifecycleProvider — kind doesn't satisfy it (no
 	// native start/stop), so the s/S keypress falls through silently
-	// for kind rows. The hint bar still advertises the keys; the cost
+	// for kind rows. The hint bar still advertises the keys. The cost
 	// of greying them per-row isn't worth the renderer complexity.
 	lp, ok := localcluster.ByName(row.Provider).(localcluster.LifecycleProvider)
 	if !ok {

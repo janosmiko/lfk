@@ -3,7 +3,7 @@ package scheduler
 // Sig identifies an in-flight or queued scheduler task for coalescing.
 // Two Submits with identical Sigs are treated as duplicates: the older
 // queued entry is replaced by the newer one (newer wins). Sigs are
-// compared by value; all five fields contribute to identity.
+// compared by value. All five fields contribute to identity.
 //
 // Name is included so two distinct loads with the same Kind/Target/Gen
 // do not collapse into each other — e.g. "List Deployments" (the main
@@ -37,7 +37,7 @@ func (s Sig) NeverCoalesce() bool {
 
 // coalesceIgnoresGen reports whether two submissions of this Kind should
 // coalesce even when their Gen differs. Dashboard sections re-fire on a
-// fixed per-context target (e.g. "c1#metrics") every refresh; keeping Gen
+// fixed per-context target (e.g. "c1#metrics") every refresh. Keeping Gen
 // in their coalesce identity let a watch-tick or cursor-move resubmission
 // stack a second full six-task batch behind the first instead of replacing
 // it, so stale batches accumulated in the Low lane. Other Kinds keep Gen in
@@ -48,7 +48,7 @@ func (k Kind) coalesceIgnoresGen() bool {
 }
 
 // CoalescesWith reports whether a queued task's Sig should be displaced by a
-// newer submission with Sig s. Identity is Kind+Context+Name+Target; Gen is
+// newer submission with Sig s. Identity is Kind+Context+Name+Target. Gen is
 // included only for Kinds that do not opt out via coalesceIgnoresGen.
 func (s Sig) CoalescesWith(other Sig) bool {
 	if s.Kind != other.Kind ||

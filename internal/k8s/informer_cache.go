@@ -43,7 +43,7 @@ type InformerCacheMode string
 // are also what the config file accepts.
 const (
 	// InformerCacheOff routes every list directly to the apiserver. Matches
-	// kubectl semantics; recommended when the apiserver dislikes extra
+	// kubectl semantics. Recommended when the apiserver dislikes extra
 	// watch traffic.
 	InformerCacheOff InformerCacheMode = "off"
 	// InformerCacheAuto starts in direct-list mode per (context, GVR) and
@@ -54,7 +54,7 @@ const (
 	InformerCacheAuto InformerCacheMode = "auto"
 	// InformerCacheAlways routes every list through the informer cache,
 	// starting watches eagerly on first use. Matches the always-on behaviour
-	// from issue #86's first cut; use when you know the cluster is large.
+	// from issue #86's first cut. Use when you know the cluster is large.
 	InformerCacheAlways InformerCacheMode = "always"
 )
 
@@ -105,7 +105,7 @@ type informerEntry struct {
 
 	// memoMu guards memo. Keys are "<namespace>/<name>" (or "/<name>"
 	// for cluster-scoped resources). Entries grow over the cache's
-	// lifetime; entries for deleted pods linger until Stop. At typical
+	// lifetime. Entries for deleted pods linger until Stop. At typical
 	// scales (a few thousand items, hours-long sessions) this is a
 	// negligible memory footprint relative to the indexer itself.
 	memoMu sync.Mutex
@@ -119,7 +119,7 @@ type informerEntry struct {
 //
 // Lifecycle: factories and informers persist for the lifetime of the parent
 // Client. Stop() closes every watch and blocks until all informer goroutines
-// have exited; it is called from Client.Shutdown().
+// have exited. It is called from Client.Shutdown().
 type informerCache struct {
 	clientFactory func(contextName string) (dynamic.Interface, error)
 
@@ -230,7 +230,7 @@ func (ic *informerCache) observeCachedListSize(contextName string, gvr schema.Gr
 
 // isPromoted reports whether the auto-mode router should send the next list
 // for (contextName, gvr) through the informer cache. False means take the
-// direct path; observeDirectListSize will decide whether to flip later.
+// direct path. observeDirectListSize will decide whether to flip later.
 func (ic *informerCache) isPromoted(contextName string, gvr schema.GroupVersionResource) bool {
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
@@ -275,7 +275,7 @@ func (ic *informerCache) stopOne(contextName string, gvr schema.GroupVersionReso
 // listItems walks the cached objects for (context, GVR) filtered by
 // namespace and returns them as []model.Item. Each object is keyed in
 // the per-item memo by namespace/name plus its own
-// metadata.resourceVersion; items whose RV matches the cached entry
+// metadata.resourceVersion. Items whose RV matches the cached entry
 // are reused as-is, only items whose RV differs (or whose key was
 // never seen) run through build.
 //
@@ -363,7 +363,7 @@ func (e *informerEntry) applyMemo(listNamespace string, objs []*unstructured.Uns
 
 	// Prune memo entries within the current list's scope that did not
 	// appear in objs. An all-namespaces list ("") is authoritative for
-	// every key; a namespaced list is only authoritative for keys with
+	// every key. A namespaced list is only authoritative for keys with
 	// that namespace prefix, so we leave other namespaces' entries
 	// untouched. Without this, deleted pods accumulate in the memo for
 	// the lifetime of the informer.
@@ -453,7 +453,7 @@ func (ic *informerCache) getOrStart(contextName string, gvr schema.GroupVersionR
 	}(informer, entry.stopCh)
 	go func(inf cache.SharedIndexInformer, stopCh, synced chan struct{}) {
 		defer ic.wg.Done()
-		// HasSynced flips true after the initial LIST completes; we close
+		// HasSynced flips true after the initial LIST completes. We close
 		// `synced` so the first list() call can return promptly without
 		// burning CPU in cache.WaitForCacheSync's polling loop. When
 		// stopCh closes before sync (Stop or auto-demote during warmup),
@@ -506,7 +506,7 @@ func waitForSync(ctx context.Context, entry *informerEntry, timeout time.Duratio
 
 // Stop closes every watch and blocks until all informer goroutines have
 // exited. Idempotent — safe to call from a defer in main.go even if the
-// cache was never used; concurrent Stop calls all wait on the same
+// cache was never used. Concurrent Stop calls all wait on the same
 // WaitGroup. After Stop, getOrStart returns an error rather than silently
 // spinning up a new informer that would leak.
 func (ic *informerCache) Stop() {

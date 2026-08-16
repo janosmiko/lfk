@@ -7,7 +7,7 @@ import (
 )
 
 // workerClass selects which priority lane a worker prefers when picking the
-// next task. General workers honor strict priority (with aging); the reserved
+// next task. General workers honor strict priority (with aging). The reserved
 // classes bias toward one end of the range but always fall back so a reserved
 // slot is never wasted when its preferred lane is empty.
 type workerClass int
@@ -25,7 +25,7 @@ const (
 // dequeue scenario.
 //
 // In production, StartWorkers is called once at app init right after New().
-// Tests that don't exercise dispatch can skip StartWorkers; only Submit's
+// Tests that don't exercise dispatch can skip StartWorkers. Only Submit's
 // queueing surface is needed.
 func (r *Registry) StartWorkers() {
 	if r == nil {
@@ -96,7 +96,7 @@ func (r *Registry) SetWorkersForTest(workers, criticalReserved int) {
 
 // SetLowReservedForTest overrides the low-reserved worker count before any
 // pool is spawned. Clamped against the current worker/critical totals.
-// Production code MUST NOT call this; use the ConfigLowReserved global.
+// Production code MUST NOT call this. Use the ConfigLowReserved global.
 func (r *Registry) SetLowReservedForTest(n int) {
 	if r == nil {
 		return
@@ -110,7 +110,7 @@ func (r *Registry) SetLowReservedForTest(n int) {
 // Registry before any per-context queue is created (queues capture it lazily on
 // first Submit). The value is used verbatim — including 0 to disable aging — so
 // tests can exercise both small thresholds and the strict-priority kill switch.
-// Production code MUST NOT call this; use the ConfigAgingThreshold global.
+// Production code MUST NOT call this. Use the ConfigAgingThreshold global.
 func (r *Registry) SetAgingThresholdForTest(n int) {
 	if r == nil {
 		return
@@ -153,7 +153,7 @@ func workerClassFor(i, criticalReserved, lowReserved int) workerClass {
 
 // workerLoop is one worker goroutine: pulls tasks from q honoring priority
 // and its worker class, runs Fn with timeout, delivers Result. The class
-// biases which lane it prefers (see pickTask); all classes fall back so no
+// biases which lane it prefers (see pickTask). All classes fall back so no
 // worker idles while work is queued.
 func (r *Registry) workerLoop(q *ctxQueue, class workerClass) {
 	defer r.workersWG.Done()
@@ -249,7 +249,7 @@ func shutdownPending(stopAll, stop chan struct{}) bool {
 
 // pickTask dequeues the next task for this worker, biased by its class.
 //
-// A Critical-class worker takes Critical first; a Low-class worker takes Low
+// A Critical-class worker takes Critical first. A Low-class worker takes Low
 // first. When the preferred lane is empty, BOTH fall through to
 // dequeueByPriorityLocked (priority + aging) rather than idling while other
 // work waits — the reservation guarantees a slot is biased toward that lane,
@@ -359,7 +359,7 @@ func (r *Registry) pokePreempt(kctx string, newPrio Priority) bool {
 // runTask executes a single queued task with timeout. Future is
 // delivered on completion (or error). If the task is preempted while
 // running, it is requeued at the head of its priority lane and runTask
-// returns; the same task will be picked up by a worker again later
+// returns. The same task will be picked up by a worker again later
 // when the higher-priority work has cleared.
 //
 // The visibility surface (Start/Finish) is populated for every
@@ -407,7 +407,7 @@ func (r *Registry) runTask(task *queuedTask) {
 			close(task.future)
 			return
 		}
-		// Finish the visibility entry from this attempt; the next
+		// Finish the visibility entry from this attempt. The next
 		// attempt (after re-dispatch) calls Start again.
 		r.Finish(visID)
 		q.mu.Lock()

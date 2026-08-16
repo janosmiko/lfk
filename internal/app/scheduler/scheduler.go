@@ -58,7 +58,7 @@ var (
 
 	// ErrContextSwitched is delivered when CancelContext drops this
 	// task's context before it could run. Caller's tea.Cmd should return
-	// nil (no UI update needed; the cluster context is gone).
+	// nil (no UI update needed, the cluster context is gone).
 	ErrContextSwitched = errors.New("scheduler: context switched")
 
 	// ErrSuperseded is delivered when CancelStaleByGen drops or cancels a
@@ -78,7 +78,7 @@ type queuedTask struct {
 // a wake signal channel.
 //
 // skips and agingThreshold implement anti-starvation aging: skips[p] counts
-// how many times lane p has been passed over while non-empty; once it reaches
+// how many times lane p has been passed over while non-empty. Once it reaches
 // agingThreshold the lane is promoted ahead of higher-priority lanes for one
 // dequeue. Critical (lane 0) is never aged. agingThreshold == 0 disables aging
 // (strict priority). See dequeueByPriorityLocked.
@@ -202,7 +202,7 @@ func (q *ctxQueue) drain(err error) {
 // agingThreshold times preempts it for a single dequeue. Without this, sustained
 // High submissions on a slow cluster keep the High lane non-empty forever and
 // Low work (security scans, dashboard, metrics) never runs (priority
-// starvation); aging bounds that wait to ~agingThreshold higher-priority
+// starvation). Aging bounds that wait to ~agingThreshold higher-priority
 // dispatches. agingThreshold == 0 restores strict priority.
 func (q *ctxQueue) dequeueByPriorityLocked() (*queuedTask, bool) {
 	if lane := q.lanes[int(PriorityCritical)]; len(lane) > 0 {
@@ -269,7 +269,7 @@ func (q *ctxQueue) hasPendingWork() bool {
 // Registry is nil or has been closed, the Future immediately receives
 // Result{Err: ErrContextSwitched}.
 //
-// No workers are spawned by this commit; submitted tasks accumulate in
+// No workers are spawned by this commit. Submitted tasks accumulate in
 // their priority lane until a later commit adds the worker pool.
 func (r *Registry) Submit(req SubmitReq) Future {
 	fut := make(chan Result, 1)

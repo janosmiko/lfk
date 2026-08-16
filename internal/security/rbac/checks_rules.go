@@ -14,7 +14,7 @@ import (
 )
 
 // ruleCheck describes one dangerous grant to look for. A rule matches when
-// its apiGroups, verbs, and resources all intersect the wanted sets; "*" in
+// its apiGroups, verbs, and resources all intersect the wanted sets. "*" in
 // the rule's apiGroups or verbs matches anything, but resources must match
 // explicitly — wildcard-resource roles are rbac_wildcard's territory.
 type ruleCheck struct {
@@ -90,7 +90,7 @@ var ruleChecks = []ruleCheck{
 }
 
 // ruleMatches reports whether one PolicyRule grants what the check looks
-// for. apiGroups and verbs honor a "*" in the rule; resources must be
+// for. apiGroups and verbs honor a "*" in the rule. Resources must be
 // explicit.
 func ruleMatches(r *rbacv1.PolicyRule, c *ruleCheck) bool {
 	return intersectsOrWildcard(r.APIGroups, c.apiGroups) &&
@@ -161,7 +161,7 @@ func (d *rbacData) ruleFindings() []security.Finding {
 			}
 			out = append(out, auditRules("", "ClusterRole", r.Name, r.Rules)...)
 			// Cluster-wide secret read is only an exposure once the role is
-			// actually bound; an inert ClusterRole is just a definition.
+			// actually bound. An inert ClusterRole is just a definition.
 			if d.crbsOK && boundNames[r.Name] && readsSecrets(r.Rules) {
 				out = append(out, makeFinding("", "ClusterRole", r.Name, "rbac_secrets_cluster_wide", security.SeverityHigh,
 					"cluster-wide secret read",

@@ -27,7 +27,7 @@ type helpSection struct {
 	bindings []helpEntry
 }
 
-// helpSections lives in help_sections.go; key formatting in help_keys.go.
+// helpSections lives in help_sections.go. Key formatting in help_keys.go.
 
 // BuildHelpLines builds the searchable help lines, optionally filtering
 // by a query string. contextMode limits sections to those matching the
@@ -55,14 +55,14 @@ func BuildHelpLines(filter, contextMode string, screenWidth int) []string {
 }
 
 // Overlay box geometry. The percentages and the 50x20 floors are the
-// long-standing sizing; the clamps against the terminal are what stop that
+// long-standing sizing. The clamps against the terminal are what stop that
 // floor from producing an overlay LARGER than the screen it sits in.
 const (
 	helpBoxPctW   = 70 // percent of the terminal width
 	helpBoxPctH   = 80 // percent of the terminal height
 	helpBoxFloorW = 50 // smallest comfortable box, when the terminal allows it
 	helpBoxFloorH = 20
-	helpBoxFrame  = 2 // border; lipgloss counts it inside Width()/Height()
+	helpBoxFrame  = 2 // border, lipgloss counts it inside Width()/Height()
 	// helpBoxHardW / helpBoxHardH are the irreducible box: 22 columns is what
 	// the widest fixed string in the chrome ("  ↓ more below") needs before it
 	// wraps and starts adding rows, and 9 rows is the chrome plus a single
@@ -88,7 +88,7 @@ func helpBoxWidth(screenWidth int) int {
 	return max(min(w, screenWidth-helpBoxFrame), helpBoxHardW)
 }
 
-// helpBoxHeight is helpBoxWidth's vertical counterpart; its floor overflows
+// helpBoxHeight is helpBoxWidth's vertical counterpart. Its floor overflows
 // below ~22 rows.
 func helpBoxHeight(screenHeight int) int {
 	h := max(screenHeight*helpBoxPctH/100, helpBoxFloorH)
@@ -184,7 +184,7 @@ func buildHelpSpecs(filter, contextMode string, innerW int) []helpLineSpec {
 	keyWidth := helpKeyColumnWidth(groups, innerW)
 	// rowOverhead is the fixed prefix helpSpecPlain puts before a
 	// description: 4 leading spaces + keyWidth + 2 spaces between the
-	// columns. descBudget is the exact room left; flooring at 1 keeps the
+	// columns. descBudget is the exact room left. Flooring at 1 keeps the
 	// wrapped row inside innerW so the renderer's Truncate never lops a
 	// character with a "~". The only residual overflow is a key wider than
 	// the capped column, which no description width could fix.
@@ -266,7 +266,7 @@ func collectHelpGroups(filter, contextMode string) []helpGroup {
 
 // helpSectionInContext reports whether a section belongs to the view the
 // help screen was opened from. An empty (or explorer-level) context shows
-// only the explorer sections; any other context shows only its own.
+// only the explorer sections. Any other context shows only its own.
 func helpSectionInContext(section helpSection, contextMode string) bool {
 	if contextMode == "" || contextMode == "Navigation" || contextMode == "Bookmarks" {
 		return section.context == ""
@@ -279,7 +279,7 @@ func helpSectionInContext(section helpSection, contextMode string) bool {
 // stepping in and out per section.
 //
 // The cap stops one unusually long key from pushing every description off
-// a narrow screen; a key past the cap simply overflows its own cell.
+// a narrow screen. A key past the cap simply overflows its own cell.
 func helpKeyColumnWidth(groups []helpGroup, innerW int) int {
 	maxWidth := max(innerW/3, helpKeyColumnMinWidth)
 	width := helpKeyColumnMinWidth
@@ -296,7 +296,7 @@ func helpKeyColumnWidth(groups []helpGroup, innerW int) int {
 // wrapHelpText word-wraps desc to width on word boundaries. A space-free
 // token wider than width (e.g. a slash-joined "owner/port-forward/orphan/
 // finding/mark" enumeration) is broken after its "/" separators so it
-// wraps at readable boundaries rather than mid-word; a segment between
+// wraps at readable boundaries rather than mid-word. A segment between
 // slashes that is itself wider than width falls back to a hard character
 // break. The output never exceeds width, so RenderHelpScreen's final
 // Truncate never adds a "~".
@@ -309,7 +309,7 @@ func wrapHelpText(desc string, width int) []string {
 	}
 
 	// Tokenize into pieces no wider than width. spaceBefore marks pieces
-	// that follow a real space (a word boundary); slash continuations and
+	// that follow a real space (a word boundary). Slash continuations and
 	// hard-break fragments glue to the previous piece with no space.
 	type piece struct {
 		text        string
@@ -537,7 +537,7 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	// buildHelpSpecs already word-wrapped descriptions to innerW, so each
 	// spec is one rendered row. Truncate stays as a safety net for the
 	// rare row whose key column alone overruns innerW (extremely narrow
-	// terminals); it never trims wrapped descriptions in normal layouts.
+	// terminals). It never trims wrapped descriptions in normal layouts.
 	lines := make([]string, len(specs))
 	for i, s := range specs {
 		lines[i] = Truncate(helpSpecStyled(s, search, i == currentMatchLine), innerW)

@@ -30,7 +30,7 @@ func (m *Model) clearRight() {
 }
 
 // clampPreviewScroll prevents scrolling past the preview content.
-// Only details+events scroll; pinned header (children) and footer (resource usage) are excluded.
+// Only details+events scroll. Pinned header (children) and footer (resource usage) are excluded.
 func (m *Model) clampPreviewScroll() {
 	// This runs in the Update path (preview wheel/keys) and renders right-pane
 	// content below (the split pinned header and the measurement render), all
@@ -150,7 +150,7 @@ type previewMeasureKey struct {
 // content once at a height tall enough to hold all of it (so a long list or YAML
 // document can scroll to the end — see the issue where the right pane froze
 // ~halfway down a few-hundred-item list because the height was capped). While
-// the user scrolls, the key is unchanged so this is O(1); it recomputes only
+// the user scrolls, the key is unchanged so this is O(1). It recomputes only
 // when the content or layout changes.
 func (m *Model) measureScrollableLines(innerW, scrollableH int) int {
 	yaml := m.previewYAML
@@ -217,7 +217,7 @@ func (m Model) previewSummaryBand(width int) string {
 	sel := m.selectedMiddleItem()
 	// Synthetic rows (dashboards, security sources, port-forwards, captures,
 	// collapsed groups) all carry a "__"-prefixed Kind and have no status
-	// rollup; real resource types carry their Kubernetes Kind.
+	// rollup. Real resource types carry their Kubernetes Kind.
 	if sel == nil || strings.HasPrefix(sel.Kind, "__") {
 		return ""
 	}
@@ -321,7 +321,7 @@ func (m Model) renderRightColumn(width, height int) string {
 	}
 
 	// Append events to scrollable content (events scroll with the details).
-	// Lists have no events; their scroll is already applied above.
+	// Lists have no events. Their scroll is already applied above.
 	if !listPreview && !m.fullYAMLPreview && m.previewEventsContent != "" {
 		result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
 	}
@@ -362,7 +362,7 @@ func (m Model) renderRightColumn(width, height int) string {
 // isRightListPreview reports whether the right pane's scrollable content is the
 // plain resource list shown while hovering a resource type (renderRightDefault's
 // RenderTable over rightItems). Only this path honours ActiveRightScroll, so the
-// windowed render in renderRightColumn is gated on it; every other case
+// windowed render in renderRightColumn is gated on it. Every other case
 // (dashboards, security sources, union members rendered with RenderColumn,
 // details/YAML/tree) falls back to the generic render-then-slice path.
 func (m Model) isRightListPreview() bool {
@@ -430,7 +430,7 @@ func (m Model) isSecurityGroupSplit() bool {
 // reserve one line for the header).
 func (m Model) renderDetailsOnly(width, height int) string {
 	sel := m.selectedMiddleItem()
-	// Security finding groups carry their own title line; no DETAILS header.
+	// Security finding groups carry their own title line. No DETAILS header.
 	if sel != nil && sel.Kind == "__security_finding_group__" {
 		return ui.RenderFindingGroupDetails(*sel, nil, width, height)
 	}
@@ -517,7 +517,7 @@ func (m Model) renderRightResourceTypes(width, height int) string {
 		return m.monitoringPreview
 	}
 	// Security sources: show a scanning spinner while the findings
-	// preview load is actually in flight; once it completes, an empty
+	// preview load is actually in flight. Once it completes, an empty
 	// rightItems means "this source returned zero findings" or "the
 	// fetch errored out", and the spinner would loop forever — so fall
 	// through to renderRightDefault (which says "No resources found")

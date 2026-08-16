@@ -269,7 +269,7 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 // curRow is the rendered-slice index of the cursor line (-1 if none).
 // curCol is the absolute visual column of the current match start on that row
 // (-1 when curRow is -1). The cursor row's match at curCol is styled with
-// SelectedSearchHighlightStyle; all other matches use LogSearchHighlightStyle.
+// SelectedSearchHighlightStyle. All other matches use LogSearchHighlightStyle.
 func highlightSearchMatches(lines []string, query string, curRow, curCol int) []string {
 	result := make([]string, len(lines))
 	for i, line := range lines {
@@ -309,7 +309,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 			// Use ansi.Truncate (visual-width aware) for the pre-trim instead
 			// of rune-slicing. On a kyverno-style log row each embedded SGR
 			// sequence costs 4-5 rune slots while contributing zero visual
-			// width; the rune-based cap chopped lines off mid-content (and
+			// width. The rune-based cap chopped lines off mid-content (and
 			// often mid-CSI), which downstream let "0m" / "[NNm" leak as
 			// literal text and the visible payload was replaced by trailing
 			// spaces from FillLinesBg's pad-to-width pass.
@@ -356,8 +356,8 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 				}
 				line = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
 				// Record where in the result slice this cursor row lands and its
-				// search-match column. The gutter indicator is 1 visual cell; the
-				// optional line-number gutter follows; then content at visualCurCol.
+				// search-match column. The gutter indicator is 1 visual cell. The
+				// optional line-number gutter follows. Then content at visualCurCol.
 				cursorRow = len(result)
 				cursorCol = 1 + visualCurCol
 				if lineNumbers {
@@ -395,7 +395,7 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 
 	// We need to figure out which source lines and which wrapped sub-lines
 	// correspond to the scroll offset. For wrapping, scroll refers to source
-	// lines; topSkip drops sub-lines from the very top of lines[scroll].
+	// lines. topSkip drops sub-lines from the very top of lines[scroll].
 	var result []string
 	cursorRow := -1
 	cursorCol := -1

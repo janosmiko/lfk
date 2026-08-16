@@ -18,7 +18,7 @@ import (
 )
 
 // execPTYTickMsg triggers a re-render of the embedded terminal.
-// The ptmx field identifies which tab's terminal this tick belongs to; gen is
+// The ptmx field identifies which tab's terminal this tick belongs to, gen is
 // the chain generation, used to drop ticks from superseded tick chains.
 type execPTYTickMsg struct {
 	ptmx *os.File
@@ -211,7 +211,7 @@ func (m Model) execAltScreen() bool {
 
 // execViewportRows reports the number of PTY rows the user can see in
 // the current window — the same value viewExecTerminal uses for its
-// viewH. The handlers and the renderer must agree on this number; if
+// viewH. The handlers and the renderer must agree on this number. If
 // the scroll clamp uses a larger viewport than the renderer, the
 // oldest few lines get trimmed off the top when the user scrolls all
 // the way back.
@@ -233,7 +233,7 @@ func (m Model) execViewportRows() int {
 // execScrollBy adjusts the scrollback offset by delta lines (negative =
 // scroll back into history, positive = scroll forward toward live). The
 // offset is clamped to [0, max(Len - viewH, 0)] — i.e. the oldest line
-// can sit at the top of the viewport, but never further; otherwise the
+// can sit at the top of the viewport, but never further. Otherwise the
 // rendered window slides past the start of scrollback and shows blanks.
 func (m Model) execScrollBy(delta int) Model {
 	if m.execScrollback == nil {

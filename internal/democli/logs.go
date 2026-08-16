@@ -69,7 +69,7 @@ func runLogs(ctx context.Context, args []string, stdout io.Writer) error {
 			return nil
 		case t := <-ticker.C:
 			if err := writeLogLine(w, rng, a, pod, t); err != nil {
-				return nil // consumer closed the read end; not an error to report
+				return nil // consumer closed the read end. Not an error to report
 			}
 			if err := w.Flush(); err != nil {
 				return nil

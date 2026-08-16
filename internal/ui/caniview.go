@@ -23,7 +23,7 @@ var canIVerbs = []struct {
 }
 
 // RenderCanIView renders the can-i browser with a two-column layout.
-// The left column (API groups) is interactive; the right column (resources) is display-only.
+// The left column (API groups) is interactive. The right column (resources) is display-only.
 func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor, groupScroll int, subjectName string, namespaces []string, width, height int, hintBar string, resourceScroll int, nsNegated bool) string {
 	// Title at the left, scope label flushed to the far right with
 	// baseBg-painted gap fill. Matches the WhoCan header layout so the
@@ -89,7 +89,7 @@ func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor
 // confusing than no label).
 func joinTitleAndRightLabel(title, rightLabel string, width int) string {
 	if lipgloss.Width(title)+1+lipgloss.Width(rightLabel) > width {
-		// No room for the right label; just return the title.
+		// No room for the right label. Just return the title.
 		return title
 	}
 	gap := max(width-lipgloss.Width(title)-lipgloss.Width(rightLabel), 1)

@@ -115,7 +115,7 @@ func VimScrollOff(scroll, cursor, numEntries, height, scrollOff int, displayLine
 // UnicodeCoreActive reports whether the terminal measures text by grapheme
 // cluster, which it announces by answering the mode 2027 query. Bubble Tea
 // sends that query at startup and switches its renderer to grapheme width only
-// when an answer comes back; until then the renderer measures with wcwidth.
+// when an answer comes back. Until then the renderer measures with wcwidth.
 // lfk's own layout goes through lipgloss, which always measures by grapheme
 // cluster, so the renderer and the layout agree only while this is set.
 var UnicodeCoreActive bool
@@ -147,7 +147,7 @@ func iconCell(icon model.Icon) string {
 
 // normalizeEmojiWidth drops the variation selector when the terminal does not
 // measure by grapheme cluster. lipgloss counts a base codepoint plus the
-// selector as two columns; a terminal measuring with wcwidth draws one, so the
+// selector as two columns. A terminal measuring with wcwidth draws one, so the
 // row ends a column short and the panel border lands early. Without the
 // selector both measures say one column, the glyph renders in text
 // presentation, and the row stays aligned (#604).
@@ -255,7 +255,7 @@ func ClusterPickerHeader(width int) string {
 		padRight("STATUS", clusterPickerStatusColW) +
 		padLeft("COLOR", clusterPickerColorColW)
 	if width < clusterPickerTrailingW+4 {
-		// Column too narrow for the full header; fall back to a
+		// Column too narrow for the full header. Fall back to a
 		// section label so we don't return a mangled string.
 		return Truncate("KUBECONFIG", width)
 	}

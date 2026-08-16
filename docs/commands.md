@@ -25,13 +25,13 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:orphans [<kind>]` | Open cluster-wide orphan resource overview |
 | `:session save <name>` | Save the current workspace (all tabs) as a named session |
 | `:session delete <name>` &nbsp;·&nbsp; `:session rm <name>` | Delete a named session |
-| `:sessions` &nbsp;·&nbsp; `C` | Open the session manager (enter=switch, s=save current as…, d=delete, /=filter). The active session auto-saves on quit; start on one with `lfk --session <name>` / `LFK_SESSION`. |
+| `:sessions` &nbsp;·&nbsp; `C` | Open the session manager |
 | `:quit` &nbsp;·&nbsp; `:q` &nbsp;·&nbsp; `:q!` | Exit |
 | `:nyan` | Toggle Nyan mode |
 | `:kubetris` | Play Kubetris |
 | `:credits` | Show credits |
-| `:dashboard` | Show Cluster Dashboard
-| `:monitoring`| Show Monitoring Dashboard
+| `:dashboard` | Show Cluster Dashboard |
+| `:monitoring` | Show Monitoring Dashboard |
 
 ### `:sort <column>`
 
@@ -45,7 +45,9 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `linenumbers` / `nolinenumbers` | Line numbers |
 | `timestamps` / `notimestamps` | Timestamps |
 | `follow` / `nofollow` | Auto-scroll to tail |
-| `ansi` / `noansi` | Render ANSI SGR colors from log output. Off replaces ESC bytes with U+FFFD (see config-reference.md `log_viewer.render_ansi`). |
+| `ansi` / `noansi` | Render ANSI SGR colors from log output |
+
+`noansi` replaces ESC bytes with U+FFFD (see `log_viewer.render_ansi` in [config-reference.md](config-reference.md)).
 
 ### `:scheduler`
 
@@ -57,6 +59,10 @@ Scheduler / task queue overlay. Inside:
 - `Esc` / `q` — close
 
 Repeated completed tasks collapse with a `×N` suffix.
+
+### `:sessions`
+
+Session manager: `Enter` switches, `s` saves the current workspace as a new session, `d` deletes, `/` filters. The active session auto-saves on quit. Start on a given session with `lfk --session <name>` or `LFK_SESSION`.
 
 ## Shell commands
 

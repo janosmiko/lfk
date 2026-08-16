@@ -62,15 +62,15 @@ type previewLogState struct {
 	podKey               string       // ctx/ns/name currently streaming
 	readerInFlight       *atomic.Bool // single-reader guard across model copies
 	err                  string
-	autoReconnectAttempt int // consecutive done-reconnect attempts; reset to 0 on a line
+	autoReconnectAttempt int // consecutive done-reconnect attempts. Reset to 0 on a line
 	// fromBottom is the scroll offset for the preview pane.
-	// 0 = auto-follow (show newest); N = show N rows up from the bottom.
+	// 0 = auto-follow (show newest). N = show N rows up from the bottom.
 	// K scrolls back (fromBottom++), J scrolls forward (fromBottom--).
 	fromBottom int
 
 	// Lazy history loading state.
 	// hasMoreHistory is true when there may be older lines not yet loaded.
-	// Set to true on fresh stream start; cleared when an empty overlap is found
+	// Set to true on fresh stream start. Cleared when an empty overlap is found
 	// or the buffer cap is reached.
 	hasMoreHistory bool
 	// loadingHistory is true while a one-shot history fetch is in flight.
@@ -82,7 +82,7 @@ type previewLogState struct {
 }
 
 // appendPreviewLogLine adds a line to the preview buffer. The buffer may grow
-// beyond previewLogCap when lazy history has been prepended; it is only capped
+// beyond previewLogCap when lazy history has been prepended. It is only capped
 // at previewLogMaxLines to bound total memory. The GC-friendly tail-copy is
 // performed at the higher bound so the dropped head can be collected.
 func (m *Model) appendPreviewLogLine(line string) {
@@ -139,7 +139,7 @@ func (m *Model) cancelPreviewLogStream() {
 // function records the error in previewLog.err and returns a nil cmd.
 func (m Model) startPreviewLogStream(ref podRef, reconnect bool) (Model, tea.Cmd) {
 	// Stop / clear the previous stream before touching kubectl. The full cancel
-	// clears the buffer; the light stop preserves it for reconnects.
+	// clears the buffer. The light stop preserves it for reconnects.
 	if reconnect {
 		m.stopPreviewStream()
 	} else {
@@ -234,7 +234,7 @@ func (m Model) startPreviewLogStream(ref podRef, reconnect bool) (Model, tea.Cmd
 // waitForPreviewLogLine returns a tea.Cmd that reads exactly one line from
 // previewLog.ch. The readerInFlight guard (Swap-on-arm) ensures that only one
 // reader is in flight at a time even when model copies are made during a pod
-// switch; if a reader is already in flight the cmd is a no-op.
+// switch. If a reader is already in flight the cmd is a no-op.
 func (m Model) waitForPreviewLogLine() tea.Cmd {
 	ch := m.previewLog.ch
 	if ch == nil {
@@ -273,7 +273,7 @@ func (m Model) updatePreviewLogLine(msg previewLogLineMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 
-	// The reader that produced this msg has exited; mark it idle so the next
+	// The reader that produced this msg has exited. Mark it idle so the next
 	// arm in waitForPreviewLogLine is not blocked by a stale true value.
 	if m.previewLog.readerInFlight != nil {
 		m.previewLog.readerInFlight.Store(false)
@@ -304,7 +304,7 @@ func (m Model) updatePreviewLogLine(msg previewLogLineMsg) (tea.Model, tea.Cmd) 
 	// fromBottom is a bottom-anchored physical-line offset, so appending a line
 	// would otherwise shift the window toward the newest line. When the user has
 	// scrolled back (fromBottom > 0) advance it by the new line's physical
-	// (wrapped) height so the same lines stay visible; fromBottom == 0 keeps
+	// (wrapped) height so the same lines stay visible. fromBottom == 0 keeps
 	// auto-following the newest line. The single-line measure is O(1).
 	if m.previewLog.fromBottom > 0 {
 		m.previewLog.fromBottom += ui.PreviewLogPhysicalCount([]string{msg.line}, m.previewLogInnerWidth())
@@ -437,7 +437,7 @@ func (r podRef) key() string {
 // be restored when the user returns to the same pod. A copy of the slice is
 // stored (not an alias) so later mutations to the live buffer cannot corrupt
 // the cache. No-op when podKey is empty or the buffer is empty.
-// LRU eviction: the key is moved to most-recent in previewLogCacheOrder; if
+// LRU eviction: the key is moved to most-recent in previewLogCacheOrder. If
 // the cache exceeds previewLogCacheMax the oldest key is dropped.
 func (m *Model) cachePreviewLog() {
 	if m.previewLog.podKey == "" || len(m.previewLog.lines) == 0 {
@@ -605,7 +605,7 @@ func (m Model) selectedPodForLogPreview() (podRef, bool) {
 
 // fetchOlderPreviewLogs returns a tea.Cmd that runs a one-shot kubectl logs
 // --tail=<tail> for ref (no -f), capturing combined output, and emits a
-// previewLogHistoryMsg. The fetch runs in the background; the model correlates
+// previewLogHistoryMsg. The fetch runs in the background. The model correlates
 // the result by podKey to drop stale responses.
 func (m Model) fetchOlderPreviewLogs(ref podRef, tail int) tea.Cmd {
 	kubectlPath, err := k8s.KubectlPath()
@@ -661,7 +661,7 @@ func (m Model) updatePreviewLogHistory(msg previewLogHistoryMsg) tea.Model {
 		return m
 	}
 
-	// The fetched lines are the last <tail> lines of the pod; the current
+	// The fetched lines are the last <tail> lines of the pod. The current
 	// buffer's oldest lines overlap the end of that set, so only the prefix
 	// before the overlap is genuinely older.
 	newOlder := mergeOlderLogLines(m.previewLog.lines, msg.lines)

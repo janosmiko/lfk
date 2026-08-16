@@ -16,7 +16,7 @@ import (
 // that ultimately resolves to a (Cluster)Role with a matching rule.
 //
 // Multiple bindings can grant the same subject — each grant is emitted
-// as its own row so the user can audit every path; the renderer
+// as its own row so the user can audit every path. The renderer
 // shouldn't dedupe.
 type WhoCanSubject struct {
 	// Kind is "User" / "Group" / "ServiceAccount", straight from
@@ -40,7 +40,7 @@ type WhoCanSubject struct {
 // (group, resource) in the requested namespace scope.
 //
 // Scope rules (matching kubectl-who-can):
-//   - namespace == "" → all namespaces are in scope; every RoleBinding
+//   - namespace == "" → all namespaces are in scope. Every RoleBinding
 //     in the cluster plus every ClusterRoleBinding is examined.
 //   - namespace != "" → ClusterRoleBindings still count (cluster-wide
 //     grants always apply), but RoleBindings outside `namespace` are
@@ -76,7 +76,7 @@ func (c *Client) WhoCan(ctx context.Context, contextName, namespace, group, reso
 	for _, crb := range clusterRoleBindings.Items {
 		role, ok := lookupRoleForBinding(crb.RoleRef, "", clusterRoles, roles)
 		if !ok {
-			continue // dangling RoleRef; treat as no grant
+			continue // dangling RoleRef. Treat as no grant
 		}
 		if !ruleSetMatches(role.rules, verb, group, resource) {
 			continue
@@ -143,7 +143,7 @@ func loadClusterRoles(ctx context.Context, cs kubernetes.Interface) (map[string]
 }
 
 // loadRoles fetches Roles. When namespace is empty it walks every
-// namespace; otherwise it scopes to the one in question. Indexed by
+// namespace. Otherwise it scopes to the one in question. Indexed by
 // "<namespace>/<name>" because Role names aren't unique cluster-wide.
 func loadRoles(ctx context.Context, cs kubernetes.Interface, namespace string) (map[string]roleEntry, error) {
 	list, err := cs.RbacV1().Roles(namespace).List(ctx, metav1.ListOptions{})
@@ -169,7 +169,7 @@ func loadRoleBindings(ctx context.Context, cs kubernetes.Interface, namespace st
 
 // lookupRoleForBinding resolves a RoleRef into the underlying role's
 // rules. RoleBindings can reference either a Role (in their own
-// namespace) or a ClusterRole; ClusterRoleBindings always reference
+// namespace) or a ClusterRole. ClusterRoleBindings always reference
 // a ClusterRole. Returns false when the referenced role isn't loaded
 // (orphan ref, RBAC drift) so the caller skips silently — kubectl
 // does the same.
@@ -186,7 +186,7 @@ func lookupRoleForBinding(ref rbacv1.RoleRef, bindingNamespace string, clusterRo
 }
 
 // subjectFromBinding converts an rbacv1.Subject into our flat result
-// row. ServiceAccount kept its namespace (part of identity); other
+// row. ServiceAccount kept its namespace (part of identity). Other
 // kinds normalise namespace to empty so the table doesn't show
 // misleading values.
 func subjectFromBinding(s rbacv1.Subject, via string) WhoCanSubject {
@@ -200,7 +200,7 @@ func subjectFromBinding(s rbacv1.Subject, via string) WhoCanSubject {
 // ruleSetMatches returns true when at least one rule in the set grants
 // the (verb, group, resource) tuple. Skips:
 //   - nonResourceURLs rules (don't grant resource permissions)
-//   - resourceNames-scoped rules (restrict to named objects; the picker
+//   - resourceNames-scoped rules (restrict to named objects, the picker
 //     does not model object names, so reporting these as generic access
 //     would over-report permissions).
 func ruleSetMatches(rules []rbacv1.PolicyRule, verb, group, resource string) bool {
@@ -239,7 +239,7 @@ func verbMatches(ruleVerbs []string, verb string) bool {
 }
 
 // groupMatches: rule grants the group when rule.APIGroups contains
-// the group or "*". Empty group ("") is the core API group; the rule
+// the group or "*". Empty group ("") is the core API group. The rule
 // must list it explicitly (or "*") for a match — there is no "any"
 // fallback because authors who write "" mean the core group.
 func groupMatches(ruleGroups []string, group string) bool {

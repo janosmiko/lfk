@@ -11,7 +11,7 @@
 // The package is a leaf: it imports nothing from lfk, so internal/k8s,
 // internal/model and internal/ui can all use it without an import cycle.
 // The sanitizer implementations live here (see sanitize.go) rather than in
-// internal/ui for the same reason; internal/ui re-exports them.
+// internal/ui for the same reason. internal/ui re-exports them.
 package tainted
 
 import (
@@ -50,7 +50,7 @@ func WrapAll(ss []string) []String {
 }
 
 // Line unwraps for a single-line sink: a table cell, a title, a status
-// message. Drops C0/C1 controls and bidi overrides entirely; no ANSI or tab
+// message. Drops C0/C1 controls and bidi overrides entirely. No ANSI or tab
 // survives, because a short cell has no legitimate use for either.
 func (t String) Line() string {
 	return SanitizeTerminalText(t.raw)

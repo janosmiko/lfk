@@ -93,7 +93,7 @@ func (c *Client) HostForContext(displayName string) string {
 // preserved by suffixing the display name with the source file's basename
 // (e.g. "dev (dev-envs)" / "dev (itg-k8s)"). This is essential for issue #23:
 // clientcmd merges duplicates into one entry, hiding every file but the
-// first; surfacing each as its own UI entry lets the user actually drill into
+// first. Surfacing each as its own UI entry lets the user actually drill into
 // the cluster they want.
 //
 // fallbackCurrent is the current-context that clientcmd's merged config
@@ -248,7 +248,7 @@ func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool) []string {
 	var paths []string
 
 	// KUBECONFIG env var (colon-separated on unix). Empty entries (a stray
-	// "KUBECONFIG=:" or a trailing colon) are dropped; when nothing
+	// "KUBECONFIG=:" or a trailing colon) are dropped. When nothing
 	// non-empty remains the variable counts as unset, so the default
 	// discovery still applies instead of silently loading zero clusters.
 	envPaths := trimNonEmpty(filepath.SplitList(os.Getenv("KUBECONFIG")))
@@ -363,9 +363,9 @@ func expandTilde(path, home string) string {
 // ResolveKubeconfigDirs picks the user's kubeconfig discovery directories by
 // applying the documented precedence: CLI flags > env var > config file.
 // Replacement semantics — the first layer that yields any non-empty entry
-// wins outright; lower-priority layers are NOT merged in.
+// wins outright. Lower-priority layers are NOT merged in.
 //
-// Each entry is trimmed of surrounding whitespace; whitespace-only entries
+// Each entry is trimmed of surrounding whitespace. Whitespace-only entries
 // are dropped so they do not silently shadow a lower-priority layer that
 // has real paths. The env var is split on the OS path-list separator
 // (":" on unix, ";" on Windows), matching how KUBECONFIG itself is parsed.
@@ -417,7 +417,7 @@ func ValidateKubeconfigDirs(paths []string) error {
 // a wrapped error otherwise. Empty path is treated as "no override" and
 // passes silently — the caller falls back to default discovery. Tilde
 // prefixes ("~", "~/...") are expanded against the user's home directory
-// before stat; an unresolvable home is itself a validation error so a typo
+// before stat. An unresolvable home is itself a validation error so a typo
 // like "~/.kuibe/config.d" doesn't silently degrade to "no directory
 // override applied".
 func ValidateKubeconfigDir(path string) error {
@@ -443,7 +443,7 @@ func ValidateKubeconfigDir(path string) error {
 }
 
 // resolveKubeconfigPaths returns the kubeconfig file list for NewClient:
-// an explicit --kubeconfig override wins outright; otherwise discovery
+// an explicit --kubeconfig override wins outright. Otherwise discovery
 // runs via buildKubeconfigPaths.
 func resolveKubeconfigPaths(override string, kubeconfigDirs []string, exclusive bool) []string {
 	if override != "" {

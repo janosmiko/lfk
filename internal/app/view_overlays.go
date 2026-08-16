@@ -34,7 +34,7 @@ func (m Model) renderOverlay(background string) string {
 	// breadcrumb, and the bold weight on selection highlights all keep
 	// their tint — the explorer fades without going gray. Stacked
 	// overlays (CanISubject on top of CanI) re-enter this function via
-	// the layered recursion below; an extra faint wrap on an
+	// the layered recursion below. An extra faint wrap on an
 	// already-faint line is a visual no-op (the terminal just sees more
 	// SGR 2 markers), so the recursive call composes safely.
 	//
@@ -103,7 +103,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	switch m.overlay {
 	case overlayNamespace:
 		// Pass the overlay box height to the helper so its visible-item
-		// cap matches what fits; otherwise on a list of 30+ namespaces
+		// cap matches what fits. Otherwise on a list of 30+ namespaces
 		// lipgloss grows the box on overflow and the user sees it
 		// "shrink" back to its declared size when a filter narrows the
 		// list.
@@ -139,7 +139,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayShuttingDown:
 		// Mirror the Quit overlay: a single line centered on both axes in a
 		// fixed-size box. See the overlayQuitConfirm case for the height
-		// arithmetic (visible outer height is sh+2; the inner slice is
+		// arithmetic (visible outer height is sh+2, the inner slice is
 		// sh-2 rows so Align centers the title on the middle row).
 		sw := max(min(32, m.width-10), 10)
 		sh := max(min(3, m.height-6), 3)
@@ -635,7 +635,7 @@ func (m Model) renderOverlayColumnToggle() (string, int, int) {
 	// Pass the overlay box dimensions (not the full screen) so the
 	// renderer's maxVisible cap matches what fits inside the box.
 	// Otherwise on a tall terminal the renderer emits ~34 lines into a
-	// 20-tall box; the box visibly grew on overflow and "shrank" back
+	// 20-tall box. The box visibly grew on overflow and "shrank" back
 	// as the filter narrowed results — looked like the window was
 	// resizing.
 	overlayW := min(50, m.width-10)
@@ -700,7 +700,7 @@ func (m Model) renderCanIOverlay(background string) string {
 	innerW := overlayW - 4
 	innerH := overlayH - 2
 
-	// Search bar shown inside the overlay; normal hints moved to the main status bar.
+	// Search bar shown inside the overlay. Normal hints moved to the main status bar.
 	var hintBar string
 	if m.canISearchActive {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.canISearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.canISearchInput.CursorRight())
@@ -734,7 +734,7 @@ func (m Model) renderCanIOverlay(background string) string {
 }
 
 // renderErrorLogOverlay renders the error log overlay on top of the given background.
-// In fullscreen mode it replaces the background entirely; in overlay mode it centers on top.
+// In fullscreen mode it replaces the background entirely. In overlay mode it centers on top.
 func (m Model) renderErrorLogOverlay(background string) string {
 	vp := ui.ErrorLogVisualParams{
 		VisualMode:     m.errorLogVisualMode,

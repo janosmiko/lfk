@@ -6,7 +6,7 @@ import (
 )
 
 // previewLogTimeColWidth is the fixed visual width of the time column in the
-// log preview pane. Relative times are at most ~8 chars ("365d ago"); 10 gives
+// log preview pane. Relative times are at most ~8 chars ("365d ago"). 10 gives
 // a clean 2-char gap between the time and the message column.
 const previewLogTimeColWidth = 10
 
@@ -17,7 +17,7 @@ const previewLogTimeColWidth = 10
 // the caller handles that pipeline so all physical lines share the same path.
 //
 // This form (joined, no indent) is used by the existing tests that call it
-// directly; production rendering goes through previewPhysicalLines.
+// directly. Production rendering goes through previewPhysicalLines.
 func formatPreviewLogLine(raw string) string {
 	p := ParseLogLine(raw)
 	// p.Prefix is dropped entirely.
@@ -146,7 +146,7 @@ func RenderLogPreview(lines []string, errMsg string, width, height int, podLabel
 	} else {
 		// Build physical lines: format each raw line (strip prefix, relativise
 		// timestamp), sanitize, then hard-wrap to width with table-aligned columns.
-		// Physical lines are already width-fit; do NOT re-truncate or re-wrap here.
+		// Physical lines are already width-fit. Do NOT re-truncate or re-wrap here.
 		physical := previewPhysicalLines(lines, width)
 		total := len(physical)
 		// Window: bottom-anchored by fromBottom.

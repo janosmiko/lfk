@@ -64,10 +64,10 @@ func (m *Manager) resolveWorkloadLabels(ctx context.Context, kubeCtx string, fin
 // ignore pattern reaches findings from sources that carry no labels (trivy,
 // kyverno) as long as another source (heuristic) observed the same resource.
 //
-// Runs in O(n) with one index map; the shared label maps are read-only so
+// Runs in O(n) with one index map. The shared label maps are read-only so
 // aliasing them across findings is safe.
 func propagateResourceLabels(findings []Finding) {
-	// First non-empty label map per resource wins; later ones are not merged.
+	// First non-empty label map per resource wins. Later ones are not merged.
 	// Today only the heuristic source stamps labels, so a key has at most one
 	// authority. A future multi-stamping source would need merge logic here.
 	labelsByKey := make(map[string]map[string]string)

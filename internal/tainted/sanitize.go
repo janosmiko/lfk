@@ -73,14 +73,14 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 // Unicode replacement character and expands tab characters to spaces
 // using a logTabWidth-column tab stop. Binary data from processes like
 // MySQL handshakes contains bytes that break terminal width calculations
-// and corrupt the viewer layout; C1 controls (raw or UTF-8-encoded, e.g.
+// and corrupt the viewer layout. C1 controls (raw or UTF-8-encoded, e.g.
 // U+009B "CSI") let a log line hijack the terminal on emulators that
 // honour 8-bit C1 (VTE, Linux console).
 //
 // Tab expansion is required because lipgloss.Width treats '\t' as
 // zero-width while the terminal renders it as a jump to the next tab
 // stop. The viewer's contentWidth-overflow guard (in RenderLogViewer)
-// uses lipgloss.Width to decide when to truncate; without expansion,
+// uses lipgloss.Width to decide when to truncate. Without expansion,
 // tab-bearing lines slip through with an undercounted width, get
 // re-wrapped internally by lipgloss, and push the bottom border off the
 // visible area. Reported on dragonfly-operator (controller-runtime/zap)
@@ -92,7 +92,7 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 // log producers that emit ANSI colours render as intended. Non-SGR CSI
 // sequences (cursor movement, screen erase) remain unsafe for an inline
 // viewer and are still replaced. A bare ESC with no valid CSI introducer
-// is replaced too; leaving it would cause terminals to wait for a
+// is replaced too. Leaving it would cause terminals to wait for a
 // follow-up byte and mis-interpret subsequent output.
 //
 // C1 detection is decode-aware, not a raw byte-range check: a byte-level
@@ -128,7 +128,7 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 		c := s[i]
 		if renderAnsi && c == 0x1b {
 			if end := parseSGRSequence(s, i); end > i {
-				// SGR sequences are zero-width; do not advance col.
+				// SGR sequences are zero-width. Do not advance col.
 				b.WriteString(s[i:end])
 				i = end
 				continue
@@ -162,7 +162,7 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 		switch {
 		case r == utf8.RuneError && size <= 1:
 			// Invalid UTF-8. A lone byte in the C1 range is still a
-			// control character regardless of encoding; anything else
+			// control character regardless of encoding. Anything else
 			// invalid passes through unchanged, matching legacy
 			// behaviour for non-UTF-8 binary payloads. Column tracking
 			// mirrors the old approximation: only a would-be leading
@@ -203,7 +203,7 @@ func parseSGRSequence(s string, i int) int {
 	j := i + 2
 	// Parameter bytes: digits, ';' and ':' only (truecolour uses both
 	// separators). This deliberately excludes the private markers < = > ?
-	// and the CSI intermediate bytes 0x20-0x2F: CSI > Ps ; Ps m is
+	// and the CSI intermediate bytes 0x20-0x2F: CSI > Ps . Ps m is
 	// XTMODKEYS, which reprograms xterm's keyboard-modifier reporting, so
 	// forwarding a private marker let a cluster-controlled line change
 	// terminal state after rendering (TASK-885).

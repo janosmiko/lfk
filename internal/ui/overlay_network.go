@@ -192,7 +192,7 @@ func renderNetpolDirectionRules(info NetworkPolicyEntry, targetLabel string, wid
 }
 
 // renderNetpolRuleLabel renders a rule's heading line: deny rules (Cilium)
-// are marked and styled as warnings; an L7 summary is appended when present.
+// are marked and styled as warnings. An L7 summary is appended when present.
 func renderNetpolRuleLabel(rule NetpolRuleEntry, idx int) string {
 	label := fmt.Sprintf("  Rule %d:", idx+1)
 	style := OverlayNormalStyle

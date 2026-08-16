@@ -190,7 +190,7 @@ var zapLevelName = map[string]string{
 //	LEVEL\t[LOGGER\t]MESSAGE[\t{JSON_FIELDS}]
 //
 // produced by controller-runtime after a leading RFC3339 timestamp.
-// LEVEL must be a known token (see zapLevelName); the trailing JSON
+// LEVEL must be a known token (see zapLevelName). The trailing JSON
 // object, when present and parseable, is unpacked so structured context
 // (controller, namespace, reconcileID, ...) appears flat in the preview.
 //
@@ -315,7 +315,7 @@ func parseEnvoyFields(s string) ([]LogPreviewField, bool) {
 
 // javaLevelName normalises the SLF4J / Logback / Spring Boot level
 // tokens (the only frameworks worth recognising here cover all of
-// these). DEBUG and INFO are common; FATAL is rare in pure Logback but
+// these). DEBUG and INFO are common. FATAL is rare in pure Logback but
 // emitted by some shims.
 var javaLevelName = map[string]string{
 	"TRACE":   "Trace",
@@ -352,13 +352,13 @@ var javaSpringBoot = regexp.MustCompile(`^\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERRO
 //	10:30:00.123 [main] INFO com.example.MyService - Connecting to database
 //
 // The " - " separator before the message is part of the canonical
-// pattern; lines without it are rejected to avoid claiming free-form
+// pattern. Lines without it are rejected to avoid claiming free-form
 // text that happens to contain a level word.
 var javaLogback = regexp.MustCompile(`^(\d{2}:\d{2}:\d{2}[.,]\d{3,})\s+\[([^\]]+)\]\s+(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\s+([\w.$]+)\s+-\s+(.*)$`)
 
 // parseJavaFields tries the Spring Boot pattern first, then the plain
 // Logback pattern. Field order leads with the level, logger, and
-// message because those are what a developer scans for; thread, pid,
+// message because those are what a developer scans for. Thread, pid,
 // and time follow. For Spring Boot the leading RFC3339 timestamp is
 // extracted earlier by splitLeadingTimestamp and lives in p.Time, so
 // time does not appear in the returned Fields. For Logback the pattern
@@ -462,7 +462,7 @@ func parseKlogFields(s string) ([]LogPreviewField, bool) {
 
 // splitLeadingTimestamp returns the leading RFC3339Nano timestamp and the
 // remainder, or ("", s, false) when s does not start with a timestamp.
-// This is the canonical primitive; stripTimestampRaw delegates to it.
+// This is the canonical primitive. stripTimestampRaw delegates to it.
 // Minimum length: "2024-01-15T10:30:00Z " = 21 chars.
 //
 // The separator after the timestamp may be either a space (kubectl logs)
@@ -564,7 +564,7 @@ func parseLogfmtFields(s string) ([]LogPreviewField, bool) {
 // single log line. Output is exactly width columns wide and height+2 rows
 // tall (matching RenderLogViewer's title + body + footer layout) so it can
 // be JoinHorizontal'd next to the main log view. scroll is the number of
-// body rows to skip from the top; it is clamped to [0, max] internally so
+// body rows to skip from the top. It is clamped to [0, max] internally so
 // callers can pass an unclamped value and rely on LogPreviewMaxScroll for
 // the upper bound when they need it (e.g. to gate key handlers).
 //

@@ -89,14 +89,14 @@ func (k Kind) String() string {
 }
 
 // Task is a single tracked unit of work. While in flight FinishedAt is
-// the zero value; after Finish() is called the field is set and the
+// the zero value. After Finish() is called the field is set and the
 // task remains in the Running list for DefaultLingerDuration so users
 // can see what just ran.
 //
 // Silent marks routine work that should NOT activate the title-bar
 // spinner (watch-mode auto-refresh). Silent tasks still appear in
 // Snapshot/SnapshotCompleted so they show up in the :scheduler
-// overlay history; only the title-bar renderer filters them out.
+// overlay history. Only the title-bar renderer filters them out.
 type Task struct {
 	ID         uint64
 	Kind       Kind
@@ -104,7 +104,7 @@ type Task struct {
 	Name       string   // human label, e.g. "List Pods"
 	Target     string   // human context, e.g. "default / web-7d8c-abc"
 	StartedAt  time.Time
-	FinishedAt time.Time // zero while running; set on Finish()
+	FinishedAt time.Time // zero while running. Set on Finish()
 	Silent     bool      // suppress from title-bar indicator only
 	Current    int       // progress: items processed so far (0 = not started)
 	Total      int       // progress: total items (0 = unknown/not applicable)
@@ -162,7 +162,7 @@ type Registry struct {
 	nextID         atomic.Uint64
 	threshold      time.Duration
 	lingerDuration time.Duration   // how long finished tasks stay in the Running list
-	completed      []CompletedTask // newest-first; capped at completedCap
+	completed      []CompletedTask // newest-first. Capped at completedCap
 	completedCap   int
 
 	// Scheduling state — per-context priority queues.
@@ -292,7 +292,7 @@ func (r *Registry) startWithPriority(kind Kind, prio Priority, name, target stri
 }
 
 // StartUntracked is the no-op variant used by routine work that should not
-// surface in the indicator (watch-mode refreshes). Returns 0; Finish(0) is
+// surface in the indicator (watch-mode refreshes). Returns 0. Finish(0) is
 // also a no-op, so callers can use the same defer pattern as the tracked
 // path. Safe to call on a nil receiver.
 func (r *Registry) StartUntracked() uint64 {
@@ -316,7 +316,7 @@ func (r *Registry) StartCancellable(owner uint64, kind Kind, name, target string
 }
 
 // UpdateProgress sets the Current and Total counters on a tracked task.
-// Called from background goroutines during bulk operations; the values
+// Called from background goroutines during bulk operations. The values
 // are read on the next View() cycle via Snapshot(). No-op for unknown
 // IDs or nil receiver.
 func (r *Registry) UpdateProgress(id uint64, current, total int) {
@@ -451,7 +451,7 @@ func (r *Registry) Finish(id uint64) {
 
 // pruneExpiredLocked removes finished-lingering tasks whose linger
 // window has expired. Called by Snapshot under r.mu. Returns the new
-// order slice; expired tasks are deleted from r.tasks and r.cancels.
+// order slice. Expired tasks are deleted from r.tasks and r.cancels.
 func (r *Registry) pruneExpiredLocked(now time.Time) {
 	if r.lingerDuration <= 0 {
 		return
@@ -554,7 +554,7 @@ func (r *Registry) LenIndicator() int {
 
 // lenLocked counts visible tasks under r.mu. skipSilent drops silent
 // tasks (watch-mode refresh). skipFinished drops finished-lingering
-// tasks; pass true for title-bar indicator semantics, false for the
+// tasks. Pass true for title-bar indicator semantics, false for the
 // overlay-facing count that includes the linger window.
 func (r *Registry) lenLocked(skipSilent, skipFinished bool) int {
 	now := time.Now()
@@ -563,7 +563,7 @@ func (r *Registry) lenLocked(skipSilent, skipFinished bool) int {
 		if skipSilent && t.Silent {
 			continue
 		}
-		// Past-linger entries are skipped unconditionally; we do not GC
+		// Past-linger entries are skipped unconditionally. We do not GC
 		// here (kept read-only style), Snapshot's prune handles eviction.
 		// A non-positive lingerDuration means "do not linger" so finished
 		// tasks expire immediately for counting purposes.
@@ -632,7 +632,7 @@ func (r *Registry) InjectCompletedForTest(c CompletedTask) {
 
 // CancelContext drops every queued task for kctx (delivering
 // ErrContextSwitched to their Futures) and cancels every in-flight
-// task on that context. Worker goroutines for kctx exit; a subsequent
+// task on that context. Worker goroutines for kctx exit. A subsequent
 // Submit re-spawns them lazily.
 //
 // Called from app code when the user switches away from a cluster
@@ -689,11 +689,11 @@ func (r *Registry) CancelStaleByGen(kctx string, keepGen uint64) {
 	}
 
 	for _, rt := range running {
-		// Snapshot taken under r.mu above; we act outside the lock (mirrors
+		// Snapshot taken under r.mu above. We act outside the lock (mirrors
 		// CancelContext). The window is safe: rt.cancel() is idempotent, and
 		// the Future is only ever sent-to/closed by runTask — never here. If
 		// a concurrent CancelContext already set contextSwitched, this guard
-		// skips the task and runTask delivers ErrContextSwitched; otherwise
+		// skips the task and runTask delivers ErrContextSwitched. Otherwise
 		// runTask sees superseded and delivers ErrSuperseded. No double-send.
 		if rt.superseded.Load() || rt.preempted.Load() || rt.contextSwitched.Load() {
 			continue

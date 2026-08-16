@@ -44,7 +44,7 @@ type wrappedEventChunk struct {
 }
 
 // wrappedEventChunks splits a logical event line into physical sub-lines
-// with column tracking. The first sub-line uses the full contentW; later
+// with column tracking. The first sub-line uses the full contentW. Later
 // sub-lines are indented by hangingIndent so the wrapped message stays
 // under the original message column.
 //
@@ -82,7 +82,7 @@ func wrappedEventChunks(line string, contentW, hangingIndent int) []wrappedEvent
 
 // WrapEventLine wraps a single event timeline line into physical lines
 // that fit within contentW. The first physical line uses the full
-// width; continuation lines are indented by hangingIndent so wrapped
+// width. Continuation lines are indented by hangingIndent so wrapped
 // message text aligns under the original message column instead of
 // re-flowing flush to the left margin.
 func WrapEventLine(line string, contentW, hangingIndent int) []string {
@@ -96,7 +96,7 @@ func WrapEventLine(line string, contentW, hangingIndent int) []string {
 
 // WrappedEventRowOpts bundles inputs for RenderWrappedEventRow. The
 // caller computes which selection range applies (line-mode highlights
-// the whole row; char-mode pre-computes the absolute column range on
+// the whole row. Char-mode pre-computes the absolute column range on
 // the logical line). Cursor block rendering is opt-in via IsCursor.
 type WrappedEventRowOpts struct {
 	Line          string
@@ -130,7 +130,7 @@ type WrappedEventRowOpts struct {
 // long event to a short one — same behaviour YAML relies on.
 //
 // V-mode (line) selection still spans every sub-line because the user
-// explicitly asked for the whole wrapped block to be highlighted; v
+// explicitly asked for the whole wrapped block to be highlighted. V
 // and B modes stick to the simpler single-line model.
 func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 	chunks := wrappedEventChunks(opts.Line, opts.ContentW, opts.HangingIndent)
@@ -187,7 +187,7 @@ func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 
 // applyCharSelectionToFirstSubLine highlights the [selStart, selEnd)
 // column range on the first physical sub-line of a wrapped event. The
-// range is clamped to the sub-line's bounds; the selection that
+// range is clamped to the sub-line's bounds. The selection that
 // extends past contentW is not shown on continuation lines (matches
 // the YAML viewer's behaviour, where v-mode selection only paints the
 // first sub-line).
@@ -215,7 +215,7 @@ func RenderEventViewer(p EventViewerParams) string {
 	// Title with mode indicators.
 	title := "Event Timeline"
 	if p.ResourceName != "" {
-		// ResourceName is a cluster object name; the body lines (p.Lines)
+		// ResourceName is a cluster object name. The body lines (p.Lines)
 		// are already sanitized upstream, but the title is built here from
 		// the raw value.
 		title += " - " + SanitizeTerminalText(p.ResourceName)
@@ -285,7 +285,7 @@ func RenderEventViewer(p EventViewerParams) string {
 
 	// Resolve the start index so the cursor entry is visible under physical-line
 	// pagination. The key handler tracks scroll in logical-entry units and is
-	// wrap-unaware; without this a wrapped entry above the cursor can push it
+	// wrap-unaware. Without this a wrapped entry above the cursor can push it
 	// (and the footer's line number) off the viewport.
 	cursor := max(min(p.Cursor, len(p.Lines)-1), 0)
 	scroll := eventStartForCursor(p, evLineCtx, max(p.Scroll, 0), cursor, maxVisible)
@@ -343,7 +343,7 @@ func RenderEventViewer(p EventViewerParams) string {
 // cursor entry's first sub-line within maxVisible physical lines. It reconciles
 // the wrap-unaware logical-entry scroll the key handler supplies with the
 // renderer's physical-line pagination, mirroring errorLogStartForCursor. The
-// incoming scroll is honoured when it already shows the cursor; otherwise it is
+// incoming scroll is honoured when it already shows the cursor. Otherwise it is
 // pulled down just far enough.
 func eventStartForCursor(p EventViewerParams, ctx eventLineContext, scroll, cursor, maxVisible int) int {
 	minStart := cursor
@@ -440,8 +440,8 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 // charSelectionRangeForLine returns the [start, end) column range to
 // highlight on the given logical line under v-mode selection. Mirrors
 // renderCharSelection's per-line logic: anchor-only line highlights
-// from anchorCol to end-of-line; cursor-only line highlights from 0 to
-// cursorCol+1; middle lines highlight everything (caller can detect
+// from anchorCol to end-of-line. Cursor-only line highlights from 0 to
+// cursorCol+1. Middle lines highlight everything (caller can detect
 // "everything" via end == len(line)).
 func charSelectionRangeForLine(p EventViewerParams, ctx eventLineContext, i int) (start, end int) {
 	lineWidth := len([]rune(p.Lines[i]))

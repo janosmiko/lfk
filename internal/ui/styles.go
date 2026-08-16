@@ -12,7 +12,7 @@ import (
 )
 
 // Tokyonight Storm color palette default values. These back the mutable
-// Color* variables below; no-color mode blanks the variables so inline
+// Color* variables below. No-color mode blanks the variables so inline
 // lipgloss.Color(ColorX) calls scattered across the codebase yield
 // NoColor{} without touching any call site.
 const (
@@ -48,7 +48,7 @@ func ThemeColor(spec string) color.Color {
 
 // Theme color slots used by inline lipgloss.Color(ColorX) calls throughout
 // the codebase. ApplyTheme rewrites them from the active theme so inline
-// call sites track theme changes; applyNoColorTheme blanks them so inline
+// call sites track theme changes. applyNoColorTheme blanks them so inline
 // foreground calls resolve to NoColor{}. They stay as package variables
 // so code that already references them keeps compiling unchanged.
 //
@@ -122,7 +122,7 @@ var (
 	StatusWarning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
 
 	// Whole-row status tint (issue #540). Colors mirror the Status cell (StatusFailed = error, StatusProgressing = primary) so
-	// the row tint and the cell never disagree. Fg variants recolor the row text; Bg variants lay a muted severity background.
+	// the row tint and the cell never disagree. Fg variants recolor the row text. Bg variants lay a muted severity background.
 	RowTintFailedFg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
 	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	RowTintFailedBg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
@@ -258,14 +258,14 @@ var (
 			Bold(true)
 
 	// Schema side pane (ctrl+k): the header names the field and carries
-	// the accent; the description is prose to read, so it stays plain.
+	// the accent. The description is prose to read, so it stays plain.
 	FieldDocHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 	FieldDocTextStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
 	FieldDocErrorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
 
 	// Which-key panel. The panel draws one flat list with no section
 	// headers, so the description's color is the only thing left that says
-	// which family an entry belongs to; the key keeps one accent throughout.
+	// which family an entry belongs to. The key keeps one accent throughout.
 	// Red is deliberately unused: it is the app's failure/destructive signal,
 	// and a red description reads as an error message rather than as a
 	// category — a risk the panel's most destructive entries (Delete, Force
@@ -279,7 +279,7 @@ var (
 	// nor the key's, or the two halves of a row collapse into one
 	// (TestWhichKeyGroupStyles_NeverMatchThePlainDescriptionOrTheKey). The key
 	// keeps Secondary because HelpKeyStyle draws every hint-bar hotkey in that
-	// same green bold; Actions is what moved, having held Secondary since the
+	// same green bold. Actions is what moved, having held Secondary since the
 	// accent sat on the KEY rather than on the description.
 	WhichKeyKeyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
@@ -555,8 +555,8 @@ var phraseSeverityWords = map[string]statusSev{
 
 // phraseSeverity classifies an unknown status string by scanning its words
 // against phraseSeverityWords. The worst-severity word wins ("Healthy but
-// degraded" is failed); a positive word preceded by "not" reads as
-// progressing-amber, mirroring the exact-match "NotReady"; no recognized word
+// degraded" is failed). A positive word preceded by "not" reads as
+// progressing-amber, mirroring the exact-match "NotReady". No recognized word
 // yields sevUnknown (gray).
 func phraseSeverity(status string) statusSev {
 	sev := sevUnknown
@@ -667,7 +667,7 @@ const (
 // the heuristic where the type name alone would misclassify (e.g. cert-manager
 // "Issuing", whose False state is normal, not a failure). Keys are lowercase.
 var conditionPolarities = map[string]condPolarity{
-	// ArgoCD Application (status-less; the type's presence is the signal).
+	// ArgoCD Application (status-less, the type's presence is the signal).
 	"comparisonerror":         condError,
 	"invalidspecerror":        condError,
 	"unknownerror":            condError,
@@ -679,7 +679,7 @@ var conditionPolarities = map[string]condPolarity{
 	"orphanedresourcewarning": condWarning,
 	// cert-manager.
 	"ready":   condReady,
-	"issuing": condInfo, // actively issuing; False is the normal idle state
+	"issuing": condInfo, // actively issuing. False is the normal idle state
 	// external-secrets.
 	"secretsynced": condReady,
 	// FluxCD.
@@ -785,7 +785,7 @@ func ConditionStyle(condType, status string) lipgloss.Style {
 
 // BoxWidth sets style's width so its rendered CONTENT is w columns wide.
 //
-// lipgloss v2 counts the border inside Width(); v1 counted it outside. Every
+// lipgloss v2 counts the border inside Width(). v1 counted it outside. Every
 // caller computes a content width and budgets the border columns separately,
 // so the border has to be added back or each box renders two columns narrow —
 // and nested boxes compound the loss.

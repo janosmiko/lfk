@@ -103,7 +103,7 @@ type PacketRow struct {
 // RenderTrafficCaptureOverlay renders the inner content of the traffic
 // capture overlay. The caller wraps the result with OverlayStyle, which
 // supplies the rounded border and Padding(1, 2). contentW is the usable
-// width inside that padding (caller computes it as overlayW - 4); contentH
+// width inside that padding (caller computes it as overlayW - 4). contentH
 // is the usable height (caller computes it as overlayH - 4).
 //
 // contentH bounds the live packet table — without it the rendered string
@@ -210,7 +210,7 @@ func buildCaptureConfig(e CaptureOverlayEntry, contentW int) string {
 	}
 	sb.WriteString("\n")
 	// Hint bar lives in the bottom-of-screen status bar (overlayHintBarMisc).
-	// Adding inline hints here would duplicate that surface; see overlay.go
+	// Adding inline hints here would duplicate that surface. See overlay.go
 	// for the project-wide convention.
 	return sb.String()
 }
@@ -310,7 +310,7 @@ func buildCaptureLive(e CaptureOverlayEntry, contentW, contentH int) string {
 		sb.WriteString("\n")
 		// Bound the visible table to the rows that fit in the remaining
 		// overlay height so the box doesn't grow with packet count. Window
-		// into the buffer using ScrollOffset; G (jump-to-bottom) sends a
+		// into the buffer using ScrollOffset. G (jump-to-bottom) sends a
 		// huge ScrollOffset which we clamp to the last page.
 		visibleRows := remainingRowsForPacketTable(sb.String(), contentH)
 		start, end := windowPackets(len(e.Packets), e.ScrollOffset, visibleRows)
@@ -339,8 +339,8 @@ func remainingRowsForPacketTable(rendered string, contentH int) int {
 // to render. scrollOffset is "rows back from the latest packet" — 0 means
 // "show the most recent visible window" (tail -f), positive values reveal
 // older history. This matches what users expect from a live packet table:
-// new arrivals push old ones up; you scroll k/up to see history; G returns
-// to live; g jumps to the oldest packet. Clamps so a huge scrollOffset
+// new arrivals push old ones up. You scroll k/up to see history. G returns
+// to live. g jumps to the oldest packet. Clamps so a huge scrollOffset
 // (g key) lands on the oldest page rather than running past the buffer.
 func windowPackets(n, scrollOffset, visible int) (int, int) {
 	if n == 0 || visible <= 0 {

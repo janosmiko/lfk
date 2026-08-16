@@ -176,7 +176,7 @@ func errorLogVisualWrap(plainText string, contentW int) (first string, cont []st
 
 // renderErrorLogSelectionContent builds the selection-highlighted content
 // sub-lines for an entry (no gutter). Line ('V') mode highlights every
-// sub-line; char ('v') mode applies the column-range highlight to the first
+// sub-line. Char ('v') mode applies the column-range highlight to the first
 // sub-line only and renders continuation sub-lines as plain wrapped text —
 // matching the event viewer convention (RenderWrappedEventRow), where char
 // selection does not span wrapped lines.
@@ -215,14 +215,14 @@ func errorLogEntryLines(entry ErrorLogEntry, contentW int, inSelection bool) int
 
 // errorLogStartForCursor returns the scroll (start entry index) that keeps the
 // cursor entry's first sub-line within maxVisible physical lines. The incoming
-// scroll is honoured when it already shows the cursor; otherwise it is clamped
+// scroll is honoured when it already shows the cursor. Otherwise it is clamped
 // into the visible range. This reconciles the key handler's logical-entry
 // scroll model with the renderer's physical-line pagination, so the cursor is
 // never drawn off-screen whether or not entries wrap.
 func errorLogStartForCursor(reversed []ErrorLogEntry, scroll, cursor, maxVisible, contentW int, vp ErrorLogVisualParams, selStart, selEnd int) int {
 	inSel := func(i int) bool { return vp.VisualMode != 0 && i >= selStart && i <= selEnd }
 	// Walk back from the cursor accumulating physical lines until the next
-	// entry above would no longer fit; minStart is the earliest start that
+	// entry above would no longer fit. minStart is the earliest start that
 	// still keeps the cursor's first sub-line on screen.
 	minStart := cursor
 	used := 1 // the cursor entry's first sub-line
@@ -240,7 +240,7 @@ func errorLogStartForCursor(reversed []ErrorLogEntry, scroll, cursor, maxVisible
 // log entries with level indicators. Long messages are wrapped to width so they
 // stay readable instead of being truncated. The scroll parameter (in logical
 // entry units, matching the key handler) is honoured when it keeps the cursor
-// visible; pagination is by physical line and the start index is adjusted so a
+// visible. Pagination is by physical line and the start index is adjusted so a
 // wrapped entry never pushes the cursor (or the footer) off the viewport. When
 // showDebug is false, DBG entries are filtered out.
 func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll, width, height int, showDebug bool, vp ErrorLogVisualParams) string {
@@ -278,7 +278,7 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll, width, height int, s
 	colEnd := max(vp.VisualStartCol, vp.CursorCol)
 
 	// Resolve the start index so the cursor entry is always visible. The key
-	// handler tracks scroll in logical-entry units and is wrap-unaware; here
+	// handler tracks scroll in logical-entry units and is wrap-unaware. Here
 	// we paginate by physical line, so a literal entry-based scroll could
 	// leave the cursor (and the footer) off-screen when entries wrap.
 	cursor := max(min(vp.CursorLine, len(reversed)-1), 0)
@@ -327,7 +327,7 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll, width, height int, s
 // Every physical sub-line is prefixed with the gutter (line marker) so the
 // cursor line is flagged consistently in all modes — matching the event
 // viewer. The cursor line also carries a reverse-video block cursor on its
-// first sub-line when not selecting; during selection the highlight stands in
+// first sub-line when not selecting. During selection the highlight stands in
 // for it. contentW is the width available after the gutter.
 func renderErrorLogEntry(entry ErrorLogEntry, contentW int, vp ErrorLogVisualParams, i, selStart, selEnd, colStart, colEnd int) string {
 	isCursor := i == vp.CursorLine

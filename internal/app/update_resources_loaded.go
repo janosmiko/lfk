@@ -21,7 +21,7 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	if msg.err != nil {
-		// Without a context list there is nothing to restore into; show the
+		// Without a context list there is nothing to restore into. Show the
 		// error rather than a splash that never ends.
 		m.abandonSessionRestore()
 		m.err = msg.err
@@ -202,7 +202,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 		}
 	}
 	// Replay a bookmark that was queued waiting on this context's discovery.
-	// IsContextAware switches the bookmark's effective context; for context-free
+	// IsContextAware switches the bookmark's effective context. For context-free
 	// bookmarks the effective context is the model's current context, which we
 	// match against msg.context so we only replay when the right discovery lands.
 	if m.bookmarkAwaitingDiscovery != nil {
@@ -500,7 +500,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	// Align previewLoading with whether a preview fetch is actually in
 	// flight. clearRight() / invalidatePreviewForCursorChange() armed the
 	// flag to true on navigation so the right pane keeps showing the
-	// spinner across the main-list arrival; if no preview cmd is
+	// spinner across the main-list arrival. If no preview cmd is
 	// dispatched (e.g., empty namespace, so selectedMiddleItem is nil and
 	// loadPreview returns nil), leaving the flag armed would render
 	// "Loading..." forever instead of letting the right pane fall through
@@ -552,7 +552,7 @@ func (m *Model) applyWarningEventsFilter() {
 
 // applyEventGrouping collapses duplicate Events sharing ClusterName/Type/
 // Reason/Message/Object into a single row with a summed Count. Runs only when
-// viewing the Event resource list with grouping enabled; other resource kinds
+// viewing the Event resource list with grouping enabled. Other resource kinds
 // pass through untouched.
 func (m *Model) applyEventGrouping() {
 	if !m.eventGrouping || m.nav.ResourceType.Kind != "Event" {
@@ -565,7 +565,7 @@ func (m *Model) applyEventGrouping() {
 // after an Events-view toggle (warnings-only, grouping). It re-applies the
 // full pipeline — warning filter, grouping, and the active filter preset —
 // so toggling any one of them never silently drops the others. A cache miss
-// leaves m.middleItems untouched; the next resource load will rebuild it.
+// leaves m.middleItems untouched. The next resource load will rebuild it.
 func (m *Model) rebuildEventsFromCache() {
 	cached, ok := m.itemCache[m.navKey()]
 	if !ok {
@@ -651,7 +651,7 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 	// Align previewLoading with whether a preview fetch is actually in
 	// flight (see updateResourcesLoadedMain for rationale). At LevelOwned,
 	// kinds without further owned children (or empty Helm releases) make
-	// loadPreview return nil; without this the right pane spins forever.
+	// loadPreview return nil. Without this the right pane spins forever.
 	previewCmd := m.loadPreview()
 	m.previewLoading = previewCmd != nil
 	m.suppressBgtasks = savedSuppress
@@ -707,7 +707,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 		m.suppressBgtasks = true
 	}
 	// Align previewLoading with whether a preview fetch is actually in
-	// flight. clearRight() armed the flag to true on navigation; at
+	// flight. clearRight() armed the flag to true on navigation. At
 	// LevelContainers loadPreview returns nil, so leaving it armed would
 	// make the right pane render "Loading..." forever. Conversely, when a
 	// preview cmd is dispatched the flag must stay true so the spinner

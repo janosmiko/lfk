@@ -141,7 +141,7 @@ var crashHeaderStyle = lipgloss.NewStyle().
 // The previous redesign nested a second rounded-border panel around the
 // body, mirroring the label/secret editor pattern. That doubled the
 // horizontal chrome and pushed the visible row beyond the terminal width
-// on tighter terminals; the terminal then soft-wrapped each row and the
+// on tighter terminals. The terminal then soft-wrapped each row and the
 // next row's `│` border appeared mid-line on the wrap continuation. The
 // single-divider layout removes that nested chrome while keeping the
 // visual hierarchy.
@@ -400,7 +400,7 @@ func renderCrashContainerTableLines(containers []CrashContainerEntry, active str
 
 // crashCell returns s padded (or truncated) to width using lipgloss.
 // Using lipgloss.Width handles Unicode rune width correctly and is
-// transparent to ANSI escapes; fmt.Sprintf("%-Ns", ...) miscounts both.
+// transparent to ANSI escapes. Fmt.Sprintf("%-Ns", ...) miscounts both.
 func crashCell(s string, width int) string {
 	return lipgloss.NewStyle().Width(width).Render(s)
 }
@@ -412,7 +412,7 @@ func crashJoinRow(cells ...string) string {
 }
 
 // findCrashContainer locates a container by name in either the init or
-// app slice; returns nil if not found.
+// app slice. Returns nil if not found.
 func findCrashContainer(entry CrashInvestigatorEntry, name string) *CrashContainerEntry {
 	for i := range entry.InitContainers {
 		if entry.InitContainers[i].Name == name {
@@ -521,9 +521,9 @@ func formatTimeAgo(t time.Time) string {
 // renderCrashEventsTab renders the Events tab body. The header line
 // declares the count and is followed by a thin divider so the user has a
 // clear visual hierarchy above the column headers. Empty state shows a
-// friendly "no events" message; otherwise a TYPE/REASON/AGE/MESSAGE
+// friendly "no events" message. Otherwise a TYPE/REASON/AGE/MESSAGE
 // table with Warning rows colored. Rows past the viewport are clipped
-// using scroll; the renderer clamps so G (sentinel 999999) lands on
+// using scroll. The renderer clamps so G (sentinel 999999) lands on
 // the last page.
 func renderCrashEventsTab(entry CrashInvestigatorEntry, scroll, width, height int) string {
 	header := crashHeaderStyle.Render(fmt.Sprintf("EVENTS · %d", len(entry.Events)))
@@ -535,7 +535,7 @@ func renderCrashEventsTab(entry CrashInvestigatorEntry, scroll, width, height in
 	}
 
 	// Reserve column space for the leading 4-space indent + fixed
-	// columns + 2-space gutters; remainder is the message budget.
+	// columns + 2-space gutters. Remainder is the message budget.
 	const (
 		typeW   = 7
 		reasonW = 18
@@ -587,7 +587,7 @@ func renderCrashEventsTab(entry CrashInvestigatorEntry, scroll, width, height in
 // dim divider for visual hierarchy. The body is clipped to the viewport
 // — long logs scroll with j/k/g/G/Ctrl+D/Ctrl+U.
 //
-// The header + divider are reserved as the top sticky lines; scroll
+// The header + divider are reserved as the top sticky lines. Scroll
 // only moves the body. That way users keep the "previous|current"
 // context visible at all times.
 func renderCrashLogsTab(entry CrashInvestigatorEntry, scroll, width, height int) string {
@@ -606,7 +606,7 @@ func renderCrashLogsTab(entry CrashInvestigatorEntry, scroll, width, height int)
 	b.WriteString(divider)
 	b.WriteString("\n\n")
 
-	// Reserve 3 lines for header + divider + blank; body has the rest.
+	// Reserve 3 lines for header + divider + blank. Body has the rest.
 	bodyHeight := max(height-3, 1)
 
 	if active == nil {
@@ -704,7 +704,7 @@ func sanitizeCrashMessage(s string) string {
 }
 
 // fallbackCrashStr returns an em-dash placeholder when s is blank
-// (whitespace-only); otherwise returns s unchanged.
+// (whitespace-only). Otherwise returns s unchanged.
 func fallbackCrashStr(s string) string {
 	if strings.TrimSpace(s) == "" {
 		return "—"

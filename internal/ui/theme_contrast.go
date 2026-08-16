@@ -231,14 +231,14 @@ func derivedParentHighlightBg(t Theme) string {
 // minimum WCAG contrast ratio against the bg hex color. The value parameter is
 // the user-facing normalized knob in [0, 1]:
 //
-//   - 0.0  = off (no-op; returns fg unchanged)
+//   - 0.0  = off (no-op, returns fg unchanged)
 //   - 0.175 approx = WCAG AA threshold (4.5:1) for normal text
 //   - 0.3   approx = WCAG AAA threshold (7.0:1)
 //   - 1.0   = maximum (targets 21:1, forces fg toward pure black or white)
 //
 // The mapping is: wcagTarget = 1.0 + clamp(value, 0, 1) * 20.0
 //
-// Only the HSL lightness channel is adjusted; hue and saturation are
+// Only the HSL lightness channel is adjusted. Hue and saturation are
 // preserved, so chromatic colors keep their identity at moderate values.
 // At value=1.0 the extremes (L=0 or L=1) are achromatic by definition —
 // hue collapse at max value is an acceptable and documented trade-off.

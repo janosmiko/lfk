@@ -115,7 +115,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.restoreCursor()
 		m.restoreLevelFilter()
 		// The restored rows were captured on context entry and carry stale
-		// [RO] markers; an in-context Ctrl+R toggle since then updated the
+		// [RO] markers. An in-context Ctrl+R toggle since then updated the
 		// override but not this snapshot. Re-apply so the picker marker
 		// matches the context's current read-only state.
 		m.refreshContextReadOnlyMarkers()
@@ -237,7 +237,7 @@ func resolveOwnerResourceType(kind, apiVersion string, discovered []model.Resour
 }
 
 // navigateToOwner teleports to the owning resource. apiVersion may be empty
-// for callers that only know a built-in Kind ("Pod", "Node"); see
+// for callers that only know a built-in Kind ("Pod", "Node"). See
 // resolveOwnerResourceType.
 func (m Model) navigateToOwner(kind, name, apiVersion string) (tea.Model, tea.Cmd) {
 	crds := m.discoveredResources[m.discoveryContext()]
@@ -288,7 +288,7 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 	ui.ActiveLeftScroll = 0
 
 	// Remember this level's filter, then clear all live filter/search state so
-	// the child level is a fresh start; navigating back (navigateParent)
+	// the child level is a fresh start. Navigating back (navigateParent)
 	// restores the list exactly as the user left it.
 	m.resetFilterForTypeSwitch()
 
@@ -364,7 +364,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	case m.discoveringContexts[sel.Name] && len(previewItems) > 0:
 		// Hover-discovery is in flight and the right pane already had
 		// something to show (seed fallback). Reuse those items so the
-		// user sees content immediately; apiResourceDiscoveryMsg will
+		// user sees content immediately. apiResourceDiscoveryMsg will
 		// replace them with the real list when discovery completes.
 		m.setMiddleItems(previewItems)
 		m.itemCache[m.navKey()] = m.middleItems
@@ -525,7 +525,7 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.saveCurrentSession()
 	// Show the cached list immediately while loadResources decides
 	// whether to serve from cache (fresh-cache shortcut) or issue a real
-	// fetch. The cache-then-refresh UX is unchanged; the refetch-suppression
+	// fetch. The cache-then-refresh UX is unchanged. The refetch-suppression
 	// now lives in loadResources, which compares the cache's freshness
 	// fingerprint against the current fetch parameters.
 	if cached, cacheHit := m.itemCache[m.navKey()]; cacheHit {
@@ -563,7 +563,7 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 			m.setCursor(0)
 		}
 		// loadSecurityAffectedResources legitimately returns nil (manager
-		// torn down, no group key); arming the spinner without a command
+		// torn down, no group key). Arming the spinner without a command
 		// would strand it forever.
 		if cmd := m.loadSecurityAffectedResources(false); cmd != nil {
 			m.loading = true
@@ -755,7 +755,7 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	// (navigateChildResource handles __security_finding_group__,
 	// navigateChildOwned routes __security_affected_resource__ through
 	// jumpToFindingResource). Falling through to loadYAML here used to
-	// produce "Warning: unknown resource type"; an earlier fix returned
+	// produce "Warning: unknown resource type". An earlier fix returned
 	// nil here which silently no-op'd Enter and stranded users on the
 	// finding-groups list.
 	if onSecurityView(&m) {

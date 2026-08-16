@@ -14,7 +14,7 @@ var CursorBlockStyle = lipgloss.NewStyle().Reverse(true)
 // of truth for both visual width and the rendered body — it carries the
 // already-applied YAML syntax highlighting / diff coloring / log producer
 // ANSI codes that we need to preserve around the cursor. plainLine is kept
-// as a parameter for legacy call sites; the function no longer reads it
+// as a parameter for legacy call sites. The function no longer reads it
 // because slicing plainLine destroyed any styling around the cursor row
 // (matched lines lost their YAML colors the moment the cursor sat on them).
 // When the cursor is at a negative column the styled line is returned as-is.
@@ -68,7 +68,7 @@ func RenderVisualSelection(line string, visualType rune, lineIdx, selStart, selE
 }
 
 // renderCharSelection highlights a character-level selection range. Columns
-// are visual columns; embedded ANSI escape sequences in line are treated as
+// are visual columns. Embedded ANSI escape sequences in line are treated as
 // zero-width so cursor and selection address the same positions.
 //
 // On the anchor line, highlight from anchorCol to end of line (downward) or
@@ -113,7 +113,7 @@ func renderBlockSelection(line string, lineWidth, colStart, colEnd int) string {
 }
 
 // highlightColumnRange highlights visible characters from colStart (inclusive)
-// to colEnd (exclusive). The line may carry producer SGR sequences; the
+// to colEnd (exclusive). The line may carry producer SGR sequences. The
 // before/after segments keep their original styling (ansi.Truncate /
 // TruncateLeft preserve embedded ANSI), while the selected slice is rendered
 // through SelectedStyle on stripped text so the selection's fg/bg pair
@@ -126,7 +126,7 @@ func highlightColumnRange(line string, lineWidth, colStart, colEnd int) string {
 		colEnd = lineWidth
 	}
 	if colStart >= lineWidth {
-		// Selection is beyond the line; render the line with a padded
+		// Selection is beyond the line. Render the line with a padded
 		// selection cell so the user sees where their cursor parked.
 		return line + SelectedStyle.Render(" ")
 	}

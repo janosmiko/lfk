@@ -13,7 +13,7 @@ import (
 // can target, not only the ones seeded with data (see
 // TestListKinds_CoversEveryAdvertisedResource and
 // TestNewDemoClient_DiscoverAPIResources_NoPanic). metrics.k8s.io/v1 is
-// mapped alongside v1beta1 because internal/k8s.metricsGVR tries both; only
+// mapped alongside v1beta1 because internal/k8s.metricsGVR tries both. Only
 // v1beta1 carries seed data since GetPodMetrics/GetNodeMetrics stop at the
 // first route that returns.
 func ListKinds() map[schema.GroupVersionResource]string {

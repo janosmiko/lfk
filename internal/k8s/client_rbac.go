@@ -65,7 +65,7 @@ func (c *Client) GetSelfRules(ctx context.Context, contextName, namespace string
 }
 
 // GetSelfRulesAs returns all access rules for the specified user/ServiceAccount in the given namespace.
-// The asUser parameter should be in the format "system:serviceaccount:<namespace>:<name>" for ServiceAccounts.
+// The asUser parameter must be in the format "system:serviceaccount:<namespace>:<name>" for ServiceAccounts.
 // If asUser is empty, it checks the current user's permissions.
 func (c *Client) GetSelfRulesAs(ctx context.Context, contextName, namespace, asUser string) ([]AccessRule, error) {
 	cfg, err := c.restConfigForContext(contextName)
@@ -166,9 +166,9 @@ func (c *Client) GetSelfRulesMultiNS(ctx context.Context, contextName, asUser st
 		}
 	}
 
-	// Also check ClusterRoleBindings — if the SA is bound at cluster scope, the
-	// SelfSubjectRulesReview in any namespace will already reflect those permissions,
-	// but we note this for completeness. No extra namespaces to add here.
+	// ClusterRoleBindings are not walked: if the SA is bound at cluster scope,
+	// SelfSubjectRulesReview in any namespace already reflects those permissions,
+	// so no extra namespaces need to be added here.
 
 	// Build the sorted, capped namespace list.
 	namespaces := make([]string, 0, len(nsSet))
@@ -273,7 +273,7 @@ func (c *Client) ListRBACSubjects(ctx context.Context, contextName string) ([]RB
 	// Collect subjects from ClusterRoleBindings.
 	crbList, err := clientset.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		// Permission denied is non-fatal; continue with RoleBindings.
+		// Permission denied is non-fatal. Continue with RoleBindings.
 		crbList = &rbacv1.ClusterRoleBindingList{}
 	}
 	for _, crb := range crbList.Items {
@@ -309,7 +309,7 @@ func (c *Client) ListRBACSubjects(ctx context.Context, contextName string) ([]RB
 		subjects = append(subjects, RBACSubject(key))
 	}
 
-	// Sort: Users first, then Groups, then ServiceAccounts; within each kind by name.
+	// Sort: Users first, then Groups, then ServiceAccounts. Within each kind by name.
 	kindOrder := map[string]int{"User": 0, "Group": 1, "ServiceAccount": 2}
 	sort.Slice(subjects, func(i, j int) bool {
 		if kindOrder[subjects[i].Kind] != kindOrder[subjects[j].Kind] {

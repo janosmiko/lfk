@@ -35,7 +35,7 @@ const (
 )
 
 // Package-level config globals populated from internal/ui/config_apply.go.
-// These are read at scheduler.New() time; later mutations have no effect
+// These are read at scheduler.New() time. Later mutations have no effect
 // on already-running schedulers (consistent with ConfigWatchInterval).
 var (
 	ConfigWorkersPerContext     = DefaultWorkersPerContext

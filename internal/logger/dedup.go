@@ -71,7 +71,7 @@ func ShouldEmit(tag, contextKey string) (emit bool, suppressed int) {
 }
 
 // WarnOnce emits a WARN log at most once per dedup window. Identical
-// repeats during the window are silently counted; the next emission
+// repeats during the window are silently counted. The next emission
 // after the window includes "suppressed_during_window" so the rate is
 // not lost. The entry is also published to UIChan for the in-app log
 // overlay.

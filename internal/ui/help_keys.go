@@ -52,7 +52,7 @@ func mapChordTokens(key string, f func(string) string) string {
 
 // helpKeyDisplay formats a keybinding value as text for the help screen.
 // A modified chord gets its modifiers capitalized and its key uppercased
-// ("ctrl+shift+x" -> "Ctrl+Shift+X", "shift+tab" -> "Shift+Tab"); anything
+// ("ctrl+shift+x" -> "Ctrl+Shift+X", "shift+tab" -> "Shift+Tab"). Anything
 // that is not a chord displays verbatim.
 //
 // This is also the form the help screen's search index is built from, so a
@@ -66,7 +66,7 @@ func helpKeyDisplay(key string) string {
 
 // helpKeySeparator is the display-only form of "/" between alternative
 // bindings for one action ("h/Left" -> "h / Left"). Spaced on both sides
-// so it reads as a gap rather than competing with the keys; styled dimmer
+// so it reads as a gap rather than competing with the keys. Styled dimmer
 // than the keys at render time (see styleHelpKeyCell in help.go) so it
 // stops drawing the eye like a third keybinding.
 //

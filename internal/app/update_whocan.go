@@ -13,7 +13,7 @@ import (
 // enterWhoCanMode flips the Can-I overlay into reverse-RBAC mode and
 // prepares the resource picker. The resource list is the deduped union
 // of all Can-I groups so the user sees the same canonical names as in
-// the forward view; the cursor lands on whatever resource was
+// the forward view. The cursor lands on whatever resource was
 // highlighted in Can-I (when reachable) so Tab feels like a
 // continuation rather than a fresh start.
 func (m Model) enterWhoCanMode() (tea.Model, tea.Cmd) {
@@ -48,7 +48,7 @@ func (m Model) enterWhoCanMode() (tea.Model, tea.Cmd) {
 	resource := whoCanCurrentResource(m.whoCan.resourceList, m.whoCan.resourceCursor)
 	if resource == "" {
 		// No resources in the picker (Can-I hadn't loaded any). Leave
-		// the subjects panel idle; the user will see the empty list.
+		// the subjects panel idle. The user will see the empty list.
 		m.whoCan.resource = ""
 		return m, nil
 	}
@@ -268,7 +268,7 @@ func (m Model) refreshWhoCanForCursor(visible []string) (tea.Model, tea.Cmd) {
 // handleWhoCanFilterKey processes typing into the resource filter.
 // As keystrokes land the visible list narrows and the cursor snaps to
 // the top of the new list (with a query fire so the right pane keeps
-// up). Enter accepts the filter and exits filter mode; Esc clears it.
+// up). Enter accepts the filter and exits filter mode. Esc clears it.
 func (m Model) handleWhoCanFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	action := handleFilterKey(&m.whoCan.resourceFilter, msg)
 	switch action {
@@ -322,7 +322,7 @@ func (m Model) handleWhoCanFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // loadWhoCan dispatches the WhoCan fetch for the current verb +
-// resource + namespace. Fires asynchronously; the result lands as
+// resource + namespace. Fires asynchronously. The result lands as
 // whoCanLoadedMsg and is injected into m.whoCan.subjects by the
 // handler.
 //
@@ -333,7 +333,7 @@ func (m Model) handleWhoCanFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // in-flight fetch.
 func (m Model) loadWhoCan() tea.Cmd {
 	verb := ui.WhoCanVerbs[m.whoCan.verbCursor]
-	// "*" means "any verb"; passed through to verbMatches which treats
+	// "*" means "any verb". Passed through to verbMatches which treats
 	// it as "match any rule with at least one verb". An earlier version
 	// rewrote "*" to "get" — that silently dropped subjects whose roles
 	// granted list/watch/etc. but not get.
@@ -440,7 +440,7 @@ func (m Model) renderWhoCanOverlay(background string) string {
 // renderer paints the new subject list on the next frame.
 func (m Model) updateWhoCanLoaded(msg whoCanLoadedMsg) Model {
 	if msg.gen != m.requestGen {
-		return m // stale; user moved on
+		return m // stale. User moved on
 	}
 	m.whoCan.loading = false
 	if msg.err != nil {

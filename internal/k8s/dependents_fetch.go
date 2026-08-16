@@ -150,7 +150,7 @@ func dependentRefsFrom(
 	if namespace == "" {
 		// An empty namespace lists cluster-wide, which needs cluster-scoped
 		// RBAC a user holding one namespaced Role does not have. Both callers
-		// already filter these out; this keeps a future owner kind from
+		// already filter these out. This keeps a future owner kind from
 		// reintroducing the cluster-wide call by accident.
 		return nil, fmt.Errorf("the dependent walk needs a namespace")
 	}

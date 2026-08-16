@@ -9,7 +9,7 @@ import (
 )
 
 // whichKeyGroup classifies a catalog entry. The panel renders one flat list
-// with no section headers, the way neovim's which-key does; the category cue
+// with no section headers, the way neovim's which-key does. The category cue
 // the headers used to be is the color each group tints its entries'
 // DESCRIPTIONS with (whichKeyGroupStyles - the keys keep one shared accent).
 // The group name reaches the screen only in the legend row at the foot of the
@@ -48,7 +48,7 @@ type whichKeyAction = wkAction[*wkCtx]
 
 // wkCtx carries the row state every predicate needs, resolved once per call.
 // Predicates used to each call selectedMiddleItem() -> visibleMiddleItems(),
-// which re-filters the whole list; at ~14 predicates that was 14 filter passes
+// which re-filters the whole list. At ~14 predicates that was 14 filter passes
 // per render. unionSentinel and readOnly are included because multiple
 // predicates (wkSingleCluster/wkUnionAllowed and wkWritable/wkWritableKindIn/
 // PasteApply, respectively) each derive the same value from m.
@@ -116,7 +116,7 @@ func wkLevelIn(pred func(c *wkCtx) bool, levels ...model.Level) func(c *wkCtx) b
 
 // wkOnRow reports whether a resource row is highlighted at a level a direct
 // kubectl-backed action (Describe/Edit/Logs/Force Delete/...) can act on.
-// Most handlers in that family don't level-check explicitly; they rely on
+// Most handlers in that family don't level-check explicitly. They rely on
 // selectedResourceKind() returning "" (blocked by isVirtualResourceKind or
 // an empty wkKindIn match) above LevelResources, so this stays a plain
 // comparison rather than a wkLevelIn call for cheapness. Delete is the
@@ -342,8 +342,8 @@ func wkAllNamespacesAvailable(c *wkCtx) bool {
 
 // wkReadOnlyToggleAvailable mirrors handleKeyReadOnlyToggle (readonly.go):
 // blocked outright when --read-only was set at startup (cliReadOnly, sticky
-// for the process); at LevelClusters it additionally needs a selected
-// context that isn't a union-set row (wkClusterRowSelected); every other
+// for the process). At LevelClusters it additionally needs a selected
+// context that isn't a union-set row (wkClusterRowSelected). Every other
 // level needs no row.
 func wkReadOnlyToggleAvailable(c *wkCtx) bool {
 	if c.m.cliReadOnly {
@@ -358,7 +358,7 @@ func wkReadOnlyToggleAvailable(c *wkCtx) bool {
 // wkTogglePreviewAvailable mirrors handleExplorerTogglePreview
 // (update_keys_explorer.go): blocked only when hovering the Overview or
 // Monitoring dashboard pseudo-item at LevelResourceTypes, a silent no-op in
-// the handler; every other row and level toggles the preview.
+// the handler. Every other row and level toggles the preview.
 func wkTogglePreviewAvailable(c *wkCtx) bool {
 	if c.level != model.LevelResourceTypes || c.sel == nil {
 		return true
@@ -375,7 +375,7 @@ func wkTogglePreviewAvailable(c *wkCtx) bool {
 // never reaches handleExplorerToggleLogPreview there, regardless of
 // fullLogPreview. Below LevelClusters: turning the preview OFF always
 // succeeds, so once it is already on the key stays available regardless of
-// kind; turning it ON only produces a real log stream for a Pod row, or a
+// kind. Turning it ON only produces a real log stream for a Pod row, or a
 // Container row with an owning pod name resolved (m.nav.OwnedName, set at
 // LevelContainers).
 func wkTogglePreviewLogsAvailable(c *wkCtx) bool {
@@ -389,10 +389,10 @@ func wkTogglePreviewLogsAvailable(c *wkCtx) bool {
 }
 
 // wkAPIExplorerAvailable mirrors openExplainBrowser's level switch
-// (update_explain.go): unavailable at LevelClusters; at LevelResourceTypes it
+// (update_explain.go): unavailable at LevelClusters. At LevelResourceTypes it
 // additionally needs a selected row that isn't a collapsed-group header or
 // one of the dashboard pseudo-items (kind or Extra "__overview__" /
-// "__monitoring__"); LevelResources/Owned/Containers work off the navigated
+// "__monitoring__"). LevelResources/Owned/Containers work off the navigated
 // resource type and need no row.
 func wkAPIExplorerAvailable(c *wkCtx) bool {
 	switch c.level {
@@ -459,7 +459,7 @@ func wkFullscreenAvailable(c *wkCtx) bool {
 // "select exactly 2" toast, so those counts are excluded the same way
 // Delete/Edit exclude union-blocked kinds. len(m.selectedItems) is used
 // instead of the handler's selectedItemsList() to avoid an extra
-// visibleMiddleItems filter pass per render; the two differ only when a
+// visibleMiddleItems filter pass per render. The two differ only when a
 // selected row has since scrolled out of the current filter, the same
 // accepted approximation wkActionMenuAvailable documents for hasSelection().
 func wkDiffAvailable(c *wkCtx) bool {
@@ -588,7 +588,7 @@ func whichKeyHelpKey(kb ui.Keybindings) string {
 
 // whichKeyExplorerActions returns a copy of the shared explorer catalog, so a
 // caller cannot reorder or overwrite the package slice through it. Only tests
-// call this; the render path reads whichKeyExplorerActionList directly, so the
+// call this. The render path reads whichKeyExplorerActionList directly, so the
 // clone costs nothing per frame.
 func whichKeyExplorerActions() []whichKeyAction {
 	return slices.Clone(whichKeyExplorerActionList)
@@ -616,7 +616,7 @@ func whichKeyExcludedBindings() map[string]string {
 		// the panel.
 		"WhichKeyLeader": "the leader key itself",
 		// SetMark ("m") arms m.pendingMark and waits for the bookmark-slot
-		// key (update_keys_explorer.go:26-33,330-332); unlike the g-prefix
+		// key (update_keys_explorer.go:26-33,330-332). Unlike the g-prefix
 		// (armWhichKey/renderWhichKey), nothing renders while pendingMark is
 		// true — there is no popup, just a silent wait for the next key.
 		"SetMark": "chord prefix, no rendered continuation",
