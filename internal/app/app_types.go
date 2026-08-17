@@ -464,7 +464,10 @@ type TabState struct {
 	// its own jumps independently. navSnapshots are never mutated after
 	// captureNavSnapshot deep-copies their slices, so copying the outer
 	// slice on save/restore is enough.
-	jumpBackStack      []navSnapshot
+	jumpBackStack []navSnapshot
+	// levelMem holds the views this tab left each cluster at, so the level
+	// keys walk back down inside the tab that recorded them.
+	levelMem           levelMemory
 	cursors            [5]int
 	middleScroll       int // persistent scroll position for middle column (vim-style scrolloff)
 	leftScroll         int // persistent scroll position for left column (vim-style scrolloff)

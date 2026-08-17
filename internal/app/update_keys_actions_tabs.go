@@ -23,8 +23,12 @@ func (m Model) handleExplorerActionKeyNewTab() (tea.Model, tea.Cmd, bool) {
 	newTab := m.cloneCurrentTab()
 	m.tabs = append(m.tabs[:insertAt], append([]TabState{newTab}, m.tabs[insertAt:]...)...)
 	m.activeTab = insertAt
+	// cloneCurrentTab leaves the new tab's navigation history empty on
+	// purpose. Those live on the Model, so without a load the new tab keeps
+	// using — and then saves back — the history of the tab it was cloned from.
+	loadCmd := m.loadTab(m.activeTab)
 	m.setStatusMessage(fmt.Sprintf("Tab %d created", m.activeTab+1), false)
-	return m, scheduleStatusClear(), true
+	return m, tea.Batch(loadCmd, scheduleStatusClear()), true
 }
 
 func (m Model) handleExplorerActionKeyNextTab() (tea.Model, tea.Cmd, bool) {

@@ -17,7 +17,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand / collapse all resource groups |
 | `x` | At resource types level: pin, hide, or show the selected type (action menu) |
-| `0` / `1` / `2` | Jump to clusters / types / resources level |
+| `0` / `1` / `2` | Jump to clusters / types / resources level, per cluster and both ways |
 | `J` / `K` | Scroll preview pane down / up |
 | `o` / `O` | Jump to owner/controller / open Object Explorer |
 | `Backspace` | Jump back through teleport history |

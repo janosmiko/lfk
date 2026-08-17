@@ -320,7 +320,7 @@ Inside the namespace selector:
 
 | Key | Action |
 |---|---|
-| `0` / `1` / `2` | Clusters / resource types / resources level |
+| `0` / `1` / `2` | Clusters / resource types / resources level, both ways |
 | `o` | Owner or controller of the selected resource |
 | `Backspace` | Back through teleport history |
 | `g` + key | Goto resource type (`g` opens the which-key popup) |
@@ -442,7 +442,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 ### Navigating
 
 - Press `o` on a resource to jump to its owner (Pod -> Deployment), then `Backspace` to jump back
-- Teleport between levels with `0` / `1` / `2` (clusters / resource types / resources)
+- Teleport between levels with `0` / `1` / `2` (clusters / resource types / resources). `1` and `2` bring you back to the view you left, per cluster
 - Jump straight to a resource type from anywhere: type `:pod`, `:dep`, `:pvc`
 - Set a bookmark with `m<letter>`, jump back with `'<letter>`, the saved namespace and filter come with it
 - Pin your daily-driver resource types with `p` and hide noisy ones via `x`, both remembered per cluster
