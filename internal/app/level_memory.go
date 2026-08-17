@@ -34,13 +34,19 @@ func (l *levelMemory) remember(key levelMemoryKey, snap navSnapshot) {
 	if l.views == nil {
 		l.views = make(map[levelMemoryKey]navSnapshot)
 	}
-	if _, exists := l.views[key]; !exists {
-		for len(l.order) >= levelMemoryCap {
-			delete(l.views, l.order[0])
-			l.order = l.order[1:]
+	// A rewrite moves the key back to the newest end, so the entry the user
+	// just refreshed is not the next one evicted.
+	for i, existing := range l.order {
+		if existing == key {
+			l.order = append(l.order[:i], l.order[i+1:]...)
+			break
 		}
-		l.order = append(l.order, key)
 	}
+	for len(l.order) >= levelMemoryCap {
+		delete(l.views, l.order[0])
+		l.order = l.order[1:]
+	}
+	l.order = append(l.order, key)
 	l.views[key] = snap
 	l.lastContext = key.context
 }

@@ -124,6 +124,25 @@ func TestLevelMemoryStaysUnderItsCap(t *testing.T) {
 	assert.False(t, oldest, "the first cluster recorded must be gone")
 }
 
+func TestLevelMemoryEvictsTheLeastRecentlyWritten(t *testing.T) {
+	m := levelMemoryModel(t)
+	remember := func(i int) {
+		m.nav.Level = model.LevelResources
+		m.nav.Context = fmt.Sprintf("ctx-%d", i)
+		m.rememberLevel()
+	}
+	for i := range levelMemoryCap {
+		remember(i)
+	}
+	remember(0)              // refresh the oldest entry
+	remember(levelMemoryCap) // force one eviction
+
+	_, refreshed := m.levelMem.views[levelMemoryKey{context: "ctx-0", level: model.LevelResources}]
+	assert.True(t, refreshed, "a refreshed entry must not be the one evicted")
+	_, next := m.levelMem.views[levelMemoryKey{context: "ctx-1", level: model.LevelResources}]
+	assert.False(t, next, "the next-oldest entry must be evicted instead")
+}
+
 func TestNewTabStartsWithoutTheLevelMemoryOfItsSource(t *testing.T) {
 	m := levelMemoryModel(t)
 	up, _, _ := m.handleExplorerActionKeyLevelCluster()
