@@ -2,7 +2,7 @@
 
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)[![Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com)](https://cloudsmith.com)
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Stars](https://img.shields.io/github/stars/janosmiko/lfk?style=flat)](https://github.com/janosmiko/lfk) [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-db61a2)](https://github.com/sponsors/janosmiko) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)[![Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com)](https://cloudsmith.com)
 
 **LFK** is a keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. It brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
@@ -71,12 +71,18 @@ KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 
 [docs/usage.md](docs/usage.md#command-line-flags) has the full CLI reference and the runtime tuning options: mouse capture, no-color mode, read-only mode, watch-mode interval, discovery cache, and Secret lazy loading.
 
-## Support
+## Sponsor
 
-LFK is a side project I build in my free time, and the tools that go into it (IDE licenses, AI assistants) are not free. If LFK saves you time, consider sponsoring:
+LFK is Apache-2.0 and stays free. I build it in my free time, and the tools it takes to build it are not free.
+
+**Do you use LFK at work? Ask your team to sponsor it.** A company expenses this without noticing, and an individual feels it. Most clusters LFK gets pointed at are company clusters.
 
 - [GitHub Sponsors](https://github.com/sponsors/janosmiko)
 - [Buy Me a Coffee](https://buymeacoffee.com/janosmiko)
+
+Sponsorship pays for the IDE licenses and AI assistants that go into development. More of it buys more hours for LFK.
+
+Money is not the only way to help. Star the repo, file a good bug report, or tell one colleague who lives in `kubectl`.
 
 Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
 Cloudsmith is a hosted package management service that stores and serves packages in many formats.
@@ -500,13 +506,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, bui
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE).
-
-## Star history
-
-<a href="https://www.star-history.com/?repos=janosmiko%2Flfk&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=janosmiko/lfk&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=janosmiko/lfk&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=janosmiko/lfk&type=date&legend=top-left" />
- </picture>
-</a>
