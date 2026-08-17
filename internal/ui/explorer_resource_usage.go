@@ -95,7 +95,7 @@ func renderUsageBar(used, req, lim int64, barWidth int, formatFn func(int64) str
 	suffix := usageSuffixText(used, req, lim, formatFn)
 
 	// Reserve the fixed suffix column so the bar length is independent of the
-	// value string width; bars rendered with the same suffixWidth match.
+	// value string width. Bars rendered with the same suffixWidth match.
 	bw := max(barWidth-suffixWidth-2, 5) // 2 for brackets
 
 	bar := NormalStyle.Render("[") + renderUsageBarFill(bw, used, req, lim) + NormalStyle.Render("]")
@@ -109,8 +109,8 @@ func renderUsageBar(used, req, lim int64, barWidth int, formatFn func(int64) str
 // request up to 90% of the limit, red at/above 90% of the limit. The red zone
 // wins regardless of the request, so a container whose request sits near its
 // limit still turns red as usage approaches the limit. The remainder is a dim
-// headroom track; when usage has not reached the request, a tick marks the
-// request position. With a limit the bar spans 0..limit; without one it spans
+// headroom track. When usage has not reached the request, a tick marks the
+// request position. With a limit the bar spans 0..limit. Without one it spans
 // 0..max(usage, request) (so an over-request burst is visible) and there is no
 // red zone \u2014 there is no hard cap to reach. Glyphs ramp \u2592 -> \u2593 -> \u2588 so the zones
 // stay legible without color (NO_COLOR terminals).

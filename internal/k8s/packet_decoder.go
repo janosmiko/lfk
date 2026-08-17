@@ -27,7 +27,7 @@ type PacketSummary struct {
 	DstPort  string
 	Length   int
 	Flags    string // for TCP: "PSH ACK"
-	Extra    string // for DNS: "Q kubernetes.default"; for ICMP: "echo request"
+	Extra    string // for DNS: "Q kubernetes.default", for ICMP: "echo request"
 }
 
 func decodePacket(data []byte, ci gopacket.CaptureInfo, linkLayer gopacket.LayerType) PacketSummary {
@@ -136,7 +136,7 @@ func (c *countingWriter) Write(p []byte) (int, error) {
 }
 
 // Run reads packets from src until EOF, context cancellation, or a read error.
-// Raw pcap bytes are teed to d.file via io.TeeReader; each decoded packet is
+// Raw pcap bytes are teed to d.file via io.TeeReader. Each decoded packet is
 // forwarded to d.onPacket. Atomic counters are updated per packet/byte.
 func (d *packetDecoder) Run(ctx context.Context, src io.Reader) error {
 	counting := &countingWriter{w: d.file, n: d.byteCount}
@@ -149,7 +149,7 @@ func (d *packetDecoder) Run(ctx context.Context, src io.Reader) error {
 	// returns it. Parsing here lets stripSLL2 actually fire.
 	//
 	// pcap is endian-tagged: a magic of 0xa1b2c3d4 / 0xa1b23c4d means the
-	// rest of the header is big-endian; 0xd4c3b2a1 / 0x4d3cb2a1 means
+	// rest of the header is big-endian. 0xd4c3b2a1 / 0x4d3cb2a1 means
 	// little-endian. tcpdump on Linux/macOS produces little-endian by
 	// default, but a pcap captured on a big-endian host (some MIPS / older
 	// SPARC) and shipped to lfk would silently parse the linktype wrong
@@ -249,7 +249,7 @@ func stripSLL2(data []byte) ([]byte, gopacket.LayerType) {
 
 // layerTypeForLinkType maps a pcap link-type to the gopacket layer type used
 // as the decoding entry point. gopacket v1.1.19 does not include LinuxSLL2
-// (DLT 276); SLL2 is handled by stripSLL2 in the decoder loop, so other
+// (DLT 276). SLL2 is handled by stripSLL2 in the decoder loop, so other
 // unknown link types fall back to Ethernet as best-effort.
 func layerTypeForLinkType(lt layers.LinkType) gopacket.LayerType {
 	switch lt {

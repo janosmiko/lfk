@@ -110,7 +110,7 @@ func RenderRightsizingOverlay(data *model.Rightsizing, loading bool, err error, 
 //     duplicate the indicator here.
 func renderRightsizingHeader(data *model.Rightsizing, loading bool, err error) string {
 	if loading && data == nil {
-		// Cold load — the centered body owns the placeholder; header
+		// Cold load — the centered body owns the placeholder. Header
 		// stays minimal so the cold state reads as one focused message.
 		return BarDimStyle.Render("Loading…")
 	}
@@ -260,7 +260,7 @@ func headroomMethodologySuffix(s model.RightsizingStrategy, headroom float64) st
 // renderRightsizingTable draws the 2-row grouped-header recommendations
 // table sized to fill `width`. The top header row has REQUEST / LIMIT
 // (and BOUNDS for VPA) group spans whose cells render centered without
-// internal separators inside each span; the sub-header row breaks each
+// internal separators inside each span. The sub-header row breaks each
 // group into CURRENT / SUGGESTION / Δ sub-columns. The BOUNDS group is
 // dropped when source != VPA, since estimated recommendations carry no
 // lower/upper bounds.
@@ -286,7 +286,7 @@ func renderRightsizingTable(data *model.Rightsizing, scroll, width, height int) 
 }
 
 // buildRightsizingDataRows yields one pre-rendered data row per
-// (container, resource). `scroll` skips the first N rows; `maxRows`
+// (container, resource). `scroll` skips the first N rows. `maxRows`
 // clips the rest. Each row is a slice of styled cell strings (already
 // padded + width-fitted) ready to be joined by the row renderer.
 func buildRightsizingDataRows(

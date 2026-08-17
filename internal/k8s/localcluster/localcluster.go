@@ -67,14 +67,13 @@ const (
 
 // Provider is the minimum contract every local-cluster CLI wrapper
 // implements: identity, presence, listing, and creation/destruction.
-// Implementations are not required to be goroutine-safe; callers must
+// Implementations are not required to be goroutine-safe. Callers must
 // serialize access to a single Provider.
 //
 // kind cannot start or stop existing clusters in place (it has no
 // native verb for it), so kindProvider implements Provider but NOT
 // LifecycleProvider. Callers that need start/stop must type-assert
-// to LifecycleProvider — the type assertion replaces the runtime
-// SupportsStartStop() capability query that earlier revisions used.
+// to LifecycleProvider.
 type Provider interface {
 	Name() string
 	// Installed reports whether the underlying CLI is present on $PATH.
@@ -90,7 +89,7 @@ type Provider interface {
 
 // LifecycleProvider is the optional capability for providers whose
 // CLIs support stopping and restarting an existing cluster. k3d and
-// minikube implement this; kind does not (creating + deleting are the
+// minikube implement this. Kind does not (creating + deleting are the
 // only kind verbs that touch cluster lifecycle).
 //
 // Use a type assertion to test for it:
@@ -121,14 +120,14 @@ type LifecycleProvider interface {
 // ConfigFile is validated by Provider.Create at the boundary
 // (validateConfigFile): must be empty, or an absolute path to an
 // existing regular file with no traversal segments. The v1 wizard
-// always leaves it empty; the validation exists so a future
+// always leaves it empty. The validation exists so a future
 // programmatic caller can't smuggle ../etc/passwd or similar into
 // the underlying CLI's --config flag.
 type CreateSpec struct {
 	Name       string
 	K8sVersion string
 	Nodes      int    // ignored when ConfigFile is set
-	ConfigFile string // optional absolute path to existing regular file; see validateConfigFile
+	ConfigFile string // optional absolute path to existing regular file. See validateConfigFile
 }
 
 // Cluster is the manager's view of one local cluster. Best-effort: any
@@ -188,7 +187,7 @@ func ByName(name string) Provider {
 // --- providers ---
 //
 // Each provider type has a runner field for the os/exec seam. Real
-// lifecycle implementations live in kind.go, k3d.go, and minikube.go;
+// lifecycle implementations live in kind.go, k3d.go, and minikube.go.
 // k3d and minikube also satisfy LifecycleProvider via Start/Stop
 // methods declared in their respective files. The trivial Name and
 // Installed methods stay here (provider-uniform shape).

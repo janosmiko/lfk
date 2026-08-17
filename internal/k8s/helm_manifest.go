@@ -8,7 +8,7 @@ import (
 
 // ManifestResourceRef represents a single resource declared in a helm release
 // manifest. Fields are extracted from apiVersion, kind, metadata.name, and
-// metadata.namespace; cluster-scoped resources have an empty Namespace.
+// metadata.namespace. Cluster-scoped resources have an empty Namespace.
 type ManifestResourceRef struct {
 	APIVersion string
 	Kind       string
@@ -36,7 +36,7 @@ type manifestDoc struct {
 // cannot prevent the rest of a chart from rendering.
 //
 // The error return value is reserved for a future fatal-failure signal (such
-// as an input that exceeds a size cap); the current best-effort implementation
+// as an input that exceeds a size cap). The current best-effort implementation
 // never uses it, but keeping the signature lets callers add error handling
 // without breaking compatibility.
 //
@@ -131,7 +131,7 @@ func isYAMLDocSeparator(line string) bool {
 		return true
 	}
 	// The character immediately following "---" must be whitespace for the
-	// rest-of-line content to even be considered; otherwise "---foo" is just
+	// rest-of-line content to even be considered. Otherwise "---foo" is just
 	// a document body line that happens to start with dashes.
 	if rest[0] != ' ' && rest[0] != '\t' && rest[0] != '\r' {
 		return false

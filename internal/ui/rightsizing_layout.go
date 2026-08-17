@@ -10,7 +10,7 @@ import (
 // overlay. `widths` and `aligns` are per sub-column (one entry per
 // physical cell). `subHdrs` is the bottom-row header text per
 // sub-column. `spans` is the top-row group header (REQUEST, LIMIT,
-// BOUNDS); singletons (CONTAINER, RES, USAGE) are NOT included in
+// BOUNDS). Singletons (CONTAINER, RES, USAGE) are NOT included in
 // `spans` — they render as blank cells in the group header row.
 type rsLayout struct {
 	widths  []int
@@ -63,7 +63,7 @@ const (
 // longest sub-header label AND the typical maximum data value so cells
 // never wrap (lipgloss `Width(n)` wraps overflow rather than truncating).
 // CONTAINER stays near header width because names are variable and get
-// ellipsised when over-long; value columns must accommodate "SUGGESTION"
+// ellipsised when over-long. Value columns must accommodate "SUGGESTION"
 // (10) so the bottom-row labels render whole. USAGE has to fit memory
 // values like "2162Mi" (6) and "10000Mi" (7) — bumped to 8 so we don't
 // wrap on real argo-cd / kafka workloads. Δ holds "-100%" (5 chars).
@@ -89,7 +89,7 @@ const (
 //	      = sum(widths[i]) + 3N - 1
 //
 // where N is the number of sub-columns. The +2 per cell is the cell
-// padding; the (N-1) accounts for inter-cell separators.
+// padding. The (N-1) accounts for inter-cell separators.
 func rsLayoutFor(hasBounds bool, panelW int) rsLayout {
 	subHdrs := []string{"CONTAINER", "RES", "USAGE", "CURRENT", "SUGGESTION", "Δ", "CURRENT", "SUGGESTION", "Δ"}
 	aligns := []lipgloss.Position{
@@ -199,7 +199,7 @@ func rsDistributeWidths(panelW int, mins []int) []int {
 }
 
 // renderRSGroupHeader renders the top header row. Singletons (the
-// columns NOT covered by any span) render as blank space; group spans
+// columns NOT covered by any span) render as blank space. Group spans
 // render their `name` centered within the span's display width with
 // `─` filler chars on both sides so the span's extent is visually
 // obvious. Separators between cells use box-drawing corners to bracket
@@ -218,7 +218,7 @@ func rsDistributeWidths(panelW int, mins []int) []int {
 // reserves the +1 char for this trailing slot.
 //
 // Corners + filler use `ColorBorder` to match the mid-rule + sub-header
-// separators; the group `name` itself uses `ColorPrimary` bold so it
+// separators. The group `name` itself uses `ColorPrimary` bold so it
 // reads as the dominant signal.
 func renderRSGroupHeader(layout rsLayout) string {
 	nameStyle := lipgloss.NewStyle().
@@ -329,7 +329,7 @@ func renderRSSeparator(layout rsLayout) string {
 
 // renderRSDataRow assembles a data row from pre-rendered cells. Cells
 // must be pre-styled and width-fitted (use `renderRSCell` /
-// `renderRSCellPrestyled`); this helper just inserts separators
+// `renderRSCellPrestyled`). This helper just inserts separators
 // between them and appends the trailing closing `│`. Layout is unused
 // here — kept on the signature so all row renderers share a uniform
 // shape (group/sub/sep/data).
@@ -384,7 +384,7 @@ func renderRSCellPrestyled(content string, width int, align lipgloss.Position, f
 // budget the last char becomes `…` so the truncation is visible. When
 // `width <= 0` returns the empty string. Plain runes only — assumes
 // content has no embedded ANSI sequences (data values are unstyled
-// strings; the styling lives on the surrounding `renderRSCell` style).
+// strings. The styling lives on the surrounding `renderRSCell` style).
 func rsTruncate(s string, width int) string {
 	if width <= 0 {
 		return ""

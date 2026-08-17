@@ -45,7 +45,7 @@ func (d *clusterData) batchFindings() []security.Finding {
 }
 
 // storageExpansionFindings flags StatefulSets whose volumeClaimTemplates use
-// a StorageClass with allowVolumeExpansion unset or false — the volumes
+// a StorageClass with allowVolumeExpansion unset or false. The volumes
 // cannot grow in place, and StatefulSet storage is painful to migrate.
 func (d *clusterData) storageExpansionFindings() []security.Finding {
 	if !d.scOK {
@@ -72,7 +72,7 @@ func (d *clusterData) storageExpansionFindings() []security.Finding {
 				class = defaultClass
 			}
 			if class == "" {
-				continue // no default class resolvable; different problem
+				continue // no default class resolvable, a separate problem
 			}
 			if canExpand, known := expandable[class]; known && !canExpand {
 				fixed = append(fixed, class)

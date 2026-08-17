@@ -109,7 +109,7 @@ func (m Model) handleRightsizingOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.
 //  1. Cache hit for the (strategy, newHeadroom) pair → swap data
 //     pointer in place, no fetch.
 //  2. s.data populated → call k8s.RescaleRightsizing to multiply
-//     every recommendation by newH/oldH locally; cache the result
+//     every recommendation by newH/oldH locally. Cache the result
 //     under the new key for future revisits.
 //  3. Fallback (cache miss AND s.data == nil) → async load. This
 //     path is only hit on the first frame before
@@ -208,7 +208,7 @@ func indexOfHeadroom(h float64, headrooms []float64) int {
 // snapHeadroomInDirection picks the preset to land on when the
 // current headroom is not in the preset list. `direction == +1` →
 // smallest preset > current (or the first preset when current is
-// already past the top); `direction == -1` → largest preset < current
+// already past the top). `direction == -1` → largest preset < current
 // (or the last preset when current is below the bottom). Mirrors the
 // vim wrap behavior at the edges so a snapped press still cycles.
 func snapHeadroomInDirection(current float64, direction int, headrooms []float64) float64 {
@@ -239,7 +239,7 @@ func snapHeadroomInDirection(current float64, direction int, headrooms []float64
 // Two paths:
 //
 //  1. Cache hit on (newStrategy, headroom) → swap data pointer in
-//     place; no async fetch and no flash.
+//     place. No async fetch and no flash.
 //  2. Cache miss → kick the async load BUT keep the previous
 //     strategy's data in s.data so the renderer can keep showing it
 //     while the new fetch runs. The renderer combines `loading=true`

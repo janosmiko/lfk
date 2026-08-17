@@ -96,7 +96,7 @@ const (
 )
 
 // ConfigWatchInterval is the resolved polling interval used when watch mode
-// is active. Set from config file; CLI flag override is applied later in
+// is active. Set from config file. CLI flag override is applied later in
 // app.NewModel.
 var ConfigWatchInterval = DefaultWatchInterval
 
@@ -106,7 +106,7 @@ var ConfigWatchInterval = DefaultWatchInterval
 const DefaultBackgroundWatchInterval = 10 * time.Second
 
 // ConfigBackgroundWatchInterval is the resolved background/idle polling interval.
-// Set from config file; CLI flag override is applied in app.NewModel. Clamped
+// Set from config file. CLI flag override is applied in app.NewModel. Clamped
 // to [MinWatchInterval, MaxWatchInterval] like the foreground interval.
 var ConfigBackgroundWatchInterval = DefaultBackgroundWatchInterval
 
@@ -127,7 +127,7 @@ const DefaultWatchThrottle = true
 // to fully disable it (watch_interval is then used unconditionally).
 var ConfigWatchThrottle = DefaultWatchThrottle
 
-// ClampForegroundIdleTimeout restricts d to [0, MaxWatchInterval]; 0 disables.
+// ClampForegroundIdleTimeout restricts d to [0, MaxWatchInterval]. 0 disables.
 func ClampForegroundIdleTimeout(d time.Duration) time.Duration {
 	if d < 0 {
 		return 0
@@ -169,13 +169,13 @@ func ClampWatchInterval(d time.Duration) time.Duration {
 var ConfigLogPath string
 
 // ConfigKubeconfigDirs holds the kubeconfig_dir value from the config file (if any).
-// The YAML value may be either a single string or a list of strings; both are
-// normalised into this slice. Empty (nil) means "no override; use the default".
+// The YAML value may be either a single string or a list of strings. Both are
+// normalised into this slice. Empty (nil) means "no override, use the default".
 var ConfigKubeconfigDirs []string
 
 // ConfigKubeconfigExclusive holds kubeconfig_exclusive from the config file:
 // whether a set KUBECONFIG suppresses the default kubeconfig discovery
-// (kubectl semantics). Defaults to true; CLI flag and env override it at
+// (kubectl semantics). Defaults to true. CLI flag and env override it at
 // client construction (see k8s.ResolveKubeconfigExclusive).
 var ConfigKubeconfigExclusive = true
 
@@ -294,7 +294,7 @@ var ConfigClusterResourceColumns map[string]map[string][]string
 // Fields are AND-ed together. When `Invert` is true the resulting boolean is
 // negated, so e.g. `status: Bound` + `invert: true` matches everything that is
 // NOT Bound. The pre-existing `ReadyNot` flag remains for fine-grained Ready
-// negation; rule-level `Invert` is the general escape hatch.
+// negation. Rule-level `Invert` is the general escape hatch.
 type ConfigFilterMatch struct {
 	Status      string `json:"status" yaml:"status"`
 	ReadyNot    bool   `json:"ready_not" yaml:"ready_not"`
@@ -317,7 +317,7 @@ var ConfigFilterPresets map[string][]ConfigFilterPreset
 // ColumnsForKind returns the configured column list for the given resource
 // and cluster context. Resolution order: per-cluster resource_columns,
 // per-cluster views (GVR then Kind), global resource_columns, global views
-// (GVR then Kind). Per-cluster wins over global; the legacy resource_columns
+// (GVR then Kind). Per-cluster wins over global. The legacy resource_columns
 // surface wins over views within a scope so users with both keys configured
 // see the explicit resource_columns override. GVR keys win over Kind keys
 // within the views surface, matching ResolveView.
@@ -441,7 +441,7 @@ const (
 
 // ConfigInformerCacheMode resolves to one of "off"/"auto"/"always" after
 // LoadConfig. Default "auto" so users on large clusters (issue #86) get the
-// namespace-switch perf win for free; small clusters pay nothing because
+// namespace-switch perf win for free. Small clusters pay nothing because
 // auto-mode only promotes a (context, GVR) to the cache once a list crosses
 // 1000 items, and demotes it again when the list shrinks.
 var ConfigInformerCacheMode = InformerCacheAuto
@@ -459,7 +459,7 @@ var ConfigInformerCacheMode = InformerCacheAuto
 //	0.3   approx. WCAG AAA threshold (7.0:1)
 //	1.0   maximum — forces fg toward pure black or white against any bg
 //
-// Values outside [0, 1] are clamped. Only HSL lightness is adjusted; hue and
+// Values outside [0, 1] are clamped. Only HSL lightness is adjusted. Hue and
 // saturation are preserved at moderate values.
 var ConfigMinContrastRatio float64
 
@@ -468,7 +468,7 @@ var ConfigMinContrastRatio float64
 // key.
 const (
 	// TerminalModePTY embeds the shell in lfk's TUI via an internal vt10x
-	// terminal. Output stays inside lfk; selection works via host-terminal
+	// terminal. Output stays inside lfk. Selection works via host-terminal
 	// shift+drag. Default.
 	TerminalModePTY = "pty"
 	// TerminalModeExec hands the host terminal to the shell via
@@ -499,7 +499,7 @@ func defaultTerminalMode() string {
 
 // defaultTerminalModeForOS is the testable inner form. Windows must
 // default to Exec because creack/pty's Windows StartWithSize returns
-// ErrUnsupported; every other platform gets the richer embedded PTY.
+// ErrUnsupported. Every other platform gets the richer embedded PTY.
 func defaultTerminalModeForOS(goos string) string {
 	if goos == "windows" {
 		return TerminalModeExec
@@ -512,7 +512,7 @@ func defaultTerminalModeForOS(goos string) string {
 //   - effectiveMode is always a valid mode the caller can assign to
 //     ConfigTerminalMode. When the input is empty or unrecognised the
 //     caller's currentMode is returned unchanged.
-//   - warning is non-empty when a fallback was applied; the caller is
+//   - warning is non-empty when a fallback was applied. The caller is
 //     expected to log it at Warn level so the user sees why their
 //     configured value didn't stick.
 //
@@ -536,7 +536,7 @@ func resolveTerminalMode(configValue, goos, currentMode string) (mode string, wa
 	default:
 		// The raw configValue is intentionally NOT embedded in the
 		// warning — log redaction policy. Users can check their config
-		// file to see what they typed; the "valid" list logged by the
+		// file to see what they typed. The "valid" list logged by the
 		// caller tells them what is accepted.
 		return currentMode, "unrecognised terminal mode; using " + currentMode
 	}
@@ -544,8 +544,8 @@ func resolveTerminalMode(configValue, goos, currentMode string) (mode string, wa
 
 // ScrollbackLines clamps for the embedded PTY scrollback ring. The
 // default of 5000 covers an extended interactive session without
-// running the parent process out of memory; the floor stops a typo in
-// the config from disabling scrollback entirely; the ceiling caps
+// running the parent process out of memory. The floor stops a typo in
+// the config from disabling scrollback entirely. The ceiling caps
 // memory at roughly 10MB even with very long lines.
 const (
 	ScrollbackLinesDefault = 5000
@@ -594,7 +594,7 @@ var ConfigPinnedSummariesSet bool
 
 // ConfigUnionSets holds named multi-cluster groups defined in config.
 // Resolved by --union-set into a list of contexts + optional namespace.
-// Empty by default; populated by applyConfigOptions when union_sets is
+// Empty by default. Populated by applyConfigOptions when union_sets is
 // present in the YAML config.
 var ConfigUnionSets []UnionSetConfig
 
@@ -667,7 +667,7 @@ var ConfigWhichKeyLeaderDelayMs = 0
 
 // ConfigWhichKeyGrouped is the STARTUP default for the leader panel's entry
 // order: true clusters entries by category, false sorts purely by key. The
-// leader key toggles it at runtime for the rest of the session; the runtime
+// leader key toggles it at runtime for the rest of the session. The runtime
 // state is never written back here.
 var ConfigWhichKeyGrouped = true
 
@@ -694,7 +694,7 @@ func ResolveReadOnly(context string, cliFlag bool) bool {
 }
 
 // ConfigK8sClientQPS / ConfigK8sClientBurst are the global foreground REST
-// client rate limits. Defaults mirror k8s.DefaultClientQPS/Burst; raising the
+// client rate limits. Defaults mirror k8s.DefaultClientQPS/Burst. Raising the
 // stock client-go 5/10 keeps foreground lists responsive while background
 // scans run. Per-cluster overrides take precedence.
 var (
@@ -712,14 +712,14 @@ var (
 
 // init wires the foreground rate resolver into the k8s package so every REST
 // client picks up the configured (or default) QPS/Burst. Set unconditionally
-// at package load; resolution is lazy, so config applied later is honored.
+// at package load. Resolution is lazy, so config applied later is honored.
 func init() {
 	k8s.RateLimitForContext = ResolveK8sClientRate
 }
 
 // ResolveK8sClientRate returns the effective foreground QPS/Burst for a
 // context. Precedence: per-cluster override > global > compiled default.
-// Returned as (float32, int) to match rest.Config fields; this is the resolver
+// Returned as (float32, int) to match rest.Config fields. This is the resolver
 // wired into k8s.RateLimitForContext.
 func ResolveK8sClientRate(context string) (qps float32, burst int) {
 	q, b := ConfigK8sClientQPS, ConfigK8sClientBurst

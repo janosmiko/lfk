@@ -24,7 +24,7 @@ var secretInnerPanelStyle = lipgloss.NewStyle().
 //   - searchQuery / searchActive: the / filter.
 //   - editKeyCursor / editValueCursor: byte offsets inside editKey /
 //     editValue where the "█" cursor block lands.
-//   - selected: keys marked with `s` for batch copy; rendered with a
+//   - selected: keys marked with `s` for batch copy. Rendered with a
 //     "✓" prefix in the key column. May be nil.
 //   - formatActive / formatCursor: drive the Shift+Y format-picker
 //     chip row, rendered above the inner panel when formatActive.
@@ -106,7 +106,7 @@ func RenderSecretEditorOverlay(
 	//   - value contains '\n'  → focused bordered pane (handles newlines
 	//     + scroll without breaking the table layout)
 	//   - value is single line  → inline table-cell edit (the cursor
-	//     row's value cell shows the cursor; surrounding rows stay
+	//     row's value cell shows the cursor. Surrounding rows stay
 	//     visible for context — the bordered pane is overkill for a
 	//     one-line password/token).
 	var dataContent string
@@ -184,7 +184,7 @@ func renderSecretEditorTable(
 	editValue string,
 	editValueCursor int,
 	editColumn int,
-	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
+	selectedKeys map[string]bool, // keys marked with `s` for batch copy, nil = none
 	width, height int,
 ) string {
 	keyColW := computeKeyColumnWidth(secret.Keys, width, 3)
@@ -224,14 +224,14 @@ func renderSecretEditorTable(
 	rendered := t.Render()
 	if len(secret.Keys) == 0 {
 		// Headers always rendered (above) so the user sees the column
-		// labels; placeholder hint sits below them on its own line.
+		// labels. Placeholder hint sits below them on its own line.
 		return rendered + "\n" + BarDimStyle.Render("  (empty - press 'a' to add a key)")
 	}
 	return rendered
 }
 
 // secretValueDisplay returns the display string for a secret value.
-// Hidden values render as the fixed mask; revealed values flow through
+// Hidden values render as the fixed mask. Revealed values flow through
 // SingleLineCell so embedded newlines (multi-line secret payloads like
 // kubeconfig values) don't expand the table cell vertically.
 func secretValueDisplay(val string, revealed bool, maxW int) string {

@@ -22,7 +22,7 @@ type LocalClusterOverlayState struct {
 	Clusters           []LocalClusterRowView
 	Cursor             int
 	Loading            bool
-	Info               string // transient banner ("Created kind/dev"); rendered above the table
+	Info               string // transient banner ("Created kind/dev"). Rendered above the table
 	GlobalErr          string
 	Width              int
 	Height             int
@@ -164,9 +164,9 @@ func renderLocalClusterList(s LocalClusterOverlayState) string {
 }
 
 // formatLocalClusterRow lays out one table row. nameW is the width of
-// the Name column (flex with overlay width); other columns are fixed
+// the Name column (flex with overlay width). Other columns are fixed
 // (provider 9, status 12, k8s 10, nodes 5, age 8). Values are
-// truncated to fit; provider/status/k8s/nodes are short by
+// truncated to fit. Provider/status/k8s/nodes are short by
 // construction so truncation only really matters for Name.
 func formatLocalClusterRow(nameW int, prov, name, status, ver, nodes, age string) string {
 	return fmt.Sprintf("%-9s  %-*s  %-12s  %-10s  %-5s  %-8s",

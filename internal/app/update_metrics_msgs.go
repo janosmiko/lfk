@@ -18,7 +18,7 @@ import (
 // a long multi-cluster session can't accumulate every resource ever hovered.
 // The secret cache holds decoded plaintext, so it gets the tighter cap (also a
 // security win — less plaintext resident). When a cache is full a fresh map is
-// started, dropping the cold set; the active hover repopulates instantly.
+// started, dropping the cold set. The active hover repopulates instantly.
 const (
 	secretPreviewCacheCap    = 64
 	serviceEndpointsCacheCap = 256
@@ -98,7 +98,7 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 // map, so the assignment is a no-op for those.
 func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLoadedMsg) Model {
 	if msg.gen != m.requestGen {
-		return m // stale response; the caller's m.previewLoading stays armed
+		return m // stale response. The caller's m.previewLoading stays armed
 	}
 	// The fetch is no longer in flight for the current gen. Clear the
 	// spinner regardless of outcome so the right pane stops saying
@@ -122,7 +122,7 @@ func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLo
 		// only inject if it's still the cache's current value. A fresher
 		// fetch may have already updated the cache (extremely rare race
 		// where the fresh response beats the tea.Batch goroutine
-		// scheduling); in that case its handler already injected and
+		// scheduling). In that case its handler already injected and
 		// this stale emit must not clobber it. Don't write the cache
 		// either — it already holds msg.data when the guard passes.
 		if existing, ok := m.serviceEndpointsCache[key]; !ok || existing != msg.data {
@@ -179,7 +179,7 @@ func injectServiceEndpointColumns(item *model.Item, data *k8s.ServiceEndpoints) 
 
 func (m Model) updatePreviewSecretDataLoaded(msg previewSecretDataLoadedMsg) Model {
 	if msg.gen != m.requestGen {
-		return m // stale response; discard. A newer load is still in flight,
+		return m // stale response. Discard. A newer load is still in flight,
 		// so leave previewLoading armed for the next reply.
 	}
 	// The fetch is no longer in flight for the current gen. Clear the spinner
@@ -428,7 +428,7 @@ func ensureNodeMetricsColumnsPlaceholder(item *model.Item) {
 
 // updateRightsizingLoaded handles the rightsizingLoadedMsg. Stale
 // generation discarded (overlay closed + reopened with a different
-// workload before this fetch returned); otherwise stores the result
+// workload before this fetch returned). Otherwise stores the result
 // in m.rightsizing (or m.rightsizing.err) and caches it for re-opens.
 //
 // Errors are NOT cached — the next overlay open will retry instead
@@ -508,7 +508,7 @@ func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 		if !ok {
 			// Metrics-server didn't return data for this node (or not yet).
 			// Touch the item so CPU/CPU%/MEM/MEM% columns exist with "n/a"
-			// values; otherwise autoDetectColumns hides the columns
+			// values. Otherwise autoDetectColumns hides the columns
 			// entirely whenever metrics are unavailable, and they pop
 			// in/out as metrics-server churns.
 			ensureNodeMetricsColumnsPlaceholder(item)

@@ -45,8 +45,8 @@ type Result struct {
 
 // Future is a buffered (size 1) channel the caller awaits inside its
 // tea.Cmd goroutine. The buffer guarantees the worker never blocks on
-// send even if the caller goroutine has already returned (defensive —
-// in practice the caller always reads exactly once).
+// send even if the caller goroutine has already returned. This is
+// defensive — in practice the caller always reads exactly once.
 type Future <-chan Result
 
 // Sentinel errors delivered via Result.Err.
@@ -58,7 +58,7 @@ var (
 
 	// ErrContextSwitched is delivered when CancelContext drops this
 	// task's context before it could run. Caller's tea.Cmd should return
-	// nil (no UI update needed; the cluster context is gone).
+	// nil (no UI update needed, the cluster context is gone).
 	ErrContextSwitched = errors.New("scheduler: context switched")
 
 	// ErrSuperseded is delivered when CancelStaleByGen drops or cancels a
@@ -78,7 +78,7 @@ type queuedTask struct {
 // a wake signal channel.
 //
 // skips and agingThreshold implement anti-starvation aging: skips[p] counts
-// how many times lane p has been passed over while non-empty; once it reaches
+// how many times lane p has been passed over while non-empty. Once it reaches
 // agingThreshold the lane is promoted ahead of higher-priority lanes for one
 // dequeue. Critical (lane 0) is never aged. agingThreshold == 0 disables aging
 // (strict priority). See dequeueByPriorityLocked.
@@ -196,14 +196,15 @@ func (q *ctxQueue) drain(err error) {
 // empty. Caller must hold q.mu.
 //
 // Critical is absolute: foundational gating work (API discovery, RBAC,
-// namespaces) and destructive mutations must never be delayed, so it is served
-// outright and is never aged. Among the non-Critical lanes the highest-priority
-// non-empty lane wins by default, but a lower lane passed over more than
-// agingThreshold times preempts it for a single dequeue. Without this, sustained
-// High submissions on a slow cluster keep the High lane non-empty forever and
-// Low work (security scans, dashboard, metrics) never runs (priority
-// starvation); aging bounds that wait to ~agingThreshold higher-priority
-// dispatches. agingThreshold == 0 restores strict priority.
+// namespaces) and destructive mutations must never be delayed. So it is
+// served outright and is never aged. Among the non-Critical lanes the
+// highest-priority non-empty lane wins by default. But a lower lane
+// passed over more than agingThreshold times preempts it for a single
+// dequeue. Without this, sustained High submissions on a slow cluster
+// keep the High lane non-empty forever. Low work (security scans,
+// dashboard, metrics) never runs (priority starvation). Aging bounds
+// that wait to ~agingThreshold higher-priority dispatches.
+// agingThreshold == 0 restores strict priority.
 func (q *ctxQueue) dequeueByPriorityLocked() (*queuedTask, bool) {
 	if lane := q.lanes[int(PriorityCritical)]; len(lane) > 0 {
 		q.lanes[int(PriorityCritical)] = lane[1:]
@@ -247,13 +248,13 @@ func (q *ctxQueue) dequeueByPriorityLocked() (*queuedTask, bool) {
 
 // hasPendingWork reports whether any priority lane is non-empty. Used by
 // the worker loop to decide whether to re-signal q.wake after a failed
-// pickTask: if the queue is truly empty we must NOT re-signal, otherwise
-// a stale wake left over from a previous drain creates a hot loop in
-// which the same worker repeatedly receives and resends the signal
-// without parking (issue #206 — observed as 2.26M goroutine
-// block/unblock events per second). Caller does not need to hold q.mu;
-// the read is racy but only used as a hint and the worst case is one
-// extra empty wake which the workers tolerate by parking again.
+// pickTask. If the queue is truly empty we must NOT re-signal. Otherwise
+// a stale wake left over from a previous drain creates a hot loop. In
+// that loop the same worker repeatedly receives and resends the signal
+// without parking. This was issue #206 — observed as 2.26M goroutine
+// block/unblock events per second. Caller does not need to hold q.mu.
+// The read is racy but only used as a hint. The worst case is one
+// extra empty wake, which the workers tolerate by parking again.
 func (q *ctxQueue) hasPendingWork() bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -269,7 +270,7 @@ func (q *ctxQueue) hasPendingWork() bool {
 // Registry is nil or has been closed, the Future immediately receives
 // Result{Err: ErrContextSwitched}.
 //
-// No workers are spawned by this commit; submitted tasks accumulate in
+// No workers are spawned by this commit. Submitted tasks accumulate in
 // their priority lane until a later commit adds the worker pool.
 func (r *Registry) Submit(req SubmitReq) Future {
 	fut := make(chan Result, 1)
@@ -301,13 +302,13 @@ func (r *Registry) Submit(req SubmitReq) Future {
 
 	// Coalesce against work already IN FLIGHT, not just queued. Without this,
 	// a slow fetch (e.g. Pod metrics on a sluggish cluster) that is still
-	// running cannot absorb an identical resubmission — the duplicate queues
+	// running cannot absorb an identical resubmission. The duplicate queues
 	// behind it and runs a redundant API call when the worker frees up. The
 	// queue-only coalesce below never sees the running task because it lives
 	// in runningTasks, not q.lanes. Checked before enqueue so the caller's
-	// Future resolves immediately with ErrCoalesced (its tea.Cmd returns nil;
-	// the in-flight task's result is the one that matters). Mutations opt out
-	// via NeverCoalesce — a second write must always run.
+	// Future resolves immediately with ErrCoalesced (its tea.Cmd returns nil,
+	// because the in-flight task's result is the one that matters). Mutations
+	// opt out via NeverCoalesce — a second write must always run.
 	if !sig.NeverCoalesce() && r.coalescesWithRunning(req.KubeContext, sig) {
 		fut <- Result{Err: ErrCoalesced}
 		close(fut)
@@ -344,7 +345,7 @@ func (r *Registry) Submit(req SubmitReq) Future {
 
 // coalescesWithRunning reports whether an in-flight task on kctx has a Sig that
 // the incoming sig coalesces with. A task already being torn down (preempted,
-// superseded, or context-switched) is skipped: it is about to free its slot
+// superseded, or context-switched) is skipped. It is about to free its slot
 // and deliver a sentinel, so coalescing onto it would drop the fresh request.
 func (r *Registry) coalescesWithRunning(kctx string, sig Sig) bool {
 	r.mu.Lock()

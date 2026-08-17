@@ -14,7 +14,7 @@ import (
 // Keep this list in sync with the action handlers in update_actions.go and
 // the bulk handlers in update_actions.go (executeBulkAction). Adding a new
 // mutating action without listing it here is a silent escape from read-only
-// mode; the readonly_test.go suite asserts membership for every known label.
+// mode. The readonly_test.go suite asserts membership for every known label.
 var mutatingActions = map[string]bool{
 	// Core kubectl mutations.
 	"Delete":               true,
@@ -68,12 +68,12 @@ var mutatingActions = map[string]bool{
 	"Reconcile":     true,
 
 	// Longhorn node mutations. Force Delete (above) disables scheduling then
-	// deletes; Evict Replicas / Cancel Eviction toggle spec.evictionRequested.
+	// deletes. Evict Replicas / Cancel Eviction toggle spec.evictionRequested.
 	"Evict Replicas":  true,
 	"Cancel Eviction": true,
 
 	// Karpenter NodeClaim mutations. Disrupt removes the underlying
-	// node; Cordon / Uncordon / Drain Node operate on the node bound
+	// node. Cordon / Uncordon / Drain Node operate on the node bound
 	// to the NodeClaim.
 	"Disrupt":              true,
 	"Cordon/Uncordon Node": true,
@@ -120,7 +120,7 @@ func isUnionAllowedActionForKind(kind, label string) bool {
 //
 // Built-in action labels are checked against mutatingActions. Custom user
 // actions (ui.CustomAction) bypass this set because their labels are
-// arbitrary; isMutatingActionForKind handles them — call that variant
+// arbitrary. isMutatingActionForKind handles them — call that variant
 // when the resource kind is known so custom actions can be evaluated
 // against their ReadOnlySafe flag.
 func isMutatingAction(label string) bool {
@@ -171,7 +171,7 @@ func (m Model) readOnlyForContext(ctx string) bool {
 
 // bulkReadOnlyContext returns the first target context that would make a
 // mutating bulk action illegal. Bulk union actions are all-or-nothing at the
-// dispatcher; individual handlers should not partially mutate a mixed
+// dispatcher. Individual handlers should not partially mutate a mixed
 // read-only/read-write selection.
 func (m Model) bulkReadOnlyContext() (string, bool) {
 	if len(m.bulkItems) == 0 {
@@ -326,7 +326,7 @@ func (m *Model) recomputeHideSecurityBadges(ctx string) {
 //     that row updates immediately, and the new state is stored in
 //     contextROOverrides so it persists across re-navigations within the
 //     session and is honored on context entry. Per-context config and
-//     global config provide the *initial* state; the override wins until
+//     global config provide the *initial* state. The override wins until
 //     toggled again.
 //
 //   - Inside a context, the toggle flips the active tab's read-only
@@ -358,7 +358,7 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 		m.contextROOverrides[sel.Name] = newState
 		// Update m.middleItems by index rather than via the sel pointer.
 		// selectedMiddleItem may return a pointer into a transient filtered
-		// slice on its fallback path; writing through that pointer would
+		// slice on its fallback path. Writing through that pointer would
 		// not reach the cached middleItems below, leaving the [RO] marker
 		// stale until the next refresh.
 		for i := range m.middleItems {

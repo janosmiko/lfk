@@ -1,6 +1,6 @@
 # Contributing to lfk
 
-Contributions are welcome! Here is how to get started.
+Setup, build, and release steps for `lfk` contributors.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ Contributions are welcome! Here is how to get started.
 - `kubectl` configured and working
 - `golangci-lint`
 
-## Development Setup
+## Development setup
 
 ```bash
 # Clone the repository
@@ -27,7 +27,7 @@ make build
 ./lfk
 ```
 
-## Building and Testing
+## Building and testing
 
 ```bash
 # Build
@@ -43,7 +43,7 @@ go test -race ./...
 golangci-lint run
 ```
 
-## Project Structure
+## Project structure
 
 - `main.go` - Entry point, initializes the Kubernetes client, loads config, and starts the Bubbletea program
 - `internal/app/` - Core application logic: the Bubbletea model, update loop, async commands, and bookmarks
@@ -52,7 +52,7 @@ golangci-lint run
 - `internal/ui/` - All rendering: columns, overlays, styles, themes, help screen, and log viewer
 - `internal/logger/` - Application logging
 
-## Submitting Changes
+## Submitting changes
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-feature`)
@@ -69,7 +69,12 @@ Typical flow:
 
 1. Land conventional commits on `main` (`feat:`, `fix:`, `perf:`, `refactor:`, etc.).
 2. The `release-please` workflow opens or updates a Release PR with the next version, an updated `flake.nix` `baseVersion`, and a `CHANGELOG.md` entry.
-3. If `go.sum` changed since the last release, check out the Release PR locally and run `make refresh-vendor-hash` so `vendorHash` matches the new vendored module set, then push the change to the PR branch. (`verify-flake-build` in `release.yml` will catch a stale hash if you forget.)
+3. If `go.sum` changed since the last release:
+   1. Check out the Release PR locally.
+   2. Run `make refresh-vendor-hash` so `vendorHash` matches the new vendored module set.
+   3. Push the change to the PR branch.
+
+   (`verify-flake-build` in `release.yml` catches a stale hash if you forget this step.)
 4. Merge the Release PR. release-please tags the merge commit (e.g. `v0.9.33`), and `release.yml` takes over to publish the release.
 
-For emergency manual releases (skipping the bot), `make bump-version VERSION=X.Y.Z` and `make release VERSION=X.Y.Z` remain available; the `verify-flake-version` job in `release.yml` is the safety net that prevents a tag/`flake.nix` mismatch.
+For emergency manual releases (skipping the bot), `make bump-version VERSION=X.Y.Z` and `make release VERSION=X.Y.Z` remain available. The `verify-flake-version` job in `release.yml` is the safety net that prevents a tag/`flake.nix` mismatch.

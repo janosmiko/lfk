@@ -19,7 +19,7 @@ var (
 )
 
 // compileSearchRegex compiles "(?i)"+query, memoizing the most recently used
-// query. The search/filter hot paths call this per item per frame; only one
+// query. The search/filter hot paths call this per item per frame. Only one
 // query is active at a time, so a single-entry cache eliminates redundant
 // compiles — e.g. filtering a 5k-pod list or running n/N over a 50k-line log
 // buffer would otherwise recompile the pattern thousands of times per keypress.
@@ -276,7 +276,7 @@ func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string 
 	}
 	switch mode {
 	case SearchRegex, SearchFuzzy:
-		// Regex / fuzzy don't get the inline-aware treatment yet; fall
+		// Regex / fuzzy don't get the inline-aware treatment yet. Fall
 		// back to the plain substring path so they keep the existing
 		// behavior. The YAML preview's main caller uses substring.
 		return HighlightMatchStyled(line, rawQuery, hlStyle)
@@ -342,7 +342,7 @@ func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string 
 
 // highlightSpans applies style to a list of [start, end) plain-byte
 // spans inside a (possibly already-styled) line. Spans are positions
-// in ansi.Strip(line); they're mapped to visual columns and spliced
+// in ansi.Strip(line). They're mapped to visual columns and spliced
 // back into the styled line via ansi.Cut / ansi.TruncateLeft so the
 // surrounding ANSI between matches is preserved.
 //
@@ -360,7 +360,7 @@ func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string 
 // plain text (help.go path) or text whose inner styling is uniform
 // (search-bar paths), so this is a non-issue in practice. A future
 // caller passing a syntax-highlighted line (e.g. log content with
-// per-token colors) would lose styling on matched characters; in
+// per-token colors) would lose styling on matched characters. In
 // that case use HighlightMatchInline (search.go) which tracks
 // activeOpen across the highlighted segment.
 //
@@ -487,7 +487,7 @@ func highlightFuzzy(line, query string, style lipgloss.Style, restoreCodes strin
 
 	// Convert rune indices to plain byte offsets so highlightSpans can
 	// map them to visual columns. range over plain yields the byte
-	// offset of each rune; the trailing len(plain) closes the last
+	// offset of each rune. The trailing len(plain) closes the last
 	// run.
 	runeByteOff := make([]int, 0, len(plainRunes)+1)
 	for byteOff := range plain {
@@ -535,7 +535,7 @@ func SearchModeIndicator(rawQuery string) string {
 // HighlightMatchCurrentAtCol highlights every match of rawQuery in line with
 // normalStyle, except the occurrence whose start is at visual column currentCol,
 // which uses currentStyle. currentCol < 0 (or no match starting there) means all
-// matches use normalStyle. Substring and regex modes only; fuzzy falls back to
+// matches use normalStyle. Substring and regex modes only. Fuzzy falls back to
 // uniform normalStyle (a fuzzy "current occurrence" is ill-defined).
 func HighlightMatchCurrentAtCol(line, rawQuery string, normalStyle, currentStyle lipgloss.Style, currentCol int) string {
 	if rawQuery == "" {

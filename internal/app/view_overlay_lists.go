@@ -43,14 +43,14 @@ func overlayListScroll(prev *int, cursor, total, maxVisible int) int {
 // overlayListChromeFilterable returns the number of non-item rows the
 // OverlayList block occupies for a filterable overlay (Filterable=true):
 // title (1) + title's bottom padding row (1) + filter prompt (1) +
-// blank separator below filter (1) = 4 rows. Lipgloss's 1+1 vertical
+// blank separator below filter (1) = 4 rows, and lipgloss's 1+1 vertical
 // padding around the block is handled by the caller subtracting 2 from
 // the outer overlay height before passing the result as cfg.Height —
 // so this helper returns the chrome INSIDE the block only.
 func overlayListChromeFilterable() int { return 4 }
 
 // renderActionOverlay maps the action-menu items onto OverlayList. The
-// verb code (model.Item.Status) renders as the "[s]" status badge; the
+// verb code (model.Item.Status) renders as the "[s]" status badge. The
 // long-form description (Extra) renders dim after the action name.
 // Adaptive width replaces the old ActionOverlayWidth helper so long
 // Karpenter / Knative descriptions still grow the box without wrapping.
@@ -71,7 +71,7 @@ func renderActionOverlay(m Model) (string, int) {
 
 // renderPodSelectOverlay maps the pod picker (used by both the standard
 // log-pod selector and the embedded view's pod-switcher) onto OverlayList.
-// Pod status moves into the dim Description segment; the per-status color
+// Pod status moves into the dim Description segment. The per-status color
 // styling from the bespoke renderer is not preserved (acceptable for the
 // log viewer's "pick a pod" UX).
 func renderPodSelectOverlay(m Model) string {
@@ -124,7 +124,7 @@ func renderCanISubjectOverlay(m Model, innerW int) string {
 
 // renderBookmarkOverlay maps the bookmark picker onto OverlayList. Each row
 // shows the bookmark's saved namespace scope as a dim "ns: <scope>" suffix.
-// The jump replays that scope by default; Tab opts out, surfaced by the
+// The jump replays that scope by default. Tab opts out, surfaced by the
 // "[KEEP CURRENT NS]" title chip.
 func renderBookmarkOverlay(m Model) string {
 	const w = 90
@@ -218,7 +218,7 @@ func renderSessionsOverlay(m Model) string {
 
 // renderTemplateOverlay maps the resource-template picker onto OverlayList.
 // The "[Category] Name" composition collapses into Status (the category) +
-// Name; the bespoke "> " cursor indicator is replaced by OverlayList's
+// Name. The bespoke "> " cursor indicator is replaced by OverlayList's
 // uniform highlight background.
 func renderTemplateOverlay(m Model) (string, int) {
 	src := m.filteredTemplates()
@@ -305,7 +305,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 
 // renderColorschemeOverlay maps the colorscheme picker (with its group-
 // divider headers between Dark / Light / etc. sections) onto OverlayList.
-// Headers render as "── Name ──" via OverlayList's Header item flag; the
+// Headers render as "── Name ──" via OverlayList's Header item flag. The
 // caller's `cursor` (selectable-index) is translated to the display index
 // inside the items slice so OverlayList can highlight the right row.
 //
@@ -400,10 +400,10 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 // renderAutoSyncOverlay maps the ArgoCD AutoSync configuration picker
 // onto OverlayList. Three rows (AutoSync, Self-Heal, Prune) each carry
 // a pre-styled " ON" / "OFF" / "  -" indicator in the Badge column.
-// Self-Heal and Prune are gated on AutoSync being on; when AutoSync is
+// Self-Heal and Prune are gated on AutoSync being on. When AutoSync is
 // off they render with Disabled=true (dim) and show the "  -" badge
 // instead of OFF. The cursor highlight is capped to the label column
-// (CursorHighlightWidth) so it never sits behind the ON/OFF switches; the
+// (CursorHighlightWidth) so it never sits behind the ON/OFF switches. The
 // space/enter/esc keys live in the app-wide hint bar at the bottom.
 func renderAutoSyncOverlay(m Model) string {
 	const (
@@ -460,7 +460,7 @@ func renderAutoSyncOverlay(m Model) string {
 // OverlayList. The renderer is fullscreen-style (returns a fully styled
 // overlay including OverlayStyle wrapping) so it slots into the
 // renderOverlayFullscreen path the same way the legacy renderer did.
-// Column header lives in cfg.Subtitle; row fields pack into Name with
+// Column header lives in cfg.Subtitle. Row fields pack into Name with
 // fixed widths so they align with the header.
 func renderHelmHistoryOverlay(m Model) string {
 	const (
@@ -657,7 +657,7 @@ func renderClusterColorOverlay(m Model, innerW, contentH int) string {
 }
 
 // padRight returns s padded with spaces to at least width visual cells.
-// Used to align the badge column across rows in OverlayList; lipgloss
+// Used to align the badge column across rows in OverlayList, because lipgloss
 // handles overflow truncation for us, so this only adds — never trims.
 //
 //nolint:unparam // intentionally generic; current callers happen to share width=14 but each picks its own

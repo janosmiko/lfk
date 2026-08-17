@@ -16,7 +16,7 @@ func firstContainer(pod *corev1.Pod, c corev1.Container) bool {
 	return len(pod.Spec.Containers) > 0 && pod.Spec.Containers[0].Name == c.Name
 }
 
-// runtimeSocketPaths are container-runtime control sockets; mounting one is
+// runtimeSocketPaths are container-runtime control sockets. Mounting one is
 // equivalent to root on the node. /var/run is a symlink to /run on modern
 // distros, so both spellings are listed.
 var runtimeSocketPaths = map[string]bool{
@@ -60,7 +60,7 @@ func checkRuntimeSocket(pod *corev1.Pod, c corev1.Container) []security.Finding 
 
 // safeSysctls is the kubelet's allowed-by-default set (Pod Security Standards
 // baseline), mirroring upstream pkg/kubelet/sysctl/safe_sysctls.go. It tracks
-// the newest Kubernetes release; some entries are version-gated upstream, so
+// the newest Kubernetes release. Some entries are version-gated upstream, so
 // on older clusters a listed sysctl may still need the kubelet allowlist.
 var safeSysctls = map[string]bool{
 	"kernel.shm_rmid_forced":              true,
@@ -196,7 +196,7 @@ func checkSecretEnv(pod *corev1.Pod, c corev1.Container) []security.Finding {
 // whose value is a literal in the pod spec instead of a secretKeyRef. The
 // summary lists names only — never the values. Include/exclude are
 // case-insensitive name globs from config: include adds names to flag (and,
-// matched explicitly, overrides a built-in exemption); exclude is never
+// matched explicitly, overrides a built-in exemption). Exclude is never
 // flagged and wins over include.
 func checkSecretEnvWith(pod *corev1.Pod, c corev1.Container, include, exclude []string) []security.Finding {
 	var names []string

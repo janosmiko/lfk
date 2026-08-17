@@ -15,7 +15,7 @@ var ActiveHighlightQuery string
 // ActiveHighlightCategories opts-in to highlighting matching text in
 // the category bars too. Only set when the user explicitly opted into
 // category-aware search/filter (Tab inside the input at
-// LevelResourceTypes); otherwise category bars stay un-highlighted
+// LevelResourceTypes). Otherwise category bars stay un-highlighted
 // even when ActiveHighlightQuery is non-empty, so plain `/foo` doesn't
 // flash a category that the user hasn't asked to navigate into.
 var ActiveHighlightCategories bool
@@ -55,7 +55,7 @@ var ActiveColumnOrder []string
 var ActiveMiddleColumnLayout []MiddleColumnRegion
 
 // ActiveCollapsedCategories is set by the app before rendering the resource types
-// column. Keys are category names; presence means the category is collapsed.
+// column. Keys are category names. Presence means the category is collapsed.
 var ActiveCollapsedCategories map[string]bool
 
 // ActiveMiddleScroll is the persistent scroll position for the middle column.
@@ -81,7 +81,7 @@ var ActiveLeftScroll int
 // visible rows instead of every row from the top down (which made each frame
 // O(scroll position)). Column widths are still computed over all items, so the
 // layout stays stable while scrolling. -1 (the default) means "no windowing".
-// It applies only to a cursor-less RenderTable (cursor < 0); the middle column
+// It applies only to a cursor-less RenderTable (cursor < 0). The middle column
 // always renders with a real cursor, so it is never affected and none of its
 // click/sort globals are touched.
 var ActiveRightScroll = -1
@@ -298,7 +298,7 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 	}
 
 	// Build display-line-to-item map for mouse click handling (active middle
-	// column only; a cursor-less render is never the real middle column).
+	// column only. A cursor-less render is never the real middle column).
 	if isActive && cursor >= 0 {
 		ActiveMiddleLineMap = ActiveMiddleLineMap[:0]
 		for ei := startEntry; ei < endEntry; ei++ {
@@ -586,7 +586,7 @@ func FormatItem(item model.Item, width int) string {
 			}
 			visualName = iconPrefix + rawName
 		} else if ActiveHighlightQuery != "" {
-			// Name fits without truncation; apply highlight to displayName portion.
+			// Name fits without truncation. Apply highlight to displayName portion.
 			iconPrefix := ""
 			if icon != "" {
 				iconPrefix = IconStyle.Render(icon) + " "
@@ -598,7 +598,7 @@ func FormatItem(item model.Item, width int) string {
 		return visualName + strings.Repeat(" ", padding) + rightSide
 	}
 
-	// No right side info; apply highlight before truncation for simple case.
+	// No right side info. Apply highlight before truncation for simple case.
 	if ActiveHighlightQuery != "" {
 		iconPrefix := ""
 		if icon != "" {
@@ -623,7 +623,7 @@ func FormatItemPlain(item model.Item, width int) string {
 
 	name := displayName
 
-	// Prepend icon if present (plain text, no IconStyle; resolved based on IconMode).
+	// Prepend icon if present (plain text, no IconStyle, resolved based on IconMode).
 	icon := iconCell(item.Icon)
 	if icon != "" {
 		name = icon + " " + name

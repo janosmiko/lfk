@@ -11,7 +11,7 @@ import (
 // kv_editor.go holds rendering primitives shared by the three K/V
 // editor overlays (secret, configmap, label). Each editor used to
 // hand-roll its own ASCII table with `|` / `-` separators and manual
-// padding; centralising the rendering on lipgloss/table here keeps
+// padding. Centralising the rendering on lipgloss/table here keeps
 // the three editors visually consistent and removes ~60 lines of
 // near-identical code per editor.
 
@@ -42,7 +42,7 @@ func RenderKVEditorEditPane(
 	)
 
 	// Field-box dimensions: two fields share the available height.
-	// Key gets one content row; Value gets the rest.
+	// Key gets one content row. Value gets the rest.
 	fieldOuterW := max(width, 12)
 	keyContentH := 1
 	valContentH := max(height-keyContentH-4, 1) // -4: 2 borders for each box's top+bottom = 4 rows total chrome
@@ -60,7 +60,7 @@ func RenderKVEditorEditPane(
 }
 
 // kvFieldBox wraps `content` in a labelled bordered box. Active
-// fields get an accent border color; idle fields use the standard
+// fields get an accent border color. Idle fields use the standard
 // border color. The box's bg matches the editor's baseBg so it
 // doesn't paint a different shade against the surrounding pane.
 func kvFieldBox(label, content string, active bool, outerW, contentH int) string {
@@ -69,7 +69,7 @@ func kvFieldBox(label, content string, active bool, outerW, contentH int) string
 		BorderBackground(BaseBg).
 		Background(BaseBg).
 		Padding(0, 1)
-	// -2 for the left/right borders; BoxWidth/BoxHeight add them back, since
+	// -2 for the left/right borders. BoxWidth/BoxHeight add them back, since
 	// lipgloss v2 counts the border inside Width/Height.
 	border = BoxHeight(BoxWidth(border, outerW-2), contentH)
 
@@ -132,7 +132,7 @@ func sanitizeMultilineBody(s string) string {
 // cursor - a byte offset into the raw, unsanitized s - to the matching
 // offset in the sanitized result. The edit buffer is seeded straight from
 // the cluster value (a Secret/ConfigMap/annotation key or value), so this is
-// the last point before the live cursor overlay reaches the screen; mapping
+// the last point before the live cursor overlay reaches the screen. Mapping
 // the offset keeps the cursor on the same character instead of drifting once
 // bytes ahead of it are dropped.
 func sanitizeCursorText(s string, cursor int) (string, int) {
@@ -186,7 +186,7 @@ func overlayCursor(s string, cursor int, active bool, maxW int) string {
 // `scroll` is the visible-line offset — the renderer is purely a
 // function of state, so the SCROLL is supplied externally rather than
 // computed here. The handler owns the scroll state and keeps it
-// sticky (cursor moves freely inside [scroll, scroll+maxH); only when
+// sticky (cursor moves freely inside [scroll, scroll+maxH). Only when
 // the cursor leaves the window does the handler nudge scroll). See
 // AdjustEditValueScroll for the handler's update rule.
 func overlayCursorMultiline(s string, cursor int, active bool, scroll, maxW, maxH int) string {
@@ -428,7 +428,7 @@ func SingleLineCell(s string, maxW int) string {
 	if s == "" || maxW <= 0 {
 		return Truncate(s, maxW)
 	}
-	// strings.NewReplacer is allocation-friendly here; the inputs are
+	// strings.NewReplacer is allocation-friendly here. The inputs are
 	// small and we hit this once per visible cell per render.
 	flat := strings.NewReplacer(
 		"\r\n", " ↵ ",
@@ -502,7 +502,7 @@ func computeKeyColumnWidth(keys []string, totalWidth, divisor int) int {
 
 // scrollWindowStart returns the first visible row index so `cursor`
 // stays in view inside a window of `windowH` rows. Vim-like contract:
-// if the cursor is already inside [0, windowH), no scroll; otherwise
+// if the cursor is already inside [0, windowH), no scroll. Otherwise
 // pull just enough so the cursor lands on the last visible row.
 func scrollWindowStart(cursor, windowH, total int) int {
 	if total <= windowH {
@@ -518,7 +518,7 @@ func scrollWindowStart(cursor, windowH, total int) int {
 
 // kvSelColumnW is the visible width (without padding) of the leading
 // "selection marker" column shared by every K/V editor. Wide enough
-// for the "✓" glyph plus no trailing space; lipgloss/table's per-cell
+// for the "✓" glyph plus no trailing space, and lipgloss/table's per-cell
 // padding (1,1) supplies the gap to the KEY column on either side.
 const kvSelColumnW = 1
 
@@ -532,14 +532,14 @@ const kvSelColumnW = 1
 // to shift every row's key text two columns to the right whether or
 // not the row was actually selected).
 //
-// cursorRow is the body-row index (0-based; lipgloss/table's HeaderRow
+// cursorRow is the body-row index (0-based, lipgloss/table's HeaderRow
 // is the constant -1) of the cursor. Pass -1 when no row is the cursor
 // (e.g. an empty table that's only showing headers + a placeholder).
 //
 // editing toggles off the SelectedBg highlight on the cursor row when
 // the user is actively editing an inline cell. The cursor character
 // itself renders as reverse-video at the byte offset (see
-// overlayCursor); its embedded \x1b[7m / \x1b[0m SGR pair breaks the
+// overlayCursor). Its embedded \x1b[7m / \x1b[0m SGR pair breaks the
 // continuity of any background the table wraps around the cell, so
 // the row's SelectedBg ends up visible BEFORE the cursor and missing
 // AFTER it — the user-reported "background is different before and
@@ -560,7 +560,7 @@ func newKVEditorTable(keyColW, valColW, cursorRow int, editing bool) *table.Tabl
 			Background(BaseBg)).
 		Headers("", "KEY", "VALUE").
 		StyleFunc(func(row, col int) lipgloss.Style {
-			// Padding eats text space; widen the cell by the padding
+			// Padding eats text space. Widen the cell by the padding
 			// budget (1 + 1 = 2) so the row-data Truncate's full
 			// content can land inside without wrapping into a second
 			// visual line.

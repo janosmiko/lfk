@@ -10,15 +10,15 @@ import (
 const (
 	MinWorkersPerContext = 1
 	MaxWorkersPerContext = 16
-	// DefaultWorkersPerContext is the per-context worker pool size. 8 (up from
-	// 4) gives a slow-responding cluster enough concurrent slots that the
-	// foreground resource lists, previews, and the background metrics/events
-	// fan-out are not all contending for the same handful of workers — the
-	// "Low tasks queued but never run" symptom on a slow API server.
+	// DefaultWorkersPerContext is the per-context worker pool size. 8 (up
+	// from 4) gives a slow cluster enough concurrent slots so foreground
+	// resource lists, previews, and background metrics/events don't
+	// contend for the same workers. That's the "Low tasks queued but
+	// never run" symptom on a slow API server.
 	DefaultWorkersPerContext = 8
 	DefaultCriticalReserved  = 1
-	// DefaultLowReserved is how many workers prefer Low (background) work so
-	// metrics, events, and dashboard scans always have a slot even while the
+	// DefaultLowReserved is how many workers prefer Low (background) work
+	// so metrics, events, and dashboard scans have a slot while the
 	// foreground floods the general pool. Mirrors CriticalReserved at the
 	// other end of the priority range. Clamped to leave >=1 general worker.
 	DefaultLowReserved    = 2
@@ -35,7 +35,7 @@ const (
 )
 
 // Package-level config globals populated from internal/ui/config_apply.go.
-// These are read at scheduler.New() time; later mutations have no effect
+// These are read at scheduler.New() time. Later mutations have no effect
 // on already-running schedulers (consistent with ConfigWatchInterval).
 var (
 	ConfigWorkersPerContext     = DefaultWorkersPerContext
@@ -114,9 +114,9 @@ func ClampAgingThreshold(n int) int {
 }
 
 // ClampLowReserved enforces 0 <= reserved <= workers - critical - 1 so at
-// least one general worker always remains for High work (a low-reserved
-// worker prefers Low but falls back, so the floor is about guaranteeing High
-// is never left without a dedicated slot). Negative values clamp to 0.
+// least one general worker always remains for High work. A low-reserved
+// worker prefers Low but falls back, so the floor is about guaranteeing
+// High is never left without a dedicated slot. Negative values clamp to 0.
 func ClampLowReserved(reserved, workers, critical int) int {
 	if reserved < 0 {
 		return 0

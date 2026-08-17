@@ -40,7 +40,7 @@ const applyFieldManager = "lfk"
 // — issue #23.
 type contextInfo struct {
 	// display is the unique name shown in the lfk UI. Equal to original
-	// when no other file defines a context with the same name; otherwise of
+	// when no other file defines a context with the same name. Otherwise of
 	// the form "original (basename)".
 	display string
 	// original is the context name as written in the source kubeconfig
@@ -93,7 +93,7 @@ type Client struct {
 	injectedMetaClient any // metadata.Interface
 
 	// demo is true when this Client was built by NewDemoClient (--demo flag).
-	// It never talks to a real cluster; IsDemo lets the app layer surface a
+	// It never talks to a real cluster. IsDemo lets the app layer surface a
 	// badge instead of inspecting the injected fields directly.
 	demo bool
 
@@ -113,7 +113,7 @@ type Client struct {
 	// testHostByDisplay, when set, lets tests bypass kubeconfig host
 	// resolution in HostForContext. Most fake test clients are constructed
 	// without Cluster definitions (no server URL), so a real
-	// restConfigForContext call would fail; this map provides synthetic
+	// restConfigForContext call would fail. This map provides synthetic
 	// answers keyed by display name.
 	testHostByDisplay map[string]string
 
@@ -125,10 +125,10 @@ type Client struct {
 	// secretLazyLoading, when true, routes Secret listing through the
 	// metadata-only API so decoded values are lazy-fetched on hover instead
 	// of being pulled up-front. Configured via the secret_lazy_loading
-	// option; off by default so the list behaves like every other resource.
+	// option. Off by default so the list behaves like every other resource.
 	// Accessed concurrently from tea.Cmd goroutines (GetResources et al)
 	// while the startup setter (and any future runtime-reload path) writes
-	// it; an atomic load/store keeps the access race-free without a lock.
+	// it. An atomic load/store keeps the access race-free without a lock.
 	secretLazyLoading atomic.Bool
 
 	// kubesharkNamespaceOverride is the namespace probed for the kubeshark
@@ -139,7 +139,7 @@ type Client struct {
 	// concurrency rationale as secretLazyLoading above.
 	kubesharkNamespaceOverride atomic.Pointer[string]
 
-	// Guarded by discoveryMu; concurrent tea.Cmd goroutines may discover
+	// Guarded by discoveryMu. Concurrent tea.Cmd goroutines may discover
 	// across different contexts.
 	discoveryMu      sync.Mutex
 	discoveryClients map[string]*disk.CachedDiscoveryClient
@@ -164,23 +164,23 @@ type Client struct {
 	clientCache map[string]*ctxClients
 	// clientGroup coalesces concurrent builds for the same cache key+kind so a
 	// burst of cold-cache callers runs ONE construction, not N. clientCacheGen
-	// is bumped (under clientMu) on every cache invalidation; a build that
+	// is bumped (under clientMu) on every cache invalidation. A build that
 	// races an invalidate compares the generation it captured before building
 	// and skips caching its now-stale result, so an invalidated client is
 	// never served as a cache hit. (The old lock-across-build made invalidate
-	// and build mutually exclusive; building outside the lock reintroduces the
+	// and build mutually exclusive. Building outside the lock reintroduces the
 	// race that the generation guard closes.)
 	clientGroup    singleflight.Group
 	clientCacheGen uint64
 
 	// informerMu guards informerMode + informers. Writes happen at most
-	// once (SetInformerCacheMode at startup); reads happen on every
+	// once (SetInformerCacheMode at startup). Reads happen on every
 	// GetResources. RWMutex is overkill for the call rate but documents
 	// the intent — and a future runtime config-reload path can flip the
 	// mode safely without retrofitting synchronization across callers.
 	informerMu sync.RWMutex
 	// informerMode selects the routing strategy for GetResources. See
-	// InformerCacheMode for the three values; default (zero value "") is
+	// InformerCacheMode for the three values. Default (zero value "") is
 	// treated as InformerCacheAuto so users get the issue #86 win without
 	// any config change. Read via informerSnapshot.
 	informerMode InformerCacheMode
@@ -211,7 +211,7 @@ type Client struct {
 	ignoreChecker IgnoreChecker
 	// showIgnored, when true, includes ignored findings in the output
 	// (rendered with an "ignored" indicator) instead of hiding them. Off
-	// by default; toggled via the security ignore-list overlay. Read via
+	// by default. Toggled via the security ignore-list overlay. Read via
 	// securityIgnoreSnapshot.
 	showIgnored bool
 }
@@ -339,7 +339,7 @@ func (c *Client) Shutdown() {
 // creates or updates each object through the dynamic client — no kubectl
 // subprocess. Demo mode's fake dynamic client lives only in this process,
 // so a subprocess kubectl would write into a separate in-memory tracker the
-// UI never reads from; this is the apply path demo mode must use to
+// UI never reads from. This is the apply path demo mode must use to
 // actually change what the UI shows. defaultNamespace fills in any object
 // that leaves metadata.namespace unset, matching kubectl apply -n.
 func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespace, manifest string) error {
@@ -435,7 +435,7 @@ func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespac
 //     default), it is exclusive (kubectl/k9s semantics): step 2 and the
 //     default of step 3 are skipped.
 //  2. ~/.kube/config (skipped under an exclusive KUBECONFIG).
-//  3. All files in each kubeconfigDirs entry (recursively; symlinks to directories are followed).
+//  3. All files in each kubeconfigDirs entry (recursively, symlinks to directories are followed).
 //     Defaults to [~/.kube/config.d/] when the slice is empty and no exclusive KUBECONFIG applies.
 //
 // kubeconfigOverride (--kubeconfig) beats everything: when non-empty it is
@@ -616,7 +616,7 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 
 // GetResourcesUnion fetches resources from multiple contexts in parallel and
 // merges the results. Each item is stamped with ClusterName for drill-down
-// routing; the UI renders that field as the first-class CONTEXT column.
+// routing. The UI renders that field as the first-class CONTEXT column.
 // Partial results are returned alongside an errors.Join of every per-context
 // failure, so the status bar can surface "2 of 8 contexts failed: …" instead
 // of silently truncating to the first error.

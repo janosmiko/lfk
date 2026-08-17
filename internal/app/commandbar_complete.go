@@ -494,7 +494,7 @@ func (m *Model) contextNames() []string {
 // command bar opens for a context that isn't cached yet.
 //
 // A stale entry (older than namespaceCacheTTL) is still returned here
-// so completions remain visible while a background refresh runs; the
+// so completions remain visible while a background refresh runs. The
 // refresh is scheduled from handleKeyCommandBar.
 func (m *Model) namespaceNames() []string {
 	return m.cachedNamespaces[m.activeContext()].names

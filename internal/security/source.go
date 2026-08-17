@@ -19,7 +19,7 @@ const (
 	CategoryReliability Category = "reliability"
 )
 
-// Severity is a 4-level scale; sources map their own scales onto these.
+// Severity is a 4-level scale. Sources map their own scales onto these.
 type Severity int
 
 const (
@@ -42,7 +42,7 @@ type ResourceRef struct {
 	// declarative label-match ignore patterns. Populated by sources that hold
 	// the live object (heuristic, advisor) and propagated across same-resource
 	// findings by the Manager. Excluded from JSON/YAML so the on-disk findings
-	// cache stays lean (see issue #387); re-stamped on every fresh scan.
+	// cache stays lean (see issue #387). Re-stamped on every fresh scan.
 	Labels map[string]string `json:"-" yaml:"-"`
 }
 

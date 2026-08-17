@@ -21,8 +21,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// chance to — mouse-toggle, tab-switch, and mode-specific handlers below
 	// all run ahead of handleExplorerKey's own copy of this guard (kept there
 	// too, for callers that invoke it directly), and previously left the leader
-	// armed indefinitely after, e.g., the mouse-capture toggle key
-	// (IMPORTANT-5, review round 1).
+	// armed indefinitely after, e.g., the mouse-capture toggle key.
 	mdl, consumed := m.whichKeyLeaderIntercept(msg)
 	m = mdl
 	if consumed {
@@ -184,7 +183,7 @@ func (m Model) handleTabSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 // In modeExplorer at the resource-data levels (LevelResources, LevelOwned,
 // LevelContainers) it batches the right-pane preview load with a
 // background refresh of the middle column. The cached middleItems
-// restored by loadTab are shown immediately; the refresh result replaces
+// restored by loadTab are shown immediately. The refresh result replaces
 // them when the fetch returns. This is stale-while-revalidate — without
 // it, a mutation on tab A (e.g. deleting a pod whose restart count was
 // 10) leaves tab B's saved list stale until the next watch tick or
@@ -195,7 +194,7 @@ func (m Model) handleTabSwitchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 // is a live resource list for the hovered type — those items DO go stale
 // when another tab mutates the cluster. loadResources(forPreview=true)
 // has a fresh-cache shortcut for hover-cycles that returns cached items
-// synchronously; the per-tab itemCache means mutations on a sibling tab
+// synchronously. The per-tab itemCache means mutations on a sibling tab
 // never invalidate it. Drop the cache-freshness fingerprint for the
 // hovered resource type so the shortcut misses and a real fetch runs.
 // The itemCache entry itself is left in place so navigation-history
@@ -525,7 +524,7 @@ func (m Model) handleKeyOpenMarks() Model {
 	m.overlay = overlayBookmarks
 	m.overlayCursor = 0
 	m.bookmarkFilter.Clear()
-	// Every open starts with "load saved namespace" (the default); Tab
+	// Every open starts with "load saved namespace" (the default). Tab
 	// opts out to keep the current scope. A prior open's toggle must not leak in.
 	m.bookmarkLoadNamespace = true
 	return m

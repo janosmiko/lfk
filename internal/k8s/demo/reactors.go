@@ -8,7 +8,7 @@ import (
 
 // reactingClientset is the subset of *k8sfake.Clientset (via its embedded
 // testing.Fake) AddRBACReactors needs. Declared here instead of importing
-// k8sfake so the reactor logic doesn't depend on the fake package's full
+// k8sfake so the reactor logic does not depend on the fake package's full
 // surface.
 type reactingClientset interface {
 	PrependReactor(verb, resource string, reaction clienttesting.ReactionFunc)
@@ -17,7 +17,7 @@ type reactingClientset interface {
 // AddRBACReactors wires SelfSubjectAccessReview and SelfSubjectRulesReview
 // reactors that report the demo user as fully authorized. Neither review
 // type is a tracked object, so the fake clientset has no built-in reactor
-// for them: Create falls through to a zero-value response (Allowed: false,
+// for them. Create falls through to a zero-value response (Allowed: false,
 // no resource rules), which hides every action in the UI. See
 // internal/k8s/client_rbac.go CheckRBAC and GetSelfRulesAs for the exact
 // request/response shape the app reads.

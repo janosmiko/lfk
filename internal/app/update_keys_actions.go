@@ -445,7 +445,7 @@ func (m Model) handleExplorerActionKeySaveResource() (tea.Model, tea.Cmd, bool) 
 
 func (m Model) handleExplorerActionKeyPreviewDown() (tea.Model, tea.Cmd, bool) {
 	if m.fullLogPreview {
-		// J: scroll toward newest (reduce fromBottom); 0 = auto-follow.
+		// J: scroll toward newest (reduce fromBottom). 0 = auto-follow.
 		if m.previewLog.fromBottom > 0 {
 			m.previewLog.fromBottom--
 		}
@@ -698,7 +698,7 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 		return m, tea.Batch(scheduleStatusClear(), m.loadPreview()), true
 	}
 	// Open the filter preset overlay. Orphan presets require a context-wide
-	// scan and are omitted at the union sentinel; other quick filters remain
+	// scan and are omitted at the union sentinel. Other quick filters remain
 	// useful against the merged rows.
 	kind := m.nav.ResourceType.Kind
 	key := orphanCacheKey{kubeContext: m.nav.Context, namespace: m.orphanCacheNamespace()}
@@ -718,11 +718,9 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 
 func (m Model) handleExplorerActionKeyDiff() (tea.Model, tea.Cmd, bool) {
 	if m.nav.Level < model.LevelResources {
-		// Diff requires two resources to compare; cluster picker and
+		// Diff requires two resources to compare. Cluster picker and
 		// resource-type levels have nothing to diff. Don't consume the
-		// key here — let it fall through to other handlers (the local-
-		// cluster manager's `d` handler used to live at LevelClusters,
-		// which is why this used to show an error). Silent no-op now.
+		// key here — let it fall through to other handlers instead.
 		return m, nil, false
 	}
 	selected := m.selectedItemsList()

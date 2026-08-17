@@ -92,7 +92,7 @@ type PrinterColumn struct {
 	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
 	// Priority mirrors the column's additionalPrinterColumns priority.
 	// kubectl shows priority 0 columns in standard output and hides
-	// priority > 0 columns unless `-o wide`; LFK applies the same default.
+	// priority > 0 columns unless `-o wide`. LFK applies the same default.
 	Priority int
 }
 
@@ -234,7 +234,7 @@ var ConfigDefaultRightsizingHeadroom float64
 // GroupedRef identifies a single resource within a grouped row (e.g., one
 // of the many Event objects collapsed into a single line by event grouping).
 // ClusterName is set in union mode so the bulk dispatcher can route each ref
-// to its source cluster; empty otherwise.
+// to its source cluster. Empty otherwise.
 type GroupedRef struct {
 	Name        string
 	Namespace   string
@@ -258,7 +258,7 @@ type Item struct {
 	LastSeen      time.Time        // Most recent observation (Events only — drives the "Last Seen" column)
 	Columns       []KeyValue       // Additional resource fields for summary preview
 	Conditions    []ConditionEntry // Status conditions for the details pane
-	ClusterName   string           // Source cluster in union mode; empty in normal mode
+	ClusterName   string           // Source cluster in union mode. Empty in normal mode
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
@@ -267,15 +267,15 @@ type Item struct {
 	// duplicate of Status, so the list summary can still roll up by phase
 	// rather than falling back to coarse Ready/NotReady conditions (issue #536).
 	StatusFromPhase bool
-	Hidden          bool // Resource-type row the user hid; rendered dimmed when revealed via ShowRareResources
-	Rare            bool // Rarely-used type surfaced only via ShowRareResources; rendered dimmed and not user-hideable
+	Hidden          bool // Resource-type row the user hid. Rendered dimmed when revealed via ShowRareResources
+	Rare            bool // Rarely-used type surfaced only via ShowRareResources. Rendered dimmed and not user-hideable
 
 	ReadOnly     bool   // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
-	ClusterColor string // Optional named color (one of ui.ClusterColorNames) for context rows; empty = no swatch.
+	ClusterColor string // Optional named color (one of ui.ClusterColorNames) for context rows. Empty = no swatch.
 	// LocalClusterStatus is "running" / "stopped" / "" — populated only
 	// for cluster-picker rows whose context name is recognised in
 	// Model.localClusterCache. The renderer prepends a filled-circle
-	// glyph for "running" and a hollow-circle glyph for "stopped"; an
+	// glyph for "running" and a hollow-circle glyph for "stopped". An
 	// empty string means the row is not a local cluster and the
 	// renderer skips the icon entirely.
 	LocalClusterStatus string
@@ -298,7 +298,7 @@ type Item struct {
 // SelectionKey returns the stable map key identifying this item in a
 // multi-selection set. Union-mode rows carry a non-empty ClusterName, which
 // is prepended so the same name+namespace appearing in two clusters stays
-// distinct; non-union rows produce the legacy "namespace/name" (or bare
+// distinct. Non-union rows produce the legacy "namespace/name" (or bare
 // "name") form. This is the single source of truth for the key: both the
 // app's selection store and the ui renderer's selected-row check derive
 // their keys here so the two can never drift.
@@ -326,7 +326,7 @@ func (i Item) ColumnValue(key string) string {
 
 // MissingRefStatus is the Status string assigned to a ResourceNode whose
 // referenced object (Secret/ConfigMap/PVC/ServiceAccount) does not exist on
-// the cluster. The k8s package writes it; the ui package matches on it in
+// the cluster. The k8s package writes it. The ui package matches on it in
 // StatusStyle to render the node red. Keep these two callers in sync via
 // this single constant.
 const MissingRefStatus = "MissingRef"
@@ -401,7 +401,7 @@ type Bookmark struct {
 
 // IsContextAware reports whether this bookmark is anchored to a specific
 // kube context or named union set. Context-aware bookmarks switch to their
-// stored target on jump; context-free bookmarks use whatever target is
+// stored target on jump. Context-free bookmarks use whatever target is
 // currently active.
 func (b Bookmark) IsContextAware() bool {
 	return b.Context != "" || b.UnionSet != ""
@@ -498,14 +498,14 @@ func (s RightsizingStrategy) MethodologyHint() string {
 
 // Rightsizing is the per-workload right-sizing recommendation
 // payload. Source is the legacy human-readable label kept for
-// external readers; new code should branch on Strategy instead.
+// external readers. New code should branch on Strategy instead.
 type Rightsizing struct {
 	Source              string                // legacy human-readable label (set from Strategy.HumanLabel())
 	Strategy            RightsizingStrategy   // which algorithm produced these numbers
 	AvailableStrategies []RightsizingStrategy // subset of AllRightsizingStrategies usable on this workload + cluster
 	Headroom            float64               // headroom multiplier that produced these numbers (e.g. 1.25 = 25% padding above usage)
 	PodCount            int                   // pods aggregated (always 1 for Pod kind)
-	Window              string                // sampling window (e.g. "30s" for metrics-server, "1d"/"7d" for Prometheus); empty for VPA
+	Window              string                // sampling window (e.g. "30s" for metrics-server, "1d"/"7d" for Prometheus). Empty for VPA
 	Containers          []ContainerRec
 }
 

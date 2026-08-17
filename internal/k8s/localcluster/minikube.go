@@ -34,7 +34,7 @@ func minikubeCLIError(op string, code int, stderr string, err error) error {
 
 // minikubeProfileListJSONShape mirrors the subset of `minikube profile
 // list -o json` we care about. minikube's JSON has more fields than
-// these; anything we omit is ignored on Unmarshal.
+// these. Anything we omit is ignored on Unmarshal.
 type minikubeProfileListJSONShape struct {
 	Valid []minikubeProfile `json:"valid"`
 }
@@ -79,13 +79,13 @@ func (p *minikubeProvider) List(ctx context.Context) ([]Cluster, error) {
 }
 
 // minikubeStatus maps minikube's profile-list Status string to the
-// closed ClusterStatus set. minikube emits at least Running / Stopped /
-// Paused / Stopping / Starting / Misconfigured / OK (recent versions
-// aggregate host+apiserver into "OK" when both are Running) — we
-// surface the two healthy states (running/ok → Running, stopped →
-// Stopped) and let transient/misconfigured states fall through to
-// Unknown. Casting the raw string into ClusterStatus directly would
-// smuggle arbitrary values past the type's "closed set" contract.
+// closed ClusterStatus set. minikube emits Running / Stopped / Paused /
+// Stopping / Starting / Misconfigured / OK (recent versions aggregate
+// host+apiserver into "OK" when both are Running). We surface the two
+// healthy states (running/ok → Running, stopped → Stopped) and let
+// transient/misconfigured states fall through to Unknown. Casting the
+// raw string into ClusterStatus directly would smuggle arbitrary
+// values past the type's "closed set" contract.
 //
 // Unknown raw values get logged so we can spot new minikube version
 // behaviours from user reports without having to reproduce locally.
@@ -109,7 +109,7 @@ func (p *minikubeProvider) Create(ctx context.Context, spec CreateSpec) error {
 	defer cancel()
 
 	// `--interactive=false` is critical: lfk attaches a TTY to the
-	// child process, so minikube's first-run driver picker / sudo
+	// child process. So minikube's first-run driver picker / sudo
 	// prompts would block forever, looking like a silent hang until
 	// the 10-minute timeout. Forcing non-interactive mode makes
 	// minikube error loud instead — the stderr surfaces in the
@@ -126,7 +126,7 @@ func (p *minikubeProvider) Create(ctx context.Context, spec CreateSpec) error {
 		// — `--extra-config` is for component knobs like
 		// `kubelet.foo=bar`, not a YAML file path. Rather than smuggle
 		// the path into the wrong flag, fail loud. The wizard's
-		// config-file escape hatch is deferred to v1.1; v1 keeps
+		// config-file escape hatch is deferred to v1.1. v1 keeps
 		// CreateSpec.ConfigFile as always-empty.
 		return fmt.Errorf("minikube: config-file is not supported (deferred to v1.1)")
 	}

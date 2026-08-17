@@ -81,7 +81,7 @@ func hasPrometheusConfigured(contextName string) bool {
 // GetRightsizing builds a per-container recommendation payload for
 // the given workload using the requested strategy + headroom factor.
 // Empty strategy defaults to StrategySnapshot for backward
-// compatibility; headroom == 0 defaults to
+// compatibility. Headroom == 0 defaults to
 // model.DefaultRightsizingHeadroom so callers that haven't migrated
 // to the new signature still get a sane recommendation.
 //
@@ -282,7 +282,7 @@ func (c *Client) applySnapshotStrategy(ctx context.Context, contextName, namespa
 
 // podSpecContainers returns the container list from the workload's
 // pod spec template. CronJob is two levels deep (.spec.jobTemplate
-// .spec.template.spec.containers); Pod has it directly on .spec.
+// .spec.template.spec.containers). Pod has it directly on .spec.
 //
 // Init containers are intentionally excluded — their resource needs
 // are different from steady-state recommendations (out of v1 scope).
@@ -532,7 +532,7 @@ func scaleQuantityByHeadroom(q string, headroom float64) string {
 		return q
 	}
 	if isMemoryQuantity(q) {
-		// MilliValue() for memory returns bytes×1000; convert back to
+		// MilliValue() for memory returns bytes×1000. Convert back to
 		// bytes before scaling so SnapMemBytesToCanonical sees the right
 		// unit.
 		bytes := parsed.MilliValue() / 1000
@@ -544,7 +544,7 @@ func scaleQuantityByHeadroom(q string, headroom float64) string {
 // scaleLimitFromRatio returns the recommended limit that preserves
 // the spec's request:limit ratio. Empty string when any input is
 // empty/zero or unparseable — callers treat that as "don't recommend
-// a limit; user didn't have one."
+// a limit. User didn't have one."
 func scaleLimitFromRatio(currentRequest, currentLimit, recommendedRequest string) string {
 	if currentRequest == "" || currentLimit == "" || recommendedRequest == "" {
 		return ""
@@ -564,7 +564,7 @@ func scaleLimitFromRatio(currentRequest, currentLimit, recommendedRequest string
 	ratio := float64(cl.MilliValue()) / float64(cr.MilliValue())
 	scaled := int64(float64(rr.MilliValue()) * ratio)
 	if isMemoryQuantity(currentRequest) {
-		// MilliValue for memory returns bytes×1000; convert back to bytes for the snap.
+		// MilliValue for memory returns bytes×1000. Convert back to bytes for the snap.
 		return SnapMemBytesToCanonical(scaled / 1000)
 	}
 	return SnapCPUMilliToCanonical(scaled)
@@ -588,7 +588,7 @@ func isMemoryQuantity(s string) bool {
 // snapping logic from internal/ui/quantity_math.go. The k8s package
 // can't import internal/ui (would invert the architecture's data ->
 // presentation direction), so the helpers live in both places. Keep
-// in sync; they're only ~15 lines each.
+// in sync. They're only ~15 lines each.
 func SnapCPUMilliToCanonical(milli int64) string {
 	if milli <= 0 {
 		return "0"

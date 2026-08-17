@@ -48,7 +48,7 @@ type OrphanReport struct {
 //     right now, but a workload template (Deployment/Job/CronJob/...)
 //     still references it — typical CronJob between firings or a
 //     scaled-to-zero Deployment. Reason is "no live consumer". Hidden by
-//     default; the strict-mode toggle in the overlay flips them on so
+//     default. The strict-mode toggle in the overlay flips them on so
 //     users can audit "what's idle right now" instead of just "what's
 //     truly unused".
 //
@@ -96,7 +96,7 @@ type orphanLists struct {
 }
 
 // fetchOrphanLists pulls every input the detector needs in one place.
-// Per-list errors accumulate; the corresponding pointer stays nil and
+// Per-list errors accumulate. The corresponding pointer stays nil and
 // the safe*Items helpers turn that into an empty slice so the rest of
 // the pipeline runs unaffected.
 func fetchOrphanLists(ctx context.Context, cs kubernetes.Interface, namespace string) (orphanLists, []error) {
@@ -244,7 +244,7 @@ func computeOrphanDeps(l orphanLists) orphanDeps {
 		pdbs:    podsOK && workloadTemplatesOK,
 		netpols: podsOK && workloadTemplatesOK,
 		// RBAC is a mutual dependency web: Role/ClusterRole "bound"
-		// status is computed from the binding lists; RoleBinding/
+		// status is computed from the binding lists. RoleBinding/
 		// ClusterRoleBinding roleRef validity is computed from the
 		// Role/ClusterRole lists. See buildRBACIndex.
 		roles:               l.roleBindings != nil,

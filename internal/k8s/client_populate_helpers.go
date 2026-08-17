@@ -97,7 +97,7 @@ func populateMetadataFields(ti *model.Item, obj map[string]any) {
 
 // appendAllConditions stores every well-formed condition on ti.Conditions for
 // the details pane's CONDITIONS section. It is the single source of that
-// section across all resource kinds; the column extractors below only produce
+// section across all resource kinds. The column extractors below only produce
 // the compact at-a-glance summary in ti.Columns.
 func appendAllConditions(ti *model.Item, conditions []any) {
 	for _, c := range conditions {
@@ -123,7 +123,7 @@ func appendAllConditions(ti *model.Item, conditions []any) {
 }
 
 // extractGenericConditions adds a compact, single-condition summary to
-// ti.Columns for generic CRD resources. It prefers the "Ready" condition; if
+// ti.Columns for generic CRD resources. It prefers the "Ready" condition. If
 // not found, it falls back to the last condition in the array. The full
 // per-condition detail is populated separately via appendAllConditions.
 func extractGenericConditions(ti *model.Item, conditions []any) {

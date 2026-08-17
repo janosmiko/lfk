@@ -17,7 +17,7 @@ import (
 // (</>) uses this so flipping headroom doesn't kick a re-fetch and
 // the table never flashes through "Computing right-sizing…".
 //
-// Backward compat: returns nil when data == nil; returns the input
+// Backward compat: returns nil when data == nil. Returns the input
 // pointer unchanged when data.Headroom == 0 (legacy / not set) —
 // better to do nothing than mis-scale by an unknown ratio. Mutation
 // safety: when scaling does happen, a NEW *model.Rightsizing is
@@ -101,7 +101,7 @@ func scaleQuantityByRatio(q string, ratio float64, isMemory bool) string {
 		return q
 	}
 	if isMemory {
-		// MilliValue() for memory returns bytes×1000; convert back to
+		// MilliValue() for memory returns bytes×1000. Convert back to
 		// bytes before scaling so SnapMemBytesToCanonical sees the right
 		// unit.
 		bytes := parsed.MilliValue() / 1000

@@ -41,9 +41,9 @@ var ActiveSessionColumns []string
 
 // ActivePrinterColumns maps CRD additionalPrinterColumns names to their
 // declared priority for the resource type currently rendered in the middle
-// column. Set by the app before rendering; nil for non-CRD resources or CRDs
+// column. Set by the app before rendering. Nil for non-CRD resources or CRDs
 // without printer columns. Priority 0 columns are treated as mandatory (always
-// shown, never dropped by the width budget); priority > 0 columns are hidden by
+// shown, never dropped by the width budget). Priority > 0 columns are hidden by
 // default, matching kubectl's standard vs. `-o wide` behaviour.
 var ActivePrinterColumns map[string]int
 
@@ -127,7 +127,7 @@ func stabilizeColumnOrder(order []string) {
 		if iPinned && jPinned {
 			return ri < rj
 		}
-		// A pinned key sorts before any unpinned one; two unpinned keys
+		// A pinned key sorts before any unpinned one. Two unpinned keys
 		// compare equal so the stable sort preserves their discovery order.
 		return iPinned && !jPinned
 	})
@@ -223,7 +223,7 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	}
 
 	// Mandatory CRD printer-column protection applies only on the default
-	// auto-detect path; an explicit session or configured (views.<kind>.columns)
+	// auto-detect path. An explicit session or configured (views.<kind>.columns)
 	// order is authoritative and left untouched. When active, move mandatory
 	// columns to the front so the width budget serves them before optional extras.
 	mandatoryActive := fromAutoDetect && ActivePrinterColumns != nil
@@ -241,7 +241,7 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	//   1. Default: longestName + 1 spacing column.
 	//   2. If that fits in (totalWidth - usedWidth) — i.e. name + builtins
 	//      already fit even without any extras — keep the full reservation.
-	//      Whatever room is left flows to extras; if it's not enough for a
+	//      Whatever room is left flows to extras. If it's not enough for a
 	//      column, the loop below drops them and Name gets the slack via
 	//      the caller's nameW computation. This is the case the user hit:
 	//      a 52-char Node FQDN on a 97-char middle column was getting
@@ -298,7 +298,7 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 		// config that renders fully in the wide full screen list silently drops
 		// trailing columns (issue #354). Reserve only what the configured
 		// columns leave after their capped widths and let NAME compress to a
-		// small floor; NAME still reclaims any leftover via the caller's nameW,
+		// small floor. NAME still reclaims any leftover via the caller's nameW,
 		// so wide panes are unchanged.
 		configuredBudget := 0
 		for _, key := range candidates {
@@ -316,7 +316,7 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 			nameReserve = max(totalWidth-usedWidth-minExtrasBudget, nameFloor)
 		}
 		if mandatoryBudget > 0 {
-			// Never let the name reservation crowd out mandatory columns; NAME
+			// Never let the name reservation crowd out mandatory columns. NAME
 			// shrinks toward its floor and overflow is clipped by the caller.
 			nameReserve = min(nameReserve, max(totalWidth-usedWidth-mandatoryBudget, nameFloor))
 		}
@@ -338,7 +338,7 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 
 // fitExtraColumns selects columns from candidates that fit within available
 // width and computes their display widths. Columns are added in order until the
-// budget is exhausted (optional columns then stop); mandatory CRD printer
+// budget is exhausted (optional columns then stop). Mandatory CRD printer
 // columns are always emitted even past the budget, leaving the row to be
 // clipped. Leftover budget is redistributed round-robin to capped columns.
 //
@@ -353,7 +353,7 @@ func fitExtraColumns(candidates []string, seen map[string]*colInfo, available, m
 	for _, key := range candidates {
 		info := seen[key]
 		colW, natural := extraColWidth(info, key, maxColW)
-		// Mandatory printer columns are always emitted; remainingW may go
+		// Mandatory printer columns are always emitted. remainingW may go
 		// negative, which is fine — NAME floors and the row is clipped.
 		if colW > remainingW && (!mandatoryActive || !isMandatoryColumn(key)) {
 			break
@@ -392,7 +392,7 @@ func fitExtraColumns(candidates []string, seen map[string]*colInfo, available, m
 
 // selectColumnCandidates determines which extra columns to display based on
 // session overrides, per-kind config, or auto-detection. The second return
-// value reports whether the auto-detect path produced the result; only then
+// value reports whether the auto-detect path produced the result. Only then
 // may mandatory CRD printer-column protection reorder/force columns (an
 // explicit session or config order is authoritative and left untouched).
 //
@@ -413,7 +413,7 @@ func selectColumnCandidates(seen map[string]*colInfo, order []string, kind strin
 
 	// Build a ResourceRef so GVR-keyed view configs resolve. When the
 	// rendered kind matches ActiveResourceRef (set by the app for the
-	// middle column) carry through the full GVR; otherwise fall back to
+	// middle column) carry through the full GVR. Otherwise fall back to
 	// Kind-only — at LevelOwned/LevelContainers the rendered kind diverges
 	// from nav.ResourceType so GVR can't be trusted and Kind lookup applies.
 	rt := ResourceRef{Kind: kind}
@@ -515,7 +515,7 @@ func isHiddenColumnPrefix(key string) bool {
 // blockedColumnsForMode returns the set of columns blocked in the current display mode.
 // Description and References are always blocked because security findings put
 // multi-line content into them (Falco's Details has \n-separated key/value
-// pairs, References is a \n-joined URL list); they belong in the right-pane
+// pairs, References is a \n-joined URL list). They belong in the right-pane
 // detail renderer, not in the explorer table where newlines break the layout.
 func blockedColumnsForMode() map[string]bool {
 	if ActiveFullscreenMode {
@@ -561,10 +561,10 @@ func GetExtraColumnValue(item *model.Item, key string) string {
 
 // columnHeaderAliases shortens column header labels without renaming the
 // underlying Column key. Renaming the key would silently break user session
-// state, persisted column configs, and the column-visibility overlay; the
+// state, persisted column configs, and the column-visibility overlay. The
 // header alias is purely cosmetic. Names listed here either:
 //   - duplicate the resource type's name (Ingress -> "Ingress Class" =>
-//     "Class"; the user already knows it's an Ingress).
+//     "Class". The user already knows it's an Ingress).
 //   - are unnecessarily verbose given typical column-width budgets.
 var columnHeaderAliases = map[string]string{
 	"Ingress Class":       "Class",
@@ -577,7 +577,7 @@ var columnHeaderAliases = map[string]string{
 	"Last Transition":     "Transition",
 	"Service Account":     "SA",
 	// Security finding columns: the underlying camelCase keys are kept as-is
-	// for ColumnValue() lookups in the details renderer; the alias is the
+	// for ColumnValue() lookups in the details renderer. The alias is the
 	// human-readable form rendered in the table header.
 	"ResourceKind": "Resource Kind",
 	"FindingCount": "Findings",
@@ -592,6 +592,6 @@ func ColumnHeaderLabel(key string) string {
 		return strings.ToUpper(alias)
 	}
 	// key can be a CRD condition type or printer-column name (cluster-sourced)
-	// promoted into a table HEADER; sanitize before it reaches the screen.
+	// promoted into a table HEADER. Sanitize before it reaches the screen.
 	return strings.ToUpper(SanitizeTerminalText(key))
 }

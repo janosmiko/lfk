@@ -19,7 +19,7 @@ import (
 // fetchConfigMapFindings lists ConfigMaps (best-effort) and flags those with
 // credential-looking data keys — plaintext secrets outside Secrets are not
 // covered by encryption-at-rest or Secret RBAC. Also returns the "ns/name"
-// set of existing ConfigMaps for the missing-reference check; ok=false means
+// set of existing ConfigMaps for the missing-reference check. ok=false means
 // the list failed and reference checks must be skipped.
 func (s *Source) fetchConfigMapFindings(ctx context.Context, namespace string) (findings []security.Finding, names map[string]bool, ok bool) {
 	cms, ok := security.Collect(func(o metav1.ListOptions) ([]corev1.ConfigMap, string, error) {
@@ -78,7 +78,7 @@ func credentialLookingKeys(cm *corev1.ConfigMap, include, exclude []string) []st
 		}
 		names = append(names, key)
 	}
-	// Map iteration order is random; sort for stable summaries.
+	// Map iteration order is random. Sort for stable summaries.
 	slices.Sort(names)
 	return names
 }

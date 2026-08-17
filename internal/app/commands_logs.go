@@ -216,7 +216,7 @@ func (m *Model) startLogStream() tea.Cmd {
 		// kubectl (with --ignore-errors) keeps re-emitting the same
 		// 'container X is waiting to start' line every retry. We want the
 		// user to see the message once so they know what's happening, but
-		// not a flood. Dedup within this kubectl run; reconnect resets.
+		// not a flood. Dedup within this kubectl run. Reconnect resets.
 		seenTransient := map[string]bool{}
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
@@ -496,7 +496,7 @@ func (m *Model) maybeLoadMoreHistory() tea.Cmd {
 // writeTempLog writes log data to a uniquely-named, owner-only (0600) file in
 // the OS temp dir. pattern is an os.CreateTemp pattern (the "*" is replaced by a
 // random string). Logs frequently carry bearer tokens / connection strings, so
-// the file must not be world-readable; the random suffix plus CreateTemp's
+// the file must not be world-readable. The random suffix plus CreateTemp's
 // O_EXCL also defeat the predictable-path symlink TOCTOU that a fixed /tmp name
 // allowed, and os.TempDir keeps it working on Windows where /tmp does not exist.
 func writeTempLog(pattern string, data []byte) (string, error) {

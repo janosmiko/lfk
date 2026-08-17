@@ -15,7 +15,7 @@ import (
 
 // CmdRunner abstracts the two os/exec calls each Provider needs:
 // LookPath (for Installed()) and Run (for everything else). Production
-// uses realRunner; tests inject FakeRunner for hermetic unit tests.
+// uses realRunner. Tests inject FakeRunner for hermetic unit tests.
 type CmdRunner interface {
 	LookPath(name string) (string, error)
 	Run(ctx context.Context, name string, args ...string) (stdout, stderr string, exitCode int, err error)

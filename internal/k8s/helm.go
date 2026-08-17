@@ -132,7 +132,7 @@ func (c *Client) GetHelmReleases(ctx context.Context, contextName, namespace str
 }
 
 // buildHelmReleaseColumns builds the detail columns for a helm release list item.
-// It tries to decode the gzipped release blob stored in the secret data; on
+// It tries to decode the gzipped release blob stored in the secret data. On
 // failure it logs a warning and returns an empty slice so the list still renders.
 func buildHelmReleaseColumns(data map[string][]byte, relName, displayStatus string) []model.KeyValue {
 	raw, ok := data["release"]
@@ -335,7 +335,7 @@ func findLatestHelmReleaseSecret(ctx context.Context, cs kubernetes.Interface, n
 }
 
 // latestHelmReleaseSecret returns the highest-revision release secret. The helm
-// `version` label is the authoritative revision; CreationTimestamp only breaks
+// `version` label is the authoritative revision. CreationTimestamp only breaks
 // ties (its 1s granularity collides on fast install/rollback and CI upgrades,
 // and the API's name-sort orders "v10" before "v2"). items must be non-empty.
 func latestHelmReleaseSecret(items []corev1.Secret) corev1.Secret {

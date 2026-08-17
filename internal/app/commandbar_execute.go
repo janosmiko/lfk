@@ -54,8 +54,6 @@ func (m Model) kubectlContext(displayName string) string {
 	return m.client.OriginalContextName(displayName)
 }
 
-// executeCommandBarInput is the main entry point for command bar execution.
-// It classifies the input and dispatches to the appropriate handler.
 func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	input = strings.TrimSpace(input)
 	if input == "" {
@@ -568,7 +566,7 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 
 // ensureAtResourceTypesLevel navigates parent until reaching
 // model.LevelResourceTypes. Returns the updated model and true on
-// success; if the level drops below that threshold (cluster level)
+// success. If the level drops below that threshold (cluster level)
 // it returns false without mutating the model further.
 func ensureAtResourceTypesLevel(m Model) (Model, bool) {
 	for m.nav.Level > model.LevelResourceTypes {
@@ -723,7 +721,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 		// PTY-mode commands don't route through tea.ExecProcess, so the
 		// namespace-cache invalidation that normally arrives via
 		// actionResultMsg won't fire here. That's acceptable because the
-		// user sees the result inline and can refresh manually with R; a
+		// user sees the result inline and can refresh manually with R. A
 		// future improvement could propagate invalidation through
 		// execPTYExitMsg. The affectsNamespaces value is intentionally
 		// dropped to keep the PTY path free of bespoke wiring.
@@ -754,7 +752,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 }
 
 // wrapYAMLCmdAsJSON converts the YAML payload of an inner yamlClipboardMsg
-// into JSON. A single-document payload becomes a JSON object; a multi-document
+// into JSON. A single-document payload becomes a JSON object. A multi-document
 // payload (separated by `\n---\n` per copyYAMLToClipboard's joiner) becomes a
 // JSON array. The bulk-fetch wiring, status messages, and error envelope are
 // reused unchanged.

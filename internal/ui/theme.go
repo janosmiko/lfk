@@ -17,7 +17,7 @@ var ActiveTheme = DefaultTheme()
 // them on the very next frame instead of waiting for an unrelated field
 // (data tick, age bucket roll, resize) to change. Atomic because the
 // other Active* / Config* globals are bound by an undocumented
-// "UI-thread only" contract; making this one self-enforcing eliminates
+// "UI-thread only" contract. Making this one self-enforcing eliminates
 // a torn-read class of bug if a future caller invokes ApplyTheme from
 // an informer callback or other background goroutine.
 var ThemeRev atomic.Uint64
@@ -41,7 +41,7 @@ type Theme struct {
 
 // BaseBg, BarBg, and SurfaceBg are exported TerminalColor values that inline
 // styles can use to set their background, respecting the transparency setting.
-// When ConfigTransparentBg is true they are NoColor{}; otherwise they hold
+// When ConfigTransparentBg is true they are NoColor{}. Otherwise they hold
 // the theme's Base, BarBg, and Surface colors respectively.
 var (
 	BaseBg    color.Color = lipgloss.NoColor{}
@@ -70,7 +70,7 @@ func DefaultTheme() Theme {
 
 // ApplyTheme updates all style variables with the given theme colors.
 // When ConfigNoColor is true, style globals are rebuilt without foreground
-// or background colors; emphasis is preserved via bold/underline/reverse.
+// or background colors. Emphasis is preserved via bold/underline/reverse.
 func ApplyTheme(t Theme) {
 	// Apply minimum contrast enforcement before storing the active theme.
 	// t is passed by value so mutations here are local to this function and
@@ -355,7 +355,7 @@ func ApplyTheme(t Theme) {
 	// Which-key group accents, which tint the DESCRIPTION (the key keeps one
 	// accent throughout — t.Secondary, the same hotkey green every hint bar
 	// draws its keys in, which is why no group may claim it). Three track the
-	// theme; Cyan, Orange and Magenta have no Theme field (the same
+	// theme. Cyan, Orange and Magenta have no Theme field (the same
 	// special-purpose constants the age and usage columns use), so they are the
 	// ones that can sit badly on an unusually light Base — run them through the
 	// same contrast floor the theme colors got above when the user asked for
@@ -437,7 +437,7 @@ func ApplyTheme(t Theme) {
 
 	// Crash investigator inner panel + section/header styles. Reassigned
 	// here so the surface background and border foreground track the
-	// active theme; init-time values capture SurfaceBg=NoColor{} before
+	// active theme. Init-time values capture SurfaceBg=NoColor{} before
 	// any theme is applied, so without this refresh borders / underlines
 	// would render fg-only and "punch through" to the terminal's default
 	// background.

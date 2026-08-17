@@ -2,9 +2,8 @@
 // the audit violations recorded on each Constraint's .status as
 // security.Findings.
 //
-// Constraints are dynamic: every ConstraintTemplate the cluster admin
-// installs creates a new CRD under constraints.gatekeeper.sh, so the
-// adapter has to discover the GroupVersionResources at fetch time
+// Constraints are dynamic. Every ConstraintTemplate the cluster admin installs creates a new CRD under
+// constraints.gatekeeper.sh. The adapter therefore has to discover the GroupVersionResources at fetch time
 // (via the Kubernetes Discovery API) before listing them.
 package gatekeeper
 
@@ -28,18 +27,16 @@ import (
 const ConstraintsGroup = "constraints.gatekeeper.sh"
 
 // ConstraintsVersion is the API version Gatekeeper has shipped Constraints
-// under since v3.0. Newer versions (v1) are anticipated; for now we list
+// under since v3.0. Newer versions (v1) are anticipated. For now we list
 // only v1beta1 instances and accept that v1-only constraints would be
 // missed until this constant is updated.
 const ConstraintsVersion = "v1beta1"
 
-// constraintTemplateGVRs are the parent-CRD availability probe targets,
-// newest API version first. The probe avoids the Discovery API (which
-// client-go doesn't expose with a context, so a hung API server would
-// block the probe goroutine past the manager's 3s timeout). v1 has been
-// GA since Gatekeeper 3.10; clusters older than that serve
-// ConstraintTemplate as v1beta1 only, so the probe falls back to it
-// before reporting Gatekeeper unavailable.
+// constraintTemplateGVRs are the parent-CRD availability probe targets, newest API version
+// first. The probe avoids the Discovery API (which client-go doesn't expose with a context).
+// A hung API server would otherwise block the probe goroutine past the manager's 3s timeout.
+// v1 has been GA since Gatekeeper 3.10. Clusters older than that serve ConstraintTemplate as
+// v1beta1 only, so the probe falls back to it before reporting Gatekeeper unavailable.
 var constraintTemplateGVRs = []schema.GroupVersionResource{
 	{Group: "templates.gatekeeper.sh", Version: "v1", Resource: "constrainttemplates"},
 	{Group: "templates.gatekeeper.sh", Version: "v1beta1", Resource: "constrainttemplates"},
@@ -68,13 +65,11 @@ func (s *Source) Categories() []security.Category {
 	return []security.Category{security.CategoryPolicy, security.CategoryCompliance}
 }
 
-// IsAvailable returns true when the cluster serves the
-// templates.gatekeeper.sh API group (the parent ConstraintTemplate
-// CRD). Probing via the dynamic client honours the caller's context
-// timeout, unlike client-go's Discovery() ServerResourcesForGroupVersion
-// which has no Context-aware variant — a stalled API server there
-// would block the manager's 3s probe timeout indefinitely and starve
-// the rest of the security source probes.
+// IsAvailable returns true when the cluster serves the templates.gatekeeper.sh API group (the parent
+// ConstraintTemplate CRD). Probing via the dynamic client honours the caller's context timeout. By
+// contrast, client-go's Discovery() ServerResourcesForGroupVersion has no Context-aware variant. A
+// stalled API server there would therefore block the manager's 3s probe timeout indefinitely and
+// starve the rest of the security source probes.
 func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) {
 	if s.dynClient == nil {
 		return false, nil
@@ -84,8 +79,8 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 		if err == nil {
 			return true, nil
 		}
-		// NotFound / no-such-resource → this API version isn't served;
-		// try the next. Other errors propagate so the manager's probe
+		// NotFound / no-such-resource → this API version is not served.
+		// Try the next one. Other errors propagate so the manager's probe
 		// preserves the previous-known availability rather than briefly
 		// hiding Gatekeeper on a transient failure.
 		if !apierrors.IsNotFound(err) {
@@ -99,14 +94,14 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 // Fetch lists every Constraint instance the cluster currently knows
 // about and converts each .status.violations entry into a Finding.
 // Each kind's instance list is paginated (default 200 items per page)
-// to keep per-response payloads bounded — Constraints carry full
+// to keep per-response payloads bounded. Constraints carry full
 // status.violations[] arrays and can balloon on busy clusters. The
 // per-CRD listing failure mode is swallowed so a single broken kind
 // doesn't black out the whole feed.
 //
 // namespace is ignored: Gatekeeper Constraints are cluster-scoped, but
-// each violation carries its own (group, version, kind, namespace, name)
-// — the namespace surface comes from there, not from the parent CR.
+// each violation carries its own (group, version, kind, namespace, name).
+// The namespace surface comes from there, not from the parent CR.
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.dynClient == nil || s.clientset == nil {
 		return nil, nil
@@ -143,13 +138,13 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 // discoverConstraintKinds returns every API resource served under
 // constraints.gatekeeper.sh/v1beta1, bounded by ctx. client-go's
 // Discovery() ServerResourcesForGroupVersion has no Context-aware
-// variant, so we run it on a goroutine and select on ctx.Done(); the
+// variant, so we run it on a goroutine and select on ctx.Done(). The
 // goroutine may leak if the API server hangs forever, but the caller
 // returns promptly and the manager can move on.
 //
 // A NotFound discovery error is treated as "Gatekeeper webhook
 // installed but no ConstraintTemplates registered yet" rather than a
-// failure: returning the error here would surface as a per-fetch
+// failure. Returning the error here would surface as a per-fetch
 // "Application error" in the explorer and spam the log on every
 // FetchAll. An empty list is the correct semantic — there are zero
 // constraint kinds to query, so there are zero violations.
@@ -180,7 +175,7 @@ func discoverConstraintKinds(ctx context.Context, clientset kubernetes.Interface
 // parseConstraint walks a single Constraint object and converts every
 // status.violations entry into a security.Finding. constraintKind is
 // the Kubernetes Kind name of the parent constraint (e.g.,
-// "K8sRequiredLabels"); we surface it on the Finding so users can
+// "K8sRequiredLabels"). We surface it on the Finding so users can
 // distinguish "10 violations of K8sRequiredLabels" from "10 violations
 // of K8sBlockNodeport" in the group view.
 func parseConstraint(u *unstructured.Unstructured, constraintKind string) []security.Finding {
@@ -237,7 +232,7 @@ func defaultEnforcementAction(u *unstructured.Unstructured) string {
 
 // severityFromEnforcement maps Gatekeeper's enforcementAction values to
 // the explorer's coarse severity buckets so the SEC badge colour matches
-// users' expectations: a "deny" violation is louder than a "dryrun" one
+// users' expectations. A "deny" violation is louder than a "dryrun" one,
 // even though Gatekeeper itself doesn't grade severities.
 func severityFromEnforcement(action string) security.Severity {
 	switch strings.ToLower(action) {

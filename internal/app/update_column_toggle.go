@@ -42,7 +42,7 @@ type columnToggleState struct {
 	columnToggleSnapshot columnToggleSnapshot
 	sessionColumns       map[string][]string // kind -> ordered visible extra column keys (session-only)
 	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
-	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
+	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved, Name is implicit)
 }
 
 // captureColumnToggleSnapshot deep-copies the current per-kind column
@@ -156,7 +156,7 @@ func mergeColumnToggleEntries(builtinEntries, extraEntries []columnToggleEntry, 
 
 	// Backward compatibility: saved orders that predate configurable Name omit
 	// the "Name" key. Pin Name first so reopening the overlay matches the
-	// renderer's pinned-first behaviour in orderedColumnKeys; without this,
+	// renderer's pinned-first behaviour in orderedColumnKeys. Without this,
 	// reopening a legacy order and pressing Enter would persist Name at a
 	// non-first position. An order that lists "Name" honours that position.
 	if e, ok := byKey["Name"]; ok && !slices.Contains(savedOrder, "Name") {
@@ -490,7 +490,7 @@ func (m Model) handleColumnToggleKeyK2() (tea.Model, tea.Cmd) {
 // sessionColumns / hiddenBuiltinColumns / columnOrder for the current
 // kind WITHOUT closing the overlay. Called after every Space/J/K/c so
 // the table behind the overlay reflects edits live. handleColumnToggleKeyEnter
-// is now just "apply + close"; Esc reverts via restoreColumnToggleSnapshot.
+// is now just "apply + close". Esc reverts via restoreColumnToggleSnapshot.
 //
 // Pointer receiver because we may need to assign newly-allocated maps
 // when the caller's map fields are nil — a value receiver would only
@@ -565,8 +565,8 @@ func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
 	// the snapshot so a future Esc-after-reopen doesn't restore stale
 	// state.
 	m.applyColumnToggleState()
-	// Persist the committed layout (issue #353 follow-up). Live-apply during
-	// the overlay only touches in-memory maps; the on-disk layout is written
+	// Persist the committed layout. Live-apply during
+	// the overlay only touches in-memory maps. The on-disk layout is written
 	// here on commit so an Esc that reverts via the snapshot never leaks an
 	// uncommitted edit to disk.
 	m.persistColumnPrefs()

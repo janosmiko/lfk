@@ -1,7 +1,7 @@
 // Secret-level heuristic checks: legacy long-lived ServiceAccount token
 // Secrets and expiring TLS certificates. Gated by
 // security.heuristic.scan_secrets (default on) because they require listing
-// Secret objects; the list is best-effort like the other non-pod scans.
+// Secret objects. The list is best-effort like the other non-pod scans.
 // Summaries never include Secret data.
 
 package heuristic
@@ -38,7 +38,7 @@ func makeSecretFinding(ns, name, check string, sev security.Severity, title, sum
 
 // fetchSecretFindings lists Secrets (best-effort) and runs the Secret-level
 // checks. Returns immediately when scan_secrets is disabled. Also returns
-// the "ns/name" set of existing Secrets for the missing-reference check;
+// the "ns/name" set of existing Secrets for the missing-reference check.
 // ok=false (disabled or list failed) means Secret references cannot be
 // verified and must be skipped.
 func (s *Source) fetchSecretFindings(ctx context.Context, namespace string) (findings []security.Finding, names map[string]bool, ok bool) {

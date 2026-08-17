@@ -12,8 +12,6 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-// sortIndicatorForColumn returns a sort direction indicator (" ▲" or " ▼") if
-// the given column name matches the currently sorted column, or "" otherwise.
 // sortIndicatorForColumn returns "↑" or "↓" if the given column is sorted, or "".
 func sortIndicatorForColumn(colName string) string {
 	if ActiveSortColumnName == colName {
@@ -54,13 +52,13 @@ type headerSegment struct {
 
 // renderStyledHeader renders the header segments into a single line capped at
 // width. The segment whose colName matches the active sort column is rendered
-// with SortActiveHeaderStyle (accent) so the sorted column stands out; every
+// with SortActiveHeaderStyle (accent) so the sorted column stands out. Every
 // other segment is dim+bold, matching the previous flat header. Truncation
 // happens on each segment's plain text before styling, so no ANSI escape
 // sequence is ever cut and styled cells stay self-contained.
 func renderStyledHeader(segments []headerSegment, width int) string {
 	var b strings.Builder
-	dimStyle := DimStyle.Bold(true) // derive once; reused for every inactive cell
+	dimStyle := DimStyle.Bold(true) // derive once. Reused for every inactive cell
 	remaining := width
 	for _, seg := range segments {
 		if remaining <= 0 {
@@ -123,7 +121,7 @@ func styledExtraCell(ec extraColumn, item *model.Item) string {
 // statusAbbreviations maps long-form Pod-ish status strings to a compact
 // label used when the STATUS column has been shrunk under width pressure.
 // Entries here are status values that are otherwise too verbose for narrow
-// layouts; status values not in the map render as-is and rely on the
+// layouts. Status values not in the map render as-is and rely on the
 // width-aware Truncate fallback. AbbreviateStatusForWidth picks between
 // the full string and the abbreviation based on the column's width budget.
 var statusAbbreviations = map[string]string{
@@ -141,8 +139,8 @@ var statusAbbreviations = map[string]string{
 }
 
 // AbbreviateStatusForWidth returns a status label that fits within w
-// visible columns. Returns the full status when it already fits; otherwise
-// looks up a curated abbreviation; otherwise falls back to the original
+// visible columns. Returns the full status when it already fits. Otherwise
+// looks up a curated abbreviation. Otherwise falls back to the original
 // (the caller will then truncate it). Pure function so the layout pass
 // and the cell renderer can both use it.
 func AbbreviateStatusForWidth(status string, w int) string {
@@ -157,7 +155,7 @@ func AbbreviateStatusForWidth(status string, w int) string {
 
 // styledRestartsCell renders the restarts column with recent-restart arrow
 // styling. Rows whose LastRestartAt is within the past hour are tagged with
-// an up-arrow; when any row in the table has a recent restart, rows without
+// an up-arrow. When any row in the table has a recent restart, rows without
 // one get a space prefix so values remain column-aligned.
 func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) string {
 	restarts := SanitizeTerminalText(item.Restarts)
@@ -195,7 +193,7 @@ func plainRestartsCell(item model.Item, anyRecentRestart bool) string {
 }
 
 // formatTableRowOrdered builds a plain-text table row using the given column
-// order. "Name" is rendered at its position within order; an order without a
+// order. "Name" is rendered at its position within order. An order without a
 // "Name" entry renders no name cell (the column is hidden). The preprocessed
 // values (ns, ready, restarts, status, age) are passed through since they have
 // row-specific handling upstream (e.g. the cursor row preprocesses restarts for
@@ -228,7 +226,7 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 
 // formatTableRowStyledOrdered builds a styled table row using the given
 // column order. The Name cell (with icon + badge handling) is rendered at its
-// position within order via the styled name helper; an order without a "Name"
+// position within order via the styled name helper. An order without a "Name"
 // entry renders no name cell (the column is hidden).
 func formatTableRowStyledOrdered(item model.Item,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
@@ -282,7 +280,7 @@ func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
 
 // styledNameCell renders the Name column with optional icon and dimmed
 // styling for completed items. Pods in Succeeded or Completed status get
-// their name dimmed; otherwise NormalStyle is used. The active highlight
+// their name dimmed. Otherwise NormalStyle is used. The active highlight
 // query is applied to the resolved display name.
 //
 // When a security finding index is active and the item has matching findings,
@@ -406,7 +404,7 @@ func resourceColumnStyle(key, val string) lipgloss.Style {
 func extraColumnValueStyle(key, val string) lipgloss.Style {
 	if canonical, ok := canonicalBoolStatus(val); ok {
 		// ALLCAPS headers would tokenize letter-by-letter in the polarity
-		// heuristic; lowercase them so "ESTABLISHED" matches like "Established".
+		// heuristic. Lowercase them so "ESTABLISHED" matches like "Established".
 		if key == strings.ToUpper(key) {
 			key = strings.ToLower(key)
 		}
@@ -474,7 +472,7 @@ func pctStyle(val string) lipgloss.Style {
 }
 
 // ParseResourceValue parses a CPU (millicores) or memory (bytes) string back to
-// int64. Unparseable input (empty, "n/a", garbage) yields 0; callers that must
+// int64. Unparseable input (empty, "n/a", garbage) yields 0. Callers that must
 // distinguish "missing" from a genuine 0 should use ParseResourceValueOK.
 func ParseResourceValue(val string, isCPU bool) int64 {
 	v, _ := ParseResourceValueOK(val, isCPU)

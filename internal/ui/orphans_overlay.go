@@ -26,7 +26,7 @@ type OrphanCounts struct {
 // OrphanScrollForCursor returns the new scroll offset that keeps
 // `cursor` visible inside a viewport of `bodyHeight` rows starting at
 // `scroll`. Vim semantics: do nothing if the cursor is already in
-// view; otherwise scroll just enough to put the cursor on the nearest
+// view. Otherwise scroll just enough to put the cursor on the nearest
 // visible edge. Mirrors WhoCanScrollForCursor — keep them in sync.
 func OrphanScrollForCursor(scroll, cursor, bodyHeight, total int) int {
 	if total <= bodyHeight {
@@ -77,7 +77,7 @@ func OrphanClampScroll(scroll, total, bodyHeight int) int {
 //	[N+4] ""                                  trailing empty from header's "\n"
 //
 // chipLines must equal the wrapped row count emitted by
-// renderOrphanChips for the same width and counts; callers compute it
+// renderOrphanChips for the same width and counts. Callers compute it
 // via OrphanChipLines so the renderer and the move handler always
 // agree on viewport size. With all 11 kinds always shown, the strip
 // wraps to 2 rows on a typical 100-col overlay and to 3+ rows on
@@ -142,7 +142,7 @@ func RenderOrphansOverlay(
 	b.WriteString(OverlayTitleStyle.Render(title))
 	b.WriteString("\n\n")
 
-	// width-4 = OverlayStyle.Padding(1, 2) horizontal cost; the chip row
+	// width-4 = OverlayStyle.Padding(1, 2) horizontal cost. The chip row
 	// must fit inside the inner content area.
 	chips := renderOrphanChips(counts, activeChip, max(width-4, 40))
 	chipLines := strings.Count(chips, "\n") + 1
@@ -249,7 +249,7 @@ func orphanChipDefs(counts OrphanCounts) []orphanChipDef {
 // orphanChipLayout returns the widest unpadded chip text and the
 // column count for the chip grid given counts and inner width.
 // Renderer and move handler share this so their wrap row counts always
-// match exactly; the renderer also reuses maxTextW so every cell pads
+// match exactly. The renderer also reuses maxTextW so every cell pads
 // to a uniform width.
 func orphanChipLayout(counts OrphanCounts, width int) (maxTextW, cols int) {
 	defs := orphanChipDefs(counts)
@@ -301,7 +301,7 @@ func renderOrphanChips(counts OrphanCounts, active, width int) string {
 		// Pad the inner text to maxTextW so every chip occupies the
 		// same visual width. Surround with single-space padding (matches
 		// renderCrashTabBar). The styled span covers all of it — for
-		// the active chip the bg fills the whole padded button; for
+		// the active chip the bg fills the whole padded button. For
 		// inactive chips the dim fg covers the padding too, and bg is
 		// the surrounding overlay surface.
 		inner := fmt.Sprintf(" %-*s ", maxTextW, fmt.Sprintf("%s %d", d.label, d.count))

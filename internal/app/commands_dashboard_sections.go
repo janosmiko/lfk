@@ -17,7 +17,7 @@ import (
 
 // dashboardSection enumerates the parallel fetches that compose the
 // cluster dashboard. Each section runs as a separate scheduled task so
-// foreground work can preempt mid-flight (Task 26 wires the fan-out).
+// foreground work can preempt mid-flight.
 type dashboardSection int
 
 const (
@@ -31,7 +31,7 @@ const (
 
 // pinnedSummaryResult is one pinned resource type's status rollup, rendered
 // as inline dashboard metric rows below Pods (dashboardPinnedRows). index
-// preserves pin order across the unordered fan-out; notFound flags a pin key
+// preserves pin order across the unordered fan-out. notFound flags a pin key
 // absent from the cluster's discovery (e.g. a CRD not installed here).
 type pinnedSummaryResult struct {
 	index       int
@@ -51,7 +51,7 @@ type dashboardWidths struct {
 	node    int // per-node CPU/Mem bars (two side by side)
 	sep     int // horizontal separator rule
 	label   int // metric-row label column width (for inline label/bar/summary alignment)
-	content int // total content width; inline rows are truncated to it as a safety net
+	content int // total content width. Inline rows are truncated to it as a safety net
 }
 
 // dashboardMetricLines lays out one cluster metric over two lines: the label +
@@ -90,7 +90,7 @@ func (m Model) dashboardContentWidth(twoCol bool) int {
 }
 
 // dashboardWidths derives the metric-row widths from the target content width.
-// Bars are uniform and as wide as the column allows; the summary lives on its
+// Bars are uniform and as wide as the column allows. The summary lives on its
 // own line, so it no longer constrains the bar. maxPinnedLabel is the longest
 // label any pinned row will render (see maxPinnedLabelWidth) - the label
 // column widens to fit it, capped at 14, so a long CRD display name never
@@ -100,7 +100,7 @@ func (m Model) dashboardContentWidth(twoCol bool) int {
 func (m Model) dashboardWidths(twoCol bool, maxPinnedLabel int) dashboardWidths {
 	contentW := m.dashboardContentWidth(twoCol)
 	labelCol := min(max(maxPinnedLabel, 5), 14) // "Nodes" / "Pods" / "CPU" / "Mem" at minimum
-	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
+	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`. The two bars share
 	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
 	// gaps), so split the rest between them to reach the same right edge as the
 	// top bars instead of staying noticeably narrower.
@@ -442,7 +442,7 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
 	// No trailing blank here: pinned rows (dashboardPinnedRows) render
-	// directly below Pods inside the same block; composeDashboard adds the
+	// directly below Pods inside the same block. composeDashboard adds the
 	// separating blank after them.
 
 	return lines

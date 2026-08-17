@@ -1,8 +1,8 @@
-# Release Process
+# Release process
 
-Operational reference for the maintainer. The release pipeline is fully automated on tag push (see `.github/workflows/release.yml`); this document covers one-time bootstrap, secret management, and recovery procedures.
+Operational reference for the maintainer. The release pipeline is fully automated on tag push (see `.github/workflows/release.yml`). This document covers one-time bootstrap, secret management, and recovery procedures.
 
-## Trigger a Release
+## Trigger a release
 
 Releases are driven by `release-please`:
 
@@ -13,19 +13,19 @@ Releases are driven by `release-please`:
 
 To cut a release manually (skipping `release-please`): `make release VERSION=X.Y.Z` then `git push && git push --tags`.
 
-## External Accounts (one-time bootstrap)
+## External accounts (one-time bootstrap)
 
 | Channel | Account / Repo | Setup |
 |---|---|---|
 | Homebrew | `janosmiko/homebrew-tap` | Existing. PAT in `RELEASE_TAP_TOKEN`. |
 | Scoop | `janosmiko/scoop-bucket` | Empty repo with README + LICENSE. Same PAT. |
 | Winget | Fork of `microsoft/winget-pkgs` at `janosmiko/winget-pkgs` | PAT in `WINGET_TOKEN` with `contents:write` on the fork. |
-| AUR | aur.archlinux.org account `janosmiko` | SSH public key uploaded; `lfk-bin` reserved. Private key in `AUR_SSH_PRIVATE_KEY` (multi-line PEM). |
+| AUR | aur.archlinux.org account `janosmiko` | SSH public key uploaded. `lfk-bin` reserved. Private key in `AUR_SSH_PRIVATE_KEY` (multi-line PEM). |
 | Chocolatey | chocolatey.org publisher `janosmiko` | API key in `CHOCOLATEY_API_KEY`. `lfk` package id reserved. |
-| Snap | snapcraft.io publisher | Snap name `lfk` registered; classic confinement justification approved. Macaroon in `SNAPCRAFT_STORE_CREDENTIALS` (run `snapcraft export-login --snaps=lfk --acls=package_access,package_push,package_update,package_release - 2>&1 \| tail -n +2`). |
+| Snap | snapcraft.io publisher | Snap name `lfk` registered. Classic confinement justification approved. Macaroon in `SNAPCRAFT_STORE_CREDENTIALS` (run `snapcraft export-login --snaps=lfk --acls=package_access,package_push,package_update,package_release - 2>&1 \| tail -n +2`). |
 | Cloudsmith | cloudsmith.io account `janosmiko` | Repository `janosmiko/lfk` with DEB + RPM enabled. API key in `CLOUDSMITH_API_KEY`. |
 
-## GitHub Secrets
+## GitHub secrets
 
 | Secret | Used by | Rotation |
 |---|---|---|
@@ -36,7 +36,7 @@ To cut a release manually (skipping `release-please`): `make release VERSION=X.Y
 | `WINGET_TOKEN` | Winget upstream PR | rotate annually |
 | `AUR_SSH_PRIVATE_KEY` | AUR push | rotate when key compromised |
 | `CHOCOLATEY_API_KEY` | choco push | rotate when key compromised |
-| `SNAPCRAFT_STORE_CREDENTIALS` | snap upload | macaroon expires; rotate every 12 months |
+| `SNAPCRAFT_STORE_CREDENTIALS` | snap upload | macaroon expires, rotate every 12 months |
 | `CLOUDSMITH_API_KEY` | cloudsmith push | rotate annually |
 
 ## Recovery: a single channel's publish failed
@@ -64,10 +64,10 @@ cloudsmith push rpm janosmiko/lfk/any-distro/any-version dist/lfk_<version>_<arc
 
 Run after each release tag completes. Channels with classic Snap or first-time Chocolatey moderation may legitimately be "pending" — that's not a failure.
 
-- [ ] **Homebrew:** `brew update && brew upgrade lfk` on macOS or Linux; `lfk --version` matches.
+- [ ] **Homebrew:** `brew update && brew upgrade lfk` on macOS or Linux. `lfk --version` matches.
 - [ ] **Scoop:** on Windows, `scoop update lfk && lfk --version`.
 - [ ] **Winget:** check `https://github.com/microsoft/winget-pkgs/pulls?q=author%3Ajanosmiko` for the auto-PR. Once merged: `winget upgrade janosmiko.lfk`.
-- [ ] **AUR:** `https://aur.archlinux.org/packages/lfk-bin` shows the new version; `yay -Syu lfk-bin` on Arch.
+- [ ] **AUR:** `https://aur.archlinux.org/packages/lfk-bin` shows the new version. `yay -Syu lfk-bin` on Arch.
 - [ ] **Chocolatey:** `https://chocolatey.org/packages/lfk` shows the new version (may say "Pending" for first submission). `choco upgrade lfk`.
 - [ ] **Snap:** `snap info lfk` shows new version on `stable` track. `snap refresh lfk --classic`.
 - [ ] **Cloudsmith:** `https://cloudsmith.io/~janosmiko/repos/lfk/packages/` lists the new `.deb` and `.rpm`.

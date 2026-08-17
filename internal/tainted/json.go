@@ -3,16 +3,15 @@ package tainted
 import "errors"
 
 // errMarshalJSON is returned by MarshalJSON. Without it, json.Marshal on a
-// struct holding a String silently produces {} for that field - the payload
-// is unexported and the type has no marshaller - so the field vanishes
-// instead of erroring. A quiet MarshalJSON that emitted Line() instead would
-// fix the vanishing act but reopen the problem the type exists to close: it
-// would let any caller serialize cluster text without choosing between Line
-// and Body, bypassing both unwraps the same way a bare String() method
-// would. Failing loudly keeps that choice mandatory.
+// struct holding a String silently produces {}. The payload is unexported
+// and the type has no marshaller, so the field vanishes instead of erroring.
+// A quiet MarshalJSON emitting Line() would fix that, but it would reopen
+// the problem the type exists to close. Callers could serialize cluster
+// text without choosing between Line and Body, the same bypass a bare
+// String() method allows. Failing loudly keeps that choice mandatory.
 var errMarshalJSON = errors.New("tainted.String cannot be marshalled directly; unwrap with Line or Body first")
 
-// MarshalJSON always fails; see errMarshalJSON.
+// MarshalJSON always fails. See errMarshalJSON for the reason.
 func (t String) MarshalJSON() ([]byte, error) {
 	return nil, errMarshalJSON
 }

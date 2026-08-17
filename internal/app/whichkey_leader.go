@@ -20,7 +20,7 @@ type whichKeyState struct {
 	// grouping is the panel's entry order. The zero value follows
 	// ui.ConfigWhichKeyGrouped rather than copying it, so a zero-value Model
 	// reads the CONFIGURED default instead of a stale snapshot of it. NewModel
-	// seeds it from the state file (whichkey_prefs.go); the runtime toggle is
+	// seeds it from the state file (whichkey_prefs.go). The runtime toggle is
 	// persisted there, never written back to the user's config file.
 	grouping wkGrouping
 	// cells caches the visible panel's entries for the duration of ONE
@@ -75,10 +75,10 @@ type whichKeyLeaderTickMsg struct{ seq int }
 
 // armWhichKeyLeader is called on every leader keypress. The panel scrolls
 // rather than pages, so a repeat press while already armed has nothing to
-// advance to; USER DECISION: it toggles the entry order instead — grouped by
+// advance to. USER DECISION: it toggles the entry order instead — grouped by
 // category or pure key order — indefinitely, and leaves the panel open. esc
 // closes it (whichKeyLeaderIntercept), as does pressing any action key. With
-// the default zero delay the panel shows at once; which_key_leader_delay_ms
+// the default zero delay the panel shows at once. which_key_leader_delay_ms
 // instead schedules a reveal tick.
 func (m Model) armWhichKeyLeader() (Model, tea.Cmd) {
 	if !ui.ConfigWhichKeyEnabled {
@@ -124,7 +124,7 @@ func (m Model) disarmWhichKeyLeader() Model {
 // so each group lands as one contiguous run — the entries flow column-major
 // across the whole panel rather than restarting per section, and the group's
 // color (not a header) is what reads as the category cue. Ungrouped drops the
-// clustering; the colors and the legend stay, and carry the category on their
+// clustering. The colors and the legend stay, and carry the category on their
 // own.
 func (m Model) whichKeyLeaderCells() []whichKeyCell {
 	acts := m.availableWhichKeyActions()

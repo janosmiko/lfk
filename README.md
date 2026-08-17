@@ -2,188 +2,34 @@
 
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)[![Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com)](https://cloudsmith.com)
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Stars](https://img.shields.io/github/stars/janosmiko/lfk?style=flat)](https://github.com/janosmiko/lfk) [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-db61a2)](https://github.com/sponsors/janosmiko) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)[![Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com)](https://cloudsmith.com)
 
 **LFK** is a keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. It brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
-## Support
+## Install
 
-LFK is a side project I build in my free time, and the tools that go into it
-(IDE licenses, AI assistants) are not free. If LFK saves you time and you'd like
-to help cover those costs and fund continued development, consider sponsoring:
-
-- [GitHub Sponsors](https://github.com/sponsors/janosmiko)
-- [Buy Me a Coffee](https://buymeacoffee.com/janosmiko)
-
-Every contribution is appreciated and helps make LFK sustainable.
-
-**Thank you for your support!**
-
-Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
-Cloudsmith is the only fully hosted, cloud-native, universal package management solution, that enables your organization to create, store and share packages in any format, to any place, with total confidence.
-
-## Screenshots
-
-### Demo
-
-![Demo](./docs/imgs/demo.gif)
-
-### Themes
-
-![Themes](./docs/imgs/themes.gif)
-
-### Features
-
-| Feature | |
-| --- | --- |
-| Pods | <img src="./docs/imgs/pods.png" alt="Pods" width="600"> |
-| Pods fullscreen | <img src="./docs/imgs/pods-fullscreen.png" alt="Pods fullscreen" width="600"> |
-| Pod action menu | <img src="./docs/imgs/pods-actions.png" alt="Pod actions" width="600"> |
-| Cluster Dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster Dashboard" width="600"> |
-| Object Explorer | <img src="./docs/imgs/object-explorer.png" alt="Object Explorer" width="600"> |
-| API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
-| YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
-| Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
-| Log Top | <img src="./docs/imgs/log-top.png" alt="Log Top" width="600"> |
-| Helm integration | <img src="./docs/imgs/helm-integration.png" alt="Helm integration" width="600"> |
-| ArgoCD integration | <img src="./docs/imgs/argocd-integration.png" alt="ArgoCD integration" width="600"> |
-| ArgoCD AutoSync config | <img src="./docs/imgs/argocd-autosync.png" alt="ArgoCD auto-sync config" width="300"> |
-| Security dashboard | <img src="./docs/imgs/security-heuristics.png" alt="Built-in security heuristics" width="600"> |
-| Trivy integration | <img src="./docs/imgs/trivy-integration.png" alt="Trivy integration" width="600"> |
-| Crash Investigator | <img src="./docs/imgs/crash-investigator.png" alt="Crash Investigator" width="600"> |
-| Pod Startup Analysis | <img src="./docs/imgs/startup-analysis.png" alt="Pod Startup Analysis" width="600"> |
-| Can-I RBAC permissions browser | <img src="./docs/imgs/can-i.png" alt="Can-I viewer" width="600"> |
-| Label and annotation editor | <img src="./docs/imgs/label-annotation-editor.png" alt="Label and annotation editor" width="600"> |
-| Quick filters | <img src="./docs/imgs/quick-filters.png" alt="Quick filters" width="600"> |
-| Column visibility and reordering | <img src="./docs/imgs/column-visibility-reordering.png" alt="Column visibility and reordering" width="600"> |
-| Bookmarks | <img src="./docs/imgs/bookmarks.png" alt="Bookmarks" width="600"> |
-| Multi-tab support | <img src="./docs/imgs/tab-support.png" alt="Multi-tab support" width="600"> |
-| Union view | <img src="./docs/imgs/union-sets.png" alt="Union sets" width="600"> |
-| Local cluster management | <img src="./docs/imgs/local-clusters.png" alt="Local clusters" width="600"> |
-
-## Features
-
-### Navigation and Layout
-
-- **Three-column Miller columns** interface (parent / current / preview)
-- **Owner-based navigation**: Clusters -> Resource Types -> Resources -> Owned Resources -> Containers
-- **Resource groups**: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
-- **Pinned resource types**: Pin individual resource types (built-in or CRD) into a "Pinned" section at the top of the list, below the dashboards. Configurable via `pinned_types` in config (legacy `pinned_groups` also supported) or interactively with `p` key (stored per-context or per named union set)
-- **Pinned dashboard summaries**: Pin any resource type's status summary (Jobs failed/succeeded, Argo app health/sync, any CRD's phase/conditions rollup) as inline rows on the cluster dashboard for a one-page daily health check. Shows Jobs, Deployments, Argo CD Applications, Flux Kustomizations, and cert-manager Certificates by default (CRD-backed defaults appear only when installed); your first pin keeps the defaults you see and adds your type. Toggle from the action menu (`x`) at the resource types level, or set `pinned_summaries` in config (max 10 per scope; stored per-context or per named union set)
-- **CRD categories**: Discovered CRDs are grouped by API group name (e.g., `argoproj.io`, `longhorn.io`, `networking.istio.io`)
-- **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them (dimmed) under their categories and an "Advanced" group (resets each launch; set `show_rare_types: true` in config to show them from startup)
-- **Hide individual resource types**: At the resource types level, open the action menu (`x`) on a type to hide or show it. Hidden types are saved per cluster context (or named union set) and stay hidden across restarts. Press `H` to reveal hidden types dimmed so you can un-hide them
-- **Expandable/collapsible resource groups** with `z`
-- **Layout cycle** with `Shift+F` — hide sidebar, then fullscreen middle column, then restore
-- **Vim-style keybindings** throughout (fully customizable via config)
-- **Mouse support**: Click to navigate, scroll wheel scrolls the pane under the pointer, `Ctrl+Option+Y` toggles mouse capture, Shift+Drag for native terminal text selection
-
-### Cluster Management
-
-- **Multi-tab support**: Open multiple views side by side
-- **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG_DIR` env var. The `KUBECONFIG` env var is exclusive like kubectl — when set it replaces `~/.kube/config` and the default `config.d/` scan (explicit `--kubeconfig-dir`/`KUBECONFIG_DIR` still merge); opt out with `kubeconfig_exclusive: false`.
-- **Union view**: Merge resources from multiple clusters into a single table with a `Context` column identifying the source, via `--union-context` (repeatable) or a named `--union-set` from config. See [Union View](docs/union-context.md).
-- **Cluster dashboard** when entering a context (configurable)
-- **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
-- **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser and an ASCII-art tree view (`T`, sticky across navigation; `Space` folds branches)
-- **Object Explorer** for drilling into the selected resource's live object (`O` key); arrays expand into indexed elements, so recursive status trees (e.g. `.status.steps[].steps[]`) are walkable; live-refreshes under watch mode (`w` to pause, `R` to refresh manually); `T` toggles a tree view that expands the whole subtree with ASCII-art guides, `Space` folds branches
-- **Schema side pane** (`Ctrl+K`) shows the cluster's own description of the field under the cursor, in a bordered pane beside the YAML viewer and Object Explorer; it follows the cursor, reads the connected cluster so CRDs resolve like built-in kinds, and caches what it reads
-- **Namespace selector** overlay with type-to-filter
-- **All-namespaces mode** (enabled by default)
-- **Local cluster management** — create, list, and delete `kind` clusters; create, list, start, stop, and delete `k3d` and `minikube` clusters (kind has no native start/stop) from inside lfk via the `Ctrl+N` manager overlay.
-
-### Resource Operations
-
-- **Read-only mode**: Lock a session against destructive actions (delete, edit, scale, restart, exec, port-forward, drain, etc.). Enable with `--read-only`, the `read_only: true` config field, per-context `clusters.<name>.read_only`, or the in-app `Ctrl+R` toggle (toggles the highlighted row's `[RO]` marker at the cluster picker; toggles the current tab inside a context). A `[RO]` badge in the title bar marks active sessions. See [Read-Only Mode](docs/usage.md#read-only-mode).
-- **Security dashboard**: Aggregated findings from Trivy, Kyverno, Kubescape, Falco, Gatekeeper, plus two built-in zero-dependency scanners: a heuristic Pod-spec scanner and an Advisor source with reliability recommendations (missing PDBs, quotas, probes, requests — dashboard-only, never on the SEC badge). Auto-detects installed sources, shows a per-resource SEC badge, and probes lazily on first use. Enable/disable globally or per cluster via `security.enabled` / `clusters.<name>.security`. See [Security Dashboard](docs/security.md).
-- **Permission-aware actions**: Actions your RBAC refuses are dropped from the action menu for Pod, Deployment, StatefulSet, DaemonSet and ReplicaSet, decided by one bulk `SelfSubjectAccessReview` pass per context, namespace and kind, and cached under the same three. Fails open when the review errors or times out. See [Permission-Aware Actions](docs/usage.md#permission-aware-actions).
-- **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize
-- **Selectable delete cascade**: Both delete confirmations show the propagation policy and cycle it with `Tab` — `Background` (delete now, garbage collector removes dependents), `Foreground` (keep the object until dependents are gone), `Orphan` (leave dependents running), and `None` (send no policy, letting the API server decide; regular delete only, since force delete runs through `kubectl`). Applies to bulk delete too. The default is `Background`, sent explicitly, so deleting a Job no longer falls through to the API server's legacy `Orphan` default and leaves its pods running; picking `None` opts back into that server-side default deliberately. Change the default with `delete_propagation_policy`. See [Delete confirm dialog](docs/keybindings.md#delete-confirm-dialog).
-- **Cost of a destructive action, in three rows**: The delete, drain, and scale dialogs answer what happens before you confirm, as `Scope` (what else stops existing), `Availability` (what stops serving), and `Risk` (what refuses the action, or what it leaves with no owner). Every row is built from the selected cascade policy, so `Tab` rewrites all three in place and no two rows can disagree. `Scope` walks `ownerReferences`, so a deep chain such as Deployment to ReplicaSet to Pod is counted in full. Under `Orphan` the `Risk` row names the real cost, which is objects left with no controller to manage them. A row with nothing to say is left out, so deleting a bare pod stays a small box. See [Delete confirm dialog](docs/keybindings.md#delete-confirm-dialog).
-- **Custom user-defined actions**: Define custom shell commands per resource type in config
-- **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart, and ArgoCD bulk sync/refresh
-- **Resource sorting** by name, age, or status, remembered per resource kind for the session
-- **Filter and search**: Filter with `f`, search with `/` -- supports substring, regex (auto-detected), and fuzzy (`~` prefix) modes
-- **Abbreviated search**: Type `pvc`, `hpa`, `deploy` etc. to jump to resource types
-- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`). Value positions (namespace, context, resource name, option, column, format) accept fuzzy matches; command names stay on prefix.
-- **Watch mode**: Auto-refresh resources every 2 seconds (enabled by default)
-- **Owner/controller navigation**: Jump to the owner of any resource with `o`
-- **Events view** with warnings-only filter toggle and duplicate-event grouping (`z`)
-- **Crash Investigator** — per-Pod tabbed view combining restart history, pod-scoped events, previous/current container logs, and container-scoped `describe` — accessible from the Pod action menu (`x` → `I`). Refresh with `Shift+R`.
-- **Traffic capture** — per-pod packet capture (kubectl-debug or kubeshark, auto-detected) with live decode and pcap export. Press `c` on a Pod or Service.
-
-### Preview and Editing
-
-- **YAML preview** in the right column with syntax highlighting
-- **Full-screen YAML viewer** with scrollable output, search, section folding (`Tab`/`z`), and in-place editing
-- **Field-manager blame** (`m`) in the YAML viewer: who and when last wrote the line under the cursor, from `.metadata.managedFields`
-- **Your name on your own writes**: lfk stamps the field manager `lfk:<os-user>`, so blame shows the person and not just the tool. Override or shorten it to plain `lfk` with the `field_manager` config field
-- **Resource details** summary in split preview (toggle with `Shift+P`)
-- **List status summary** band pinned at the bottom of the children pane (like the resource-usage footer) when hovering a resource type in the resource-type list — always shows the resource count, plus a colored status rollup for kinds with a health signal (ArgoCD Application health/sync, Pod phase, workload ready ratios, Node readiness, Namespace/PV/PVC phase, Flux & cert-manager Ready) — plus a generic `.status.phase` or `.status.conditions` rollup for any other kind that surfaces one — so you can confirm a whole list is healthy without drilling in
-- **Inline log viewer** with streaming, search, live text filter (`f`: plain/`~`fuzzy/regex/`\`literal), severity filter (`i`/`o`: step the minimum level shown — INFO+/WARN+/ERROR+), line numbers, word wrap, follow mode (`F`), timestamps toggle, previous container logs, container filter, tail-first loading, line jump, structured preview pane (`P`: parses the selected line as JSON or logfmt, falls back to plain text), and automatic reconnect across init-container transitions (stays attached as each init container finishes and the next one starts)
-- **Log Top** — aggregate a resource's logs by parsed attributes (method, host, path, status, service, or JSON/logfmt keys) showing request counts, REQ/s, ERR%, 4xx/5xx counts, avg/max latency, and p50/p95/p99 percentiles (when duration data is present). Columns auto-fit the terminal width (wider = more columns, up to all of REQ, REQ/s, ERR%, P50/P95/P99, ERR, 4XX, 5XX, AVG, MAX, %); `,` toggles/reorders columns. Auto-detects Traefik JSON, ingress-nginx, Envoy, NCSA common/combined access logs (nginx, Apache, Traefik default), JSON, and logfmt. Launch from the resource action menu ("Log Top") or press `T` in the open log viewer. In view: `g` group by, `p` profile, `,` columns (show/hide and reorder), `enter` drill down, sort key to re-sort, `esc` back.
-- **Inline describe view** with scrollable output
-- **Secret viewing/editing** with decode toggle (`Ctrl+S`) and dedicated editor (`e`)
-- **Embedded terminal** (PTY mode) for exec and shell with tab switching — PTY keeps running in background when switching tabs
-
-### Resource Management
-
-- **Resource templates**: Create resources from 25+ built-in templates plus your own (`a`, `/` to search); includes a Custom Resource template as a starting point. Drop manifests in `~/.config/lfk/templates/` or save one there with `x` -> `T` Export Template. `d` in the picker deletes one of your saved templates after a confirmation; built-ins cannot be deleted
-- **Export as template**: `x` -> `T` Export Template strips a live object down to an appliable manifest (no `status`, `uid`, `resourceVersion`, `nodeName`, `clusterIP`, finalizers, `pod-template-hash`, Helm ownership markers, injected token volume, ...) and sends it to the clipboard, a file, or the template list. `s` on the destination picker opens the field picker: tick which categories the export removes (namespace, labels, annotations, Helm ownership, vendor runtime annotations, Secret values); correctness fields show as locked rows. Choices persist. Secret values are blanked by default (keys and `type` kept). Allowed in read-only mode
-- **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
-- **Network policy visualizer**: Visualize a NetworkPolicy's ingress/egress rules (`x` → `N` on a NetworkPolicy), or list every policy affecting a Pod or Service (`x` → "Network Policies" on the resource) — including which backing pods a policy covers. Supports CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy (entities, FQDNs, deny rules, L7 indicators) when the Cilium CRDs are installed. The dialog scrolls with the mouse wheel and is searchable (`/`, `n`/`N`)
-- **Clipboard support**: Copy resource name (`y`), open copy-as picker (`Y`: YAML / JSON / Table), copy a single field via a filterable picker (`Ctrl+Y`: visible columns by default, `Tab` for all manifest fields — e.g. a node's external IP), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
-- **Bookmarks**: Save favorite resource paths (including the active list filter) for quick navigation
-- **Orphan detection**: Press `Shift+Z` (or run bare `:orphans`) to open the cluster-wide orphan overview across 11 kinds — Pods, Secrets, ConfigMaps, Services, PVCs, HPAs, PDBs, NetworkPolicies, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings. Per-list filters are still available via the filter-preset overlay (`.`) on each kind, or jump straight to a filtered view with `:orphans <kind>` (e.g., `:orphans secrets`). A strict / lenient toggle (`s`) flips between "truly unused" and "currently idle but referenced by workload templates" (e.g. CronJob between firings). Auto-excludes Helm release Secrets, ServiceAccount tokens, owner-managed resources, and `kube-root-ca.crt`.
-- **Session persistence**: Remembers last context/namespace/resource, the active list filter, and the highlighted row across restarts. **Named sessions** save the whole multi-tab workspace under a name and switch between them from the session manager (`C` or `:sessions`); the active session is auto-saved on quit and reopened on start, so working in one never clobbers another. Start on a specific one with `lfk --session <name>` (or `LFK_SESSION`). Navigate before the restore finishes and lfk drops the saved row rather than pulling your cursor back
-
-### Integrations
-
-- **ArgoCD integration**: Browse Applications, sync, terminate sync, refresh, view managed resources
-- **Argo Workflows integration**: Suspend/resume, stop/terminate, resubmit Workflows; submit from WorkflowTemplates; suspend/resume CronWorkflows
-- **Helm integration**: Browse releases, view managed resources, uninstall
-- **HPA scaling**: Press `S` on a HorizontalPodAutoscaler to edit its min/max replica bounds and scale its target workload (Deployment / StatefulSet / ReplicaSet) in one overlay
-- **KEDA integration**: Pause/unpause ScaledObjects and ScaledJobs
-- **External Secrets integration**: Force refresh ExternalSecrets, ClusterExternalSecrets, and PushSecrets
-- **CRD discovery**: Automatically discovers installed CRDs and groups them by API group
-
-### Customization
-
-- **460+ built-in color schemes** from [ghostty themes](https://github.com/ghostty-org/ghostty): Tokyonight, Catppuccin, Dracula, Nord, Rose Pine, Gruvbox, and many more. Transparent background support.
-- **Runtime theme switching**: Press `T` to preview and switch themes without restarting
-- **Auto dark/light mode**: configure a dark and a light scheme; lfk switches automatically when the OS appearance changes (requires CSI 996/2031 terminal support: Ghostty, kitty, Contour, …)
-- **Custom color themes** via config file (Tokyonight theme by default)
-- **Configurable keybindings** for direct actions, including `Ctrl+Shift` chords that stay distinct from plain `Ctrl` (requires Kitty keyboard protocol or xterm `modifyOtherKeys`: Ghostty, kitty, WezTerm, foot, xterm — not macOS Terminal.app; see [Ctrl+Shift chords](docs/keybindings.md#ctrlshift-chords))
-- **Configurable search abbreviations**
-- **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
-- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable. Also decides how the which-key panel and help screen draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
-- **Configurable table columns** (global, per-resource-type, and per-cluster)
-- **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
-- **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
-- **Status-aware coloring**: Running=green, Pending=yellow, Failed=red — also applied to CRD printer-column values: recognized status words (Active, Failed, Pending, ...) get their severity color, and True/False values follow the column's polarity (Established=False red, Failed=False green)
-- **Row status tint**: failed/progressing rows stay visible even when the Status column is hidden — `foreground` (default) colors the row's Name cell in the status color when Status is hidden, `background` adds a muted status-colored row background, `off` disables it. Set via `appearance.row_status_tint`
-- **Resource usage metrics**: CPU/MEM with color-coded bars in dashboard
-- **Node uptime column**: time since each node last booted, to spot restarts. Requires Prometheus as the monitoring source and node_exporter (the Kubernetes API does not expose boot time)
-
-## Installation
+Pick your platform:
 
 ```bash
 # Homebrew (macOS / Linux)
 brew install janosmiko/tap/lfk
 
-# Windows: Scoop
+# Scoop (Windows)
 scoop bucket add janosmiko https://github.com/janosmiko/scoop-bucket && scoop install lfk
-# or: winget install janosmiko.lfk
-# or: choco install lfk
 
-# Linux: Arch / AUR
+# Winget (Windows)
+winget install janosmiko.lfk
+
+# Chocolatey (Windows)
+choco install lfk
+
+# AUR (Arch)
 yay -S lfk-bin
 
-# Linux: Debian / Ubuntu (Cloudsmith APT)
+# APT (Debian / Ubuntu)
 curl -1sLf 'https://dl.cloudsmith.io/public/janosmiko/lfk/setup.deb.sh' | sudo -E bash && sudo apt update && sudo apt install lfk
 
-# Linux: Fedora / RHEL (Cloudsmith DNF)
+# DNF (Fedora / RHEL)
 curl -1sLf 'https://dl.cloudsmith.io/public/janosmiko/lfk/setup.rpm.sh' | sudo -E bash && sudo dnf install lfk
 
 # Go
@@ -193,19 +39,22 @@ go install github.com/janosmiko/lfk@latest
 nix run github:janosmiko/lfk
 ```
 
-`kubectl` is required and must be configured. `helm` and `trivy` are optional (Helm management, image vulnerability scanning). No cluster yet? `lfk --demo` runs against a built-in fake cluster instead.
+Then run it:
 
-> See [docs/installation.md](docs/installation.md) for Windows, Docker, NixOS/home-manager flake input, building from source, and the full list of optional CLI dependencies.
+```bash
+lfk
+lfk --demo
+```
+
+`lfk` uses `~/.kube/config` and `~/.kube/config.d/*`. `lfk --demo` runs against a built-in fake cluster, so no kubeconfig is needed.
+
+`kubectl` is required and must be configured. `helm` and `trivy` are optional, for Helm management and image vulnerability scanning.
+
+[docs/installation.md](docs/installation.md) covers Docker, NixOS and home-manager, binary releases, building from source, and the full list of optional CLI dependencies.
 
 ## Usage
 
 ```bash
-# Use default kubeconfig (~/.kube/config + ~/.kube/config.d/*)
-lfk
-
-# Try it without a cluster (no kubeconfig required)
-lfk --demo
-
 # Start in a specific context / namespace
 lfk --context my-cluster -n kube-system
 
@@ -220,9 +69,205 @@ KUBECONFIG_DIR=/path/to/configs/ lfk
 KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
 
-> See [docs/usage.md](docs/usage.md) for the full CLI reference and runtime tuning options: mouse capture, no-color mode, read-only mode, watch-mode interval, discovery cache (`KUBECACHEDIR`), and Secret lazy loading.
+[docs/usage.md](docs/usage.md#command-line-flags) has the full CLI reference and the runtime tuning options: mouse capture, no-color mode, read-only mode, watch-mode interval, discovery cache, and Secret lazy loading.
 
-## Navigation Hierarchy
+## Sponsor
+
+LFK is Apache-2.0 and stays free. I build it in my free time, and the tools it takes to build it are not free.
+
+**Do you use LFK at work? Ask your team to sponsor it.** A company expenses this without noticing, and an individual feels it. Most clusters LFK gets pointed at are company clusters.
+
+- [GitHub Sponsors](https://github.com/sponsors/janosmiko)
+- [Buy Me a Coffee](https://buymeacoffee.com/janosmiko)
+
+Sponsorship pays for the IDE licenses and AI assistants that go into development. More of it buys more hours for LFK.
+
+Money is not the only way to help. Star the repo, file a good bug report, or tell one colleague who lives in `kubectl`.
+
+Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
+Cloudsmith is a hosted package management service that stores and serves packages in many formats.
+
+## Screenshots
+
+### Demo
+
+![Demo](./docs/imgs/demo.gif)
+
+### Themes
+
+![Themes](./docs/imgs/themes.gif)
+
+### Explorer
+
+| Feature | |
+| --- | --- |
+| Pods | <img src="./docs/imgs/pods.png" alt="Pods" width="600"> |
+| Pods fullscreen | <img src="./docs/imgs/pods-fullscreen.png" alt="Pods fullscreen" width="600"> |
+| Pod action menu | <img src="./docs/imgs/pods-actions.png" alt="Pod actions" width="600"> |
+| Cluster Dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster Dashboard" width="600"> |
+| Object Explorer | <img src="./docs/imgs/object-explorer.png" alt="Object Explorer" width="600"> |
+| API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
+
+### Viewers
+
+| Feature | |
+| --- | --- |
+| YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
+| Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
+| Log Top | <img src="./docs/imgs/log-top.png" alt="Log Top" width="600"> |
+
+### Integrations
+
+| Feature | |
+| --- | --- |
+| Helm integration | <img src="./docs/imgs/helm-integration.png" alt="Helm integration" width="600"> |
+| ArgoCD integration | <img src="./docs/imgs/argocd-integration.png" alt="ArgoCD integration" width="600"> |
+| ArgoCD AutoSync config | <img src="./docs/imgs/argocd-autosync.png" alt="ArgoCD auto-sync config" width="300"> |
+| Trivy integration | <img src="./docs/imgs/trivy-integration.png" alt="Trivy integration" width="600"> |
+
+### Analysis
+
+| Feature | |
+| --- | --- |
+| Security Dashboard | <img src="./docs/imgs/security-heuristics.png" alt="Built-in security heuristics" width="600"> |
+| Crash Investigator | <img src="./docs/imgs/crash-investigator.png" alt="Crash Investigator" width="600"> |
+| Pod Startup Analysis | <img src="./docs/imgs/startup-analysis.png" alt="Pod Startup Analysis" width="600"> |
+| Can-I RBAC permissions browser | <img src="./docs/imgs/can-i.png" alt="Can-I viewer" width="600"> |
+
+### Workspace
+
+| Feature | |
+| --- | --- |
+| Label and annotation editor | <img src="./docs/imgs/label-annotation-editor.png" alt="Label and annotation editor" width="600"> |
+| Quick filters | <img src="./docs/imgs/quick-filters.png" alt="Quick filters" width="600"> |
+| Column visibility and reordering | <img src="./docs/imgs/column-visibility-reordering.png" alt="Column visibility and reordering" width="600"> |
+| Bookmarks | <img src="./docs/imgs/bookmarks.png" alt="Bookmarks" width="600"> |
+| Multi-tab support | <img src="./docs/imgs/tab-support.png" alt="Multi-tab support" width="600"> |
+| Union view | <img src="./docs/imgs/union-sets.png" alt="Union sets" width="600"> |
+| Local cluster management | <img src="./docs/imgs/local-clusters.png" alt="Local clusters" width="600"> |
+
+## Features
+
+### Navigation
+
+- Three-column Miller columns layout: parent, current, preview
+- Owner-based hierarchy: Clusters -> Resource Types -> Resources -> Owned Resources -> Containers
+- Jump to a resource's owner with `o`, back with `Backspace`
+- Teleport between levels with `0` / `1` / `2`
+- Cycle the layout with `F`, expand or collapse groups with `z`
+- Vim keybindings throughout, remappable, including `Ctrl+Shift` chords: [keybindings.md](docs/keybindings.md#ctrlshift-chords)
+- Mouse click, scroll, and `Ctrl+Option+Y` to release capture: [usage.md](docs/usage.md#mouse-support)
+
+### Resource type list
+
+- Groups: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
+- Discovered CRDs grouped by API group, for example `argoproj.io`, `longhorn.io`
+- Pin a type with `p`: [keybindings.md](docs/keybindings.md#navigation)
+- Pin a type's dashboard summary with `x`: [config-reference.md](docs/config-reference.md#top-level-fields)
+- Hide or show a single type with `x`, reveal hidden ones with `H`: [config-reference.md](docs/config-reference.md#top-level-fields)
+- Rarely used types (CSI internals, webhooks, APF, leases) hidden until `H`: [config-reference.md](docs/config-reference.md#top-level-fields)
+- Status summary band under the hovered type: [features.md](docs/features.md#list-status-summary)
+
+### Clusters and contexts
+
+- Multi-tab workspace with `t` / `]` / `[`: [keybindings.md](docs/keybindings.md#tabs)
+- Merged kubeconfig from `~/.kube/config`, `~/.kube/config.d/*`, and `KUBECONFIG_DIR`: [usage.md](docs/usage.md#kubeconfig-directory)
+- Union view merging several clusters into one table: [union-context.md](docs/union-context.md)
+- Cluster Dashboard on entering a context: [config-reference.md](docs/config-reference.md#top-level-fields)
+- Monitoring dashboard with Prometheus and Alertmanager alerts, `@`: [config-reference.md](docs/config-reference.md#monitoring)
+- Local kind, k3d, and minikube clusters with `Ctrl+N`: [keybindings.md](docs/keybindings.md#local-clusters-manager)
+- Named sessions with `C`: [keybindings.md](docs/keybindings.md#named-sessions)
+- Context, namespace, filter, and cursor row restored on start: [config-reference.md](docs/config-reference.md#session-persistence)
+
+### Safety
+
+- Read-only mode via `--read-only` or `Ctrl+R`: [usage.md](docs/usage.md#read-only-mode)
+- Actions your RBAC refuses are dropped from the action menu: [usage.md](docs/usage.md#permission-aware-actions)
+- Security dashboard and SEC badges from Trivy, Kyverno, Kubescape, Falco, Gatekeeper, and three built-in scanners: [security.md](docs/security.md)
+- Delete cascade picker, `Tab` cycles Background / Foreground / Orphan / None: [keybindings.md](docs/keybindings.md#delete-confirm-dialog)
+- Scope, Availability, and Risk rows on the delete, drain, and scale dialogs: [keybindings.md](docs/keybindings.md#delete-confirm-dialog)
+- RBAC browser with `U`, reverse lookup with `Tab`: [keybindings.md](docs/keybindings.md#can-i-browser)
+
+### Resource actions
+
+- Action menu `x`: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize: [keybindings.md](docs/keybindings.md#action-menu-items)
+- Multi-select with `Space`, range with `Ctrl+Space`, then bulk delete, scale, or restart: [keybindings.md](docs/keybindings.md#multi-selection)
+- Custom shell actions per resource type: [config-reference.md](docs/config-reference.md#custom-actions)
+- Port forwarding, with active forwards listed under the Networking group: [keybindings.md](docs/keybindings.md#action-menu-items)
+- Right-sizing Advisor with `x` -> `z`: [keybindings.md](docs/keybindings.md#right-sizing-advisor)
+- Network policy visualizer with `x` -> `N`, Cilium aware: [keybindings.md](docs/keybindings.md#network-policy-visualizer)
+- Traffic capture with `c` on a Pod or Service: [usage.md](docs/usage.md#traffic-capture)
+
+### Finding things
+
+- Filter with `f`, search with `/`, in substring, regex, fuzzy, or literal mode
+- Abbreviated jumps such as `pvc`, `hpa`, `deploy`: [config-reference.md](docs/config-reference.md#abbreviations)
+- Command bar `:` for resource jumps, built-ins, kubectl, and shell: [commands.md](docs/commands.md), autocomplete in [features.md](docs/features.md#command-bar-autocomplete)
+- Quick filter presets with `.`: [config-reference.md](docs/config-reference.md#filter-presets)
+- Sorting with `>` / `<` / `=` / `-`, remembered per kind: [keybindings.md](docs/keybindings.md#sorting)
+- Bookmarks with `m<slot>` and `'<slot>`: [keybindings.md](docs/keybindings.md#bookmarks)
+- Orphan detection with `Shift+Z` across 11 kinds: [usage.md](docs/usage.md#orphan-detection)
+
+### Viewers
+
+- YAML preview in the right column, details summary with `Shift+P`
+- Fullscreen YAML Viewer with search, folding, and in-place editing: [keybindings.md](docs/keybindings.md#yaml-view)
+- Field-manager blame with `m`, writes stamped `lfk:<os-user>`: [config-reference.md](docs/config-reference.md#top-level-fields)
+- Schema side pane with `Ctrl+K`: [features.md](docs/features.md#schema-side-pane)
+- Object Explorer with `O` for the live object: [keybindings.md](docs/keybindings.md#object-explorer)
+- API Explorer with `I` for the resource schema: [keybindings.md](docs/keybindings.md#api-explorer)
+- Describe with `v`, relationship map with `M`, events with `V` plus warnings-only and grouping toggles: [keybindings.md](docs/keybindings.md#actions)
+
+### Logs and shells
+
+- Live-log preview pane with `L`, fullscreen viewer with `Ctrl+L`: [keybindings.md](docs/keybindings.md#log-viewer)
+- Text filter `f`, severity filter `i` / `o`, structured preview `P`: [keybindings.md](docs/keybindings.md#log-viewer)
+- Log Top aggregates access logs into a metrics table, `T`: [keybindings.md](docs/keybindings.md#log-top)
+- Crash Investigator with `x` -> `I`: [keybindings.md](docs/keybindings.md#crash-investigator-overlay)
+- Embedded terminal for exec and shell, `Ctrl+T` cycles the mode: [features.md](docs/features.md#embedded-terminal)
+- Node shell with `x` -> `s`: [usage.md](docs/usage.md#node-shell)
+
+### Creating and copying
+
+- Resource templates with `a`, built-ins plus your own: [features.md](docs/features.md#resource-templates)
+- Export a live object as a template with `x` -> `T`: [features.md](docs/features.md#export-as-template)
+- Copy name `y`, copy-as picker `Y`, single field `Ctrl+Y`: [keybindings.md](docs/keybindings.md#clipboard)
+- Apply a manifest from the clipboard with `Ctrl+P`: [keybindings.md](docs/keybindings.md#clipboard)
+- Save the selected manifest to a file with `W`
+- Decode Secrets with `Ctrl+S`, edit them decoded with `e`: [keybindings.md](docs/keybindings.md#secret-actions)
+- Finalizer search and removal with `Ctrl+G`
+
+### Integrations
+
+- Argo CD: browse Applications, sync, terminate, refresh: [features.md](docs/features.md#argo-cd)
+- Argo Workflows: suspend, resume, stop, resubmit, submit from a template: [features.md](docs/features.md#argo-workflows)
+- Helm: browse releases, values, diff, upgrade, rollback, uninstall: [keybindings.md](docs/keybindings.md#helm-release-actions)
+- HPA scaling overlay with `S`: [keybindings.md](docs/keybindings.md#horizontalpodautoscaler-actions)
+- KEDA: pause and unpause ScaledObjects and ScaledJobs: [features.md](docs/features.md#keda)
+- External Secrets: force refresh: [features.md](docs/features.md#external-secrets)
+- CRD discovery, grouped by API group
+
+### Appearance
+
+- 460+ built-in color schemes from [ghostty themes](https://github.com/ghostty-org/ghostty), `T` switches live: [config-reference.md](docs/config-reference.md#color-schemes)
+- Auto dark and light switching with the OS appearance: [config-reference.md](docs/config-reference.md#auto-darklight-mode)
+- Custom theme colors, Tokyonight by default: [config-reference.md](docs/config-reference.md#theme)
+- Icon modes: auto, unicode, nerdfont, simple, emoji, none: [config-reference.md](docs/config-reference.md#icon-mode-auto-detection)
+- Status colors on rows and CRD printer columns: [features.md](docs/features.md#status-colors)
+- Row status tint when the Status column is hidden: [config-reference.md](docs/config-reference.md#row-status-tint)
+- Transparent background: [config-reference.md](docs/config-reference.md#appearance)
+
+### Tables and metrics
+
+- Column visibility and order with `,`, remembered per kind: [keybindings.md](docs/keybindings.md#column-toggle-overlay)
+- Configurable columns globally, per resource type, and per cluster: [config-reference.md](docs/config-reference.md#views)
+- CPU and memory bars on the Cluster Dashboard: [features.md](docs/features.md#resource-usage-metrics)
+- Node uptime column: [config-reference.md](docs/config-reference.md#node-uptime-column)
+- Namespace resource quota dashboard with `Q`
+- Watch mode auto-refresh with `w`: [usage.md](docs/usage.md#watch-mode-interval)
+- Random startup tips: [config-reference.md](docs/config-reference.md#top-level-fields)
+
+## Navigation hierarchy
 
 ```
 Clusters (kubeconfig contexts)
@@ -232,9 +277,19 @@ Clusters (kubeconfig contexts)
                     +-- Containers (for Pods)
 ```
 
-Namespaces are **not** a navigation level. The current namespace is shown in the top-right corner and can be changed by pressing `\`. All-namespaces mode is enabled by default (toggle with `A`). Inside the namespace selector, press `Space` to include namespaces, `Tab` to exclude them (negative selection — shows all except the marked namespaces, each prefixed with `!`), `A` to reset to all-namespaces mode, or `R` to refresh the list from the cluster. Press `.` to quick-filter straight to the namespace of the resource highlighted behind the overlay.
+Namespaces are **not** a navigation level. The top-right corner shows the current namespace. Press `\` to open the selector, which filters as you type. All-namespaces mode is on by default, and `A` toggles it.
 
-### Owner Resolution
+Inside the namespace selector:
+
+| Key | Action |
+|---|---|
+| `Space` | Include a namespace |
+| `Tab` | Exclude a namespace (shows all except the marked ones, each prefixed with `!`) |
+| `A` | Reset to all-namespaces mode |
+| `R` | Refresh the list from the cluster |
+| `.` | Quick-filter to the namespace of the resource behind the overlay |
+
+### Owner resolution
 
 - **Deployments** show their Pods (resolved through ReplicaSets, flattened)
 - **StatefulSets / DaemonSets / Jobs** show their Pods directly
@@ -247,125 +302,129 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 ## Keybindings
 
-> For the complete keybinding reference (YAML view, log viewer, describe, diff, exec mode, and all sub-modes), see [docs/keybindings.md](docs/keybindings.md). Press `F1` in-app for the built-in help screen, `?` for the which-key action panel.
+[docs/keybindings.md](docs/keybindings.md) is the complete reference, including the YAML view, Log Viewer, describe, diff, exec mode, and every sub-mode. Press `F1` in-app for the help screen, `?` for the which-key action panel.
 
-### Navigation
-
-| Key | Action |
-|---|---|
-| `h` / `Left` | Navigate to parent level |
-| `l` / `Right` | Navigate into selected item |
-| `j` / `Down` | Move cursor down |
-| `k` / `Up` | Move cursor up |
-| `gg` / `Home` | Jump to top of list |
-| `G` / `End` | Jump to bottom of list |
-| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll down/up |
-| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page scroll down/up |
-| `Enter` | Open full-screen YAML view / navigate into |
-| `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
-| `p` | Pin/unpin resource type (at resource types level) |
-| `x` | At resource types level: pin/unpin or hide/show the selected resource type (saved per cluster context / union set) |
-| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed |
-| `0` / `1` / `2` | Jump to clusters / types / resources level |
-| `J` / `K` | Scroll preview pane down/up |
-| `o` | Jump to owner/controller of selected resource |
-| `Backspace` | Jump back through teleport history (owner / port-forward / orphan / finding / mark jumps) |
-| `g`+`p/d/s/n/N/i/j/c/r/D/t/C/S/h/v/V/b` | Goto resource type: Pods / Deployments / Services / Nodes / Namespaces / Ingresses / Jobs / CronJobs / ReplicaSets / DaemonSets / StatefulSets / ConfigMaps / Secrets / HPAs / PVCs / PVs / PDBs (press `g` for which-key popup; add CRDs like ArgoCD via `goto_targets`) |
-
-### Views and Modes
+### Move
 
 | Key | Action |
 |---|---|
-| `F1` | Toggle help screen (`?` too, where no which-key panel exists: overlays and exec mode) |
-| `f` | Filter items in current view |
-| `/` | Search and jump to match |
-| `n` / `N` | Next / previous search match |
-| `P` | Toggle between details and YAML preview |
-| `M` | Toggle resource relationship map |
-| `F` | Cycle layout: hide sidebar -> fullscreen -> normal |
+| `h` / `l` | Parent level / into the selected item |
+| `j` / `k` | Cursor down / up |
+| `gg` / `G` | Top / bottom of list |
+| `Ctrl+D` / `Ctrl+U` | Half-page scroll down / up |
+| `Ctrl+F` / `Ctrl+B` | Full-page scroll down / up |
+| `J` / `K` | Scroll the preview pane down / up |
+| `Enter` | Fullscreen YAML view, or navigate into |
+
+### Jump
+
+| Key | Action |
+|---|---|
+| `0` / `1` / `2` | Clusters / resource types / resources level |
+| `o` | Owner or controller of the selected resource |
+| `Backspace` | Back through teleport history |
+| `g` + key | Goto resource type (`g` opens the which-key popup) |
+| `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase context-aware, uppercase context-free) |
+| `\` / `A` | Namespace selector / toggle all-namespaces |
+| `g\` | Previous namespace |
+
+### Resource type list
+
+| Key | Action |
+|---|---|
+| `z` | Expand or collapse all groups (Events view: toggle grouping) |
+| `p` | Pin or unpin the selected type |
+| `x` | Pin, hide, or show the selected type |
+| `H` | Reveal rarely used and hidden types |
+
+### Search and filter
+
+| Key | Action |
+|---|---|
+| `f` | Filter items in the current view |
+| `/` | Search and jump to a match |
+| `n` / `N` | Next / previous match |
 | `.` | Quick filter presets |
-| `!` | Error log (V/v select, y copy, f fullscreen) |
-| `Ctrl+S` | Toggle secret value visibility |
-| `Ctrl+G` | Finalizer search and remove |
-| `I` | API Explorer (browse resource structure interactively) |
-| `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
-| `Ctrl+K` | Schema side pane for the field under the cursor (YAML viewer, Object Explorer) |
+| `,` | Column visibility and order |
+| `>` / `<` / `=` / `-` | Sort by next / previous column, flip direction, reset |
+
+### Views
+
+| Key | Action |
+|---|---|
+| `F1` / `?` | Help screen / which-key action panel |
+| `P` | Details summary or YAML preview |
+| `M` | Resource relationship map |
+| `F` | Cycle layout: hide sidebar, fullscreen, restore |
+| `I` / `O` | API Explorer / Object Explorer |
+| `Ctrl+K` | Schema side pane for the field under the cursor |
 | `U` | RBAC permissions browser (can-i) |
-| `T` | Open theme selector |
-| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl (`:k get pod`), shell (`:! cmd`) |
-| `w` | Toggle watch mode (auto-refresh) |
-| `,` | Column visibility toggle (show/hide and reorder columns) |
-| `>` / `<` | Sort by next / previous column |
-| `=` | Toggle sort direction (ascending/descending) |
-| `-` | Reset sort to default (Name ascending) |
-| `W` | Save resource to file / toggle warnings-only (Events) |
-| `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
-| `@` | Cycle Cluster / Monitoring dashboard |
-| `Q` | Namespace resource quota dashboard |
 
 ### Actions
 
 | Key | Action |
 |---|---|
-| `x` | Action menu (logs, exec, describe, edit, delete, scale, port-forward, etc.) |
-| `\` / `A` | Namespace selector / toggle all-namespaces |
-| `g\` | Jump to previous namespace (swap back and forth) |
-| `L` | Toggle live-log preview pane (right pane, streaming tail; pod and container rows) |
-| `Ctrl+L` | Open fullscreen log viewer |
-| `v` | Describe resource |
+| `x` | Action menu (logs, exec, describe, edit, delete, scale, port-forward) |
+| `v` / `L` / `Ctrl+L` | Describe / live-log preview / fullscreen Log Viewer |
 | `D` / `X` | Delete / force delete |
-| `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
-| `Ctrl+Y` | Copy a single field (columns by default, `Tab` for all manifest fields; works with multi-selection) |
+| `y` / `Y` / `Ctrl+Y` | Copy name / copy-as picker / copy a single field |
+| `Ctrl+P` / `W` | Apply from clipboard / save the manifest to a file |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
-| `?` | Which-key action panel: hotkeys actionable right now, descriptions colored by category with a color legend at the bottom (scroll: `Ctrl+D`/`Ctrl+U`, close: `esc`; `?` again switches between category and key order, kept for the session). Also in every fullscreen viewer except exec mode, where it lists what that viewer supports in its current state. `F1` opens full help |
-| `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
-| `t` / `]` / `[` | New tab / next / previous |
-| `}` / `{` | Move current tab right / left |
+| `Ctrl+S` / `Ctrl+G` | Secret value visibility / finalizer search and remove |
 
-All views (YAML, logs, describe, diff, exec) use vim-style navigation (`j`/`k`, `gg`/`G`, `Ctrl+D`/`Ctrl+U`, `/` search, `v`/`V` visual selection). See [docs/keybindings.md](docs/keybindings.md) for the full reference.
+### Tools
 
-> For the complete command bar reference (built-in commands, shell/kubectl execution, resource jumps), see [docs/commands.md](docs/commands.md).
+| Key | Action |
+|---|---|
+| `:` | Command bar (resource jumps, built-ins, kubectl, shell) |
+| `T` | Theme selector |
+| `@` / `Q` | Cluster or monitoring dashboard / namespace quotas |
+| `w` | Watch mode (auto-refresh) |
+| `Ctrl+T` | Cycle terminal mode (pty / exec / mux) |
+| `Ctrl+R` | Read-only mode |
+| `!` | Error log |
+| `t` / `]` / `[` / `}` / `{` | New tab / next / previous / move right / move left |
+
+All views (YAML, logs, describe, diff, exec) use vim-style navigation: `j`/`k`, `gg`/`G`, `Ctrl+D`/`Ctrl+U`, `/` search, `v`/`V` visual selection.
+
+[docs/commands.md](docs/commands.md) is the command bar reference: built-in commands, shell and kubectl execution, resource jumps.
 
 ## Configuration
 
-Create `~/.config/lfk/config.yaml` to customize the application. All fields are optional; only the values you specify will override the defaults.
-
-> For the complete configuration reference, see [docs/config-reference.md](docs/config-reference.md) and [docs/config-example.yaml](docs/config-example.yaml).
-
-### Quick Start
+1. Create `~/.config/lfk/config.yaml`.
+2. Add only the keys you want to change. Every other value keeps its default.
+3. Press `T` in-app to browse themes, then put the name you picked in `colorscheme`.
 
 ```yaml
-# Color scheme (press T in-app to browse 460+ themes with live preview)
-# Auto dark/light mode — Ghostty-style "dark:X,light:Y" syntax switches the
-# scheme when the OS appearance changes (CSI 996/2031; Ghostty, kitty >= 0.27, …)
+# Color scheme. "dark:X,light:Y" switches with the OS appearance.
 colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
 
-# Use terminal's own background
+# Use the terminal's own background
 transparent_background: true
 
-# Icon mode: "auto" (default, detects Nerd Font terminals like Ghostty/Kitty/WezTerm),
-# "unicode", "nerdfont" (requires Nerd Font in terminal), "simple" (ASCII labels),
-# "emoji", or "none". The LFK_ICONS env var overrides this setting.
+# auto, unicode, nerdfont, simple, emoji, or none. LFK_ICONS overrides it.
 icons: auto
 
 # Disable mouse capture (allows native terminal text selection)
 mouse: false
 
-# Custom keybinding overrides (only specify what you want to change)
+# Keybinding overrides
 keybindings:
   logs: "ctrl+l"
   toggle_preview_logs: "L"
   describe: "v"
   delete: "D"
 
-# Search abbreviations (extend built-in abbreviations for :pod, :dep, etc.)
+# Search abbreviations
 abbreviations:
   myapp: myapplications
 ```
 
-### Search Modes
+[docs/config-reference.md](docs/config-reference.md) is the full reference, [docs/config-example.yaml](docs/config-example.yaml) a commented example of every field.
 
-All search and filter inputs support three modes, auto-detected from the query string:
+### Search modes
+
+Every search and filter input auto-detects the mode from the query string:
 
 | Mode | Syntax | Example |
 |---|---|---|
@@ -374,69 +433,76 @@ All search and filter inputs support three modes, auto-detected from the query s
 | Fuzzy | `~` prefix | `~deplymnt` |
 | Literal | `\` prefix | `\err.*` |
 
-**Clipboard paste**: All search, filter, and command bar inputs accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). Multiline paste shows a confirmation dialog.
+All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A multiline paste shows a confirmation dialog.
 
-**Recall previous queries**: While the `f` filter or `/` search input is open, press `Up` / `Down` to cycle through previous queries. `/` and `f` share one history (the matcher and matched fields are identical between them), kept separate from the `:` command bar. The log viewer's `/` search has its own history because it matches raw log lines (substring/regex over arbitrary text) rather than resource names — pooling it would surface irrelevant entries. All three persist across sessions under `$XDG_STATE_HOME/lfk/` (default `~/.local/state/lfk/`) — `query-history` for explorer `/` and `f`, `log-search-history` for the log viewer's `/`, and `history` for the command bar.
+`Up` / `Down` recall previous queries. `/` and `f` share one history, the Log Viewer's `/` and the `:` command bar keep their own. All three survive restarts under `$XDG_STATE_HOME/lfk/`: [keybindings.md](docs/keybindings.md#log-viewer).
 
-## Tips and Tricks
+## Tips and tricks
 
-- Peek at Pod/Deployment logs with `L` (live-log preview pane), or open the fullscreen log viewer with `Ctrl+L`
-- Jump straight to a resource type from anywhere: type `:pod`, `:dep`, `:pvc` in the command bar
-- Press `o` on a resource to jump to its owner (e.g. Pod -> Deployment), then `Backspace` to jump back
-- Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
-- Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete/scale/restart via `x`
-- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Each bookmark shows its saved namespace in the overlay and the jump applies it by default; press Tab to opt out and keep the current scope. An active list filter is saved with the bookmark and reapplied on jump (shown as `> /<filter>` in the slot name)
-- Press `.` for quick filter presets (e.g. only failing Pods); extend them per resource type in config
-- Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
-- Copy the resource name with `y`; press `Y` to copy as YAML, JSON, or Table
-- Apply a manifest straight from your clipboard with `Ctrl+P`
-- Hunt down unused ConfigMaps, Secrets, PVCs and more with `Shift+Z` (orphan detection)
-- Run kubectl without leaving lfk (`:k get pods -o wide`) or any shell command (`:! curl ...`)
-- Investigate a crash-looping Pod with `x` -> `I`: restart history, events, previous logs, and describe in one tabbed view
-- Lock a session against destructive actions with `Ctrl+R` (read-only mode)
-- Try a new look without restarting: `T` live-previews 460+ themes
-- Resource stuck in Terminating? `Ctrl+G` searches its finalizers and removes them
-- Press `Tab` inside `/` or `f` to broaden matching to labels, annotations, finalizers, and other column values
-- Recall earlier queries with `Up`/`Down` inside `/`, `f`, and the `:` command bar - history persists across restarts
-- See how a resource connects to everything else with `M` (relationship map)
-- Need everything except a few namespaces? In the `\` selector, `Tab` excludes namespaces instead of selecting them
-- Pin your daily-driver resource types with `p` and hide noisy ones via `x` - both remembered per cluster
+### Navigating
+
+- Press `o` on a resource to jump to its owner (Pod -> Deployment), then `Backspace` to jump back
 - Teleport between levels with `0` / `1` / `2` (clusters / resource types / resources)
+- Jump straight to a resource type from anywhere: type `:pod`, `:dep`, `:pvc`
+- Set a bookmark with `m<letter>`, jump back with `'<letter>`, the saved namespace and filter come with it
+- Pin your daily-driver resource types with `p` and hide noisy ones via `x`, both remembered per cluster
+- Need everything except a few namespaces? In the `\` selector, `Tab` excludes namespaces instead of selecting them
+- See how a resource connects to everything else with `M` (relationship map)
+
+### Finding
+
+- Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
+- Press `Tab` inside `/` or `f` to broaden matching to labels, annotations, finalizers, and other column values
+- Recall earlier queries with `Up` / `Down` inside `/`, `f`, and the `:` command bar
+- Press `.` for quick filter presets, for example only failing Pods
+- Hunt down unused ConfigMaps, Secrets, PVCs and more with `Shift+Z` (orphan detection)
 - Sort by any column with `>` / `<`, flip direction with `=`, reset with `-`
-- Check firing Prometheus/Alertmanager alerts with `@` and namespace quotas with `Q`
-- Open an Ingress host - or an active port-forward's localhost URL - in your browser with `Ctrl+O`; on a Service, `Ctrl+O` starts a port forward and opens it
-- Save the selected resource manifest to a file with `W`
-- Spin up a throwaway kind/k3d/minikube cluster without leaving lfk: `Ctrl+N` at the cluster list
-- Capture a Pod's network traffic with `c` - live decode plus pcap export (kubectl-debug or kubeshark)
-- Walk any resource's live object with `O` (Object Explorer): `r` finds keys recursively, `T` expands an ASCII tree, `y` copies the field path
-- Forget `kubectl explain` - `I` opens the API Explorer, and `n`/`N` searches auto-drill into nested fields
-- In the YAML viewer, press `O` on a line to jump into the Object Explorer at that attribute, or `I` to see its schema
+- Check firing Prometheus or Alertmanager alerts with `@`, and namespace quotas with `Q`
+
+### Logs
+
+- Peek at Pod or Deployment logs with `L`, open the fullscreen viewer with `Ctrl+L`
+- Make noisy logs readable with `P`: the structured preview parses JSON, logfmt, klog, zap, nginx, envoy, Java, and postgres lines
+- Save logs to a file with `S` (loaded lines) or `Ctrl+S` (full history), the path lands on your clipboard
+- Switch pods or filter containers without leaving the Log Viewer: press `\`
+- Investigate a crash-looping Pod with `x` -> `I`: restart history, events, previous logs, and describe in one tabbed view
+
+### Inspecting
+
+- Walk any resource's live object with `O`: `r` finds keys recursively, `T` expands an ASCII tree, `y` copies the field path
+- Forget `kubectl explain`, `I` opens the API Explorer and `n` / `N` auto-drill into nested fields
+- In the YAML Viewer, press `O` on a line to open the Object Explorer at that attribute, or `I` to see its schema
 - `Ctrl+K` opens a side pane with the schema description of the field under the cursor, and keeps it in step as you move
-- Fold YAML sections with `z` (`Z` folds all); edit the resource in your `$EDITOR` with `Ctrl+E`
-- Every viewer speaks vim: counts (`100j`, `42G`, `5n`), visual selections (`v` / `V` / `Ctrl+V`), and text objects (`viw`) work everywhere
-- Make noisy logs readable with `P` - the structured preview parses JSON, logfmt, klog, zap, nginx, envoy, Java, and postgres lines
-- Save logs to a file with `S` (loaded lines) or `Ctrl+S` (full history) - the path lands on your clipboard
-- Switch pods or filter containers without leaving the log viewer: press `\`
+- Fold YAML sections with `z` (`Z` folds all), edit the resource in your `$EDITOR` with `Ctrl+E`
 - Replay a resource's event history as a timeline with `V`
-- Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can - every subject allowed to run a verb on a resource
-- Get per-container CPU/memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
+- Every viewer speaks vim: counts (`100j`, `42G`, `5n`), visual selections (`v` / `V` / `Ctrl+V`), and text objects (`viw`)
+
+### Acting
+
+- Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete, scale, or restart via `x`
+- Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
+- Copy the resource name with `y`, press `Y` to copy as YAML, JSON, or Table
+- Apply a manifest straight from your clipboard with `Ctrl+P`
+- Save the selected resource manifest to a file with `W`
+- Resource stuck in Terminating? `Ctrl+G` searches its finalizers and removes them
+- Open an Ingress host, or an active port-forward's localhost URL, with `Ctrl+O`. On a Service it starts a port forward and opens it
+- Run kubectl without leaving lfk (`:k get pods -o wide`) or any shell command (`:! curl ...`)
+
+### Cluster work
+
+- Lock a session against destructive actions with `Ctrl+R` (read-only mode)
+- Spin up a throwaway kind, k3d, or minikube cluster with `Ctrl+N` at the cluster list
+- Capture a Pod's network traffic with `c`: live decode plus pcap export
+- Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can, every subject allowed to run a verb on a resource
+- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
 - Watch an ArgoCD Application roll out wave by wave: `x` -> `W` opens the Sync Wave Timeline
+- Try a new look without restarting: `T` live-previews 460+ themes
 - Waiting for a rollout? `:nyan` and `:kubetris` are real commands
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, build/test commands, project layout, and the PR submission flow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, build and test commands, project layout, and the PR flow.
 
 ## License
 
-Apache License 2.0 - see [LICENSE](LICENSE) for details.
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=janosmiko%2Flfk&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=janosmiko/lfk&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=janosmiko/lfk&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=janosmiko/lfk&type=date&legend=top-left" />
- </picture>
-</a>
+Apache License 2.0, see [LICENSE](LICENSE).

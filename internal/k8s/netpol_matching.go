@@ -187,7 +187,7 @@ func listNetpolsAndPods(ctx context.Context, dynClient dynamic.Interface, namesp
 
 // parseNetpolForMatch parses a NetworkPolicy object into a label selector and
 // a display info struct. The selector honors both matchLabels and
-// matchExpressions; an empty podSelector selects all pods in the namespace.
+// matchExpressions. An empty podSelector selects all pods in the namespace.
 // Returns a nil selector if the podSelector cannot be parsed.
 func parseNetpolForMatch(obj *unstructured.Unstructured) (labels.Selector, *NetworkPolicyInfo) {
 	info := &NetworkPolicyInfo{
@@ -275,7 +275,7 @@ func ciliumPodLabels(lbls map[string]string, namespace string, nsOwnLabels map[s
 
 // lazyNamespaceLabels returns a function that lists all namespaces once, on
 // first use, into a namespace-name -> labels map. Cilium namespace-derived
-// selectors need this to resolve which namespaces carry a given label; on list
+// selectors need this to resolve which namespaces carry a given label. On list
 // failure (e.g. no permission) it yields an empty map, disabling only the
 // namespace-derived matching.
 func lazyNamespaceLabels(ctx context.Context, dynClient dynamic.Interface) func() map[string]map[string]string {
@@ -297,7 +297,7 @@ func lazyNamespaceLabels(ctx context.Context, dynClient dynamic.Interface) func(
 
 // lazyClusterPods returns a function that lists pods across all namespaces
 // once, on first use. Clusterwide Cilium policies need the full list to
-// report affected pods accurately; on list failure it falls back to the
+// report affected pods accurately. On list failure it falls back to the
 // namespace-scoped pods.
 func lazyClusterPods(ctx context.Context, dynClient dynamic.Interface, fallback []unstructured.Unstructured) func() []unstructured.Unstructured {
 	var cached []unstructured.Unstructured

@@ -41,7 +41,7 @@ type objectExplorerState struct {
 	// path with ASCII-art guides instead of the flat current level. treeRows
 	// is the pre-order flattened subtree, rebuilt on every path/root change.
 	// treeCollapsed holds the folded rows (space / toggle_fold), keyed by
-	// their relative segs; cleared whenever the tree re-roots.
+	// their relative segs. Cleared whenever the tree re-roots.
 	tree          bool
 	treeRows      []model.ObjectTreeRow
 	treeCollapsed map[string]struct{}
@@ -94,7 +94,7 @@ func (rt *objectExplorerState) selected() (model.ObjectField, bool) {
 }
 
 // openObjectExplorer enters the Object Explorer for the focused resource.
-// It needs the live object (Item.Raw); synthetic items without one get a
+// It needs the live object (Item.Raw). Synthetic items without one get a
 // status message.
 func (m Model) openObjectExplorer() (tea.Model, tea.Cmd) {
 	if m.nav.Level < model.LevelResources {
@@ -143,7 +143,7 @@ func (m *Model) syncObjectExplorerLive() {
 	}
 	// Live off: leave the snapshot frozen so the view doesn't shift under the
 	// user. A manual refresh (R) sets objectExplorerForceSync to apply one
-	// update anyway; consume it here so it stays a single-shot.
+	// update anyway. Consume it here so it stays a single-shot.
 	if !m.objectExplorerLive && !m.objectExplorerForceSync {
 		return
 	}
@@ -234,7 +234,7 @@ func (m Model) refreshObjectExplorer() (tea.Model, tea.Cmd) {
 }
 
 // exitObjectExplorer resets state and returns to the mode the Object Explorer
-// was opened from (the explorer by default; the YAML viewer when opened via P).
+// was opened from (the explorer by default, the YAML viewer when opened via P).
 func (m *Model) exitObjectExplorer() {
 	m.mode = m.objectExplorerReturnMode
 	m.objectExplorerReturnMode = modeExplorer
@@ -691,7 +691,7 @@ func (m Model) selectedNodeYAML() string {
 	return string(out)
 }
 
-// formatObjectPath renders path segments as a readable dotted path; see
+// formatObjectPath renders path segments as a readable dotted path. See
 // model.FormatObjectPath.
 func formatObjectPath(segs []string) string {
 	return model.FormatObjectPath(segs)

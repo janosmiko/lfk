@@ -37,7 +37,7 @@ func (d *clusterData) statefulSetServiceFindings() []security.Finding {
 			continue
 		}
 		if w.stsServiceName == "" {
-			// serviceName is required by validation; an empty value only
+			// serviceName is required by validation. An empty value only
 			// appears in pre-validation fakes. Nothing to check.
 			continue
 		}
@@ -56,11 +56,9 @@ func (d *clusterData) statefulSetServiceFindings() []security.Finding {
 	return out
 }
 
-// endpointFindings flags selector Services with zero ready endpoints
-// (selector matches nothing, or every backend is down) and Services with
-// exactly one ready endpoint (any restart is a full outage). Selector-less
-// and ExternalName Services manage their endpoints elsewhere and are
-// skipped.
+// endpointFindings flags selector Services with zero ready endpoints (selector matches nothing, or every
+// backend is down). It also flags Services with exactly one ready endpoint (any restart is a full outage).
+// Selector-less and ExternalName Services manage their endpoints elsewhere and are skipped.
 func (d *clusterData) endpointFindings() []security.Finding {
 	if !d.servicesOK || !d.epsOK {
 		return nil

@@ -35,7 +35,7 @@ func webContainerSpec() corev1.Container {
 func buildDeployment() *appsv1.Deployment {
 	created := demoEpoch.Add(-7 * 24 * time.Hour)
 	labels := map[string]string{"app": "web"}
-	// 6 desired replicas: 5 healthy plus the one crashlooping pod, so the
+	// 6 desired replicas: 5 healthy plus the one crashlooping pod. So the
 	// crashloop stays the single obviously-unhealthy workload among a
 	// mostly-healthy deployment instead of dominating a tiny replica set.
 	replicas := int32(6)
@@ -121,8 +121,8 @@ func buildReplicaSet() *appsv1.ReplicaSet {
 
 // buildWebPods returns the "web" ReplicaSet's pods: 5 healthy pods (one of
 // which the Ticker flips between Running and Pending) and the single
-// crashlooping pod, so Running pods stay a majority throughout the ticker
-// cycle.
+// crashlooping pod. This keeps Running pods a majority throughout the
+// ticker cycle.
 func buildWebPods() []*corev1.Pod {
 	return []*corev1.Pod{
 		healthyWebPod(PodWebHealthy1, uidPodWebHealthy1, "10.0.2.11"),

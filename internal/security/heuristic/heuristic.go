@@ -19,7 +19,7 @@ type Source struct {
 	secretEnvInclude  []string
 	secretEnvExclude  []string
 	// scanSecrets gates the Secret-listing checks (legacy_sa_token_secret,
-	// tls_secret_expiry); from security.heuristic.scan_secrets.
+	// tls_secret_expiry). From security.heuristic.scan_secrets.
 	scanSecrets bool
 }
 
@@ -74,8 +74,8 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists pods in the given namespace (empty = all namespaces) and runs
-// every registered check against every container, then the best-effort
-// non-pod scans (Services, namespaces, ConfigMaps, Ingresses).
+// every registered check against every container. Then it runs the
+// best-effort non-pod scans (Services, namespaces, ConfigMaps, Ingresses).
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil
@@ -142,7 +142,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 // fetchServiceFindings lists Services (paginated) and runs the Service-level
 // checks. Best-effort: a list error (typically Forbidden for restricted
 // users) stops the Service scan without failing the source — the pod
-// findings must survive. Findings from pages that did load are kept; the
+// findings must survive. Findings from pages that did load are kept. The
 // checks are presence-based, so a partial list can under-report but never
 // invent findings.
 func (s *Source) fetchServiceFindings(ctx context.Context, namespace string) []security.Finding {

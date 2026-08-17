@@ -347,7 +347,7 @@ func (m *Model) clampLogScroll() {
 // ensureLogCursorVisible adjusts logScroll so the cursor is within the visible
 // content area. In wrap mode the math accounts for visual rows (each source
 // line may produce multiple wrapped sub-lines) so the cursor doesn't drift
-// off-screen when intermediate lines wrap heavily; outside wrap mode it's
+// off-screen when intermediate lines wrap heavily. Outside wrap mode it's
 // classic source-line scrolloff. logFollow always wins: it snaps to the
 // (maxScroll, topSkip) pair that pins the most recent sub-line to the bottom.
 func (m *Model) ensureLogCursorVisible() {
@@ -388,7 +388,7 @@ func (m *Model) ensureLogCursorVisible() {
 // adjustLogScrollForCursorWrap positions logScroll/logWrapTopSkip so that
 // the cursor's source line (and ideally all of its wrapped sub-lines) is
 // inside the visible viewport, in visual-row terms. Pins cursor's bottom
-// sub-line to the viewport's bottom row when scrolling down; cursor's first
+// sub-line to the viewport's bottom row when scrolling down. Cursor's first
 // sub-line to row 0 when scrolling up. Drops scrolloff for simplicity.
 func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
 	availWidth := m.logWrapAvailWidth()
@@ -523,7 +523,7 @@ func wrappedLineCount(line string, width int) int {
 // via lipgloss Height, so we don't pad here.
 //
 // Lines are rendered in the default style. The hint bar's "scrolled N"
-// indicator is enough signal that the user is in history mode; dimming
+// indicator is enough signal that the user is in history mode. Dimming
 // the body just made it harder to read without adding new information.
 func renderScrollbackView(sb *scrollback, offset, viewH, viewW int) string {
 	lines := sb.Snapshot()
@@ -663,7 +663,7 @@ func (m Model) viewExecTerminal() string {
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Padding(0, 0).
 		Width(m.width)
-	// viewH counts content rows only; BoxHeight adds the top/bottom rules back,
+	// viewH counts content rows only. BoxHeight adds the top/bottom rules back,
 	// since lipgloss v2 counts the border inside Height(). Width needs no such
 	// adjustment here — this border has no left/right edges.
 	bordered := ui.BoxHeight(borderStyle, viewH).Render(termContent)

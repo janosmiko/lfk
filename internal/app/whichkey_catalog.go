@@ -123,7 +123,7 @@ type whichKeyCatalog interface {
 // needing it would otherwise pay for two.
 type wkCatalog[C any] struct {
 	resolve func(m *Model) C
-	// input reports a focused text input; nil means the mode has none that
+	// input reports a focused text input, nil means the mode has none that
 	// reaches the leader dispatch.
 	input   func(m *Model) bool
 	actions []wkAction[C]
@@ -164,10 +164,10 @@ func (c wkCatalog[C]) available(m *Model) []whichKeyEntry {
 // Explorer's literal "r" (objectexplorer.go:289), a k9s habit that costs
 // nothing to configure. One of the two rows is then a lie, and the panel cannot
 // tell which: the viewers interleave literal and kb.* cases in their switches
-// (update_describe.go dispatches kb.ToggleWrap BEFORE "y"; update_yaml.go
+// (update_describe.go dispatches kb.ToggleWrap BEFORE "y", update_yaml.go
 // dispatches "y" before kb.Refresh), so neither "the literal wins" nor "the
 // binding wins" holds. Advertising neither is the only answer that is never
-// false; the key still works, it just stops being advertised as two things.
+// false. The key still works, it just stops being advertised as two things.
 //
 // Under any keybinding set that does not create such an overlap this is a
 // no-op: the entries that deliberately share a key (y with three meanings, q
@@ -208,7 +208,7 @@ func (c wkCatalog[C]) inputFocused(m *Model) bool {
 }
 
 // whichKeyModeCatalog binds one viewMode to its catalog. name is the label the
-// guards report a failure under; the modes have no String() of their own.
+// guards report a failure under. The modes have no String() of their own.
 type whichKeyModeCatalog struct {
 	mode    viewMode
 	name    string

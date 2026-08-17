@@ -50,7 +50,7 @@ func IsValidClusterColor(name string) bool {
 // ActiveTheme so a colorscheme switch propagates on the next render —
 // the package-level Color* slots are stuck on Tokyo Night defaults
 // (they only branch between "default" and "no-color blanked" inside
-// ApplyTheme; they never receive the active theme's actual values), so
+// ApplyTheme. They never receive the active theme's actual values), so
 // using them here would have left the cluster tints frozen on the
 // boot-time palette regardless of which theme the user picked.
 //
@@ -76,7 +76,7 @@ func clusterColorBg(name string) color.Color {
 
 // clusterColorFg picks a contrasting foreground for the named colour.
 // Theme-mapped names get ActiveTheme.SelectedFg (designed to contrast
-// with the theme's accent backgrounds); ANSI-mapped names get ANSI
+// with the theme's accent backgrounds). ANSI-mapped names get ANSI
 // black, which is universally legible on every bright ANSI background.
 func clusterColorFg(name string) color.Color {
 	switch name {
@@ -150,7 +150,7 @@ func ClusterColorTileBg(name string) string {
 
 // ClusterColorTileBgOver is ClusterColorTileBg for a row wrapped by an outer
 // style — specifically the cursor row's selection highlight. The colored
-// tile ends with an SGR reset; left alone, that reset cancels the outer
+// tile ends with an SGR reset. Left alone, that reset cancels the outer
 // style for every cell after the tile, so the cursor highlight vanishes for
 // the rest of the row. Re-emitting the outer style's open codes right after
 // the tile restores it. Mirrors the HighlightMatchStyledOver "restore"

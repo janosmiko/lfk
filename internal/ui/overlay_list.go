@@ -23,10 +23,10 @@ const overlayListChrome = 4
 // fields render only when the matching feature flag in OverlayListConfig
 // is enabled — callers leave them zero-valued otherwise.
 type OverlayListItem struct {
-	Key          string // shortcut letter; rendered "[k]" when cfg.ShowKey
+	Key          string // shortcut letter. Rendered "[k]" when cfg.ShowKey
 	Name         string // primary text
-	Description  string // dim secondary suffix; rendered when cfg.ShowDescription
-	Status       string // status badge; rendered "[s]" when cfg.ShowStatus
+	Description  string // dim secondary suffix. Rendered when cfg.ShowDescription
+	Status       string // status badge. Rendered "[s]" when cfg.ShowStatus
 	Active       bool   // ✓ marker when cfg.ShowActiveMarker
 	ActiveMarker string // overrides the default ✓ glyph when Active and non-empty
 	Selected     bool   // checkbox state when cfg.MultiSelect
@@ -47,7 +47,7 @@ type OverlayListItem struct {
 }
 
 // OverlayListConfig is the rendering contract for OverlayList. Feature
-// flags are independent; set the ones that apply to your overlay shape.
+// flags are independent. Set the ones that apply to your overlay shape.
 // Items are expected to be pre-filtered by the caller — Filter/FilterActive
 // only drive the filter-line display.
 type OverlayListConfig struct {
@@ -213,7 +213,7 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			// Cursor row: plain text padded so the selection background spans
 			// the item area. The scrollbar + badge sit outside the highlight
 			// so they stay readable against the box. CursorHighlightWidth
-			// caps the highlight short of the item area; the remainder pads
+			// caps the highlight short of the item area. The remainder pads
 			// with the surface background so the badge column stays put.
 			// Text is truncated to the highlight width — anything longer
 			// would wrap inside the Width(hlW) block, pushing every row
@@ -270,11 +270,6 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 	return out
 }
 
-// itemPlainLine returns the item rendered as plain text (no styling).
-// Used for the cursor row (where embedded styles would punch holes in
-// the highlight background) and for width measurement. `hasActive`
-// controls whether the active-marker column is reserved — see
-// anyActive for the collapse rule.
 // activeMarkerGlyph returns the single-cell marker drawn for an Active row,
 // defaulting to ✓ unless the item overrides it (e.g. "!" for excluded items).
 func activeMarkerGlyph(it OverlayListItem) string {
@@ -284,6 +279,11 @@ func activeMarkerGlyph(it OverlayListItem) string {
 	return "✓"
 }
 
+// itemPlainLine returns the item rendered as plain text (no styling).
+// Used for the cursor row (where embedded styles would punch holes in
+// the highlight background) and for width measurement. `hasActive`
+// controls whether the active-marker column is reserved — see
+// anyActive for the collapse rule.
 func itemPlainLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) string {
 	if it.Header {
 		return "── " + it.Name + " ──"
@@ -360,9 +360,9 @@ func itemStyledLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) s
 
 // renderScrollbar returns the single-cell scrollbar character to draw on
 // the right of the row at visualIdx (0-indexed within the visible window).
-// Thumb size is proportional to viewport coverage (visible/total); thumb
+// Thumb size is proportional to viewport coverage (visible/total). Thumb
 // position interpolates linearly from 0 to (visible - thumb) across the
-// scroll range. Track uses OverlayDimStyle; thumb uses OverlayFilterStyle
+// scroll range. Track uses OverlayDimStyle. Thumb uses OverlayFilterStyle
 // so it reads against the dim track without competing with the cursor
 // highlight or filter-row colour.
 func renderScrollbar(visualIdx, totalVisible, totalItems, startIdx int) string {

@@ -6,12 +6,12 @@ import (
 )
 
 // DeletePropagation selects how a delete cascades to dependent objects.
-// Values match the lowercase config spelling; the k8s layer maps them to
+// Values match the lowercase config spelling. The k8s layer maps them to
 // metav1.DeletionPropagation.
 type DeletePropagation string
 
 const (
-	// DeletePropagationBackground deletes the object immediately; the garbage
+	// DeletePropagationBackground deletes the object immediately. The garbage
 	// collector removes dependents afterwards. This is kubectl's default.
 	DeletePropagationBackground DeletePropagation = "background"
 	// DeletePropagationForeground keeps the object visible until every
@@ -49,7 +49,7 @@ var deletePropagationCascading = []DeletePropagation{
 }
 
 // ParseDeletePropagation resolves a config string to a policy. The bool
-// reports whether the input was recognized; callers that want to warn on a
+// reports whether the input was recognized. Callers that want to warn on a
 // typo check it, everyone else can use the Background fallback directly.
 func ParseDeletePropagation(raw string) (DeletePropagation, bool) {
 	switch DeletePropagation(strings.ToLower(strings.TrimSpace(raw))) {

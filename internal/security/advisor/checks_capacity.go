@@ -29,7 +29,7 @@ func (d *clusterData) quotaFindings() []security.Finding {
 			continue
 		}
 		// Status.Hard mirrors Spec.Hard once the quota controller has
-		// reconciled; fall back to Spec.Hard for a brand-new quota. Used is
+		// reconciled. Fall back to Spec.Hard for a brand-new quota. Used is
 		// empty in that window too, so the fallback cannot create a finding.
 		hard := q.Status.Hard
 		if len(hard) == 0 {

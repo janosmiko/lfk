@@ -49,7 +49,7 @@ func severityOrder(it model.Item) int {
 // column. When Kind or Name is missing the row renders as
 // "(unknown resource)" — the previous "(cluster-scoped)" placeholder was
 // misleading because real cluster-scoped objects (e.g., ClusterRole/admin)
-// carry a non-empty Kind and Name and render through the normal path; the
+// carry a non-empty Kind and Name and render through the normal path. The
 // empty-ref case only fires when the source could not extract the resource
 // (e.g., Falco events without InvolvedObject), and labelling those as
 // cluster-scoped suggested a real K8s cluster-level finding existed.
@@ -232,7 +232,7 @@ func (c *Client) GetSecurityAffectedResourcesCached(contextName, namespace strin
 // affectedResourcesFromResult builds the affected-resource items for one
 // finding group from a FetchResult: surfaces the source error, matches
 // findings by source+group, dedups + sorts resources, and applies the ignore
-// policy (hide when show-ignored is off; tag __ignored__ when on). Shared by
+// policy (hide when show-ignored is off, tag __ignored__ when on). Shared by
 // the scanning and cache-only paths.
 func (c *Client) affectedResourcesFromResult(res security.FetchResult, sourceName, groupKey string) ([]model.Item, error) {
 	// Surface the requested source's per-source error so a source-specific

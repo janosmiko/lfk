@@ -1,4 +1,4 @@
-# Command Bar Reference
+# Command Bar reference
 
 Press `:` to open the command bar. Input is classified by the first word:
 
@@ -13,7 +13,7 @@ Press `:` to open the command bar. Input is classified by the first word:
 
 | Command | Description |
 |---|---|
-| `:namespace <ns>…` &nbsp;·&nbsp; `:ns <ns>…` | Switch namespace(s); no args opens the Namespaces list |
+| `:namespace <ns>…` &nbsp;·&nbsp; `:ns <ns>…` | Switch namespace(s). No args opens the Namespaces list |
 | `:context <ctx>` &nbsp;·&nbsp; `:ctx <ctx>` | Switch kube context |
 | `:sort <column>` | Sort the current list by column name |
 | `:set <option>` | Toggle log viewer option (see below) |
@@ -25,13 +25,13 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:orphans [<kind>]` | Open cluster-wide orphan resource overview |
 | `:session save <name>` | Save the current workspace (all tabs) as a named session |
 | `:session delete <name>` &nbsp;·&nbsp; `:session rm <name>` | Delete a named session |
-| `:sessions` &nbsp;·&nbsp; `C` | Open the session manager (enter=switch, s=save current as…, d=delete, /=filter). The active session auto-saves on quit; start on one with `lfk --session <name>` / `LFK_SESSION`. |
+| `:sessions` &nbsp;·&nbsp; `C` | Open the session manager |
 | `:quit` &nbsp;·&nbsp; `:q` &nbsp;·&nbsp; `:q!` | Exit |
 | `:nyan` | Toggle Nyan mode |
 | `:kubetris` | Play Kubetris |
 | `:credits` | Show credits |
-| `:dashboard` | Show Cluster Dashboard
-| `:monitoring`| Show Monitoring Dashboard
+| `:dashboard` | Show Cluster Dashboard |
+| `:monitoring` | Show Monitoring Dashboard |
 
 ### `:sort <column>`
 
@@ -45,7 +45,9 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `linenumbers` / `nolinenumbers` | Line numbers |
 | `timestamps` / `notimestamps` | Timestamps |
 | `follow` / `nofollow` | Auto-scroll to tail |
-| `ansi` / `noansi` | Render ANSI SGR colors from log output. Off replaces ESC bytes with U+FFFD (see config-reference.md `log_viewer.render_ansi`). |
+| `ansi` / `noansi` | Render ANSI SGR colors from log output |
+
+`noansi` replaces ESC bytes with U+FFFD (see `log_viewer.render_ansi` in [config-reference.md](config-reference.md)).
 
 ### `:scheduler`
 
@@ -57,6 +59,19 @@ Scheduler / task queue overlay. Inside:
 - `Esc` / `q` — close
 
 Repeated completed tasks collapse with a `×N` suffix.
+
+### `:sessions`
+
+Session manager.
+
+| Key | Action |
+|---|---|
+| `Enter` | Switch to the session |
+| `s` | Save the current workspace as a new session |
+| `d` | Delete the session |
+| `/` | Filter |
+
+The active session auto-saves on quit. Start on a given session with `lfk --session <name>` or `LFK_SESSION`.
 
 ## Shell commands
 
@@ -79,7 +94,7 @@ Repeated completed tasks collapse with a `×N` suffix.
 
 Autocomplete offers subcommands, flags, resource types, and namespaces. Typing `:k` or `:kubectl` alone surfaces the subcommand list. Value positions (namespace, resource name, output format) accept fuzzy matches — exact > prefix > substring > subsequence — while command names themselves stay on prefix.
 
-Namespace suggestions come from a per-context cache warmed when the context is opened and refreshed on a 60s TTL. In-app mutations — `:k create ns`, `:k delete ns`, or a template apply — invalidate the cache immediately so new namespaces appear in completions without waiting for the TTL; changes made outside the TUI (CI, cloud console, `kubectl` in another shell) surface on the next refresh. The existing list stays visible during refreshes so completions never blank out.
+Namespace suggestions come from a per-context cache warmed when the context is opened and refreshed on a 60s TTL. In-app mutations (`:k create ns`, `:k delete ns`, or a template apply) invalidate the cache immediately, so new namespaces appear in completions without waiting for the TTL. Changes made outside the TUI (CI, cloud console, `kubectl` in another shell) surface on the next refresh. The existing list stays visible during refreshes so completions never blank out.
 
 ## Resource jumps
 

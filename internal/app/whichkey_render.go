@@ -36,7 +36,7 @@ func (c whichKeyCell) keyText() string {
 
 // fillWhichKeyDisplay resolves each cell's drawn key once per build. The grid
 // measures the key twice (panel width, then per-column field) and the renderer
-// writes it a third time; parsing the chord at each of those points is three
+// writes it a third time. Parsing the chord at each of those points is three
 // passes per frame for the same answer.
 func fillWhichKeyDisplay(cells []whichKeyCell) {
 	for i := range cells {
@@ -75,7 +75,7 @@ const (
 	// equivalent knob - its long labels make one unnecessary - but lfk's
 	// short ones need it to stop the panel from going wide-and-flat instead
 	// of tall-and-narrow. 5 leaves whichKeyMinColW as the sole driver (never
-	// binding) up to a 227-column terminal; the cap first binds at 228
+	// binding) up to a 227-column terminal. The cap first binds at 228
 	// columns (container 198, which the width-driven formula would split into
 	// 6 columns), and the even redivision that follows leaves 39-wide columns
 	// - 36 of content once whichKeySpacing is subtracted - comfortably above
@@ -132,7 +132,7 @@ const (
 	// above) are guaranteed to match or beat the old flat-4 column count.
 	// The one place that trade-off surfaces is width 179-186, which lands
 	// one column narrower (4 instead of 5) than the old margin=4 would have
-	// given; it never drops below 4 columns, and every width outside that
+	// given. It never drops below 4 columns, and every width outside that
 	// eight-wide band matches or improves on the old baseline.
 	whichKeyOuterMargin           = 4  // tier 1, unchanged from before
 	whichKeyOuterMarginTier2      = 8  // starts at whichKeyOuterMarginTier2Width
@@ -176,10 +176,10 @@ const (
 type whichKeyGrid struct {
 	boxW  int // column width, spacing included
 	boxN  int // column count
-	rowN  int // grid rows; entries fill column-major
+	rowN  int // grid rows. Entries fill column-major
 	lead  int // spaces before each column, always whichKeySpacing
 	keyW  int // right-aligned key field, shared by every column
-	descW int // description field; 0 drops the description
+	descW int // description field. 0 drops the description
 }
 
 // whichKeyGridFor ports which-key.nvim's box arithmetic (view.lua:340-344):
@@ -225,7 +225,7 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	// which-key.nvim lays each box out at box_width - spacing (view.lua:346)
 	// and prepends that spacing before every box, including the first, once
 	// there is more than one column (view.lua:358) - so win.padding[2] alone
-	// (whichKeyPadH) is not neovim's real left margin; padding[2] + spacing
+	// (whichKeyPadH) is not neovim's real left margin. Padding[2] + spacing
 	// is (2+3=5 here). lfk applies that same lead unconditionally, even at a
 	// single column, which is where it deliberately parts from neovim: a
 	// which-key.nvim popup shrink-wraps to its content there, so the reserved
@@ -238,7 +238,7 @@ func whichKeyGridFor(cells []whichKeyCell, container int) whichKeyGrid {
 	}
 	g.rowN = (len(cells) + boxN - 1) / boxN
 	contentW := max(boxW-whichKeySpacing, 1)
-	// A key wider than the cell would starve the label; clamp it so at least
+	// A key wider than the cell would starve the label. Clamp it so at least
 	// one column of description survives, and let writeWhichKeyCell truncate.
 	// Reachable only on a terminal too narrow for box_width to honour maxRow.
 	if maxKey+whichKeyGap+1 > contentW {
@@ -289,7 +289,7 @@ func wkPad(n int) string {
 // registry group. Resolved once per render rather than per cell.
 type whichKeyCellStyles struct {
 	key   lipgloss.Style // uniform across every entry
-	desc  lipgloss.Style // ungrouped fallback; the whole goto popup uses it
+	desc  lipgloss.Style // ungrouped fallback. The whole goto popup uses it
 	group map[whichKeyGroup]lipgloss.Style
 }
 
@@ -391,7 +391,7 @@ type whichKeyPanelLayout struct {
 	container  int
 	bodyRows   int // rows the content needs
 	viewRows   int // rows the panel shows
-	maxScroll  int // largest row offset; 0 when everything fits
+	maxScroll  int // largest row offset. 0 when everything fits
 	legendRows int // 1 when the group-color legend renders below the entries, else 0
 }
 
@@ -519,7 +519,7 @@ func (m Model) renderWhichKey(background string) string {
 // panel spanning the full width, styled after neovim's which-key: one flat
 // list, no section headers, flowing column-major through a uniform grid. The
 // panel grows to fit its content up to whichKeyMaxRows and whatever the
-// terminal allows; anything past that scrolls (scroll is a row offset, clamped
+// terminal allows. Anything past that scrolls (scroll is a row offset, clamped
 // here). Returns background unchanged when there is nothing to show or the
 // terminal is too small.
 func (m Model) renderWhichKeyPanel(background string, cells []whichKeyCell, scroll int) string {

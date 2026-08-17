@@ -134,7 +134,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			}
 		}
 		// Message/Reason/Health Message are free-text and may carry embedded
-		// SGR colour worth keeping; everything else is a short structured
+		// SGR colour worth keeping. Everything else is a short structured
 		// field value, so the plain single-line sanitizer is enough.
 		if messageKeys[kv.Key] {
 			val = SanitizeLogBody(StripBidiOverrides(val), false)
@@ -242,7 +242,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render(strings.ToUpper(kv.Key)))
 		// Endpoints emits one entry per line with `\n` as separator so
-		// the per-endpoint render stays readable; everything else uses
+		// the per-endpoint render stays readable. Everything else uses
 		// the legacy `, ` split so existing fields render unchanged.
 		sep := ", "
 		if kv.Key == "Endpoints" {
@@ -545,7 +545,7 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 		// Type indicator and styling.
 		var dot, reasonStr string
 		// padRight/Truncate measure visual columns, matching maxReasonW
-		// above; truncateStr and fmt's "%-*s" both count runes, which
+		// above. truncateStr and fmt's "%-*s" both count runes, which
 		// mismeasures a wide (e.g. CJK) or multibyte Reason.
 		if e.warning {
 			dot = errorStyle.Render("\u25cf")

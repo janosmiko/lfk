@@ -11,7 +11,7 @@ import (
 
 // SyncWavePane mirrors the app-side syncWavePane enum. Determines
 // highlight tier in the renderer: active pane's cursor row gets the
-// bright Selected style; inactive pane's cursor row gets ParentHighlightStyle.
+// bright Selected style. Inactive pane's cursor row gets ParentHighlightStyle.
 type SyncWavePane int
 
 const (
@@ -35,14 +35,14 @@ type SyncWaveBodyCursor struct {
 //
 // BodyScroll is the body pane's first-visible row offset (in flattened-
 // row units) — applied to the right-pane content only. The sidebar is
-// fixed-position; only the body scrolls. SidebarCursor / BodyCursor /
+// fixed-position. Only the body scrolls. SidebarCursor / BodyCursor /
 // ActivePane drive cursor highlight (active pane's cursor gets the
-// bright SelectedFg + Primary style; inactive pane's cursor gets
+// bright SelectedFg + Primary style. Inactive pane's cursor gets
 // ParentHighlightStyle, matching the main browser's parent-pane
 // convention).
 //
 // SinglePane collapses the sidebar so narrow viewports (< 50 cols) get
-// a body-only fallback; the renderer falls through to a single-pane
+// a body-only fallback. The renderer falls through to a single-pane
 // path when this is true.
 //
 // Collapsed mirrors the app-side `collapsed` map keyed by phase name
@@ -66,14 +66,12 @@ type SyncWaveTimelineEntry struct {
 	Loading      bool
 	LoadingFrame int
 
-	// New for two-pane layout. Wired into the renderer in Task 5;
-	// populated from app state in Task 6.
 	SidebarCursor int
 	BodyCursor    SyncWaveBodyCursor
 	BodyScroll    int
 	ActivePane    SyncWavePane
 	SinglePane    bool            // when true, sidebar is hidden
-	Collapsed     map[string]bool // mirror of app-side collapsed; both phase and wave keys
+	Collapsed     map[string]bool // mirror of app-side collapsed. Both phase and wave keys
 }
 
 // SyncWaveLastOperation summarizes the previous (or current) operation
@@ -187,7 +185,7 @@ func formatRelative(t time.Time) string {
 func RenderSyncWaveTimeline(entry SyncWaveTimelineEntry, width, height int) string {
 	headerLines := buildSyncWaveHeader(entry, width)
 	if height <= 0 {
-		// Unbounded: emit header + body joined as today; useful for
+		// Unbounded: emit header + body joined as today. Useful for
 		// tests that pass height=0 to skip clipping.
 		body := buildBody(entry, width, 1000)
 		return strings.Join(append(headerLines, body...), "\n")
@@ -310,7 +308,7 @@ const (
 )
 
 // bodyRow is one logical row in the flattened body view. The renderer
-// uses it to apply cursor highlighting; the key handler uses it to walk
+// uses it to apply cursor highlighting. The key handler uses it to walk
 // the cursor through the visible rows skipping collapsed waves' resources.
 type bodyRow struct {
 	kind        bodyRowKind
@@ -433,7 +431,7 @@ func padOrTruncate(s string, width int) string {
 // tier is determined by entry.ActivePane and entry.BodyCursor.
 //
 // Body rows come from flattenBodyRows applied to the selected phase, then
-// rendered in order. BodyScroll slices off rows above the viewport; rows
+// rendered in order. BodyScroll slices off rows above the viewport. Rows
 // below the viewport are dropped. Empty padding rows fill any remainder.
 func buildBody(entry SyncWaveTimelineEntry, bodyWidth, viewportRows int) []string {
 	if len(entry.Phases) == 0 || entry.SidebarCursor < 0 || entry.SidebarCursor >= len(entry.Phases) {

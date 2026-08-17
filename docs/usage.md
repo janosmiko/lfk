@@ -95,19 +95,24 @@ When `--context` or `--namespace` flags are provided, the saved session state is
 ignored and the app opens directly in the specified context/namespace. The user
 can still change the namespace during the session.
 
-Restoring a session takes two steps: lfk opens the saved resource type as soon
-as the cluster list arrives, then selects the saved row when the resource list
-comes back. Press a key or click during that gap and lfk gives up the saved row,
-so an arriving list cannot pull the cursor away from where you went.
+Restoring a session takes two steps:
 
-## Mouse Support
+1. lfk opens the saved resource type as soon as the cluster list arrives.
+2. lfk selects the saved row when the resource list comes back.
 
-By default, lfk captures mouse input for click navigation, scroll, and tab
-switching. If you need native terminal text selection (e.g., shift+click to
-select text), you can disable mouse capture:
+Press a key or click during that gap and lfk gives up the saved row, so an
+arriving list cannot pull the cursor away from where you went.
+
+## Mouse support
+
+Disable mouse capture to get native terminal text selection (for example,
+shift+click):
 
 - **CLI flag:** `lfk --no-mouse`
 - **Config file:** Add `mouse: false` to `~/.config/lfk/config.yaml`
+
+By default, lfk captures mouse input for click navigation, scroll, and tab
+switching.
 
 ### Explorer click semantics
 
@@ -119,7 +124,7 @@ The three-pane explorer maps mouse clicks to navigation actions:
 | Middle pane (different row) | Select that row and load its preview in the right pane |
 | Middle pane (cursored row) | Drill into it (same as `Enter` / Right arrow) |
 | Right pane | Drill into the selected item |
-| Table header row | Sort by that column; click again toggles direction |
+| Table header row | Sort by that column, click again to toggle direction |
 | Right-click on middle pane | Move cursor to the clicked row and open the action menu |
 | Right-click on right pane | Open the action menu for the currently selected item |
 | Right-click on left pane | No-op |
@@ -145,37 +150,36 @@ underneath:
 | Click inside the box on padding/title/border | No-op (use `Esc` or click outside to dismiss) |
 
 Other list overlays (color scheme picker, bookmarks, templates, container /
-pod / log selectors, column toggle, etc.) accept wheel scroll; row-click
-activation is being added incrementally — for now use `Enter` after wheel
+pod / log selectors, column toggle, etc.) accept wheel scroll. Row-click
+activation is being added incrementally. For now, use `Enter` after wheel
 scrolling to the desired row.
 
 Fullscreen overlays (the secret / config-map / label editors, rollback /
 helm-history pickers, the auto-sync dialog, the Can-I browser, and the
 NetworkPolicy viewer) cover the entire screen, so there is no "outside" to
-click; press `Esc` to close them.
+click. Press `Esc` to close them.
 
 > macOS Terminal.app does not support shift+click text selection while mouse
 > capture is active. Use `--no-mouse` or switch to a terminal that handles this
 > correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
 
-## No-Color Mode
+## No-color mode
 
-Disable all foreground and background colors while keeping selection and
-other highlights visible via bold, underline, and reverse-video SGR codes.
-Useful for monochrome terminals, piped output, or lower CPU usage.
+Disable all foreground and background colors. Selection and other highlights
+stay visible via bold, underline, and reverse-video SGR codes. Useful for
+monochrome terminals, piped output, or lower CPU usage.
 
 - **CLI flag:** `lfk --no-color`
-- **Environment variable:** `NO_COLOR=1 lfk` (any non-empty value; see
+- **Environment variable:** `NO_COLOR=1 lfk` (any non-empty value, see
   [no-color.org](https://no-color.org/))
 - **Config file:** Add `no_color: true` to `~/.config/lfk/config.yaml`
 
 Precedence: `--no-color` flag > `NO_COLOR` env var > config file.
 
-## Kubeconfig Directory
+## Kubeconfig directory
 
-By default, lfk discovers additional kubeconfig files from `~/.kube/config.d/`
-(recursively). This can be overridden — and multiple directories can be merged —
-via CLI, environment variable, or config:
+Override or merge the directories lfk scans for kubeconfig files, via CLI,
+environment variable, or config:
 
 - **CLI flag:** `lfk --kubeconfig-dir /path/to/configs/` (repeatable: pass `--kubeconfig-dir` multiple times to merge several directories).
 - **Environment variable:** `KUBECONFIG_DIR=/path/to/configs/ lfk`. Colon-separated for multiple directories on Unix (`KUBECONFIG_DIR=/dir/a:/dir/b`), matching the convention `KUBECONFIG` uses.
@@ -187,9 +191,11 @@ via CLI, environment variable, or config:
     - /team-b/configs
   ```
 
-Precedence (replacement, not merge): `--kubeconfig-dir` flag > `KUBECONFIG_DIR` env var > config file > default `~/.kube/config.d/`. Each entry's tilde (`~/`) is expanded against `$HOME`. lfk validates every directory exists at startup and errors out loudly on a typo. The `--kubeconfig` flag bypasses all directory discovery entirely.
+Precedence (replacement, not merge): `--kubeconfig-dir` flag > `KUBECONFIG_DIR` env var > config file > default `~/.kube/config.d/` (scanned recursively). Each entry's tilde (`~/`) is expanded against `$HOME`.
 
-## Read-Only Mode
+lfk validates every directory exists at startup and errors out loudly on a typo. The `--kubeconfig` flag bypasses all directory discovery entirely.
+
+## Read-only mode
 
 Read-only mode disables every action that changes cluster state — delete,
 edit, scale, restart, rollback, exec, attach, port-forward, drain, cordon,
@@ -236,18 +242,21 @@ tab when created and re-evaluate on context switch.
 `Ctrl+R` behavior depends on where you are:
 
 - **At the cluster picker**: flips the `[RO]` marker on the highlighted
-  context row. The toggle is stored as a session override that wins
-  over per-context and global config when entering that context.
-  Persists across back-and-forth navigation to the picker; cleared on
-  process exit. Blocked when `--read-only` is set.
-- **Inside a context**: flips read-only for the current tab and records
-  the choice as a session override for that context, so it survives
-  navigating back to the picker and re-entering, and keeps the picker's
-  `[RO]` marker in sync. Session-scoped — does not write to the config
-  file. Keyed by context, so unlocking one context never leaks read-write
-  state into another. Blocked when `--read-only` is set; the CLI flag is
-  the strongest precedence level and cannot be defeated within the
-  running process.
+  context row.
+  - Stored as a session override that wins over per-context and global
+    config when entering that context.
+  - Persists across back-and-forth navigation to the picker. Cleared on
+    process exit.
+  - Blocked when `--read-only` is set.
+- **Inside a context**: flips read-only for the current tab.
+  - Recorded as a session override for that context, so it survives
+    navigating back to the picker and re-entering, and keeps the
+    picker's `[RO]` marker in sync.
+  - Session-scoped. Does not write to the config file.
+  - Keyed by context, so unlocking one context never leaks read-write
+    state into another.
+  - Blocked when `--read-only` is set. The CLI flag is the strongest
+    precedence level and cannot be defeated within the running process.
 
 ### CLI flag
 
@@ -257,14 +266,14 @@ lfk --context prod --read-only
 ```
 
 `--read-only` is process-wide. `--context` only selects the starting
-context; it does not scope the read-only flag.
+context. It does not scope the read-only flag.
 
 ### Discovery
 
 The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
 can find the row toggle without reading docs.
 
-## Permission-Aware Actions
+## Permission-aware actions
 
 Actions the current user cannot run are dropped from the action menu, so a
 delete you are not allowed to make no longer fails after the confirm
@@ -295,7 +304,7 @@ dialog. The gate is the same one read-only mode uses.
 - **Bulk actions**: gated only when every selected row sits in one context
   and namespace. A mixed selection is left to the API server.
 
-## Node Shell
+## Node shell
 
 From the Node action menu (`x` → `s`), lfk launches a privileged debug pod
 that `nsenter`s into PID 1 on the selected node, giving an interactive shell
@@ -308,7 +317,7 @@ is removed when the shell exits.
 
 Node shell is a mutating action and is gated by the read-only check.
 
-## Cluster Color Coding
+## Cluster color coding
 
 Tag any cluster with a background color so the title bar tints the
 moment you enter it — useful for "I am unmistakably in prod" feedback
@@ -328,7 +337,7 @@ when a stray `D` would do real damage.
 - **Persistence**: the assignment is saved to
   `$XDG_STATE_HOME/lfk/cluster-colors.yaml` (defaults to
   `~/.local/state/lfk/cluster-colors.yaml`) so colors survive restarts.
-  The file is lfk-managed — don't hand-edit; use the in-app picker.
+  The file is lfk-managed. Don't hand-edit it, use the in-app picker.
   Unknown color names in the file are ignored on load (with a warning
   written to the lfk log) so a typo doesn't poison neighbouring entries.
 
@@ -347,7 +356,7 @@ bright codes so they look the same regardless of which lfk theme is
 active — useful when none of the theme accent colors fit a particular
 cluster's identity.
 
-## Watch-Mode Interval
+## Watch-mode interval
 
 Watch mode (toggle with `w`) polls the current resource list on an interval.
 The default 2-second interval is a good balance between freshness and API
@@ -357,14 +366,14 @@ load. Tune it with:
   `2s`, `1m`, ...)
 - **Config file:** Add `watch_interval: 5s` to `~/.config/lfk/config.yaml`
 
-Values outside `[500ms, 10m]` are clamped to the bounds; invalid values fall
+Values outside `[500ms, 10m]` are clamped to the bounds. Invalid values fall
 back to 2s.
 
 ### Battery / idle throttling
 
 In watch mode, lfk slows its refresh to `background_watch_interval` (default 10s)
 when the terminal window is unfocused, or when a focused window has had no
-keypress for `foreground_idle_timeout` (default 120s; set 0 to disable). It
+keypress for `foreground_idle_timeout` (default 120s, set 0 to disable). It
 snaps back to `watch_interval` and refreshes immediately on focus or keypress.
 The loading spinner only animates while a load is actually in flight.
 
@@ -372,7 +381,7 @@ Set `watch_throttle: false` to disable this throttling entirely.
 
 Flags: `--background-watch-interval`, `--foreground-idle-timeout`.
 
-## Discovery Cache
+## Discovery cache
 
 API discovery (the list of resource types and CRDs the server exposes) is
 cached on disk under `~/.kube/cache/discovery/<host>/` with a 5-minute TTL.
@@ -390,7 +399,7 @@ discovery round-trips on the API server and reduces startup time.
 - **TTL:** 5 minutes. Stale entries are refetched automatically on the
   next discovery request.
 
-## Endpoint Visibility
+## Endpoint visibility
 
 The right-pane preview for the **Endpoints** and **EndpointSlices** kinds
 shows every endpoint individually, with target pod, node, and ready state:
@@ -407,7 +416,7 @@ ENDPOINTS
   192.168.1.8  → pod/foo-7d9-broken  on node-c   (NotReady)
 ```
 
-Ready endpoints render with no status suffix; only `(NotReady)` is shown
+Ready endpoints render with no status suffix. Only `(NotReady)` is shown
 inline so the eye is drawn to the broken ones. A row degrades gracefully
 when `targetRef` (no target pod) or `nodeName` (host-network endpoints)
 is absent. Multiple addresses on a single EndpointSlice entry (dual-stack
@@ -441,7 +450,7 @@ session affinity, etc.), press `v` (Describe).
 
 `lfk` flags Kubernetes resources that have no live consumer or controller, across 11 kinds:
 
-- **Pods without owners** — typically debug / one-off pods that escaped a controller. Static pods (kubelet-managed) are excluded; terminal pods older than an hour are tagged separately.
+- **Pods without owners** — typically debug / one-off pods that escaped a controller. Static pods (kubelet-managed) are excluded. Terminal pods older than an hour are tagged separately.
 - **Secrets / ConfigMaps not mounted** — anything not referenced by a Pod (volumes, env, envFrom, imagePullSecrets), an Ingress (`spec.tls.secretName`), or a ServiceAccount.
 - **Services with no endpoints** — non-Headless, non-ExternalName Services with zero backing addresses.
 - **PersistentVolumeClaims not mounted** — bound but no Pod or workload template references them.
@@ -455,13 +464,13 @@ session affinity, etc.), press `v` (Describe).
 Press **`Shift+Z`** anywhere in the explorer (or type `:orphans` in the command bar) to open the orphan overview overlay. It scans the cluster and lists every orphan in one table grouped by kind:
 
 - `Tab` / `Shift+Tab` cycle through every kind filter chip (All plus all supported orphan kinds rendered in the strip)
-- `s` toggles strict / lenient — strict (default) hides items referenced by workload templates (e.g. CronJob between firings, scaled-to-zero Deployment); lenient surfaces them
+- `s` toggles strict / lenient — strict (default) hides items referenced by workload templates (e.g. CronJob between firings, scaled-to-zero Deployment). Lenient shows them
 - `/` filters by namespace + name
 - `Enter` jumps straight to the highlighted resource (the namespace switches automatically)
 - `R` re-scans the cluster
 - `Esc`, `q`, or `Shift+Z` close the overlay
 
-Partial-RBAC denials surface as a warning banner at the top of the overlay. A kind is shown only if every list its orphan check depends on loaded; a kind whose answer would depend on a denied list is omitted rather than risking a false "unused".
+Partial-RBAC denials surface as a warning banner at the top of the overlay. A kind is shown only if every list its orphan check depends on loaded. A kind whose answer would depend on a denied list is omitted rather than risking a false "unused".
 
 ### Per-kind filter presets
 
@@ -490,17 +499,17 @@ auto-detected:
 | `kubectl debug` | Ephemeral container streaming `tcpdump` | kubectl 1.30+, ephemeral containers enabled, target pod can grant `NET_ADMIN` / `NET_RAW` |
 | kubeshark | Hand-off (port-forward + browser) | `kubeshark-hub` Service in `kubeshark` namespace (override via `kubeshark.namespace`) |
 
-Hardened non-root pods can't grant `NET_ADMIN` / `NET_RAW`; capture fails
+Hardened non-root pods can't grant `NET_ADMIN` / `NET_RAW`. Capture fails
 with a message pointing at kubeshark. Install with
 `helm install kubeshark kubeshark/kubeshark -n kubeshark --create-namespace`.
 
 pcap output: `$XDG_STATE_HOME/lfk/captures/` (default
 `~/.local/state/lfk/captures/`). The full per-phase keymap lives in
-[`docs/keybindings.md`](keybindings.md#traffic-capture-overlay); the
+[`docs/keybindings.md`](keybindings.md#traffic-capture-overlay). The
 load-bearing keys:
 
 - `s` — stop, stay in overlay
-- `Esc` — stop and stay; second `Esc` dismisses + deletes the pcap
+- `Esc` — stop and stay. Second `Esc` dismisses + deletes the pcap
   unless `Y` was pressed
 - `Y` — copy pcap path to system clipboard, marks the capture as saved
 - `e` (from stopped phase) — re-open config to tweak the filter, then
@@ -515,13 +524,15 @@ listed [Read-Only](#read-only-mode) `port-forward` block applies to the
 user-triggered Port Forward action, not to the kubeshark backend's
 read-only tunnel to its in-cluster hub.
 
-## Secret Lazy Loading
+## Secret lazy loading
 
-On clusters with many Helm releases or large TLS secrets, listing the
-Secrets resource type can transfer tens of megabytes. Enable lazy loading
-to fetch only metadata for the list and defer decoded values to hover:
+Enable lazy loading to fetch only metadata for the Secrets list and defer
+decoded values to hover:
 
 - **Config file:** Add `secret_lazy_loading: true` to `~/.config/lfk/config.yaml`
+
+On clusters with many Helm releases or large TLS secrets, listing the
+Secrets resource type can transfer tens of megabytes.
 
 Trade-off: the Type column is dropped from the list (metadata-only fetch
 doesn't include it) and there's a small per-hover fetch for decoded values
@@ -536,7 +547,7 @@ Both are off by default.
 | Variable | Effect |
 |---|---|
 | `LFK_PPROF_ADDR` | Serves Go `pprof` on the given **loopback** address (e.g. `127.0.0.1:6060`). Non-loopback addresses are refused. |
-| `LFK_MEMSTATS_INTERVAL` | Logs heap and goroutine counts to the app log on each interval (Go duration, e.g. `30s`; clamped to a 1s floor). |
+| `LFK_MEMSTATS_INTERVAL` | Logs heap and goroutine counts to the app log on each interval (Go duration, e.g. `30s`, clamped to a 1s floor). |
 
 ```bash
 # Periodic memory snapshots in the app log (heap_objects, goroutines, ...)
@@ -548,5 +559,5 @@ go tool pprof http://127.0.0.1:6060/debug/pprof/heap
 ```
 
 Reading a suspected leak: rising `heap_objects` with a flat `goroutines`
-count points at an unbounded cache or buffer; a steadily climbing
+count points at an unbounded cache or buffer. A steadily climbing
 `goroutines` count points at a watch or stream that is never stopped.

@@ -75,7 +75,7 @@ func parseLogLine(line []byte, namespace string) []security.Finding {
 }
 
 // formatFalcoOutput extracts a human-readable summary and structured details
-// from a Falco log entry. The summary is a one-liner; the details show
+// from a Falco log entry. The summary is a one-liner. The details show
 // key fields as labeled lines.
 func formatFalcoOutput(entry falcoLogEntry) (summary, details string) {
 	fields := entry.OutputFields

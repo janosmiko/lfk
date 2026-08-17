@@ -33,7 +33,7 @@ func BuildSidebarItems(discovered []ResourceTypeEntry) []Item {
 
 // markHiddenItems applies the user's per-context HiddenTypes to the sidebar.
 // When the reveal toggle (ShowRareResources) is off, items whose version-
-// agnostic type key is hidden are dropped; when it is on they are kept but
+// agnostic type key is hidden are dropped. When it is on they are kept but
 // flagged Hidden so the renderer dims them, letting the user find a hidden
 // type and un-hide it. Items without a pinnable key (dashboards, collapsed
 // group placeholders) never match.
@@ -69,7 +69,7 @@ func markHiddenItems(items []Item) []Item {
 //
 // A SecuritySourceEntry with empty SourceName is treated as a loader
 // placeholder (shown while the availability probe is in flight on a
-// fresh cluster); the produced Item carries SecurityLoaderKind and no
+// fresh cluster). The produced Item carries SecurityLoaderKind and no
 // Extra so the navigation layer can no-op clicks on it.
 func injectSecuritySourceItems() []Item {
 	if SecuritySourcesFn == nil {

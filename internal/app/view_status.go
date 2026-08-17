@@ -12,7 +12,7 @@ import (
 
 // broadModeSuffix names the extra match dimension Tab opens at the
 // current level. At LevelResourceTypes Tab adds category-bar matches
-// ("+groups"); everywhere else it scans column values ("+columns").
+// ("+groups"). Everywhere else it scans column values ("+columns").
 // Returned with parentheses so the caller can drop it next to the
 // "filter"/"search" label without ad-hoc spacing logic.
 func (m Model) broadModeSuffix() string {
@@ -154,7 +154,7 @@ func (m Model) explorerDrillPath() []string {
 			return []string{name}
 		}
 	case modeDiff:
-		// Diff compares two resources; name both.
+		// Diff compares two resources. Name both.
 		switch {
 		case m.diffView.leftName != "" && m.diffView.rightName != "":
 			return []string{m.diffView.leftName + " ↔ " + m.diffView.rightName}
@@ -198,7 +198,7 @@ func (m Model) explorerDrillPath() []string {
 // The namespace is dropped for cluster-scoped resources (empty namespace) and
 // the kind when it is unknown.
 func resourceTitleLabel(kind, namespace, name string) string {
-	// kind/namespace/name come from cluster-controlled resources; sanitize
+	// kind/namespace/name come from cluster-controlled resources. Sanitize
 	// once here rather than at each of the nine call sites.
 	kind = ui.SanitizeTerminalText(kind)
 	namespace = ui.SanitizeTerminalText(namespace)
@@ -407,7 +407,7 @@ func (m Model) statusBar() string {
 	}
 
 	// Layout: the informational chip group (sort, counter / selected
-	// count, filter preset, NYAN) anchors the FAR RIGHT; the keymap
+	// count, filter preset, NYAN) anchors the FAR RIGHT. The keymap
 	// hints fill the remaining space on the left. JoinStatusBar treats
 	// the right side as priority — on overflow the keymap is the part
 	// that yields. Overlay hint bars use a separate code path above and
@@ -509,7 +509,7 @@ func (m Model) whichKeyLeaderHintBar() string {
 // explorerStatusChips composes the right-anchored chip group for the
 // explorer status bar: sort indicator, cursor counter or selection
 // badge, active filter preset, and NYAN flag. Reading order is
-// left-to-right; the chip group as a whole is right-aligned by
+// left-to-right. The chip group as a whole is right-aligned by
 // JoinStatusBar in statusBar(). Returns the joined string ready to
 // pass as the `right` argument to JoinStatusBar.
 func (m Model) explorerStatusChips() string {
@@ -523,7 +523,7 @@ func (m Model) explorerStatusChips() string {
 		parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
 	}
 	// Counter ↔ selection swap. By default we surface the cursor position
-	// inside the visible item list ("[1/47]"); the moment the user marks
+	// inside the visible item list ("[1/47]"). The moment the user marks
 	// at least one item we replace that chip with the selection-count
 	// badge ("3 selected"). Showing both was redundant — the user knows
 	// they're in bulk mode the second they kick off a selection — and the
@@ -560,7 +560,7 @@ func (m Model) explorerStatusChips() string {
 // explorerHintEntries builds the bottom hint bar for explorer views (cluster
 // picker, resource-type browser, resource list). Extracted from statusBar to
 // keep that function under the gocyclo budget. Dashboard views use a reduced
-// set; standard explorer views use the full set with conditional hides for
+// set. Standard explorer views use the full set with conditional hides for
 // keys that are no-ops at the current level.
 func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
@@ -614,7 +614,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	// Advertise the read-only toggle on every level so users can
 	// discover it without reading docs. At the cluster picker it
-	// flips a row marker; inside a context it locks/unlocks the
+	// flips a row marker. Inside a context it locks/unlocks the
 	// active tab. Hidden inside a context when --read-only is set,
 	// since the gate rejects the toggle.
 	if m.nav.Level == model.LevelClusters || !m.cliReadOnly {
@@ -705,7 +705,7 @@ func renderInputWithCursor(value string, cursor int) string {
 // helpHintBar renders the status-bar hint line for the help screen,
 // switching shape based on which input/applied state is active.
 // Extracted from statusBar to keep that function under the gocyclo
-// budget; the help screen has five distinct prompt shapes.
+// budget. The help screen has five distinct prompt shapes.
 func (m Model) helpHintBar() string {
 	switch {
 	case m.helpSearchActive:

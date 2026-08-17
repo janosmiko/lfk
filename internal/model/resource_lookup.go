@@ -46,7 +46,7 @@ func FindResourceTypeIn(ref string, discovered []ResourceTypeEntry) (ResourceTyp
 
 // FindResourceType is kept as a convenience wrapper that searches without
 // a discovered slice. It exists for callers that don't have access to the
-// discovered set yet; most callers should use FindResourceTypeIn directly.
+// discovered set yet. Most callers should use FindResourceTypeIn directly.
 func FindResourceType(ref string) (ResourceTypeEntry, bool) {
 	return FindResourceTypeIn(ref, nil)
 }

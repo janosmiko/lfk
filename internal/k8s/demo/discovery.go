@@ -6,14 +6,14 @@ import (
 )
 
 // ListKinds maps every GroupVersionResource any internal/k8s code path can
-// LIST against the dynamic client to its List kind — the shape
+// LIST against the dynamic client to its List kind. That is the shape
 // dynamicfake.NewSimpleDynamicClientWithCustomListKinds needs to serve List
 // calls. An unregistered GVR makes the fake panic on List instead of
-// returning an error, so this map must register every resource a List call
+// returning an error. So this map must register every resource a List call
 // can target, not only the ones seeded with data (see
 // TestListKinds_CoversEveryAdvertisedResource and
 // TestNewDemoClient_DiscoverAPIResources_NoPanic). metrics.k8s.io/v1 is
-// mapped alongside v1beta1 because internal/k8s.metricsGVR tries both; only
+// mapped alongside v1beta1 because internal/k8s.metricsGVR tries both. Only
 // v1beta1 carries seed data since GetPodMetrics/GetNodeMetrics stop at the
 // first route that returns.
 func ListKinds() map[schema.GroupVersionResource]string {
@@ -42,8 +42,8 @@ func ListKinds() map[schema.GroupVersionResource]string {
 		// apiextensions.k8s.io/v1 CustomResourceDefinitions: fetchCRDPrinterColumns
 		// (internal/k8s/discovery.go) lists this unconditionally as part of
 		// every DiscoverAPIResources call. Zero CRDs are seeded in demo mode,
-		// but the registration must exist regardless or the fake panics
-		// before it gets the chance to return an empty list.
+		// but the registration must exist regardless. Otherwise the fake
+		// panics before it gets the chance to return an empty list.
 		{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}: "CustomResourceDefinitionList",
 
 		// networking.k8s.io/v1 NetworkPolicies and their Cilium CRD
@@ -62,9 +62,9 @@ func ListKinds() map[schema.GroupVersionResource]string {
 }
 
 // APIResourceLists is the discovery output installed on the fake clientset's
-// FakeDiscovery.Resources, covering every kind ListKinds serves so
-// DiscoverAPIResources (internal/k8s/discovery.go) populates the sidebar
-// from the demo cluster the same way it would from a real one.
+// FakeDiscovery.Resources, covering every kind ListKinds serves. This lets
+// DiscoverAPIResources (internal/k8s/discovery.go) populate the sidebar from
+// the demo cluster the same way it would from a real one.
 func APIResourceLists() []*metav1.APIResourceList {
 	rw := metav1.Verbs{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	ro := metav1.Verbs{"get", "list"}

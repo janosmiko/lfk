@@ -75,8 +75,8 @@ func parseLogArgs(args []string) logArgs {
 	return a
 }
 
-// podName derives a stable, readable pod identity from the parsed target:
-// a literal pod name is used as-is, a "kind/name" resource ref contributes
+// podName derives a stable, readable pod identity from the parsed target.
+// A literal pod name is used as-is, a "kind/name" resource ref contributes
 // its name, and a label selector ("app=web,tier=x") contributes the first
 // label's value. Different targets deterministically produce different
 // identities, which is what seeds a different (but reproducible) log stream

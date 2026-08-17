@@ -45,13 +45,11 @@ func (s *Source) Categories() []security.Category {
 	return []security.Category{security.CategoryVuln, security.CategoryMisconfig}
 }
 
-// IsAvailable checks that the VulnerabilityReport CRD is served by the API.
-// A successful List call means the CRD is registered — even if empty.
-// NotFound is returned as (false, nil) so the manager's probe treats it
-// as a definitive "not installed" signal (and updates the availability
-// map). Other errors (timeouts, RBAC, transient API failures) are
-// returned as (false, err) so the probe leaves the previous-known
-// state untouched rather than briefly hiding the source on a flake.
+// IsAvailable checks that the VulnerabilityReport CRD is served by the API. A successful List call
+// means the CRD is registered — even if empty. NotFound is returned as (false, nil) so the manager's
+// probe treats it as a definitive "not installed" signal (and updates the availability map). Other
+// errors (timeouts, RBAC, transient API failures) are returned as (false, err). That lets the probe
+// leave the previous-known state untouched rather than briefly hiding the source on a flake.
 func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) {
 	if s.client == nil {
 		return false, nil
@@ -68,8 +66,8 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 
 // Fetch lists VulnerabilityReport and ConfigAuditReport CRDs and returns
 // them as findings. Lists are paginated (default 200 items per page) so
-// large clusters don't materialise the whole report set in one response
-// — Trivy reports embed full vuln details, and a busy cluster easily
+// large clusters don't materialise the whole report set in one response.
+// Trivy reports embed full vuln details, and a busy cluster easily
 // produces 10s of MB per source. Per-report parse errors are swallowed
 // (malformed items skipped).
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {

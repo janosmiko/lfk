@@ -45,7 +45,7 @@ File locations:
   Override dirs for portable installs: LFK_CONFIG_DIR, LFK_STATE_DIR, LFK_DATA_DIR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliOpts.KubeconfigExclusiveSet = cmd.Flags().Changed("kubeconfig-exclusive")
-			// LFK_SESSION is the env equivalent of --session; the explicit
+			// LFK_SESSION is the env equivalent of --session. The explicit
 			// flag wins when both are set.
 			if !cmd.Flags().Changed("session") {
 				if s := os.Getenv("LFK_SESSION"); s != "" {
@@ -165,7 +165,7 @@ func resolveStartupClient(opts app.StartupOptions) (*k8s.Client, error) {
 func runTUI(opts app.StartupOptions) error {
 	// Silence klog (Kubernetes client library) to prevent it from writing
 	// error messages to stderr which corrupts the TUI output.
-	// Initially discard; after logger init, redirect to our log file.
+	// Initially discard. After logger init, redirect to our log file.
 	klog.InitFlags(nil)
 	_ = flag.Set("logtostderr", "false")
 	_ = flag.Set("stderrthreshold", "FATAL")
@@ -225,7 +225,7 @@ func runTUI(opts app.StartupOptions) error {
 	)
 
 	// Optional pprof endpoint for debugging hot CPU paths (issue #206).
-	// Off by default; set LFK_PPROF_ADDR=127.0.0.1:6060 to enable. The
+	// Off by default. Set LFK_PPROF_ADDR=127.0.0.1:6060 to enable. The
 	// address MUST resolve to a loopback host — anything else exposes
 	// process internals (heap, goroutines, credentials in symbols) on
 	// the network and we refuse to start.
@@ -245,7 +245,7 @@ func runTUI(opts app.StartupOptions) error {
 	}
 
 	// Optional periodic memory diagnostics for chasing leaks (issue #387).
-	// Off by default; set LFK_MEMSTATS_INTERVAL=30s to log heap and goroutine
+	// Off by default. Set LFK_MEMSTATS_INTERVAL=30s to log heap and goroutine
 	// counts to the app log on each tick. A slow leak shows up as rising
 	// heap_objects (cache/buffer leak) or rising goroutines (watch/stream
 	// leak). Use alongside LFK_PPROF_ADDR for a full heap profile.
@@ -289,7 +289,7 @@ func runTUI(opts app.StartupOptions) error {
 	// has not let the process exit within the grace period, kill the
 	// program — which restores the terminal — and exit, so a drain wedged
 	// on an unreachable cluster cannot leave the user stuck on a frozen
-	// alt-screen. p is assigned just below; the closure captures the
+	// alt-screen. p is assigned just below. The closure captures the
 	// variable, so it is set by the time the notifier ever runs.
 	var p *tea.Program
 	m.SetShutdownNotifier(armForceQuit(app.ForceQuitGracePeriod,
@@ -298,7 +298,7 @@ func runTUI(opts app.StartupOptions) error {
 	))
 	p = tea.NewProgram(m)
 
-	// ErrProgramKilled is expected when the watchdog force-quits; treat it
+	// ErrProgramKilled is expected when the watchdog force-quits. Treat it
 	// as a clean exit rather than surfacing it as a startup failure.
 	if _, err := p.Run(); err != nil && !errors.Is(err, tea.ErrProgramKilled) {
 		os.Stderr = origStderr
@@ -379,7 +379,7 @@ func unionSetLookup(sets []ui.UnionSetConfig, client *k8s.Client) app.UnionSetLo
 				// ResolveUnionSet, so surface the malformed-set message via
 				// the kubeconfig context name so it reads naturally in the
 				// downstream "context not found" error path. Tests cover the
-				// happy path; production users with this bug will see the
+				// happy path. Production users with this bug will see the
 				// validation error at startup with the offending set name.
 				logger.Error("union set is malformed", "error", err)
 				return nil, "", nil, false

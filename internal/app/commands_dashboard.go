@@ -89,7 +89,7 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	// A prior fan-out for this same (context, gen) may still be mid-flight
 	// (e.g. this reload was triggered by a pin toggle before the previous
 	// dashboard load finished). Its accumulator's `expected` count was seeded
-	// from *that* fan-out's total; if this fresh fan-out has a different
+	// from *that* fan-out's total. If this fresh fan-out has a different
 	// total (a different pin count), letting both feed the same accumulator
 	// would mix section data across fan-outs or complete against the wrong
 	// count. Evict it so this fan-out always starts from a clean slate. The
@@ -132,7 +132,7 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 		{dashboardSectionPDB, func(ctx context.Context) dashboardData { return fetchDashboardPDB(ctx, kctx, client) }},
 		{dashboardSectionNodeMetrics, func(ctx context.Context) dashboardData {
 			// Node metrics needs node items as input. Re-fetch them inside
-			// this section to keep it self-contained; a node-list failure
+			// this section to keep it self-contained. A node-list failure
 			// surfaces as nodeMetricsErr so the dashboard renders an explicit
 			// "metrics unavailable" instead of zeros.
 			nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
@@ -178,7 +178,7 @@ func dashboardAccKey(kctx string, gen uint64) string {
 // handleDashboardPartial accumulates a section result and emits a
 // single dashboardLoadedMsg only after all expected sections have arrived.
 // This avoids flickering the dashboard layout on every watch tick
-// (each tick fires one partial fetch per section; rendering on each one
+// (each tick fires one partial fetch per section. Rendering on each one
 // would repeatedly clear sections that haven't arrived yet).
 //
 // Stale messages (different context or different requestGen) are
@@ -199,7 +199,7 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	if m.dashboardAcc == nil {
 		// Lazy-init: production app_init.go pre-allocates this map, but
 		// test fixtures with bare Model{} don't. The stale-drop branch
-		// above already guards a nil map; mirror that here so a current
+		// above already guards a nil map. Mirror that here so a current
 		// partial arriving before init can't panic.
 		m.dashboardAcc = make(map[string]*dashboardAccumulator)
 	}
@@ -210,7 +210,7 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	} else {
 		// A coalesced old fan-out (smaller total) can race a fresh one (larger
 		// total, e.g. a pin added mid-flight) on the same (context, gen).
-		// Awaiting the larger fan-out guarantees a full frame; the smaller
+		// Awaiting the larger fan-out guarantees a full frame. The smaller
 		// fan-out's keys are a subset delivered by surviving coalesced tasks.
 		acc.expected = max(acc.expected, msg.total)
 	}
@@ -344,7 +344,7 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 		if warn := dashboardWarningsColumn(data); len(warn) > 0 {
 			right = append(right, warn...)
 			// Divide warnings from the events below. Size it to match
-			// wrapEventsColumn's wrap width (rightW-4); that helper adds the
+			// wrapEventsColumn's wrap width (rightW-4). That helper adds the
 			// leading "  " pad, so the rule renders as a single full-width line
 			// rather than wrapping.
 			_, rightW := dashboardColumnWidths(content, m.width-2)

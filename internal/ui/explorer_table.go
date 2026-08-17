@@ -11,7 +11,7 @@ import (
 )
 
 // RenderTable renders items in a table format with column headers for resource views.
-// headerLabel is used as the first column header; defaults to "NAME" if empty.
+// headerLabel is used as the first column header. Defaults to "NAME" if empty.
 //
 // Column-config contract: RenderTable applies the Active* column globals
 // (ActiveSessionColumns, ActiveHiddenBuiltinColumns, ActiveColumnOrder,
@@ -319,7 +319,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 	// Row-status-tint plan for this render (issue #540). Whole-row tint is the
 	// background mode (always) and the foreground fallback when both Status and
-	// Name are hidden; name-only foreground tint applies when the Status column
+	// Name are hidden. Name-only foreground tint applies when the Status column
 	// is hidden but Name is shown — so a failed/pending row stays visible even
 	// without its Status cell, without shouting a full colored line while the
 	// Status cell is right there. Status visible in foreground mode -> no tint.
@@ -355,7 +355,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 	nameW := max(width-contextW-nsW-readyW-restartsW-ageW-statusW-markerColW-extraTotalW-tileW, 10)
 	if nameHidden {
-		// No name cell is emitted (Name is absent from order); zero the width
+		// No name cell is emitted (Name is absent from order). Zero the width
 		// so the unused value can't be mistaken for a real reservation.
 		nameW = 0
 	}
@@ -566,7 +566,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				// (do not swap in the selection background) and mark the cursor
 				// with bold, so the "failed" background never disappears on
 				// selection (issue #540 UAT). The checkmark stays reserved for
-				// actual multi-selection; a blank marker cell keeps the row's
+				// actual multi-selection. A blank marker cell keeps the row's
 				// background.
 				markerPrefix := ""
 				if wantMarker {

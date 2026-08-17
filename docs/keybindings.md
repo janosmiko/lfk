@@ -1,4 +1,4 @@
-# Keybindings Reference
+# Keybindings reference
 
 Complete list of all keybindings in `lfk`. All keybindings can be overridden in `~/.config/lfk/config.yaml` under the `keybindings` section. Only `esc`, `ctrl+c`, and `q` (quit) are hardcoded.
 
@@ -15,14 +15,20 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Enter` | Open full-screen YAML view / navigate into |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `z` | Toggle expand / collapse all resource groups / toggle event grouping in the Events list |
-| `x` | At resource types level: pin / unpin or hide / show the selected resource type, or pin / unpin its dashboard summary, via the action menu (saved per cluster context / union set) |
+| `z` | Toggle expand / collapse all resource groups |
+| `x` | At resource types level: pin, hide, or show the selected type (action menu) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down / up |
-| `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the Object Explorer for it |
-| `Backspace` | Jump back through teleport history (owner, port-forward, orphan, finding, and mark jumps push history; hierarchical `h`/`l` navigation does not) |
+| `o` / `O` | Jump to owner/controller / open Object Explorer |
+| `Backspace` | Jump back through teleport history |
 
-## Goto Navigation
+In the Events list, `z` toggles event grouping instead of expand/collapse.
+
+`x`, at the resource types level, also lets you pin or unpin the selected type's dashboard summary through the action menu. Pin, hide, and summary choices are saved per cluster context, or per union set.
+
+Teleport history records owner, port-forward, orphan, finding, and mark jumps. Hierarchical `h`/`l` navigation does not push a history entry.
+
+## Goto navigation
 
 Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the goto which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
 
@@ -61,21 +67,19 @@ looks up `jump_top` + the next keypress. A chord that does not is reported at
 startup and ignored. Rebinding `jump_top` therefore disables the built-in
 chords, which all start with `g`; re-point the ones you use at the new prefix.
 
-## Views and Tools
+## Views and tools
 
 | Key | Action |
 |---|---|
 | `F1` | Toggle help screen |
-| `?` | Which-key action panel -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key action panel — see [Which-Key Panel](#which-key-panel) |
 | `P` | Toggle between details summary and YAML preview |
-| | Details pane shows labels, finalizers, annotation count, and resource metadata |
-| | Details view shows deletion timestamp (with warning highlight) for resources being deleted |
 | `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) |
 | `F` | Cycle layout: hide sidebar -> fullscreen -> restore (dashboards toggle fullscreen) |
 | `M` | Toggle resource relationship map view |
 | `,` | Column visibility toggle (show / hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
 | `p` | Pin / unpin resource type (at resource types level) |
-| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
+| `H` | Toggle rarely used and hidden resource types |
 | `I` | API Explorer (browse resource structure interactively) |
 | `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
 | `U` | RBAC permissions browser (can-i) |
@@ -87,7 +91,13 @@ chords, which all start with `g`; re-point the ones you use at the new prefix.
 | `Ctrl+N` | Open the Local Clusters Manager overlay (only at LevelClusters) |
 | `Q` | Namespace resource quota dashboard |
 | `` ` `` | Scheduler / task queue overlay (Tab toggles running / completed history; `a` toggles show-all entries in completed view) |
-| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:scheduler`), kubectl (`:k get pod`), shell (`:! cmd`) |
+| `:` | Command bar (resource jumps, built-ins, kubectl, shell) |
+
+`P`'s details summary shows labels, finalizers, annotation count, and other resource metadata, including a highlighted deletion timestamp for resources being deleted.
+
+`H`'s rarely used types are CSI internals, webhooks, APF, leases, and advanced core resources. Revealed types show dimmed. The toggle resets on each launch, but per-type hides persist.
+
+`:`'s resource jumps use the kind name, for example `:pod` or `:dep`. Built-ins include `:ns`, `:ctx`, `:set`, `:sort`, `:export`, and `:scheduler`. `:k` runs kubectl, for example `:k get pod`. `:!` runs a shell command, for example `:! cmd`.
 
 ## Sorting
 
@@ -99,7 +109,7 @@ chords, which all start with `g`; re-point the ones you use at the new prefix.
 
 Your chosen sort is remembered per resource kind and per cluster context, and persists across restarts (stored in `~/.local/state/lfk/sort_memory.yaml`), so leaving a list and returning — or quitting and reopening lfk — keeps your sort instead of resetting. Use `-` (reset) to drop a remembered sort.
 
-## Modes & Settings
+## Modes and settings
 
 | Key | Action |
 |---|---|
@@ -119,12 +129,16 @@ Press **`Shift+Z`** anywhere in the explorer (or type `:orphans` with no argumen
 
 | Key | Action |
 | --- | ------ |
-| `Tab` / `Shift+Tab` | Cycle kind filter chips (All / Pods / Secrets / CMs / Svcs / PVCs / HPAs / PDBs / NetPols / Roles / RBs) |
-| `s` | Toggle strict / lenient — strict (default) hides items referenced by workload templates; lenient surfaces them |
+| `Tab` / `Shift+Tab` | Cycle kind filter chips |
+| `s` | Toggle strict / lenient filtering |
 | `/` | Filter by namespace + name |
 | `Enter` | Jump to the highlighted resource (namespace switches automatically) |
 | `R` | Re-scan the cluster |
 | `Esc` / `q` / `Shift+Z` | Close the overlay |
+
+The kind filter chips are All, Pods, Secrets, CMs, Svcs, PVCs, HPAs, PDBs, NetPols, Roles, and RBs.
+
+Strict mode (the default) hides items referenced by workload templates. Lenient mode surfaces them.
 
 ### Per-kind presets
 
@@ -157,7 +171,7 @@ Auto-excluded from Pod "Orphans":
 
 Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason is `"no owner (terminal)"` to distinguish them from live workloads.
 
-## Search and Filter
+## Search and filter
 
 | Key | Action | Config key |
 |---|---|---|
@@ -276,9 +290,13 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 | Key | Action |
 |---|---|
 | `y` | Copy resource name to clipboard (with multi-selection: newline-joined names of all selected items) |
-| `Y` | Open copy-as picker (YAML/JSON/Table). YAML/JSON support multi-selection (multi-doc YAML joined with `---`, JSON array). Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest. |
-| `Ctrl+Y` | Copy a single field. Opens instantly on the visible table columns (Name, Status, extras...) — `Enter` copies the cell value. `Tab` switches to the full manifest field list, where array elements are labeled semantically (`status.addresses[ExternalIP].address` for a node's external IP) so filtering `ExternalIP` finds the address row. With multi-selection the chosen column/field is extracted from every selected item, one value per line; labeled array elements resolve per manifest (not by index), and items missing the field are skipped. Remembers the last-copied entry per resource kind for the session and preselects it next time. |
+| `Y` | Open copy-as picker (YAML / JSON / Table) |
+| `Ctrl+Y` | Copy a single field |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
+
+`Y`'s YAML and JSON formats support multi-selection: multi-doc YAML joined with `---`, or a JSON array. Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest.
+
+`Ctrl+Y` opens instantly on the visible table columns (Name, Status, extras). `Enter` copies the cell value. `Tab` switches to the full manifest field list, where array elements are labeled semantically (`status.addresses[ExternalIP].address` for a node's external IP), so filtering `ExternalIP` finds the address row. With multi-selection the chosen column/field is extracted from every selected item, one value per line. Labeled array elements resolve per manifest, not by index, and items missing the field are skipped. `Ctrl+Y` remembers the last-copied entry per resource kind for the session and preselects it next time.
 
 When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and `Ctrl+Y` operate on the selection rather than the cursor row — mirroring the precedence used by `D` (delete) and other bulk actions. `Y` and `Ctrl+Y` are capped at 50 manifests per copy (client-go's default rate limiter serializes the per-item fetches).
 
@@ -374,7 +392,7 @@ suffix in their name.
 | `j` / `k` | Bookmark overlay | Navigate bookmarks |
 | `/` | Bookmark overlay | Filter bookmarks by name |
 | `Enter` | Bookmark overlay | Jump to selected bookmark |
-| `Tab` | Bookmark overlay | Toggle `[KEEP CURRENT NS]` — opt out of loading the bookmark's saved namespace on the next jump |
+| `Tab` | Bookmark overlay | Toggle `[KEEP CURRENT NS]` |
 | `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
 | `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
 
@@ -402,7 +420,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 
 ## YAML View
 
-> Search (`/`), help (`F1`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed.
+> Search (`/`), help (`F1`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed. `123 Ctrl+D` / `123 Ctrl+U` set the scroll step shared by both keys, following vim's `'scroll'` option. The result is clamped to the viewport.
 
 | Key | Action |
 |---|---|
@@ -422,7 +440,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (sets shared Ctrl+D/Ctrl+U step) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in YAML |
 | `n` / `N` | Next / previous search match |
@@ -443,7 +461,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
 | `Ctrl+K` | Toggle the schema side pane for the attribute under the cursor (configurable via `field_doc`) |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
@@ -469,7 +487,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `P` | Open the whole resource in the full YAML viewer |
 | `I` | Open the API Explorer at the selected item's schema |
 | `Ctrl+K` | Toggle the schema side pane for the selected item (configurable via `field_doc`) |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` | Close the Object Explorer |
 | `Esc` | Clear filter / back one level / close at root |
@@ -491,7 +509,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (sets shared Ctrl+D/Ctrl+U step) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in content |
 | `n` / `N` | Next / previous search match |
@@ -503,7 +521,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
@@ -526,11 +544,11 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `G` / `End` | Jump to bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
-| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (sets shared Ctrl+D/Ctrl+U step) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `F` | Toggle follow mode (auto-scroll to new logs) |
 | `f` | Filter log lines live (`~`fuzzy, regex auto-detected, `\`literal); narrows the view to matching lines |
-| `i` / `o` | Lower / raise the minimum log severity shown — cycles **off → INFO+ → WARN+ → ERROR+** (all source levels merge into these three). Structured logs use the parsed level; plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO. So INFO+ hides debug/trace, WARN+ shows only warn/error lines, ERROR+ only error/failure lines |
+| `i` / `o` | Lower / raise the minimum log severity shown |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
@@ -553,9 +571,11 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` / `Esc` | Close log viewer |
+
+`i` / `o` cycle the minimum severity through `off`, `INFO+`, `WARN+`, and `ERROR+`. All source levels merge into these three tiers. Structured logs use the parsed level. Plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO. `INFO+` hides debug/trace lines, `WARN+` shows only warn and error lines, and `ERROR+` shows only error and failure lines.
 
 The log viewer's `/` keeps its own persistent history at `$XDG_STATE_HOME/lfk/log-search-history` (default `~/.local/state/lfk/log-search-history`), separate from the explorer's `query-history`. Log search matches raw log lines (substring/regex over arbitrary text) rather than resource names, so pooling the two would surface irrelevant entries on Up/Down in either context.
 
@@ -585,7 +605,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `n` / `N` | Next / previous search match |
 | `Tab` | Cycle the dimension `Enter` drills into |
 | `Enter` | Drill into selected group (descends to the next unused dimension, marked `▸` in its column header) |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |
 
 ## Exec Mode (embedded terminal)
@@ -653,7 +673,7 @@ from `terminal:` in the config.
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (sets shared Ctrl+D/Ctrl+U step) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in diff |
 | `n` / `N` | Next / previous search match |
@@ -670,7 +690,7 @@ from `terminal:` in the config.
 | `#` | Toggle line numbers |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `u` | Toggle unified/side-by-side view |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
@@ -696,7 +716,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `123G` | Jump to specific line number |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
-| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (sets shared Ctrl+D/Ctrl+U step) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `Shift+F` | Toggle fullscreen event viewer (also minimizes back) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
@@ -709,7 +729,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy N lines from cursor (count-prefixed yank) |
-| `?` | Which-key panel (fullscreen viewer only) -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel (fullscreen viewer only) — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Open this help, scrolled to the Event Timeline section (`?` too, in the overlay) |
 | `q` / `Esc` | Close overlay (or exit fullscreen back to overlay) |
 
@@ -756,7 +776,7 @@ overlay interprets it as "reset to defaults for this kind" rather than
 leaving the table empty. To render only built-ins with zero extras, keep
 at least one built-in column checked when you press Enter.
 
-## Inline Editors (Secret / ConfigMap / Labels & Annotations)
+## Inline Editors (Secret / ConfigMap / labels and annotations)
 
 The Secret, ConfigMap, and Labels/Annotations editors use a shared key-value
 overlay. The list view supports vim-like navigation; pressing `e` or `a`
@@ -769,13 +789,17 @@ enters edit mode for the selected (or new) entry.
 | `j` / `k` | Move cursor up / down |
 | `e` | Edit selected key/value |
 | `a` | Add a new key/value entry |
-| `y` | Copy: cursor row's value when nothing is selected, **opens the format picker automatically when 1+ rows are selected** (so you don't silently copy a single value while ignoring the marked bundle) |
-| `Space` | Toggle selection on the current row (cursor auto-advances; works across non-adjacent rows) |
-| `Y` | Always open the format picker; copies selected rows (or the cursor row) as YAML / JSON / dotenv / `key=value` / values-only |
+| `y` | Copy value (opens the format picker if rows are selected) |
+| `Space` | Toggle selection on the current row |
+| `Y` | Open the format picker |
 | `/` | Filter the list by key (typing extends the query, `Enter` applies, `Esc` clears) |
 | `D` | Delete selected entry |
 | `Enter` | Save changes and close (no-op if nothing changed) |
 | `Esc` | Close without saving |
+
+`y` copies the cursor row's value when nothing is selected. It opens the format picker automatically when one or more rows are selected, so you don't silently copy a single value while ignoring the marked bundle.
+
+`Space` auto-advances the cursor after toggling, and works across non-adjacent rows.
 
 The Labels/Annotations editor additionally has a `Tab` binding in the list
 view to switch between the labels pane and the annotations pane. Switching
@@ -783,6 +807,8 @@ tabs clears the multi-row selection (label and annotation namespaces are
 disjoint).
 
 ### Format picker (Shift+Y)
+
+`Y` always opens the picker and copies the selected rows, or the cursor row, as YAML, JSON, dotenv, `key=value`, or values-only.
 
 When the format picker is open, the bottom hint bar swaps to picker controls:
 
@@ -838,15 +864,19 @@ The editor picks one of two modes based on the value being edited:
 | `/` | Search fields |
 | `n` / `N` | Next / previous search match (recursive: auto-drills into children / searches parent) |
 | `r` | Recursive field browser (browse all nested fields with filter) |
-| `T` | Toggle tree view — show the whole field subtree with ASCII-art guides; stays on while drilling/going back until toggled off (configurable via `tree_view`) |
-| `Space` / `z` | Fold / unfold the field subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
+| `T` | Toggle tree view (configurable via `tree_view`) |
+| `Space` / `z` | Fold / unfold the subtree under the cursor |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `?` | Which-key panel for this view -- see [Which-Key Panel](#which-key-panel) |
+| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
 | `F1` | Full help |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |
+
+`T`'s tree view shows the whole field subtree with ASCII-art guides, and stays on while drilling in or going back, until you toggle it off again.
+
+`Space` / `z` folding applies only in tree view (`z` is configurable via `toggle_fold`).
 
 ## Can-I Browser
 
@@ -899,7 +929,7 @@ has access.
 ClusterRoleBindings always count regardless of namespace scope (cluster-wide
 grants apply everywhere); RoleBindings outside the active scope are excluded.
 
-## Can-I Subject Selector
+## Can-I subject selector
 
 | Key | Action |
 |---|---|
@@ -953,7 +983,9 @@ Available strategies (priority order; unavailable ones are skipped):
 The headroom multiplier is the safety-margin factor applied on top of the strategy's raw
 output. Cycle through `1.0`, `1.1`, `1.25`, `1.5`, `1.75`, `2.0` with `<` and `>`.
 Default is `1.25` (the closest preset to lfk's previous hardcoded `1.2` factor —
-existing recommendations stay visually similar after the upgrade).
+existing recommendations stay visually similar after the upgrade). If the active
+value isn't one of the presets, the first press of `<` or `>` snaps to the nearest
+one instead of stepping from it.
 
 | Key | Action |
 |---|---|
@@ -961,7 +993,7 @@ existing recommendations stay visually similar after the upgrade).
 | `r` | Force-refresh (invalidate the cached entry for the active strategy + headroom and re-fetch) |
 | `]` | Cycle to the next available strategy (wraps around) |
 | `[` | Cycle to the previous available strategy (wraps around) |
-| `>` | Cycle to the next headroom multiplier (wraps around; snaps to nearest preset on first press if the active value isn't in the list) |
+| `>` | Cycle to the next headroom multiplier (wraps around) |
 | `<` | Cycle to the previous headroom multiplier (wraps around; same snap behavior as `>`) |
 | `j` / `k` | Scroll up / down |
 | `g` / `G` (or `Home` / `End`) | Jump to top / bottom |
@@ -1022,9 +1054,11 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `[` | Previous tab |
 | `}` | Move current tab right (shift+]) |
 | `{` | Move current tab left (shift+[) |
-| `Ctrl+C` | Close current tab (quit if last tab). Cancels a bulk action first, but only one started on this tab |
+| `Ctrl+C` | Close current tab (quit if last tab) |
 
-## Read-Only Mode
+`Ctrl+C` cancels an in-progress bulk action on the current tab first, rather than closing it. It only cancels a bulk action started on that tab, not one running in another tab.
+
+## Read-only mode
 
 | Key | Action |
 |---|---|
@@ -1041,7 +1075,7 @@ mode: X disabled" toast. See [Read-Only Mode](usage.md#read-only-mode)
 for the full precedence rules across the CLI flag, per-context config,
 and global config.
 
-## Cluster Color Coding
+## Cluster color coding
 
 | Key | Action |
 |---|---|
@@ -1179,7 +1213,7 @@ Inside the manager: `enter` switch (auto-saves the one you're leaving), `s` save
 | `q` | Quit application (with confirmation) |
 | `Esc` | Go back one level / close overlay / quit |
 
-## Action Menu Items
+## Action Menu items
 
 The action menu (`x` key) shows context-specific actions based on the resource type.
 
@@ -1194,72 +1228,74 @@ The field picker (`s` from the destination picker) chooses which categories the 
 | Namespace | removed | `metadata.namespace` |
 | Labels | kept | every author-written label |
 | Annotations | kept | every author-written annotation |
-| Helm ownership | removed | `helm.sh/chart`, `meta.helm.sh/*`, `heritage`, `release`, `chart`, and `app.kubernetes.io/managed-by` when its value is `Helm` |
+| Helm ownership | removed | Helm chart / release labels and annotations |
 | Vendor runtime annotations | removed | `cni.projectcalico.org/*`, `field.cattle.io/*`, `management.cattle.io/*` |
 | Secret values | removed | Secret values; keys and `type` kept |
+
+Helm ownership removes `helm.sh/chart`, `meta.helm.sh/*`, `heritage`, `release`, `chart`, and `app.kubernetes.io/managed-by` when its value is `Helm`.
 
 Locked rows offer no choice — keeping them yields a manifest that will not apply: `status` and the server-set metadata (`uid`, `resourceVersion`, `generation`, `creationTimestamp`, `managedFields`, `selfLink`, `ownerReferences`), `last-applied-configuration`, finalizers, and controller-generated labels (`pod-template-hash`, `controller-uid`, `job-name`).
 
 The template picker (`a`): `Enter` create, `/` filter, `d` delete the highlighted saved template after a confirmation, `Esc`/`q` close. `d` works on your own templates only — the built-ins have no file behind them.
 
-### Pod Actions
+### Pod actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
 
-### Deployment Actions
+### Deployment actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### StatefulSet Actions
+### StatefulSet actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### DaemonSet Actions
+### DaemonSet actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### HorizontalPodAutoscaler Actions
+### HorizontalPodAutoscaler actions
 `S` Scale (edit min/max bounds & target replicas), `E` Edit, `D` Delete, `v` Describe, `b` Debug Pod, `V` Events
 
 The Scale overlay edits the HPA's `spec.minReplicas` / `spec.maxReplicas` (the HPA keeps autoscaling within the new range) and, optionally, scales the target workload directly. Fields prefill from the HPA's current values. `j`/`k` (or `↓`/`↑`) move between the three fields; `h`/`-` and `l`/`+` decrement/increment the active field; `←`/`→` move the cursor within the field; digits type a value directly. Target replica changes may be reverted by the HPA on its next reconcile. The same `h`/`-`/`l`/`+` steppers work in the workload Scale overlay.
 
-### Service Actions
+### Service actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `O` Port Forward & Open (forward a port and open it in the browser), `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
-### Secret Actions
+### Secret actions
 `e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
-### ConfigMap Actions
+### ConfigMap actions
 `e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
-### Node Actions
+### Node actions
 `c` Cordon/Uncordon (toggle schedulability), `n` Drain, `t` Taints (editor: mark taints for removal with `space`, add with `a`, pick a common taint with `p`, apply with `enter`), `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 Drain streams the eviction progress live: in PTY terminal mode (default on macOS/Linux) the `kubectl drain` output renders in lfk's embedded scrollable terminal; in Exec mode the host terminal is handed over. The same applies to Drain Node on a Karpenter NodeClaim.
 
-### Longhorn Node Actions
+### Longhorn Node actions
 `e` Evict Replicas, `C` Cancel Eviction, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events, `P` Permissions
 
 The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas scheduled on each node. Force Delete disables scheduling, then deletes (the `validator.longhorn.io` webhook rejects deleting a still-schedulable node). Evict Replicas disables scheduling and sets `spec.evictionRequested`, so Longhorn rebuilds each replica on another node before removing it.
 
-### Job Actions
+### Job actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
-### CronJob Actions
+### CronJob actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Trigger (create Job), `S` Suspend/Resume (pause/resume schedule), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
-### ArgoCD Application Actions
+### ArgoCD Application actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
-### Helm Release Actions
+### Helm Release actions
 `u` Values, `A` All Values, `E` Edit Values, `d` Diff, `U` Upgrade, `R` Rollback, `h` History, `v` Describe, `D` Delete, `b` Debug Pod, `V` Events
 
-### Ingress Actions
+### Ingress actions
 `o` Open in Browser, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
-### PVC Actions
+### PVC actions
 `g` Go to Pod, `b` Debug Mount, `B` Debug Pod, `v` Describe, `E` Edit, `D` Delete, `V` Events
 
-### Default Actions (all other resources)
+### Default actions (all other resources)
 `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
-### Bulk Actions (when items multi-selected)
+### Bulk actions (when items multi-selected)
 `D` Delete, `X` Force Delete, `S` Scale, `r` Restart
 
 ArgoCD Application bulk actions (when Application resources are multi-selected):
@@ -1267,7 +1303,7 @@ ArgoCD Application bulk actions (when Application resources are multi-selected):
 
 Custom actions defined in the config file appear after the built-in actions.
 
-## Configuring Keybindings
+## Configuring keybindings
 
 All keybindings can be overridden in `~/.config/lfk/config.yaml`. Only specify the keys you want to change — defaults apply for everything else.
 
@@ -1428,18 +1464,18 @@ keybindings:
 Opened from the Pod action menu (`x` → `I`). Combines events, restart history,
 last logs, and describe for the failing container in one tabbed panel.
 
-| Key            | Action                                                   |
-| -------------- | -------------------------------------------------------- |
-| `Tab` / `S-Tab`| Cycle tabs forward / backward                            |
-| `1` / `2` / `3` / `4` | Jump to Summary / Events / Logs / Describe        |
-| `c`            | Cycle active container (init + app)                       |
-| `p`            | Toggle previous / current logs (Logs tab only)            |
-| `j` / `k`      | Scroll within tab body                                    |
-| `g` / `G`      | Jump to top / bottom of tab body                          |
-| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up                                  |
-| `Ctrl+F` / `Ctrl+B` | Full-page down / up (also `PgDn` / `PgUp`)           |
-| `Shift+R`      | Refresh — re-fetch all sections, preserves cursor state  |
-| `Esc` / `q`    | Close overlay                                             |
+| Key | Action |
+| --- | --- |
+| `Tab` / `S-Tab` | Cycle tabs forward / backward |
+| `1` / `2` / `3` / `4` | Jump to Summary / Events / Logs / Describe |
+| `c` | Cycle active container (init + app) |
+| `p` | Toggle previous / current logs (Logs tab only) |
+| `j` / `k` | Scroll within tab body |
+| `g` / `G` | Jump to top / bottom of tab body |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up |
+| `Ctrl+F` / `Ctrl+B` | Full-page down / up (also `PgDn` / `PgUp`) |
+| `Shift+R` | Refresh — re-fetch all sections, preserves cursor state |
+| `Esc` / `q` | Close overlay |
 
 ### Sync Wave Timeline (Applications)
 
@@ -1453,7 +1489,7 @@ on the right. `Tab` toggles which pane has focus.
 | --- | --- |
 | `j` / `↓` | Move sidebar cursor down (wraps); resets body cursor + scroll |
 | `k` / `↑` | Move sidebar cursor up (wraps) |
-| `Enter` / `Space` | Toggle phase collapse (sidebar marker `▾`/`▸`; body shows placeholder when collapsed) |
+| `Enter` / `Space` | Toggle phase collapse |
 | `Tab` / `Shift+Tab` | Switch focus to body |
 | `g` / `G` | First / last phase |
 
@@ -1463,7 +1499,7 @@ on the right. `Tab` toggles which pane has focus.
 | --- | --- |
 | `j` / `↓` | Move body cursor down (wave headers + visible resources) |
 | `k` / `↑` | Move body cursor up |
-| `Enter` / `Space` | If on wave header: toggle wave collapse. If on placeholder: toggle phase collapse. If on resource: no-op |
+| `Enter` / `Space` | Toggle wave / phase collapse (no-op on a resource) |
 | `Tab` / `Shift+Tab` | Switch focus to sidebar |
 | `g` / `G` | First / last visible body row |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll |
@@ -1475,6 +1511,10 @@ on the right. `Tab` toggles which pane has focus.
 | --- | --- |
 | `R` | Refresh |
 | `q` / `Esc` | Close overlay |
+
+In the sidebar, `Enter` / `Space` toggles collapse for the phase under the cursor: the sidebar marker switches between `▾` and `▸`, and the body shows a placeholder for a collapsed phase.
+
+In the body, `Enter` / `Space` depends on the cursor: on a wave header it toggles that wave's collapse, on a placeholder it toggles the phase collapse, and on a resource row it does nothing.
 
 While `Application.status.operationState.phase == "Running"`, the overlay
 auto-refreshes every 3 seconds. A spinner animates in the header during

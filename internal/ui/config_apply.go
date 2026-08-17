@@ -24,9 +24,9 @@ import (
 //
 //  2. Ghostty-style dual-mode – "dark:Rose Pine,light:Rose Pine Dawn"
 //     Parses each comma-separated segment for a "dark:" or "light:" prefix.
-//     Both, one, or neither segment may be present; order does not matter.
+//     Both, one, or neither segment may be present. Order does not matter.
 //     ConfigDarkColorscheme / ConfigLightColorscheme are set accordingly.
-//     No default scheme is applied immediately; the terminal's first CSI 997
+//     No default scheme is applied immediately. The terminal's first CSI 997
 //     notification will trigger the initial switch.
 func applyColorscheme(theme *Theme, cfg configFile) {
 	if cfg.Colorscheme == "" {
@@ -109,7 +109,7 @@ func applyConfigOptions(cfg configFile) {
 		if warning != "" {
 			// Raw cfg.Terminal is intentionally not logged — log
 			// redaction policy. The "valid" list tells the user what
-			// is accepted; their own config file is the source of
+			// is accepted. Their own config file is the source of
 			// truth for what they typed.
 			logger.Warn(warning,
 				"valid", []string{TerminalModePTY, TerminalModeExec, TerminalModeMux},
@@ -140,7 +140,7 @@ func applyConfigOptions(cfg configFile) {
 	if len(cfg.PinnedTypes) > 0 {
 		ConfigPinnedTypes = cfg.PinnedTypes
 	}
-	if cfg.PinnedSummaries != nil { // nil vs "[]" distinguishes defaults-on from defaults-off; see ConfigPinnedSummariesSet
+	if cfg.PinnedSummaries != nil { // nil vs "[]" distinguishes defaults-on from defaults-off. See ConfigPinnedSummariesSet
 		ConfigPinnedSummaries = cfg.PinnedSummaries
 		ConfigPinnedSummariesSet = true
 	}
@@ -216,7 +216,7 @@ func applyConfigOptions(cfg configFile) {
 	if os.Getenv("NO_COLOR") != "" {
 		// Per https://no-color.org, the presence of NO_COLOR (regardless of
 		// value) disables color. Env takes precedence over the config file
-		// field; CLI flag is applied later in main.go.
+		// field. CLI flag is applied later in main.go.
 		ConfigNoColor = true
 	}
 }
@@ -269,7 +269,7 @@ func applyClusterSecurityConfig(ctx string, sec *securityConfig) {
 		ConfigClusterSecuritySources[ctx] = sec.Sources
 	}
 	// ignore_patterns is honored only in the top-level security
-	// section; per-cluster scoping is expressed via each pattern's
+	// section. Per-cluster scoping is expressed via each pattern's
 	// `cluster` glob instead. Warn rather than silently drop.
 	if len(sec.IgnorePatterns) > 0 {
 		logger.Warn("clusters.<ctx>.security.ignore_patterns is ignored; "+
@@ -401,7 +401,7 @@ func applySessionDefaults(cfg configFile) {
 	}
 }
 
-// applyTailLines copies a positive tail-line override into dst; non-positive
+// applyTailLines copies a positive tail-line override into dst. Non-positive
 // values are ignored so a stray `0` keeps the compiled default.
 func applyTailLines(src *int, dst *int) {
 	if src != nil && *src > 0 {
@@ -605,7 +605,7 @@ func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
 // parseRightsizingStrategy resolves a config string against the known
 // strategy literals (strict match, no case folding — predictable for
 // users typing config files by hand). Returns the matched strategy
-// and true on success; ("", false) for unknown values.
+// and true on success. ("", false) for unknown values.
 func parseRightsizingStrategy(s string) (model.RightsizingStrategy, bool) {
 	candidate := model.RightsizingStrategy(s)
 	if slices.Contains(model.AllRightsizingStrategies, candidate) {
@@ -641,7 +641,7 @@ func rightsizingStrategyLiterals() []string {
 
 // applySchedulerConfig pushes the YAML scheduler section into the
 // scheduler package-globals consumed by FromGlobals at request time.
-// A nil section is a no-op; zero/negative values are ignored so
+// A nil section is a no-op. Zero/negative values are ignored so
 // omitted fields don't clobber the compiled defaults.
 // K8sClientQPS and K8sClientBurst set the global foreground REST client rate
 // (per-cluster overrides are applied from the clusters section). The k8s

@@ -1,6 +1,6 @@
 // Scaling/disruption interaction checks: PDBs that deadlock against HPA
-// minimums, PDBs that strand crashlooping pods during drains, and manifests
-// that fight their autoscaler over the replica count.
+// minimums, and PDBs that strand crashlooping pods during drains. Also
+// covers manifests that fight their autoscaler over the replica count.
 
 package advisor
 
@@ -24,10 +24,9 @@ func (d *clusterData) scalingFindings() []security.Finding {
 	)
 }
 
-// pdbUnhealthyPolicyFindings flags PDBs without unhealthyPodEvictionPolicy.
-// The default (IfHealthyBudget) refuses to evict already-unhealthy pods when
-// the budget is not met, so a drain can hang on a crashlooping workload that
-// the eviction could not make any less available. AlwaysAllow (1.27+) fixes it.
+// pdbUnhealthyPolicyFindings flags PDBs without unhealthyPodEvictionPolicy. The default (IfHealthyBudget)
+// refuses to evict already-unhealthy pods when the budget is not met. A drain can hang on a crashlooping
+// workload that the eviction could not make any less available. AlwaysAllow (1.27+) fixes it.
 func (d *clusterData) pdbUnhealthyPolicyFindings() []security.Finding {
 	if !d.pdbsOK {
 		return nil
@@ -46,10 +45,10 @@ func (d *clusterData) pdbUnhealthyPolicyFindings() []security.Finding {
 }
 
 // pdbVsHPAFindings flags PDBs whose integer minAvailable exceeds the
-// minReplicas of an HPA scaling the same workload: when the HPA scales to
+// minReplicas of an HPA scaling the same workload. When the HPA scales to
 // its minimum, the PDB permits zero disruptions and drains deadlock.
 // minAvailable == minReplicas is deliberately not flagged (too common, and
-// pdb_blocks_drain covers the current-replica case); percentage minAvailable
+// pdb_blocks_drain covers the current-replica case). Percentage minAvailable
 // is skipped because its pod count depends on the live scale.
 func (d *clusterData) pdbVsHPAFindings() []security.Finding {
 	if !d.pdbsOK || !d.hpasOK {
@@ -93,8 +92,8 @@ func (d *clusterData) pdbVsHPAFindings() []security.Finding {
 }
 
 // staticReplicasFindings flags HPA-scaled workloads whose .spec.replicas is
-// still owned by another field manager (helm, kubectl, a GitOps controller):
-// every re-apply of that manifest resets the replica count and fights the
+// still owned by another field manager (helm, kubectl, a GitOps controller).
+// Every re-apply of that manifest resets the replica count and fights the
 // autoscaler.
 func (d *clusterData) staticReplicasFindings() []security.Finding {
 	if !d.hpasOK {
@@ -119,14 +118,13 @@ func (d *clusterData) staticReplicasFindings() []security.Finding {
 	return out
 }
 
-// staticReplicasOwner returns the field manager that owns .spec.replicas
-// through a whole-object write — i.e. a manifest that re-applies. Writes
-// through the scale subresource (the HPA controller, kubectl scale) are
-// excluded by their Subresource field rather than by manager name, which
-// varies across Kubernetes versions (kube-controller-manager pre-1.24,
-// horizontal-pod-autoscaler later); both names are excluded as a fallback
-// for entries recorded before subresource tracking. Empty when no manifest
-// pins the field. Malformed managedFields entries are skipped — they must
+// staticReplicasOwner returns the field manager that owns .spec.replicas through a
+// whole-object write — i.e. a manifest that re-applies. Writes through the scale
+// subresource (the HPA controller, kubectl scale) are excluded by their Subresource
+// field rather than by manager name. Manager names vary across Kubernetes versions
+// (kube-controller-manager pre-1.24, horizontal-pod-autoscaler later). Both names are
+// excluded as a fallback for entries recorded before subresource tracking. Empty when
+// no manifest pins the field. Malformed managedFields entries are skipped — they must
 // not invent findings.
 func staticReplicasOwner(entries []metav1.ManagedFieldsEntry) string {
 	for i := range entries {

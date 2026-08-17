@@ -48,7 +48,7 @@ func Sample() MemSample {
 }
 
 // LogFields renders a sample as structured key/value pairs for slog-style
-// logging. Byte counts are reported in MiB for readability; HeapObjects and
+// logging. Byte counts are reported in MiB for readability. HeapObjects and
 // goroutines are the leak-class discriminators and are reported raw.
 func LogFields(s MemSample) []any {
 	return []any{
@@ -63,7 +63,7 @@ func LogFields(s MemSample) []any {
 }
 
 // NormalizeInterval validates a requested sampling interval. A non-positive
-// interval disables sampling (ok=false); anything below MinInterval is clamped
+// interval disables sampling (ok=false). Anything below MinInterval is clamped
 // up to MinInterval.
 func NormalizeInterval(d time.Duration) (interval time.Duration, ok bool) {
 	if d <= 0 {

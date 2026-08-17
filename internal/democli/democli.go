@@ -1,7 +1,7 @@
 // Package democli implements the hidden "__demo-kubectl" subcommand that
 // --demo mode re-enters instead of a real kubectl binary (see
 // k8s.KubectlPath). Every existing kubectl call site in the app keeps
-// running unmodified; only the resolved binary path changes, so this
+// running unmodified. Only the resolved binary path changes, so this
 // package must accept the same argument shapes the app already passes.
 package democli
 
@@ -13,9 +13,9 @@ import (
 
 // Run dispatches args (the kubectl-style argv, verb first) to the matching
 // verb handler. Verbs the app never needs to serve in demo mode (exec,
-// port-forward, drain, debug, apply, and anything else unimplemented) print
-// a single clear refusal line and return a non-nil error so the caller exits
-// non-zero — never falling through to a real binary.
+// port-forward, drain, debug, apply, and anything else unimplemented)
+// print a single clear refusal line. They return a non-nil error so the
+// caller exits non-zero — never falling through to a real binary.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "__demo-kubectl: no kubectl verb given") //nolint:errcheck

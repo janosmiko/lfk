@@ -1,4 +1,4 @@
-# Views and Overlays
+# Views and overlays
 
 Reference list of every view, fullscreen flag, and overlay lfk renders.
 
@@ -12,12 +12,12 @@ lfk's UI is built from three layered concepts:
   per tab on `TabState.mode` and mirrored to `Model.mode`.
 - **Fullscreen flag** — boolean on `Model` (and sometimes `TabState`)
   that lets a sub-pane take the whole screen *without* leaving
-  `modeExplorer`. Multiple flags can coexist; precedence is decided in
+  `modeExplorer`. Multiple flags can coexist. Precedence is decided in
   `viewExplorerColumns` (see [`internal/app/view.go`](../internal/app/view.go)).
 - **Overlay** — modal panel that floats over the current view. The
   underlying view is dimmed but stays mounted. Overlays own the keyboard
   while open and dismiss back to the view they appeared over. Most are
-  typed via `overlayKind` and mutually exclusive; a few live as
+  typed via `overlayKind` and mutually exclusive. A few live as
   independent boolean fields on `Model` so they can stack on top of an
   `overlayKind` overlay (see [Boolean overlays](#boolean-overlays)).
 
@@ -26,11 +26,11 @@ Source of truth for the enums:
 and `overlayKind`. When those enums change, update this doc and the help
 catalog in
 [`internal/ui/help_sections.go`](../internal/ui/help_sections.go)
-(`internal/ui/help.go` renders that catalog; it holds no per-view rows).
+(`internal/ui/help.go` renders that catalog and holds no per-view rows).
 
 Default trigger keys below come from
-[`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go);
-users can rebind any of them — see [keybindings.md](./keybindings.md)
+[`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go).
+Users can rebind any of them, see [keybindings.md](./keybindings.md)
 for the full reference.
 
 ## Views (`viewMode`)
@@ -41,7 +41,7 @@ Listed in `viewMode` declaration order.
 | ----------------- | ------------------------------------- | ---------------------------------------------------------------------- |
 | `modeExplorer`    | default                               | Three-column resource browser (clusters → resource types → resources). |
 | `modeYAML`        | `Enter` on a resource                 | Full-screen YAML preview with search and copy.                         |
-| `modeHelp`        | `F1`                                  | Searchable, filterable keybinding reference. `?` also opens it in the overlays and exec mode, where no which-key panel claims the key. |
+| `modeHelp`        | `F1`                                  | Searchable, filterable keybinding reference.                           |
 | `modeLogs`        | `L` on a pod / workload               | Log viewer with follow, wrap, search, visual selection.                |
 | `modeDescribe`    | `v` on a resource                     | `kubectl describe`-style detail view.                                  |
 | `modeDiff`        | `d` between two selected resources    | Side-by-side diff (e.g. ArgoCD live vs. desired).                      |
@@ -50,6 +50,9 @@ Listed in `viewMode` declaration order.
 | `modeEventViewer` | event timeline overlay → drill-in     | Full-screen event viewer with grouping.                                |
 | `modeKubetris`    | `:kubetris`                           | Easter-egg game.                                                       |
 | `modeCredits`     | `:credits`                            | Scrolling credits screen.                                              |
+
+> Note: `?` also opens `modeHelp` from the overlays and exec mode, where
+> no which-key panel claims the key.
 
 ## Fullscreen flags inside `modeExplorer`
 
@@ -60,7 +63,7 @@ wins.
 
 | Flag                      | Scope    | Default trigger                       | What it shows                                                                                                                |
 | ------------------------- | -------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `fullscreenMiddle`        | per-tab  | `F`                                   | Hides left and right columns; the middle resource list takes the whole screen.                                                |
+| `fullscreenMiddle`        | per-tab  | `F`                                   | Hides left and right columns. The middle resource list takes the whole screen.                                                |
 | `fullscreenDashboard`     | per-tab  | `Enter` on `[Dashboard]`, `@`         | Cluster or monitoring dashboard (see Note below).                                                                            |
 | `errorLogFullscreen`      | global   | inside the error-log overlay (`F`)    | Promotes the error-log overlay to a full-screen log buffer.                                                                   |
 | `eventTimelineFullscreen` | global   | inside the event-timeline overlay     | Promotes the event timeline overlay to a full-screen viewer (also reachable via the `modeEventViewer` drill).                 |
@@ -100,7 +103,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | ------------------ | -------------------- | ------------------------------------ |
 | `overlayBookmarks` | `'`, `:bookmarks`    | Saved navigation slots, with filter. |
 
-### Editors / Forms
+### Editors / forms
 
 | Overlay                  | Default trigger                | Purpose                                            |
 | ------------------------ | ------------------------------ | -------------------------------------------------- |
@@ -126,7 +129,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayConfirm`     | delete / drain                   | y/n confirmation for reversible actions. Delete shows a cascade policy row (`Tab` cycles it). |
 | `overlayConfirmType` | force delete / force finalize    | Requires typing `DELETE` for destructive ops. Force delete shows a cascade policy row (`Tab` cycles it). |
 | `overlayQuitConfirm` | `q`                              | Confirm before exiting lfk.                                   |
-| `overlayShuttingDown`| after confirming quit            | Notice shown while background processes drain; force quits after 10s if it hangs. |
+| `overlayShuttingDown`| after confirming quit            | Notice shown while background processes drain. Force quits after 10s if it hangs. |
 | `overlayPasteConfirm`| paste into search / filter       | Confirm multi-line paste.                                     |
 
 ### Information panels
@@ -162,7 +165,13 @@ and follow their own dismissal rules.
 | ------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `overlayErrorLog`  | `!`             | Application error log overlay (lfk's own error buffer). Has its own `errorLogFullscreen` toggle for full-screen mode. |
 | `commandBarActive` | `:`             | Bottom-of-screen `:command [args]` input with autocomplete, history, and ghost-text preview.                          |
-| `fieldDoc.on`      | `Ctrl+K`        | Schema side pane in the YAML viewer and Object Explorer. Shows the cluster's description of the field under the cursor and follows it as the cursor moves. Drawn like the log viewer's structured preview (`RenderLogPreviewPane`) and joined horizontally, so it takes columns rather than rows. `splitFieldDocWidth` sizes it and reports zero on a terminal too narrow for both. |
+| `fieldDoc.on`      | `Ctrl+K`        | Schema side pane in the YAML viewer and Object Explorer.                                                              |
+
+> Note: the field-doc pane shows the cluster's description of the field
+> under the cursor and follows it as the cursor moves. It is drawn like
+> the log viewer's structured preview (`RenderLogPreviewPane`) and joined
+> horizontally, so it takes columns rather than rows. `splitFieldDocWidth`
+> sizes it and reports zero on a terminal too narrow for both.
 
 ## Adding a new view, fullscreen flag, or overlay
 

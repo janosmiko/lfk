@@ -103,7 +103,7 @@ func (c *Client) buildMetadata(contextName string, cfg *rest.Config) (metadata.I
 // for the same (key, kind) are coalesced by clientGroup so a cold-cache burst
 // runs one construction, not N.
 //
-// get/set read and write the kind-specific ctxClients field; build performs the
+// get/set read and write the kind-specific ctxClients field. Build performs the
 // actual construction. kind disambiguates the singleflight key so a clientset
 // and a dynamic build for the same cache key never collapse into each other.
 func buildCachedClient[T comparable](
@@ -128,7 +128,7 @@ func buildCachedClient[T comparable](
 	gen := c.clientCacheGen
 	c.clientMu.Unlock()
 
-	// The singleflight key includes BOTH kind and gen; clientCache itself stays
+	// The singleflight key includes BOTH kind and gen. clientCache itself stays
 	// keyed by key alone (one ctxClients per context, get/set select the field):
 	//   - kind: a clientset and a dynamic build for the same context must be
 	//     independent flights, or one caller gets the wrong type.
@@ -208,7 +208,7 @@ func (c *Client) cachedDynamic(contextName string, throttled bool, restConfig fu
 }
 
 // cachedMetadata returns the memoized metadata-only client for contextName
-// (foreground rate only; no throttled metadata variant is used).
+// (foreground rate only, no throttled metadata variant is used).
 func (c *Client) cachedMetadata(contextName string, restConfig func() (*rest.Config, error)) (metadata.Interface, error) {
 	return buildCachedClient(c, clientCacheKey(contextName, false), "metadata",
 		func(e *ctxClients) metadata.Interface { return e.metadata },

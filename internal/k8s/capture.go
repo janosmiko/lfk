@@ -39,7 +39,7 @@ type CaptureRequest struct {
 	Context   string
 	Namespace string
 	PodName   string
-	Container string // optional; passed as --target to kubectl debug
+	Container string // optional. Passed as --target to kubectl debug
 	Interface string // default "any"
 	SnapLen   int    // default 65535
 	BPFFilter string // optional
@@ -72,7 +72,7 @@ type CaptureManager struct {
 	onUpdate func()
 
 	// backendFactory builds backend implementations. Defaults to
-	// defaultBackendFactory; tests inject fakes via SetBackendFactory.
+	// defaultBackendFactory. Tests inject fakes via SetBackendFactory.
 	backendFactory func(CaptureBackend) (captureBackend, error)
 }
 
@@ -165,7 +165,7 @@ func defaultBackendFactory(b CaptureBackend) (captureBackend, error) {
 	}
 }
 
-// Start spawns a streaming capture; not used for kubeshark hand-off.
+// Start spawns a streaming capture. Not used for kubeshark hand-off.
 func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket func(PacketSummary)) (int, error) {
 	if req.Backend == BackendKubeshark {
 		return 0, fmt.Errorf("kubeshark hand-off does not use CaptureManager")
@@ -306,7 +306,7 @@ func classifyCaptureExit(backend CaptureBackend, runErr, waitErr error, stderrTx
 		return CaptureStopped, ""
 	}
 
-	// Translate stderr first; if a backend-specific message matches, prefer
+	// Translate stderr first. If a backend-specific message matches, prefer
 	// it over the raw exit-code text.
 	friendly := ""
 	if backend == BackendKubectlDebug && stderrTxt != "" {
@@ -371,7 +371,7 @@ func (m *CaptureManager) Stop(id int) error {
 	return fmt.Errorf("capture id %d not found", id)
 }
 
-// StopAll cancels every entry; used on lfk shutdown.
+// StopAll cancels every entry. Used on lfk shutdown.
 func (m *CaptureManager) StopAll() {
 	m.mu.Lock()
 	for _, e := range m.entries {

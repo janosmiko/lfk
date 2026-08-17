@@ -157,7 +157,7 @@ type Keybindings struct {
 
 	// TogglePreviewLogs toggles the right-pane live-log preview for the
 	// selected pod. Bound to "L" (shift+l) at deeper levels (resources,
-	// containers); at Level=Clusters the same key opens ClusterColorPicker
+	// containers). At Level=Clusters the same key opens ClusterColorPicker
 	// and the dispatcher gates accordingly. The fullscreen log viewer
 	// (kb.Logs) uses "ctrl+l" so the plain "L" is free for this toggle.
 	TogglePreviewLogs string `json:"toggle_preview_logs" yaml:"toggle_preview_logs"`
@@ -234,7 +234,7 @@ func DefaultKeybindings() Keybindings {
 		// footnote has to work in the Object Explorer, which scrolls its
 		// preview pane with J/K.
 		FieldDoc: "ctrl+k",
-		// "T" is also the explorer-level ThemeSelector; TreeView only dispatches
+		// "T" is also the explorer-level ThemeSelector. TreeView only dispatches
 		// inside the Object/API Explorer modes, which have their own handlers.
 		TreeView:      "T",
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",
@@ -281,7 +281,7 @@ func DefaultKeybindings() Keybindings {
 
 		// Mouse capture toggle. Ctrl+Option+Y (Ctrl+Alt+Y) avoids the Ctrl+X
 		// collision with the bookmark-overlay delete and is hard to hit by
-		// accident; rebindable like any other key. Bubble Tea prints modifiers
+		// accident. Rebindable like any other key. Bubble Tea prints modifiers
 		// in a fixed order (ctrl, alt, shift, ...), so the stored string is
 		// "ctrl+alt+y".
 		MouseToggle: "ctrl+alt+y",
@@ -309,7 +309,7 @@ func DefaultKeybindings() Keybindings {
 		LocalClusterManager: "ctrl+n",
 
 		// Live-log preview pane toggle. "L" (shift+l) at resource/container
-		// levels; at Level=Clusters the same key opens ClusterColorPicker
+		// levels. At Level=Clusters the same key opens ClusterColorPicker
 		// (gated in handleExplorerNavKey). The fullscreen log viewer
 		// (kb.Logs) is "ctrl+l".
 		TogglePreviewLogs: "L",
@@ -356,7 +356,7 @@ var modifierOrder = []string{"ctrl", "alt", "shift", "meta", "hyper", "super"}
 //     ("alt+ctrl+y") and are now always printed in modifierOrder ("ctrl+alt+y")
 //   - a shift chord reports the SHIFTED character, so "ctrl+shift+x" has to
 //     become "ctrl+shift+X" — the lowercase form never matches
-//   - shift on its own is not reported as a modifier at all; the terminal just
+//   - shift on its own is not reported as a modifier at all. The terminal just
 //     sends the shifted character, so "shift+x" becomes plain "X"
 //
 // A binding naming an unrecognised modifier is returned untouched rather than

@@ -18,7 +18,7 @@ import (
 // WorkloadConfigurationScanGVR is the primary CRD the kubescape-operator
 // emits — one object per scanned workload, listing the result of every
 // control it ran. Other Kubescape CRDs (vulnerability manifests, summary
-// objects) are out of scope for this MVP; they can be wired in later
+// objects) are out of scope for this MVP. They can be wired in later
 // without changing the public Source API.
 var WorkloadConfigurationScanGVR = schema.GroupVersionResource{
 	Group:    "spdx.softwarecomposition.kubescape.io",
@@ -50,7 +50,7 @@ func (s *Source) Categories() []security.Category {
 // IsAvailable checks that the WorkloadConfigurationScan CRD is served.
 // NotFound is returned as (false, nil) so the manager's probe treats
 // it as a definitive "kubescape-operator not installed" signal.
-// Transient errors propagate so a 3s timeout / RBAC blip / API server
+// Transient errors propagate. A 3s timeout / RBAC blip / API server
 // hiccup leaves the previous availability untouched rather than
 // briefly hiding Kubescape on shift+r.
 func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) {
@@ -67,12 +67,11 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 	return true, nil
 }
 
-// Fetch lists WorkloadConfigurationScan CRDs and converts every failing
-// control into a security.Finding. Lists are paginated (default 200
-// items per page) so the per-page response stays bounded — Kubescape
-// scans embed the full control list per workload and can produce large
-// payloads on busy clusters. Per-object parse errors are swallowed so a
-// malformed report doesn't black out the whole feed.
+// Fetch lists WorkloadConfigurationScan CRDs and converts every failing control into a
+// security.Finding. Lists are paginated (default 200 items per page) so the per-page response
+// stays bounded. Kubescape scans embed the full control list per workload and can produce large
+// payloads on busy clusters. Per-object parse errors are swallowed so a malformed report doesn't
+// black out the whole feed.
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil

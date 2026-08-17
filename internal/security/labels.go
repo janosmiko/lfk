@@ -29,7 +29,7 @@ func (m *Manager) resolveWorkloadLabels(ctx context.Context, kubeCtx string, fin
 			continue
 		}
 		ref := findings[i].Resource
-		// Skip refs the resolver is guaranteed to reject — the mapped kinds are
+		// Skip refs the resolver is guaranteed to reject. The mapped kinds are
 		// all namespaced, so a namespace-less ref (e.g. a cluster-scoped RBAC
 		// finding) resolves to nil. Skipping here keeps such refs from burning
 		// the lookup budget and starving resolvable workloads later in the scan.
@@ -59,15 +59,15 @@ func (m *Manager) resolveWorkloadLabels(ctx context.Context, kubeCtx string, fin
 }
 
 // propagateResourceLabels fills in ResourceRef.Labels for findings whose source
-// did not expose them, copying from same-resource findings that did. Resources
-// are matched by ResourceRef.Key() (namespace/kind/name), so a label-match
-// ignore pattern reaches findings from sources that carry no labels (trivy,
-// kyverno) as long as another source (heuristic) observed the same resource.
+// did not expose them, copying from same-resource findings that did. Matched by
+// ResourceRef.Key() (namespace/kind/name), so a label-match ignore pattern
+// reaches labelless sources (trivy, kyverno) once another source (heuristic)
+// observed the same resource.
 //
-// Runs in O(n) with one index map; the shared label maps are read-only so
+// Runs in O(n) with one index map. The shared label maps are read-only so
 // aliasing them across findings is safe.
 func propagateResourceLabels(findings []Finding) {
-	// First non-empty label map per resource wins; later ones are not merged.
+	// First non-empty label map per resource wins. Later ones are not merged.
 	// Today only the heuristic source stamps labels, so a key has at most one
 	// authority. A future multi-stamping source would need merge logic here.
 	labelsByKey := make(map[string]map[string]string)

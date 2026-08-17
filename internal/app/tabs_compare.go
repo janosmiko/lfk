@@ -28,7 +28,7 @@ func (m *Model) sortMiddleItems() {
 	colName := m.sortColumnName
 	if colName == "" {
 		// Production always seeds sortColumnName with sortColDefault in
-		// NewModel; an empty value here means a test fixture that built
+		// NewModel. An empty value here means a test fixture that built
 		// a bare Model{} literal. Skip sorting in that case — otherwise
 		// the tiebreaker below would impose a deterministic order on
 		// items the caller may want to keep in their original sequence.
@@ -195,7 +195,7 @@ func metricValueMissing(colName string, item model.Item) bool {
 // preservation.
 //
 // Columns whose comparator needs the whole Item (top-level fields,
-// timestamps, status priority) are handled inline; extra columns go
+// timestamps, status priority) are handled inline. Extra columns go
 // through columnValueCmp, with auto-detection as the final fallback.
 func comparePrimaryColumn(a, b model.Item, colName string) int {
 	switch colName {
@@ -487,7 +487,7 @@ var ageDurationUnits = map[byte]time.Duration{
 // parseAgeDuration parses the single-unit duration strings emitted by
 // k8s.formatAge (e.g. "45s", "5d", "2y") — never a combined form like
 // "5d3h". time.ParseDuration only understands ns/us/ms/s/m/h, so it can't
-// parse formatAge's "d"/"y" suffixes; this is a dedicated parser instead
+// parse formatAge's "d"/"y" suffixes. This is a dedicated parser instead
 // of reusing compareDurationCmp.
 func parseAgeDuration(s string) (time.Duration, bool) {
 	s = strings.TrimSpace(s)
@@ -547,7 +547,7 @@ func compareREVCmp(a, b string) int {
 
 // compareIPCmp compares IP-address column values numerically, so
 // "10.0.0.9" sorts before "10.0.0.10". Values may be comma-joined lists
-// (e.g. External IPs); only the first address drives the comparison.
+// (e.g. External IPs). Only the first address drives the comparison.
 // Falls back to case-insensitive lexicographic comparison when either
 // value lacks a parseable leading address (e.g. "None", "<none>").
 func compareIPCmp(a, b string) int {

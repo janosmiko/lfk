@@ -178,7 +178,7 @@ func (m Model) loadPreviewResources() tea.Cmd {
 		cmds = append(cmds, eventsCmd)
 	}
 	// loadPreviewSecretData is itself gated on kind and the lazy-loading
-	// config flag; call it unconditionally and let it no-op when not
+	// config flag. Call it unconditionally and let it no-op when not
 	// applicable. Keeping the gate centralised there makes the contract
 	// testable without reaching into tea.Batch internals here.
 	if secretCmd := m.loadPreviewSecretData(); secretCmd != nil {
@@ -386,7 +386,7 @@ func (m Model) loadAlerts() tea.Cmd {
 }
 
 // loadNetworkPolicy fetches and parses a network policy for visualization.
-// Cilium policies may carry multiple specs; a multi-spec policy opens the
+// Cilium policies may carry multiple specs. A multi-spec policy opens the
 // stacked multi-policy view instead of the single view.
 func (m Model) loadNetworkPolicy() tea.Cmd {
 	client := m.client
@@ -480,7 +480,7 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 		logExecCmd("Running helm command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			// Helm chart values commonly embed secrets/passwords; redact
+			// Helm chart values commonly embed secrets/passwords. Redact
 			// the captured output before persisting it to lfk.log.
 			logger.Error("helm get values failed", "cmd", cmd.String(), "error", cmdErr, "output", logger.Redact(string(output)))
 			return helmValuesLoadedMsg{
@@ -547,8 +547,8 @@ func serviceEndpointsCacheKey(ctx, ns, name string) string {
 // network call returns) AND fire a fresh background fetch (so pod
 // churn — restart, rolling update, HPA scale — is always reflected
 // within one watch tick). Pure cache-only would show stale ready
-// state after pod restart; pure fetch-only would flash a blank row
-// every watch tick. Both run in parallel; the fresh response normally
+// state after pod restart. Pure fetch-only would flash a blank row
+// every watch tick. Both run in parallel. The fresh response normally
 // arrives last and overwrites the cache emit.
 //
 // Returns nil when:
@@ -620,7 +620,7 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 // isServiceWithoutEndpoints reports whether the selected Service has
 // no backing EndpointSlices to roll up — Headless services
 // (clusterIP=None) and ExternalName services. Both surface their type
-// in the populated "Type" column already; reading it back avoids a
+// in the populated "Type" column already. Reading it back avoids a
 // round-trip to fetch the spec just for the gating check.
 func isServiceWithoutEndpoints(sel *model.Item) bool {
 	for _, kv := range sel.Columns {

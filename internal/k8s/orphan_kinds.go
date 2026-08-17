@@ -20,7 +20,7 @@ import (
 // rbacIndex tracks which (Cluster)Roles are bound and which Roles
 // exist (so binding.roleRef validation can flag dangling references).
 // A RoleBinding's roleRef can target either a Role (in the binding's
-// own namespace) or a ClusterRole (cluster-wide); a ClusterRoleBinding
+// own namespace) or a ClusterRole (cluster-wide). A ClusterRoleBinding
 // only ever targets a ClusterRole.
 type rbacIndex struct {
 	// boundRoles tracks Role refs by (binding.namespace, role.Name).
@@ -185,7 +185,7 @@ func buildWorkloadIndex(in workloadInputs) workloadIndex {
 		idx.keys[workloadKey{"DaemonSet", ds.Namespace, ds.Name}] = struct{}{}
 	}
 	// ReplicaSets and Pods can theoretically also be scaleTargetRefs but
-	// it's rare; HPA targeting bare Pods isn't even valid. Skip those —
+	// it's rare. HPA targeting bare Pods isn't even valid. Skip those —
 	// users with custom-resource HPA targets will see false positives,
 	// which is acceptable until someone actually hits one.
 	return idx
@@ -365,7 +365,7 @@ func pvcOrphan(p corev1.PersistentVolumeClaim, lenient, strict refSet) (OrphanIt
 // different kind). Owner-managed HPAs (rare — usually a HelmRelease or
 // custom controller) are excluded since the owner manages the
 // reference. Custom-resource HPA targets aren't validated here — we'd
-// need to walk every CRD; until someone hits a real false positive
+// need to walk every CRD. Until someone hits a real false positive
 // from that, skip the lookup if the target kind isn't one of the
 // well-known workload kinds we list.
 func hpaOrphan(h autoscalingv2.HorizontalPodAutoscaler, idx workloadIndex) (OrphanItem, bool) {
@@ -397,7 +397,7 @@ func hpaOrphan(h autoscalingv2.HorizontalPodAutoscaler, idx workloadIndex) (Orph
 // the workload-template walker already fixed for Secrets/ConfigMaps.
 //
 // Empty selector matches all pods in the namespace per API contract,
-// so it's never an orphan. nil selector is invalid; treat as orphan
+// so it's never an orphan. nil selector is invalid. Treat as orphan
 // with a distinct reason so the user knows what's wrong.
 func pdbOrphan(b policyv1.PodDisruptionBudget, _ []corev1.Pod, allLabels templatePodLabels) (OrphanItem, bool) {
 	if len(b.OwnerReferences) > 0 {

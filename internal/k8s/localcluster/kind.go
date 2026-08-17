@@ -20,7 +20,7 @@ const (
 //   - err == nil with non-zero exit code: emits a plain error (no %!w)
 //   - empty stderr: omits the double-colon ": :"
 //
-// Both are theoretically reachable through FakeRunner; the production
+// Both are theoretically reachable through FakeRunner. The production
 // realRunner always pairs a non-zero exit with a non-nil ExitError.
 func kindCLIError(op string, code int, stderr string, err error) error {
 	base := fmt.Sprintf("kind: %s failed (exit %d)", op, code)
@@ -130,20 +130,20 @@ func (p *kindProvider) Delete(ctx context.Context, name string) error {
 
 // kindProvider intentionally does NOT implement LifecycleProvider.
 // kind has no native verb for stopping or restarting an existing
-// cluster — handlers must type-assert prov.(LifecycleProvider) and
+// cluster. Handlers must type-assert prov.(LifecycleProvider) and
 // silently fall through when the provider doesn't satisfy it.
 
 // kindContainerStatus asks Docker for the control-plane container's
 // state. Multi-node kind clusters have additional worker containers
-// whose state is NOT polled here; if a partial-stop leaves only
+// whose state is NOT polled here. If a partial-stop leaves only
 // workers down, this function still reports ClusterStatusRunning.
 // That's a deliberate simplification: the manager UI's "is this cluster
 // roughly up" probe doesn't justify N docker-inspect calls per cluster.
 //
 // `name` here is a string from kind's own stdout (`kind get clusters`),
 // not from wizard-validated user input. It reaches `docker inspect` as
-// a discrete argv element via exec.CommandContext (NOT via `sh -c`),
-// so shell metacharacters cannot escape — argv injection is contained
+// a discrete argv element via exec.CommandContext (NOT via `sh -c`).
+// So shell metacharacters cannot escape: argv injection is contained
 // at the os/exec layer regardless of what kind reports. If a future
 // refactor switches to a shell-interpreted path, this is the call site
 // that needs explicit validation.

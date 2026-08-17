@@ -153,7 +153,7 @@ func ObjectValuePreview(v any) string {
 	}
 }
 
-// scalarString stringifies a scalar value; non-scalars and nil yield "".
+// scalarString stringifies a scalar value. Non-scalars and nil yield "".
 func scalarString(v any) string {
 	switch t := v.(type) {
 	case nil:
@@ -184,7 +184,7 @@ func scalarString(v any) string {
 }
 
 // ResolveObjectPath walks root along segs and returns the value at the end.
-// Plain segments index into a map; "[i]" segments index into an array. Returns
+// Plain segments index into a map. "[i]" segments index into an array. Returns
 // ok=false if any segment is missing or out of range.
 func ResolveObjectPath(root any, segs []string) (any, bool) {
 	cur := root

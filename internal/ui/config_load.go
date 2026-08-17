@@ -25,7 +25,7 @@ type configFile struct {
 	// Custom theme overrides in the "theme" section are applied on top.
 	// Appearance groups the visual knobs (colorscheme, icons, no_color,
 	// transparent_background, min_contrast_ratio, dim_overlay). This is the
-	// canonical home; the flat keys of the same name are deprecated aliases
+	// canonical home. The flat keys of the same name are deprecated aliases
 	// kept for backward compatibility. When both are set, the appearance group
 	// wins (it is merged down onto the flat fields at load time).
 	Appearance    *AppearanceConfig `json:"appearance" yaml:"appearance"`
@@ -60,7 +60,7 @@ type configFile struct {
 	// supported multiplexer).
 	Terminal string `json:"terminal" yaml:"terminal"`
 	// ScrollbackLines is the per-tab capacity of the embedded PTY
-	// scrollback ring buffer. Default 5000; clamped to
+	// scrollback ring buffer. Default 5000. Clamped to
 	// [ScrollbackLinesMin, ScrollbackLinesMax]. Only meaningful in pty
 	// mode — exec and mux delegate scrollback to the host terminal.
 	ScrollbackLines int `json:"scrollback_lines" yaml:"scrollback_lines"`
@@ -83,14 +83,14 @@ type configFile struct {
 	Tips *bool `json:"tips" yaml:"tips"`
 	// LogViewer groups all log-viewer settings (tail sizes, ANSI rendering,
 	// and the startup-toggle defaults for preview / prefixes / timestamps).
-	// This is the canonical home for these knobs; the flat log_tail_lines,
+	// This is the canonical home for these knobs. The flat log_tail_lines,
 	// log_tail_lines_short, and log_render_ansi keys below are deprecated
 	// aliases kept for backward compatibility. When both are set, the
 	// log_viewer group wins. Note: log_path is the application's own log
 	// file and is intentionally NOT part of this group.
 	LogViewer *LogViewerConfig `json:"log_viewer" yaml:"log_viewer"`
 	// LogTailLines is the deprecated flat alias for log_viewer.tail_lines.
-	// Controls how many log lines are initially loaded via --tail; scrolling
+	// Controls how many log lines are initially loaded via --tail. Scrolling
 	// to the top fetches older history in the background. Defaults to 1000.
 	LogTailLines *int `json:"log_tail_lines" yaml:"log_tail_lines"`
 	// LogTailLinesShort is the deprecated flat alias for
@@ -99,7 +99,7 @@ type configFile struct {
 	LogTailLinesShort *int `json:"log_tail_lines_short" yaml:"log_tail_lines_short"`
 	// LogRenderAnsi is the deprecated flat alias for log_viewer.render_ansi.
 	// Controls whether ANSI SGR sequences (colour, bold, underline) emitted by
-	// log producers are rendered. Defaults to true; false strips all ANSI.
+	// log producers are rendered. Defaults to true. False strips all ANSI.
 	LogRenderAnsi *bool `json:"log_render_ansi" yaml:"log_render_ansi"`
 	// LogTopDefaultProfile is the default Log Top parser profile. Valid values:
 	// auto | traefik-json | nginx-combined | ingress-nginx | envoy | json | logfmt.
@@ -165,7 +165,7 @@ type configFile struct {
 	// invalid. Set equal to watch_interval to disable background throttling.
 	BackgroundWatchInterval string `json:"background_watch_interval" yaml:"background_watch_interval"`
 	// ForegroundIdleTimeout is the no-input window before a focused window
-	// throttles to background_watch_interval. Go duration; 0 disables. Default 120s.
+	// throttles to background_watch_interval. Go duration. 0 disables. Default 120s.
 	ForegroundIdleTimeout string `json:"foreground_idle_timeout" yaml:"foreground_idle_timeout"`
 	// WatchThrottle enables focus/idle watch throttling. Set false to fully
 	// disable it: the watch tick then always uses watch_interval. Default true.
@@ -206,12 +206,12 @@ type configFile struct {
 	MinContrastRatio *float64 `json:"min_contrast_ratio" yaml:"min_contrast_ratio"`
 	// ReadOnly disables all mutating actions (delete, edit, scale, restart,
 	// exec, port-forward, drain, cordon, etc.) for every context. Per-context
-	// overrides under clusters.<name>.read_only take precedence; the
+	// overrides under clusters.<name>.read_only take precedence. The
 	// --read-only CLI flag wins over both.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
 	// FieldManager overrides the name lfk sends as the field manager on every
 	// write. The apiserver records it in metadata.managedFields, which the
-	// YAML blame view reads. Empty falls back to "lfk:<os-user>"; set a plain
+	// YAML blame view reads. Empty falls back to "lfk:<os-user>". Set a plain
 	// "lfk" to keep the username off the cluster.
 	FieldManager string `json:"field_manager" yaml:"field_manager"`
 	// ShowRareTypes, when true, surfaces the rarely-used resource types (CSI
@@ -219,7 +219,7 @@ type configFile struct {
 	// synthetic "Advanced" category of uncategorized core resources) in the
 	// sidebar from startup — as if the ToggleRare key (H) were already pressed
 	// — so the full resource-type list is always visible. The runtime H toggle
-	// still flips it for the session; it resets to this value on the next
+	// still flips it for the session. It resets to this value on the next
 	// launch. Default false.
 	ShowRareTypes *bool `json:"show_rare_types" yaml:"show_rare_types"`
 	// Security configures the built-in security-findings dashboard. When
@@ -231,7 +231,7 @@ type configFile struct {
 	// the right-sizing advisor uses on its first overlay open of the
 	// session. Once the user changes strategy or headroom in the overlay,
 	// those choices stick across subsequent overlay opens (within the
-	// session); restarting lfk falls back to these config values.
+	// session). Restarting lfk falls back to these config values.
 	//
 	//   strategy: "vpa" | "prom_max_1d" | "prom_avg_1d" | "prom_p95_7d" | "snapshot"
 	//   headroom: one of 1.0, 1.1, 1.25, 1.5, 1.75, 2.0
@@ -246,12 +246,12 @@ type configFile struct {
 	// future fields can land here without further config schema changes.
 	Kubeshark *KubesharkConfig `json:"kubeshark" yaml:"kubeshark"`
 	// Scheduler holds the runtime knobs for the priority task scheduler.
-	// All fields are optional; missing keys fall back to the scheduler
+	// All fields are optional. Missing keys fall back to the scheduler
 	// package's compiled defaults.
 	Scheduler *SchedulerConfig `json:"scheduler" yaml:"scheduler"`
 	// KubeconfigDir overrides the default kubeconfig directory path (~/.kube/config.d).
 	// Accepts either a single string ("/path/to/dir") or a list of strings
-	// (["/dir/one", "/dir/two"]); when a list is given, every directory is
+	// (["/dir/one", "/dir/two"]). When a list is given, every directory is
 	// merged into the discovery set. The --kubeconfig-dir CLI flag takes
 	// precedence (repeatable), then the KUBECONFIG_DIR env var (colon-separated),
 	// then this config value.
@@ -259,7 +259,7 @@ type configFile struct {
 
 	// KubeconfigExclusive controls whether a set KUBECONFIG env var
 	// suppresses the default discovery (~/.kube/config and the
-	// ~/.kube/config.d scan), matching kubectl. Defaults to true; set
+	// ~/.kube/config.d scan), matching kubectl. Defaults to true. Set
 	// false to restore the historical merge-everything behavior. The
 	// --kubeconfig-exclusive CLI flag, then LFK_KUBECONFIG_EXCLUSIVE,
 	// take precedence over this value.
@@ -268,12 +268,12 @@ type configFile struct {
 	// flag. Each set bundles a list of contexts and an optional default
 	// namespace so users don't have to retype long --union-context lists
 	// for the same recurring cluster groups (e.g. blue/green/canary).
-	// CLI --namespace overrides the per-set namespace; --union-context and
+	// CLI --namespace overrides the per-set namespace. --union-context and
 	// --context are mutually exclusive with --union-set.
 	UnionSets UnionSetsConfig `json:"union_sets" yaml:"union_sets"`
 	// GotoTargets maps full g-prefix chords (e.g. "gA") to user-defined
 	// goto targets. Chords must start with the jump_top key and be exactly
-	// 2 runes. Kind is required; Group and Name are optional.
+	// 2 runes. Kind is required. Group and Name are optional.
 	// User entries override built-ins on chord collision.
 	GotoTargets map[string]GotoTargetEntry `json:"goto_targets" yaml:"goto_targets"`
 	// WhichKeyEnabled controls whether the which-key popup appears while a
@@ -287,7 +287,7 @@ type configFile struct {
 	WhichKeyLeaderDelayMs *int `json:"which_key_leader_delay_ms" yaml:"which_key_leader_delay_ms"`
 	// WhichKeyGrouped is the startup order of the leader panel: grouped by
 	// category (true) or purely by key (false). The leader key toggles it for
-	// the session; the toggle is not persisted back to the file.
+	// the session. The toggle is not persisted back to the file.
 	WhichKeyGrouped *bool `json:"which_key_grouped" yaml:"which_key_grouped"`
 }
 
@@ -340,7 +340,7 @@ func (sets *UnionSetsConfig) UnmarshalJSON(data []byte) error {
 }
 
 // SchedulerConfig holds the runtime knobs for the priority task
-// scheduler. All fields are optional; missing keys fall back to the
+// scheduler. All fields are optional. Missing keys fall back to the
 // scheduler package's compiled defaults.
 type SchedulerConfig struct {
 	WorkersPerContext int               `json:"workers_per_context" yaml:"workers_per_context"`
@@ -496,7 +496,7 @@ type KubesharkConfig struct {
 // UnionSetConfig is the on-disk schema for one entry under union_sets.
 type UnionSetConfig struct {
 	// Name is the identifier used by --union-set to reference this entry.
-	// Must be unique across UnionSets; duplicates are dropped at apply
+	// Must be unique across UnionSets. Duplicates are dropped at apply
 	// time (last wins) with a startup warning.
 	Name string `json:"name" yaml:"name"`
 	// Contexts is the list of cluster entries to merge in this union view.
@@ -519,7 +519,7 @@ type UnionSetConfig struct {
 // canary is green in this set, the prod-blue marker stays blue) without
 // affecting the cluster picker's global per-context tints.
 //
-// The color name must be one of ui.ClusterColorNames; invalid values are
+// The color name must be one of ui.ClusterColorNames. Invalid values are
 // dropped at sanitize time with a warning, leaving the entry usable but
 // untinted (the row gets a blank reserved cell instead of a colored tile).
 type UnionSetContextConfig struct {
@@ -581,7 +581,7 @@ type securityConfig struct {
 	// (omitted = enabled).
 	Enabled *bool `json:"enabled" yaml:"enabled"`
 	// HideBadges sets the default for suppressing the per-resource SEC severity
-	// badge. The dashboard still scans; only the inline row badge is hidden.
+	// badge. The dashboard still scans. Only the inline row badge is hidden.
 	// Toggleable at runtime. Settable globally and per-cluster (a per-cluster
 	// value overrides the global default for that context).
 	HideBadges *bool `json:"hide_badges" yaml:"hide_badges"`
@@ -609,18 +609,18 @@ type heuristicConfig struct {
 	// SecretEnvInclude / SecretEnvExclude tune the secret_env check with
 	// case-insensitive env-var name globs (`*`, `?`). Include adds names to
 	// flag on top of the built-in credential keywords (an explicit match
-	// overrides a built-in exemption); Exclude adds names to never flag and
+	// overrides a built-in exemption). Exclude adds names to never flag and
 	// wins over Include.
 	SecretEnvInclude []string `json:"secret_env_include" yaml:"secret_env_include"`
 	SecretEnvExclude []string `json:"secret_env_exclude" yaml:"secret_env_exclude"`
 	// ScanSecrets gates the heuristic checks that list Secret objects
-	// (legacy_sa_token_secret, tls_secret_expiry). Defaults to true; set
+	// (legacy_sa_token_secret, tls_secret_expiry). Defaults to true. Set
 	// false to keep the source from ever listing Secrets.
 	ScanSecrets *bool `json:"scan_secrets" yaml:"scan_secrets"`
 }
 
 // SecurityIgnorePattern is a declarative ignore rule from the config file.
-// Each field is a glob (`*` and `?`); an empty field matches anything. A
+// Each field is a glob (`*` and `?`). An empty field matches anything. A
 // finding is ignored when every non-empty field matches it. A pattern with
 // every field empty is treated as a no-op (skipped) to avoid silently hiding
 // all findings.
@@ -634,7 +634,7 @@ type SecurityIgnorePattern struct {
 	// Empty = any group.
 	Group string `json:"group,omitempty" yaml:"group,omitempty"`
 	// Namespace globs the resource namespace. Empty (or `*`) = any namespace,
-	// which hides the whole group; a specific value scopes the ignore to that
+	// which hides the whole group. A specific value scopes the ignore to that
 	// namespace only. Cluster-scoped findings have an empty namespace.
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	// Labels match the target resource's Kubernetes labels: each entry is a
@@ -664,7 +664,7 @@ func (p SecurityIgnorePattern) IsEmpty() bool {
 //
 // Strategy values mirror model.AllRightsizingStrategies (string form).
 // Headroom values must match one of model.RightsizingHeadrooms within
-// 1e-9 epsilon; off-preset values are dropped at apply time so the
+// 1e-9 epsilon. Off-preset values are dropped at apply time so the
 // picker never displays an out-of-list multiplier on first open.
 type RightsizingDefaultsConfig struct {
 	Strategy string  `json:"strategy" yaml:"strategy"`

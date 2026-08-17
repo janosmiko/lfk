@@ -8,14 +8,55 @@ sources, each auto-detected by the operator or CRDs it needs.
 
 | Source | Config key | Requires in cluster | Findings |
 |---|---|---|---|
-| Heuristic | `heuristic` | nothing (built-in) | Pod- and Service-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, entire Secrets in env (envFrom), default ServiceAccount (+ token automount), missing resource limits, unpinned image tags, leftover ephemeral debug containers, Windows HostProcess containers, Services with externalIPs, namespaces without Pod Security enforcement labels or NetworkPolicies, credential-looking ConfigMap keys, Ingresses without TLS or with catch-all hosts, legacy ServiceAccount token Secrets, expired/expiring TLS certificates, bare pods without a controller (reliability), pods referencing missing ConfigMaps/Secrets (reliability) |
-| Advisor | `advisor` | nothing (built-in) | Reliability recommendations: namespaces without ResourceQuota/LimitRange, multi-replica workloads without a PodDisruptionBudget or topology spread, drain-blocking or orphaned PDBs, single-replica workloads, missing probes or resource requests, identical liveness/readiness probes, liveness without readiness, downtime rollout strategies, OnDelete update strategies, zero termination grace period, emptyDir without sizeLimit, quotas near their limit, HPAs pinned / at their ceiling / lacking target requests, PDB minAvailable above HPA minimums, PDBs without unhealthyPodEvictionPolicy, manifests pinning replicas under an HPA, StatefulSets with missing or non-headless governing Services, Services with zero or one ready endpoint, suspended CronJobs, standalone Jobs without TTL, StatefulSet volumes on non-expandable StorageClasses |
-| RBAC | `rbac` | nothing (built-in) | Privilege-escalation paths in Roles/ClusterRoles and their bindings: wildcard rules, impersonation, bind/escalate verbs, pods/exec + attach + port-forward grants, kubelet API (nodes/proxy), CSR approval, admission-webhook write access, cluster-wide secret reads, and bindings to anonymous users, system:masters, cluster-admin, or the default ServiceAccount. Kubernetes built-ins (bootstrap-labeled or system:-prefixed) are excluded — note this also skips user-created objects deliberately named `system:*`, so the source audits misconfigurations, not active evasion |
+| Heuristic | `heuristic` | nothing (built-in) | Pod/Service hardening issues |
+| Advisor | `advisor` | nothing (built-in) | Reliability recommendations |
+| RBAC | `rbac` | nothing (built-in) | RBAC privilege-escalation paths |
 | Trivy | `trivy` | [Trivy Operator](https://github.com/aquasecurity/trivy-operator) (`VulnerabilityReport`, `ConfigAuditReport` CRDs) | Image vulnerabilities + config-audit misconfigurations |
 | Kyverno | `kyverno` | Policy Reports API (`PolicyReport`, `ClusterPolicyReport` from `wgpolicyk8s.io/v1alpha2`) | Policy violations |
 | Kubescape | `kubescape` | [kubescape-operator](https://github.com/kubescape/kubescape-operator) (`WorkloadConfigurationScan` CRD) | Failed compliance controls |
 | Falco | `falco` | [Falco](https://falco.org) DaemonSet + falcosidekick (pod logs / K8s Events) | Runtime security events |
 | Gatekeeper | `gatekeeper` | [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) (Constraint CRDs under `constraints.gatekeeper.sh`) | Constraint audit violations |
+
+### Heuristic
+
+Pod- and Service-spec hardening checks: privileged, host PID/IPC/network,
+hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot,
+allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined,
+unmasked procMount, unsafe sysctls, hostPort, shared process namespace,
+plaintext secrets in env, entire Secrets in env (envFrom), default
+ServiceAccount (+ token automount), missing resource limits, unpinned image
+tags, leftover ephemeral debug containers, Windows HostProcess containers,
+Services with externalIPs, namespaces without Pod Security enforcement labels
+or NetworkPolicies, credential-looking ConfigMap keys, Ingresses without TLS
+or with catch-all hosts, legacy ServiceAccount token Secrets, expired/expiring
+TLS certificates, bare pods without a controller (reliability), and pods
+referencing missing ConfigMaps/Secrets (reliability).
+
+### Advisor
+
+Reliability recommendations: namespaces without ResourceQuota/LimitRange,
+multi-replica workloads without a PodDisruptionBudget or topology spread,
+drain-blocking or orphaned PDBs, single-replica workloads, missing probes or
+resource requests, identical liveness/readiness probes, liveness without
+readiness, downtime rollout strategies, OnDelete update strategies, zero
+termination grace period, emptyDir without sizeLimit, quotas near their limit,
+HPAs pinned / at their ceiling / lacking target requests, PDB minAvailable
+above HPA minimums, PDBs without unhealthyPodEvictionPolicy, manifests pinning
+replicas under an HPA, StatefulSets with missing or non-headless governing
+Services, Services with zero or one ready endpoint, suspended CronJobs,
+standalone Jobs without TTL, and StatefulSet volumes on non-expandable
+StorageClasses.
+
+### RBAC
+
+Privilege-escalation paths in Roles/ClusterRoles and their bindings: wildcard
+rules, impersonation, bind/escalate verbs, pods/exec + attach + port-forward
+grants, kubelet API (nodes/proxy), CSR approval, admission-webhook write
+access, cluster-wide secret reads, and bindings to anonymous users,
+system:masters, cluster-admin, or the default ServiceAccount. Kubernetes
+built-ins (bootstrap-labeled or system:-prefixed) are excluded. This also
+skips user-created objects deliberately named `system:*`, so the source
+audits misconfigurations, not active evasion.
 
 **Heuristic, Advisor, and RBAC are always available** — they only need API
 access, so the Security category is never empty unless the dashboard is
@@ -32,9 +73,9 @@ their checks instead of failing the source, and the `kube-system`,
 `kube-public`, and `kube-node-lease` namespaces are always excluded.
 
 The heuristic `secret_env` check (plaintext credential-looking env vars) is
-tunable with `security.heuristic.secret_env_include` / `secret_env_exclude` —
+tunable with `security.heuristic.secret_env_include` / `secret_env_exclude`,
 case-insensitive env-var name globs added on top of the built-in keyword and
-exemption lists (exclude wins); the same patterns also drive the
+exemption lists (exclude wins). The same patterns also drive the
 `configmap_secret_keys` check. The Secret-listing checks
 (`legacy_sa_token_secret`, `tls_secret_expiry`, and Secret-reference
 verification) can be turned off with `security.heuristic.scan_secrets: false`
@@ -58,7 +99,7 @@ security:
 
 - `enabled: false` removes the Security category, hides the SEC badge, and runs
   no source probes.
-- `sources.<name>: false` disables one source; any source omitted from the map
+- `sources.<name>: false` disables one source. Any source omitted from the map
   stays enabled. Disabling **every** source leaves the Security category empty
   (same as `enabled: false`).
 
@@ -115,16 +156,16 @@ clusters:
 - **Low priority**: security scans run as a low-priority background task and on a
   dedicated, throttled API client (QPS 10 / burst 20, separate from the
   foreground budget), so a multi-source scan never starves foreground resource
-  lists. The foreground client rate is configurable; see
+  lists. The foreground client rate is configurable, see
   [API client rate limits](config-reference.md#api-client-rate-limits).
 - **Drill-down**: open the Security category, pick a source to list finding
   groups (one per check/CVE), then drill into a group to see affected
-  resources. `Enter` on an affected resource jumps to the real object;
+  resources. `Enter` on an affected resource jumps to the real object.
   `Backspace` jumps back.
 - **Per-resource findings**: the `Security Findings` action (`x` on a resource
   row) opens a finding-group list filtered to that resource **and its owners**
   across all sources — the same set the SEC badge counts (e.g. a Pod row
-  includes its Deployment's trivy CVEs). Rows carry a `Source` column;
+  includes its Deployment's trivy CVEs). Rows carry a `Source` column.
   `Enter` drills into a group's affected resources as usual, and `Backspace`
   jumps back to the originating list.
 
@@ -159,7 +200,7 @@ persists across sessions.
 
 `security.ignore_patterns` in the config file defines glob-based rules applied
 at startup — useful for org-wide accepted findings. Each field is a glob (`*`,
-`?`); an empty field matches anything. A finding is ignored when every non-empty
+`?`). An empty field matches anything. A finding is ignored when every non-empty
 field matches it.
 
 ```yaml
@@ -181,7 +222,7 @@ empty is ignored (it would otherwise hide everything).
 The optional `labels` field matches the target resource's Kubernetes labels —
 the right tool for silencing whole classes of infrastructure pods (CNI, CSI,
 storage) without naming each one. Each entry is a label key mapped to a glob
-value (`*`, `?`); **all** entries must match (AND). `labels` combines with the
+value (`*`, `?`). **All** entries must match (AND). `labels` combines with the
 other fields, so you can still scope by source, namespace, or cluster.
 
 Semantics:
@@ -195,7 +236,7 @@ Semantics:
   object — but only when at least one `labels` pattern is configured, and only
   for the standard workload kinds (Pod, Deployment, ReplicaSet, StatefulSet,
   DaemonSet, Job, CronJob). The lookups run on the throttled security client and
-  are capped per scan; other kinds (and CRDs) resolve to no labels.
+  are capped per scan. Other kinds (and CRDs) resolve to no labels.
 - A resource with no resolvable labels is never hidden by a label pattern.
 - **Cached badges**: labels are not persisted to the on-disk findings cache, so
   on reopen the cached badges paint before the live scan re-stamps labels — a
@@ -222,5 +263,5 @@ security:
 
 > Label ignores hide privileged host-level pods, which is usually the intent for
 > CNI/CSI. Add them deliberately — a compromised infrastructure pod then
-> produces no finding. They are opt-in for exactly this reason; lfk ships no
+> produces no finding. They are opt-in for exactly this reason. lfk ships no
 > default ignores.

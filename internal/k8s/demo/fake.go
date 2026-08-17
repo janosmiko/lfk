@@ -11,9 +11,9 @@ import (
 )
 
 // NewClientset returns a fake kubernetes.Interface seeded with the demo
-// cluster's typed objects, RBAC reactors that grant every action (see
-// AddRBACReactors), and a discovery client reporting every kind the dynamic
-// client serves (see APIResourceLists).
+// cluster's typed objects and RBAC reactors that grant every action (see
+// AddRBACReactors). It also carries a discovery client reporting every kind
+// the dynamic client serves (see APIResourceLists).
 func NewClientset() *k8sfake.Clientset {
 	cs := k8sfake.NewClientset(typedObjects()...)
 	AddRBACReactors(cs)
@@ -34,10 +34,10 @@ func NewDynamicClient() *dynamicfake.FakeDynamicClient {
 }
 
 // seedMetrics adds the metrics.k8s.io readings directly against their real
-// GVR ({metrics.k8s.io, v1beta1, pods|nodes}). They can't go through the
-// constructor's objects... path: ObjectTracker.Add guesses the resource
-// name from the object's Kind via naive pluralization, and "PodMetrics" /
-// "NodeMetrics" guess to "podmetricses" / "nodemetricses" — not the "pods" /
+// GVR ({metrics.k8s.io, v1beta1, pods|nodes}). They cannot go through the
+// constructor's objects... path. ObjectTracker.Add guesses the resource
+// name from the object's Kind via naive pluralization. "PodMetrics" /
+// "NodeMetrics" guess to "podmetricses" / "nodemetricses", not the "pods" /
 // "nodes" resource name the real metrics API (and internal/k8s.metricsGVR)
 // actually uses. Tracker().Create takes the GVR explicitly, bypassing the guess.
 func seedMetrics(dyn *dynamicfake.FakeDynamicClient) {
@@ -56,7 +56,7 @@ func seedMetrics(dyn *dynamicfake.FakeDynamicClient) {
 	}
 }
 
-// typedObjects returns every seed object as its typed API type — what the
+// typedObjects returns every seed object as its typed API type: what the
 // fake clientset's tracker and Discovery() need.
 func typedObjects() []runtime.Object {
 	objs := make([]runtime.Object, 0, 20)

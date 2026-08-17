@@ -2,11 +2,12 @@ package logger
 
 import "regexp"
 
-// redactPatterns is a curated set of regexes for likely-sensitive content
-// that may end up in stderr from auth helpers, exec credential plugins,
-// kubectl invocations, or upstream library messages. The list is intentionally
-// conservative — false positives in stderr logs are worse than missing a
-// novel pattern, since users investigating issues need readable context.
+// redactPatterns is a curated set of regexes for likely-sensitive content.
+// It targets content that may end up in stderr from auth helpers, exec
+// credential plugins, kubectl invocations, or upstream library messages.
+// The list is intentionally conservative — false positives in stderr logs
+// are worse than missing a novel pattern, since users investigating issues
+// need readable context.
 var redactPatterns = []struct {
 	re   *regexp.Regexp
 	repl string
