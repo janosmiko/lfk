@@ -1089,8 +1089,12 @@ func TestRenderTable_PodStatusAbbreviatesUnderWidthPressure(t *testing.T) {
 
 func TestRenderTableDiscoversChangedLikeAnyColumn(t *testing.T) {
 	origSortable := ActiveSortableColumns
+	origSortableCount := ActiveSortableColumnCount
 	ActiveSortableColumns = nil
-	defer func() { ActiveSortableColumns = origSortable }()
+	defer func() {
+		ActiveSortableColumns = origSortable
+		ActiveSortableColumnCount = origSortableCount
+	}()
 
 	// The cycle is only rebuilt on a render that carries a cursor.
 	origScroll := ActiveMiddleScroll

@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -302,30 +303,46 @@ func TestDemoModeChangedColumn(t *testing.T) {
 
 	// The bug: only the pod lfk watched restart had a value. Every seeded pod
 	// carries condition transitions, so the rendered table must show an age
-	// for several distinct rows.
-	filled := countFilledChangedCells(out.String())
-	if filled < 3 {
-		t.Fatalf("Changed column filled only %d rows, want at least 3; pty output:\n%s", filled, out.String())
+	// for several distinct pods.
+	filled := podsWithFilledChangedCell(out.String())
+	if len(filled) < 3 {
+		t.Fatalf("Changed column filled for %d distinct pods %v, want at least 3; pty output:\n%s",
+			len(filled), filled, out.String())
 	}
 }
 
 // changedCellPattern matches the age shapes formatAge emits (45s, 5m, 2h, 3d, 1y).
 var changedCellPattern = regexp.MustCompile(`\b\d+[smhdy]\b`)
 
-// countFilledChangedCells counts pty lines that name a seeded pod and carry at
-// least two age-shaped values. Every row already renders AGE, so a second one
-// on the same line is the CHANGED cell.
-func countFilledChangedCells(screen string) int {
-	filled := 0
+// demoWebPodPattern matches the seeded web pod names.
+var demoWebPodPattern = regexp.MustCompile(`web-7d8f9c6b5-[a-z0-9]+`)
+
+// podsWithFilledChangedCell returns the sorted, deduplicated names of seeded
+// pods whose row carries at least two age-shaped values. Every row already
+// renders AGE, so a second one on the same line is the CHANGED cell.
+//
+// Deduplicating by name is the point. The pty stream holds every redraw frame,
+// so counting matching lines would let one populated pod satisfy a
+// three-row threshold on its own -- passing even when the column is filled for
+// exactly the one pod whose restart lfk happened to witness, which is the
+// regression this test exists to catch.
+func podsWithFilledChangedCell(screen string) []string {
+	seen := map[string]bool{}
 	for line := range strings.SplitSeq(stripSGR(screen), "\n") {
-		if !strings.Contains(line, "web-7d8f9c6b5-") {
+		name := demoWebPodPattern.FindString(line)
+		if name == "" {
 			continue
 		}
 		if len(changedCellPattern.FindAllString(line, -1)) >= 2 {
-			filled++
+			seen[name] = true
 		}
 	}
-	return filled
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // stripSGR removes ANSI escape sequences so column values are matchable.
