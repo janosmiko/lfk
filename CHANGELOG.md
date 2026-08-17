@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.3](https://github.com/janosmiko/lfk/compare/v0.17.2...v0.17.3) (2026-08-17)
+
+
+### Features
+
+* add a Changed column with the time since the last change ([#631](https://github.com/janosmiko/lfk/issues/631)) ([0b8d926](https://github.com/janosmiko/lfk/commit/0b8d926b4039937af81a3c35f08e95bb3f59d4c3))
+* **nav:** make the 0/1/2 level keys walk back down ([#633](https://github.com/janosmiko/lfk/issues/633)) ([63b5333](https://github.com/janosmiko/lfk/commit/63b5333323f8f76f057c6d623db617f115500b9e))
+
 ## [0.17.2](https://github.com/janosmiko/lfk/compare/v0.17.1...v0.17.2) (2026-08-15)
 
 
