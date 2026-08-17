@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -114,6 +116,7 @@ func (m *Model) sortPreviewItems(items []model.Item, rt model.ResourceTypeEntry)
 	}
 	ref := ui.ResourceRef{Group: rt.APIGroup, Version: rt.APIVersion, Resource: rt.Resource, Kind: rt.Kind}
 	col, asc := m.kindSortPref(ref, m.nav.Context)
+	applyChangedColumn(items, time.Now())
 	sortItemsByColumn(items, col, asc, rt.Kind)
 }
 

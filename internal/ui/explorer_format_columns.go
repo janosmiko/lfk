@@ -95,7 +95,11 @@ type colInfo struct {
 // list instead makes display order independent of insertion order, so no
 // mutation path can reintroduce the flicker.
 var canonicalColumnPriority = map[string]int{
-	"CPU": 0, "CPU%": 1, "CPU/R": 2, "CPU/L": 3,
+	// Changed leads the block. Behind the metrics columns it lost the width
+	// budget on a narrow pane and vanished from the list the user had just
+	// sorted by it.
+	ChangedColumnName: -1,
+	"CPU":             0, "CPU%": 1, "CPU/R": 2, "CPU/L": 3,
 	"MEM": 4, "MEM%": 5, "MEM/R": 6, "MEM/L": 7,
 	"Uptime": 8,
 }

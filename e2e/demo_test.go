@@ -20,6 +20,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -257,9 +259,95 @@ func TestDemoModeCronJobLogs(t *testing.T) {
 	}
 }
 
+// waitForAfter2 is waitForAfter returning the new offset.
+func waitForAfter2(t *testing.T, out *output, offset int, substr string, timeout time.Duration) int {
+	t.Helper()
+	waitForAfter(t, out, offset, substr, timeout)
+	return len(out.String())
+}
+
 func sendKeys(t *testing.T, f *os.File, s string) {
 	t.Helper()
 	if _, err := f.Write([]byte(s)); err != nil {
 		t.Fatalf("writing to pty: %v", err)
 	}
 }
+
+// TestDemoModeChangedColumn drives the Changed column the way the user did when
+// they found it empty. A unit test cannot catch that class of bug: it feeds
+// hand-built items, so it never notices that real list rows carry no source
+// for the value. This asserts the column is there without being asked for,
+// and that it fills for more than one row.
+func TestDemoModeChangedColumn(t *testing.T) {
+	ptmx, out, stderr := startDemoUnderPty(t)
+
+	sendKeys(t, ptmx, "\r")
+	at := waitForThenSend(t, out, "Pods", ptmx, "/Pods\r", startupTimeout)
+	at = waitForNewThenSend(t, out, at, demo.PodWebCrashLoop, ptmx, "\r", startupTimeout)
+	// The column is a regular column now, so it renders before any sort.
+	at = waitForAfter2(t, out, at, "CHANGED", startupTimeout)
+
+	// The command bar reaches the sort key without counting > presses. The
+	// first Enter accepts the autocomplete entry, the second runs the command.
+	sendKeys(t, ptmx, ":sort Changed")
+	time.Sleep(300 * time.Millisecond)
+	sendKeys(t, ptmx, "\r")
+	time.Sleep(300 * time.Millisecond)
+	sendKeys(t, ptmx, "\r")
+
+	waitForAfter(t, out, at, "Sort by Changed", startupTimeout)
+
+	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
+		t.Fatalf("lfk panicked; pty output:\n%s\nstderr:\n%s", out.String(), stderr.String())
+	}
+
+	// The bug: only the pod lfk watched restart had a value. Every seeded pod
+	// carries condition transitions, so the rendered table must show an age
+	// for several distinct pods.
+	filled := podsWithFilledChangedCell(out.String())
+	if len(filled) < 3 {
+		t.Fatalf("Changed column filled for %d distinct pods %v, want at least 3; pty output:\n%s",
+			len(filled), filled, out.String())
+	}
+}
+
+// changedCellPattern matches the age shapes formatAge emits (45s, 5m, 2h, 3d, 1y).
+var changedCellPattern = regexp.MustCompile(`\b\d+[smhdy]\b`)
+
+// demoWebPodPattern matches the seeded web pod names.
+var demoWebPodPattern = regexp.MustCompile(`web-7d8f9c6b5-[a-z0-9]+`)
+
+// podsWithFilledChangedCell returns the sorted, deduplicated names of seeded
+// pods whose row carries at least two age-shaped values. Every row already
+// renders AGE, so a second one on the same line is the CHANGED cell.
+//
+// Deduplicating by name is the point. The pty stream holds every redraw frame,
+// so counting matching lines would let one populated pod satisfy a
+// three-row threshold on its own -- passing even when the column is filled for
+// exactly the one pod whose restart lfk happened to witness, which is the
+// regression this test exists to catch.
+func podsWithFilledChangedCell(screen string) []string {
+	seen := map[string]bool{}
+	for line := range strings.SplitSeq(stripSGR(screen), "\n") {
+		name := demoWebPodPattern.FindString(line)
+		if name == "" {
+			continue
+		}
+		if len(changedCellPattern.FindAllString(line, -1)) >= 2 {
+			seen[name] = true
+		}
+	}
+	names := make([]string, 0, len(seen))
+	for n := range seen {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// stripSGR removes ANSI escape sequences so column values are matchable.
+func stripSGR(s string) string {
+	return ansiPattern.ReplaceAllString(s, "")
+}
+
+var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)

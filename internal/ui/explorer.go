@@ -103,6 +103,11 @@ var ActiveSortColumnName string
 // ActiveSortAscending is true for ascending sort.
 var ActiveSortAscending = true
 
+// ChangedColumnName is the column showing how long ago an object last changed.
+// The app stamps it onto every row and the cycle discovers it like any other
+// column.
+const ChangedColumnName = "Changed"
+
 // ActiveSortableColumns holds the names of all sortable columns in visual order.
 // Set during RenderTable. Used by the app layer for sort cycling.
 var ActiveSortableColumns []string

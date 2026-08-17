@@ -34,6 +34,7 @@ func (m *Model) sortMiddleItems() {
 		// items the caller may want to keep in their original sequence.
 		return
 	}
+	applyChangedColumn(m.middleItems, time.Now())
 	m.middleItemsRev++
 	sortItemsByColumn(m.middleItems, colName, m.sortAscending, m.nav.ResourceType.Kind)
 }
@@ -149,22 +150,23 @@ type valueCmpFunc func(a, b string) int
 // percent/resource columns silently fell through to lexicographic sort
 // (e.g. "100%" < "9%").
 var columnValueCmp = map[string]valueCmpFunc{
-	"CPU":          func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
-	"MEM":          func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
-	"CPU%":         comparePercentCmp,
-	"MEM%":         comparePercentCmp,
-	"CPU/R":        comparePercentCmp,
-	"CPU/L":        comparePercentCmp,
-	"MEM/R":        comparePercentCmp,
-	"MEM/L":        comparePercentCmp,
-	"Ports":        comparePortsCmp,
-	"Progress":     compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
-	"Duration":     compareDurationCmp,
-	"REV":          compareREVCmp,
-	"Cluster IP":   compareIPCmp,
-	"Pod IP":       compareIPCmp,
-	"External IPs": compareIPCmp,
-	"Uptime":       compareUptimeCmp,
+	"CPU":            func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
+	"MEM":            func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
+	"CPU%":           comparePercentCmp,
+	"MEM%":           comparePercentCmp,
+	"CPU/R":          comparePercentCmp,
+	"CPU/L":          comparePercentCmp,
+	"MEM/R":          comparePercentCmp,
+	"MEM/L":          comparePercentCmp,
+	"Ports":          comparePortsCmp,
+	"Progress":       compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
+	"Duration":       compareDurationCmp,
+	"REV":            compareREVCmp,
+	"Cluster IP":     compareIPCmp,
+	"Pod IP":         compareIPCmp,
+	"External IPs":   compareIPCmp,
+	"Uptime":         compareUptimeCmp,
+	ChangedColumnKey: compareUptimeCmp,
 }
 
 // metricsMissingLastColumns are columns whose cells can render as an "n/a"
@@ -175,7 +177,8 @@ var metricsMissingLastColumns = map[string]bool{
 	"CPU": true, "MEM": true,
 	"CPU%": true, "MEM%": true,
 	"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
-	"Uptime": true,
+	"Uptime":         true,
+	ChangedColumnKey: true,
 }
 
 // metricValueMissing reports whether item's value for colName is an "n/a"

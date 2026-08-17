@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -2644,12 +2645,16 @@ func TestUpdateResourcesLoadedPreviewPrimesItemCache(t *testing.T) {
 	expectedKey := "test-ctx/persistentvolumeclaims"
 	cached, ok := rm.itemCache[expectedKey]
 	assert.True(t, ok, "itemCache must be primed at drill-in navKey %q", expectedKey)
-	assert.Equal(t, items, cached, "cached items must match preview payload")
+	// The load pipeline stamps the Change column onto every row, so compare
+	// against the enriched shape rather than the raw payload.
+	want := append([]model.Item(nil), items...)
+	applyChangedColumn(want, time.Now())
+	assert.Equal(t, want, cached, "cached items must match preview payload")
 	assert.Equal(t, rm.fetchFingerprint(), rm.cacheFingerprints[expectedKey],
 		"cacheFingerprints must snapshot the fetch-affecting state at prime time for this key")
 	// The existing rightItems behavior still runs — preview pane shows the
 	// filtered items.
-	assert.Equal(t, items, rm.rightItems)
+	assert.Equal(t, want, rm.rightItems)
 }
 
 // TestUpdateResourcesLoadedPreviewNoPrimeWhenMissingRT verifies that the

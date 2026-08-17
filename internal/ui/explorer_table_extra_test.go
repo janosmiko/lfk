@@ -1086,3 +1086,39 @@ func TestRenderTable_PodStatusAbbreviatesUnderWidthPressure(t *testing.T) {
 			"full Succeeded must remain at 200 cols")
 	})
 }
+
+func TestRenderTableDiscoversChangedLikeAnyColumn(t *testing.T) {
+	origSortable := ActiveSortableColumns
+	origSortableCount := ActiveSortableColumnCount
+	ActiveSortableColumns = nil
+	defer func() {
+		ActiveSortableColumns = origSortable
+		ActiveSortableColumnCount = origSortableCount
+	}()
+
+	// The cycle is only rebuilt on a render that carries a cursor.
+	origScroll := ActiveMiddleScroll
+	ActiveMiddleScroll = 0
+	defer func() { ActiveMiddleScroll = origScroll }()
+
+	items := []model.Item{{
+		Name: "pod-a", Namespace: "prod", Kind: "Pod",
+		Columns: []model.KeyValue{{Key: ChangedColumnName, Value: "5s"}},
+	}}
+	RenderTable("NAME", items, 0, 100, 20, false, "", "")
+
+	count := 0
+	for _, c := range ActiveSortableColumns {
+		if c == ChangedColumnName {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "Changed must join the cycle exactly once, discovered like any column")
+	assert.Equal(t, len(ActiveSortableColumns), ActiveSortableColumnCount)
+
+	// No column, no cycle entry: nothing special-cases the key any more.
+	ActiveSortableColumns = nil
+	RenderTable("NAME", []model.Item{{Name: "pod-a", Namespace: "prod", Kind: "Pod"}}, 0, 100, 20, false, "", "")
+	assert.NotContains(t, ActiveSortableColumns, ChangedColumnName,
+		"a list without the column must not carry the key in the cycle")
+}
