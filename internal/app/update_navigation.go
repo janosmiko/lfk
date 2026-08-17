@@ -107,6 +107,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			return m, nil // no cluster selection level in CLI-started union mode
 		}
 		m.saveCursor()
+		m.rememberLevel()
 		m.nav.Level = model.LevelClusters
 		m.nav.Context = ""
 		m.setMiddleItems(m.leftItems)
@@ -123,6 +124,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 
 	case model.LevelResources:
 		m.saveCursor()
+		m.rememberLevel()
 		m.nav.Level = model.LevelResourceTypes
 		m.nav.ResourceType = model.ResourceTypeEntry{}
 		// When session restore puts us at LevelResources before API

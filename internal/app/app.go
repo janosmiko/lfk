@@ -135,7 +135,6 @@ type Model struct {
 
 	err error // error to display
 
-	// Loading indicator.
 	loading bool
 
 	// previewLoading is set true when a preview load is in flight for the
@@ -145,8 +144,7 @@ type Model struct {
 	// completing. Without this the right pane briefly renders
 	// "No resources found" between the two transitions.
 	previewLoading bool
-	// Spinner for loading animation.
-	spinner spinner.Model
+	spinner        spinner.Model
 	// spinnerTicking guards the tick loop. armSpinner never stacks a second loop.
 	spinnerTicking bool
 
@@ -744,6 +742,8 @@ type Model struct {
 
 	// Jump history: back stack for "teleport" jumps. jump_back pops it. Capped at jumpHistoryCap.
 	jumpBackStack []navSnapshot
+	// Level memory: the view each cluster was left at, so the 1 and 2 keys walk back down (level_memory.go).
+	levelMem levelMemory
 
 	// Stack of LevelOwned parents for nested drill-downs (popped by navigateParent).
 	ownedParentStack []ownedParentState

@@ -393,7 +393,10 @@ func (m Model) handleExplorerActionKeyLevelCluster() (tea.Model, tea.Cmd, bool) 
 
 func (m Model) handleExplorerActionKeyLevelTypes() (tea.Model, tea.Cmd, bool) {
 	if m.nav.Level < model.LevelResourceTypes {
-		return m, nil, true // can't jump forward
+		if cmd, ok := m.restoreLevel(model.LevelResourceTypes); ok {
+			return m, cmd, true
+		}
+		return m, nil, true // nothing remembered for this level
 	}
 	for m.nav.Level > model.LevelResourceTypes {
 		before := m.nav.Level
@@ -408,7 +411,10 @@ func (m Model) handleExplorerActionKeyLevelTypes() (tea.Model, tea.Cmd, bool) {
 
 func (m Model) handleExplorerActionKeyLevelResources() (tea.Model, tea.Cmd, bool) {
 	if m.nav.Level < model.LevelResources {
-		return m, nil, true
+		if cmd, ok := m.restoreLevel(model.LevelResources); ok {
+			return m, cmd, true
+		}
+		return m, nil, true // nothing remembered for this level
 	}
 	for m.nav.Level > model.LevelResources {
 		before := m.nav.Level

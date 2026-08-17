@@ -73,6 +73,7 @@ func (m *Model) saveCurrentTab() {
 		t.leftItemsHistory[i] = append([]model.Item(nil), hist...)
 	}
 	t.jumpBackStack = cloneNavSnapshots(m.jumpBackStack)
+	t.levelMem = m.levelMem.clone()
 	t.cursors = m.cursors
 	t.middleScroll = ui.ActiveMiddleScroll
 	t.leftScroll = ui.ActiveLeftScroll
@@ -214,6 +215,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 		m.leftItemsHistory[i] = append([]model.Item(nil), hist...)
 	}
 	m.jumpBackStack = cloneNavSnapshots(t.jumpBackStack)
+	m.levelMem = t.levelMem.clone()
 	m.cursors = t.cursors
 	ui.ActiveMiddleScroll = t.middleScroll
 	ui.ActiveLeftScroll = t.leftScroll
