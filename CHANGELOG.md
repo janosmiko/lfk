@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.4](https://github.com/janosmiko/lfk/compare/v0.17.3...v0.17.4) (2026-08-18)
+
+
+### Bug Fixes
+
+* sort the Changed and Uptime columns by their real timestamps ([#641](https://github.com/janosmiko/lfk/issues/641)) ([54b38b3](https://github.com/janosmiko/lfk/commit/54b38b3fc27de944234f970511e04c3850044c0e))
+
 ## [0.17.3](https://github.com/janosmiko/lfk/compare/v0.17.2...v0.17.3) (2026-08-17)
 
 
