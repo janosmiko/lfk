@@ -639,6 +639,10 @@ func (m Model) updateNodeUptimeEnriched(msg nodeUptimeEnrichedMsg) Model {
 		return m
 	}
 	m.middleItemsRev++
+	// One clock read for the whole message: a per-item read separates two
+	// nodes with equal uptime by the loop delay, and the sort then ranks
+	// that noise ahead of the name tiebreaker.
+	now := time.Now()
 	for i := range m.middleItems {
 		item := &m.middleItems[i]
 		if empty {
@@ -650,6 +654,7 @@ func (m Model) updateNodeUptimeEnriched(msg nodeUptimeEnrichedMsg) Model {
 		var value string
 		if d, ok := lookupNodeUptime(*item, msg.uptimes); ok {
 			value = k8s.FormatAge(d)
+			item.BootedAt = now.Add(-d)
 		} else {
 			value = "n/a"
 		}

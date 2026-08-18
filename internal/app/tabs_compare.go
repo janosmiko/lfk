@@ -150,23 +150,21 @@ type valueCmpFunc func(a, b string) int
 // percent/resource columns silently fell through to lexicographic sort
 // (e.g. "100%" < "9%").
 var columnValueCmp = map[string]valueCmpFunc{
-	"CPU":            func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
-	"MEM":            func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
-	"CPU%":           comparePercentCmp,
-	"MEM%":           comparePercentCmp,
-	"CPU/R":          comparePercentCmp,
-	"CPU/L":          comparePercentCmp,
-	"MEM/R":          comparePercentCmp,
-	"MEM/L":          comparePercentCmp,
-	"Ports":          comparePortsCmp,
-	"Progress":       compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
-	"Duration":       compareDurationCmp,
-	"REV":            compareREVCmp,
-	"Cluster IP":     compareIPCmp,
-	"Pod IP":         compareIPCmp,
-	"External IPs":   compareIPCmp,
-	"Uptime":         compareUptimeCmp,
-	ChangedColumnKey: compareUptimeCmp,
+	"CPU":          func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
+	"MEM":          func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
+	"CPU%":         comparePercentCmp,
+	"MEM%":         comparePercentCmp,
+	"CPU/R":        comparePercentCmp,
+	"CPU/L":        comparePercentCmp,
+	"MEM/R":        comparePercentCmp,
+	"MEM/L":        comparePercentCmp,
+	"Ports":        comparePortsCmp,
+	"Progress":     compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
+	"Duration":     compareDurationCmp,
+	"REV":          compareREVCmp,
+	"Cluster IP":   compareIPCmp,
+	"Pod IP":       compareIPCmp,
+	"External IPs": compareIPCmp,
 }
 
 // metricsMissingLastColumns are columns whose cells can render as an "n/a"
@@ -238,6 +236,10 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return cmpInt(severityRank(getColumnValue(a, "Severity")), severityRank(getColumnValue(b, "Severity")))
 	case sortColEventLastSeen:
 		return compareLastSeenCmp(a, b)
+	case ChangedColumnKey:
+		return compareChangedCmp(a, b)
+	case "Uptime":
+		return compareUptimeItemCmp(a, b)
 	}
 	va, vb := getColumnValue(a, colName), getColumnValue(b, colName)
 	if cmp, ok := columnValueCmp[colName]; ok {
@@ -397,6 +399,35 @@ func compareAgeCmp(a, b model.Item) int {
 	case a.CreatedAt.After(b.CreatedAt):
 		return -1
 	case a.CreatedAt.Before(b.CreatedAt):
+		return 1
+	default:
+		return 0
+	}
+}
+
+// compareChangedCmp compares by the real change timestamp instead of the
+// rendered cell. formatAge buckets a range of ages into one string, so a row
+// changed 60s ago and a row changed 61s ago both read "1m" and a string
+// comparison ranks them by name. Rows with no change source return 0 so the
+// shared tiebreaker chain orders them, and the empty cell already sends them
+// to the bottom through metricsMissingLastColumns.
+func compareChangedCmp(a, b model.Item) int {
+	ta, okA := changeAt(a)
+	tb, okB := changeAt(b)
+	switch {
+	case okA && okB:
+		// Newer sorts first in ascending view, matching Age.
+		switch {
+		case ta.After(tb):
+			return -1
+		case ta.Before(tb):
+			return 1
+		default:
+			return 0
+		}
+	case okA:
+		return -1
+	case okB:
 		return 1
 	default:
 		return 0
