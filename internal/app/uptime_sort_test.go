@@ -77,3 +77,27 @@ func TestUptimeCarryOverKeepsTheBootTime(t *testing.T) {
 		t.Fatalf("a watch tick must keep the boot time, got %v", fresh[0].BootedAt)
 	}
 }
+
+func TestUptimeEnrichmentStampsOneReferenceTime(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{{Name: "aaa-node"}, {Name: "zzz-node"}}
+
+	result, _ := m.Update(nodeUptimeEnrichedMsg{
+		uptimes: k8s.NodeUptimes{ByName: map[string]time.Duration{
+			"aaa-node": 3 * time.Hour,
+			"zzz-node": 3 * time.Hour,
+		}},
+		gen: 0,
+	})
+	items := result.(Model).middleItems
+
+	// Equal uptimes must stay equal. A per-item clock read would separate
+	// them by the loop delay and rank them ahead of the name tiebreaker.
+	if !items[0].BootedAt.Equal(items[1].BootedAt) {
+		t.Fatalf("equal uptimes must share a boot time, got %v and %v", items[0].BootedAt, items[1].BootedAt)
+	}
+	sortItemsByColumn(items, "Uptime", true, "Node")
+	if items[0].Name != "aaa-node" {
+		t.Fatalf("equal uptimes must fall through to name order, got %q", items[0].Name)
+	}
+}
