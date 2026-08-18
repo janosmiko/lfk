@@ -285,3 +285,23 @@ func TestChangedJoinsTheSortCycle(t *testing.T) {
 		t.Fatalf("the Changed key must be reachable in the cycle, got idx=%d ok=%v", idx, ok)
 	}
 }
+
+func TestChangedSortUsesTheRealTimeNotTheRenderedCell(t *testing.T) {
+	now := time.Now()
+	// Both rows render "1m". Only the timestamp separates them.
+	items := []model.Item{
+		podWithConditions("aaa-older", now.Add(-61*time.Second)),
+		podWithConditions("zzz-newer", now.Add(-60*time.Second)),
+	}
+
+	applyChangedColumn(items, now)
+	if a, b := items[0].ColumnValue(ChangedColumnKey), items[1].ColumnValue(ChangedColumnKey); a != b {
+		t.Fatalf("this test needs two equal cells, got %q and %q", a, b)
+	}
+
+	sortItemsByColumn(items, ChangedColumnKey, true, "Pod")
+
+	if items[0].Name != "zzz-newer" {
+		t.Fatalf("the newer change must sort first, got %q", items[0].Name)
+	}
+}
