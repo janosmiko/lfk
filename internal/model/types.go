@@ -244,24 +244,28 @@ type GroupedRef struct {
 // Item represents a single navigable entry in any column.
 type Item struct {
 	Name          string
-	Namespace     string           // Namespace of the resource (populated in all-namespaces mode)
-	Status        string           // Used for pod/resource status coloring
-	Kind          string           // The Kubernetes resource kind
-	Extra         string           // Extra metadata (e.g., resource ref "group/version/resource")
-	Category      string           // Display category grouping (e.g., "Workloads", "Networking")
-	Icon          Icon             // Icon variants for display (see icon.go)
-	Age           string           // Human-readable age (e.g., "5m", "2h", "3d")
-	Ready         string           // Ready count (e.g., "2/3" for pods or deployments)
-	Restarts      string           // Restart count (for pods)
-	LastRestartAt time.Time        // Most recent container restart time
-	CreatedAt     time.Time        // Creation timestamp for sorting (Events: first observed timestamp in the series)
-	LastSeen      time.Time        // Most recent observation (Events only — drives the "Last Seen" column)
-	Columns       []KeyValue       // Additional resource fields for summary preview
-	Conditions    []ConditionEntry // Status conditions for the details pane
-	ClusterName   string           // Source cluster in union mode. Empty in normal mode
-	Selected      bool             // Whether this item is part of a multi-selection
-	Deprecated    bool             // Whether this resource uses a deprecated API version
-	Deleting      bool             // Whether this resource has a deletionTimestamp set
+	Namespace     string    // Namespace of the resource (populated in all-namespaces mode)
+	Status        string    // Used for pod/resource status coloring
+	Kind          string    // The Kubernetes resource kind
+	Extra         string    // Extra metadata (e.g., resource ref "group/version/resource")
+	Category      string    // Display category grouping (e.g., "Workloads", "Networking")
+	Icon          Icon      // Icon variants for display (see icon.go)
+	Age           string    // Human-readable age (e.g., "5m", "2h", "3d")
+	Ready         string    // Ready count (e.g., "2/3" for pods or deployments)
+	Restarts      string    // Restart count (for pods)
+	LastRestartAt time.Time // Most recent container restart time
+	CreatedAt     time.Time // Creation timestamp for sorting (Events: first observed timestamp in the series)
+	LastSeen      time.Time // Most recent observation (Events only — drives the "Last Seen" column)
+	// BootedAt is when a node last booted (Nodes only, from Prometheus
+	// node_boot_time_seconds). The Uptime cell it feeds is a bucketed
+	// string, so the sort reads this instead — see compareUptimeItemCmp.
+	BootedAt    time.Time
+	Columns     []KeyValue       // Additional resource fields for summary preview
+	Conditions  []ConditionEntry // Status conditions for the details pane
+	ClusterName string           // Source cluster in union mode. Empty in normal mode
+	Selected    bool             // Whether this item is part of a multi-selection
+	Deprecated  bool             // Whether this resource uses a deprecated API version
+	Deleting    bool             // Whether this resource has a deletionTimestamp set
 	// StatusFromPhase records that Status was derived from .status.phase.
 	// Set for generic CRDs whose Phase printer column is suppressed as a
 	// duplicate of Status, so the list summary can still roll up by phase

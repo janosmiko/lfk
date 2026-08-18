@@ -137,6 +137,7 @@ func (m *Model) carryOverMetricsColumns(newItems []model.Item) {
 // preview fetches return unenriched items, so without the carry-over the
 // preview's column set flips against the drilled list on every refetch).
 func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
+	carryOverBootedAt(oldItems, newItems)
 	metricsKeys := map[string]bool{
 		"CPU": true, "CPU/R": true, "CPU/L": true,
 		"MEM": true, "MEM/R": true, "MEM/L": true,

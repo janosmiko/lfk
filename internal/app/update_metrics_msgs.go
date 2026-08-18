@@ -650,6 +650,7 @@ func (m Model) updateNodeUptimeEnriched(msg nodeUptimeEnrichedMsg) Model {
 		var value string
 		if d, ok := lookupNodeUptime(*item, msg.uptimes); ok {
 			value = k8s.FormatAge(d)
+			item.BootedAt = time.Now().Add(-d)
 		} else {
 			value = "n/a"
 		}
