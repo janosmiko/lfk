@@ -58,15 +58,19 @@ func TestSyncedAtSortsThroughItsStatusPrefix(t *testing.T) {
 }
 
 func TestLastTransitionKeepsUnparseableCellsLast(t *testing.T) {
-	for _, asc := range []bool{true, false} {
-		items := []model.Item{
-			crdWithTransition("aaa-empty", ""),
-			crdWithTransition("zzz-real", "14d ago"),
-		}
-		sortItemsByColumn(items, "Last Transition", asc, "CustomResourceDefinition")
+	// A CRD printer column may also be named Last Transition and hold
+	// anything, so an unreadable cell must behave like an empty one.
+	for _, cell := range []string{"", "unknown", "n/a"} {
+		for _, asc := range []bool{true, false} {
+			items := []model.Item{
+				crdWithTransition("aaa-empty", cell),
+				crdWithTransition("zzz-real", "14d ago"),
+			}
+			sortItemsByColumn(items, "Last Transition", asc, "CustomResourceDefinition")
 
-		if items[len(items)-1].Name != "aaa-empty" {
-			t.Fatalf("asc=%v: an empty cell must sort last, got %q", asc, items[len(items)-1].Name)
+			if items[len(items)-1].Name != "aaa-empty" {
+				t.Fatalf("cell %q asc=%v: an unreadable cell must sort last, got %q", cell, asc, items[len(items)-1].Name)
+			}
 		}
 	}
 }

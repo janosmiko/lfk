@@ -183,6 +183,14 @@ var metricsMissingLastColumns = map[string]bool{
 	"Synced At":       true,
 }
 
+// relativeAgoColumns hold formatRelativeTime output ("1138d ago"). A CRD
+// printer column may carry the same name and any text at all, so the sort
+// treats a cell it cannot read as missing data rather than ranking it.
+var relativeAgoColumns = map[string]bool{
+	"Last Transition": true,
+	"Synced At":       true,
+}
+
 // metricValueMissing reports whether item's value for colName is an "n/a"
 // placeholder that should always sort last. Returns false for columns not
 // in metricsMissingLastColumns.
@@ -191,7 +199,14 @@ func metricValueMissing(colName string, item model.Item) bool {
 		return false
 	}
 	v := strings.TrimSpace(getColumnValue(item, colName))
-	return v == "" || v == "n/a"
+	if v == "" || v == "n/a" {
+		return true
+	}
+	if relativeAgoColumns[colName] {
+		_, ok := parseRelativeAgo(v)
+		return !ok
+	}
+	return false
 }
 
 // comparePrimaryColumn returns -1, 0, or +1 for a < b, a == b, a > b
