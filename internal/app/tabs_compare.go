@@ -150,33 +150,37 @@ type valueCmpFunc func(a, b string) int
 // percent/resource columns silently fell through to lexicographic sort
 // (e.g. "100%" < "9%").
 var columnValueCmp = map[string]valueCmpFunc{
-	"CPU":          func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
-	"MEM":          func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
-	"CPU%":         comparePercentCmp,
-	"MEM%":         comparePercentCmp,
-	"CPU/R":        comparePercentCmp,
-	"CPU/L":        comparePercentCmp,
-	"MEM/R":        comparePercentCmp,
-	"MEM/L":        comparePercentCmp,
-	"Ports":        comparePortsCmp,
-	"Progress":     compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
-	"Duration":     compareDurationCmp,
-	"REV":          compareREVCmp,
-	"Cluster IP":   compareIPCmp,
-	"Pod IP":       compareIPCmp,
-	"External IPs": compareIPCmp,
+	"CPU":             func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
+	"MEM":             func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
+	"CPU%":            comparePercentCmp,
+	"MEM%":            comparePercentCmp,
+	"CPU/R":           comparePercentCmp,
+	"CPU/L":           comparePercentCmp,
+	"MEM/R":           comparePercentCmp,
+	"MEM/L":           comparePercentCmp,
+	"Ports":           comparePortsCmp,
+	"Progress":        compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
+	"Duration":        compareDurationCmp,
+	"REV":             compareREVCmp,
+	"Cluster IP":      compareIPCmp,
+	"Last Transition": compareRelativeAgoCmp,
+	"Synced At":       compareRelativeAgoCmp,
+	"Pod IP":          compareIPCmp,
+	"External IPs":    compareIPCmp,
 }
 
-// metricsMissingLastColumns are columns whose cells can render as an "n/a"
-// placeholder — metrics-server data missing (CPU/MEM family) or unknown
-// Uptime. Rows with such a value must sort to the bottom regardless of
-// sort direction (see sortMiddleItems).
+// metricsMissingLastColumns are columns whose cells can render empty or as an
+// "n/a" placeholder — metrics-server data missing (CPU/MEM family), unknown
+// Uptime, a resource with no condition timestamp. Rows with such a value must
+// sort to the bottom regardless of sort direction (see sortMiddleItems).
 var metricsMissingLastColumns = map[string]bool{
 	"CPU": true, "MEM": true,
 	"CPU%": true, "MEM%": true,
 	"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
-	"Uptime":         true,
-	ChangedColumnKey: true,
+	"Uptime":          true,
+	ChangedColumnKey:  true,
+	"Last Transition": true,
+	"Synced At":       true,
 }
 
 // metricValueMissing reports whether item's value for colName is an "n/a"
@@ -565,6 +569,35 @@ func compareUptimeCmp(a, b string) int {
 	default:
 		return strings.Compare(strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b)))
 	}
+}
+
+// compareRelativeAgoCmp compares formatRelativeTime output ("1138d ago") by
+// real duration. Without it the values sorted lexicographically and "1138d
+// ago" landed above "14d ago". A cell may carry a status word in front
+// ("syncing 5m ago"), so the last field before "ago" is the duration.
+// Unparseable values sort after real ones, mirroring compareUptimeCmp.
+func compareRelativeAgoCmp(a, b string) int {
+	da, okA := parseRelativeAgo(a)
+	db, okB := parseRelativeAgo(b)
+	switch {
+	case okA && okB:
+		return cmpInt64(int64(da), int64(db))
+	case okA:
+		return -1
+	case okB:
+		return 1
+	default:
+		return strings.Compare(strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b)))
+	}
+}
+
+// parseRelativeAgo extracts the duration from a "<n><unit> ago" cell.
+func parseRelativeAgo(v string) (time.Duration, bool) {
+	fields := strings.Fields(strings.TrimSpace(v))
+	if len(fields) < 2 || fields[len(fields)-1] != "ago" {
+		return 0, false
+	}
+	return parseAgeDuration(fields[len(fields)-2])
 }
 
 // compareREVCmp compares REV column values numerically (decimal). Falls back
