@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.5](https://github.com/janosmiko/lfk/compare/v0.17.4...v0.17.5) (2026-08-19)
+
+
+### Bug Fixes
+
+* sort relative-time columns by duration ([#643](https://github.com/janosmiko/lfk/issues/643)) ([49013f8](https://github.com/janosmiko/lfk/commit/49013f834d0ceb0ad6d372cf22cd85e3afa27e9c))
+
 ## [0.17.4](https://github.com/janosmiko/lfk/compare/v0.17.3...v0.17.4) (2026-08-18)
 
 
