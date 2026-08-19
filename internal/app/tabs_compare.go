@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -165,6 +166,11 @@ var columnValueCmp = map[string]valueCmpFunc{
 	"Cluster IP":      compareIPCmp,
 	"Last Transition": compareRelativeAgoCmp,
 	"Synced At":       compareRelativeAgoCmp,
+	// formatAge output ("10d", "9h"), which sorts before "9h" as text.
+	"Last Scale Time": compareUptimeCmp,
+	"Next":            compareUptimeCmp,
+	"Last Deployed":   compareUptimeCmp,
+	"Interval":        compareDurationCmp,
 	"Pod IP":          compareIPCmp,
 	"External IPs":    compareIPCmp,
 }
@@ -177,10 +183,14 @@ var metricsMissingLastColumns = map[string]bool{
 	"CPU": true, "MEM": true,
 	"CPU%": true, "MEM%": true,
 	"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
-	"Uptime":          true,
-	ChangedColumnKey:  true,
-	"Last Transition": true,
-	"Synced At":       true,
+	"Uptime":             true,
+	ChangedColumnKey:     true,
+	"Last Transition":    true,
+	"Synced At":          true,
+	"Last Scale Time":    true,
+	"Next":               true,
+	"Last Deployed":      true,
+	k8s.EventColLastSeen: true,
 }
 
 // relativeAgoColumns hold formatRelativeTime output ("1138d ago"). A CRD
@@ -259,6 +269,14 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return compareChangedCmp(a, b)
 	case "Uptime":
 		return compareUptimeItemCmp(a, b)
+	case k8s.EventColLastSeen:
+		// The cell is formatAge output, so two events one second apart can
+		// share it. Events carry the observation time, so compare that;
+		// anything else with a column of this name keeps the cell.
+		if a.LastSeen.IsZero() && b.LastSeen.IsZero() {
+			return compareUptimeCmp(getColumnValue(a, k8s.EventColLastSeen), getColumnValue(b, k8s.EventColLastSeen))
+		}
+		return compareLastSeenCmp(a, b)
 	}
 	va, vb := getColumnValue(a, colName), getColumnValue(b, colName)
 	if cmp, ok := columnValueCmp[colName]; ok {
