@@ -58,24 +58,6 @@ func TestSyncedAtSortsThroughItsStatusPrefix(t *testing.T) {
 	}
 }
 
-func TestLastTransitionKeepsUnparseableCellsLast(t *testing.T) {
-	// A CRD printer column may also be named Last Transition and hold
-	// anything, so an unreadable cell must behave like an empty one.
-	for _, cell := range []string{"", "unknown", "n/a"} {
-		for _, asc := range []bool{true, false} {
-			items := []model.Item{
-				crdWithTransition("aaa-empty", cell),
-				crdWithTransition("zzz-real", "14d ago"),
-			}
-			sortItemsByColumn(items, "Last Transition", asc, "CustomResourceDefinition")
-
-			if items[len(items)-1].Name != "aaa-empty" {
-				t.Fatalf("cell %q asc=%v: an unreadable cell must sort last, got %q", cell, asc, items[len(items)-1].Name)
-			}
-		}
-	}
-}
-
 func itemWithColumn(name, key, value string) model.Item {
 	return model.Item{Name: name, Kind: "Widget", Columns: []model.KeyValue{{Key: key, Value: value}}}
 }
@@ -96,17 +78,30 @@ func TestAgeShapedColumnsSortByDuration(t *testing.T) {
 	}
 }
 
-func TestAgeShapedColumnsKeepUnreadableCellsLast(t *testing.T) {
-	for _, col := range []string{"Last Scale Time", "Next", "Last Deployed"} {
-		for _, asc := range []bool{true, false} {
-			items := []model.Item{
-				itemWithColumn("aaa-empty", col, ""),
-				itemWithColumn("zzz-real", col, "9h"),
-			}
-			sortItemsByColumn(items, col, asc, "Widget")
+func TestTimeShapedColumnsKeepUnreadableCellsLast(t *testing.T) {
+	cases := []struct{ col, good string }{
+		{"Last Transition", "14d ago"},
+		{"Synced At", "14d ago"},
+		{"Last Scale Time", "9h"},
+		{"Next", "9h"},
+		{"Last Deployed", "9h"},
+		{"Last Seen", "9h"},
+		{"Interval", "5m0s"},
+	}
+	// A CRD printer column may reuse any of these names and hold any text.
+	for _, c := range cases {
+		for _, bad := range []string{"", "n/a", "unknown"} {
+			for _, asc := range []bool{true, false} {
+				items := []model.Item{
+					itemWithColumn("aaa-bad", c.col, bad),
+					itemWithColumn("zzz-real", c.col, c.good),
+				}
+				sortItemsByColumn(items, c.col, asc, "Widget")
 
-			if items[len(items)-1].Name != "aaa-empty" {
-				t.Fatalf("%s asc=%v: an empty cell must sort last, got %q", col, asc, items[len(items)-1].Name)
+				if items[len(items)-1].Name != "aaa-bad" {
+					t.Fatalf("%s cell %q asc=%v: an unreadable cell must sort last, got %q",
+						c.col, bad, asc, items[len(items)-1].Name)
+				}
 			}
 		}
 	}

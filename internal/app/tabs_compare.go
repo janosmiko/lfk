@@ -191,14 +191,39 @@ var metricsMissingLastColumns = map[string]bool{
 	"Next":               true,
 	"Last Deployed":      true,
 	k8s.EventColLastSeen: true,
+	"Interval":           true,
 }
 
-// relativeAgoColumns hold formatRelativeTime output ("1138d ago"). A CRD
-// printer column may carry the same name and any text at all, so the sort
-// treats a cell it cannot read as missing data rather than ranking it.
-var relativeAgoColumns = map[string]bool{
-	"Last Transition": true,
-	"Synced At":       true,
+// readableTimeValue maps a time-shaped column to the parser that decides
+// whether its cell holds a real value. A CRD printer column may reuse any of
+// these names and hold arbitrary text, so a cell no parser can read sorts last
+// instead of ranking among real durations.
+var readableTimeValue = map[string]func(string) bool{
+	"Last Transition":    readableRelativeAgo,
+	"Synced At":          readableRelativeAgo,
+	"Last Scale Time":    readableAge,
+	"Next":               readableAge,
+	"Last Deployed":      readableAge,
+	k8s.EventColLastSeen: readableAge,
+	"Interval":           readableGoDuration,
+}
+
+// readableRelativeAgo reports whether v is formatRelativeTime output.
+func readableRelativeAgo(v string) bool {
+	_, ok := parseRelativeAgo(v)
+	return ok
+}
+
+// readableAge reports whether v is formatAge output.
+func readableAge(v string) bool {
+	_, ok := parseAgeDuration(v)
+	return ok
+}
+
+// readableGoDuration reports whether v is a Go duration string.
+func readableGoDuration(v string) bool {
+	_, err := time.ParseDuration(strings.TrimSpace(v))
+	return err == nil
 }
 
 // metricValueMissing reports whether item's value for colName is an "n/a"
@@ -212,9 +237,8 @@ func metricValueMissing(colName string, item model.Item) bool {
 	if v == "" || v == "n/a" {
 		return true
 	}
-	if relativeAgoColumns[colName] {
-		_, ok := parseRelativeAgo(v)
-		return !ok
+	if readable, ok := readableTimeValue[colName]; ok {
+		return !readable(v)
 	}
 	return false
 }
