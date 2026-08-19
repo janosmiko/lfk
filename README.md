@@ -506,3 +506,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, bui
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE).
+
+## Star History
+
+<a href="https://star-history.dera.page/#janosmiko/lfk&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=janosmiko/lfk&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=janosmiko/lfk&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=janosmiko/lfk&type=date&legend=top-left" />
+ </picture>
+</a>
