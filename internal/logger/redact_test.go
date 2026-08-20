@@ -227,6 +227,24 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"s3cret-quoted-single"},
 		},
 		{
+			name:            "double-quoted value with an escaped quote does not leak the tail",
+			input:           `payload: {"password": "front-part\"tail-secret"} received`,
+			wantContains:    []string{`"password": "[REDACTED]"`, "received"},
+			wantNotContains: []string{"front-part", "tail-secret"},
+		},
+		{
+			name:            "single-quoted value with an escaped quote does not leak the tail",
+			input:           `payload: {'password': 'front-part\'tail-secret'} received`,
+			wantContains:    []string{`'password': '[REDACTED]'`, "received"},
+			wantNotContains: []string{"front-part", "tail-secret"},
+		},
+		{
+			name:            "double-quoted value ending in an escaped backslash",
+			input:           `payload: {"token": "secret-value\\"} received`,
+			wantContains:    []string{`"token": "[REDACTED]"`, "received"},
+			wantNotContains: []string{"secret-value"},
+		},
+		{
 			name:            "base64 blob under a generic data key is not redacted (documented stance)",
 			input:           "data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I=",
 			wantContains:    []string{"data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I="},

@@ -32,8 +32,12 @@ var redactPatterns = []struct {
 	{regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://)[^:@\s/]*:[^@\s/]+@`), "${1}[REDACTED-CREDS]@"},
 	// Bearer tokens in Authorization headers.
 	{regexp.MustCompile(`(?i)(Bearer\s+)[A-Za-z0-9._-]{20,}`), "${1}[REDACTED-BEARER]"},
+	// Quoted values first, with escape-aware bodies: a bare [^"]+ would stop
+	// at an escaped quote ("front\"tail") and leak the tail past redaction.
+	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)"(?:\\.|[^"\\])*"`), `${1}${2}"[REDACTED]"`},
+	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)'(?:\\.|[^'\\])*'`), `${1}${2}'[REDACTED]'`},
 	// RE2 has no lookbehind: the boundary char and value quote are captured
-	// and replayed so quoted output ("password": "x") keeps its quoting.
+	// and replayed so unquoted (or unterminated-quote) output keeps its shape.
 	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)(["']?)[^\s&"',;]+`), "${1}${2}${3}[REDACTED]"},
 	// kubectl --from-literal=KEY=VALUE — keep KEY, redact VALUE.
 	{regexp.MustCompile(`(--from-literal=[^=\s]+=)[^\s"']+`), "${1}[REDACTED]"},
