@@ -52,21 +52,3 @@ func (s *yamlViewState) resetBlame() {
 	s.blameLoading = false
 	s.blame = nil
 }
-
-// copy returns a deep copy: slices and the map are cloned so a value stored
-// in a TabState never aliases the live viewer's backing arrays. Scalars,
-// strings, and the TextInput value are copied by assignment.
-func (s yamlViewState) copy() yamlViewState {
-	cp := s
-	if s.matchLines != nil {
-		cp.matchLines = append([]int(nil), s.matchLines...)
-	}
-	if s.sections != nil {
-		cp.sections = append([]yamlSection(nil), s.sections...)
-	}
-	if s.blame != nil {
-		cp.blame = append([]blameLine(nil), s.blame...)
-	}
-	cp.collapsed = copyMapStringBool(s.collapsed)
-	return cp
-}

@@ -114,15 +114,6 @@ func TestUpdateYamlBlameLoaded_ErrorClosesTheBlame(t *testing.T) {
 	assert.Nil(t, got.yamlView.blame)
 }
 
-func TestYamlViewStateCopy_ClonesTheBlameSlice(t *testing.T) {
-	s := yamlViewState{blame: []blameLine{{manager: "kubectl"}}}
-
-	cp := s.copy()
-	cp.blame[0].manager = "changed"
-
-	assert.Equal(t, "kubectl", s.blame[0].manager, "a tab snapshot must not alias the live viewer")
-}
-
 func TestUpdateYamlBlameLoaded_DropsAReplyForOldContent(t *testing.T) {
 	m := Model{}
 	m.yamlView.content = "spec:\n  replicas: 3\n"
