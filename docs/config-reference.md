@@ -54,6 +54,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `watch_interval` | string | `2s` | Polling interval in watch mode. Go duration string, clamped to [500ms, 10m]. Override with `--watch-interval`. |
 | `background_watch_interval` | string | `10s` | Watch cadence while the window is unfocused or focused-idle. Same form and [500ms, 10m] clamp as `watch_interval`. Set equal to `watch_interval` to disable background throttling. |
 | `foreground_idle_timeout` | string | `120s` | No-input window before a focused window throttles to `background_watch_interval`. Go duration; `0` disables focused-idle throttling (background throttling still applies). Clamped to [0, 10m]. |
+| `metrics_interval` | string | `15s` | Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh. Go duration, clamped to [2s, 10m]; `0` fetches on every tick. Manual refresh always fetches. |
 | `watch_throttle` | bool | `true` | Master switch for focus/idle watch throttling. Set `false` to disable it entirely; the watch tick then always uses `watch_interval`. |
 | `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
 | `events` | object | *(see Events section)* | Events view startup-toggle defaults. See [Events](#events). |
