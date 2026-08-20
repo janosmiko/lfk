@@ -46,17 +46,16 @@ type Model struct {
 	// Item cache: maps navigation path to loaded items for faster back navigation.
 	itemCache map[string][]model.Item
 
-	// cacheFingerprints maps the same keys as itemCache to a fingerprint
-	// of the fetch-affecting state (namespace, allNamespaces,
-	// selectedNamespaces) that was in effect when the entry was written.
-	// loadResources uses it to decide whether a primed cache entry is
-	// still applicable: if the current fingerprint matches, the fetch can
-	// be served from cache instead of hitting the API. This is populated
-	// only by updateResourcesLoadedPreview and updateResourcesLoadedMain
-	// — the paths that fetch data under the current state. Other writers
-	// (session restore, bookmarks, toggleRare rebuild) leave the entry
-	// without a fingerprint, which safely defaults to a real fetch.
+	// cacheFingerprints maps the same keys as itemCache to a fingerprint of
+	// the fetch-affecting state (namespace, allNamespaces, selectedNamespaces)
+	// when the entry was written. loadResources compares it to the current
+	// fingerprint to judge whether a primed entry is still valid. Entries
+	// without one (session restore, bookmarks, toggleRare) default to a fetch.
 	cacheFingerprints map[string]string
+	// previewContentFingerprints holds the hovered item's last fetched
+	// resourceVersion, keyed by context+kind+SelectionKey. Bounded to one
+	// entry: recording a new key drops any other.
+	previewContentFingerprints map[string]string
 
 	// Full-screen YAML viewer state (the `y` view): content, scroll/cursor,
 	// search, visual selection, wrap, and collapsible sections. Extracted
@@ -96,12 +95,10 @@ type Model struct {
 	// reset on a fresh open or a recursive jump.
 	explainAncestors []explainLevel
 
-	// Split preview: show children in top 1/3 + YAML in bottom 2/3 of right column.
-	splitPreview bool
-	// Full YAML preview: show only YAML in the right column (no children list).
-	fullYAMLPreview bool
-	// Full log preview: show the selected pod's live logs in the right column.
-	fullLogPreview bool
+	// Right-column preview mode: splitPreview shows children in the top 1/3 +
+	// YAML below, fullYAMLPreview shows YAML only (no children list), and
+	// fullLogPreview shows the selected pod's live logs.
+	splitPreview, fullYAMLPreview, fullLogPreview bool
 	// previewLog holds the bounded buffer and stream state for the live-log
 	// right-pane preview (see previewlog.go).
 	previewLog previewLogState
@@ -427,11 +424,9 @@ type Model struct {
 	// Show decoded secret values in preview.
 	showSecretValues bool
 
-	// Toggle to show only Warning events in Event list view.
-	warningEventsOnly bool
-
-	// Collapse duplicate Events (per-tab mirror of Model.eventGrouping).
-	eventGrouping bool
+	// Event list view toggles: warningEventsOnly hides everything but Warning
+	// rows, eventGrouping collapses duplicates.
+	warningEventsOnly, eventGrouping bool
 
 	// scheduler tracks in-flight async loads AND owns priority-based
 	// dispatch (resource lists, YAML fetches, metrics, dashboards).
@@ -442,6 +437,10 @@ type Model struct {
 	// suppressBgtasks routes loaders through Registry.StartUntracked so
 	// watch-mode auto-refreshes don't flash the title-bar indicator.
 	suppressBgtasks bool
+
+	// metricsLastFetch stamps the last list-wide CPU/MEM fetch per
+	// "context/kind". Not in TabState: metrics-server is cluster-wide.
+	metricsLastFetch map[string]time.Time
 
 	// :scheduler overlay state: tasksOverlayShowCompleted (Tab) flips
 	// running ↔ history. tasksOverlayShowAll (`a`, history only) lifts

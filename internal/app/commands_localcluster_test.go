@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -58,6 +59,35 @@ func TestDetectLocalClustersCmd_AggregatesProviders(t *testing.T) {
 	}
 	if msg.providerErrors["k3d"] == "" {
 		t.Fatalf("expected k3d error captured, got %v", msg.providerErrors)
+	}
+}
+
+// A stuck docker daemon must not block wg.Wait() forever. The done-channel
+// select keeps a red run fast instead of wedging the suite.
+func TestDetectLocalClustersCmd_BoundedByPerProviderTimeout(t *testing.T) {
+	stuck := fakeProvider{
+		name: "stuck", installed: true,
+		listFn: func(ctx context.Context) ([]localcluster.Cluster, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	cmd := detectLocalClustersCmdWithTimeout(1, []localcluster.Provider{stuck}, 50*time.Millisecond)
+
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+
+	select {
+	case msg := <-done:
+		got, ok := msg.(localClustersDetectedMsg)
+		if !ok {
+			t.Fatalf("expected localClustersDetectedMsg, got %T", msg)
+		}
+		if got.providerErrors["stuck"] == "" {
+			t.Fatalf("expected stuck provider's timeout error recorded, got %v", got.providerErrors)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("detectLocalClustersCmd did not return within the per-provider timeout: List(context.Background()) blocks forever")
 	}
 }
 
