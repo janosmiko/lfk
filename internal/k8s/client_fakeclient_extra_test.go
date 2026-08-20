@@ -778,6 +778,7 @@ func TestBuildCronJobTree_LogsPodOwnerTreeError(t *testing.T) {
 
 	logged := buf.String()
 	assert.Contains(t, logged, "cron-12345", "expected the failing job name in the log")
+	assert.Contains(t, logged, "namespace=default", "expected the Job namespace in the log")
 	assert.Contains(t, logged, assert.AnError.Error(), "expected the underlying error to be logged")
 }
 
