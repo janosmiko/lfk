@@ -80,6 +80,7 @@ func (m Model) updatePreviewYAMLLoaded(msg previewYAMLLoadedMsg) Model {
 	}
 	if msg.err != nil {
 		m.previewYAML = ""
+		m.clearPreviewContentFingerprint()
 		return m
 	}
 	// Pre-indented in the loading goroutine — no heavy work on main thread.
