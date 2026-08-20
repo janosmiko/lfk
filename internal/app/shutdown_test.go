@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"os"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -87,4 +89,56 @@ func TestBeginShutdown_FiresNotifier(t *testing.T) {
 	_, _ = m.beginShutdown()
 
 	assert.Equal(t, 1, calls, "shutdown notifier must fire once")
+}
+
+// isClosedFile reports whether f has already been closed.
+func isClosedFile(t *testing.T, f *os.File) bool {
+	t.Helper()
+	_, err := f.Write([]byte{0})
+	return errors.Is(err, os.ErrClosed)
+}
+
+func TestSignalShutdown_ClosesActiveExecPTY(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.tabs = []TabState{{}}
+
+	_, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = w.Close() })
+	m.execPTY = w
+
+	m.signalShutdown()
+
+	assert.Nil(t, m.execPTY, "signalShutdown must nil out the active exec PTY")
+	assert.True(t, isClosedFile(t, w), "signalShutdown must close the active exec PTY")
+}
+
+func TestSignalShutdown_ClosesBackgroundTabExecPTY(t *testing.T) {
+	m := baseModelWithFakeClient()
+
+	_, wBg, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = wBg.Close() })
+
+	m.tabs = []TabState{
+		{execPTY: wBg},
+		{},
+	}
+	m.activeTab = 1
+
+	m.signalShutdown()
+
+	assert.Nil(t, m.tabs[0].execPTY, "signalShutdown must nil out the background tab's exec PTY")
+	assert.True(t, isClosedFile(t, wBg), "signalShutdown must close the background tab's exec PTY")
+}
+
+func TestSignalShutdown_IsIdempotentAndNilSafe(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+
+	assert.NotPanics(t, func() {
+		m.signalShutdown()
+		m.signalShutdown()
+	})
 }

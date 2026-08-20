@@ -39,6 +39,10 @@ type PortForwardEntry struct {
 	StartedAt    time.Time
 	cmd          *exec.Cmd
 	cancel       context.CancelFunc
+	// shownTerminal marks a Stopped/Failed entry as already returned by
+	// EntriesForDisplay once. Set so the second call can evict it instead
+	// of leaving dead entries in the list forever.
+	shownTerminal bool
 }
 
 // PortForwardManager manages active port forwards.
@@ -72,6 +76,36 @@ func (m *PortForwardManager) Entries() []PortForwardEntry {
 		result[i] = *e
 	}
 	return result
+}
+
+// EntriesForDisplay returns a snapshot for UI display, evicting a
+// Stopped/Failed entry once it has already been shown once.
+func (m *PortForwardManager) EntriesForDisplay() []PortForwardEntry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	kept := m.entries[:0]
+	for _, e := range m.entries {
+		if isTerminalPortForwardStatus(e.Status) && e.shownTerminal {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	m.entries = kept
+
+	result := make([]PortForwardEntry, len(m.entries))
+	for i, e := range m.entries {
+		if isTerminalPortForwardStatus(e.Status) {
+			e.shownTerminal = true
+		}
+		result[i] = *e
+	}
+	return result
+}
+
+// isTerminalPortForwardStatus reports a state the forward will never leave on its own.
+func isTerminalPortForwardStatus(s PortForwardStatus) bool {
+	return s == PortForwardStopped || s == PortForwardFailed
 }
 
 // ActiveCount returns the number of active (running) port forwards.

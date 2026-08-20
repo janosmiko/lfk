@@ -106,6 +106,21 @@ func (m *Model) cleanupExecPTY() {
 	m.execScrollOffset = 0
 }
 
+// closeAllExecPTYs closes the active exec PTY plus every backgrounded
+// tab's exec PTY, mirroring cancelAllTabLogStreams.
+func (m *Model) closeAllExecPTYs() {
+	m.cleanupExecPTY()
+	for i := range m.tabs {
+		if i == m.activeTab {
+			continue
+		}
+		if m.tabs[i].execPTY != nil {
+			_ = m.tabs[i].execPTY.Close()
+			m.tabs[i].execPTY = nil
+		}
+	}
+}
+
 // handleExecKey forwards key presses to the embedded PTY.
 // Ctrl+] is a prefix key (like tmux's Ctrl+b). Scroll bindings use
 // Ctrl+<letter> so they share the prefix's modifier convention and
