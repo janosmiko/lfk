@@ -303,7 +303,12 @@ func (c *Client) buildCronJobTree(ctx context.Context, dynClient dynamic.Interfa
 					Status:    extractStatus(job.Object),
 				}
 				root.Children = append(root.Children, jobNode)
-				_ = c.buildPodOwnerTree(ctx, dynClient, namespace, "Job", job.GetName(), jobNode)
+				if podErr := c.buildPodOwnerTree(ctx, dynClient, namespace, "Job", job.GetName(), jobNode); podErr != nil {
+					// Tree build proceeds without this Job's pods. Log so
+					// operators can see why they aren't appearing.
+					logger.Warn("Resource tree: building pod owner tree for job failed; pods skipped",
+						"job", job.GetName(), "namespace", namespace, "error", podErr)
+				}
 			}
 		}
 	}

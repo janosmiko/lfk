@@ -60,82 +60,11 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	started := 0
 	var lastErr error
 	for _, item := range items {
-		itemCtx := kctx
-		if item.ClusterName != "" {
-			itemCtx = item.ClusterName
-		}
-		itemNs := ns
-		if item.Namespace != "" {
-			itemNs = item.Namespace
-		}
-
-		kind := item.Kind
-		if kind == "" {
-			kind = m.nav.ResourceType.Kind
-		}
-
-		followFlag := "-f"
-		if m.logView.previous {
-			followFlag = "--previous"
-		}
-		var args []string
-		switch kind {
-		case "Pod":
-			args = []string{
-				"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
-			}
-		default:
-			resourceRef := strings.ToLower(kind) + "/" + item.Name
-			args = []string{
-				"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
-			}
-		}
-
-		// Add --tail for initial loading.
-		if m.logView.tailLines > 0 {
-			args = append(args, fmt.Sprintf("--tail=%d", m.logView.tailLines))
-		}
-
-		args = append(args, "--timestamps")
-
-		m.addLogEntry("DBG", "kubectl "+strings.Join(args, " "))
-
-		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
-		logger.Info("Starting multi-log kubectl",
-			"item", item.Name,
-			"context", itemCtx,
-			"cmd", cmd.String(),
-			"kubeconfig", m.client.KubeconfigPathForContext(itemCtx))
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			logger.Error("Failed to create stdout pipe for multi-log", "item", item.Name, "error", err)
+		if err := m.startMultiLogItem(ctx, &wg, ch, kubectlPath, kctx, ns, item, true); err != nil {
 			lastErr = err
 			continue
 		}
-		cmd.Stderr = cmd.Stdout
-
-		if err := cmd.Start(); err != nil {
-			logger.Error("Failed to start kubectl logs for multi-log", "item", item.Name, "error", err)
-			lastErr = err
-			continue
-		}
-
 		started++
-		wg.Go(func() {
-			defer cmd.Wait() //nolint:errcheck
-			scanner := bufio.NewScanner(stdout)
-			scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
-			for scanner.Scan() {
-				select {
-				case ch <- scanner.Text():
-				case <-ctx.Done():
-					return
-				}
-			}
-		})
 	}
 
 	// Close the channel once all goroutines finish.
@@ -158,6 +87,102 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	return m, m.waitForLogLine()
 }
 
+// verbose is true for the initial start (DBG entry, info-level command
+// trace) and false for a restart, which logs its own quieter messages.
+func (m *Model) startMultiLogItem(
+	ctx context.Context, wg *sync.WaitGroup, ch chan<- string,
+	kubectlPath, kctx, ns string, item model.Item, verbose bool,
+) error {
+	itemCtx := kctx
+	if item.ClusterName != "" {
+		itemCtx = item.ClusterName
+	}
+	itemNs := ns
+	if item.Namespace != "" {
+		itemNs = item.Namespace
+	}
+
+	kind := item.Kind
+	if kind == "" {
+		kind = m.nav.ResourceType.Kind
+	}
+
+	followFlag := "-f"
+	if m.logView.previous {
+		followFlag = "--previous"
+	}
+	var args []string
+	switch kind {
+	case "Pod":
+		args = []string{
+			"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
+			"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
+		}
+	default:
+		resourceRef := strings.ToLower(kind) + "/" + item.Name
+		args = []string{
+			"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
+			"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
+		}
+	}
+
+	// Add --tail for initial loading.
+	if m.logView.tailLines > 0 {
+		args = append(args, fmt.Sprintf("--tail=%d", m.logView.tailLines))
+	}
+
+	args = append(args, "--timestamps")
+
+	if verbose {
+		m.addLogEntry("DBG", "kubectl "+logger.Redact(strings.Join(args, " ")))
+	}
+
+	cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
+	if verbose {
+		logger.Info("Starting multi-log kubectl",
+			"item", item.Name,
+			"context", logger.Redact(itemCtx),
+			"cmd", logger.Redact(cmd.String()),
+			"kubeconfig", logger.Redact(m.client.KubeconfigPathForContext(itemCtx)))
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		if verbose {
+			logger.Error("Failed to create stdout pipe for multi-log", "item", item.Name, "error", err)
+		} else {
+			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", logger.Redact(itemNs), "context", logger.Redact(itemCtx))
+		}
+		return err
+	}
+	cmd.Stderr = cmd.Stdout
+
+	if err := cmd.Start(); err != nil {
+		if verbose {
+			logger.Error("Failed to start kubectl logs for multi-log", "item", item.Name, "error", err)
+		} else {
+			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", logger.Redact(itemNs), "context", logger.Redact(itemCtx), "cmd", logger.Redact(cmd.String()))
+		}
+		return err
+	}
+
+	wg.Go(func() {
+		defer cmd.Wait() //nolint:errcheck
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
+		for scanner.Scan() {
+			select {
+			case ch <- scanner.Text():
+			case <-ctx.Done():
+				return
+			}
+		}
+	})
+
+	return nil
+}
+
 // restartMultiLogStream restarts a multi-log stream using stored items,
 // preserving current viewer settings (used when toggling timestamps).
 func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
@@ -177,72 +202,7 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 
 	var wg sync.WaitGroup
 	for _, item := range items {
-		itemCtx := kctx
-		if item.ClusterName != "" {
-			itemCtx = item.ClusterName
-		}
-		itemNs := ns
-		if item.Namespace != "" {
-			itemNs = item.Namespace
-		}
-
-		kind := item.Kind
-		if kind == "" {
-			kind = m.nav.ResourceType.Kind
-		}
-
-		followFlag := "-f"
-		if m.logView.previous {
-			followFlag = "--previous"
-		}
-		var args []string
-		switch kind {
-		case "Pod":
-			args = []string{
-				"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
-			}
-		default:
-			resourceRef := strings.ToLower(kind) + "/" + item.Name
-			args = []string{
-				"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
-			}
-		}
-
-		// Add --tail for initial loading.
-		if m.logView.tailLines > 0 {
-			args = append(args, fmt.Sprintf("--tail=%d", m.logView.tailLines))
-		}
-
-		args = append(args, "--timestamps")
-
-		cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "context", itemCtx)
-			continue
-		}
-		cmd.Stderr = cmd.Stdout
-
-		if err := cmd.Start(); err != nil {
-			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "context", itemCtx, "cmd", cmd.String())
-			continue
-		}
-
-		wg.Go(func() {
-			defer cmd.Wait() //nolint:errcheck
-			scanner := bufio.NewScanner(stdout)
-			scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
-			for scanner.Scan() {
-				select {
-				case ch <- scanner.Text():
-				case <-ctx.Done():
-					return
-				}
-			}
-		})
+		_ = m.startMultiLogItem(ctx, &wg, ch, kubectlPath, kctx, ns, item, false)
 	}
 
 	go func() {
