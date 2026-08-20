@@ -138,7 +138,7 @@ func fetchDashboardNodes(ctx context.Context, kctx string, client *k8s.Client) d
 	var data dashboardData
 	nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
 		Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
-	})
+	}, k8s.PreferCache())
 	if err == nil {
 		data.nodeItems = nodeItems
 		data.nodeCount = len(nodeItems)
@@ -157,7 +157,7 @@ func fetchDashboardPods(ctx context.Context, kctx string, client *k8s.Client) da
 	var data dashboardData
 	podItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
 		Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true,
-	})
+	}, k8s.PreferCache())
 	if err == nil {
 		data.pods = countPodStats(podItems)
 	}
@@ -304,7 +304,7 @@ func countResolvedPins(pins []string, discovered []model.ResourceTypeEntry) int 
 // up with the same summary builder the preview band uses.
 func fetchPinnedSummary(ctx context.Context, kctx string, client *k8s.Client, index int, key string, entry model.ResourceTypeEntry) dashboardData {
 	res := pinnedSummaryResult{index: index, key: key, displayName: model.DisplayNameFor(entry)}
-	items, err := client.GetResources(ctx, kctx, "", entry)
+	items, err := client.GetResources(ctx, kctx, "", entry, k8s.PreferCache())
 	if err != nil {
 		res.err = err
 		logger.Warn("Pinned summary list failed", "key", key, "error", err)
