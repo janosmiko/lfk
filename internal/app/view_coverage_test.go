@@ -49,14 +49,10 @@ func TestViewExecTerminalNoSideBorders(t *testing.T) {
 // because stripANSI only strips CSI sequences, so it would otherwise reach
 // a real terminal and rewrite its window title.
 func TestViewExecTerminalSanitizesTitle(t *testing.T) {
-	m := Model{
-		width:     40,
-		height:    10,
-		mode:      modeExec,
-		execTitle: "Exec: \x1b]0;evil\x07ns/pod",
-		tabs:      []TabState{{}},
-	}
-	out := m.viewExecTerminal()
+	m := basePush80Model()
+	m.mode = modeExec
+	m.execTitle = "Exec: \x1b]0;evil\x07ns/pod"
+	out := stripANSI(m.viewExecTerminal())
 
 	assert.NotContains(t, out, "\x1b]0;evil\x07", "OSC escape must be stripped from the exec title")
 	assert.Contains(t, out, "Exec:", "printable title text must survive sanitization")
