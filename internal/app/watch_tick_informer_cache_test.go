@@ -168,5 +168,6 @@ func waitForListActionCountToSettle(t *testing.T, dyn *dynfake.FakeDynamicClient
 		stable = 0
 		last = current
 	}
+	t.Fatalf("pod LIST action count did not stabilize; last count=%d", last)
 	return last
 }
