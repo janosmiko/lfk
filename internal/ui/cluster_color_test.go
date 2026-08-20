@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
@@ -77,18 +76,4 @@ func TestClusterColorTitleBarStyle_UnknownColorIsZeroStyle(t *testing.T) {
 	// to pass through unchanged.
 	assert.Equal(t, lipgloss.NoColor{}, style.GetBackground(),
 		"unknown color must yield the zero style (NoColor background) so callers can compose unconditionally")
-}
-
-func TestClusterColorSwatch_KnownColorRendersBlock(t *testing.T) {
-	out := ClusterColorSwatch("red")
-	assert.Contains(t, out, "██", "known color renders the full block character so the swatch is visible at a glance")
-}
-
-func TestClusterColorSwatch_UnknownColorRendersDimDots(t *testing.T) {
-	out := ClusterColorSwatch("")
-	assert.Contains(t, out, "··", "unset/unknown color renders dim dots so rows stay aligned with coloured rows")
-	// We can't reliably assert ANSI escapes here — see the title-bar test
-	// above. The character choice (dots vs. blocks) is the user-visible
-	// marker that this row has no color set.
-	_ = strings.Contains(out, "")
 }

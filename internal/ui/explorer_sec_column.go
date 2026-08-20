@@ -35,19 +35,6 @@ const (
 	securityBadgeLowMed   = "\u25cb" // ○ empty circle
 )
 
-// securityBadgeFor returns a styled severity badge for the given resource,
-// or an empty string when idx is nil or the resource has zero findings.
-// The badge format is "<symbol><worst-count>" (e.g. "●3": 3 criticals), with
-// both glyph and color driven by the highest severity present. Only the
-// worst-severity count is shown — lower-severity findings are surfaced in the
-// Security dashboard, not on the glance-level row badge.
-func securityBadgeFor(idx *security.FindingIndex, ref security.ResourceRef) string {
-	if idx == nil {
-		return ""
-	}
-	return securityBadgeStyled(idx.For(ref))
-}
-
 // securityBadgeStyled renders the styled badge for the given counts, or an
 // empty string when there are no findings. It is the single styling path
 // shared by the resource-ref and model.Item entry points.
