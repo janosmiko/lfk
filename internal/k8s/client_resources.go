@@ -69,8 +69,10 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// busy cluster only the few churning pods rebuild. The rest hit the
 	// memo. That's what removes the residual ~300ms per-call cost on a
 	// 6k-pod list when the cluster has background churn.
+	// The informer cache holds an unfiltered snapshot, so a field selector
+	// must bypass it and go straight to a direct list.
 	mode, infs := c.informerSnapshot()
-	if cacheEnabled(mode, infs) && shouldUseCache(mode, infs, contextName, gvr) {
+	if rt.FieldSelector == "" && cacheEnabled(mode, infs) && shouldUseCache(mode, infs, contextName, gvr) {
 		build := func(obj *unstructured.Unstructured) model.Item {
 			return c.buildResourceItem(obj, &rt)
 		}
@@ -94,7 +96,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		lister = dynClient.Resource(gvr)
 	}
 
-	list, err := lister.List(ctx, metav1.ListOptions{})
+	list, err := lister.List(ctx, metav1.ListOptions{FieldSelector: rt.FieldSelector})
 	if err != nil {
 		return nil, fmt.Errorf("listing %s: %w", rt.Resource, err)
 	}

@@ -56,6 +56,7 @@ type ResourceTypeEntry struct {
 	APIGroup       string // e.g., "apps"
 	APIVersion     string // e.g., "v1"
 	Resource       string // e.g., "deployments" (plural lowercase for API calls)
+	FieldSelector  string // optional server-side field selector, e.g. "type=Warning"
 	Icon           Icon   // Icon variants for display (see icon.go)
 	Namespaced     bool   // true for namespace-scoped resources, false for cluster-scoped
 	RequiresCRD    bool   // true if this resource type depends on a CRD being installed
