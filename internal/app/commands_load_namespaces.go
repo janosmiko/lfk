@@ -8,18 +8,9 @@ import (
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 )
 
-func (m Model) loadNamespaces() tea.Cmd {
-	return m.loadNamespacesSilent(false)
-}
-
-// loadNamespacesSilent issues the same namespace fetch as loadNamespaces
-// but tags the resulting msg as a background refresh. Silent loads must
-// not clear m.loading in the handler: that flag belongs to the
-// middle-column/resource-types load.
-func (m Model) loadNamespacesSilent(silent bool) tea.Cmd {
-	return m.loadNamespacesForContext(m.activeContext(), silent)
-}
-
+// loadNamespacesForContext tags silent loads as a background refresh in the
+// resulting msg. The handler must not clear m.loading for a silent load:
+// that flag belongs to the middle-column/resource-types load.
 func (m Model) loadNamespacesForContext(kctx string, silent bool) tea.Cmd {
 	if m.client == nil || kctx == "" {
 		return nil

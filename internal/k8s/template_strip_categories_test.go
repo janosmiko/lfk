@@ -79,7 +79,7 @@ spec:
 // a finalizer creates an object that cannot be deleted until some controller
 // removes it — and never, if that controller is absent in the target cluster.
 func TestStripToTemplate_DropsFinalizers_KeepsAuthorMetadata(t *testing.T) {
-	out, err := StripToTemplate(helmDeploymentYAML)
+	out, err := StripToTemplateWith(helmDeploymentYAML, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	md := mapAt(t, out, "metadata")
@@ -91,7 +91,7 @@ func TestStripToTemplate_DropsFinalizers_KeepsAuthorMetadata(t *testing.T) {
 // lands inside spec.template.metadata.labels too, so a template that keeps it
 // starts the new Deployment with a stale hash its controller will fight.
 func TestStripToTemplate_DropsControllerLabels_KeepsAuthorLabels(t *testing.T) {
-	out, err := StripToTemplate(helmDeploymentYAML)
+	out, err := StripToTemplateWith(helmDeploymentYAML, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	top := mapAt(t, out, "metadata", "labels")
@@ -109,7 +109,7 @@ func TestStripToTemplate_DropsControllerLabels_KeepsAuthorLabels(t *testing.T) {
 // claiming a Helm release it is not in may be adopted by the next `helm
 // upgrade` or deleted by `helm uninstall`.
 func TestStripToTemplate_DropsHelmOwnership_KeepsRecommendedLabels(t *testing.T) {
-	out, err := StripToTemplate(helmDeploymentYAML)
+	out, err := StripToTemplateWith(helmDeploymentYAML, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	labels := mapAt(t, out, "metadata", "labels")
@@ -138,7 +138,7 @@ metadata:
 data:
   key: value
 `
-	out, err := StripToTemplate(doc)
+	out, err := StripToTemplateWith(doc, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	labels := mapAt(t, out, "metadata", "labels")
@@ -152,7 +152,7 @@ data:
 // these hold live runtime state — a pod IP, a set of public endpoint addresses —
 // that is a lie the moment the template is applied anywhere else.
 func TestStripToTemplate_DropsVendorRuntimeAnnotations_KeepsAuthorAnnotations(t *testing.T) {
-	out, err := StripToTemplate(helmDeploymentYAML)
+	out, err := StripToTemplateWith(helmDeploymentYAML, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	top := mapAt(t, out, "metadata", "annotations")

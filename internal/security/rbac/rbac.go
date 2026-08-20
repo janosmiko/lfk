@@ -26,10 +26,6 @@ type Source struct {
 	client kubernetes.Interface
 }
 
-// New returns an rbac source with no client. Fetch returns an empty slice
-// and IsAvailable reports false.
-func New() *Source { return &Source{} }
-
 // NewWithClient returns an rbac source that lists via the given client.
 func NewWithClient(client kubernetes.Interface) *Source {
 	return &Source{client: client}

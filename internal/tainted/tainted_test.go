@@ -2,7 +2,6 @@ package tainted_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -87,13 +86,4 @@ func TestNonRenderAccessorsAvoidUnwrapping(t *testing.T) {
 
 func TestRawReturnsPayloadVerbatim(t *testing.T) {
 	assert.Equal(t, hostile, tainted.Wrap(hostile).Raw())
-}
-
-func TestWrapAllPreservesOrder(t *testing.T) {
-	got := tainted.WrapAll([]string{"a", "b", "c"})
-	var b strings.Builder
-	for _, v := range got {
-		b.WriteString(v.Raw())
-	}
-	assert.Equal(t, "abc", b.String())
 }

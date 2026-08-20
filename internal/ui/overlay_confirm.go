@@ -122,15 +122,6 @@ type OverlayConfirmConfig struct {
 	WrapWidth int
 }
 
-// WrappedLineCount reports how many rows text takes at this width, so a
-// caller can size a box around content the overlay will wrap.
-func WrappedLineCount(text string, width int) int {
-	if width <= 0 {
-		return 1
-	}
-	return len(wrapConfirmText(text, width))
-}
-
 // wrapConfirmText word-wraps text to width display columns on whitespace
 // boundaries so words (and hyphenated resource names) stay intact. A single
 // token wider than width is hard-split on rune boundaries so no line exceeds

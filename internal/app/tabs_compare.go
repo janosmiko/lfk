@@ -353,10 +353,6 @@ func cmpUint64(a, b uint64) int {
 	}
 }
 
-func compareReady(a, b string) bool {
-	return compareReadyCmp(a, b) < 0
-}
-
 func compareReadyCmp(a, b string) int {
 	return cmpFloat(parseReadyRatio(a), parseReadyRatio(b))
 }
@@ -374,18 +370,10 @@ func parseReadyRatio(s string) float64 {
 	return num / den
 }
 
-func compareNumeric(a, b string) bool {
-	return compareNumericCmp(a, b) < 0
-}
-
 func compareNumericCmp(a, b string) int {
 	na, _ := strconv.Atoi(strings.TrimSpace(a))
 	nb, _ := strconv.Atoi(strings.TrimSpace(b))
 	return cmpInt(na, nb)
-}
-
-func compareResourceValues(a, b, col string) bool {
-	return compareResourceValuesCmp(a, b, col) < 0
 }
 
 // compareResourceValuesCmp compares two CPU/MEM column values numerically.

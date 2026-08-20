@@ -23,11 +23,6 @@ type Source struct {
 	scanSecrets bool
 }
 
-// New returns a heuristic source with no client. Fetch returns an empty slice
-// and IsAvailable reports false. Callers must prefer NewWithClient when they
-// have a kubernetes client.
-func New() *Source { return &Source{} }
-
 // NewWithClient returns a heuristic source that lists pods via the given client.
 func NewWithClient(client kubernetes.Interface) *Source {
 	return &Source{client: client}

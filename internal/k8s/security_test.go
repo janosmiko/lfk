@@ -19,20 +19,6 @@ func TestSeverityLabel(t *testing.T) {
 	assert.Equal(t, "?", severityLabel(security.SeverityUnknown))
 }
 
-func TestSeverityOrder(t *testing.T) {
-	crit := model.Item{Columns: []model.KeyValue{{Key: "Severity", Value: "CRIT"}}}
-	high := model.Item{Columns: []model.KeyValue{{Key: "Severity", Value: "HIGH"}}}
-	med := model.Item{Columns: []model.KeyValue{{Key: "Severity", Value: "MED"}}}
-	low := model.Item{Columns: []model.KeyValue{{Key: "Severity", Value: "LOW"}}}
-	empty := model.Item{}
-
-	assert.Equal(t, 4, severityOrder(crit))
-	assert.Equal(t, 3, severityOrder(high))
-	assert.Equal(t, 2, severityOrder(med))
-	assert.Equal(t, 1, severityOrder(low))
-	assert.Equal(t, 0, severityOrder(empty))
-}
-
 func TestShortResource(t *testing.T) {
 	assert.Equal(t, "deploy/api",
 		shortResource(security.ResourceRef{Kind: "Deployment", Name: "api"}))

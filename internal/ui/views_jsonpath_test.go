@@ -6,6 +6,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// evalJSONPath compiles and evaluates expr against obj in one step,
+// returning "" for a compile error, matching the removed EvalJSONPath helper.
+func evalJSONPath(expr string, obj map[string]any) string {
+	jp, err := CompileJSONPath(expr)
+	if err != nil {
+		return ""
+	}
+	return EvalCompiled(jp, obj)
+}
+
 func TestEvalJSONPath(t *testing.T) {
 	obj := map[string]any{
 		"metadata": map[string]any{
@@ -41,23 +51,23 @@ func TestEvalJSONPath(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.path, func(t *testing.T) {
-			got := EvalJSONPath(c.path, obj)
+			got := evalJSONPath(c.path, obj)
 			assert.Equal(t, c.want, got)
 		})
 	}
 }
 
 func TestEvalJSONPath_InvalidExpression(t *testing.T) {
-	got := EvalJSONPath("not a valid path", map[string]any{})
+	got := evalJSONPath("not a valid path", map[string]any{})
 	assert.Equal(t, "", got)
 }
 
 func TestEvalJSONPath_EmptyExpr(t *testing.T) {
-	assert.Equal(t, "", EvalJSONPath("", map[string]any{"x": 1}))
+	assert.Equal(t, "", evalJSONPath("", map[string]any{"x": 1}))
 }
 
 func TestEvalJSONPath_NilObj(t *testing.T) {
-	assert.Equal(t, "", EvalJSONPath(".x", nil))
+	assert.Equal(t, "", evalJSONPath(".x", nil))
 }
 
 func TestCompileAndEval(t *testing.T) {

@@ -61,8 +61,8 @@ func (m Model) beginShutdown() (tea.Model, tea.Cmd) {
 }
 
 // signalShutdown issues every non-blocking cancellation so background
-// goroutines (port-forwards, captures, log streams, in-flight API
-// requests) begin winding down immediately. Every call here only signals
+// goroutines (port-forwards, captures, log streams, exec PTYs, in-flight
+// API requests) begin winding down immediately. Every call here only signals
 // — nothing waits — so it is safe to run on the UI goroutine without
 // freezing the render loop. Centralising it keeps the quit entry points
 // (handleQuitConfirmOverlayKey, closeTabOrQuit's last-tab branch, and the
@@ -75,6 +75,7 @@ func (m *Model) signalShutdown() {
 		m.captureMgr.StopAll()
 	}
 	m.cancelAllTabLogStreams()
+	m.closeAllExecPTYs()
 	m.cancelInFlightRequests()
 }
 

@@ -79,32 +79,19 @@ func TestScheduleK8sCall_CoalescedReturnsNilMsg(t *testing.T) {
 	}
 }
 
-func TestLoadNamespacesSilent_SubmitsAtCriticalPriority(t *testing.T) {
-	// Use a fake-client model so loadNamespacesSilent does not bail on nil client.
+func TestLoadNamespacesForContext_SubmitsAtCriticalPriority(t *testing.T) {
+	// Use a fake-client model so loadNamespacesForContext does not bail on nil client.
 	// Workers are NOT started so the task stays queued for priority inspection.
 	m := baseModelWithFakeClient()
 	m.nav.Context = "test-ctx"
 
-	cmd := m.loadNamespacesSilent(true)
+	cmd := m.loadNamespacesForContext("test-ctx", true)
 	require.NotNil(t, cmd)
 	go cmd()
 
 	require.Eventually(t, func() bool {
 		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityCritical) >= 1
-	}, time.Second, 10*time.Millisecond, "loadNamespacesSilent must Submit at Critical priority")
-}
-
-func TestLoadNamespaces_SubmitsAtCriticalPriority(t *testing.T) {
-	m := baseModelWithFakeClient()
-	m.nav.Context = "test-ctx"
-
-	cmd := m.loadNamespaces()
-	require.NotNil(t, cmd)
-	go cmd()
-
-	require.Eventually(t, func() bool {
-		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityCritical) >= 1
-	}, time.Second, 10*time.Millisecond, "loadNamespaces must Submit at Critical priority")
+	}, time.Second, 10*time.Millisecond, "loadNamespacesForContext must Submit at Critical priority")
 }
 
 func TestDiscoverAPIResources_SubmitsAtCriticalPriority(t *testing.T) {

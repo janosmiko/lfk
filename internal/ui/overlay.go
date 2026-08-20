@@ -22,26 +22,6 @@ func GetOverlayNsScroll() int { return overlayNsScroll }
 // resolution stays in sync with the rendered scroll window.
 func SetOverlayNsScroll(s int) { overlayNsScroll = s }
 
-// ResetOverlayPodScroll is a deprecated no-op; the pod-selector overlay now
-// derives its scroll window from the cursor on every render via OverlayList.
-//
-// Deprecated: drop the call site.
-func ResetOverlayPodScroll() {}
-
-// ResetOverlayContainerScroll is a deprecated no-op; the log-container
-// multi-select overlay now derives its scroll window from the cursor on
-// every render via OverlayList.
-//
-// Deprecated: drop the call site.
-func ResetOverlayContainerScroll() {}
-
-// ResetOverlayCanISubjectScroll is a deprecated no-op; the can-i subject
-// selector overlay now derives its scroll window from the cursor on every
-// render.
-//
-// Deprecated: drop the call site.
-func ResetOverlayCanISubjectScroll() {}
-
 // ErrorLogEntry stores a single application log entry with its timestamp and severity level.
 type ErrorLogEntry struct {
 	Time    time.Time

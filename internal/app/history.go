@@ -37,12 +37,6 @@ type commandHistory struct {
 	filename string // file in the lfk state directory; empty = command bar (back-compat)
 }
 
-// historyFilePath returns the path to the command bar history file.
-// Uses the "history" file in the lfk state directory (see internal/paths).
-func historyFilePath() string {
-	return historyFilePathFor(historyFileCommand)
-}
-
 // historyFilePathFor returns the path to the named history file. Returns
 // "" when the state directory cannot be resolved.
 func historyFilePathFor(name string) string {

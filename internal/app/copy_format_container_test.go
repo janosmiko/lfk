@@ -69,19 +69,3 @@ func TestExtractContainerBlocksYAML_EphemeralContainer(t *testing.T) {
 	assert.Contains(t, out, "name: debugger")
 	assert.Contains(t, out, "image: busybox:1.36")
 }
-
-func TestExtractContainerBlocksJSON_Single(t *testing.T) {
-	out, err := ExtractContainerBlocksJSON(sampleContainerPodYAML, []string{"app"})
-	require.NoError(t, err)
-	// JSON object for single container
-	assert.True(t, strings.HasPrefix(out, "{"))
-	assert.Contains(t, out, "\"name\":\"app\"")
-}
-
-func TestExtractContainerBlocksJSON_MultiIsArray(t *testing.T) {
-	out, err := ExtractContainerBlocksJSON(sampleContainerPodYAML, []string{"app", "init-db"})
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(out, "["))
-	assert.Contains(t, out, "\"name\":\"app\"")
-	assert.Contains(t, out, "\"name\":\"init-db\"")
-}

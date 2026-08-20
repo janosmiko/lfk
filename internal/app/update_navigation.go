@@ -773,25 +773,3 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	m.yamlView.resetBlame()
 	return m, m.loadYAML()
 }
-
-// itemIndexFromDisplayLine maps a display line number to the actual item index,
-// accounting for category headers and separators in the middle column.
-func (m *Model) itemIndexFromDisplayLine(displayLine int) int {
-	visible := m.visibleMiddleItems()
-	line := 0
-	lastCategory := ""
-	for i, item := range visible {
-		if item.Category != "" && item.Category != lastCategory {
-			lastCategory = item.Category
-			if i > 0 {
-				line++ // separator
-			}
-			line++ // category header
-		}
-		if line == displayLine {
-			return i
-		}
-		line++
-	}
-	return -1
-}

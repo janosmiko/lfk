@@ -49,22 +49,3 @@ type diffViewState struct {
 
 	scrollOption int // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 }
-
-// copy returns a deep copy: the matchLines and foldState slices are cloned so
-// a value stored in a TabState never aliases the live viewer's backing arrays.
-// Scalars, strings, and the TextInput value are copied by assignment.
-//
-// diffCache is deliberately SHARED rather than cloned. It is a memo keyed on
-// the diff it holds, so the worst a second tab can do is evict the first one's
-// entry; giving each tab its own would instead hand a fresh nil cache to every
-// snapshot restore.
-func (s diffViewState) copy() diffViewState {
-	cp := s
-	if s.matchLines != nil {
-		cp.matchLines = append([]int(nil), s.matchLines...)
-	}
-	if s.foldState != nil {
-		cp.foldState = append([]bool(nil), s.foldState...)
-	}
-	return cp
-}

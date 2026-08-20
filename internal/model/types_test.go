@@ -305,41 +305,6 @@ func TestIsForceDeleteableKind(t *testing.T) {
 	}
 }
 
-// --- IsCoreCategory ---
-
-func TestIsCoreCategory(t *testing.T) {
-	tests := []struct {
-		label    string
-		category string
-		want     bool
-	}{
-		{"Dashboards", "Dashboards", true},
-		{"Workloads", "Workloads", true},
-		{"Config", "Config", true},
-		{"Networking", "Networking", true},
-		{"Storage", "Storage", true},
-		{"Access Control", "Access Control", true},
-		{"Cluster", "Cluster", true},
-		{"Helm", "Helm", true},
-		{"API and CRDs", "API and CRDs", true},
-		{"argoproj.io", "argoproj.io", false},
-		{"gateway.networking.k8s.io", "gateway.networking.k8s.io", false},
-		{"cert-manager.io", "cert-manager.io", false},
-		{"Custom", "Custom", false},
-		{"empty string", "", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.label, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsCoreCategory(tt.category))
-		})
-	}
-}
-
-func TestAPICRDsIsCoreCategory(t *testing.T) {
-	assert.True(t, IsCoreCategory("API and CRDs"),
-		"API and CRDs should be a core category")
-}
-
 // --- Templates ---
 
 func TestBuiltinTemplates(t *testing.T) {

@@ -45,7 +45,7 @@ func pressKey(t *testing.T, m Model, key string) Model {
 func TestExportStripOverlay_DefaultPathStaysTwoKeystrokes(t *testing.T) {
 	m := openedExportPicker(t)
 
-	want, err := k8s.StripToTemplate(exportPickerYAML)
+	want, err := k8s.StripToTemplateWith(exportPickerYAML, k8s.DefaultTemplateStripSet())
 	require.NoError(t, err)
 	assert.Equal(t, want, m.exportTemplatePicker.manifest,
 		"a user who never opens the field picker sees the default strip")

@@ -142,7 +142,7 @@ func TestSourceFetchSecretEnvPatterns(t *testing.T) {
 }
 
 func TestSourceFetchNilClient(t *testing.T) {
-	s := New()
+	s := NewWithClient(nil)
 	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings)

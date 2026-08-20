@@ -138,24 +138,6 @@ func TestIsResourceIgnoredSpecificOnly(t *testing.T) {
 	assert.False(t, isResourceIgnored(state, "prod", "heuristic", "CVE-2024-9999", "ns1/Deployment/backend"))
 }
 
-func TestCountIgnoredGroups(t *testing.T) {
-	state := &SecurityIgnoreState{Contexts: make(map[string][]SecurityIgnoreRule)}
-
-	// Add 2 global ignores.
-	state = addSecurityIgnore(state, "prod", SecurityIgnoreRule{Source: "heuristic", GroupKey: "CVE-A"})
-	state = addSecurityIgnore(state, "prod", SecurityIgnoreRule{Source: "heuristic", GroupKey: "CVE-B"})
-
-	// Add 1 resource-specific ignore (should NOT count).
-	state = addSecurityIgnore(state, "prod", SecurityIgnoreRule{
-		Source:   "heuristic",
-		GroupKey: "CVE-C",
-		Resource: "default/Pod/app",
-	})
-
-	assert.Equal(t, 2, countIgnoredGroups(state, "prod"))
-	assert.Equal(t, 0, countIgnoredGroups(state, "staging"))
-}
-
 func TestSecurityIgnoresRoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", tmpDir)

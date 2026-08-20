@@ -91,31 +91,3 @@ type logViewState struct {
 	searchQuery   string // applied search
 	searchHistory *commandHistory
 }
-
-// copy returns a copy with the value-typed slices (lines, multiItems,
-// containers, selectedContainers) cloned so a TabState snapshot never aliases
-// the live viewer's backing arrays. The streaming channel, cancel funcs, and
-// searchHistory pointer are shared by assignment, matching the pre-extraction
-// save/restore semantics (they are live handles, not snapshot values).
-func (s logViewState) copy() logViewState {
-	cp := s
-	if s.lines != nil {
-		cp.lines = append([]string(nil), s.lines...)
-	}
-	if s.rawLines != nil {
-		cp.rawLines = append([]string(nil), s.rawLines...)
-	}
-	if s.rawSev != nil {
-		cp.rawSev = append([]int(nil), s.rawSev...)
-	}
-	if s.multiItems != nil {
-		cp.multiItems = append([]model.Item(nil), s.multiItems...)
-	}
-	if s.containers != nil {
-		cp.containers = append([]string(nil), s.containers...)
-	}
-	if s.selectedContainers != nil {
-		cp.selectedContainers = append([]string(nil), s.selectedContainers...)
-	}
-	return cp
-}

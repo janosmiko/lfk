@@ -7,10 +7,10 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// fuzzyScore returns a match score for query against text. Higher is better;
-// 0 means no match. The scoring tiers are ordered so that a prefix match of
-// any candidate always outranks a substring match, which always outranks a
-// subsequence match, regardless of length bonuses within each tier.
+// fuzzyScoreLower returns a match score for qLower (already lowercased)
+// against text. Higher is better, 0 means no match. The scoring tiers rank
+// prefix above substring above subsequence, regardless of length bonuses
+// within each tier.
 //
 // Tiers (case-insensitive):
 //   - Exact match:      10000
@@ -19,15 +19,10 @@ import (
 //   - Subsequence match:  500 + (100 - span)                      // tighter prefers
 //
 // An empty query returns a small baseline score so direct callers that score
-// individual candidates still match. filterSuggestionsFuzzy short-circuits
-// empty queries to preserve the candidate input order.
-func fuzzyScore(text, query string) int {
-	return fuzzyScoreLower(text, strings.ToLower(query))
-}
-
-// fuzzyScoreLower is fuzzyScore with the query already lowercased. Hot-loop
-// callers should lowercase the query once and reuse this helper to avoid
-// repeated allocations per candidate.
+// individual candidates still match.
+//
+// Callers should lowercase the query once and reuse this helper across
+// candidates to avoid repeated allocations.
 func fuzzyScoreLower(text, qLower string) int {
 	if qLower == "" {
 		return 1

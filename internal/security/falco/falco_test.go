@@ -14,22 +14,22 @@ import (
 )
 
 func TestSourceName(t *testing.T) {
-	assert.Equal(t, "falco", New().Name())
+	assert.Equal(t, "falco", NewWithClient(nil).Name())
 }
 
 func TestSourceCategories(t *testing.T) {
-	cats := New().Categories()
+	cats := NewWithClient(nil).Categories()
 	assert.Contains(t, cats, security.CategoryPolicy)
 }
 
 func TestIsAvailableNilClient(t *testing.T) {
-	ok, err := New().IsAvailable(t.Context(), "ctx")
+	ok, err := NewWithClient(nil).IsAvailable(t.Context(), "ctx")
 	assert.False(t, ok)
 	assert.NoError(t, err)
 }
 
 func TestFetchNilClient(t *testing.T) {
-	findings, err := New().Fetch(t.Context(), "ctx", "")
+	findings, err := NewWithClient(nil).Fetch(t.Context(), "ctx", "")
 	assert.Nil(t, findings)
 	assert.NoError(t, err)
 }

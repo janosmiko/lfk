@@ -2,9 +2,12 @@ package app
 
 import (
 	"testing"
+	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCov80RestorePortForwardsNoKubectl(t *testing.T) {
@@ -66,5 +69,28 @@ func TestRestartLocalPort(t *testing.T) {
 				t.Errorf("restartLocalPort(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+// A terminal port-forward, once shown, must be evicted after its grace
+// period even if the manager never fires another update callback.
+func TestWaitForPortForwardUpdate_FiresOnEvictionDeadlineWithoutCallback(t *testing.T) {
+	m := basePush80Model()
+	current := time.Now()
+	mgr := k8s.NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.SeedTerminalEntryForTest(1, current.Add(-4*time.Second))
+	m.portForwardMgr = mgr
+
+	cmd := m.waitForPortForwardUpdate()
+	require.NotNil(t, cmd)
+
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+
+	select {
+	case msg := <-done:
+		assert.IsType(t, portForwardUpdateMsg{}, msg)
+	case <-time.After(2 * time.Second):
+		t.Fatal("waitForPortForwardUpdate did not fire on the eviction deadline without a manager callback")
 	}
 }

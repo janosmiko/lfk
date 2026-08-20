@@ -37,9 +37,3 @@ func TestCopyFormatLabelAndKey(t *testing.T) {
 	assert.Equal(t, "Table", CopyFormatTable.Label())
 	assert.Equal(t, "t", CopyFormatTable.ShortcutKey())
 }
-
-func TestCopyFormatStatusKey(t *testing.T) {
-	assert.Equal(t, "yaml", CopyFormatYAML.statusKey())
-	assert.Equal(t, "json", CopyFormatJSON.statusKey())
-	assert.Equal(t, "table", CopyFormatTable.statusKey())
-}

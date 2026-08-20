@@ -484,32 +484,6 @@ func TestRenderResourceTree(t *testing.T) {
 	})
 }
 
-// --- truncateNoMarker ---
-
-func TestTruncateNoMarker(t *testing.T) {
-	tests := []struct {
-		name     string
-		s        string
-		maxW     int
-		expected string
-	}{
-		{"zero maxW", "hello", 0, ""},
-		{"negative maxW", "hello", -1, ""},
-		{"fits exactly", "hello", 5, "hello"},
-		{"fits with room", "hi", 5, "hi"},
-		{"needs truncation", "hello world", 6, "hello "},
-		{"maxW 1", "hello", 1, "h"},
-		{"empty string", "", 5, ""},
-		{"unicode fits", "héllo", 5, "héllo"},
-		{"unicode truncated", "héllo world", 4, "héll"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, truncateNoMarker(tt.s, tt.maxW))
-		})
-	}
-}
-
 // --- truncateStr ---
 
 func TestTruncateStr(t *testing.T) {

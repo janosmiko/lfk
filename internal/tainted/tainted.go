@@ -40,15 +40,6 @@ func Wrap(s string) String {
 	return String{raw: s}
 }
 
-// WrapAll wraps a slice in place-equivalent order.
-func WrapAll(ss []string) []String {
-	out := make([]String, len(ss))
-	for i, s := range ss {
-		out[i] = Wrap(s)
-	}
-	return out
-}
-
 // Line unwraps for a single-line sink: a table cell, a title, a status
 // message. Drops C0/C1 controls and bidi overrides entirely. No ANSI or tab
 // survives, because a short cell has no legitimate use for either.

@@ -70,45 +70,8 @@ type BackgroundTaskRow struct {
 	Position   int           // 1-based queue position. Only for TaskStatusQueued
 }
 
-// RenderBackgroundTasksOverlay renders the modal content for the :scheduler
-// overlay. width and height are the outer overlay dimensions. The caller
-// wraps this string in ui.OverlayStyle (rounded border + padding), so
-// this function only emits the inner content: title, header row, data
-// rows, and footer summary. No border, no padding.
-//
-// The caller's OverlayStyle adds 1 cell of border on each side plus 2
-// cells of horizontal padding, for a total of 6 cells of horizontal
-// overhead. The inner content must fit within width-6 columns or rows
-// will wrap onto a second line.
-//
-// mode picks between the Running view (live ELAPSED column, "Scheduler
-// — Running" title, rows show STATUS = Running / Queued #N / Finished)
-// and the Completed view (fixed DURATION column, "Scheduler — Completed"
-// title, "N completed" footer).
-//
-// rows is the unified active-table slice — callers merge running,
-// queued, and finished-lingering tasks into one ordered list and tag
-// each with Status. Eliminating the separate Queued section keeps the
-// overlay box at a stable height as items flow through the lifecycle.
-//
-// scroll is the index of the first visible row. The renderer clamps it
-// into [0, max) so callers can bump it blindly in response to j/k key
-// presses without maintaining their own clamp logic. When the row count
-// exceeds the visible window, the footer gains a "(X-Y)" position
-// indicator so users know where they are in the list.
-//
-// The data area is padded to a fixed line count so the overlay box
-// stays a constant size regardless of how many rows are present —
-// queued items appearing/draining no longer make the window jump.
-func RenderBackgroundTasksOverlay(rows []BackgroundTaskRow, mode BackgroundTaskOverlayMode, scroll, width, height int) string {
-	return RenderBackgroundTasksOverlayWithSubtitle(rows, mode, "", scroll, width, height)
-}
-
-// RenderBackgroundTasksOverlayWithSubtitle renders the overlay with an
-// optional dim suffix appended to the title — used to surface state
-// like "(showing all entries)" when the user has toggled the
-// sub-second filter off via `a`. The empty-subtitle variant matches
-// RenderBackgroundTasksOverlay exactly.
+// RenderBackgroundTasksOverlayWithSubtitle renders the :scheduler overlay's
+// inner content. Data area height is fixed and scroll is clamped internally.
 func RenderBackgroundTasksOverlayWithSubtitle(rows []BackgroundTaskRow, mode BackgroundTaskOverlayMode, subtitle string, scroll, width, height int) string {
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).

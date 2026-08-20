@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -28,27 +27,6 @@ func ExtractContainerBlocksYAML(podYAML string, names []string) (string, error) 
 		docs = append(docs, strings.TrimRight(string(out), "\n"))
 	}
 	return strings.Join(docs, "\n---\n") + "\n", nil
-}
-
-// ExtractContainerBlocksJSON mirrors ExtractContainerBlocksYAML but
-// emits JSON. One name → a JSON object; multiple names → a JSON array.
-func ExtractContainerBlocksJSON(podYAML string, names []string) (string, error) {
-	blocks, err := extractContainerBlocks(podYAML, names)
-	if err != nil {
-		return "", err
-	}
-	if len(blocks) == 1 {
-		b, err := json.Marshal(blocks[0])
-		if err != nil {
-			return "", fmt.Errorf("marshaling container %q: %w", blocks[0]["name"], err)
-		}
-		return string(b) + "\n", nil
-	}
-	b, err := json.Marshal(blocks)
-	if err != nil {
-		return "", fmt.Errorf("marshaling container array: %w", err)
-	}
-	return string(b) + "\n", nil
 }
 
 // extractContainerBlocks parses podYAML and returns each requested

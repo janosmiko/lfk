@@ -1,7 +1,6 @@
 package app
 
 import (
-	"maps"
 	"sort"
 
 	"github.com/janosmiko/lfk/internal/logagg"
@@ -88,35 +87,6 @@ type logTopState struct {
 	// (e.g. 5j, 10G). Cleared by consumeCountPrefix after each motion, and also
 	// cleared on any non-digit non-motion key.
 	lineInput string
-}
-
-func (s logTopState) copy() logTopState {
-	c := s
-	// Zero transient overlay state that must not persist across tab snapshots.
-	c.colFilter = ""
-	c.colFilterActive = false
-	c.drillTarget = ""
-	c.groupBy = append([]string(nil), s.groupBy...)
-	c.parsed = append([]logagg.Fields(nil), s.parsed...)
-	c.rows = append([]logagg.Row(nil), s.rows...)
-	if s.drillStack != nil {
-		c.drillStack = make([]logTopDrillFrame, len(s.drillStack))
-		for i, fr := range s.drillStack {
-			c.drillStack[i] = logTopDrillFrame{
-				groupBy: append([]string(nil), fr.groupBy...),
-				filters: append([]logTopDrillFilter(nil), fr.filters...),
-			}
-		}
-	}
-	c.displayDims = append([]string(nil), s.displayDims...)
-	c.colOrder = append([]string(nil), s.colOrder...)
-	if s.colHidden != nil {
-		c.colHidden = maps.Clone(s.colHidden)
-	}
-	c.agg = nil           // live aggregation is rebuilt lazily; never share the pointer across snapshots
-	c.colSnapOrder = nil  // ephemeral: esc-cancel snapshot, valid only while the columns overlay is open
-	c.colSnapHidden = nil // ephemeral: esc-cancel snapshot, valid only while the columns overlay is open
-	return c
 }
 
 func (m *Model) saveLogTopToTab(t *TabState) {
