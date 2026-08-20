@@ -118,6 +118,24 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"hunter2-DSNMARKER"},
 		},
 		{
+			name:            "password as a path component is not mangled",
+			input:           "cat /etc/passwd: permission denied",
+			wantContains:    []string{"cat /etc/passwd: permission denied"},
+			wantNotContains: []string{"[REDACTED"},
+		},
+		{
+			name:            "redis URL with password only (no username)",
+			input:           "redis://:hunter2SECRET@host:6379/0 connection refused",
+			wantContains:    []string{"redis://[REDACTED-CREDS]@host:6379/0", "connection refused"},
+			wantNotContains: []string{"hunter2SECRET"},
+		},
+		{
+			name:            "redis URL with no credentials passes through unchanged",
+			input:           "connecting to redis://host:6379/0",
+			wantContains:    []string{"connecting to redis://host:6379/0"},
+			wantNotContains: []string{"[REDACTED"},
+		},
+		{
 			name:            "no secrets passes through unchanged",
 			input:           "kubectl get pods -n default --context prod",
 			wantContains:    []string{"kubectl get pods -n default --context prod"},
