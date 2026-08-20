@@ -100,16 +100,19 @@ func isClosedFile(t *testing.T, f *os.File) bool {
 
 func TestSignalShutdown_ClosesActiveExecPTY(t *testing.T) {
 	m := baseModelWithFakeClient()
-	m.tabs = []TabState{{}}
 
 	_, w, err := os.Pipe()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = w.Close() })
 	m.execPTY = w
+	// TabState mirrors Model's exec state after saveCurrentTab. The mirror
+	// must be nilled too, so a later restore can't re-close the same fd.
+	m.tabs = []TabState{{execPTY: w}}
 
 	m.signalShutdown()
 
 	assert.Nil(t, m.execPTY, "signalShutdown must nil out the active exec PTY")
+	assert.Nil(t, m.tabs[0].execPTY, "signalShutdown must nil out the active tab's mirrored exec PTY")
 	assert.True(t, isClosedFile(t, w), "signalShutdown must close the active exec PTY")
 }
 

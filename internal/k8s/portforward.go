@@ -39,11 +39,14 @@ type PortForwardEntry struct {
 	StartedAt    time.Time
 	cmd          *exec.Cmd
 	cancel       context.CancelFunc
-	// shownTerminal marks a Stopped/Failed entry as already returned by
-	// EntriesForDisplay once. Set so the second call can evict it instead
-	// of leaving dead entries in the list forever.
-	shownTerminal bool
+	// shownAt is when a Stopped/Failed entry was first returned by
+	// EntriesForDisplay. Zero means not yet shown.
+	shownAt time.Time
 }
+
+// portForwardEvictionGrace: Bubble Tea can coalesce two Updates into one
+// paint, so evicting on the next call risks dropping an entry unseen.
+const portForwardEvictionGrace = 3 * time.Second
 
 // PortForwardManager manages active port forwards.
 type PortForwardManager struct {
@@ -51,13 +54,22 @@ type PortForwardManager struct {
 	entries  []*PortForwardEntry
 	nextID   int
 	onUpdate func() // callback when entries change
+	now      func() time.Time
 }
 
 // NewPortForwardManager creates a new port forward manager.
 func NewPortForwardManager() *PortForwardManager {
 	return &PortForwardManager{
 		nextID: 1,
+		now:    time.Now,
 	}
+}
+
+// SetClockForTest overrides the manager's clock. Test-only.
+func (m *PortForwardManager) SetClockForTest(now func() time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.now = now
 }
 
 // SetUpdateCallback sets a callback that is invoked when entries change.
@@ -79,14 +91,16 @@ func (m *PortForwardManager) Entries() []PortForwardEntry {
 }
 
 // EntriesForDisplay returns a snapshot for UI display, evicting a
-// Stopped/Failed entry once it has already been shown once.
+// Stopped/Failed entry once portForwardEvictionGrace has passed since it
+// was first returned.
 func (m *PortForwardManager) EntriesForDisplay() []PortForwardEntry {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	now := m.now()
 
 	kept := m.entries[:0]
 	for _, e := range m.entries {
-		if isTerminalPortForwardStatus(e.Status) && e.shownTerminal {
+		if isTerminalPortForwardStatus(e.Status) && !e.shownAt.IsZero() && now.Sub(e.shownAt) >= portForwardEvictionGrace {
 			continue
 		}
 		kept = append(kept, e)
@@ -95,8 +109,8 @@ func (m *PortForwardManager) EntriesForDisplay() []PortForwardEntry {
 
 	result := make([]PortForwardEntry, len(m.entries))
 	for i, e := range m.entries {
-		if isTerminalPortForwardStatus(e.Status) {
-			e.shownTerminal = true
+		if isTerminalPortForwardStatus(e.Status) && e.shownAt.IsZero() {
+			e.shownAt = now
 		}
 		result[i] = *e
 	}

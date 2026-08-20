@@ -110,6 +110,9 @@ func (m *Model) cleanupExecPTY() {
 // tab's exec PTY, mirroring cancelAllTabLogStreams.
 func (m *Model) closeAllExecPTYs() {
 	m.cleanupExecPTY()
+	if m.activeTab >= 0 && m.activeTab < len(m.tabs) {
+		m.tabs[m.activeTab].execPTY = nil
+	}
 	for i := range m.tabs {
 		if i == m.activeTab {
 			continue

@@ -9,30 +9,41 @@ import (
 )
 
 // --- EntriesForDisplay: terminal-state eviction ---
-// A terminal entry survives its first display and is gone by the second.
+// A terminal entry survives its first display, and any display still
+// within the grace period, and is gone once the grace period has passed.
 
-func TestEntriesForDisplay_EvictsStoppedAfterSecondCall(t *testing.T) {
+func TestEntriesForDisplay_StoppedSurvivesBackToBackCallsThenEvicts(t *testing.T) {
 	mgr := NewPortForwardManager()
+	current := time.Now()
+	mgr.SetClockForTest(func() time.Time { return current })
+
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
-		{ID: 1, Status: PortForwardStopped, StartedAt: time.Now()},
-		{ID: 2, Status: PortForwardRunning, StartedAt: time.Now()},
+		{ID: 1, Status: PortForwardStopped, StartedAt: current},
+		{ID: 2, Status: PortForwardRunning, StartedAt: current},
 	}
 	mgr.mu.Unlock()
 
 	first := mgr.EntriesForDisplay()
-	assert.Len(t, first, 2, "stopped entry must still be visible on first display")
+	assert.Len(t, first, 2, "stopped entry must be visible on first display")
 
 	second := mgr.EntriesForDisplay()
-	require.Len(t, second, 1, "stopped entry must be evicted after being shown once")
-	assert.Equal(t, 2, second[0].ID, "the running entry must remain")
+	require.Len(t, second, 2, "an immediate second display must not evict — coalesced Updates can skip a paint")
+
+	current = current.Add(portForwardEvictionGrace)
+	third := mgr.EntriesForDisplay()
+	require.Len(t, third, 1, "stopped entry must be evicted once the grace period has passed")
+	assert.Equal(t, 2, third[0].ID, "the running entry must remain")
 }
 
-func TestEntriesForDisplay_EvictsFailedAfterSecondCall(t *testing.T) {
+func TestEntriesForDisplay_FailedSurvivesBackToBackCallsThenEvicts(t *testing.T) {
 	mgr := NewPortForwardManager()
+	current := time.Now()
+	mgr.SetClockForTest(func() time.Time { return current })
+
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
-		{ID: 1, Status: PortForwardFailed, Error: "boom", StartedAt: time.Now()},
+		{ID: 1, Status: PortForwardFailed, Error: "boom", StartedAt: current},
 	}
 	mgr.mu.Unlock()
 
@@ -41,7 +52,11 @@ func TestEntriesForDisplay_EvictsFailedAfterSecondCall(t *testing.T) {
 	assert.Equal(t, "boom", first[0].Error, "the failure reason must be visible on first display")
 
 	second := mgr.EntriesForDisplay()
-	assert.Empty(t, second, "failed entry must be evicted after being shown once")
+	require.Len(t, second, 1, "an immediate second display must not evict — coalesced Updates can skip a paint")
+
+	current = current.Add(portForwardEvictionGrace)
+	third := mgr.EntriesForDisplay()
+	assert.Empty(t, third, "failed entry must be evicted once the grace period has passed")
 }
 
 func TestEntriesForDisplay_NeverEvictsActiveEntries(t *testing.T) {
