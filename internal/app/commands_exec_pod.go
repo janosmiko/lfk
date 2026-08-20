@@ -466,7 +466,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 			logExplainFailure(target, apiVersion, cmdErr)
 			return explainLoadedMsg{
 				gen: gen,
-				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
+				err: logger.RedactErr(cmdErr, output),
 			}
 		}
 
@@ -509,7 +509,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 			logExplainFailure(resource, apiVersion, cmdErr)
 			return explainRecursiveMsg{
 				gen: gen,
-				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
+				err: logger.RedactErr(cmdErr, output),
 			}
 		}
 
@@ -554,7 +554,7 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 			logExplainFailure(target, apiVersion, cmdErr)
 			return explainTreeLoadedMsg{
 				gen: gen,
-				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
+				err: logger.RedactErr(cmdErr, output),
 			}
 		}
 
@@ -610,7 +610,7 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 		msg := ident
 		if cmdErr != nil {
 			logExplainFailure(target, apiVersion, cmdErr)
-			msg.err = fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))
+			msg.err = logger.RedactErr(cmdErr, output)
 			return msg
 		}
 		_, msg.fields = parseExplainOutput(string(output), parentPath)

@@ -485,7 +485,7 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 			logger.Error("helm get values failed", "cmd", cmd.String(), "error", cmdErr, "output", logger.Redact(string(output)))
 			return helmValuesLoadedMsg{
 				title: title,
-				err:   fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
+				err:   logger.RedactErr(cmdErr, output),
 			}
 		}
 		content := strings.TrimSpace(string(output))

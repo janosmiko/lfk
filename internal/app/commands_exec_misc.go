@@ -59,7 +59,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			logger.Error("kubectl force delete failed", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx, "error", err)
-			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
+			return actionResultMsg{err: logger.RedactErr(err, output)}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Force deleted %s/%s", rt.Resource, name)}
 	})
@@ -93,7 +93,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			logger.Error("kubectl patch failed", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx, "error", err)
-			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
+			return actionResultMsg{err: logger.RedactErr(err, output)}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Finalizers removed from %s/%s", rt.Resource, name)}
 	})

@@ -36,10 +36,9 @@ func runHelmCmdResult(cmd *exec.Cmd, successMsg, failPrefix string) tea.Msg {
 	logExecCmd("Running helm command", cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// Do not log raw helm output — it can echo Secret values on error. The
-		// captured output still reaches the user via the (ephemeral) status bar.
+		// Do not log raw helm output — it can echo Secret values on error.
 		logger.Error("helm command failed", "cmd", cmd.String(), "error", err)
-		return actionResultMsg{err: fmt.Errorf("%s: %w: %s", failPrefix, err, strings.TrimSpace(string(out)))}
+		return actionResultMsg{err: fmt.Errorf("%s: %w", failPrefix, logger.RedactErr(err, out))}
 	}
 	return actionResultMsg{message: successMsg}
 }
@@ -215,7 +214,7 @@ func (m Model) helmDiff() tea.Cmd {
 			allCmd.Env = env
 			allOut, allErr := allCmd.CombinedOutput()
 			if allErr != nil {
-				return diffLoadedMsg{err: fmt.Errorf("getting all values: %w: %s", allErr, strings.TrimSpace(string(allOut)))}
+				return diffLoadedMsg{err: fmt.Errorf("getting all values: %w", logger.RedactErr(allErr, allOut))}
 			}
 			defaultOut = string(allOut)
 			leftLabel = "All Values (defaults + overrides)"
@@ -227,7 +226,7 @@ func (m Model) helmDiff() tea.Cmd {
 		logExecCmd("Running helm command", userCmd)
 		userOut, userErr := userCmd.CombinedOutput()
 		if userErr != nil {
-			return diffLoadedMsg{err: fmt.Errorf("getting user values: %w: %s", userErr, strings.TrimSpace(string(userOut)))}
+			return diffLoadedMsg{err: fmt.Errorf("getting user values: %w", logger.RedactErr(userErr, userOut))}
 		}
 
 		return diffLoadedMsg{
@@ -354,10 +353,9 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 		logExecCmd("Running helm command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			// Don't log raw helm output (may echo Secret values); the user still
-			// sees it via the returned error in the status bar.
+			// Don't log raw helm output (may echo Secret values).
 			logger.Error("helm rollback failed", "cmd", cmd.String(), "error", cmdErr)
-			return helmRollbackDoneMsg{err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))}
+			return helmRollbackDoneMsg{err: logger.RedactErr(cmdErr, output)}
 		}
 		return helmRollbackDoneMsg{}
 	})

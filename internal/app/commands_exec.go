@@ -35,10 +35,10 @@ func runInteractiveShellExec(cmd *exec.Cmd, title, sessionLabel string, clearBef
 			logExecCmd("Opening "+sessionLabel+" in "+mxName, wrapped)
 			output, err := wrapped.CombinedOutput()
 			if err != nil {
-				logger.Error(sessionLabel+" multiplexer spawn failed", "error", err, "output", string(output))
+				logger.Error(sessionLabel+" multiplexer spawn failed", "error", err, "output", logger.Redact(string(output)))
 				return actionResultMsg{
-					err: fmt.Errorf("opening %s in new %s %s: %w: %s",
-						sessionLabel, mxName, paneNoun, err, strings.TrimSpace(string(output))),
+					err: fmt.Errorf("opening %s in new %s %s: %w",
+						sessionLabel, mxName, paneNoun, logger.RedactErr(err, output)),
 				}
 			}
 			return actionResultMsg{
@@ -115,10 +115,10 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("kubectl describe failed", "cmd", cmd.String(), "error", err, "output", string(output))
+			logger.Error("kubectl describe failed", "cmd", cmd.String(), "error", err, "output", logger.Redact(string(output)))
 			return describeLoadedMsg{
 				title: title,
-				err:   fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output))),
+				err:   logger.RedactErr(err, output),
 			}
 		}
 		return describeLoadedMsg{

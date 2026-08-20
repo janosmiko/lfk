@@ -54,6 +54,12 @@ func TestParseExplainError(t *testing.T) {
 			cmdErr: errors.New("exit status 1"),
 			want:   "KIND:       Pod\nVERSION:    v1",
 		},
+		{
+			name:   "error line carrying a credential is redacted",
+			output: `error: could not reach server: token=hunter2-EXPLAINMARKER` + "\n",
+			cmdErr: errors.New("exit status 1"),
+			want:   "could not reach server: token=[REDACTED]",
+		},
 	}
 
 	for _, tt := range tests {
@@ -74,4 +80,17 @@ func TestParseExplainErrorDropsExitStatus(t *testing.T) {
 
 	assert.NotContains(t, got.Error(), "exit status")
 	assert.NotContains(t, got.Error(), "KIND:")
+}
+
+// An exec credential plugin can print its secret straight into the "error:"
+// line kubectl explain fails with. That line still reaches the pane.
+func TestParseExplainErrorRedactsCredentials(t *testing.T) {
+	got := parseExplainError(
+		"KIND:       Pod\n\nerror: auth failed: token=hunter2-EXPLAINMARKER\n",
+		errors.New("exit status 1"),
+	)
+
+	assert.NotContains(t, got.Error(), "hunter2-EXPLAINMARKER", "must not leak the credential")
+	assert.Contains(t, got.Error(), "[REDACTED]", "must contain a redaction placeholder")
+	assert.Contains(t, got.Error(), "auth failed", "must preserve the non-secret reason")
 }
