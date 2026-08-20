@@ -6,12 +6,14 @@ import (
 	"strings"
 )
 
-// redactPatterns is a curated set of regexes for likely-sensitive content.
-// It targets content that may end up in stderr from auth helpers, exec
-// credential plugins, kubectl invocations, or upstream library messages.
-// The list is intentionally conservative — false positives in stderr logs
-// are worse than missing a novel pattern, since users investigating issues
-// need readable context.
+// secretKeyAlt lists the credential-shaped key names recognized by the
+// inline key=value/key: value rule and the YAML block-scalar header rule
+// below. Shared so both stay in sync.
+const secretKeyAlt = `(?:password|passwd|pwd|db[_-]?pass(?:word)?|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|dsn|database[_-]?url|connection[_-]?string)`
+
+// redactPatterns is intentionally conservative: a false positive breaks
+// debugging stderr output, a missed novel pattern doesn't. Redact applies
+// each one line at a time so `\s*` can't cross into an unrelated next line.
 var redactPatterns = []struct {
 	re   *regexp.Regexp
 	repl string
@@ -30,24 +32,66 @@ var redactPatterns = []struct {
 	{regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://)[^:@\s/]*:[^@\s/]+@`), "${1}[REDACTED-CREDS]@"},
 	// Bearer tokens in Authorization headers.
 	{regexp.MustCompile(`(?i)(Bearer\s+)[A-Za-z0-9._-]{20,}`), "${1}[REDACTED-BEARER]"},
-	// Matches env-style identifiers ending in the keyword too (MYSQL_PASSWORD).
-	// RE2 has no lookbehind, so the boundary char is captured and replayed.
-	// Excluding "/" there keeps /etc/passwd from reading as a key.
-	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*(?:password|passwd|pwd|db[_-]?pass(?:word)?|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|dsn|database[_-]?url|connection[_-]?string)\s*[=:]\s*)[^\s&"',;]+`), "${1}${2}[REDACTED]"},
+	// RE2 has no lookbehind: the boundary char and value quote are captured
+	// and replayed so quoted output ("password": "x") keeps its quoting.
+	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)(["']?)[^\s&"',;]+`), "${1}${2}${3}[REDACTED]"},
 	// kubectl --from-literal=KEY=VALUE — keep KEY, redact VALUE.
 	{regexp.MustCompile(`(--from-literal=[^=\s]+=)[^\s"']+`), "${1}[REDACTED]"},
 }
 
-// Redact scrubs likely-sensitive content (JWTs, cloud-provider keys, embedded
-// URL credentials, common key=value secrets) from s before it lands in the
-// log file. Idempotent: running it twice on the same input produces the same
-// output. Designed for stderr capture and other places where untrusted text
-// flows into the structured logger.
+// blockScalarHeaderRe matches a YAML block-scalar header ("password: |-",
+// "token: >") whose key looks like a secret. Group 1 is the header's leading
+// indentation, used by Redact to find where the block scalar body ends.
+var blockScalarHeaderRe = regexp.MustCompile(`(?i)^(\s*)[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*:\s*[|>][+-]?\s*$`)
+
+// Deliberate non-goal: base64 under a generic key like "data:" stays
+// unredacted. Entropy checks misfire on kubectl/helm's legitimate base64.
+// Scoping to Secret "data:" needs doc-boundary tracking this redactor avoids.
+
+// Redact scrubs likely-sensitive content from s before it reaches the log
+// file. Idempotent. Processes one line at a time, plus a stateful pass for
+// YAML block scalars ("password: |-" plus indented body) a per-line regex misses.
 func Redact(s string) string {
-	for _, p := range redactPatterns {
-		s = p.re.ReplaceAllString(s, p.repl)
+	if !strings.Contains(s, "\n") {
+		return redactLine(s)
 	}
-	return s
+
+	lines := strings.Split(s, "\n")
+	inBlock := false
+	blockIndent := 0
+	for i, line := range lines {
+		if inBlock {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if indent := leadingIndent(line); indent > blockIndent {
+				lines[i] = line[:indent] + "[REDACTED]"
+				continue
+			}
+			inBlock = false
+		}
+		if m := blockScalarHeaderRe.FindStringSubmatch(line); m != nil {
+			blockIndent = len(m[1])
+			inBlock = true
+		}
+		lines[i] = redactLine(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func redactLine(line string) string {
+	for _, p := range redactPatterns {
+		line = p.re.ReplaceAllString(line, p.repl)
+	}
+	return line
+}
+
+func leadingIndent(line string) int {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	return i
 }
 
 // RedactErr wraps err with output, redacted - subprocess output (e.g. helm
