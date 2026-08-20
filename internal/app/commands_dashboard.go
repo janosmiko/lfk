@@ -137,7 +137,7 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 			// "metrics unavailable" instead of zeros.
 			nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
 				Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
-			})
+			}, k8s.PreferCache())
 			if err != nil {
 				return dashboardData{nodeMetricsErr: err}
 			}
@@ -428,7 +428,7 @@ func fetchWarningEvents(reqCtx context.Context, kctx string, client *k8s.Client)
 func fetchPDBWarnings(reqCtx context.Context, kctx string, client *k8s.Client) []pdbWarning {
 	pdbItems, pdbErr := client.GetResources(reqCtx, kctx, "", model.ResourceTypeEntry{
 		Kind: "PodDisruptionBudget", APIGroup: "policy", APIVersion: "v1", Resource: "poddisruptionbudgets", Namespaced: true,
-	})
+	}, k8s.PreferCache())
 	if pdbErr != nil {
 		return nil
 	}

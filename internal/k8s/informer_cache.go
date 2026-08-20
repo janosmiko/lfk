@@ -3,10 +3,12 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -15,8 +17,18 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// defaultHotTTL: longer than a watch-tick gap, short enough to release an
+// unused watch.
+const defaultHotTTL = 5 * time.Minute
+
+// defaultSweepInterval bounds how often markHot pays for a full sweep of
+// every (context, GVR). A dashboard plus pinned summaries call markHot
+// dozens of times per watch tick, and the sweep holds ic.mu throughout.
+const defaultSweepInterval = time.Minute
 
 // Default resync period for informers: zero means "never resync from a full
 // list" — we still see live updates via the watch channel. Setting a non-zero
@@ -77,6 +89,15 @@ type gvrAutoState struct {
 	mu               sync.Mutex
 	promoted         bool // true => current path is the informer cache
 	consecutiveSmall int  // count of cached lists below autoDemoteBelow
+	// hot exempts a GVR from size-based demotion regardless of list size
+	// -- set by markHot for watch-tick refreshes. lastUse drives the TTL
+	// sweep that clears it again once nothing refreshes it anymore.
+	hot     bool
+	lastUse time.Time
+	// denied is set once this GVR's watch has reported Forbidden,
+	// MethodNotSupported, or NotFound -- RBAC or API surface that will
+	// not change mid-session. Permanent for the life of the Client.
+	denied bool
 }
 
 // itemMemoEntry caches one converted model.Item alongside the
@@ -142,6 +163,17 @@ type informerCache struct {
 	// for the production 30s.
 	initialSyncTimeout time.Duration
 
+	// hotTTL is defaultHotTTL at runtime. Tests dial it down to
+	// milliseconds so the TTL-demote sweep is exercisable without a
+	// multi-minute sleep.
+	hotTTL time.Duration
+
+	// sweepInterval rate-limits sweepStaleHot off the watch-tick path.
+	// lastSweep is guarded by ic.mu. Tests set sweepInterval to zero to
+	// force a sweep on the next markHot.
+	sweepInterval time.Duration
+	lastSweep     time.Time
+
 	// wg counts the inf.Run + cache-sync goroutines launched in
 	// getOrStart. Stop blocks on it so the docstring's "blocks until all
 	// informer goroutines have exited" promise is real, not aspirational.
@@ -163,6 +195,9 @@ func newInformerCache(clientFactory func(string) (dynamic.Interface, error)) *in
 		demoteBelow:        autoDemoteBelow,
 		demoteAfterN:       autoDemoteAfterN,
 		initialSyncTimeout: defaultInitialSyncTimeout,
+		hotTTL:             defaultHotTTL,
+		sweepInterval:      defaultSweepInterval,
+		lastSweep:          time.Now(),
 	}
 }
 
@@ -210,6 +245,10 @@ func (ic *informerCache) observeDirectListSize(contextName string, gvr schema.Gr
 func (ic *informerCache) observeCachedListSize(contextName string, gvr schema.GroupVersionResource, n int) bool {
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
+	if state.hot {
+		state.mu.Unlock()
+		return false
+	}
 	if n < ic.demoteBelow {
 		state.consecutiveSmall++
 	} else {
@@ -229,13 +268,126 @@ func (ic *informerCache) observeCachedListSize(contextName string, gvr schema.Gr
 }
 
 // isPromoted reports whether the auto-mode router should send the next list
-// for (contextName, gvr) through the informer cache. False means take the
-// direct path. observeDirectListSize will decide whether to flip later.
+// for (contextName, gvr) through the informer cache. hot (preferCache)
+// counts as promoted too. denied overrides both.
 func (ic *informerCache) isPromoted(contextName string, gvr schema.GroupVersionResource) bool {
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	return state.promoted
+	if state.denied {
+		return false
+	}
+	return state.hot || state.promoted
+}
+
+// isDenied reports whether (contextName, gvr) has been permanently denied
+// informer routing for the session -- see denyGVR.
+func (ic *informerCache) isDenied(contextName string, gvr schema.GroupVersionResource) bool {
+	state := ic.getAutoState(contextName, gvr)
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return state.denied
+}
+
+// markHot marks (contextName, gvr) hot and starts its informer if needed.
+// Returns true on a first-ever start, so GetResources can skip the cache
+// branch this once rather than block the same call waiting for a fresh sync.
+func (ic *informerCache) markHot(contextName string, gvr schema.GroupVersionResource) bool {
+	state := ic.getAutoState(contextName, gvr)
+	state.mu.Lock()
+	if state.denied {
+		state.mu.Unlock()
+		return false
+	}
+	state.hot = true
+	state.lastUse = time.Now()
+	state.mu.Unlock()
+
+	ic.maybeSweepStaleHot()
+
+	ic.mu.Lock()
+	_, exists := ic.entries[contextName][gvr]
+	ic.mu.Unlock()
+	if exists {
+		return false
+	}
+	_, _ = ic.getOrStart(contextName, gvr)
+	return true
+}
+
+// maybeSweepStaleHot runs the sweep at most once per sweepInterval. markHot
+// fires per pinned view per watch tick, so an unconditional sweep would walk
+// every (context, GVR) entry dozens of times a tick under ic.mu.
+func (ic *informerCache) maybeSweepStaleHot() {
+	now := time.Now()
+
+	ic.mu.Lock()
+	due := now.Sub(ic.lastSweep) >= ic.sweepInterval
+	if due {
+		ic.lastSweep = now
+	}
+	ic.mu.Unlock()
+
+	if due {
+		ic.sweepStaleHot()
+	}
+}
+
+// sweepStaleHot demotes hot GVRs unused for longer than hotTTL and drops
+// auto-state entries carrying no live decision. Runs lazily off markHot
+// rather than on a timer: a closed view generates no more markHot calls.
+func (ic *informerCache) sweepStaleHot() {
+	now := time.Now()
+	type key struct {
+		ctx string
+		gvr schema.GroupVersionResource
+	}
+	var stale []key
+
+	ic.mu.Lock()
+	for ctxName, perCtx := range ic.auto {
+		for gvr, state := range perCtx {
+			state.mu.Lock()
+			if state.hot && now.Sub(state.lastUse) > ic.hotTTL {
+				state.hot = false
+				stale = append(stale, key{ctxName, gvr})
+			}
+			// A zero-value state routes like a freshly allocated one, so
+			// dropping it costs nothing -- and isPromoted allocates one
+			// per GVR the session ever lists.
+			cold := !state.hot && !state.promoted && !state.denied && state.consecutiveSmall == 0
+			state.mu.Unlock()
+			if cold {
+				delete(perCtx, gvr)
+			}
+		}
+		if len(perCtx) == 0 {
+			delete(ic.auto, ctxName)
+		}
+	}
+	ic.mu.Unlock()
+
+	for _, k := range stale {
+		ic.stopOne(k.ctx, k.gvr)
+	}
+}
+
+// denyGVR permanently disables informer routing for (contextName, gvr) --
+// RBAC or API surface that will not change mid-session. WarnOnce dedups
+// the log line across the reflector's own retry loop.
+func (ic *informerCache) denyGVR(contextName string, gvr schema.GroupVersionResource) {
+	state := ic.getAutoState(contextName, gvr)
+	state.mu.Lock()
+	state.denied = true
+	state.hot = false
+	state.promoted = false
+	state.mu.Unlock()
+
+	ic.stopOne(contextName, gvr)
+
+	logger.WarnOnce("informer-watch-denied", contextName+"/"+gvr.String(),
+		"Watch not permitted for resource; falling back to direct list for this session",
+		"context", contextName, "gvr", gvr.String())
 }
 
 // stopOne tears down the watch for a single (contextName, gvr). Used by
@@ -434,6 +586,23 @@ func (ic *informerCache) getOrStart(contextName string, gvr schema.GroupVersionR
 		nil,
 	)
 	informer := generic.Informer()
+
+	// RBAC denying watch or a resource with no watch verb never succeeds
+	// on retry -- deny it once instead of retrying forever.
+	_ = informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *cache.Reflector, err error) {
+		if apierrors.IsForbidden(err) || apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) {
+			ic.denyGVR(contextName, gvr)
+		}
+	})
+	// managedFields is never read by buildResourceItem. Drop it before
+	// objects enter the store to keep the cache's footprint down.
+	_ = informer.SetTransform(func(obj any) (any, error) {
+		if u, ok := obj.(*unstructured.Unstructured); ok {
+			unstructured.RemoveNestedField(u.Object, "metadata", "managedFields")
+		}
+		return obj, nil
+	})
+
 	entry := &informerEntry{
 		informer: informer,
 		stopCh:   make(chan struct{}),
@@ -532,4 +701,27 @@ func (ic *informerCache) Stop() {
 		close(entry.stopCh)
 	}
 	ic.wg.Wait()
+}
+
+// informerAllowed reports whether rt may ever route through the informer
+// cache. Events churn too fast to watch, Secrets use their own lazy path,
+// metrics.k8s.io has no watch verb, and a resource whose Verbs omit
+// "watch" would just fail.
+func informerAllowed(rt model.ResourceTypeEntry) bool {
+	if rt.APIGroup == "" && rt.Resource == "events" {
+		return false
+	}
+	if rt.APIGroup == "events.k8s.io" {
+		return false
+	}
+	if rt.APIGroup == "" && rt.Resource == "secrets" {
+		return false
+	}
+	if rt.APIGroup == "metrics.k8s.io" {
+		return false
+	}
+	if len(rt.Verbs) > 0 && !slices.Contains(rt.Verbs, "watch") {
+		return false
+	}
+	return true
 }

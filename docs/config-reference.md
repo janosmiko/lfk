@@ -54,6 +54,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `watch_interval` | string | `2s` | Polling interval in watch mode. Go duration string, clamped to [500ms, 10m]. Override with `--watch-interval`. |
 | `background_watch_interval` | string | `10s` | Watch cadence while the window is unfocused or focused-idle. Same form and [500ms, 10m] clamp as `watch_interval`. Set equal to `watch_interval` to disable background throttling. |
 | `foreground_idle_timeout` | string | `120s` | No-input window before a focused window throttles to `background_watch_interval`. Go duration; `0` disables focused-idle throttling (background throttling still applies). Clamped to [0, 10m]. |
+| `metrics_interval` | string | `15s` | Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh. Go duration, clamped to [2s, 10m]; `0` fetches on every tick. Manual refresh always fetches. |
 | `watch_throttle` | bool | `true` | Master switch for focus/idle watch throttling. Set `false` to disable it entirely; the watch tick then always uses `watch_interval`. |
 | `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
 | `events` | object | *(see Events section)* | Events view startup-toggle defaults. See [Events](#events). |
@@ -966,12 +967,16 @@ The `informer_cache` knob has three modes:
 - **`auto`** (default) — start in `off` mode per `(context, resource type)`,
   but the moment a list returns ≥ 1000 items, promote that resource type
   to a [shared informer](https://pkg.go.dev/k8s.io/client-go/dynamic/dynamicinformer).
-  Subsequent lists for that resource type — including namespace switches —
-  are served from the in-memory index. Once cached size has stayed below
-  500 for three consecutive cached calls, the watch is closed and the
-  resource type goes back to direct lists. Hysteresis between the promote
-  (1000) and demote (500) thresholds prevents flapping when a list size
-  hovers near the edge.
+  A resource type refreshed repeatedly by the visible list or dashboard —
+  regardless of size — also promotes, and stays promoted for as long as
+  something keeps refreshing it. Only eligible resource types promote:
+  Events, Secrets, `metrics.k8s.io`, and types whose declared verbs omit
+  `watch` always use direct lists. Subsequent lists for a promoted resource
+  type — including namespace switches — are served from the in-memory
+  index. Once cached size has stayed below 500 for three consecutive
+  cached calls, the watch is closed and the resource type goes back to
+  direct lists. Hysteresis between the promote (1000) and demote (500)
+  thresholds prevents flapping when a list size hovers near the edge.
 - **`always`** — every resource type starts a watch on first use,
   regardless of size. Use when you know the cluster is large and want to
   skip the one-time direct list before promotion.

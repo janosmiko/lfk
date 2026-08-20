@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -186,7 +187,11 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			"List "+model.DisplayNameFor(rt)+" (union)",
 			strings.Join(unionCtxs, ", "),
 			func(ctx context.Context) tea.Msg {
-				items, err := client.GetResourcesUnion(ctx, unionCtxs, ns, rt)
+				var listOpts []k8s.ListOption
+				if !forPreview {
+					listOpts = append(listOpts, k8s.PreferCache())
+				}
+				items, err := client.GetResourcesUnion(ctx, unionCtxs, ns, rt, listOpts...)
 				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 			},
 		)
@@ -273,7 +278,11 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		listName,
 		bgtaskTarget(kctx, ns),
 		func(ctx context.Context) tea.Msg {
-			items, err := client.GetResources(ctx, kctx, ns, rt)
+			var listOpts []k8s.ListOption
+			if !forPreview {
+				listOpts = append(listOpts, k8s.PreferCache())
+			}
+			items, err := client.GetResources(ctx, kctx, ns, rt, listOpts...)
 			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 		},
 	)

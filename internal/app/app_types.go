@@ -467,30 +467,31 @@ type TabState struct {
 	jumpBackStack []navSnapshot
 	// levelMem holds the views this tab left each cluster at, so the level
 	// keys walk back down inside the tab that recorded them.
-	levelMem           levelMemory
-	cursors            [5]int
-	middleScroll       int // persistent scroll position for middle column (vim-style scrolloff)
-	leftScroll         int // persistent scroll position for left column (vim-style scrolloff)
-	cursorMemory       map[string]int
-	filterMemory       map[string]savedFilter
-	itemCache          map[string][]model.Item
-	cacheFingerprints  map[string]string
-	yamlContent        string
-	yamlScroll         int
-	yamlCursor         int // cursor position in visible lines (relative to scroll)
-	yamlScrollOption   int // sticky vim 'scroll' option for [count]<C-d>/<C-u>. 0 = default (half viewport)
-	yamlSearchText     TextInput
-	yamlMatchLines     []int
-	yamlMatchIdx       int
-	yamlCollapsed      map[string]bool // collapsed state for YAML sections
-	splitPreview       bool
-	fullYAMLPreview    bool
-	fullLogPreview     bool
-	previewYAML        string
-	namespace          string
-	allNamespaces      bool
-	selectedNamespaces map[string]bool
-	nsSelectionNegated bool
+	levelMem                   levelMemory
+	cursors                    [5]int
+	middleScroll               int // persistent scroll position for middle column (vim-style scrolloff)
+	leftScroll                 int // persistent scroll position for left column (vim-style scrolloff)
+	cursorMemory               map[string]int
+	filterMemory               map[string]savedFilter
+	itemCache                  map[string][]model.Item
+	cacheFingerprints          map[string]string
+	previewContentFingerprints map[string]string
+	yamlContent                string
+	yamlScroll                 int
+	yamlCursor                 int // cursor position in visible lines (relative to scroll)
+	yamlScrollOption           int // sticky vim 'scroll' option for [count]<C-d>/<C-u>. 0 = default (half viewport)
+	yamlSearchText             TextInput
+	yamlMatchLines             []int
+	yamlMatchIdx               int
+	yamlCollapsed              map[string]bool // collapsed state for YAML sections
+	splitPreview               bool
+	fullYAMLPreview            bool
+	fullLogPreview             bool
+	previewYAML                string
+	namespace                  string
+	allNamespaces              bool
+	selectedNamespaces         map[string]bool
+	nsSelectionNegated         bool
 	// Stashed namespace selection while all-namespaces mode is active, so
 	// toggling the mode off restores the prior multi-select instead of
 	// resetting to the default namespace.

@@ -167,6 +167,10 @@ type configFile struct {
 	// ForegroundIdleTimeout is the no-input window before a focused window
 	// throttles to background_watch_interval. Go duration. 0 disables. Default 120s.
 	ForegroundIdleTimeout string `json:"foreground_idle_timeout" yaml:"foreground_idle_timeout"`
+	// MetricsInterval is the minimum gap between two list-wide CPU/MEM fetches
+	// on a watch-tick refresh. Go duration, clamped to [2s, 10m]. 0 fetches on
+	// every tick. Manual refresh always fetches. Defaults to 15s.
+	MetricsInterval string `json:"metrics_interval" yaml:"metrics_interval"`
 	// WatchThrottle enables focus/idle watch throttling. Set false to fully
 	// disable it: the watch tick then always uses watch_interval. Default true.
 	WatchThrottle *bool `json:"watch_throttle" yaml:"watch_throttle"`
