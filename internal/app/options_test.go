@@ -142,13 +142,17 @@ func TestNewModel_CLIOverrideContextAndNamespaces(t *testing.T) {
 }
 
 func TestNewModel_NoCLIOverrides(t *testing.T) {
+	// Other tests in this package save real sessions into TestMain's shared
+	// XDG sandbox. An isolated state dir keeps loadSession's result (nil,
+	// asserted below) independent of run order.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	client := newTestClientForOptions(t)
 
 	opts := StartupOptions{}
 	m := NewModel(client, opts)
 
-	// With an empty XDG_STATE_HOME (set in TestMain), loadSession returns nil,
-	// so pendingSession should be nil when no CLI overrides are given.
+	// With an empty XDG_STATE_HOME, loadSession returns nil, so pendingSession
+	// should be nil when no CLI overrides are given.
 	assert.Nil(t, m.pendingSession,
 		"pendingSession should be nil (from loadSession) when no CLI overrides are given")
 }
@@ -275,6 +279,9 @@ func TestNewModel_CLIOverrideSingleNamespace(t *testing.T) {
 }
 
 func TestNewModel_KubeconfigOnlyDoesNotCreateSyntheticSession(t *testing.T) {
+	// Isolated so a session saved by another test in the shared XDG sandbox
+	// cannot make loadSession return non-nil here.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	client := newTestClientForOptions(t)
 
 	opts := StartupOptions{Kubeconfig: "/some/kubeconfig"}
