@@ -324,14 +324,14 @@ func TestCov80LoadQuotas(t *testing.T) {
 
 func TestCov80LoadNamespaces(t *testing.T) {
 	m := basePush80Model()
-	cmd := m.loadNamespaces()
+	cmd := m.loadNamespacesForContext(m.activeContext(), false)
 	require.NotNil(t, cmd)
 }
 
 func TestCov80LoadNamespacesEmptyContext(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Context = ""
-	cmd := m.loadNamespaces()
+	cmd := m.loadNamespacesForContext(m.activeContext(), false)
 	require.NotNil(t, cmd)
 }
 
@@ -705,7 +705,7 @@ func TestCovLoadNamespaces(t *testing.T) {
 		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 	m := baseModelWithFakeClientAndScheduler(t, ns)
-	cmd := m.loadNamespaces()
+	cmd := m.loadNamespacesForContext(m.activeContext(), false)
 	msg := execCmd(t, cmd)
 	result, ok := msg.(namespacesLoadedMsg)
 	require.True(t, ok)
@@ -717,7 +717,7 @@ func TestCovLoadNamespaces(t *testing.T) {
 func TestCovLoadNamespacesNoContext(t *testing.T) {
 	m := baseModelWithFakeClientAndScheduler(t)
 	m.nav.Context = ""
-	cmd := m.loadNamespaces()
+	cmd := m.loadNamespacesForContext(m.activeContext(), false)
 	msg := execCmd(t, cmd)
 	result, ok := msg.(namespacesLoadedMsg)
 	require.True(t, ok)

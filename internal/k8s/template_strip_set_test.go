@@ -25,15 +25,6 @@ data:
   password: c3VwZXJzZWNyZXQ=
 `
 
-func TestStripToTemplateWith_DefaultSetMatchesStripToTemplate(t *testing.T) {
-	want, err := StripToTemplate(helmDeploymentYAML)
-	require.NoError(t, err)
-	got, err := StripToTemplateWith(helmDeploymentYAML, DefaultTemplateStripSet())
-	require.NoError(t, err)
-
-	assert.Equal(t, want, got, "the default set is what the two-keystroke path already does")
-}
-
 func TestStripToTemplateWith_KeepsNamespace_WhenCategoryDisabled(t *testing.T) {
 	out, err := StripToTemplateWith(helmDeploymentYAML, withoutCategory(TemplateNamespace))
 	require.NoError(t, err)

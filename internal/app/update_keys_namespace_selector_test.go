@@ -149,9 +149,9 @@ func TestHandleKeyNamespaceSelector_EmptyCacheFallsBackToLoadingSpinner(t *testi
 	assert.Equal(t, overlayNamespace, result.overlay)
 	assert.True(t, result.loading, "empty cache must show the loading spinner")
 	assert.Nil(t, result.overlayItems, "empty cache must not populate items synchronously")
-	// loadNamespaces -> loadNamespacesSilent(false): returns a tea.Cmd
-	// even when client is nil (the cmd would surface a nil-client error
-	// at execute time). Either way, it's not nil here.
+	// loadNamespacesForContext returns a tea.Cmd even when client is nil
+	// (the cmd would surface a nil-client error at execute time). Either
+	// way, it's not nil here.
 	if m.client != nil {
 		assert.NotNil(t, cmd, "empty cache must schedule a load command")
 	}

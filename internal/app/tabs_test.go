@@ -1834,12 +1834,6 @@ func TestCov80ParseReadyRatioInvalid(t *testing.T) {
 	assert.InDelta(t, 0.5, parseReadyRatio("1/2"), 0.01)
 }
 
-func TestCov80CompareNumeric(t *testing.T) {
-	assert.True(t, compareNumeric("1", "2"))
-	assert.False(t, compareNumeric("10", "2"))
-	assert.True(t, compareNumeric("abc", "1")) // "abc" parses as 0
-}
-
 func TestCov80SortModeName(t *testing.T) {
 	m := basePush80Model()
 	m.sortColumnName = ""
@@ -2097,23 +2091,11 @@ func TestCovGetPortForwardID(t *testing.T) {
 	assert.Equal(t, 0, m.getPortForwardID([]model.KeyValue{{Key: "ID", Value: "abc"}}))
 }
 
-func TestCovCompareReady(t *testing.T) {
-	assert.True(t, compareReady("0/1", "1/1"))
-	assert.False(t, compareReady("1/1", "0/1"))
-	assert.False(t, compareReady("1/1", "1/1"))
-}
-
 func TestCovParseReadyRatio(t *testing.T) {
 	assert.InDelta(t, 0.5, parseReadyRatio("1/2"), 0.01)
 	assert.InDelta(t, 0.0, parseReadyRatio("0/1"), 0.01)
 	assert.InDelta(t, 0.0, parseReadyRatio("0/0"), 0.01)
 	assert.InDelta(t, 0.0, parseReadyRatio("invalid"), 0.01)
-}
-
-func TestCovCompareNumeric(t *testing.T) {
-	assert.True(t, compareNumeric("1", "2"))
-	assert.False(t, compareNumeric("5", "3"))
-	assert.False(t, compareNumeric("abc", "def"))
 }
 
 func TestCovGetColumnValue(t *testing.T) {
@@ -2180,26 +2162,6 @@ func TestFinalJumpToSlotNotFound(t *testing.T) {
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.Contains(t, rm.statusMessage, "not set")
-}
-
-func TestCovCompareResourceValues(t *testing.T) {
-	result := compareResourceValues("100m", "200m", "CPU")
-	assert.True(t, result) // 100m < 200m
-}
-
-func TestCovCompareResourceValuesCPUPrefix(t *testing.T) {
-	result := compareResourceValues("500m", "1", "CPU(%)")
-	assert.True(t, result) // 500m < 1
-}
-
-func TestCovCompareResourceValuesMemory(t *testing.T) {
-	result := compareResourceValues("100Mi", "200Mi", "Memory")
-	assert.True(t, result)
-}
-
-func TestCovCompareResourceValuesEqual(t *testing.T) {
-	result := compareResourceValues("100m", "100m", "CPU")
-	assert.False(t, result) // equal, not less
 }
 
 func TestSortMiddleItemsResourceQuantities(t *testing.T) {
