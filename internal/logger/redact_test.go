@@ -2,6 +2,7 @@ package logger
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -189,6 +190,126 @@ func TestRedact(t *testing.T) {
 			wantContains:    []string{"host=db.example.com", "port=5432", "password=[REDACTED]"},
 			wantNotContains: []string{"oh-no"},
 		},
+		{
+			name:            "YAML block scalar with one indented secret line",
+			input:           "password: |-\n  s3cret-block-line-1",
+			wantContains:    []string{"password:", "[REDACTED]"},
+			wantNotContains: []string{"s3cret-block-line-1"},
+		},
+		{
+			name:            "YAML block scalar with three indented secret lines",
+			input:           "token: |-\n  line-one-secret\n  line-two-secret\n  line-three-secret",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"line-one-secret", "line-two-secret", "line-three-secret"},
+		},
+		{
+			name:            "YAML block scalar under a non-secret key is left untouched",
+			input:           "description: |-\n  this is just a normal\n  multi-line description",
+			wantContains:    []string{"this is just a normal", "multi-line description"},
+			wantNotContains: []string{"[REDACTED"},
+		},
+		{
+			name:            "YAML block scalar ends when indentation returns to the key level",
+			input:           "password: |-\n  s3cret-in-block\nnext_key: plain-value",
+			wantContains:    []string{"[REDACTED]", "next_key: plain-value"},
+			wantNotContains: []string{"s3cret-in-block"},
+		},
+		{
+			name:            "double-quoted JSON-ish key",
+			input:           `payload: {"password": "s3cret-quoted-double"} received`,
+			wantContains:    []string{`"password": "[REDACTED]"`, "received"},
+			wantNotContains: []string{"s3cret-quoted-double"},
+		},
+		{
+			name:            "single-quoted JSON-ish key",
+			input:           `payload: {'password': 's3cret-quoted-single'} received`,
+			wantContains:    []string{`'password': '[REDACTED]'`, "received"},
+			wantNotContains: []string{"s3cret-quoted-single"},
+		},
+		{
+			name:            "double-quoted value with an escaped quote does not leak the tail",
+			input:           `payload: {"password": "front-part\"tail-secret"} received`,
+			wantContains:    []string{`"password": "[REDACTED]"`, "received"},
+			wantNotContains: []string{"front-part", "tail-secret"},
+		},
+		{
+			name:            "single-quoted value with an escaped quote does not leak the tail",
+			input:           `payload: {'password': 'front-part\'tail-secret'} received`,
+			wantContains:    []string{`'password': '[REDACTED]'`, "received"},
+			wantNotContains: []string{"front-part", "tail-secret"},
+		},
+		{
+			name:            "double-quoted value ending in an escaped backslash",
+			input:           `payload: {"token": "secret-value\\"} received`,
+			wantContains:    []string{`"token": "[REDACTED]"`, "received"},
+			wantNotContains: []string{"secret-value"},
+		},
+		{
+			name:            "raw trailing backslash must not swallow the next field's label",
+			input:           `password: "abc\" token: "s3cretSecondField"`,
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"abc", "s3cretSecondField"},
+		},
+		{
+			name:            "raw trailing backslash in single quotes must not swallow the next field's label",
+			input:           `password: 'abc\' token: 's3cretSecondField'`,
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"abc", "s3cretSecondField"},
+		},
+		{
+			name:            "YAML block scalar with an explicit indentation indicator",
+			input:           "token: |2\n  s3cret-indent-two",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-indent-two"},
+		},
+		{
+			name:            "YAML folded scalar with indicator and chomping",
+			input:           "password: >4-\n    s3cret-folded-body",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-folded-body"},
+		},
+		{
+			name:            "YAML block scalar header with a trailing comment",
+			input:           "password: |- # from values\n  s3cret-commented-body",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-commented-body"},
+		},
+		{
+			name:            "YAML block scalar under a double-quoted key",
+			input:           "\"password\": |-\n  s3cret-quoted-header",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-quoted-header"},
+		},
+		{
+			name:            "YAML block scalar under a single-quoted key",
+			input:           "'token': >\n  s3cret-single-quoted-header",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-single-quoted-header"},
+		},
+		{
+			name:            "YAML block scalar in a sequence item",
+			input:           "- password: |\n    s3cret-sequence-body",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-sequence-body"},
+		},
+		{
+			name:            "base64 blob under a generic data key is not redacted (documented stance)",
+			input:           "data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I=",
+			wantContains:    []string{"data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I="},
+			wantNotContains: []string{"[REDACTED"},
+		},
+		{
+			name:            "ordinary YAML list is not mangled",
+			input:           "items:\n  - foo\n  - bar",
+			wantContains:    []string{"items:", "- foo", "- bar"},
+			wantNotContains: []string{"[REDACTED"},
+		},
+		{
+			name:            "diff-style indented context lines under a bare password key (no block marker) pass through",
+			input:           "--- a/values.yaml\n+++ b/values.yaml\n password:\n-  old-secret-context-line\n+  new-secret-context-line",
+			wantContains:    []string{"old-secret-context-line", "new-secret-context-line"},
+			wantNotContains: []string{"[REDACTED"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -200,8 +321,16 @@ func TestRedact(t *testing.T) {
 			for _, secret := range tt.wantNotContains {
 				assert.NotContains(t, got, secret, "redacted output must NOT contain %q (leaked secret)", secret)
 			}
+			assert.Equal(t, got, Redact(got), "Redact must be idempotent")
 		})
 	}
+}
+
+func TestRedact_CRLFBlockScalarKeepsLineEndings(t *testing.T) {
+	// The header's |- marker is swallowed by the generic value pattern, a
+	// documented harmless side effect. The point here: every line keeps \r.
+	got := Redact("password: |-\r\n  s3cret-crlf-body\r\nnext: ok\r\n")
+	assert.Equal(t, "password: [REDACTED]\r\n  [REDACTED]\r\nnext: ok\r\n", got)
 }
 
 func TestRedactErr(t *testing.T) {
@@ -216,6 +345,20 @@ func TestRedactErr(t *testing.T) {
 	assert.Contains(t, got.Error(), "exit status 1", "redacted error must preserve the underlying error reason")
 	assert.Contains(t, got.Error(), "could not connect", "redacted error must preserve the non-secret output")
 	assert.ErrorIs(t, got, baseErr, "redacted error must still wrap the original error for errors.Is")
+}
+
+func BenchmarkRedact(b *testing.B) {
+	var sb strings.Builder
+	sb.WriteString("password: |-\n")
+	for range 500 {
+		sb.WriteString("  some-non-secret-configuration-line-that-is-reasonably-long-for-benchmarking\n")
+	}
+	input := sb.String()
+
+	b.ResetTimer()
+	for range b.N {
+		_ = Redact(input)
+	}
 }
 
 func TestRedactIsIdempotent(t *testing.T) {
