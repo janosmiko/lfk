@@ -176,6 +176,7 @@ func applyConfigOptions(cfg configFile) {
 	applyWatchIntervalConfig(cfg.WatchInterval)
 	applyBackgroundWatchIntervalConfig(cfg.BackgroundWatchInterval)
 	applyForegroundIdleTimeoutConfig(cfg.ForegroundIdleTimeout)
+	applyMetricsIntervalConfig(cfg.MetricsInterval)
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
