@@ -403,7 +403,10 @@ func countPodStats(podItems []model.Item) podStats {
 func fetchWarningEvents(reqCtx context.Context, kctx string, client *k8s.Client) (limited, all []model.Item) {
 	eventItems, _ := client.GetResources(reqCtx, kctx, "", model.ResourceTypeEntry{
 		Kind: "Event", APIGroup: "", APIVersion: "v1", Resource: "events", Namespaced: true,
+		FieldSelector: "type=Warning",
 	})
+	// The field selector is a server-side optimization only. The fake/demo
+	// dynamic client ignores it, so the client-side filter below stays.
 	var warnings []model.Item
 	for _, e := range eventItems {
 		if e.Status == "Warning" {
