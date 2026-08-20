@@ -102,7 +102,7 @@ func TestSourceMetadata(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	none := New()
+	none := NewWithClient(nil)
 	ok, err = none.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.False(t, ok)

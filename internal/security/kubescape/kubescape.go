@@ -31,9 +31,6 @@ type Source struct {
 	client dynamic.Interface
 }
 
-// New returns a Source with no client (Fetch returns nil, IsAvailable false).
-func New() *Source { return &Source{} }
-
 // NewWithDynamic returns a Source using the given dynamic client.
 func NewWithDynamic(client dynamic.Interface) *Source {
 	return &Source{client: client}

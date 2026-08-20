@@ -27,9 +27,6 @@ type Source struct {
 	client kubernetes.Interface
 }
 
-// New returns a Source with no client (Fetch returns nil, IsAvailable false).
-func New() *Source { return &Source{} }
-
 // NewWithClient returns a Source using the given Kubernetes clientset.
 func NewWithClient(client kubernetes.Interface) *Source {
 	return &Source{client: client}

@@ -26,14 +26,14 @@ func newFakeDyn(objects ...runtime.Object) *dynamicfake.FakeDynamicClient {
 }
 
 func TestSourceMetadata(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	assert.Equal(t, "trivy-operator", s.Name())
 	assert.Contains(t, s.Categories(), security.CategoryVuln)
 	assert.Contains(t, s.Categories(), security.CategoryMisconfig)
 }
 
 func TestIsAvailableNilClient(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	ok, err := s.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.False(t, ok)
@@ -254,7 +254,7 @@ func TestFetchNamespaceFilter(t *testing.T) {
 }
 
 func TestFetchNilClient(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings)
