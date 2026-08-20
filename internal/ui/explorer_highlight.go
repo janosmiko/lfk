@@ -25,6 +25,12 @@ type TableLayoutCache struct {
 	ContextW, NsW, ReadyW, RestartsW, AgeW, StatusW             int
 	AnyRecentRestart                                            bool
 	ExtraCols                                                   []extraColumn
+
+	HasUnion bool
+
+	HasCategories   bool
+	CategoryForItem []string
+	HasSepForItem   []bool
 }
 
 // ActiveSelectedStyle returns SelectedStyle or a nyan rainbow style if nyan

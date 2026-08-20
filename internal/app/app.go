@@ -391,9 +391,9 @@ type Model struct {
 	middleItemsRev uint64
 	// selectionRev is bumped on every change to selectedItems so the row
 	// cache invalidates and the selection marker on non-cursor rows updates.
-	selectionRev uint64
-
-	middleTableRenderer *ui.TableRenderer
+	selectionRev            uint64
+	middleItemsVisibleCache *visibleMiddleItemsCacheEntry
+	middleTableRenderer     *ui.TableRenderer
 
 	previewDebounceGen uint64
 
