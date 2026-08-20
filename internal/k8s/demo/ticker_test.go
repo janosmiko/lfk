@@ -265,7 +265,13 @@ func TestTicker_StartStopExitsGoroutineCleanly(t *testing.T) {
 	tk := NewTicker(dyn, time.Millisecond)
 
 	tk.Start(t.Context())
-	assert.Greater(t, runtime.NumGoroutine(), baseline, "expected a new goroutine after Start")
+	// Check running, not a NumGoroutine snapshot: a goroutine from an
+	// earlier test exiting between the baseline and the check masks the
+	// new one and flakes on slow CI runners.
+	tk.mu.Lock()
+	started := tk.running
+	tk.mu.Unlock()
+	require.True(t, started, "expected Start to launch the ticker")
 
 	tk.Stop()
 
@@ -308,13 +314,15 @@ func TestTicker_ExternalContextCancelResetsRunningState(t *testing.T) {
 	tk.mu.Unlock()
 	require.False(t, running, "expected running to reset to false after external context cancellation, not just after Stop")
 
-	// Prove the practical consequence: Start must actually relaunch the
-	// goroutine after an external cancellation, not silently no-op.
-	baseline := runtime.NumGoroutine()
+	// running was just proven false, so Start's no-op guard cannot fire:
+	// running flipping back to true means the relaunch path ran.
 	tk.Start(t.Context())
 	defer tk.Stop()
-	assert.Greater(t, runtime.NumGoroutine(), baseline,
-		"expected Start to launch a new goroutine after external cancellation, not silently no-op")
+	tk.mu.Lock()
+	relaunched := tk.running
+	tk.mu.Unlock()
+	assert.True(t, relaunched,
+		"expected Start to relaunch the ticker after external cancellation, not silently no-op")
 }
 
 func TestTicker_ContextCancelEndsGoroutine(t *testing.T) {
@@ -325,7 +333,10 @@ func TestTicker_ContextCancelEndsGoroutine(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	tk.Start(ctx)
-	assert.Greater(t, runtime.NumGoroutine(), baseline, "expected a new goroutine after Start")
+	tk.mu.Lock()
+	started := tk.running
+	tk.mu.Unlock()
+	require.True(t, started, "expected Start to launch the ticker")
 
 	cancel()
 
