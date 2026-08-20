@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -106,17 +107,29 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 	}
 }
 
-// waitForPortForwardUpdate returns a command that waits for a port forward state change.
+// waitForPortForwardUpdate returns a command that waits for a port forward
+// state change, or a terminal entry's eviction deadline, whichever is first.
 func (m Model) waitForPortForwardUpdate() tea.Cmd {
 	ch := make(chan struct{}, 1)
-	m.portForwardMgr.SetUpdateCallback(func() {
+	mgr := m.portForwardMgr
+	mgr.SetUpdateCallback(func() {
 		select {
 		case ch <- struct{}{}:
 		default:
 		}
 	})
 	return func() tea.Msg {
-		<-ch
+		var deadlineC <-chan time.Time
+		if d, ok := mgr.ArmEvictionRefresh(); ok {
+			timer := time.NewTimer(d)
+			defer timer.Stop()
+			defer mgr.DisarmEvictionRefresh()
+			deadlineC = timer.C
+		}
+		select {
+		case <-ch:
+		case <-deadlineC:
+		}
 		return portForwardUpdateMsg{}
 	}
 }
