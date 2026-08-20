@@ -29,3 +29,14 @@ func TestApplyMetricsIntervalConfig(t *testing.T) {
 		})
 	}
 }
+
+// A reload that removes or corrupts the key must not keep the prior value.
+func TestApplyMetricsIntervalConfig_ReloadResetsToDefault(t *testing.T) {
+	for _, raw := range []string{"", "nonsense"} {
+		ConfigMetricsInterval = 30 * time.Second
+		applyMetricsIntervalConfig(raw)
+		if ConfigMetricsInterval != DefaultMetricsInterval {
+			t.Fatalf("raw %q: got %v want %v", raw, ConfigMetricsInterval, DefaultMetricsInterval)
+		}
+	}
+}

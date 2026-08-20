@@ -30,6 +30,9 @@ func ClampMetricsInterval(d time.Duration) time.Duration {
 }
 
 func applyMetricsIntervalConfig(raw string) {
+	// Reset first so a reload that removes or corrupts the key falls back
+	// to the default instead of keeping the previous value.
+	ConfigMetricsInterval = DefaultMetricsInterval
 	if raw == "" {
 		return
 	}
