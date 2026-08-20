@@ -282,6 +282,11 @@
       "description": "No-input window before a focused window throttles to background_watch_interval. Go duration; 0 disables. Default 120s.",
       "default": "120s"
     },
+    "metrics_interval": {
+      "type": "string",
+      "description": "Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh. Go duration, clamped to [2s, 10m]; 0 fetches every tick. Manual refresh always fetches. Default 15s.",
+      "default": "15s"
+    },
     "watch_throttle": {
       "type": "boolean",
       "description": "Master switch for focus/idle watch throttling. Set false to disable it entirely (watch_interval used unconditionally). Default true.",

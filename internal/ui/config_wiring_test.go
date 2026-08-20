@@ -73,6 +73,7 @@ mouse: false
 watch_interval: 3s
 background_watch_interval: 45s
 foreground_idle_timeout: 300s
+metrics_interval: 25s
 no_color: true
 secret_lazy_loading: true
 informer_cache: always
@@ -247,6 +248,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 3*time.Second, ConfigWatchInterval, "watch_interval")
 	assert.Equal(t, 45*time.Second, ConfigBackgroundWatchInterval, "background_watch_interval")
 	assert.Equal(t, 300*time.Second, ConfigForegroundIdleTimeout, "foreground_idle_timeout")
+	assert.Equal(t, 25*time.Second, ConfigMetricsInterval, "metrics_interval")
 	assert.True(t, ConfigNoColor, "no_color")
 	assert.True(t, ConfigSecretLazyLoading, "secret_lazy_loading")
 	assert.Equal(t, InformerCacheAlways, ConfigInformerCacheMode, "informer_cache")
@@ -410,6 +412,7 @@ var wiringCoveredFields = map[string]string{
 	"watch_interval":            "TestLoadConfig_AllSettingsWired",
 	"background_watch_interval": "TestLoadConfig_AllSettingsWired",
 	"foreground_idle_timeout":   "TestLoadConfig_AllSettingsWired",
+	"metrics_interval":          "TestLoadConfig_AllSettingsWired + TestApplyMetricsIntervalConfig",
 	"clusters":                  "TestLoadConfig_AllSettingsWired",
 	"no_color":                  "TestLoadConfig_AllSettingsWired",
 	"secret_lazy_loading":       "TestLoadConfig_AllSettingsWired",
@@ -506,6 +509,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origWatch := ConfigWatchInterval
 	origBackgroundWatch := ConfigBackgroundWatchInterval
 	origForegroundIdle := ConfigForegroundIdleTimeout
+	origMetricsInterval := ConfigMetricsInterval
 	origNoColor := ConfigNoColor
 	origKubeconfig := ConfigKubeconfigDirs
 	origKubeconfigExclusive := ConfigKubeconfigExclusive
@@ -599,6 +603,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigWatchInterval = origWatch
 		ConfigBackgroundWatchInterval = origBackgroundWatch
 		ConfigForegroundIdleTimeout = origForegroundIdle
+		ConfigMetricsInterval = origMetricsInterval
 		ConfigNoColor = origNoColor
 		ConfigKubeconfigDirs = origKubeconfig
 		ConfigKubeconfigExclusive = origKubeconfigExclusive
