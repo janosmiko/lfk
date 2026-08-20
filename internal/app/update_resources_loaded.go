@@ -510,12 +510,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	if previewCmd != nil {
 		cmds = append(cmds, previewCmd)
 	}
-	switch kind {
-	case "Pod":
-		cmds = append(cmds, m.loadPodMetricsForList())
-	case "Node":
-		cmds = append(cmds, m.loadNodeMetricsForList(), m.loadNodeUptimeForList())
-	}
+	cmds = append(cmds, m.listMetricsCmds(kind)...)
 	// Review this kind's verbs for the namespace once, off the key path, so
 	// the action menu can drop entries the cluster would refuse. Answers nil
 	// for a kind with no verb map.
@@ -678,12 +673,13 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 		return m, nil // stale response, discard
 	}
 	m.loading = false
-	if isContextCanceled(msg.err) {
-		return m, nil
-	}
 	if msg.err != nil {
-		m.err = msg.err
+		m.clearPreviewContentFingerprint()
 		m.previewLoading = false
+		if isContextCanceled(msg.err) {
+			return m, nil
+		}
+		m.err = msg.err
 		m.setErrorFromErr("Warning: ", msg.err)
 		return m, scheduleStatusClear()
 	}
