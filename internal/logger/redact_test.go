@@ -118,6 +118,42 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"hunter2-DSNMARKER"},
 		},
 		{
+			name:            "MYSQL_PASSWORD env-style key",
+			input:           "startup: MYSQL_PASSWORD=hunter2marker refused",
+			wantContains:    []string{"MYSQL_PASSWORD=[REDACTED]", "refused"},
+			wantNotContains: []string{"hunter2marker"},
+		},
+		{
+			name:            "POSTGRES_PASSWORD env-style key with colon",
+			input:           "config: POSTGRES_PASSWORD: hunter2marker invalid",
+			wantContains:    []string{"POSTGRES_PASSWORD: [REDACTED]", "invalid"},
+			wantNotContains: []string{"hunter2marker"},
+		},
+		{
+			name:            "ADMIN_TOKEN env-style key",
+			input:           "auth: ADMIN_TOKEN=hunter2marker expired",
+			wantContains:    []string{"ADMIN_TOKEN=[REDACTED]", "expired"},
+			wantNotContains: []string{"hunter2marker"},
+		},
+		{
+			name:            "AWS_SECRET_ACCESS_KEY env-style key",
+			input:           "creds: AWS_SECRET_ACCESS_KEY=hunter2marker denied",
+			wantContains:    []string{"AWS_SECRET_ACCESS_KEY=[REDACTED]", "denied"},
+			wantNotContains: []string{"hunter2marker"},
+		},
+		{
+			name:            "MY_API_KEY env-style key",
+			input:           "request: MY_API_KEY=hunter2marker rejected",
+			wantContains:    []string{"MY_API_KEY=[REDACTED]", "rejected"},
+			wantNotContains: []string{"hunter2marker"},
+		},
+		{
+			name:            "user_password lowercase env-style key",
+			input:           "login: user_password=hunter2marker failed",
+			wantContains:    []string{"user_password=[REDACTED]", "failed"},
+			wantNotContains: []string{"hunter2marker"},
+		},
+		{
 			name:            "password as a path component is not mangled",
 			input:           "cat /etc/passwd: permission denied",
 			wantContains:    []string{"cat /etc/passwd: permission denied"},

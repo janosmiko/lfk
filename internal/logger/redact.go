@@ -30,12 +30,10 @@ var redactPatterns = []struct {
 	{regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://)[^:@\s/]*:[^@\s/]+@`), "${1}[REDACTED-CREDS]@"},
 	// Bearer tokens in Authorization headers.
 	{regexp.MustCompile(`(?i)(Bearer\s+)[A-Za-z0-9._-]{20,}`), "${1}[REDACTED-BEARER]"},
-	// Generic key=value pairs for password/token/secret/api_key/etc.
-	// Keep the key visible (useful for diagnosis), redact only the value.
-	// Go's regexp (RE2) has no lookbehind, so the char before the keyword is
-	// captured and replayed rather than asserted away. Excluding "/" as well
-	// as \w keeps path segments like /etc/passwd from reading as a key.
-	{regexp.MustCompile(`(?i)(^|[^\w/])((?:password|passwd|pwd|db[_-]?pass(?:word)?|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|dsn|database[_-]?url|connection[_-]?string)\s*[=:]\s*)[^\s&"',;]+`), "${1}${2}[REDACTED]"},
+	// Matches env-style identifiers ending in the keyword too (MYSQL_PASSWORD).
+	// RE2 has no lookbehind, so the boundary char is captured and replayed.
+	// Excluding "/" there keeps /etc/passwd from reading as a key.
+	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*(?:password|passwd|pwd|db[_-]?pass(?:word)?|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|dsn|database[_-]?url|connection[_-]?string)\s*[=:]\s*)[^\s&"',;]+`), "${1}${2}[REDACTED]"},
 	// kubectl --from-literal=KEY=VALUE — keep KEY, redact VALUE.
 	{regexp.MustCompile(`(--from-literal=[^=\s]+=)[^\s"']+`), "${1}[REDACTED]"},
 }
