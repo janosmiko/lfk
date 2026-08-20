@@ -702,8 +702,8 @@ confirm_on_exit: true
 #   "auto"    - default. Per resource type, start in direct-list mode and
 #               promote to a shared informer once a list returns >= 1000
 #               items, or a repeated refresh keeps it hot regardless of
-#               size. Demote when cached size stays below 500 for three
-#               consecutive calls, or the refresh stops. Recommended.
+#               size. Events, Secrets, metrics, and non-watchable types
+#               never promote. Demote below 500 or when refreshes stop.
 #   "always"  - open a watch eagerly on first use of each resource type.
 # Legacy bool form: true → "always", false → "off".
 # Default: auto

@@ -109,6 +109,9 @@ func TestWatchTickDropsDeletedPodViaInformerCache(t *testing.T) {
 	// markHot's own informer issues one internal LIST asynchronously.
 	// Wait for it to land so it isn't mistaken for a spurious extra call.
 	listsAfterWarmup := waitForListActionCountToSettle(t, dyn)
+	// The fake watch only delivers events sent after it registers. Delete
+	// before that and the informer never sees it.
+	waitForPodWatchAction(t, dyn)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	require.NoError(t, dyn.Resource(gvr).Namespace("default").Delete(t.Context(), "doomed-pod", metav1.DeleteOptions{}))
@@ -132,6 +135,20 @@ func TestWatchTickDropsDeletedPodViaInformerCache(t *testing.T) {
 // stricter bar than "unchanged once" is needed under -race / full-suite
 // CPU contention, where the informer's own internal LIST can lag well
 // behind a single 20ms poll.
+func waitForPodWatchAction(t *testing.T, dyn *dynfake.FakeDynamicClient) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, a := range dyn.Actions() {
+			if a.GetVerb() == "watch" && a.GetResource().Resource == "pods" && a.GetResource().Group == "" {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("informer pod watch never registered")
+}
+
 func waitForListActionCountToSettle(t *testing.T, dyn *dynfake.FakeDynamicClient) int {
 	t.Helper()
 	const stableReadsRequired = 5
