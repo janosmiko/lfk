@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -701,8 +700,8 @@ func TestCovLoadQuotas(t *testing.T) {
 
 func TestCovLoadNamespaces(t *testing.T) {
 	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "kube-system"},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name:   "kube-system",
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 	m := baseModelWithFakeClientAndScheduler(t, ns)
 	cmd := m.loadNamespacesForContext(m.activeContext(), false)
@@ -789,7 +788,7 @@ func TestCovLoadResourceTreeDefaultLevel(t *testing.T) {
 
 func TestCovLoadContainers(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+		Name: "test-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{Name: "main", Image: "nginx:latest"},
@@ -992,8 +991,8 @@ func TestCovLoadNodeMetricsForListReturnsCmd(t *testing.T) {
 
 func TestCovLoadSecretData(t *testing.T) {
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
-		Data:       map[string][]byte{"key": []byte("val")},
+		Name: "my-secret", Namespace: "default",
+		Data: map[string][]byte{"key": []byte("val")},
 	}
 	m := baseModelWithFakeClient(secret)
 	m = withMiddleItem(m, model.Item{Name: "my-secret", Namespace: "default"})
@@ -1014,8 +1013,8 @@ func TestCovLoadSecretDataNil(t *testing.T) {
 
 func TestCovSaveSecretData(t *testing.T) {
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
-		Data:       map[string][]byte{"key": []byte("old")},
+		Name: "my-secret", Namespace: "default",
+		Data: map[string][]byte{"key": []byte("old")},
 	}
 	m := baseModelWithFakeClient(secret)
 	m = withMiddleItem(m, model.Item{Name: "my-secret", Namespace: "default"})
@@ -1044,8 +1043,8 @@ func TestCovSaveSecretDataNilSel(t *testing.T) {
 
 func TestCovLoadConfigMapData(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cm", Namespace: "default"},
-		Data:       map[string]string{"config.yaml": "data: true"},
+		Name: "my-cm", Namespace: "default",
+		Data: map[string]string{"config.yaml": "data: true"},
 	}
 	m := baseModelWithFakeClient(cm)
 	m = withMiddleItem(m, model.Item{Name: "my-cm", Namespace: "default"})
@@ -1066,8 +1065,8 @@ func TestCovLoadConfigMapDataNil(t *testing.T) {
 
 func TestCovSaveConfigMapData(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cm", Namespace: "default"},
-		Data:       map[string]string{"key": "old"},
+		Name: "my-cm", Namespace: "default",
+		Data: map[string]string{"key": "old"},
 	}
 	m := baseModelWithFakeClient(cm)
 	m = withMiddleItem(m, model.Item{Name: "my-cm", Namespace: "default"})

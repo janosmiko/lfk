@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	dynfake "k8s.io/client-go/dynamic/fake"
 	fake "k8s.io/client-go/kubernetes/fake"
@@ -34,10 +33,8 @@ func baseSecretModel(t *testing.T) Model {
 	t.Cleanup(func() { ui.ConfigSecretLazyLoading = prevLazy })
 
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-secret",
-			Namespace: "default",
-		},
+		Name:      "my-secret",
+		Namespace: "default",
 		Data: map[string][]byte{
 			"password": []byte("s3cret"),
 			"username": []byte("admin"),

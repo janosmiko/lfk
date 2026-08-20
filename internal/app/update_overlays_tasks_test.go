@@ -125,12 +125,10 @@ func newSchedulerWithCompletedHistory(n int) *scheduler.Registry {
 	for i := range n {
 		started := base.Add(time.Duration(i) * time.Second)
 		r.InjectCompletedForTest(scheduler.CompletedTask{
-			Task: scheduler.Task{
-				Kind:      scheduler.KindResourceList,
-				Name:      fmt.Sprintf("Task %d", i),
-				Target:    fmt.Sprintf("ctx-%d", i),
-				StartedAt: started,
-			},
+			Kind:       scheduler.KindResourceList,
+			Name:       fmt.Sprintf("Task %d", i),
+			Target:     fmt.Sprintf("ctx-%d", i),
+			StartedAt:  started,
 			FinishedAt: started.Add(time.Second),
 		})
 	}

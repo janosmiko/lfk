@@ -15,7 +15,7 @@ import (
 func TestSourceFetch(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "bad"},
+			Namespace: "prod", Name: "bad",
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name: "c", Image: "nginx:latest",
@@ -24,12 +24,10 @@ func TestSourceFetch(t *testing.T) {
 			},
 		},
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "prod", Name: "clean",
-				// A fully clean pod is controller-managed; without an owner
-				// the bare_pod check fires.
-				OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
-			},
+			Namespace: "prod", Name: "clean",
+			// A fully clean pod is controller-managed; without an owner
+			// the bare_pod check fires.
+			OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
 			Spec: corev1.PodSpec{
 				ServiceAccountName: "api-sa",
 				Containers: []corev1.Container{{
@@ -81,12 +79,12 @@ func TestSourceFetch(t *testing.T) {
 func TestSourceFetchNamespaceFilter(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p1"},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)}}}},
+			Namespace: "prod", Name: "p1",
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)}}}},
 		},
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "staging", Name: "p2"},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)}}}},
+			Namespace: "staging", Name: "p2",
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)}}}},
 		},
 	)
 
@@ -103,7 +101,7 @@ func TestSourceFetchNamespaceFilter(t *testing.T) {
 // include/exclude patterns reach it.
 func TestSourceFetchSecretEnvPatterns(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+		Namespace: "prod", Name: "p",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: "c", Image: "nginx:1.25",
@@ -155,7 +153,7 @@ func TestSourceFetchNilClient(t *testing.T) {
 func TestSourceFetchScansInitAndEphemeralContainers(t *testing.T) {
 	priv := corev1.SecurityContext{Privileged: new(true)}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "pod"},
+		Namespace: "prod", Name: "pod",
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{{
 				Name: "init", Image: "busybox", SecurityContext: &priv,
@@ -164,9 +162,7 @@ func TestSourceFetchScansInitAndEphemeralContainers(t *testing.T) {
 				Name: "main", Image: "nginx", SecurityContext: &priv,
 			}},
 			EphemeralContainers: []corev1.EphemeralContainer{{
-				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-					Name: "debug", Image: "alpine", SecurityContext: &priv,
-				},
+				Name: "debug", Image: "alpine", SecurityContext: &priv,
 			}},
 		},
 	}

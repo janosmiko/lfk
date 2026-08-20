@@ -26,7 +26,7 @@ func forbidList(client *fake.Clientset, res string) {
 
 func daemonSet(ns, name string, labels map[string]string, containers ...corev1.Container) *appsv1.DaemonSet {
 	return &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Namespace: ns, Name: name,
 		Spec: appsv1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
@@ -109,11 +109,11 @@ func TestEmptyDirNoSizeLimit(t *testing.T) {
 	limit := resource.MustParse("1Gi")
 	unbounded := deployment("prod", "unbounded", 1, nil, hardened("c"))
 	unbounded.Spec.Template.Spec.Volumes = []corev1.Volume{
-		{Name: "scratch", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+		{Name: "scratch", EmptyDir: &corev1.EmptyDirVolumeSource{}},
 	}
 	bounded := deployment("prod", "bounded", 1, nil, hardened("c"))
 	bounded.Spec.Template.Spec.Volumes = []corev1.Volume{
-		{Name: "scratch", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &limit}}},
+		{Name: "scratch", EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: &limit}},
 	}
 
 	s := NewWithClient(fake.NewSimpleClientset(unbounded, bounded))
@@ -131,9 +131,9 @@ func TestEmptyDirNoSizeLimit(t *testing.T) {
 
 func TestIdenticalProbes(t *testing.T) {
 	probe := func(path string) *corev1.Probe {
-		return &corev1.Probe{ProbeHandler: corev1.ProbeHandler{
+		return &corev1.Probe{
 			HTTPGet: &corev1.HTTPGetAction{Path: path, Port: intstr.FromInt32(8080)},
-		}}
+		}
 	}
 	same := deployment("prod", "same", 1, nil, corev1.Container{
 		Name: "c", LivenessProbe: probe("/healthz"), ReadinessProbe: probe("/healthz"),
@@ -149,9 +149,9 @@ func TestIdenticalProbes(t *testing.T) {
 
 func quota(ns, name string, hard, used corev1.ResourceList) *corev1.ResourceQuota {
 	return &corev1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Spec:       corev1.ResourceQuotaSpec{Hard: hard},
-		Status:     corev1.ResourceQuotaStatus{Hard: hard, Used: used},
+		Namespace: ns, Name: name,
+		Spec:   corev1.ResourceQuotaSpec{Hard: hard},
+		Status: corev1.ResourceQuotaStatus{Hard: hard, Used: used},
 	}
 }
 
@@ -170,7 +170,7 @@ func TestQuotaNearLimit(t *testing.T) {
 
 func hpaScaled(ns, name, target string, minReplicas, maxReplicas, desired int32) *autoscalingv2.HorizontalPodAutoscaler {
 	return &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Namespace: ns, Name: name,
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: target},
 			MinReplicas:    &minReplicas,

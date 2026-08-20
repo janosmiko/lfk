@@ -40,20 +40,18 @@ func buildDeployment() *appsv1.Deployment {
 	// mostly-healthy deployment instead of dominating a tiny replica set.
 	replicas := int32(6)
 	return &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              DeploymentWeb,
-			Namespace:         NamespaceDemo,
-			UID:               k8stypes.UID(uidDeploymentWeb),
-			Labels:            labels,
-			CreationTimestamp: metav1.NewTime(created),
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kubectl-client-side-apply", "Update",
-					`{"f:spec":{"f:replicas":{},"f:selector":{},"f:template":{}}}`, created),
-				managedField("kube-controller-manager", "Update",
-					`{"f:status":{"f:readyReplicas":{},"f:replicas":{},"f:availableReplicas":{},"f:conditions":{}}}`,
-					demoEpoch.Add(-5*time.Minute)),
-			},
+		APIVersion: "apps/v1", Kind: "Deployment",
+		Name:              DeploymentWeb,
+		Namespace:         NamespaceDemo,
+		UID:               k8stypes.UID(uidDeploymentWeb),
+		Labels:            labels,
+		CreationTimestamp: metav1.NewTime(created),
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kubectl-client-side-apply", "Update",
+				`{"f:spec":{"f:replicas":{},"f:selector":{},"f:template":{}}}`, created),
+			managedField("kube-controller-manager", "Update",
+				`{"f:status":{"f:readyReplicas":{},"f:replicas":{},"f:availableReplicas":{},"f:conditions":{}}}`,
+				demoEpoch.Add(-5*time.Minute)),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -89,23 +87,21 @@ func buildReplicaSet() *appsv1.ReplicaSet {
 	replicas := int32(6)
 	controller, block := true, true
 	return &appsv1.ReplicaSet{
-		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "ReplicaSet"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              ReplicaSetWeb,
-			Namespace:         NamespaceDemo,
-			UID:               k8stypes.UID(uidReplicaSetWeb),
-			Labels:            labels,
-			CreationTimestamp: metav1.NewTime(created),
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "apps/v1", Kind: "Deployment", Name: DeploymentWeb,
-					UID: k8stypes.UID(uidDeploymentWeb), Controller: &controller, BlockOwnerDeletion: &block,
-				},
+		APIVersion: "apps/v1", Kind: "ReplicaSet",
+		Name:              ReplicaSetWeb,
+		Namespace:         NamespaceDemo,
+		UID:               k8stypes.UID(uidReplicaSetWeb),
+		Labels:            labels,
+		CreationTimestamp: metav1.NewTime(created),
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "apps/v1", Kind: "Deployment", Name: DeploymentWeb,
+				UID: k8stypes.UID(uidDeploymentWeb), Controller: &controller, BlockOwnerDeletion: &block,
 			},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("deployment-controller", "Update",
-					`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:replicas":{},"f:selector":{}}}`, created),
-			},
+		},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("deployment-controller", "Update",
+				`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:replicas":{},"f:selector":{}}}`, created),
 		},
 		Spec: appsv1.ReplicaSetSpec{
 			Replicas: &replicas,
@@ -145,20 +141,18 @@ func webPodOwnerRef() metav1.OwnerReference {
 func healthyWebPod(name, uid, ip string) *corev1.Pod {
 	started := demoEpoch.Add(-2 * time.Hour)
 	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         NamespaceDemo,
-			UID:               k8stypes.UID(uid),
-			Labels:            webPodTemplateLabels(),
-			CreationTimestamp: metav1.NewTime(started),
-			OwnerReferences:   []metav1.OwnerReference{webPodOwnerRef()},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kube-controller-manager", "Update",
-					`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:containers":{}}}`, started),
-				managedField("kubelet", "Update",
-					`{"f:status":{"f:containerStatuses":{},"f:podIP":{},"f:phase":{}}}`, demoEpoch.Add(-time.Minute)),
-			},
+		APIVersion: "v1", Kind: "Pod",
+		Name:              name,
+		Namespace:         NamespaceDemo,
+		UID:               k8stypes.UID(uid),
+		Labels:            webPodTemplateLabels(),
+		CreationTimestamp: metav1.NewTime(started),
+		OwnerReferences:   []metav1.OwnerReference{webPodOwnerRef()},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kube-controller-manager", "Update",
+				`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:containers":{}}}`, started),
+			managedField("kubelet", "Update",
+				`{"f:status":{"f:containerStatuses":{},"f:podIP":{},"f:phase":{}}}`, demoEpoch.Add(-time.Minute)),
 		},
 		Spec: corev1.PodSpec{
 			NodeName:   NodeWorker1,
@@ -186,20 +180,18 @@ func crashLoopWebPod() *corev1.Pod {
 	started := demoEpoch.Add(-40 * time.Minute)
 	lastRestart := demoEpoch.Add(-3 * time.Minute)
 	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              PodWebCrashLoop,
-			Namespace:         NamespaceDemo,
-			UID:               k8stypes.UID(uidPodWebCrash),
-			Labels:            webPodTemplateLabels(),
-			CreationTimestamp: metav1.NewTime(started),
-			OwnerReferences:   []metav1.OwnerReference{webPodOwnerRef()},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kube-controller-manager", "Update",
-					`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:containers":{}}}`, started),
-				managedField("kubelet", "Update",
-					`{"f:status":{"f:containerStatuses":{},"f:podIP":{},"f:phase":{}}}`, lastRestart),
-			},
+		APIVersion: "v1", Kind: "Pod",
+		Name:              PodWebCrashLoop,
+		Namespace:         NamespaceDemo,
+		UID:               k8stypes.UID(uidPodWebCrash),
+		Labels:            webPodTemplateLabels(),
+		CreationTimestamp: metav1.NewTime(started),
+		OwnerReferences:   []metav1.OwnerReference{webPodOwnerRef()},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kube-controller-manager", "Update",
+				`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:containers":{}}}`, started),
+			managedField("kubelet", "Update",
+				`{"f:status":{"f:containerStatuses":{},"f:podIP":{},"f:phase":{}}}`, lastRestart),
 		},
 		Spec: corev1.PodSpec{
 			NodeName:   NodeWorker1,

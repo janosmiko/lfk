@@ -113,11 +113,9 @@ func TestPersistColumnPrefs_CommitsCurrentKind(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
 	m := &Model{
-		columnToggleState: columnToggleState{
-			sessionColumns:       map[string][]string{"prod\x00Deployment": {"cpu"}},
-			hiddenBuiltinColumns: map[string][]string{"prod\x00Deployment": {"Age"}},
-			columnOrder:          map[string][]string{"prod\x00Deployment": {"Name", "cpu"}},
-		},
+		sessionColumns:       map[string][]string{"prod\x00Deployment": {"cpu"}},
+		hiddenBuiltinColumns: map[string][]string{"prod\x00Deployment": {"Age"}},
+		columnOrder:          map[string][]string{"prod\x00Deployment": {"Name", "cpu"}},
 	}
 	m.nav.Context = "prod"
 	m.nav.ResourceType.Kind = "Deployment"
@@ -183,11 +181,9 @@ func TestPersistColumnPrefs_ResetRemovesEntry(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
 	m := &Model{
-		columnToggleState: columnToggleState{
-			sessionColumns:       map[string][]string{},
-			hiddenBuiltinColumns: map[string][]string{},
-			columnOrder:          map[string][]string{},
-		},
+		sessionColumns:       map[string][]string{},
+		hiddenBuiltinColumns: map[string][]string{},
+		columnOrder:          map[string][]string{},
 	}
 	m.nav.Context = "prod"
 	m.nav.ResourceType.Kind = "Deployment"

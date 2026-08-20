@@ -25,13 +25,11 @@ func buildEvents() []*corev1.Event {
 
 func podWarningEvent(name, uid, podName, podUID, reason, message string, count int32, first, last time.Time) *corev1.Event {
 	return &corev1.Event{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Event"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         NamespaceDemo,
-			UID:               k8stypes.UID(uid),
-			CreationTimestamp: metav1.NewTime(last),
-		},
+		APIVersion: "v1", Kind: "Event",
+		Name:              name,
+		Namespace:         NamespaceDemo,
+		UID:               k8stypes.UID(uid),
+		CreationTimestamp: metav1.NewTime(last),
 		InvolvedObject: corev1.ObjectReference{
 			Kind: "Pod", Name: podName, Namespace: NamespaceDemo, UID: k8stypes.UID(podUID),
 		},
@@ -48,13 +46,11 @@ func podWarningEvent(name, uid, podName, podUID, reason, message string, count i
 func jobWarningEvent() *corev1.Event {
 	at := demoEpoch.Add(-2 * time.Minute)
 	return &corev1.Event{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Event"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              JobDBMigrate + ".backofflimit",
-			Namespace:         NamespaceJobs,
-			UID:               k8stypes.UID(uidEventJobBackoffLimit),
-			CreationTimestamp: metav1.NewTime(at),
-		},
+		APIVersion: "v1", Kind: "Event",
+		Name:              JobDBMigrate + ".backofflimit",
+		Namespace:         NamespaceJobs,
+		UID:               k8stypes.UID(uidEventJobBackoffLimit),
+		CreationTimestamp: metav1.NewTime(at),
 		InvolvedObject: corev1.ObjectReference{
 			Kind: "Job", Name: JobDBMigrate, Namespace: NamespaceJobs, UID: k8stypes.UID(uidJobDBMigrate),
 		},

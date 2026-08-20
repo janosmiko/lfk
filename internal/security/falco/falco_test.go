@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
@@ -58,14 +57,12 @@ func TestParseSeverity(t *testing.T) {
 
 func TestParseEvent(t *testing.T) {
 	ev := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "prod",
-			UID:       types.UID("abc-123"),
-			Annotations: map[string]string{
-				"falco.org/rule":     "Terminal Shell in Container",
-				"falco.org/priority": "WARNING",
-				"falco.org/output":   "A shell was spawned in container",
-			},
+		Namespace: "prod",
+		UID:       types.UID("abc-123"),
+		Annotations: map[string]string{
+			"falco.org/rule":     "Terminal Shell in Container",
+			"falco.org/priority": "WARNING",
+			"falco.org/output":   "A shell was spawned in container",
 		},
 		Reason:  "FalcoAlert",
 		Message: "A shell was spawned in container",
@@ -92,13 +89,11 @@ func TestParseEvent(t *testing.T) {
 
 func TestParseEventMinimal(t *testing.T) {
 	ev := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			UID:       types.UID("xyz"),
-		},
-		Reason:  "SomeRule",
-		Message: "something happened",
-		Type:    "Warning",
+		Namespace: "default",
+		UID:       types.UID("xyz"),
+		Reason:    "SomeRule",
+		Message:   "something happened",
+		Type:      "Warning",
 		InvolvedObject: corev1.ObjectReference{
 			Kind:      "Deployment",
 			Name:      "api",
@@ -178,14 +173,12 @@ func TestExtractRefFromOutputFieldsWorkloadKinds(t *testing.T) {
 
 func TestFetchWithFakeClient(t *testing.T) {
 	ev := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "prod",
-			Name:      "falco-alert-1",
-			UID:       types.UID("uid-1"),
-			Annotations: map[string]string{
-				"falco.org/rule":     "Unexpected Outbound Connection",
-				"falco.org/priority": "ERROR",
-			},
+		Namespace: "prod",
+		Name:      "falco-alert-1",
+		UID:       types.UID("uid-1"),
+		Annotations: map[string]string{
+			"falco.org/rule":     "Unexpected Outbound Connection",
+			"falco.org/priority": "ERROR",
 		},
 		Reason:            "FalcoAlert",
 		Message:           "Outbound connection to suspicious IP",
@@ -199,11 +192,9 @@ func TestFetchWithFakeClient(t *testing.T) {
 
 	// Falco DaemonSet pod (needed for IsAvailable check).
 	falcoPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "falco",
-			Name:      "falco-node1",
-			Labels:    map[string]string{"app.kubernetes.io/name": "falco"},
-		},
+		Namespace: "falco",
+		Name:      "falco-node1",
+		Labels:    map[string]string{"app.kubernetes.io/name": "falco"},
 	}
 	client := kubefake.NewSimpleClientset(ev, falcoPod)
 	s := NewWithClient(client)

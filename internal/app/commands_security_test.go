@@ -20,8 +20,9 @@ func newTestModelWithSecurity(t *testing.T, mgr *security.Manager, kctx string) 
 	m := Model{
 		scheduler:       scheduler.New(scheduler.DefaultThreshold),
 		suppressBgtasks: true, // skip the registry side-effects in tests
+
+		securityManager: mgr,
 	}
-	m.securityManager = mgr
 	m.nav.Context = kctx
 	return m
 }

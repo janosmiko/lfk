@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/janosmiko/lfk/internal/security"
 )
@@ -17,7 +16,7 @@ func TestExtendedChecksRegistered(t *testing.T) {
 }
 
 func TestCheckSecretEnvWith(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name    string
 		env     []corev1.EnvVar
@@ -96,16 +95,17 @@ func TestCheckSecretEnvWith(t *testing.T) {
 // checks: a pod with only init containers must not panic or emit.
 func TestExtendedFirstContainerChecks_NoRegularContainers(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+		Namespace: "prod", Name: "p",
 		Spec: corev1.PodSpec{
 			InitContainers:        []corev1.Container{{Name: "init"}},
 			ShareProcessNamespace: new(true),
 			SecurityContext: &corev1.PodSecurityContext{
 				Sysctls: []corev1.Sysctl{{Name: "kernel.msgmax", Value: "1"}},
 			},
-			Volumes: []corev1.Volume{{Name: "sock", VolumeSource: corev1.VolumeSource{
+			Volumes: []corev1.Volume{{
+				Name:     "sock",
 				HostPath: &corev1.HostPathVolumeSource{Path: "/var/run/docker.sock"},
-			}}},
+			}},
 		},
 	}
 	init := pod.Spec.InitContainers[0]
@@ -117,9 +117,10 @@ func TestExtendedFirstContainerChecks_NoRegularContainers(t *testing.T) {
 
 func TestCheckRuntimeSocket(t *testing.T) {
 	hostPathVol := func(name, path string) corev1.Volume {
-		return corev1.Volume{Name: name, VolumeSource: corev1.VolumeSource{
+		return corev1.Volume{
+			Name:     name,
 			HostPath: &corev1.HostPathVolumeSource{Path: path},
-		}}
+		}
 	}
 	cases := []struct {
 		name    string
@@ -134,14 +135,14 @@ func TestCheckRuntimeSocket(t *testing.T) {
 		{"podman socket", []corev1.Volume{hostPathVol("sock", "/run/podman/podman.sock")}, 1},
 		{"trailing slash", []corev1.Volume{hostPathVol("sock", "/var/run/docker.sock/")}, 1},
 		{"generic hostPath", []corev1.Volume{hostPathVol("etc", "/etc")}, 0},
-		{"emptyDir", []corev1.Volume{{Name: "d", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}}, 0},
+		{"emptyDir", []corev1.Volume{{Name: "d", EmptyDir: &corev1.EmptyDirVolumeSource{}}}, 0},
 		{"no volumes", nil, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}, Volumes: tc.volumes},
+				Namespace: "prod", Name: "p",
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}, Volumes: tc.volumes},
 			}
 			findings := checkRuntimeSocket(pod, pod.Spec.Containers[0])
 			assert.Len(t, findings, tc.want)
@@ -153,7 +154,7 @@ func TestCheckRuntimeSocket(t *testing.T) {
 	}
 	t.Run("non-first container is skipped", func(t *testing.T) {
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+			Namespace: "prod", Name: "p",
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{Name: "c1"}, {Name: "c2"}},
 				Volumes:    []corev1.Volume{hostPathVol("sock", "/var/run/docker.sock")},
@@ -185,8 +186,8 @@ func TestCheckUnsafeSysctls(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
+				Namespace: "prod", Name: "p",
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
 			}
 			if tc.sysctls != nil {
 				pod.Spec.SecurityContext = &corev1.PodSecurityContext{Sysctls: tc.sysctls}
@@ -204,7 +205,7 @@ func TestCheckUnsafeSysctls(t *testing.T) {
 	}
 	t.Run("non-first container is skipped", func(t *testing.T) {
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+			Namespace: "prod", Name: "p",
 			Spec: corev1.PodSpec{
 				Containers:      []corev1.Container{{Name: "c1"}, {Name: "c2"}},
 				SecurityContext: &corev1.PodSecurityContext{Sysctls: []corev1.Sysctl{{Name: "kernel.msgmax", Value: "1"}}},
@@ -217,7 +218,7 @@ func TestCheckUnsafeSysctls(t *testing.T) {
 func TestCheckProcMount(t *testing.T) {
 	unmasked := corev1.UnmaskedProcMount
 	def := corev1.DefaultProcMount
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name string
 		sc   *corev1.SecurityContext
@@ -242,7 +243,7 @@ func TestCheckProcMount(t *testing.T) {
 }
 
 func TestCheckHostPort(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name   string
 		ports  []corev1.ContainerPort
@@ -291,7 +292,7 @@ func TestCheckSeccompUnconfined(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+			pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 			if tc.podProf != nil {
 				pod.Spec.SecurityContext = &corev1.PodSecurityContext{SeccompProfile: tc.podProf}
 			}
@@ -323,7 +324,7 @@ func TestCheckShareProcessNamespace(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+				Namespace: "prod", Name: "p",
 				Spec: corev1.PodSpec{
 					ShareProcessNamespace: tc.share,
 					Containers:            []corev1.Container{{Name: "c"}},
@@ -339,7 +340,7 @@ func TestCheckShareProcessNamespace(t *testing.T) {
 	}
 	t.Run("non-first container is skipped", func(t *testing.T) {
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+			Namespace: "prod", Name: "p",
 			Spec: corev1.PodSpec{
 				ShareProcessNamespace: new(true),
 				Containers:            []corev1.Container{{Name: "c1"}, {Name: "c2"}},
@@ -350,10 +351,10 @@ func TestCheckShareProcessNamespace(t *testing.T) {
 }
 
 func TestCheckSecretEnv(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	fromSecret := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{Name: "s"}, Key: "k",
+			Name: "s", Key: "k",
 		},
 	}
 	cases := []struct {
@@ -428,7 +429,7 @@ func TestCheckSATokenAutomount(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+				Namespace: "prod", Name: "p",
 				Spec: corev1.PodSpec{
 					ServiceAccountName:           tc.sa,
 					AutomountServiceAccountToken: tc.automount,
@@ -445,8 +446,8 @@ func TestCheckSATokenAutomount(t *testing.T) {
 	}
 	t.Run("non-first container is skipped", func(t *testing.T) {
 		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c1"}, {Name: "c2"}}},
+			Namespace: "prod", Name: "p",
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c1"}, {Name: "c2"}}},
 		}
 		assert.Nil(t, checkSATokenAutomount(pod, pod.Spec.Containers[1]))
 	})

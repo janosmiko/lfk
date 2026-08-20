@@ -6,23 +6,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func svc(ns, name, clusterIP string, selector map[string]string) *corev1.Service {
 	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Spec:       corev1.ServiceSpec{ClusterIP: clusterIP, Selector: selector},
+		Namespace: ns, Name: name,
+		Spec: corev1.ServiceSpec{ClusterIP: clusterIP, Selector: selector},
 	}
 }
 
 func endpointSlice(ns, svcName string, readiness ...*bool) *discoveryv1.EndpointSlice {
 	eps := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns, Name: svcName + "-abc",
-			Labels: map[string]string{discoveryv1.LabelServiceName: svcName},
-		},
+		Namespace: ns, Name: svcName + "-abc",
+		Labels: map[string]string{discoveryv1.LabelServiceName: svcName},
 	}
 	for _, r := range readiness {
 		eps.Endpoints = append(eps.Endpoints, discoveryv1.Endpoint{

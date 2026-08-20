@@ -18,7 +18,7 @@ import (
 )
 
 func namespaceObj(name string, labels map[string]string) *corev1.Namespace {
-	return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+	return &corev1.Namespace{Name: name, Labels: labels}
 }
 
 func forbidList(client *fake.Clientset, res string) {
@@ -29,16 +29,14 @@ func forbidList(client *fake.Clientset, res string) {
 
 func minimalPod(ns, name string) *corev1.Pod {
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns, Name: name,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
-		},
-		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
+		Namespace: ns, Name: name,
+		OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
+		Spec:            corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
 	}
 }
 
 func netpol(ns, name string) *networkingv1.NetworkPolicy {
-	return &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name}}
+	return &networkingv1.NetworkPolicy{Namespace: ns, Name: name}
 }
 
 func checksByResource(t *testing.T, s *Source) map[string]map[string]bool {

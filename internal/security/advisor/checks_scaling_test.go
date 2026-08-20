@@ -20,7 +20,7 @@ func TestPDBNoUnhealthyPolicy(t *testing.T) {
 	withPolicy.Spec.UnhealthyPodEvictionPolicy = &policy
 
 	systemPDB := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "sys"},
+		Namespace: "kube-system", Name: "sys",
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"app": "s"}},
 			MinAvailable: &one,
@@ -44,7 +44,7 @@ func TestPDBVsHPAMin(t *testing.T) {
 	half := intstr.FromString("50%")
 
 	hpaNilMin := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "hpa-e"},
+		Namespace: "prod", Name: "hpa-e",
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: "e"},
 			MaxReplicas:    10,

@@ -17,12 +17,10 @@ import (
 func newCompleted(name string, dur time.Duration) scheduler.CompletedTask {
 	started := time.Unix(1_000_000, 0)
 	return scheduler.CompletedTask{
-		Task: scheduler.Task{
-			Kind:      scheduler.KindResourceList,
-			Name:      name,
-			Target:    "ctx",
-			StartedAt: started,
-		},
+		Kind:       scheduler.KindResourceList,
+		Name:       name,
+		Target:     "ctx",
+		StartedAt:  started,
 		FinishedAt: started.Add(dur),
 	}
 }
@@ -32,13 +30,11 @@ func newCompleted(name string, dur time.Duration) scheduler.CompletedTask {
 // that finished recently (or a quick task that finished long ago).
 func newCompletedAt(name string, started time.Time, dur time.Duration) scheduler.CompletedTask {
 	return scheduler.CompletedTask{
-		Task: scheduler.Task{
-			Kind:      scheduler.KindResourceList,
-			Priority:  scheduler.PriorityHigh,
-			Name:      name,
-			Target:    "ctx",
-			StartedAt: started,
-		},
+		Kind:       scheduler.KindResourceList,
+		Priority:   scheduler.PriorityHigh,
+		Name:       name,
+		Target:     "ctx",
+		StartedAt:  started,
 		FinishedAt: started.Add(dur),
 	}
 }
@@ -141,13 +137,11 @@ func TestHistoryTasksForDisplay_PropagatesFields(t *testing.T) {
 	started := time.Unix(1_000_000, 0)
 	snap := []scheduler.CompletedTask{
 		{
-			Task: scheduler.Task{
-				Kind:      scheduler.KindAPIDiscovery,
-				Priority:  scheduler.PriorityCritical,
-				Name:      "Discover API resources",
-				Target:    "dev-envs",
-				StartedAt: started,
-			},
+			Kind:       scheduler.KindAPIDiscovery,
+			Priority:   scheduler.PriorityCritical,
+			Name:       "Discover API resources",
+			Target:     "dev-envs",
+			StartedAt:  started,
 			FinishedAt: started.Add(1900 * time.Millisecond),
 		},
 	}

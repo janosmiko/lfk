@@ -20,16 +20,14 @@ func buildCronJob() *batchv1.CronJob {
 	lastSchedule := demoEpoch.Add(-25 * time.Minute)
 	suspend := false
 	return &batchv1.CronJob{
-		TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1", Kind: "CronJob"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              CronJobNightlyBackup,
-			Namespace:         NamespaceJobs,
-			UID:               k8stypes.UID(UIDCronJobNightlyBackup),
-			CreationTimestamp: metav1.NewTime(created),
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kubectl-client-side-apply", "Update",
-					`{"f:spec":{"f:schedule":{},"f:jobTemplate":{}}}`, created),
-			},
+		APIVersion: "batch/v1", Kind: "CronJob",
+		Name:              CronJobNightlyBackup,
+		Namespace:         NamespaceJobs,
+		UID:               k8stypes.UID(UIDCronJobNightlyBackup),
+		CreationTimestamp: metav1.NewTime(created),
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kubectl-client-side-apply", "Update",
+				`{"f:spec":{"f:schedule":{},"f:jobTemplate":{}}}`, created),
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule: "0 2 * * *",
@@ -59,22 +57,20 @@ func buildCronJobOwnedJob() *batchv1.Job {
 	completed := demoEpoch.Add(-22 * time.Minute)
 	controller, block := true, true
 	return &batchv1.Job{
-		TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1", Kind: "Job"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              JobNightlyBackupRun,
-			Namespace:         NamespaceJobs,
-			UID:               k8stypes.UID(UIDJobNightlyBackupRun),
-			CreationTimestamp: metav1.NewTime(started),
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "batch/v1", Kind: "CronJob", Name: CronJobNightlyBackup,
-					UID: k8stypes.UID(UIDCronJobNightlyBackup), Controller: &controller, BlockOwnerDeletion: &block,
-				},
+		APIVersion: "batch/v1", Kind: "Job",
+		Name:              JobNightlyBackupRun,
+		Namespace:         NamespaceJobs,
+		UID:               k8stypes.UID(UIDJobNightlyBackupRun),
+		CreationTimestamp: metav1.NewTime(started),
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "batch/v1", Kind: "CronJob", Name: CronJobNightlyBackup,
+				UID: k8stypes.UID(UIDCronJobNightlyBackup), Controller: &controller, BlockOwnerDeletion: &block,
 			},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("cronjob-controller", "Update",
-					`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:template":{}}}`, started),
-			},
+		},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("cronjob-controller", "Update",
+				`{"f:metadata":{"f:ownerReferences":{}},"f:spec":{"f:template":{}}}`, started),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -104,28 +100,26 @@ func buildCronJobOwnedPod() *corev1.Pod {
 	finished := demoEpoch.Add(-22 * time.Minute)
 	controller, block := true, true
 	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      PodNightlyBackupRun,
-			Namespace: NamespaceJobs,
-			UID:       k8stypes.UID(uidPodNightlyBackupRun),
-			Labels: map[string]string{
-				"batch.kubernetes.io/job-name":       JobNightlyBackupRun,
-				"batch.kubernetes.io/controller-uid": UIDJobNightlyBackupRun,
+		APIVersion: "v1", Kind: "Pod",
+		Name:      PodNightlyBackupRun,
+		Namespace: NamespaceJobs,
+		UID:       k8stypes.UID(uidPodNightlyBackupRun),
+		Labels: map[string]string{
+			"batch.kubernetes.io/job-name":       JobNightlyBackupRun,
+			"batch.kubernetes.io/controller-uid": UIDJobNightlyBackupRun,
+		},
+		CreationTimestamp: metav1.NewTime(started),
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "batch/v1", Kind: "Job", Name: JobNightlyBackupRun,
+				UID: k8stypes.UID(UIDJobNightlyBackupRun), Controller: &controller, BlockOwnerDeletion: &block,
 			},
-			CreationTimestamp: metav1.NewTime(started),
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "batch/v1", Kind: "Job", Name: JobNightlyBackupRun,
-					UID: k8stypes.UID(UIDJobNightlyBackupRun), Controller: &controller, BlockOwnerDeletion: &block,
-				},
-			},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kube-controller-manager", "Update",
-					`{"f:metadata":{"f:ownerReferences":{},"f:labels":{}}}`, started),
-				managedField("kubelet", "Update",
-					`{"f:status":{"f:containerStatuses":{},"f:phase":{}}}`, finished),
-			},
+		},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kube-controller-manager", "Update",
+				`{"f:metadata":{"f:ownerReferences":{},"f:labels":{}}}`, started),
+			managedField("kubelet", "Update",
+				`{"f:status":{"f:containerStatuses":{},"f:phase":{}}}`, finished),
 		},
 		Spec: corev1.PodSpec{
 			NodeName:      NodeWorker1,
@@ -158,19 +152,17 @@ func buildJob() *batchv1.Job {
 	started := demoEpoch.Add(-25 * time.Minute)
 	backoffLimit := int32(4)
 	return &batchv1.Job{
-		TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1", Kind: "Job"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              JobDBMigrate,
-			Namespace:         NamespaceJobs,
-			UID:               k8stypes.UID(uidJobDBMigrate),
-			Labels:            map[string]string{"job-name": JobDBMigrate},
-			CreationTimestamp: metav1.NewTime(started),
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kubectl-client-side-apply", "Create",
-					`{"f:spec":{"f:backoffLimit":{},"f:template":{}}}`, started),
-				managedField("kube-controller-manager", "Update",
-					`{"f:status":{"f:conditions":{},"f:failed":{},"f:startTime":{}}}`, demoEpoch.Add(-2*time.Minute)),
-			},
+		APIVersion: "batch/v1", Kind: "Job",
+		Name:              JobDBMigrate,
+		Namespace:         NamespaceJobs,
+		UID:               k8stypes.UID(uidJobDBMigrate),
+		Labels:            map[string]string{"job-name": JobDBMigrate},
+		CreationTimestamp: metav1.NewTime(started),
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kubectl-client-side-apply", "Create",
+				`{"f:spec":{"f:backoffLimit":{},"f:template":{}}}`, started),
+			managedField("kube-controller-manager", "Update",
+				`{"f:status":{"f:conditions":{},"f:failed":{},"f:startTime":{}}}`, demoEpoch.Add(-2*time.Minute)),
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &backoffLimit,
@@ -202,25 +194,23 @@ func buildJobPod() *corev1.Pod {
 	finished := demoEpoch.Add(-22 * time.Minute)
 	controller, block := true, true
 	return &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              PodDBMigrate,
-			Namespace:         NamespaceJobs,
-			UID:               k8stypes.UID(uidPodDBMigrate),
-			Labels:            map[string]string{"job-name": JobDBMigrate},
-			CreationTimestamp: metav1.NewTime(started),
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: "batch/v1", Kind: "Job", Name: JobDBMigrate,
-					UID: k8stypes.UID(uidJobDBMigrate), Controller: &controller, BlockOwnerDeletion: &block,
-				},
+		APIVersion: "v1", Kind: "Pod",
+		Name:              PodDBMigrate,
+		Namespace:         NamespaceJobs,
+		UID:               k8stypes.UID(uidPodDBMigrate),
+		Labels:            map[string]string{"job-name": JobDBMigrate},
+		CreationTimestamp: metav1.NewTime(started),
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: "batch/v1", Kind: "Job", Name: JobDBMigrate,
+				UID: k8stypes.UID(uidJobDBMigrate), Controller: &controller, BlockOwnerDeletion: &block,
 			},
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kube-controller-manager", "Update",
-					`{"f:metadata":{"f:ownerReferences":{}}}`, started),
-				managedField("kubelet", "Update",
-					`{"f:status":{"f:containerStatuses":{},"f:phase":{}}}`, finished),
-			},
+		},
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kube-controller-manager", "Update",
+				`{"f:metadata":{"f:ownerReferences":{}}}`, started),
+			managedField("kubelet", "Update",
+				`{"f:status":{"f:containerStatuses":{},"f:phase":{}}}`, finished),
 		},
 		Spec: corev1.PodSpec{
 			NodeName:      NodeWorker1,

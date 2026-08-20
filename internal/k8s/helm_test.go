@@ -23,16 +23,14 @@ func newFakeHelmReleaseSecret(t *testing.T, name, release, status, version strin
 	t.Helper()
 	data := buildHelmReleaseSecretData(t, blob)
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         "default",
-			CreationTimestamp: metav1.Time{Time: created},
-			Labels: map[string]string{
-				"owner":   "helm",
-				"name":    release,
-				"status":  status,
-				"version": version,
-			},
+		Name:              name,
+		Namespace:         "default",
+		CreationTimestamp: metav1.Time{Time: created},
+		Labels: map[string]string{
+			"owner":   "helm",
+			"name":    release,
+			"status":  status,
+			"version": version,
 		},
 		Data: map[string][]byte{"release": data},
 		Type: "helm.sh/release.v1",
@@ -100,16 +98,14 @@ func TestGetHelmReleases_GracefulBlobFailure(t *testing.T) {
 	// using the label-only fallback with no Chart columns populated.
 	now := time.Now()
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.broken.v1",
-			Namespace:         "default",
-			CreationTimestamp: metav1.Time{Time: now},
-			Labels: map[string]string{
-				"owner":   "helm",
-				"name":    "broken",
-				"status":  "failed",
-				"version": "1",
-			},
+		Name:              "sh.helm.release.v1.broken.v1",
+		Namespace:         "default",
+		CreationTimestamp: metav1.Time{Time: now},
+		Labels: map[string]string{
+			"owner":   "helm",
+			"name":    "broken",
+			"status":  "failed",
+			"version": "1",
 		},
 		Data: map[string][]byte{"release": []byte("###not-valid-base64###")},
 	}
@@ -241,11 +237,9 @@ func TestGetHelmManagedResources_ManifestPath(t *testing.T) {
 	// The fake clientset holds the helm release secret plus a live Deployment
 	// so we can also verify live status enrichment (Ready column) below.
 	liveDep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cilium-operator",
-			Namespace: "default",
-		},
-		Spec: appsv1.DeploymentSpec{Replicas: new(int32(2))},
+		Name:      "cilium-operator",
+		Namespace: "default",
+		Spec:      appsv1.DeploymentSpec{Replicas: new(int32(2))},
 		Status: appsv1.DeploymentStatus{
 			AvailableReplicas: 2,
 			ReadyReplicas:     2,
@@ -318,12 +312,10 @@ func TestGetHelmManagedResources_EmptyManifestFallsBackToLabels(t *testing.T) {
 		t, "sh.helm.release.v1.legacy.v1", "legacy", "deployed", "1", blob, now,
 	)
 	labelledDep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "legacy-app",
-			Namespace: "default",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "legacy"},
-		},
-		Spec: appsv1.DeploymentSpec{Replicas: new(int32(1))},
+		Name:      "legacy-app",
+		Namespace: "default",
+		Labels:    map[string]string{"app.kubernetes.io/instance": "legacy"},
+		Spec:      appsv1.DeploymentSpec{Replicas: new(int32(1))},
 		Status: appsv1.DeploymentStatus{
 			AvailableReplicas: 1,
 			ReadyReplicas:     1,
@@ -352,26 +344,22 @@ func TestGetHelmManagedResources_EmptyManifestFallsBackToLabels(t *testing.T) {
 func TestGetHelmManagedResources_DecodeFailureFallsBack(t *testing.T) {
 	now := time.Now()
 	brokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.broken.v1",
-			Namespace:         "default",
-			CreationTimestamp: metav1.Time{Time: now},
-			Labels: map[string]string{
-				"owner":   "helm",
-				"name":    "broken",
-				"status":  "deployed",
-				"version": "1",
-			},
+		Name:              "sh.helm.release.v1.broken.v1",
+		Namespace:         "default",
+		CreationTimestamp: metav1.Time{Time: now},
+		Labels: map[string]string{
+			"owner":   "helm",
+			"name":    "broken",
+			"status":  "deployed",
+			"version": "1",
 		},
 		Data: map[string][]byte{"release": []byte("!!! not a helm release blob !!!")},
 	}
 	labelledSvc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "broken-svc",
-			Namespace: "default",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "broken"},
-		},
-		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+		Name:      "broken-svc",
+		Namespace: "default",
+		Labels:    map[string]string{"app.kubernetes.io/instance": "broken"},
+		Spec:      corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
 	}
 	cs := k8sfake.NewClientset(brokenSecret, labelledSvc)
 	c := newFakeClient(cs, nil)

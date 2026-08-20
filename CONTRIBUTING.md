@@ -4,7 +4,7 @@ Setup, build, and release steps for `lfk` contributors.
 
 ## Prerequisites
 
-- Go 1.26.6 or later
+- Go 1.27.0 or later
 - Access to a Kubernetes cluster (for testing)
 - `kubectl` configured and working
 - `golangci-lint`

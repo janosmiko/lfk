@@ -23,8 +23,9 @@ func canIGroupOf(name string, resources ...string) model.CanIGroup {
 }
 
 func TestEnterWhoCanMode_FlipsModeAndResetsState(t *testing.T) {
-	m := Model{}
-	m.canIMode = canIModeForward
+	m := Model{
+		canIMode: canIModeForward,
+	}
 	m.whoCan.subjectsScroll = 7 // stale value from prior session
 	mdl, _ := m.enterWhoCanMode()
 	result := mdl.(Model)
@@ -35,10 +36,11 @@ func TestEnterWhoCanMode_FlipsModeAndResetsState(t *testing.T) {
 }
 
 func TestEnterWhoCanMode_BuildsResourceListFromCanIGroups(t *testing.T) {
-	m := Model{}
-	m.canIGroups = []model.CanIGroup{
-		canIGroupOf("apps", "deployments", "statefulsets"),
-		canIGroupOf("", "pods", "secrets"),
+	m := Model{
+		canIGroups: []model.CanIGroup{
+			canIGroupOf("apps", "deployments", "statefulsets"),
+			canIGroupOf("", "pods", "secrets"),
+		},
 	}
 	mdl, _ := m.enterWhoCanMode()
 	result := mdl.(Model)
@@ -48,13 +50,14 @@ func TestEnterWhoCanMode_BuildsResourceListFromCanIGroups(t *testing.T) {
 }
 
 func TestEnterWhoCanMode_PositionsCursorOnPreSelectedResource(t *testing.T) {
-	m := Model{}
-	// Can-I cursor is on the first group; canIResourceUnderCursor returns its first
-	// resource name. Expect the picker to land on that name in the deduped list.
-	m.canIGroups = []model.CanIGroup{
-		canIGroupOf("", "pods", "secrets"),
+	m := Model{
+		// Can-I cursor is on the first group; canIResourceUnderCursor returns its first
+		// resource name. Expect the picker to land on that name in the deduped list.
+		canIGroups: []model.CanIGroup{
+			canIGroupOf("", "pods", "secrets"),
+		},
+		canIGroupCursor: 0,
 	}
-	m.canIGroupCursor = 0
 	mdl, _ := m.enterWhoCanMode()
 	result := mdl.(Model)
 	assert.Equal(t, "pods", result.whoCan.resource,
@@ -62,8 +65,9 @@ func TestEnterWhoCanMode_PositionsCursorOnPreSelectedResource(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_JKMovesCursor(t *testing.T) {
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"pods", "secrets", "services"}
 	m.whoCan.resourceCursor = 0
 
@@ -79,8 +83,9 @@ func TestHandleWhoCanKey_JKMovesCursor(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_JAtBottomDoesNotOverflow(t *testing.T) {
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"pods", "secrets"}
 	m.whoCan.resourceCursor = 1 // already at the bottom
 	mdl, _ := m.handleWhoCanKey(keyMsg("j"))
@@ -90,8 +95,9 @@ func TestHandleWhoCanKey_JAtBottomDoesNotOverflow(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_GJumpsToTopAndShiftGToBottom(t *testing.T) {
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"a", "b", "c", "d", "e"}
 	m.whoCan.resourceCursor = 2
 
@@ -105,8 +111,9 @@ func TestHandleWhoCanKey_GJumpsToTopAndShiftGToBottom(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_HomeJumpsToTopAndEndToBottom(t *testing.T) {
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"a", "b", "c", "d"}
 	m.whoCan.resourceCursor = 2
 
@@ -120,10 +127,11 @@ func TestHandleWhoCanKey_HomeJumpsToTopAndEndToBottom(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_JJKKScrollsSubjectsNotResources(t *testing.T) {
-	m := Model{}
-	m.width = 200
-	m.height = 60
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		width:    200,
+		height:   60,
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"pods"}
 	m.whoCan.resourceCursor = 0
 	// Many subjects so subjectsScroll has room to move.
@@ -144,10 +152,11 @@ func TestHandleWhoCanKey_JJKKScrollsSubjectsNotResources(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_JKAtBottomDoesNotOverflowSubjects(t *testing.T) {
-	m := Model{}
-	m.width = 200
-	m.height = 60
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		width:    200,
+		height:   60,
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.subjects = []k8s.WhoCanSubject{{Name: "x"}} // exactly one row, fits in any panel
 	m.whoCan.subjectsScroll = 0
 
@@ -211,10 +220,11 @@ func TestWhoCanScroll_ScrollingUpReleasesCursorFromBottomEdge(t *testing.T) {
 	// scrolling down then up, vim semantics should leave the viewport
 	// alone until the cursor crosses an edge — the cursor should be
 	// able to walk up *inside* the viewport, not stay glued to its bottom.
-	m := Model{}
-	m.width = 200
-	m.height = 60
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		width:    200,
+		height:   60,
+		canIMode: canIModeWhoCan,
+	}
 	// Build a big enough list that scrolling matters.
 	resources := make([]string, 80)
 	for i := range resources {
@@ -263,8 +273,9 @@ func itoa(n int) string {
 }
 
 func TestWhoCanFilter_NarrowsListAndResetsCursor(t *testing.T) {
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"configmaps", "pods", "pods/exec", "secrets"}
 	m.whoCan.resourceCursor = 3 // user was on "secrets"
 	m.whoCan.resourceFilterActive = true
@@ -276,7 +287,7 @@ func TestWhoCanFilter_NarrowsListAndResetsCursor(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_TabReturnsToForward(t *testing.T) {
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan}}
+	m := Model{canIMode: canIModeWhoCan}
 	mdl, _ := m.handleWhoCanKey(keyMsg("tab"))
 	result := mdl.(Model)
 	assert.Equal(t, canIModeForward, result.canIMode,
@@ -284,7 +295,7 @@ func TestHandleWhoCanKey_TabReturnsToForward(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_LeftRightCyclesVerb(t *testing.T) {
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan}}
+	m := Model{canIMode: canIModeWhoCan}
 	require.Equal(t, "get", ui.WhoCanVerbs[0])
 	mdl, _ := m.handleWhoCanKey(keyMsg("right"))
 	result := mdl.(Model)
@@ -296,7 +307,7 @@ func TestHandleWhoCanKey_LeftRightCyclesVerb(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_LeftAtZeroDoesNotUnderflow(t *testing.T) {
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}}
+	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}
 	mdl, _ := m.handleWhoCanKey(keyMsg("left"))
 	result := mdl.(Model)
 	assert.Equal(t, 0, result.whoCan.verbCursor,
@@ -304,7 +315,7 @@ func TestHandleWhoCanKey_LeftAtZeroDoesNotUnderflow(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_SlashEntersFilterMode(t *testing.T) {
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan}}
+	m := Model{canIMode: canIModeWhoCan}
 	mdl, _ := m.handleWhoCanKey(keyMsg("/"))
 	result := mdl.(Model)
 	assert.True(t, result.whoCan.resourceFilterActive,
@@ -312,7 +323,7 @@ func TestHandleWhoCanKey_SlashEntersFilterMode(t *testing.T) {
 }
 
 func TestUpdateWhoCanLoaded_StoresSubjects(t *testing.T) {
-	m := Model{requestGen: 4, canIState: canIState{whoCan: whoCanState{loading: true}}}
+	m := Model{requestGen: 4, whoCan: whoCanState{loading: true}}
 	subs := []k8s.WhoCanSubject{
 		{Kind: "User", Name: "alice", Via: "ClusterRoleBinding/admins → ClusterRole/cluster-admin"},
 	}
@@ -322,7 +333,7 @@ func TestUpdateWhoCanLoaded_StoresSubjects(t *testing.T) {
 }
 
 func TestUpdateWhoCanLoaded_StaleGenIgnored(t *testing.T) {
-	m := Model{requestGen: 10, canIState: canIState{whoCan: whoCanState{loading: true}}}
+	m := Model{requestGen: 10, whoCan: whoCanState{loading: true}}
 	result := m.updateWhoCanLoaded(whoCanLoadedMsg{gen: 1, subjects: []k8s.WhoCanSubject{{Kind: "User", Name: "x"}}})
 	assert.True(t, result.whoCan.loading,
 		"stale response leaves the loading flag armed so the next fresh response can clear it")
@@ -336,9 +347,10 @@ func TestHandleCanIKey_TabDuringSearchDoesNotEnterWhoCan(t *testing.T) {
 	// left the model with the search input mid-edit. Search must own
 	// Tab when active — only after it falls through can the WhoCan
 	// pivot consume the key.
-	m := Model{}
-	m.canIMode = canIModeForward
-	m.canISearchActive = true
+	m := Model{
+		canIMode:         canIModeForward,
+		canISearchActive: true,
+	}
 
 	mdl, _ := m.handleCanIKey(keyMsg("tab"))
 	result := mdl.(Model)
@@ -354,11 +366,12 @@ func TestEnterWhoCanMode_SetsLoadingFlagOnReturnedModel(t *testing.T) {
 	// method), so the mutation lived on a discarded copy. The renderer
 	// then never showed the spinner during the in-flight fetch on entry.
 	// Loading must be set on the Model the caller returns to Update.
-	m := Model{}
-	m.canIGroups = []model.CanIGroup{
-		canIGroupOf("", "pods"),
+	m := Model{
+		canIGroups: []model.CanIGroup{
+			canIGroupOf("", "pods"),
+		},
+		canIGroupCursor: 0,
 	}
-	m.canIGroupCursor = 0
 	mdl, cmd := m.enterWhoCanMode()
 	result := mdl.(Model)
 	assert.True(t, result.whoCan.loading,
@@ -382,7 +395,7 @@ func TestWhoCanCycleVerb_ArmsSpinnerWhenResourceSet(t *testing.T) {
 	// Regression: cycling the verb dispatches a new fetch but used to
 	// rely on loadWhoCan's value-receiver mutation — so the spinner
 	// never showed during verb cycling either.
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods", verbCursor: 0}}}
+	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods", verbCursor: 0}}
 	mdl, cmd := m.handleWhoCanKey(keyMsg("right"))
 	result := mdl.(Model)
 	assert.Equal(t, 1, result.whoCan.verbCursor, "right advances the verb cursor")
@@ -391,7 +404,7 @@ func TestWhoCanCycleVerb_ArmsSpinnerWhenResourceSet(t *testing.T) {
 }
 
 func TestWhoCanCycleVerb_NoResourceLeavesLoadingClear(t *testing.T) {
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}}
+	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}
 	mdl, cmd := m.handleWhoCanKey(keyMsg("right"))
 	result := mdl.(Model)
 	assert.Equal(t, 1, result.whoCan.verbCursor)
@@ -402,7 +415,7 @@ func TestWhoCanCycleVerb_NoResourceLeavesLoadingClear(t *testing.T) {
 func TestWhoCanNamespaceToggle_ArmsSpinnerWhenResourceSet(t *testing.T) {
 	// 'A' toggles namespace scope and re-fires the query when a resource
 	// is selected. The spinner must reflect the in-flight refetch.
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods"}, canINamespaces: []string{""}}}
+	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods"}, canINamespaces: []string{""}}
 	m.namespace = "default"
 	mdl, cmd := m.handleWhoCanKey(keyMsg("A"))
 	result := mdl.(Model)
@@ -415,7 +428,7 @@ func TestRefreshWhoCanForCursor_ArmsSpinnerOnResourceChange(t *testing.T) {
 	// Cursor navigation funnels through refreshWhoCanForCursor; the
 	// spinner must light up on the persisted Model when the cursor
 	// lands on a different resource.
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods", resourceList: []string{"pods", "secrets"}, resourceCursor: 0}}}
+	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods", resourceList: []string{"pods", "secrets"}, resourceCursor: 0}}
 	m.width = 200
 	m.height = 60
 	mdl, cmd := m.handleWhoCanKey(keyMsg("j"))
@@ -430,7 +443,7 @@ func TestRefreshWhoCanForCursor_SameResourceDoesNotArmSpinner(t *testing.T) {
 	// j on the last row clamps without changing resource — no fetch,
 	// no spinner. (Otherwise the user could spam keys and pin the
 	// spinner on indefinitely with no actual work happening.)
-	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "secrets", resourceList: []string{"pods", "secrets"}, resourceCursor: 1}}}
+	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "secrets", resourceList: []string{"pods", "secrets"}, resourceCursor: 1}}
 	m.width = 200
 	m.height = 60
 	mdl, cmd := m.handleWhoCanKey(keyMsg("j"))
@@ -445,8 +458,9 @@ func TestWhoCanFilterEscape_RefreshesSubjectsForCursor(t *testing.T) {
 	// scroll, but did not refresh the subjects pane against the cursor's
 	// new (un-narrowed) row. The picker would highlight one resource
 	// while the right pane still showed another resource's subjects.
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resourceList = []string{"configmaps", "deployments", "pods", "secrets"}
 	// Simulate state after live-narrow on "po": cursor at 0 of narrowed
 	// list, m.whoCan.resource set to "pods" (the previously-narrowed row).
@@ -475,8 +489,9 @@ func TestWhoCanFilterEscape_EmptyListClearsResource(t *testing.T) {
 	// Esc on an empty resource list (e.g. canIGroups never loaded) must
 	// not crash and must clear the resource so a stale "loading…" doesn't
 	// linger.
-	m := Model{}
-	m.canIMode = canIModeWhoCan
+	m := Model{
+		canIMode: canIModeWhoCan,
+	}
 	m.whoCan.resource = "pods"
 	m.whoCan.resourceFilter.Insert("zzz")
 	m.whoCan.resourceFilterActive = true
@@ -488,13 +503,14 @@ func TestWhoCanFilterEscape_EmptyListClearsResource(t *testing.T) {
 }
 
 func TestSyncCanINamespacesFromSelection_MultiSelectSortsForCanI(t *testing.T) {
-	m := Model{}
-	m.selectedNamespaces = map[string]bool{
-		"monitoring":  true,
-		"default":     true,
-		"kube-system": true,
+	m := Model{
+		selectedNamespaces: map[string]bool{
+			"monitoring":  true,
+			"default":     true,
+			"kube-system": true,
+		},
+		canIMode: canIModeForward,
 	}
-	m.canIMode = canIModeForward
 	m.syncCanINamespacesFromSelection()
 	assert.Equal(t, []string{"default", "kube-system", "monitoring"}, m.canINamespaces,
 		"forward Can-I keeps multi-select; sorted so the title bar renders deterministically across frames")
@@ -506,13 +522,14 @@ func TestSyncCanINamespacesFromSelection_MultiSelectCollapsesInWhoCan(t *testing
 	// query cluster-wide, so the displayed scope didn't match the data.
 	// In Who-Can mode we collapse to the first sorted namespace so the
 	// scope label and the query agree.
-	m := Model{}
-	m.selectedNamespaces = map[string]bool{
-		"monitoring":  true,
-		"default":     true,
-		"kube-system": true,
+	m := Model{
+		selectedNamespaces: map[string]bool{
+			"monitoring":  true,
+			"default":     true,
+			"kube-system": true,
+		},
+		canIMode: canIModeWhoCan,
 	}
-	m.canIMode = canIModeWhoCan
 	m.syncCanINamespacesFromSelection()
 	assert.Equal(t, []string{"default"}, m.canINamespaces,
 		"Who-Can collapses multi-select to the first sorted namespace so scope label and query match")
@@ -525,14 +542,15 @@ func TestEnterWhoCanMode_RefreshesResourceOnEachEntry(t *testing.T) {
 	// stale Who-Can results from the FIRST entry instead of subjects
 	// for the row they were now hovering. enterWhoCanMode must re-read
 	// the cursor unconditionally on every entry.
-	m := Model{}
-	m.canIGroups = []model.CanIGroup{
-		canIGroupOf("", "pods"),
-		canIGroupOf("apps", "deployments"),
-	}
+	m := Model{
+		canIGroups: []model.CanIGroup{
+			canIGroupOf("", "pods"),
+			canIGroupOf("apps", "deployments"),
+		},
 
-	// First entry: cursor on the core group, expect "pods".
-	m.canIGroupCursor = 0
+		// First entry: cursor on the core group, expect "pods".
+		canIGroupCursor: 0,
+	}
 	mdl, _ := m.enterWhoCanMode()
 	first := mdl.(Model)
 	require.Equal(t, "pods", first.whoCan.resource,

@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
@@ -18,8 +17,8 @@ import (
 
 func service(ns, name string, externalIPs ...string) *corev1.Service {
 	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Spec:       corev1.ServiceSpec{ExternalIPs: externalIPs},
+		Namespace: ns, Name: name,
+		Spec: corev1.ServiceSpec{ExternalIPs: externalIPs},
 	}
 }
 
@@ -54,7 +53,7 @@ func TestSourceFetchServiceExternalIPs(t *testing.T) {
 func TestSourceFetchServiceListBestEffort(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+			Namespace: "prod", Name: "p",
 			Spec: corev1.PodSpec{Containers: []corev1.Container{{
 				Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)},
 			}}},

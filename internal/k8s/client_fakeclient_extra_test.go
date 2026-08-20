@@ -997,7 +997,7 @@ func TestGetNetworkPolicyInfo_NoSpec(t *testing.T) {
 
 func newDeploymentForRollback(name, ns, uid, image string) *appsv1.Deployment {
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns, UID: k8stypes.UID(uid)},
+		Name: name, Namespace: ns, UID: k8stypes.UID(uid),
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -1010,11 +1010,9 @@ func newDeploymentForRollback(name, ns, uid, image string) *appsv1.Deployment {
 
 func newReplicaSetForRollback(name, ns, ownerUID, revision, image string) *appsv1.ReplicaSet {
 	return &appsv1.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name, Namespace: ns,
-			Annotations:     map[string]string{"deployment.kubernetes.io/revision": revision},
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "my-deploy", UID: k8stypes.UID(ownerUID)}},
-		},
+		Name: name, Namespace: ns,
+		Annotations:     map[string]string{"deployment.kubernetes.io/revision": revision},
+		OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "my-deploy", UID: k8stypes.UID(ownerUID)}},
 		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -1269,11 +1267,9 @@ func TestGetArgoManagedResources_FallbackToLabels(t *testing.T) {
 		},
 	}
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-app-deploy",
-			Namespace: "production",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "my-app"},
-		},
+		Name:      "my-app-deploy",
+		Namespace: "production",
+		Labels:    map[string]string{"app.kubernetes.io/instance": "my-app"},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -1297,15 +1293,15 @@ func TestGetArgoManagedResources_FallbackToLabels(t *testing.T) {
 
 func TestBuildServiceTree(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
+		Name: "my-svc", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": "web"},
 			Ports:    []corev1.ServicePort{{Port: 80}},
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "web-1", Namespace: "default", Labels: map[string]string{"app": "web"}},
-		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+		Name: "web-1", Namespace: "default", Labels: map[string]string{"app": "web"},
+		Status: corev1.PodStatus{Phase: corev1.PodRunning},
 	}
 	cs := k8sfake.NewClientset(svc, pod)
 	c := newFakeClient(cs, nil)
@@ -1528,15 +1524,15 @@ func TestGetOwnedResources_Node(t *testing.T) {
 
 func TestGetOwnedResources_Service(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
+		Name: "my-svc", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": "web"},
 			Ports:    []corev1.ServicePort{{Port: 80}},
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "web-1", Namespace: "default", Labels: map[string]string{"app": "web"}},
-		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+		Name: "web-1", Namespace: "default", Labels: map[string]string{"app": "web"},
+		Status: corev1.PodStatus{Phase: corev1.PodRunning},
 	}
 	cs := k8sfake.NewClientset(svc, pod)
 	dc := newFakeDynClient()
@@ -1592,8 +1588,8 @@ func TestGetResourceTree_CronJob(t *testing.T) {
 
 func TestGetResourceTree_Service(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
-		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+		Name: "my-svc", Namespace: "default",
+		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
 	}
 	cs := k8sfake.NewClientset(svc)
 	dc := newFakeDynClient()
@@ -1615,9 +1611,9 @@ func TestGetResourceTree_Node(t *testing.T) {
 
 func TestGetResourceTree_Pod(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
-		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+		Name: "my-pod", Namespace: "default",
+		Spec:   corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+		Status: corev1.PodStatus{Phase: corev1.PodRunning},
 	}
 	cs := k8sfake.NewClientset(pod)
 	dc := newFakeDynClient()
@@ -1732,10 +1728,8 @@ func TestGetOwnedResources_DaemonSet(t *testing.T) {
 
 func TestGetOwnedResources_HelmRelease(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "myrel-deploy", Namespace: "default",
-			Labels: map[string]string{"app.kubernetes.io/instance": "myrel"},
-		},
+		Name: "myrel-deploy", Namespace: "default",
+		Labels: map[string]string{"app.kubernetes.io/instance": "myrel"},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},

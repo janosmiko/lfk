@@ -8,25 +8,22 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
 func podWithVolumes(ns, name string, secrets, configMaps []string) corev1.Pod {
-	p := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name}}
+	p := corev1.Pod{Namespace: ns, Name: name}
 	for _, s := range secrets {
 		p.Spec.Volumes = append(p.Spec.Volumes, corev1.Volume{
-			Name:         "vol-" + s,
-			VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: s}},
+			Name:   "vol-" + s,
+			Secret: &corev1.SecretVolumeSource{SecretName: s},
 		})
 	}
 	for _, cm := range configMaps {
 		p.Spec.Volumes = append(p.Spec.Volumes, corev1.Volume{
 			Name: "vol-" + cm,
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: cm},
-				},
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				Name: cm,
 			},
 		})
 	}
@@ -50,30 +47,30 @@ func TestBuildRefSet_PodVolumes(t *testing.T) {
 
 func TestBuildRefSet_PodEnvAndEnvFrom(t *testing.T) {
 	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "app"},
+		Namespace: "default", Name: "app",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: "main",
 				Env: []corev1.EnvVar{
 					{Name: "DB_PASS", ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "db-secret"},
-							Key:                  "password",
+							Name: "db-secret",
+							Key:  "password",
 						},
 					}},
 					{Name: "FEATURE", ValueFrom: &corev1.EnvVarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "feature-cm"},
-							Key:                  "enabled",
+							Name: "feature-cm",
+							Key:  "enabled",
 						},
 					}},
 				},
 				EnvFrom: []corev1.EnvFromSource{
 					{SecretRef: &corev1.SecretEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "envfrom-secret"},
+						Name: "envfrom-secret",
 					}},
 					{ConfigMapRef: &corev1.ConfigMapEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "envfrom-cm"},
+						Name: "envfrom-cm",
 					}},
 				},
 			}},
@@ -92,37 +89,35 @@ func TestBuildRefSet_PodEnvAndEnvFrom(t *testing.T) {
 
 func TestBuildRefSet_InitAndEphemeralContainers(t *testing.T) {
 	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "app"},
+		Namespace: "default", Name: "app",
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{{
 				Name: "init",
 				Env: []corev1.EnvVar{{
 					Name: "INIT_PASS", ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "init-env-secret"},
-							Key:                  "password",
+							Name: "init-env-secret",
+							Key:  "password",
 						},
 					},
 				}},
 				EnvFrom: []corev1.EnvFromSource{{SecretRef: &corev1.SecretEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: "init-secret"},
+					Name: "init-secret",
 				}}},
 			}},
 			EphemeralContainers: []corev1.EphemeralContainer{{
-				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-					Name: "debug",
-					Env: []corev1.EnvVar{{
-						Name: "DEBUG_FLAG", ValueFrom: &corev1.EnvVarSource{
-							ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "debug-env-cm"},
-								Key:                  "level",
-							},
+				Name: "debug",
+				Env: []corev1.EnvVar{{
+					Name: "DEBUG_FLAG", ValueFrom: &corev1.EnvVarSource{
+						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+							Name: "debug-env-cm",
+							Key:  "level",
 						},
-					}},
-					EnvFrom: []corev1.EnvFromSource{{ConfigMapRef: &corev1.ConfigMapEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "debug-cm"},
-					}}},
-				},
+					},
+				}},
+				EnvFrom: []corev1.EnvFromSource{{ConfigMapRef: &corev1.ConfigMapEnvSource{
+					Name: "debug-cm",
+				}}},
 			}},
 		},
 	}
@@ -137,20 +132,18 @@ func TestBuildRefSet_InitAndEphemeralContainers(t *testing.T) {
 
 func TestBuildRefSet_PodProjectedVolumes(t *testing.T) {
 	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "app"},
+		Namespace: "default", Name: "app",
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{{
 				Name: "kube-api-access",
-				VolumeSource: corev1.VolumeSource{
-					Projected: &corev1.ProjectedVolumeSource{
-						Sources: []corev1.VolumeProjection{
-							{Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "bound-sa-token"},
-							}},
-							{ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "ca-bundle"},
-							}},
-						},
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{Secret: &corev1.SecretProjection{
+							Name: "bound-sa-token",
+						}},
+						{ConfigMap: &corev1.ConfigMapProjection{
+							Name: "ca-bundle",
+						}},
 					},
 				},
 			}},
@@ -165,7 +158,7 @@ func TestBuildRefSet_PodProjectedVolumes(t *testing.T) {
 
 func TestBuildRefSet_IngressTLS(t *testing.T) {
 	ing := networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "web", Name: "site"},
+		Namespace: "web", Name: "site",
 		Spec: networkingv1.IngressSpec{
 			TLS: []networkingv1.IngressTLS{{SecretName: "site-tls"}},
 		},
@@ -178,14 +171,12 @@ func TestBuildRefSet_IngressTLS(t *testing.T) {
 
 func TestBuildRefSet_PodPVCVolume(t *testing.T) {
 	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "data", Name: "db"},
+		Namespace: "data", Name: "db",
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{{
 				Name: "data",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "db-data",
-					},
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "db-data",
 				},
 			}},
 		},
@@ -198,7 +189,7 @@ func TestBuildRefSet_PodPVCVolume(t *testing.T) {
 
 func TestBuildRefSet_ServiceAccountSecrets(t *testing.T) {
 	sa := corev1.ServiceAccount{
-		ObjectMeta:       metav1.ObjectMeta{Namespace: "default", Name: "deployer"},
+		Namespace: "default", Name: "deployer",
 		Secrets:          []corev1.ObjectReference{{Name: "deployer-token"}},
 		ImagePullSecrets: []corev1.LocalObjectReference{{Name: "registry-creds"}},
 	}
@@ -215,8 +206,8 @@ func TestBuildRefSet_ServiceAccountSecrets(t *testing.T) {
 func podSpecWithSecretVolume(secretName string) corev1.PodSpec {
 	return corev1.PodSpec{
 		Volumes: []corev1.Volume{{
-			Name:         "creds",
-			VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: secretName}},
+			Name:   "creds",
+			Secret: &corev1.SecretVolumeSource{SecretName: secretName},
 		}},
 	}
 }
@@ -229,7 +220,7 @@ func podSpecWithSecretVolume(secretName string) corev1.PodSpec {
 // one's startup.
 func TestBuildRefSet_DeploymentTemplate(t *testing.T) {
 	d := appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api"},
+		Namespace: "default", Name: "api",
 		Spec: appsv1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{Spec: podSpecWithSecretVolume("api-creds")},
 		},
@@ -242,7 +233,7 @@ func TestBuildRefSet_DeploymentTemplate(t *testing.T) {
 
 func TestBuildRefSet_StatefulSetTemplate(t *testing.T) {
 	ss := appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "data", Name: "db"},
+		Namespace: "data", Name: "db",
 		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{Spec: podSpecWithSecretVolume("db-pass")},
 		},
@@ -255,7 +246,7 @@ func TestBuildRefSet_StatefulSetTemplate(t *testing.T) {
 
 func TestBuildRefSet_DaemonSetTemplate(t *testing.T) {
 	ds := appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "kube-system", Name: "cni"},
+		Namespace: "kube-system", Name: "cni",
 		Spec: appsv1.DaemonSetSpec{
 			Template: corev1.PodTemplateSpec{Spec: podSpecWithSecretVolume("cni-creds")},
 		},
@@ -268,7 +259,7 @@ func TestBuildRefSet_DaemonSetTemplate(t *testing.T) {
 
 func TestBuildRefSet_JobTemplate(t *testing.T) {
 	j := batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "migrate"},
+		Namespace: "default", Name: "migrate",
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{Spec: podSpecWithSecretVolume("migrate-creds")},
 		},
@@ -287,7 +278,7 @@ func TestBuildRefSet_JobTemplate(t *testing.T) {
 // what makes CronJobs special vs Job/Deployment/etc.
 func TestBuildRefSet_CronJobTemplate(t *testing.T) {
 	cj := batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "backup"},
+		Namespace: "default", Name: "backup",
 		Spec: batchv1.CronJobSpec{
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{

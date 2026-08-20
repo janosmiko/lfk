@@ -65,15 +65,11 @@ var secretRTCluster = model.ResourceTypeEntry{
 
 func partialSecret(name, namespace string, created time.Time) *metav1.PartialObjectMetadata {
 	return &metav1.PartialObjectMetadata{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			Namespace:         namespace,
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		APIVersion:        "v1",
+		Kind:              "Secret",
+		Name:              name,
+		Namespace:         namespace,
+		CreationTimestamp: metav1.NewTime(created),
 	}
 }
 
@@ -361,12 +357,10 @@ func TestGetResources_SecretLazyLoadingDisabledUsesDynamicPath(t *testing.T) {
 // the list item because only metadata is fetched.
 func TestGetResources_SecretLazyLoadingEnabledUsesMetadataPath(t *testing.T) {
 	meta := &metav1.PartialObjectMetadata{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "meta-secret",
-			Namespace:         "default",
-			CreationTimestamp: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
-		},
+		APIVersion: "v1", Kind: "Secret",
+		Name:              "meta-secret",
+		Namespace:         "default",
+		CreationTimestamp: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
 	}
 	mc := newFakeMetaClient(meta)
 	dc := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())

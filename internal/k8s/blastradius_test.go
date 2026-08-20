@@ -15,9 +15,9 @@ func pdb(namespace, name string, allowed int32, matchLabels map[string]string) p
 		sel = &metav1.LabelSelector{MatchLabels: matchLabels}
 	}
 	return policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
-		Spec:       policyv1.PodDisruptionBudgetSpec{Selector: sel},
-		Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: allowed},
+		Namespace: namespace, Name: name,
+		Spec:   policyv1.PodDisruptionBudgetSpec{Selector: sel},
+		Status: policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: allowed},
 	}
 }
 

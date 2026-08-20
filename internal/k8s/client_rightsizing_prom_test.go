@@ -126,7 +126,7 @@ func newPromTestClient(t *testing.T, pods []*corev1.Pod, dep *appsv1.Deployment,
 
 func makeDepFixture() (*appsv1.Deployment, []*corev1.Pod) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "default"},
+		Name: "frontend", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "frontend"}},
 			Template: corev1.PodTemplateSpec{
@@ -141,7 +141,7 @@ func makeDepFixture() (*appsv1.Deployment, []*corev1.Pod) {
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	return dep, []*corev1.Pod{pod}
 }

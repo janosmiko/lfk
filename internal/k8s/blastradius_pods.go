@@ -86,8 +86,8 @@ func podsInNamespaceFrom(ctx context.Context, cs kubernetes.Interface, namespace
 		// Built directly rather than through EvictedPodsFrom on a one-element
 		// slice, which allocated a throwaway slice per pod.
 		out = append(out, NamedPod{
-			EvictedPod: EvictedPod{Namespace: p.Namespace, Labels: p.Labels, Ready: podIsReady(p)},
-			Name:       p.Name,
+			Namespace: p.Namespace, Labels: p.Labels, Ready: podIsReady(p),
+			Name: p.Name,
 		})
 	}
 	return out, nil

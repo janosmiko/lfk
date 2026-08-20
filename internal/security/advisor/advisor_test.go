@@ -39,7 +39,7 @@ func hardened(name string) corev1.Container {
 
 func deployment(ns, name string, replicas int32, labels map[string]string, containers ...corev1.Container) *appsv1.Deployment {
 	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Namespace: ns, Name: name,
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Template: corev1.PodTemplateSpec{
@@ -52,7 +52,7 @@ func deployment(ns, name string, replicas int32, labels map[string]string, conta
 
 func statefulSet(ns, name string, replicas int32, labels map[string]string, containers ...corev1.Container) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Namespace: ns, Name: name,
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Template: corev1.PodTemplateSpec{
@@ -65,7 +65,7 @@ func statefulSet(ns, name string, replicas int32, labels map[string]string, cont
 
 func pdb(name string, selector map[string]string, minAvailable, maxUnavailable *intstr.IntOrString) *policyv1.PodDisruptionBudget {
 	return &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: name},
+		Namespace: "prod", Name: name,
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector:       &metav1.LabelSelector{MatchLabels: selector},
 			MinAvailable:   minAvailable,
@@ -75,7 +75,7 @@ func pdb(name string, selector map[string]string, minAvailable, maxUnavailable *
 }
 
 func namespaceObj(name string) *corev1.Namespace {
-	return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
+	return &corev1.Namespace{Name: name}
 }
 
 // checksFor maps "namespace/kind/name" -> set of emitted check labels.
@@ -117,8 +117,8 @@ func TestFetchNamespaceChecks(t *testing.T) {
 		namespaceObj("bare"),
 		namespaceObj("guarded"),
 		namespaceObj("kube-system"),
-		&corev1.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Namespace: "guarded", Name: "q"}},
-		&corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{Namespace: "guarded", Name: "lr"}},
+		&corev1.ResourceQuota{Namespace: "guarded", Name: "q"},
+		&corev1.LimitRange{Namespace: "guarded", Name: "lr"},
 	)
 	s := NewWithClient(client)
 	findings, err := s.Fetch(t.Context(), "", "")
@@ -218,7 +218,7 @@ func TestFetchHPAChecks(t *testing.T) {
 	}
 	hpa := func(name, target string) *autoscalingv2.HorizontalPodAutoscaler {
 		return &autoscalingv2.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: name},
+			Namespace: "prod", Name: name,
 			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 				ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: target},
 				Metrics:        []autoscalingv2.MetricSpec{utilization},

@@ -99,7 +99,7 @@ func TestRenderTable_NameReorderedHeader(t *testing.T) {
 		{Name: "beta", Namespace: "team-b"},
 	}
 	out := RenderTable("NAME", items, 0, 120, 20, false, "", "")
-	header := strings.SplitN(out, "\n", 2)[0]
+	header, _, _ := strings.Cut(out, "\n")
 	nsIdx := strings.Index(header, "NAMESPACE")
 	nameIdx := strings.Index(header, "NAME")
 	// "NAMESPACE" contains "NAME"; find the standalone NAME header after it.
@@ -128,7 +128,7 @@ func TestRenderTable_NameHiddenDropsColumn(t *testing.T) {
 		{Name: "alpha-pod", Namespace: "team-a", Age: "5m"},
 	}
 	out := RenderTable("NAME", items, 0, 120, 20, false, "", "")
-	header := strings.SplitN(out, "\n", 2)[0]
+	header, _, _ := strings.Cut(out, "\n")
 	assert.Contains(t, header, "NAMESPACE", "other columns still render")
 	// "NAMESPACE" contains the substring "NAME"; mask it before asserting the
 	// standalone NAME header is gone.

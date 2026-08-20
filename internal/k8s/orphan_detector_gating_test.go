@@ -75,17 +75,17 @@ type orphanGateCase struct {
 // at once.
 func TestDetectOrphans_GatedKindsSkipOnDependencyFailure(t *testing.T) {
 	badHPA := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "bad-hpa"},
+		Namespace: "default", Name: "bad-hpa",
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: "missing"},
 		},
 	}
-	unboundRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "leftover-role"}}
-	unboundClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "leftover-cr"}}
+	unboundRole := &rbacv1.Role{Namespace: "default", Name: "leftover-role"}
+	unboundClusterRole := &rbacv1.ClusterRole{Name: "leftover-cr"}
 	emptySubjectsCRB := func(name string) *rbacv1.ClusterRoleBinding {
 		return &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
-			RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "does-not-matter"},
+			Name:    name,
+			RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "does-not-matter"},
 		}
 	}
 
@@ -94,7 +94,7 @@ func TestDetectOrphans_GatedKindsSkipOnDependencyFailure(t *testing.T) {
 			name:     "ConfigMaps depend on the Job PodTemplate list",
 			failList: "jobs",
 			objs: []runtime.Object{
-				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-cm"}},
+				&corev1.ConfigMap{Namespace: "default", Name: "stale-cm"},
 				badHPA,
 			},
 			suppressedKind: "ConfigMaps",
@@ -105,7 +105,7 @@ func TestDetectOrphans_GatedKindsSkipOnDependencyFailure(t *testing.T) {
 			name:     "PVCs depend on the CronJob PodTemplate list",
 			failList: "cronjobs",
 			objs: []runtime.Object{
-				&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-pvc"}},
+				&corev1.PersistentVolumeClaim{Namespace: "default", Name: "stale-pvc"},
 				badHPA,
 			},
 			suppressedKind: "PVCs",
@@ -128,7 +128,7 @@ func TestDetectOrphans_GatedKindsSkipOnDependencyFailure(t *testing.T) {
 			failList: "daemonsets",
 			objs: []runtime.Object{
 				&policyv1.PodDisruptionBudget{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-pdb"},
+					Namespace: "default", Name: "stale-pdb",
 					Spec: policyv1.PodDisruptionBudgetSpec{
 						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "deleted"}},
 					},
@@ -144,7 +144,7 @@ func TestDetectOrphans_GatedKindsSkipOnDependencyFailure(t *testing.T) {
 			failList: "pods",
 			objs: []runtime.Object{
 				&networkingv1.NetworkPolicy{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-np"},
+					Namespace: "default", Name: "stale-np",
 					Spec: networkingv1.NetworkPolicySpec{
 						PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "deleted"}},
 					},
@@ -160,8 +160,8 @@ func TestDetectOrphans_GatedKindsSkipOnDependencyFailure(t *testing.T) {
 			failList: "roles",
 			objs: []runtime.Object{
 				&rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "empty-rb"},
-					RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: "does-not-matter"},
+					Namespace: "default", Name: "empty-rb",
+					RoleRef: rbacv1.RoleRef{Kind: "Role", Name: "does-not-matter"},
 				},
 				emptySubjectsCRB("empty-crb2"),
 			},

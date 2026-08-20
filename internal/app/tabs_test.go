@@ -1233,12 +1233,10 @@ func TestTabSwitchPreservesSecurityState(t *testing.T) {
 		// saveCurrentTab has something to persist. Model embeds
 		// securityModelState, so the fields are promoted but must be
 		// initialised via the embedded struct literal.
-		securityModelState: securityModelState{
-			securityManager:            mgrA,
-			securityAvailabilityByName: availA,
-			securityActiveGroup:        "groupA",
-			showSecurityIgnored:        true,
-		},
+		securityManager:            mgrA,
+		securityAvailabilityByName: availA,
+		securityActiveGroup:        "groupA",
+		showSecurityIgnored:        true,
 	}
 
 	// Switch to Tab B.

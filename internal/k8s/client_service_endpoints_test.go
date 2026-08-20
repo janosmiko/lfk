@@ -9,7 +9,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -19,11 +18,9 @@ func TestGetServiceEndpoints_AggregatesAcrossSlices(t *testing.T) {
 	// endpoints (sliced by the EndpointSlice controller) doesn't render as
 	// "no endpoints".
 	slice1 := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-svc-aaa",
-			Namespace: "default",
-			Labels:    map[string]string{"kubernetes.io/service-name": "my-svc"},
-		},
+		Name:        "my-svc-aaa",
+		Namespace:   "default",
+		Labels:      map[string]string{"kubernetes.io/service-name": "my-svc"},
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{
 			{
@@ -35,11 +32,9 @@ func TestGetServiceEndpoints_AggregatesAcrossSlices(t *testing.T) {
 		},
 	}
 	slice2 := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-svc-bbb",
-			Namespace: "default",
-			Labels:    map[string]string{"kubernetes.io/service-name": "my-svc"},
-		},
+		Name:        "my-svc-bbb",
+		Namespace:   "default",
+		Labels:      map[string]string{"kubernetes.io/service-name": "my-svc"},
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{
 			{
@@ -87,11 +82,9 @@ func TestGetServiceEndpoints_FilterIgnoresOtherServices(t *testing.T) {
 	// rollup of the one we asked for — otherwise a busy namespace would
 	// dump every endpoint into every Service preview.
 	owned := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-svc-aaa",
-			Namespace: "default",
-			Labels:    map[string]string{"kubernetes.io/service-name": "my-svc"},
-		},
+		Name:        "my-svc-aaa",
+		Namespace:   "default",
+		Labels:      map[string]string{"kubernetes.io/service-name": "my-svc"},
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{
 			{
@@ -102,11 +95,9 @@ func TestGetServiceEndpoints_FilterIgnoresOtherServices(t *testing.T) {
 		},
 	}
 	other := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "another-svc-aaa",
-			Namespace: "default",
-			Labels:    map[string]string{"kubernetes.io/service-name": "another-svc"},
-		},
+		Name:        "another-svc-aaa",
+		Namespace:   "default",
+		Labels:      map[string]string{"kubernetes.io/service-name": "another-svc"},
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{
 			{
@@ -131,11 +122,9 @@ func TestGetServiceEndpoints_MissingConditionsTreatedAsReady(t *testing.T) {
 	// "unknown" → treat as ready (per discovery.k8s.io/v1 spec). Locks the
 	// behaviour so the rollup matches what kube-proxy actually does.
 	slice := &discoveryv1.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-svc-aaa",
-			Namespace: "default",
-			Labels:    map[string]string{"kubernetes.io/service-name": "my-svc"},
-		},
+		Name:        "my-svc-aaa",
+		Namespace:   "default",
+		Labels:      map[string]string{"kubernetes.io/service-name": "my-svc"},
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{
 			{

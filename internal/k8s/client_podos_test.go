@@ -7,15 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGetPodOS_SpecOSName(t *testing.T) {
 	winOS := corev1.Windows
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "win-pod", Namespace: "default"},
-		Spec:       corev1.PodSpec{OS: &corev1.PodOS{Name: winOS}},
+		Name: "win-pod", Namespace: "default",
+		Spec: corev1.PodSpec{OS: &corev1.PodOS{Name: winOS}},
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
@@ -27,8 +26,8 @@ func TestGetPodOS_SpecOSName(t *testing.T) {
 func TestGetPodOS_NodeSelectorFallback(t *testing.T) {
 	// No spec.os; OS only discoverable via the kubernetes.io/os node selector.
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "win-pod", Namespace: "default"},
-		Spec:       corev1.PodSpec{NodeSelector: map[string]string{"kubernetes.io/os": "windows"}},
+		Name: "win-pod", Namespace: "default",
+		Spec: corev1.PodSpec{NodeSelector: map[string]string{"kubernetes.io/os": "windows"}},
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
@@ -40,8 +39,8 @@ func TestGetPodOS_NodeSelectorFallback(t *testing.T) {
 func TestGetPodOS_Linux(t *testing.T) {
 	linuxOS := corev1.Linux
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "linux-pod", Namespace: "default"},
-		Spec:       corev1.PodSpec{OS: &corev1.PodOS{Name: linuxOS}},
+		Name: "linux-pod", Namespace: "default",
+		Spec: corev1.PodSpec{OS: &corev1.PodOS{Name: linuxOS}},
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
@@ -53,8 +52,8 @@ func TestGetPodOS_Linux(t *testing.T) {
 func TestGetPodOS_Unknown(t *testing.T) {
 	// Neither spec.os nor a kubernetes.io/os selector — returns "".
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "plain-pod", Namespace: "default"},
-		Spec:       corev1.PodSpec{},
+		Name: "plain-pod", Namespace: "default",
+		Spec: corev1.PodSpec{},
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 

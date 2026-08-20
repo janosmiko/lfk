@@ -17,11 +17,9 @@ func refPod(ns, name string, spec corev1.PodSpec) *corev1.Pod {
 		spec.Containers = []corev1.Container{{Name: "c"}}
 	}
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns, Name: name,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
-		},
-		Spec: spec,
+		Namespace: ns, Name: name,
+		OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
+		Spec:            spec,
 	}
 }
 
@@ -40,42 +38,45 @@ func missingRefFindings(t *testing.T, s *Source) map[string]security.Finding {
 
 func TestMissingConfigRefs(t *testing.T) {
 	existingCM := configMap("prod", "app-config", map[string]string{"k": "v"})
-	existingSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "app-creds"}}
+	existingSecret := &corev1.Secret{Namespace: "prod", Name: "app-creds"}
 
 	volumeRef := refPod("prod", "vol-missing", corev1.PodSpec{
-		Volumes: []corev1.Volume{{Name: "cfg", VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "ghost-cm"}},
-		}}},
+		Volumes: []corev1.Volume{{
+			Name:      "cfg",
+			ConfigMap: &corev1.ConfigMapVolumeSource{Name: "ghost-cm"},
+		}},
 	})
 	envRef := refPod("prod", "env-missing", corev1.PodSpec{
 		Containers: []corev1.Container{{Name: "c", Env: []corev1.EnvVar{{
 			Name: "TOKEN",
 			ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{Name: "ghost-secret"}, Key: "k",
+				Name: "ghost-secret", Key: "k",
 			}},
 		}}}},
 	})
 	optionalRef := refPod("prod", "optional-ok", corev1.PodSpec{
 		Containers: []corev1.Container{{Name: "c", EnvFrom: []corev1.EnvFromSource{{
 			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: "ghost-cm"},
-				Optional:             new(true),
+				Name:     "ghost-cm",
+				Optional: new(true),
 			},
 		}}}},
 	})
 	healthy := refPod("prod", "healthy", corev1.PodSpec{
-		Volumes: []corev1.Volume{{Name: "cfg", VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "app-config"}},
-		}}},
+		Volumes: []corev1.Volume{{
+			Name:      "cfg",
+			ConfigMap: &corev1.ConfigMapVolumeSource{Name: "app-config"},
+		}},
 		Containers: []corev1.Container{{Name: "c", EnvFrom: []corev1.EnvFromSource{{
-			SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "app-creds"}},
+			SecretRef: &corev1.SecretEnvSource{Name: "app-creds"},
 		}}}},
 	})
 
 	ignoredPod := refPod("ignored-ns", "ignored", corev1.PodSpec{
-		Volumes: []corev1.Volume{{Name: "cfg", VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "ghost-cm"}},
-		}}},
+		Volumes: []corev1.Volume{{
+			Name:      "cfg",
+			ConfigMap: &corev1.ConfigMapVolumeSource{Name: "ghost-cm"},
+		}},
 	})
 
 	s := NewWithClient(fake.NewSimpleClientset(existingCM, existingSecret, volumeRef, envRef, optionalRef, healthy, ignoredPod))
@@ -101,8 +102,8 @@ func TestMissingConfigRefs(t *testing.T) {
 func TestMissingConfigRefsNeedsCompleteLists(t *testing.T) {
 	pod := refPod("prod", "both-missing", corev1.PodSpec{
 		Containers: []corev1.Container{{Name: "c", EnvFrom: []corev1.EnvFromSource{
-			{ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "ghost-cm"}}},
-			{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "ghost-secret"}}},
+			{ConfigMapRef: &corev1.ConfigMapEnvSource{Name: "ghost-cm"}},
+			{SecretRef: &corev1.SecretEnvSource{Name: "ghost-secret"}},
 		}}},
 	})
 

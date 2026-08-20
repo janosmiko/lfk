@@ -96,17 +96,15 @@ func TestCanIVisibleGroups(t *testing.T) {
 	}
 
 	t.Run("no query returns all", func(t *testing.T) {
-		m := Model{canIState: canIState{canIGroups: groups}}
+		m := Model{canIGroups: groups}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 4)
 	})
 
 	t.Run("query filters by group name", func(t *testing.T) {
 		m := Model{
-			canIState: canIState{
-				canIGroups:      groups,
-				canISearchQuery: "app",
-			},
+			canIGroups:      groups,
+			canISearchQuery: "app",
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -115,10 +113,8 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("empty group name matches core", func(t *testing.T) {
 		m := Model{
-			canIState: canIState{
-				canIGroups:      groups,
-				canISearchQuery: "core",
-			},
+			canIGroups:      groups,
+			canISearchQuery: "core",
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -127,10 +123,8 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("case insensitive search", func(t *testing.T) {
 		m := Model{
-			canIState: canIState{
-				canIGroups:      groups,
-				canISearchQuery: "BATCH",
-			},
+			canIGroups:      groups,
+			canISearchQuery: "BATCH",
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -153,10 +147,8 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("no match returns empty", func(t *testing.T) {
 		m := Model{
-			canIState: canIState{
-				canIGroups:      groups,
-				canISearchQuery: "nonexistent",
-			},
+			canIGroups:      groups,
+			canISearchQuery: "nonexistent",
 		}
 		indices := m.canIVisibleGroups()
 		assert.Empty(t, indices)

@@ -23,7 +23,7 @@ func TestRenderLogPreviewShowsTail(t *testing.T) {
 // The header must match the right-pane DETAILS style: dim+bold, no background.
 func TestRenderLogPreviewHeaderNoBluebar(t *testing.T) {
 	out := stripANSI(RenderLogPreview([]string{"line"}, "", 60, 5, "ns/mypod", 0))
-	firstLine := strings.SplitN(out, "\n", 2)[0]
+	firstLine, _, _ := strings.Cut(out, "\n")
 	// No leading space — first char must be 'L'.
 	assert.True(t, strings.HasPrefix(firstLine, "LIVE LOGS"),
 		"header must start with LIVE LOGS (no leading space), got: %q", firstLine)

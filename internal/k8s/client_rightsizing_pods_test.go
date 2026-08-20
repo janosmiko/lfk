@@ -13,7 +13,7 @@ import (
 
 func TestResolvePodsForWorkload_PodSelf(t *testing.T) {
 	cs := fake.NewSimpleClientset(&corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-a", Namespace: "default"},
+		Name: "pod-a", Namespace: "default",
 	})
 	c := NewTestClient(cs, nil)
 	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "Pod", "pod-a")
@@ -23,19 +23,19 @@ func TestResolvePodsForWorkload_PodSelf(t *testing.T) {
 
 func TestResolvePodsForWorkload_DeploymentByLabels(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "default"},
+		Name: "frontend", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "frontend"}},
 		},
 	}
 	pod1 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-aaa", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-aaa", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	pod2 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-bbb", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-bbb", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	other := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "backend-zzz", Namespace: "default", Labels: map[string]string{"app": "backend"}},
+		Name: "backend-zzz", Namespace: "default", Labels: map[string]string{"app": "backend"},
 	}
 	cs := fake.NewSimpleClientset(dep, pod1, pod2, other)
 	c := NewTestClient(cs, nil)
@@ -46,13 +46,13 @@ func TestResolvePodsForWorkload_DeploymentByLabels(t *testing.T) {
 
 func TestResolvePodsForWorkload_StatefulSetByLabels(t *testing.T) {
 	ss := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "db", Namespace: "default"},
+		Name: "db", Namespace: "default",
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "db"}},
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "db-0", Namespace: "default", Labels: map[string]string{"app": "db"}},
+		Name: "db-0", Namespace: "default", Labels: map[string]string{"app": "db"},
 	}
 	cs := fake.NewSimpleClientset(ss, pod)
 	c := NewTestClient(cs, nil)
@@ -63,13 +63,13 @@ func TestResolvePodsForWorkload_StatefulSetByLabels(t *testing.T) {
 
 func TestResolvePodsForWorkload_DaemonSetByLabels(t *testing.T) {
 	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "node-exporter", Namespace: "default"},
+		Name: "node-exporter", Namespace: "default",
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "node-exporter"}},
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "node-exporter-x", Namespace: "default", Labels: map[string]string{"app": "node-exporter"}},
+		Name: "node-exporter-x", Namespace: "default", Labels: map[string]string{"app": "node-exporter"},
 	}
 	cs := fake.NewSimpleClientset(ds, pod)
 	c := NewTestClient(cs, nil)
@@ -80,13 +80,13 @@ func TestResolvePodsForWorkload_DaemonSetByLabels(t *testing.T) {
 
 func TestResolvePodsForWorkload_JobByLabels(t *testing.T) {
 	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{Name: "report", Namespace: "default"},
+		Name: "report", Namespace: "default",
 		Spec: batchv1.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-name": "report"}},
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "report-x", Namespace: "default", Labels: map[string]string{"job-name": "report"}},
+		Name: "report-x", Namespace: "default", Labels: map[string]string{"job-name": "report"},
 	}
 	cs := fake.NewSimpleClientset(job, pod)
 	c := NewTestClient(cs, nil)
@@ -97,19 +97,15 @@ func TestResolvePodsForWorkload_JobByLabels(t *testing.T) {
 
 func TestResolvePodsForWorkload_CronJobWalksJobs(t *testing.T) {
 	cj := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "report", Namespace: "default", UID: "cj-uid"},
+		Name: "report", Namespace: "default", UID: "cj-uid",
 	}
 	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "report-1", Namespace: "default", UID: "job-uid",
-			OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "report", UID: "cj-uid"}},
-		},
+		Name: "report-1", Namespace: "default", UID: "job-uid",
+		OwnerReferences: []metav1.OwnerReference{{Kind: "CronJob", Name: "report", UID: "cj-uid"}},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "report-1-pod", Namespace: "default",
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Job", Name: "report-1", UID: "job-uid"}},
-		},
+		Name: "report-1-pod", Namespace: "default",
+		OwnerReferences: []metav1.OwnerReference{{Kind: "Job", Name: "report-1", UID: "job-uid"}},
 	}
 	cs := fake.NewSimpleClientset(cj, job, pod)
 	c := NewTestClient(cs, nil)
