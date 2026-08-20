@@ -286,6 +286,11 @@ func TestCovSchemeFirstVisibleSelectable(t *testing.T) {
 	m.schemeFilter = TextInput{}
 	m.schemeCursor = 0
 	ui.ResetOverlaySchemeScroll()
+	oldVisible := ui.GetOverlaySchemeVisible()
+	t.Cleanup(func() { ui.SetOverlaySchemeVisible(oldVisible) })
+	// A sibling test's render can leave this at whatever viewport size it
+	// used, so pin it here rather than trust the ambient value.
+	ui.SetOverlaySchemeVisible(20)
 	idx := m.schemeFirstVisibleSelectable()
 	assert.Equal(t, 0, idx) // first selectable
 }
@@ -300,6 +305,11 @@ func TestCovSchemeLastVisibleSelectable(t *testing.T) {
 	m.schemeFilter = TextInput{}
 	m.schemeCursor = 0
 	ui.ResetOverlaySchemeScroll()
+	oldVisible := ui.GetOverlaySchemeVisible()
+	t.Cleanup(func() { ui.SetOverlaySchemeVisible(oldVisible) })
+	// A sibling test's render can leave this at whatever viewport size it
+	// used, so pin it here rather than trust the ambient value.
+	ui.SetOverlaySchemeVisible(20)
 	idx := m.schemeLastVisibleSelectable()
 	assert.Equal(t, 1, idx) // last selectable
 }

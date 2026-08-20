@@ -853,7 +853,23 @@ func TestCovHandleHeaderClickWithColumns(t *testing.T) {
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Status: "Running", Age: "1h", Ready: "1/1"},
 	}
+
+	oldCols := ui.ActiveSortableColumns
+	oldLayout := ui.ActiveMiddleColumnLayout
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveMiddleColumnLayout = oldLayout
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Namespace", "Status", "Age"}
+	// handleHeaderClick resolves relX against this layout (populated by a real
+	// RenderTable call outside this test), so it must be set explicitly here.
+	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
+		{Key: "Name", StartX: 0, EndX: 10},
+		{Key: "Namespace", StartX: 10, EndX: 20},
+		{Key: "Status", StartX: 20, EndX: 30},
+		{Key: "Age", StartX: 30, EndX: 40},
+	}
+
 	result, cmd := m.handleHeaderClick(5)
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
