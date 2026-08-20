@@ -200,18 +200,18 @@ func TestLoadCommandHistoryNoFile(t *testing.T) {
 	assert.Equal(t, -1, loaded.cursor)
 }
 
-// --- historyFilePath ---
+// --- historyFilePathFor ---
 
-func TestHistoryFilePath(t *testing.T) {
+func TestHistoryFilePathFor(t *testing.T) {
 	t.Run("uses XDG_STATE_HOME", func(t *testing.T) {
 		t.Setenv("XDG_STATE_HOME", "/custom/state")
-		path := historyFilePath()
+		path := historyFilePathFor(historyFileCommand)
 		assert.Equal(t, "/custom/state/lfk/history", path)
 	})
 
 	t.Run("falls back to home", func(t *testing.T) {
 		t.Setenv("XDG_STATE_HOME", "")
-		path := historyFilePath()
+		path := historyFilePathFor(historyFileCommand)
 		assert.Contains(t, path, ".local/state/lfk/history")
 	})
 }

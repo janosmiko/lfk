@@ -29,22 +29,6 @@ func severityLabel(s security.Severity) string {
 	return "?"
 }
 
-// severityOrder returns a sortable integer for an Item whose severity lives
-// in its Columns. Higher = more severe.
-func severityOrder(it model.Item) int {
-	switch it.ColumnValue("Severity") {
-	case "CRIT":
-		return 4
-	case "HIGH":
-		return 3
-	case "MED":
-		return 2
-	case "LOW":
-		return 1
-	}
-	return 0
-}
-
 // shortResource returns the "kind/name" display form used in the Resource
 // column. When Kind or Name is missing the row renders as
 // "(unknown resource)" — the previous "(cluster-scoped)" placeholder was

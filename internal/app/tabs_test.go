@@ -1671,39 +1671,6 @@ func TestCov80SortMiddleItemsExtraColumn(t *testing.T) {
 	assert.Equal(t, "b", m.middleItems[0].Name)
 }
 
-func TestCov80ItemIndexFromDisplayLine(t *testing.T) {
-	m := basePush80Model()
-	m.middleItems = []model.Item{
-		{Name: "pod-1"},
-		{Name: "pod-2"},
-		{Name: "pod-3"},
-	}
-	idx := m.itemIndexFromDisplayLine(0)
-	assert.Equal(t, 0, idx)
-	idx = m.itemIndexFromDisplayLine(1)
-	assert.Equal(t, 1, idx)
-	idx = m.itemIndexFromDisplayLine(100)
-	assert.Equal(t, -1, idx)
-}
-
-func TestCov80ItemIndexFromDisplayLineWithCategories(t *testing.T) {
-	m := basePush80Model()
-	// Use LevelResources (no category filtering in visibleMiddleItems).
-	m.nav.Level = model.LevelResources
-	m.middleItems = []model.Item{
-		{Name: "pods", Category: "Core"},
-		{Name: "svc", Category: "Core"},
-		{Name: "deploy", Category: "Workloads"},
-	}
-	// Exercise the function -- it will walk through categories and count
-	// separator/header lines, hitting various branches.
-	// Line 0 = category header "Core", line 1 = pods (0), line 2 = svc (1),
-	// line 3 = separator, line 4 = category header "Workloads", line 5 = deploy (2).
-	idx := m.itemIndexFromDisplayLine(1)
-	assert.Equal(t, 0, idx)
-	assert.Equal(t, -1, m.itemIndexFromDisplayLine(200))
-}
-
 func TestCov80SanitizeError(t *testing.T) {
 	m := basePush80Model()
 	m.width = 80

@@ -1,7 +1,5 @@
 package model
 
-import "slices"
-
 // CoreCategories lists the navigation categories that are built-in to LFK
 // and always appear in a fixed order at the top of the sidebar. They cannot
 // be pinned or reordered by the user.
@@ -18,11 +16,6 @@ var CoreCategories = []string{
 	"Helm",
 	"API and CRDs",
 	"Advanced", // surfaced only when ShowRareResources is true
-}
-
-// IsCoreCategory reports whether name is one of the fixed CoreCategories.
-func IsCoreCategory(name string) bool {
-	return slices.Contains(CoreCategories, name)
 }
 
 // KnownResourceNames returns the set of lowercase plural resource names

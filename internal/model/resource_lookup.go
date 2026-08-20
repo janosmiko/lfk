@@ -44,13 +44,6 @@ func FindResourceTypeIn(ref string, discovered []ResourceTypeEntry) (ResourceTyp
 	return ResourceTypeEntry{}, false
 }
 
-// FindResourceType is kept as a convenience wrapper that searches without
-// a discovered slice. It exists for callers that don't have access to the
-// discovered set yet. Most callers should use FindResourceTypeIn directly.
-func FindResourceType(ref string) (ResourceTypeEntry, bool) {
-	return FindResourceTypeIn(ref, nil)
-}
-
 // DisplayNameFor returns a user-friendly label for a ResourceTypeEntry. It
 // honors any DisplayName already set on the entry (PseudoResources sets one
 // for Helm Releases and Port Forwards), then falls back to the curated name
