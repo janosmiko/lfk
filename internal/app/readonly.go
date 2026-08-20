@@ -269,6 +269,7 @@ func (m *Model) refreshContextReadOnlyMarkers() {
 	for i := range m.middleItems {
 		m.middleItems[i].ReadOnly = m.effectiveContextReadOnly(m.middleItems[i].Name)
 	}
+	m.middleItemsRev++
 	// Keep the cache aligned so back-navigation re-shows the fresh markers.
 	m.itemCache[m.navKey()] = m.middleItems
 }
@@ -364,6 +365,7 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 		for i := range m.middleItems {
 			if m.middleItems[i].Name == sel.Name {
 				m.middleItems[i].ReadOnly = newState
+				m.middleItemsRev++
 				break
 			}
 		}

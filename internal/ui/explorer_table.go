@@ -38,6 +38,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	var contextW, nsW, readyW, restartsW, ageW, statusW int
 	var anyRecentRestart bool
 
+	// layoutCached snapshots the incoming cache state before this call
+	// mutates ActiveTableLayout further down, so late reads (categoryForItem
+	// below) key off the same fingerprint decision as the reads here.
+	layoutCached := ActiveTableLayout != nil && ActiveTableLayout.Computed
+
 	// Detect whether any row carries a ClusterName (the union-row signal)
 	// so we can reserve a 1-cell leading tile column. The tile is painted
 	// only when item.ClusterColor is set, but the cell is reserved on
@@ -45,11 +50,15 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	// rows whose source cluster doesn't have a configured color. In
 	// non-union sessions hasUnion stays false and the row layout is
 	// unchanged.
-	hasUnion := false
-	for _, item := range items {
-		if item.ClusterName != "" {
-			hasUnion = true
-			break
+	var hasUnion bool
+	if layoutCached {
+		hasUnion = ActiveTableLayout.HasUnion
+	} else {
+		for _, item := range items {
+			if item.ClusterName != "" {
+				hasUnion = true
+				break
+			}
 		}
 	}
 	tileW := 0
@@ -298,6 +307,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			ActiveTableLayout.StatusW = statusW
 			ActiveTableLayout.AnyRecentRestart = anyRecentRestart
 			ActiveTableLayout.ExtraCols = extraCols
+			ActiveTableLayout.HasUnion = hasUnion
 			ActiveTableLayout.Computed = true
 		}
 	}
@@ -412,10 +422,16 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 	}
 
-	hasCategories := false
-	categoryForItem := make([]string, len(items))
-	hasSepForItem := make([]bool, len(items))
-	{
+	var hasCategories bool
+	var categoryForItem []string
+	var hasSepForItem []bool
+	if layoutCached {
+		hasCategories = ActiveTableLayout.HasCategories
+		categoryForItem = ActiveTableLayout.CategoryForItem
+		hasSepForItem = ActiveTableLayout.HasSepForItem
+	} else {
+		categoryForItem = make([]string, len(items))
+		hasSepForItem = make([]bool, len(items))
 		lastCat := ""
 		for i, item := range items {
 			if item.Category != "" && item.Category != lastCat {
@@ -432,6 +448,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				categoryForItem[i] = ""
 				hasSepForItem[i] = false
 			}
+		}
+		if ActiveTableLayout != nil {
+			ActiveTableLayout.HasCategories = hasCategories
+			ActiveTableLayout.CategoryForItem = categoryForItem
+			ActiveTableLayout.HasSepForItem = hasSepForItem
 		}
 	}
 

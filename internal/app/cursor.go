@@ -559,10 +559,9 @@ func (m *Model) selectedItemsList() []model.Item {
 	return selected
 }
 
-// visibleMiddleItems returns the filtered subset of middleItems when a filter
-// is active, or all middleItems otherwise. At LevelResourceTypes, it also
-// applies collapsible group logic (accordion behavior).
-func (m *Model) visibleMiddleItems() []model.Item {
+// computeVisibleMiddleItems is the uncached body of visibleMiddleItems (see
+// cursor_visible_items_cache.go).
+func (m *Model) computeVisibleMiddleItems() []model.Item {
 	items := m.middleItems
 
 	// Apply text filter first.
