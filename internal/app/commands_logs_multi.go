@@ -134,7 +134,7 @@ func (m *Model) startMultiLogItem(
 	args = append(args, "--timestamps")
 
 	if verbose {
-		m.addLogEntry("DBG", "kubectl "+strings.Join(args, " "))
+		m.addLogEntry("DBG", "kubectl "+logger.Redact(strings.Join(args, " ")))
 	}
 
 	cmd := exec.CommandContext(ctx, kubectlPath, k8s.DemoKubectlArgs(args)...)
@@ -142,9 +142,9 @@ func (m *Model) startMultiLogItem(
 	if verbose {
 		logger.Info("Starting multi-log kubectl",
 			"item", item.Name,
-			"context", itemCtx,
-			"cmd", cmd.String(),
-			"kubeconfig", m.client.KubeconfigPathForContext(itemCtx))
+			"context", logger.Redact(itemCtx),
+			"cmd", logger.Redact(cmd.String()),
+			"kubeconfig", logger.Redact(m.client.KubeconfigPathForContext(itemCtx)))
 	}
 
 	stdout, err := cmd.StdoutPipe()
@@ -152,7 +152,7 @@ func (m *Model) startMultiLogItem(
 		if verbose {
 			logger.Error("Failed to create stdout pipe for multi-log", "item", item.Name, "error", err)
 		} else {
-			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "context", itemCtx)
+			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", logger.Redact(itemNs), "context", logger.Redact(itemCtx))
 		}
 		return err
 	}
@@ -162,7 +162,7 @@ func (m *Model) startMultiLogItem(
 		if verbose {
 			logger.Error("Failed to start kubectl logs for multi-log", "item", item.Name, "error", err)
 		} else {
-			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "context", itemCtx, "cmd", cmd.String())
+			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", logger.Redact(itemNs), "context", logger.Redact(itemCtx), "cmd", logger.Redact(cmd.String()))
 		}
 		return err
 	}
