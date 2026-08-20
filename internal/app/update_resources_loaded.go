@@ -678,10 +678,11 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 		return m, nil // stale response, discard
 	}
 	m.loading = false
-	if isContextCanceled(msg.err) {
-		return m, nil
-	}
 	if msg.err != nil {
+		m.clearPreviewContentFingerprint()
+		if isContextCanceled(msg.err) {
+			return m, nil
+		}
 		m.err = msg.err
 		m.previewLoading = false
 		m.setErrorFromErr("Warning: ", msg.err)

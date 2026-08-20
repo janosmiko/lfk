@@ -56,3 +56,10 @@ func (m Model) recordPreviewContentFingerprint(sel *model.Item) {
 	}
 	m.previewContentFingerprints[key] = rv
 }
+
+// clearPreviewContentFingerprint re-arms the skipped fetches after one
+// failed. The record happens at dispatch, so a failure would otherwise keep
+// matching the unchanged resourceVersion and the retry never runs.
+func (m Model) clearPreviewContentFingerprint() {
+	clear(m.previewContentFingerprints)
+}
