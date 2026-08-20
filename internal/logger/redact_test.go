@@ -1,9 +1,11 @@
 package logger
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRedact(t *testing.T) {
@@ -110,6 +112,20 @@ func TestRedact(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRedactErr(t *testing.T) {
+	baseErr := errors.New("exit status 1")
+	output := []byte("Error: UPGRADE FAILED: could not connect, password: hunter2-MARKER host=db.example.com")
+
+	got := RedactErr(baseErr, output)
+
+	require.Error(t, got)
+	assert.NotContains(t, got.Error(), "hunter2-MARKER", "redacted error must NOT leak the secret")
+	assert.Contains(t, got.Error(), "[REDACTED]", "redacted error must contain a redaction placeholder")
+	assert.Contains(t, got.Error(), "exit status 1", "redacted error must preserve the underlying error reason")
+	assert.Contains(t, got.Error(), "could not connect", "redacted error must preserve the non-secret output")
+	assert.ErrorIs(t, got, baseErr, "redacted error must still wrap the original error for errors.Is")
 }
 
 func TestRedactIsIdempotent(t *testing.T) {

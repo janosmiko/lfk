@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 // DescribePod runs `kubectl describe pod <podName> -n <namespace> --context
@@ -28,7 +29,7 @@ func (c *Client) DescribePod(ctx context.Context, contextName, namespace, podNam
 	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+		return "", logger.RedactErr(err, output)
 	}
 	return string(output), nil
 }

@@ -1,6 +1,10 @@
 package logger
 
-import "regexp"
+import (
+	"fmt"
+	"regexp"
+	"strings"
+)
 
 // redactPatterns is a curated set of regexes for likely-sensitive content.
 // It targets content that may end up in stderr from auth helpers, exec
@@ -41,4 +45,10 @@ func Redact(s string) string {
 		s = p.re.ReplaceAllString(s, p.repl)
 	}
 	return s
+}
+
+// RedactErr wraps err with output, redacted - subprocess output (e.g. helm
+// values) can carry secrets and this error reaches the log file and status bar.
+func RedactErr(err error, output []byte) error {
+	return fmt.Errorf("%w: %s", err, Redact(strings.TrimSpace(string(output))))
 }

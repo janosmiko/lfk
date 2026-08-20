@@ -152,8 +152,8 @@ func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
 		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("kubectl apply failed", "cmd", cmd.String(), "error", err, "output", string(output))
-			return actionResultMsg{err: fmt.Errorf("kubectl apply: %s", strings.TrimSpace(string(output)))}
+			logger.Error("kubectl apply failed", "cmd", cmd.String(), "error", err, "output", logger.Redact(string(output)))
+			return actionResultMsg{err: fmt.Errorf("kubectl apply: %w", logger.RedactErr(err, output))}
 		}
 		// Templates are rare and may create a Namespace (either directly
 		// via the "Namespace" template or an edited YAML that adds one),
