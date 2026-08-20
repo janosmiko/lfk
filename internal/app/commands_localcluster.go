@@ -11,12 +11,17 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s/localcluster"
 )
+
+// localClusterListTimeout bounds each provider's List call so a wedged
+// CLI can't hold up wg.Wait() forever.
+const localClusterListTimeout = 20 * time.Second
 
 // createLocalClusterCmd is the bare cmd factory: dispatches Provider.Create
 // and emits localClusterCreatedMsg with the result. ctx must be the
@@ -69,6 +74,13 @@ func deleteLocalClusterCmd(ctx context.Context, gen uint64, p localcluster.Provi
 // is echoed back on the message so the handler can drop stale results
 // from a previous open / refresh.
 func detectLocalClustersCmd(gen uint64, provs []localcluster.Provider) tea.Cmd {
+	return detectLocalClustersCmdWithTimeout(gen, provs, localClusterListTimeout)
+}
+
+// detectLocalClustersCmdWithTimeout is detectLocalClustersCmd with the
+// per-provider List timeout as a parameter, so tests can shrink it instead
+// of waiting out the production bound.
+func detectLocalClustersCmdWithTimeout(gen uint64, provs []localcluster.Provider, timeout time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		var (
 			mu       sync.Mutex
@@ -83,7 +95,9 @@ func detectLocalClustersCmd(gen uint64, provs []localcluster.Provider) tea.Cmd {
 			wg.Add(1)
 			go func(p localcluster.Provider) {
 				defer wg.Done()
-				cs, err := p.List(context.Background())
+				cctx, cancel := context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				cs, err := p.List(cctx)
 				mu.Lock()
 				defer mu.Unlock()
 				if err != nil {

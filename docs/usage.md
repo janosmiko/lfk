@@ -379,6 +379,11 @@ The loading spinner only animates while a load is actually in flight.
 
 Set `watch_throttle: false` to disable this throttling entirely.
 
+The CPU/MEM columns on Pod and Node lists refresh on their own slower cadence,
+`metrics_interval` (default 15s), because metrics-server recomputes about that
+often. Set `metrics_interval: 0s` to refetch on every tick. A manual refresh
+(`R`) always refetches.
+
 Flags: `--background-watch-interval`, `--foreground-idle-timeout`.
 
 ## Discovery cache
