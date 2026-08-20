@@ -32,21 +32,25 @@ var redactPatterns = []struct {
 	{regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://)[^:@\s/]*:[^@\s/]+@`), "${1}[REDACTED-CREDS]@"},
 	// Bearer tokens in Authorization headers.
 	{regexp.MustCompile(`(?i)(Bearer\s+)[A-Za-z0-9._-]{20,}`), "${1}[REDACTED-BEARER]"},
-	// Quoted values first, with escape-aware bodies: a bare [^"]+ would stop
-	// at an escaped quote ("front\"tail") and leak the tail past redaction.
-	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)"(?:\\.|[^"\\])*"`), `${1}${2}"[REDACTED]"`},
-	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)'(?:\\.|[^'\\])*'`), `${1}${2}'[REDACTED]'`},
 	// RE2 has no lookbehind: the boundary char and value quote are captured
 	// and replayed so unquoted (or unterminated-quote) output keeps its shape.
+	// Fully quoted values are handled by redactQuotedValues before this runs.
 	{regexp.MustCompile(`(?i)(^|[^\w/])([A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*)(["']?)[^\s&"',;]+`), "${1}${2}${3}[REDACTED]"},
 	// kubectl --from-literal=KEY=VALUE — keep KEY, redact VALUE.
 	{regexp.MustCompile(`(--from-literal=[^=\s]+=)[^\s"']+`), "${1}[REDACTED]"},
 }
 
-// blockScalarHeaderRe matches a YAML block-scalar header ("password: |-",
-// "token: >") whose key looks like a secret. Group 1 is the header's leading
-// indentation, used by Redact to find where the block scalar body ends.
-var blockScalarHeaderRe = regexp.MustCompile(`(?i)^(\s*)[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*:\s*[|>][+-]?\s*$`)
+// A header this regex misses leaves its whole block body unredacted, so it
+// must accept "|2" / ">4-" indicators and trailing YAML comments too.
+var blockScalarHeaderRe = regexp.MustCompile(`(?i)^(\s*)[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*:\s*[|>][0-9+-]{0,2}\s*(?:#.*)?$`)
+
+// Quoted bodies are walked by redactQuotedValues, not matched greedily: a
+// value whose raw text ends in a backslash would overrun its closing quote,
+// swallow the next field's key label, and leak that field's value.
+var quotedValueLabelRe = regexp.MustCompile(`(?i)(?:^|[^\w/])[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]\s*["']`)
+
+// The overrun signature: a second secret-key label inside one quoted span.
+var innerSecretLabelRe = regexp.MustCompile(`(?i)[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*[=:]`)
 
 // Deliberate non-goal: base64 under a generic key like "data:" stays
 // unredacted. Entropy checks misfire on kubectl/helm's legitimate base64.
@@ -84,10 +88,58 @@ func Redact(s string) string {
 }
 
 func redactLine(line string) string {
+	line = redactQuotedValues(line)
 	for _, p := range redactPatterns {
 		line = p.re.ReplaceAllString(line, p.repl)
 	}
 	return line
+}
+
+func redactQuotedValues(line string) string {
+	var b strings.Builder
+	rest := line
+	for {
+		loc := quotedValueLabelRe.FindStringIndex(rest)
+		if loc == nil {
+			b.WriteString(rest)
+			return b.String()
+		}
+		open := loc[1] - 1
+		quote := rest[open]
+		end := scanQuoted(rest, open+1, quote)
+		if end < 0 {
+			// Unterminated: the generic pattern redacts what it can.
+			b.WriteString(rest[:loc[1]])
+			rest = rest[loc[1]:]
+			continue
+		}
+		if innerSecretLabelRe.MatchString(rest[open+1 : end]) {
+			// The escape-aware close swallowed another field's label, so
+			// re-terminate at the first quote and let the loop redact
+			// that next field on its own.
+			if i := strings.IndexByte(rest[open+1:], quote); i >= 0 {
+				end = open + 1 + i
+			}
+		}
+		b.WriteString(rest[:open+1])
+		b.WriteString("[REDACTED]")
+		b.WriteByte(quote)
+		rest = rest[end+1:]
+	}
+}
+
+// scanQuoted returns the index of the closing quote, treating any
+// backslash-prefixed byte as escaped, or -1 when the quote never closes.
+func scanQuoted(s string, start int, quote byte) int {
+	for i := start; i < len(s); i++ {
+		switch s[i] {
+		case '\\':
+			i++
+		case quote:
+			return i
+		}
+	}
+	return -1
 }
 
 func leadingIndent(line string) int {

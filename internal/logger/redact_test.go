@@ -245,6 +245,36 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"secret-value"},
 		},
 		{
+			name:            "raw trailing backslash must not swallow the next field's label",
+			input:           `password: "abc\" token: "s3cretSecondField"`,
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"abc", "s3cretSecondField"},
+		},
+		{
+			name:            "raw trailing backslash in single quotes must not swallow the next field's label",
+			input:           `password: 'abc\' token: 's3cretSecondField'`,
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"abc", "s3cretSecondField"},
+		},
+		{
+			name:            "YAML block scalar with an explicit indentation indicator",
+			input:           "token: |2\n  s3cret-indent-two",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-indent-two"},
+		},
+		{
+			name:            "YAML folded scalar with indicator and chomping",
+			input:           "password: >4-\n    s3cret-folded-body",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-folded-body"},
+		},
+		{
+			name:            "YAML block scalar header with a trailing comment",
+			input:           "password: |- # from values\n  s3cret-commented-body",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-commented-body"},
+		},
+		{
 			name:            "base64 blob under a generic data key is not redacted (documented stance)",
 			input:           "data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I=",
 			wantContains:    []string{"data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I="},
@@ -273,6 +303,7 @@ func TestRedact(t *testing.T) {
 			for _, secret := range tt.wantNotContains {
 				assert.NotContains(t, got, secret, "redacted output must NOT contain %q (leaked secret)", secret)
 			}
+			assert.Equal(t, got, Redact(got), "Redact must be idempotent")
 		})
 	}
 }
