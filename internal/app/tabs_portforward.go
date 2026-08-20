@@ -13,7 +13,7 @@ import (
 
 // portForwardItems returns the list of active port forwards as model.Items for display.
 func (m *Model) portForwardItems() []model.Item {
-	entries := m.portForwardMgr.Entries()
+	entries := m.portForwardMgr.EntriesForDisplay()
 	items := make([]model.Item, 0, len(entries))
 	for _, e := range entries {
 		displayLocalPort := e.LocalPort

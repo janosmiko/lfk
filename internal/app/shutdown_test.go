@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"os"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -87,4 +89,94 @@ func TestBeginShutdown_FiresNotifier(t *testing.T) {
 	_, _ = m.beginShutdown()
 
 	assert.Equal(t, 1, calls, "shutdown notifier must fire once")
+}
+
+// isClosedFile reports whether f has already been closed.
+func isClosedFile(t *testing.T, f *os.File) bool {
+	t.Helper()
+	_, err := f.Write([]byte{0})
+	return errors.Is(err, os.ErrClosed)
+}
+
+func TestSignalShutdown_ClosesActiveExecPTY(t *testing.T) {
+	m := baseModelWithFakeClient()
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = r.Close()
+		_ = w.Close()
+	})
+	m.execPTY = w
+	// TabState mirrors Model's exec state after saveCurrentTab. The mirror
+	// must be nilled too, so a later restore can't re-close the same fd.
+	m.tabs = []TabState{{execPTY: w}}
+
+	m.signalShutdown()
+
+	assert.Nil(t, m.execPTY, "signalShutdown must nil out the active exec PTY")
+	assert.Nil(t, m.tabs[0].execPTY, "signalShutdown must nil out the active tab's mirrored exec PTY")
+	assert.True(t, isClosedFile(t, w), "signalShutdown must close the active exec PTY")
+}
+
+// A stale saveCurrentTab snapshot or a late-landing async PTY start can
+// leave the active tab's mirror pointing at a different PTY than
+// m.execPTY. Both must be closed, not just the live one.
+func TestSignalShutdown_ClosesActiveTabMirrorWhenDistinctFromModelPTY(t *testing.T) {
+	m := baseModelWithFakeClient()
+
+	rLive, wLive, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = rLive.Close()
+		_ = wLive.Close()
+	})
+	rStale, wStale, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = rStale.Close()
+		_ = wStale.Close()
+	})
+
+	m.execPTY = wLive
+	m.tabs = []TabState{{execPTY: wStale}}
+
+	m.signalShutdown()
+
+	assert.True(t, isClosedFile(t, wLive), "signalShutdown must close the live exec PTY")
+	assert.True(t, isClosedFile(t, wStale), "signalShutdown must close the stale mirrored exec PTY too")
+	assert.Nil(t, m.tabs[0].execPTY, "signalShutdown must nil out the active tab's mirrored exec PTY")
+}
+
+func TestSignalShutdown_ClosesBackgroundTabExecPTY(t *testing.T) {
+	m := baseModelWithFakeClient()
+
+	rBg, wBg, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = rBg.Close()
+		_ = wBg.Close()
+	})
+
+	m.tabs = []TabState{
+		{execPTY: wBg},
+		{},
+	}
+	m.activeTab = 1
+
+	m.signalShutdown()
+
+	assert.Nil(t, m.tabs[0].execPTY, "signalShutdown must nil out the background tab's exec PTY")
+	assert.True(t, isClosedFile(t, wBg), "signalShutdown must close the background tab's exec PTY")
+}
+
+func TestSignalShutdown_IsIdempotentAndNilSafe(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+
+	assert.NotPanics(t, func() {
+		m.signalShutdown()
+		m.signalShutdown()
+	})
 }
