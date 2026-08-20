@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"strings"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 // fieldDocMaxEntries bounds the description cache. One entry is a short string,
@@ -138,6 +140,7 @@ func fieldDocPath(objPath []string) string {
 // exits non-zero, so the raw output plus the exit status fills the pane with
 // noise around a single "error:" line.
 func parseExplainError(output string, cmdErr error) error {
+	output = logger.Redact(output)
 	for line := range strings.SplitSeq(output, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if msg, ok := strings.CutPrefix(trimmed, "error:"); ok {

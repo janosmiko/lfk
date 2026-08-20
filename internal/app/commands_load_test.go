@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
@@ -109,6 +111,28 @@ func TestCov80FetchHelmHistoryExecError(t *testing.T) {
 	revs, err := fetchHelmHistory("/bin/false", "my-release", "default", "test-ctx", "")
 	assert.Error(t, err)
 	assert.Nil(t, revs)
+}
+
+// A failing `helm history` can echo a credential (kubeconfig exec plugin,
+// registry auth) on stderr. That text reaches both the log and the caller's
+// error, which setErrorFromErr writes to lfk.log and the status bar.
+func TestCov80FetchHelmHistoryRedactsOutput(t *testing.T) {
+	dir := t.TempDir()
+	helmPath := filepath.Join(dir, "helm")
+	script := "#!/bin/sh\n" +
+		"echo 'Error: could not get Kubernetes client set: token=hunter2-HELMHISTORYMARKER' >&2\n" +
+		"exit 1\n"
+	require.NoError(t, os.WriteFile(helmPath, []byte(script), 0o755))
+
+	buf := captureLogger(t)
+	revs, err := fetchHelmHistory(helmPath, "my-release", "default", "test-ctx", "")
+
+	assert.Nil(t, revs)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "hunter2-HELMHISTORYMARKER", "error must not leak the secret")
+	assert.Contains(t, err.Error(), "[REDACTED]", "error must contain a redaction placeholder")
+	assert.Contains(t, err.Error(), "could not get Kubernetes client set", "error must preserve the non-secret reason")
+	assert.NotContains(t, buf.String(), "hunter2-HELMHISTORYMARKER", "log must not leak the secret")
 }
 
 func TestCov80LoadYAMLNilSel(t *testing.T) {

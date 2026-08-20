@@ -64,7 +64,7 @@ func fetchHelmHistory(helmPath, name, ns, kubeCtx, kubeconfigPaths string) ([]ui
 		if len(bytes.TrimSpace(detail)) == 0 {
 			detail = output
 		}
-		truncated := truncateHelmOutput(detail)
+		truncated := truncateHelmOutput([]byte(logger.Redact(string(detail))))
 		logger.Error("helm history failed", "cmd", cmd.String(), "error", cmdErr, "output", truncated)
 		return nil, fmt.Errorf("%w: %s", cmdErr, truncated)
 	}

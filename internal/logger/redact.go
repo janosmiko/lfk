@@ -25,12 +25,14 @@ var redactPatterns = []struct {
 	// GitHub tokens (PAT, OAuth, server, user).
 	{regexp.MustCompile(`gh[opsu]_[A-Za-z0-9]{36,}`), "[REDACTED-GH-TOKEN]"},
 	// URLs with embedded credentials: keep scheme/host but redact the user:pass.
-	{regexp.MustCompile(`((?:https?|git|ssh)://)[^:@\s/]+:[^@\s/]+@`), "${1}[REDACTED-CREDS]@"},
+	// Any URI scheme (postgres, mysql, mongodb, redis, amqp, ...), not just
+	// the well-known ones - connection strings carry these just as often.
+	{regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://)[^:@\s/]+:[^@\s/]+@`), "${1}[REDACTED-CREDS]@"},
 	// Bearer tokens in Authorization headers.
 	{regexp.MustCompile(`(?i)(Bearer\s+)[A-Za-z0-9._-]{20,}`), "${1}[REDACTED-BEARER]"},
 	// Generic key=value pairs for password/token/secret/api_key/etc.
 	// Keep the key visible (useful for diagnosis), redact only the value.
-	{regexp.MustCompile(`(?i)((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret)\s*[=:]\s*)[^\s&"',;]+`), "${1}[REDACTED]"},
+	{regexp.MustCompile(`(?i)((?:password|passwd|pwd|db[_-]?pass(?:word)?|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|dsn|database[_-]?url|connection[_-]?string)\s*[=:]\s*)[^\s&"',;]+`), "${1}[REDACTED]"},
 	// kubectl --from-literal=KEY=VALUE — keep KEY, redact VALUE.
 	{regexp.MustCompile(`(--from-literal=[^=\s]+=)[^\s"']+`), "${1}[REDACTED]"},
 }

@@ -82,6 +82,42 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"topsecretvalue", "alsosecret"},
 		},
 		{
+			name:            "postgres URL with embedded credentials",
+			input:           "dial tcp: could not connect to postgres://dbuser:hunter2-PGMARKER@db.internal:5432/app: connection refused",
+			wantContains:    []string{"postgres://[REDACTED-CREDS]@db.internal:5432/app", "connection refused"},
+			wantNotContains: []string{"dbuser:hunter2-PGMARKER", "hunter2-PGMARKER@"},
+		},
+		{
+			name:            "mongodb URL with embedded credentials",
+			input:           "mongodb://root:s3cret-MONGOMARKER@cluster0.example.net/admin timed out",
+			wantContains:    []string{"mongodb://[REDACTED-CREDS]@cluster0.example.net/admin", "timed out"},
+			wantNotContains: []string{"root:s3cret-MONGOMARKER"},
+		},
+		{
+			name:            "DB_PASS kv inline",
+			input:           "connect: DB_PASS=hunter2-DBPASSMARKER host=db.example.com",
+			wantContains:    []string{"DB_PASS=[REDACTED]", "host=db.example.com"},
+			wantNotContains: []string{"hunter2-DBPASSMARKER"},
+		},
+		{
+			name:            "DATABASE_URL kv inline",
+			input:           "config error: DATABASE_URL=postgres://u:hunter2-DATABASEURLMARKER@db/app is invalid",
+			wantContains:    []string{"DATABASE_URL=[REDACTED]", "is invalid"},
+			wantNotContains: []string{"hunter2-DATABASEURLMARKER"},
+		},
+		{
+			name:            "connectionString kv inline",
+			input:           "startup failed: connectionString=hunter2-CONNSTRMARKER retrying",
+			wantContains:    []string{"connectionString=[REDACTED]", "retrying"},
+			wantNotContains: []string{"hunter2-CONNSTRMARKER"},
+		},
+		{
+			name:            "dsn kv inline",
+			input:           "sqlx: dsn=hunter2-DSNMARKER open failed",
+			wantContains:    []string{"dsn=[REDACTED]", "open failed"},
+			wantNotContains: []string{"hunter2-DSNMARKER"},
+		},
+		{
 			name:            "no secrets passes through unchanged",
 			input:           "kubectl get pods -n default --context prod",
 			wantContains:    []string{"kubectl get pods -n default --context prod"},
