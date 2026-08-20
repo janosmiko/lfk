@@ -275,6 +275,18 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"s3cret-commented-body"},
 		},
 		{
+			name:            "YAML block scalar under a double-quoted key",
+			input:           "\"password\": |-\n  s3cret-quoted-header",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-quoted-header"},
+		},
+		{
+			name:            "YAML block scalar under a single-quoted key",
+			input:           "'token': >\n  s3cret-single-quoted-header",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-single-quoted-header"},
+		},
+		{
 			name:            "base64 blob under a generic data key is not redacted (documented stance)",
 			input:           "data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I=",
 			wantContains:    []string{"data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I="},
