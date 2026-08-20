@@ -106,12 +106,12 @@ func TestWatchTickDropsDeletedPodViaInformerCache(t *testing.T) {
 	if !assertPodPresent(t, m.middleItems, "doomed-pod", "first tick must observe the live pod") {
 		return
 	}
-	// markHot's own informer issues one internal LIST asynchronously.
-	// Wait for it to land so it isn't mistaken for a spurious extra call.
-	listsAfterWarmup := waitForListActionCountToSettle(t, dyn)
 	// The fake watch only delivers events sent after it registers. Delete
 	// before that and the informer never sees it.
 	waitForPodWatchAction(t, dyn)
+	// Baseline after the watch: the informer's own async warm-up LIST
+	// must land before the count is captured.
+	listsAfterWarmup := waitForListActionCountToSettle(t, dyn)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	require.NoError(t, dyn.Resource(gvr).Namespace("default").Delete(t.Context(), "doomed-pod", metav1.DeleteOptions{}))
