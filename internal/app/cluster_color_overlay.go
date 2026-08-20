@@ -241,6 +241,7 @@ func (m Model) applyClusterColorSelection() (Model, bool) {
 	for i := range m.middleItems {
 		if m.middleItems[i].Name == ctx {
 			m.middleItems[i].ClusterColor = newColor
+			m.middleItemsRev++
 			break
 		}
 	}
