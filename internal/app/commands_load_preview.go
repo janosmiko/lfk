@@ -156,18 +156,24 @@ func (m Model) loadPreviewResources() tea.Cmd {
 		}
 		return nil
 	}
+	sel := m.selectedMiddleItem()
+	// Containers and YAML are 1:1 projections of the object, so an
+	// unchanged resourceVersion means unchanged output on a watch tick.
+	unchanged := m.suppressBgtasks && m.previewContentUnchanged(sel)
+
 	var cmds []tea.Cmd
 	switch {
 	case m.mapView && m.resourceTypeHasChildren():
 		cmds = append(cmds, m.loadResourceTree())
 	case m.resourceTypeHasChildren():
 		cmds = append(cmds, m.loadOwned(true))
-	case m.nav.ResourceType.Kind == "Pod":
+	case m.nav.ResourceType.Kind == "Pod" && !unchanged:
 		cmds = append(cmds, m.loadContainers(true))
 	}
-	if m.fullYAMLPreview {
+	if m.fullYAMLPreview && !unchanged {
 		cmds = append(cmds, m.loadPreviewYAML())
 	}
+	m.recordPreviewContentFingerprint(sel)
 	kind := m.nav.ResourceType.Kind
 	if kind == "Pod" || kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" {
 		if metricsCmd := m.loadMetrics(); metricsCmd != nil {

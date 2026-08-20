@@ -684,6 +684,12 @@ confirm_on_exit: true
 # (background throttling still applies). Default: 120s
 # foreground_idle_timeout: 120s
 
+# ─── Metrics Interval ─────────────────────────────────────────────────────────
+# Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh.
+# metrics-server recomputes every 15s or so. Clamped to [2s, 10m]. Set to 0s to
+# fetch on every tick. A manual refresh always fetches. Default: 15s
+# metrics_interval: 15s
+
 # ─── Watch Throttle ───────────────────────────────────────────────────────────
 # Master switch for the focus/idle throttling above. Set to false to disable it
 # entirely: the watch tick always uses watch_interval regardless of focus or
@@ -699,10 +705,11 @@ confirm_on_exit: true
 # ─── Informer Cache ───────────────────────────────────────────────────────────
 # How resource list calls are routed:
 #   "off"     - round-trip every list to the API server (matches kubectl).
-#   "auto"    - default; per resource type, start in direct-list mode and
+#   "auto"    - default. Per resource type, start in direct-list mode and
 #               promote to a shared informer once a list returns >= 1000
-#               items. Demote back to direct lists when the cached size
-#               stays below 500 for three consecutive calls. Recommended.
+#               items, or a repeated refresh keeps it hot regardless of
+#               size. Events, Secrets, metrics, and non-watchable types
+#               never promote. Demote below 500 or when refreshes stop.
 #   "always"  - open a watch eagerly on first use of each resource type.
 # Legacy bool form: true → "always", false → "off".
 # Default: auto

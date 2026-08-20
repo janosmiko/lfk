@@ -620,7 +620,7 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 // Partial results are returned alongside an errors.Join of every per-context
 // failure, so the status bar can surface "2 of 8 contexts failed: …" instead
 // of silently truncating to the first error.
-func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry, opts ...ListOption) ([]model.Item, error) {
 	type result struct {
 		items []model.Item
 		err   error
@@ -632,7 +632,7 @@ func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, names
 	for i, kctx := range contexts {
 		go func(idx int, contextName string) {
 			defer wg.Done()
-			items, err := c.GetResources(ctx, contextName, namespace, rt)
+			items, err := c.GetResources(ctx, contextName, namespace, rt, opts...)
 			if err != nil {
 				results[idx] = result{ctx: contextName, err: err}
 				return
