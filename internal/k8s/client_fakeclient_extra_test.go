@@ -1,6 +1,8 @@
 package k8s
 
 import (
+	"bytes"
+	"log/slog"
 	"maps"
 	"testing"
 
@@ -16,7 +18,9 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -737,6 +741,45 @@ func TestBuildCronJobTree(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "Job", root.Children[0].Kind)
+}
+
+// TestBuildCronJobTree_LogsPodOwnerTreeError guards a Job's pods from
+// silently vanishing when buildPodOwnerTree fails.
+func TestBuildCronJobTree_LogsPodOwnerTreeError(t *testing.T) {
+	job := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "batch/v1",
+			"kind":       "Job",
+			"metadata": map[string]any{
+				"name": "cron-12345", "namespace": "default",
+				"ownerReferences": []any{
+					map[string]any{"kind": "CronJob", "name": "my-cron"},
+				},
+			},
+		},
+	}
+	dc := newFakeDynClient(job)
+	dc.PrependReactor("list", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, assert.AnError
+	})
+	c := newFakeClient(nil, dc)
+
+	buf := &bytes.Buffer{}
+	orig := logger.Logger
+	logger.Logger = slog.New(slog.NewTextHandler(buf, nil))
+	defer func() { logger.Logger = orig }()
+
+	root := &model.ResourceNode{Name: "my-cron", Kind: "CronJob", Namespace: "default"}
+	err := c.buildCronJobTree(t.Context(), dc, "default", "my-cron", root)
+	require.NoError(t, err, "the tree must still render without the pods on failure")
+	require.Len(t, root.Children, 1)
+	assert.Equal(t, "Job", root.Children[0].Kind)
+	assert.Empty(t, root.Children[0].Children, "pods should be absent, not silently retried")
+
+	logged := buf.String()
+	assert.Contains(t, logged, "cron-12345", "expected the failing job name in the log")
+	assert.Contains(t, logged, "namespace=default", "expected the Job namespace in the log")
+	assert.Contains(t, logged, assert.AnError.Error(), "expected the underlying error to be logged")
 }
 
 func TestGetPodsViaReplicaSets(t *testing.T) {
