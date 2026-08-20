@@ -48,9 +48,6 @@ type Source struct {
 	dynClient dynamic.Interface    // probes ConstraintTemplate (IsAvailable) and lists constraint instances (Fetch)
 }
 
-// New returns a Source with no clients (Fetch returns nil, IsAvailable false).
-func New() *Source { return &Source{} }
-
 // NewWithClients returns a Source using the given clientset (for
 // discovery) and dynamic client (for listing constraints).
 func NewWithClients(clientset kubernetes.Interface, dynClient dynamic.Interface) *Source {

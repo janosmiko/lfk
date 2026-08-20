@@ -22,12 +22,12 @@ func TestDashKeyAgainstRealJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		t.Fatal(err)
 	}
-	got := EvalJSONPath(".metadata.labels.git-sha", obj)
+	got := evalJSONPath(".metadata.labels.git-sha", obj)
 	if got != "deadbeef" {
 		t.Fatalf("expected deadbeef, got %q", got)
 	}
 
-	gotBracket := EvalJSONPath(`.metadata.labels['git-sha']`, obj)
+	gotBracket := evalJSONPath(`.metadata.labels['git-sha']`, obj)
 	if gotBracket != "deadbeef" {
 		t.Fatalf("bracket form should also work; got %q", gotBracket)
 	}

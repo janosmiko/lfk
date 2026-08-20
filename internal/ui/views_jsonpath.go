@@ -8,23 +8,6 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 )
 
-// EvalJSONPath evaluates a JSONPath expression against the given unstructured
-// object and returns the stringified result. Returns "" when the path doesn't
-// resolve, the expression is invalid, or the result is empty. This is a
-// best-effort display helper — errors are intentionally silent. Callers wanting
-// to validate an expression should compile it via CompileJSONPath at config
-// load time.
-func EvalJSONPath(expr string, obj map[string]any) string {
-	if expr == "" || obj == nil {
-		return ""
-	}
-	jp, err := CompileJSONPath(expr)
-	if err != nil {
-		return ""
-	}
-	return EvalCompiled(jp, obj)
-}
-
 // CompileJSONPath compiles a k9s-style JSONPath expression (no surrounding
 // braces) into a reusable template. Returns an error for malformed
 // expressions so the caller (config applier) can surface a warning.

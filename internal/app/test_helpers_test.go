@@ -194,7 +194,7 @@ func baseModelCov() Model {
 // baseModelWithFakeClientAndScheduler returns a Model wired to fake k8s clients
 // with a scheduler that has workers started. Workers are stopped at test cleanup.
 // Use this instead of baseModelWithFakeClient for tests that execute scheduler-
-// routed commands (e.g. loadNamespaces after migration).
+// routed commands (e.g. loadNamespacesForContext after migration).
 func baseModelWithFakeClientAndScheduler(t *testing.T, objs ...runtime.Object) Model {
 	t.Helper()
 	m := baseModelWithFakeClient(objs...)

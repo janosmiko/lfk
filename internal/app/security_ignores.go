@@ -281,18 +281,6 @@ func isResourceSpecificIgnored(state *SecurityIgnoreState, ctx, source, groupKey
 	return false
 }
 
-// countIgnoredGroups returns the count of cluster-wide group ignores (rules
-// with neither a namespace nor a resource scope) for the given context.
-func countIgnoredGroups(state *SecurityIgnoreState, ctx string) int {
-	count := 0
-	for _, r := range state.Contexts[ctx] {
-		if r.Resource == "" && r.Namespace == "" {
-			count++
-		}
-	}
-	return count
-}
-
 // modelIgnoreChecker adapts SecurityIgnoreState to the k8s.IgnoreChecker
 // interface so the groupFindings engine can filter ignored entries. The
 // interface is defined in the k8s package; Go structural typing allows this

@@ -386,7 +386,7 @@ func TestStripToTemplate_PerKind(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			out, err := StripToTemplate(tc.in)
+			out, err := StripToTemplateWith(tc.in, DefaultTemplateStripSet())
 			require.NoError(t, err)
 			for _, p := range tc.gone {
 				assert.False(t, hasPath(t, out, p...), "expected %v to be stripped", p)
@@ -403,7 +403,7 @@ func TestStripToTemplate_PerKind(t *testing.T) {
 // the volumeMount that references it — leaving one without the other produces
 // a manifest the API server rejects.
 func TestStripToTemplate_DropsInjectedServiceAccountVolume(t *testing.T) {
-	out, err := StripToTemplate(livePodYAML)
+	out, err := StripToTemplateWith(livePodYAML, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	var pod corev1.Pod
@@ -454,7 +454,7 @@ func TestStripToTemplate_NoServerAssignedIdentifiersSurvive(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			out, err := StripToTemplate(tc.in)
+			out, err := StripToTemplateWith(tc.in, DefaultTemplateStripSet())
 			require.NoError(t, err)
 			for _, id := range serverAssigned {
 				assert.NotContains(t, out, id, "server-assigned identifier survived the strip")
@@ -476,7 +476,7 @@ metadata:
 data:
   key: value
 `
-	out, err := StripToTemplate(in)
+	out, err := StripToTemplateWith(in, DefaultTemplateStripSet())
 	require.NoError(t, err)
 	assert.False(t, hasPath(t, out, "metadata", "annotations"), "an annotation map emptied by the strip must be dropped")
 	assert.True(t, hasPath(t, out, "data", "key"))
@@ -486,7 +486,7 @@ data:
 // hands cluster-sourced text to this function, and a document that is not a
 // mapping must produce an error rather than a nil-map panic.
 func TestStripToTemplate_RejectsNonObject(t *testing.T) {
-	_, err := StripToTemplate("- just\n- a\n- list\n")
+	_, err := StripToTemplateWith("- just\n- a\n- list\n", DefaultTemplateStripSet())
 	assert.Error(t, err)
 }
 
@@ -495,7 +495,7 @@ func TestStripToTemplate_RejectsNonObject(t *testing.T) {
 // not travel with the keys. The type is authored, not server-set, and stays —
 // a kubernetes.io/tls Secret is a different template from an Opaque one.
 func TestStripToTemplate_SecretKeepsKeysDropsValues(t *testing.T) {
-	out, err := StripToTemplate(liveSecretYAML)
+	out, err := StripToTemplateWith(liveSecretYAML, DefaultTemplateStripSet())
 	require.NoError(t, err)
 
 	// Assert on the payload itself, not only on the decoded value: a value

@@ -44,7 +44,7 @@ func buildIndex(t *testing.T, findings ...security.Finding) *security.FindingInd
 	return security.BuildFindingIndex(findings)
 }
 
-// --- securityBadgeFor ---
+// --- securityBadgeStyled (via FindingIndex.For, the production lookup path) ---
 
 func TestSecurityBadgeForWithFindings(t *testing.T) {
 	idx := buildIndex(t,
@@ -65,7 +65,7 @@ func TestSecurityBadgeForWithFindings(t *testing.T) {
 		},
 	)
 
-	got := securityBadgeFor(idx, security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "api"})
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "api"}))
 	plain := ansi.Strip(got)
 
 	// 1 Critical (plus 1 High, 1 Low) -> the badge shows only the worst-severity
@@ -96,7 +96,7 @@ func TestSecurityBadgeForShowsOnlyWorstCount(t *testing.T) {
 	add(security.SeverityLow, 110, "low-")
 
 	idx := buildIndex(t, findings...)
-	plain := ansi.Strip(securityBadgeFor(idx, ref))
+	plain := ansi.Strip(securityBadgeStyled(idx.For(ref)))
 
 	assert.Equal(t, "\u25cf3", plain,
 		"badge must show 3 criticals only, not the 119 all-severity total")
@@ -116,7 +116,7 @@ func TestSecurityBadgeForHighUsesOrange(t *testing.T) {
 		},
 	)
 
-	got := securityBadgeFor(idx, security.ResourceRef{Namespace: "ns", Kind: "Deployment", Name: "web"})
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "ns", Kind: "Deployment", Name: "web"}))
 	plain := ansi.Strip(got)
 
 	assert.Contains(t, plain, "\u25d0", "high badge must use the half circle symbol")
@@ -132,7 +132,7 @@ func TestSecurityBadgeForMediumUsesProgressing(t *testing.T) {
 		},
 	)
 
-	got := securityBadgeFor(idx, security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "x"})
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "x"}))
 	plain := ansi.Strip(got)
 
 	assert.Contains(t, plain, "\u25cb", "medium badge must use the empty circle symbol")
@@ -149,23 +149,24 @@ func TestSecurityBadgeForLowUsesProgressing(t *testing.T) {
 		},
 	)
 
-	got := securityBadgeFor(idx, security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "y"})
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "y"}))
 	plain := ansi.Strip(got)
 
 	assert.Contains(t, plain, "\u25cb")
 	assert.Contains(t, plain, "1")
 }
 
-// --- securityBadgeFor empty / nil cases ---
+// --- securityBadgeStyled empty / nil cases ---
 
 func TestSecurityBadgeForEmpty(t *testing.T) {
 	idx := security.BuildFindingIndex(nil)
-	got := securityBadgeFor(idx, security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "no-finds"})
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "no-finds"}))
 	assert.Empty(t, got, "empty index must yield empty badge")
 }
 
 func TestSecurityBadgeForNilIndex(t *testing.T) {
-	got := securityBadgeFor(nil, security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "whatever"})
+	var idx *security.FindingIndex
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "whatever"}))
 	assert.Empty(t, got, "nil index must yield empty badge")
 }
 
@@ -176,7 +177,7 @@ func TestSecurityBadgeForResourceWithoutFindings(t *testing.T) {
 			Resource: security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "api"},
 		},
 	)
-	got := securityBadgeFor(idx, security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "other"})
+	got := securityBadgeStyled(idx.For(security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "other"}))
 	assert.Empty(t, got, "resource without findings must yield empty badge")
 }
 

@@ -44,7 +44,7 @@ func TestSourceMetadata(t *testing.T) {
 }
 
 func TestSourceUnavailableWithoutClient(t *testing.T) {
-	s := New()
+	s := NewWithClient(nil)
 	ok, err := s.IsAvailable(t.Context(), "")
 	assert.NoError(t, err)
 	assert.False(t, ok, "heuristic with nil client reports unavailable")

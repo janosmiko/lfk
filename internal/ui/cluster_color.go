@@ -102,18 +102,6 @@ func ClusterColorTitleBarStyle(name string) lipgloss.Style {
 		Bold(true)
 }
 
-// ClusterColorSwatch returns a 2-cell coloured block (foreground glyph)
-// for use in contexts where the surrounding style sets only a
-// foreground. Empty / unknown name returns two dim cells so rows
-// without a colour stay aligned.
-func ClusterColorSwatch(name string) string {
-	fg := clusterColorBg(name) // re-use the resolver — same colour, used as fg here
-	if fg == nil {
-		return lipgloss.NewStyle().Foreground(ThemeColor(ColorDimmed)).Render("··")
-	}
-	return lipgloss.NewStyle().Foreground(fg).Render("██")
-}
-
 // ClusterColorSwatchBg returns a 2-cell coloured block rendered as a
 // background tint on whitespace, intended for use inside rows that may
 // be wrapped in a selection-highlight style. Background-as-colour wins

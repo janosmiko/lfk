@@ -14,26 +14,26 @@ import (
 )
 
 func TestSourceName(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	assert.Equal(t, "policy-report", s.Name())
 }
 
 func TestSourceCategories(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	cats := s.Categories()
 	assert.Contains(t, cats, security.CategoryPolicy)
 	assert.Contains(t, cats, security.CategoryCompliance)
 }
 
 func TestIsAvailableNilClient(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	ok, err := s.IsAvailable(t.Context(), "ctx")
 	assert.False(t, ok)
 	assert.NoError(t, err)
 }
 
 func TestFetchNilClient(t *testing.T) {
-	s := New()
+	s := NewWithDynamic(nil)
 	findings, err := s.Fetch(t.Context(), "ctx", "")
 	assert.Nil(t, findings)
 	assert.NoError(t, err)

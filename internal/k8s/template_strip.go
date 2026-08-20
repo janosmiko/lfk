@@ -125,14 +125,9 @@ func redactSecretValues(obj map[string]any) {
 	}
 }
 
-// StripToTemplate rewrites a live object's YAML into a reusable template using
-// the default category set — the two-keystroke export path.
-func StripToTemplate(doc string) (string, error) {
-	return StripToTemplateWith(doc, DefaultTemplateStripSet())
-}
-
-// StripToTemplateWith is StripToTemplate with the optional categories chosen by
-// the caller. The result is meant to apply unchanged into an empty namespace.
+// StripToTemplateWith rewrites a live object's YAML into a reusable template
+// using the categories chosen by the caller. The result is meant to apply
+// unchanged into an empty namespace.
 func StripToTemplateWith(doc string, strip TemplateStripSet) (string, error) {
 	var obj map[string]any
 	if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {

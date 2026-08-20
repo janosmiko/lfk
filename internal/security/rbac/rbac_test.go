@@ -71,7 +71,7 @@ func TestSourceMetadata(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	findings, err := New().Fetch(t.Context(), "", "")
+	findings, err := NewWithClient(nil).Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings, "nil client fetches nothing")
 }

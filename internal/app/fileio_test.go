@@ -197,11 +197,11 @@ func TestCommandHistoryDownNoHistory(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
-// --- historyFilePath ---
+// --- historyFilePathFor ---
 
 func TestHistoryFilePathDefault(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", "")
-	path := historyFilePath()
+	path := historyFilePathFor(historyFileCommand)
 	assert.Contains(t, path, ".local/state/lfk/history")
 }
 

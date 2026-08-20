@@ -98,7 +98,7 @@ func TestParseConstraintEmptyStatus(t *testing.T) {
 // TestSourceWithoutClientsReportsUnavailable — the zero-value Source
 // (no clientset wired) must not panic and must report unavailable.
 func TestSourceWithoutClientsReportsUnavailable(t *testing.T) {
-	s := New()
+	s := NewWithClients(nil, nil)
 	ok, err := s.IsAvailable(t.Context(), "kctx")
 	assert.False(t, ok)
 	assert.NoError(t, err)

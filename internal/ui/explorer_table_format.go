@@ -141,27 +141,3 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 	remaining := max(width-deprecationW, 1)
 	return Truncate(displayName, remaining) + deprecationSuffix
 }
-
-// wrapExtraValue splits a value into continuation-line chunks of the given width.
-// Retained for test compatibility. No longer called by production code.
-func wrapExtraValue(val string, width int) []string {
-	if width <= 0 {
-		return nil
-	}
-	runes := []rune(val)
-	if len(runes) <= width {
-		return nil
-	}
-	var lines []string
-	for i := width; i < len(runes); i += width {
-		end := min(i+width, len(runes))
-		lines = append(lines, string(runes[i:end]))
-	}
-	return lines
-}
-
-// itemExtraLines returns how many continuation lines an item needs.
-// Line wrapping has been removed; every row is exactly one line.
-func itemExtraLines(_ *model.Item, _ []extraColumn) int {
-	return 0
-}

@@ -17,24 +17,6 @@ type extraColumn struct {
 	hasArrow bool   // true if any value in this column has a trend arrow
 }
 
-// ExtraColumnInfo is an exported representation of an extra column for use by
-// the app layer (e.g., header click handling).
-type ExtraColumnInfo struct {
-	Key   string
-	Width int
-}
-
-// CollectExtraColumns is an exported wrapper around collectExtraColumns.
-// It returns the extra columns as ExtraColumnInfo for use outside the ui package.
-func CollectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind string) []ExtraColumnInfo {
-	cols := collectExtraColumns(items, totalWidth, usedWidth, kind)
-	result := make([]ExtraColumnInfo, len(cols))
-	for i, c := range cols {
-		result[i] = ExtraColumnInfo{Key: c.key, Width: c.width}
-	}
-	return result
-}
-
 // ActiveSessionColumns holds the session-only column override for the current
 // resource type. Set by the app before rendering. Nil means no override.
 var ActiveSessionColumns []string

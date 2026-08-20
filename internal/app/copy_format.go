@@ -46,22 +46,6 @@ func (f CopyFormat) ShortcutKey() string {
 	return ""
 }
 
-// statusKey returns the lowercase identifier stored in
-// yamlClipboardMsg.format so updateYamlClipboard can render the
-// right status text. Mirrors the values copyFormatStatusParts
-// switches on.
-func (f CopyFormat) statusKey() string {
-	switch f {
-	case CopyFormatYAML:
-		return "yaml"
-	case CopyFormatJSON:
-		return "json"
-	case CopyFormatTable:
-		return "table"
-	}
-	return ""
-}
-
 // availableCopyFormats returns the picker rows applicable at the
 // given navigation level. Clusters and ResourceTypes only support
 // Table (there is no manifest behind those rows). All other levels
