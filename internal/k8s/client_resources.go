@@ -28,7 +28,7 @@ var secretGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: 
 // items therefore carry only Name/Namespace/Age/Deletion/OwnerReferences — no
 // "secret:<key>" data columns and no "Type" column. Per-secret data is loaded
 // lazily by the UI layer when the user selects a specific secret.
-func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, opts ...ListOption) ([]model.Item, error) {
 	// Virtual security resource types — dispatched to the injected manager.
 	if rt.APIGroup == model.SecurityVirtualAPIGroup {
 		return c.getSecurityFindings(ctx, contextName, namespace, rt)
@@ -72,7 +72,19 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// The informer cache holds an unfiltered snapshot, so a field selector
 	// must bypass it and go straight to a direct list.
 	mode, infs := c.informerSnapshot()
-	if rt.FieldSelector == "" && cacheEnabled(mode, infs) && shouldUseCache(mode, infs, contextName, gvr) {
+	lo := resolveListOpts(opts)
+	// allowed gates every path below (markHot, cache read, auto-promotion),
+	// not just markHot -- informerAllowed needs rt.Verbs, which the gvr-keyed
+	// cache state below doesn't carry.
+	allowed := informerAllowed(rt)
+	// justStarted is true only on the informer's first-ever start for this
+	// GVR: skip the cache branch this once instead of blocking on a sync
+	// that just began.
+	justStarted := false
+	if lo.preferCache && mode != InformerCacheOff && infs != nil && allowed {
+		justStarted = infs.markHot(contextName, gvr)
+	}
+	if !justStarted && allowed && rt.FieldSelector == "" && cacheEnabled(mode, infs) && shouldUseCache(mode, infs, contextName, gvr) {
 		build := func(obj *unstructured.Unstructured) model.Item {
 			return c.buildResourceItem(obj, &rt)
 		}
@@ -109,9 +121,9 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 
 	// Auto-mode promotion fires after the direct list, when we know the
 	// observed result size. Crossing the threshold flips the (context, GVR)
-	// to cache-backed for the *next* GetResources call, which is what makes
-	// subsequent namespace switches on a 7k-pod list feel instant.
-	if mode == InformerCacheAuto && infs != nil {
+	// to cache-backed for the *next* GetResources call. A field-selected
+	// list isn't representative of the unfiltered GVR's size.
+	if allowed && mode == InformerCacheAuto && infs != nil && rt.FieldSelector == "" {
 		infs.observeDirectListSize(contextName, gvr, len(items))
 	}
 	return c.withLonghornReplicaCounts(ctx, contextName, namespace, rt, sortResourceItems(items, rt.Kind)), nil

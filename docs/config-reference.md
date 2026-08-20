@@ -967,12 +967,16 @@ The `informer_cache` knob has three modes:
 - **`auto`** (default) — start in `off` mode per `(context, resource type)`,
   but the moment a list returns ≥ 1000 items, promote that resource type
   to a [shared informer](https://pkg.go.dev/k8s.io/client-go/dynamic/dynamicinformer).
-  Subsequent lists for that resource type — including namespace switches —
-  are served from the in-memory index. Once cached size has stayed below
-  500 for three consecutive cached calls, the watch is closed and the
-  resource type goes back to direct lists. Hysteresis between the promote
-  (1000) and demote (500) thresholds prevents flapping when a list size
-  hovers near the edge.
+  A resource type refreshed repeatedly by the visible list or dashboard —
+  regardless of size — also promotes, and stays promoted for as long as
+  something keeps refreshing it. Only eligible resource types promote:
+  Events, Secrets, `metrics.k8s.io`, and types whose declared verbs omit
+  `watch` always use direct lists. Subsequent lists for a promoted resource
+  type — including namespace switches — are served from the in-memory
+  index. Once cached size has stayed below 500 for three consecutive
+  cached calls, the watch is closed and the resource type goes back to
+  direct lists. Hysteresis between the promote (1000) and demote (500)
+  thresholds prevents flapping when a list size hovers near the edge.
 - **`always`** — every resource type starts a watch on first use,
   regardless of size. Use when you know the cluster is large and want to
   skip the one-time direct list before promotion.

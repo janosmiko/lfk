@@ -46,17 +46,16 @@ type Model struct {
 	// Item cache: maps navigation path to loaded items for faster back navigation.
 	itemCache map[string][]model.Item
 
-	// cacheFingerprints maps the same keys as itemCache to a fingerprint
-	// of the fetch-affecting state (namespace, allNamespaces,
-	// selectedNamespaces) that was in effect when the entry was written.
-	// loadResources uses it to decide whether a primed cache entry is
-	// still applicable: if the current fingerprint matches, the fetch can
-	// be served from cache instead of hitting the API. This is populated
-	// only by updateResourcesLoadedPreview and updateResourcesLoadedMain
-	// — the paths that fetch data under the current state. Other writers
-	// (session restore, bookmarks, toggleRare rebuild) leave the entry
-	// without a fingerprint, which safely defaults to a real fetch.
+	// cacheFingerprints maps the same keys as itemCache to a fingerprint of
+	// the fetch-affecting state (namespace, allNamespaces, selectedNamespaces)
+	// when the entry was written. loadResources compares it to the current
+	// fingerprint to judge whether a primed entry is still valid. Entries
+	// without one (session restore, bookmarks, toggleRare) default to a fetch.
 	cacheFingerprints map[string]string
+	// previewContentFingerprints holds the hovered item's last fetched
+	// resourceVersion, keyed by context+kind+SelectionKey. Bounded to one
+	// entry: recording a new key drops any other.
+	previewContentFingerprints map[string]string
 
 	// Full-screen YAML viewer state (the `y` view): content, scroll/cursor,
 	// search, visual selection, wrap, and collapsible sections. Extracted

@@ -705,10 +705,11 @@ confirm_on_exit: true
 # ─── Informer Cache ───────────────────────────────────────────────────────────
 # How resource list calls are routed:
 #   "off"     - round-trip every list to the API server (matches kubectl).
-#   "auto"    - default; per resource type, start in direct-list mode and
+#   "auto"    - default. Per resource type, start in direct-list mode and
 #               promote to a shared informer once a list returns >= 1000
-#               items. Demote back to direct lists when the cached size
-#               stays below 500 for three consecutive calls. Recommended.
+#               items, or a repeated refresh keeps it hot regardless of
+#               size. Events, Secrets, metrics, and non-watchable types
+#               never promote. Demote below 500 or when refreshes stop.
 #   "always"  - open a watch eagerly on first use of each resource type.
 # Legacy bool form: true → "always", false → "off".
 # Default: auto
