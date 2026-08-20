@@ -13,9 +13,8 @@ import (
 // within the grace period, and is gone once the grace period has passed.
 
 func TestEntriesForDisplay_StoppedSurvivesBackToBackCallsThenEvicts(t *testing.T) {
-	mgr := NewPortForwardManager()
 	current := time.Now()
-	mgr.SetClockForTest(func() time.Time { return current })
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -37,9 +36,8 @@ func TestEntriesForDisplay_StoppedSurvivesBackToBackCallsThenEvicts(t *testing.T
 }
 
 func TestEntriesForDisplay_FailedSurvivesBackToBackCallsThenEvicts(t *testing.T) {
-	mgr := NewPortForwardManager()
 	current := time.Now()
-	mgr.SetClockForTest(func() time.Time { return current })
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -72,4 +70,108 @@ func TestEntriesForDisplay_NeverEvictsActiveEntries(t *testing.T) {
 		entries := mgr.EntriesForDisplay()
 		assert.Lenf(t, entries, 2, "call %d: running/starting entries must never be evicted", i)
 	}
+}
+
+// Start()'s monitor goroutine mutates its own *PortForwardEntry on exit, so
+// that identity must survive a display call for the transition to show.
+func TestEntriesForDisplay_KeepsEntryPointerIdentityForLiveStateUpdates(t *testing.T) {
+	mgr := NewPortForwardManager()
+	entry := &PortForwardEntry{ID: 1, Status: PortForwardRunning, StartedAt: time.Now()}
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{entry}
+	mgr.mu.Unlock()
+
+	first := mgr.EntriesForDisplay()
+	require.Len(t, first, 1)
+	assert.Equal(t, PortForwardRunning, first[0].Status)
+
+	mgr.mu.Lock()
+	entry.Status = PortForwardStopped
+	mgr.mu.Unlock()
+
+	second := mgr.EntriesForDisplay()
+	require.Len(t, second, 1)
+	assert.Equal(t, PortForwardStopped, second[0].Status,
+		"a status mutation via the original entry pointer must survive a prior display call")
+}
+
+// --- ArmEvictionRefresh: scheduling a refresh at the eviction deadline ---
+// A terminal port-forward that has been shown must be evicted once its
+// grace period passes even if no further manager callback ever fires.
+
+func TestArmEvictionRefresh_NothingPendingForActiveOrUnshownEntries(t *testing.T) {
+	mgr := NewPortForwardManager()
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{
+		{ID: 1, Status: PortForwardRunning},
+		{ID: 2, Status: PortForwardStopped}, // never displayed: shownAt is zero
+	}
+	mgr.mu.Unlock()
+
+	_, ok := mgr.ArmEvictionRefresh()
+	assert.False(t, ok, "a running or never-shown entry must not arm an eviction tick")
+}
+
+func TestArmEvictionRefresh_SchedulesAtTheEntrysDeadline(t *testing.T) {
+	current := time.Now()
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current.Add(-time.Second)}}
+	mgr.mu.Unlock()
+
+	d, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok)
+	assert.Equal(t, portForwardEvictionGrace-time.Second, d)
+}
+
+func TestArmEvictionRefresh_DedupesUntilDisarmed(t *testing.T) {
+	current := time.Now()
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current}}
+	mgr.mu.Unlock()
+
+	_, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok, "first call must arm")
+
+	_, ok = mgr.ArmEvictionRefresh()
+	assert.False(t, ok, "a repeat call before the armed deadline fires must not stack another timer")
+
+	mgr.DisarmEvictionRefresh()
+	_, ok = mgr.ArmEvictionRefresh()
+	assert.True(t, ok, "disarming must allow re-arming for the still-pending entry")
+}
+
+func TestArmEvictionRefresh_ReArmsForAnEarlierDeadline(t *testing.T) {
+	current := time.Now()
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current}}
+	mgr.mu.Unlock()
+	_, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok)
+
+	mgr.mu.Lock()
+	mgr.entries = append(mgr.entries, &PortForwardEntry{ID: 2, Status: PortForwardFailed, shownAt: current.Add(-2 * time.Second)})
+	mgr.mu.Unlock()
+
+	d, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok, "an earlier deadline must supersede the already-armed one")
+	assert.Equal(t, portForwardEvictionGrace-2*time.Second, d)
+}
+
+// EntriesForDisplay only evicts on the next call. ArmEvictionRefresh is the
+// signal that schedules that next call once the grace period elapses.
+func TestPortForward_StaysVisibleWithoutArming(t *testing.T) {
+	current := time.Now()
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current}}
+	mgr.mu.Unlock()
+
+	current = current.Add(portForwardEvictionGrace + time.Second)
+
+	d, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok, "a shown, expired terminal entry must arm a refresh")
+	assert.Equal(t, time.Duration(0), d, "a deadline already in the past must fire immediately, not be missed")
 }

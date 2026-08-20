@@ -55,21 +55,24 @@ type PortForwardManager struct {
 	nextID   int
 	onUpdate func() // callback when entries change
 	now      func() time.Time
+	// evictionArmedAt is the deadline an in-flight waitForPortForwardUpdate
+	// tick is already waiting on, so repeated arm attempts between renders
+	// don't stack duplicate timers. Zero means nothing armed.
+	evictionArmedAt time.Time
 }
 
 // NewPortForwardManager creates a new port forward manager.
 func NewPortForwardManager() *PortForwardManager {
-	return &PortForwardManager{
-		nextID: 1,
-		now:    time.Now,
-	}
+	return NewPortForwardManagerWithClock(time.Now)
 }
 
-// SetClockForTest overrides the manager's clock. Test-only.
-func (m *PortForwardManager) SetClockForTest(now func() time.Time) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.now = now
+// NewPortForwardManagerWithClock creates a manager using the given clock
+// instead of time.Now, for deterministic eviction-timing tests.
+func NewPortForwardManagerWithClock(now func() time.Time) *PortForwardManager {
+	return &PortForwardManager{
+		nextID: 1,
+		now:    now,
+	}
 }
 
 // SetUpdateCallback sets a callback that is invoked when entries change.
@@ -98,7 +101,9 @@ func (m *PortForwardManager) EntriesForDisplay() []PortForwardEntry {
 	defer m.mu.Unlock()
 	now := m.now()
 
-	kept := m.entries[:0]
+	// A fresh slice, not m.entries[:0]: Start()'s goroutine mutates its
+	// *PortForwardEntry directly, so the retained pointers must stay intact.
+	kept := make([]*PortForwardEntry, 0, len(m.entries))
 	for _, e := range m.entries {
 		if isTerminalPortForwardStatus(e.Status) && !e.shownAt.IsZero() && now.Sub(e.shownAt) >= portForwardEvictionGrace {
 			continue
@@ -107,12 +112,14 @@ func (m *PortForwardManager) EntriesForDisplay() []PortForwardEntry {
 	}
 	m.entries = kept
 
-	result := make([]PortForwardEntry, len(m.entries))
-	for i, e := range m.entries {
-		if isTerminalPortForwardStatus(e.Status) && e.shownAt.IsZero() {
+	result := make([]PortForwardEntry, len(kept))
+	for i, e := range kept {
+		entry := *e
+		if isTerminalPortForwardStatus(entry.Status) && entry.shownAt.IsZero() {
+			entry.shownAt = now
 			e.shownAt = now
 		}
-		result[i] = *e
+		result[i] = entry
 	}
 	return result
 }
@@ -120,6 +127,64 @@ func (m *PortForwardManager) EntriesForDisplay() []PortForwardEntry {
 // isTerminalPortForwardStatus reports a state the forward will never leave on its own.
 func isTerminalPortForwardStatus(s PortForwardStatus) bool {
 	return s == PortForwardStopped || s == PortForwardFailed
+}
+
+// ArmEvictionRefresh returns the delay until the earliest terminal,
+// already-shown entry is evictable, arming that deadline so concurrent
+// callers dedupe onto one pending timer until DisarmEvictionRefresh runs.
+func (m *PortForwardManager) ArmEvictionRefresh() (time.Duration, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	deadline, found := m.earliestEvictionDeadlineLocked()
+	if !found {
+		return 0, false
+	}
+	if !m.evictionArmedAt.IsZero() && !deadline.Before(m.evictionArmedAt) {
+		return 0, false
+	}
+	m.evictionArmedAt = deadline
+
+	d := max(deadline.Sub(m.now()), 0)
+	return d, true
+}
+
+// DisarmEvictionRefresh clears the armed deadline, allowing the next
+// ArmEvictionRefresh call to schedule again.
+func (m *PortForwardManager) DisarmEvictionRefresh() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.evictionArmedAt = time.Time{}
+}
+
+// earliestEvictionDeadlineLocked returns the soonest shownAt+grace deadline
+// across all terminal, already-shown entries. Callers must hold m.mu.
+func (m *PortForwardManager) earliestEvictionDeadlineLocked() (time.Time, bool) {
+	var earliest time.Time
+	found := false
+	for _, e := range m.entries {
+		if !isTerminalPortForwardStatus(e.Status) || e.shownAt.IsZero() {
+			continue
+		}
+		deadline := e.shownAt.Add(portForwardEvictionGrace)
+		if !found || deadline.Before(earliest) {
+			earliest = deadline
+			found = true
+		}
+	}
+	return earliest, found
+}
+
+// SeedTerminalEntryForTest injects a Stopped entry shown at shownAt,
+// bypassing Start/Stop. Test-only.
+func (m *PortForwardManager) SeedTerminalEntryForTest(id int, shownAt time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.entries = append(m.entries, &PortForwardEntry{
+		ID:      id,
+		Status:  PortForwardStopped,
+		shownAt: shownAt,
+	})
 }
 
 // ActiveCount returns the number of active (running) port forwards.
