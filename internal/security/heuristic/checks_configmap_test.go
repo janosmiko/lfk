@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/janosmiko/lfk/internal/security"
@@ -14,8 +13,8 @@ import (
 
 func configMap(ns, name string, data map[string]string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Data:       data,
+		Namespace: ns, Name: name,
+		Data: data,
 	}
 }
 

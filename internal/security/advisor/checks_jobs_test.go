@@ -12,15 +12,15 @@ import (
 
 func cronJob(ns, name string, suspend bool) *batchv1.CronJob {
 	return &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Spec:       batchv1.CronJobSpec{Suspend: &suspend},
+		Namespace: ns, Name: name,
+		Spec: batchv1.CronJobSpec{Suspend: &suspend},
 	}
 }
 
 func job(ns, name string, ttl *int32, owned bool) *batchv1.Job {
 	j := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Spec:       batchv1.JobSpec{TTLSecondsAfterFinished: ttl},
+		Namespace: ns, Name: name,
+		Spec: batchv1.JobSpec{TTLSecondsAfterFinished: ttl},
 	}
 	if owned {
 		j.OwnerReferences = []metav1.OwnerReference{{Kind: "CronJob", Name: "parent"}}
@@ -31,7 +31,7 @@ func job(ns, name string, ttl *int32, owned bool) *batchv1.Job {
 // vct builds one volumeClaimTemplate; class "" leaves storageClassName nil
 // (cluster default).
 func vct(class string) []corev1.PersistentVolumeClaim {
-	pvc := corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "data"}}
+	pvc := corev1.PersistentVolumeClaim{Name: "data"}
 	if class != "" {
 		pvc.Spec.StorageClassName = &class
 	}
@@ -40,7 +40,7 @@ func vct(class string) []corev1.PersistentVolumeClaim {
 
 func storageClass(name string, expandable *bool, isDefault bool) *storagev1.StorageClass {
 	sc := &storagev1.StorageClass{
-		ObjectMeta:           metav1.ObjectMeta{Name: name},
+		Name:                 name,
 		AllowVolumeExpansion: expandable,
 	}
 	if isDefault {

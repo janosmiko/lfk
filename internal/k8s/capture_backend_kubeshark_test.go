@@ -7,7 +7,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
@@ -28,7 +27,7 @@ func TestDetectKubeshark_NotFound(t *testing.T) {
 
 func TestDetectKubeshark_Found(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "kubeshark-hub", Namespace: "kubeshark"},
+		Name: "kubeshark-hub", Namespace: "kubeshark",
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{Port: 80, Name: "http"}},
 		},
@@ -72,8 +71,8 @@ func TestClient_KubesharkNamespace_OverrideAndDefault(t *testing.T) {
 // gets read.
 func TestDetectKubeshark_HonoursOverrideNamespace(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "kubeshark-hub", Namespace: "trafcap"},
-		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80, Name: "http"}}},
+		Name: "kubeshark-hub", Namespace: "trafcap",
+		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80, Name: "http"}}},
 	}
 	cs := k8sfake.NewClientset(svc)
 	dc := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())

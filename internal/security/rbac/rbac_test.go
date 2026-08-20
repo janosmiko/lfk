@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
@@ -17,26 +16,26 @@ import (
 )
 
 func clusterRole(name string, rules ...rbacv1.PolicyRule) *rbacv1.ClusterRole {
-	return &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: name}, Rules: rules}
+	return &rbacv1.ClusterRole{Name: name, Rules: rules}
 }
 
 func role(ns, name string, rules ...rbacv1.PolicyRule) *rbacv1.Role {
-	return &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name}, Rules: rules}
+	return &rbacv1.Role{Namespace: ns, Name: name, Rules: rules}
 }
 
 func crb(name, refName string, subjects ...rbacv1.Subject) *rbacv1.ClusterRoleBinding {
 	return &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: refName},
-		Subjects:   subjects,
+		Name:     name,
+		RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: refName},
+		Subjects: subjects,
 	}
 }
 
 func rb(ns, name, refKind, refName string, subjects ...rbacv1.Subject) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		RoleRef:    rbacv1.RoleRef{Kind: refKind, Name: refName},
-		Subjects:   subjects,
+		Namespace: ns, Name: name,
+		RoleRef:  rbacv1.RoleRef{Kind: refKind, Name: refName},
+		Subjects: subjects,
 	}
 }
 

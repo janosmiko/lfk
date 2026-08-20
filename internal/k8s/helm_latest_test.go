@@ -17,11 +17,9 @@ func TestLatestHelmReleaseSecretPicksHighestRevision(t *testing.T) {
 	ts := metav1.Now() // all identical → forces the tie-break onto the version label
 	mk := func(rev string) corev1.Secret {
 		return corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              "sh.helm.release.v1.app.v" + rev,
-				CreationTimestamp: ts,
-				Labels:            map[string]string{"version": rev},
-			},
+			Name:              "sh.helm.release.v1.app.v" + rev,
+			CreationTimestamp: ts,
+			Labels:            map[string]string{"version": rev},
 		}
 	}
 	// Name-sorted order as the API returns it: v1, v10, v2.

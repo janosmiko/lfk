@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -19,8 +18,8 @@ import (
 
 func netpolTestPodObj(name, namespace string, lbls map[string]string) *corev1.Pod {
 	return &corev1.Pod{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: lbls},
+		APIVersion: "v1", Kind: "Pod",
+		Name: name, Namespace: namespace, Labels: lbls,
 	}
 }
 
@@ -67,9 +66,9 @@ func TestLoadNetworkPoliciesForResource_PodNotFound(t *testing.T) {
 
 func TestLoadNetworkPoliciesForResource_Service(t *testing.T) {
 	svc := &corev1.Service{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
-		Spec:       corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
+		APIVersion: "v1", Kind: "Service",
+		Name: "my-svc", Namespace: "default",
+		Spec: corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
 	}
 	m := netpolsTestModel(t, svc,
 		netpolTestPodObj("web-1", "default", map[string]string{"app": "web"}))
@@ -124,16 +123,14 @@ func TestRenderOverlayNetworkPoliciesMulti(t *testing.T) {
 		Namespace: "default",
 		Policies: []k8s.NetpolForResource{
 			{
-				NetworkPolicyInfo: k8s.NetworkPolicyInfo{
-					Name:        "allow-web",
-					Namespace:   "default",
-					PodSelector: map[string]string{"app": "web"},
-					PolicyTypes: []string{"Ingress"},
-					IngressRules: []k8s.NetpolRule{
-						{
-							Ports: []k8s.NetpolPort{{Protocol: "TCP", Port: "80"}},
-							Peers: []k8s.NetpolPeer{{Type: "Pod", Selector: map[string]string{"role": "frontend"}}},
-						},
+				Name:        "allow-web",
+				Namespace:   "default",
+				PodSelector: map[string]string{"app": "web"},
+				PolicyTypes: []string{"Ingress"},
+				IngressRules: []k8s.NetpolRule{
+					{
+						Ports: []k8s.NetpolPort{{Protocol: "TCP", Port: "80"}},
+						Peers: []k8s.NetpolPeer{{Type: "Pod", Selector: map[string]string{"role": "frontend"}}},
 					},
 				},
 			},
@@ -201,11 +198,11 @@ func tallNetpolModel() Model {
 	m.overlay = overlayNetworkPolicy
 	policies := make([]k8s.NetpolForResource, 10)
 	for i := range policies {
-		policies[i] = k8s.NetpolForResource{NetworkPolicyInfo: k8s.NetworkPolicyInfo{
+		policies[i] = k8s.NetpolForResource{
 			Name:        "policy-" + string(rune('a'+i)),
 			Namespace:   "default",
 			PolicyTypes: []string{"Ingress", "Egress"},
-		}}
+		}
 	}
 	m.netpolsData = &k8s.NetpolsForResource{
 		Kind: "Pod", Name: "my-pod", Namespace: "default", Policies: policies,

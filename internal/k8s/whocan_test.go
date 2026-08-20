@@ -33,7 +33,7 @@ func sortSubjects(s []WhoCanSubject) []string {
 
 func TestWhoCan_ClusterRoleBindingMatch(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-reader"},
+		Name: "pod-reader",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"get", "list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
 		},
@@ -65,7 +65,7 @@ func TestWhoCan_ClusterRoleBindingMatch(t *testing.T) {
 
 func TestWhoCan_RoleBindingToClusterRoleMatch(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "edit"},
+		Name: "edit",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"*"}, APIGroups: []string{""}, Resources: []string{"*"}},
 		},
@@ -118,7 +118,7 @@ func TestWhoCan_RoleBindingToRoleMatch(t *testing.T) {
 
 func TestWhoCan_VerbWildcard(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-master"},
+		Name: "pod-master",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"*"}, APIGroups: []string{""}, Resources: []string{"pods"}},
 		},
@@ -139,7 +139,7 @@ func TestWhoCan_VerbWildcard(t *testing.T) {
 
 func TestWhoCan_ResourceWildcard(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "core-all"},
+		Name: "core-all",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"*"}},
 		},
@@ -160,7 +160,7 @@ func TestWhoCan_ResourceWildcard(t *testing.T) {
 
 func TestWhoCan_GroupWildcard(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "any-group"},
+		Name: "any-group",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"get"}, APIGroups: []string{"*"}, Resources: []string{"deployments"}},
 		},
@@ -186,8 +186,8 @@ func TestWhoCan_NamespaceScopeFiltersRoleBindingsButNotClusterBindings(t *testin
 	// team-a", they should see team-a's RB subject and the CRB subject —
 	// NOT team-b's RB subject.
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-reader"},
-		Rules:      []rbacv1.PolicyRule{{Verbs: []string{"list"}, APIGroups: []string{""}, Resources: []string{"pods"}}},
+		Name:  "pod-reader",
+		Rules: []rbacv1.PolicyRule{{Verbs: []string{"list"}, APIGroups: []string{""}, Resources: []string{"pods"}}},
 	}
 	rbA := &rbacv1.RoleBinding{
 		ObjectMeta: nsMeta("rbA", "team-a"),
@@ -221,8 +221,8 @@ func TestWhoCan_NamespaceScopeFiltersRoleBindingsButNotClusterBindings(t *testin
 
 func TestWhoCan_AllNamespacesIncludesEveryRoleBinding(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-reader"},
-		Rules:      []rbacv1.PolicyRule{{Verbs: []string{"list"}, APIGroups: []string{""}, Resources: []string{"pods"}}},
+		Name:  "pod-reader",
+		Rules: []rbacv1.PolicyRule{{Verbs: []string{"list"}, APIGroups: []string{""}, Resources: []string{"pods"}}},
 	}
 	rbA := &rbacv1.RoleBinding{
 		ObjectMeta: nsMeta("rbA", "team-a"),
@@ -257,8 +257,8 @@ func TestWhoCan_NoMatchReturnsEmpty(t *testing.T) {
 
 func TestWhoCan_BindingWithoutMatchingRuleIsSkipped(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "secret-reader"},
-		Rules:      []rbacv1.PolicyRule{{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"secrets"}}},
+		Name:  "secret-reader",
+		Rules: []rbacv1.PolicyRule{{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"secrets"}}},
 	}
 	crb := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: pmeta("sr"),
@@ -280,7 +280,7 @@ func TestWhoCan_NonResourceURLRulesIgnored(t *testing.T) {
 	// match a resource query. kubectl-who-can returns nothing for
 	// resource queries against /healthz-only roles.
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "healthz"},
+		Name: "healthz",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"get"}, NonResourceURLs: []string{"/healthz"}},
 		},
@@ -307,7 +307,7 @@ func TestWhoCan_NonResourceURLRulesIgnored(t *testing.T) {
 // subjects that could only list/watch/etc.
 func TestWhoCan_QueryVerbWildcardMatchesAnyVerbRule(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "lister"},
+		Name: "lister",
 		Rules: []rbacv1.PolicyRule{
 			// list/watch only — no get, no "*".
 			{Verbs: []string{"list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
@@ -336,7 +336,7 @@ func TestWhoCan_QueryVerbWildcardMatchesAnyVerbRule(t *testing.T) {
 // so these rules must be excluded from the result set.
 func TestWhoCan_ResourceNamesRulesAreSkipped(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "named-pod-reader"},
+		Name: "named-pod-reader",
 		Rules: []rbacv1.PolicyRule{
 			{
 				Verbs:         []string{"get"},
@@ -368,7 +368,7 @@ func TestWhoCan_ResourceNamesRulesAreSkipped(t *testing.T) {
 // whole table to find a name.
 func TestWhoCan_ResultsSortedByName(t *testing.T) {
 	cr := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: "viewer"},
+		Name: "viewer",
 		Rules: []rbacv1.PolicyRule{
 			{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
 		},

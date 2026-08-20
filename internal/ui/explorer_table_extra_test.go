@@ -274,7 +274,7 @@ func TestRenderTable(t *testing.T) {
 			Columns: []model.KeyValue{{Key: "Context", Value: "prod"}},
 		}}
 		result := stripANSI(RenderTable("NAME", items, 0, 80, 20, false, "", ""))
-		firstLine := strings.Split(result, "\n")[0]
+		firstLine, _, _ := strings.Cut(result, "\n")
 
 		assert.Contains(t, firstLine, "CONTEXT")
 		assert.Equal(t, 1, strings.Count(firstLine, "CONTEXT"))
@@ -373,7 +373,7 @@ func TestRenderTable(t *testing.T) {
 		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
 
 		// The header line is the first line of the output.
-		firstLine := strings.Split(result, "\n")[0]
+		firstLine, _, _ := strings.Cut(result, "\n")
 		// Strip ANSI codes for easier substring ordering checks.
 		plain := stripANSI(firstLine)
 
@@ -429,7 +429,7 @@ func TestRenderTable(t *testing.T) {
 		}
 		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
 
-		firstLine := strings.Split(result, "\n")[0]
+		firstLine, _, _ := strings.Cut(result, "\n")
 		plain := stripANSI(firstLine)
 
 		nameIdx := strings.Index(plain, "NAME ")
@@ -478,7 +478,7 @@ func TestRenderTable(t *testing.T) {
 			{Name: "nginx", Namespace: "default", Status: "Running", Age: "5m"},
 		}
 		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
-		firstLine := strings.Split(result, "\n")[0]
+		firstLine, _, _ := strings.Cut(result, "\n")
 		plain := stripANSI(firstLine)
 
 		assert.NotContains(t, plain, "STATUS", "STATUS must be hidden")
@@ -513,7 +513,7 @@ func TestRenderTable(t *testing.T) {
 			{Name: "nginx", Namespace: "default"},
 		}
 		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
-		firstLine := strings.Split(result, "\n")[0]
+		firstLine, _, _ := strings.Cut(result, "\n")
 		plain := stripANSI(firstLine)
 
 		assert.NotContains(t, plain, "IP", "IP is not a real column, must be dropped")

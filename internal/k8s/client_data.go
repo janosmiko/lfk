@@ -328,20 +328,18 @@ func (c *Client) TriggerCronJob(ctx context.Context, contextName, namespace, cro
 	}
 
 	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName,
-			Namespace: namespace,
-			Annotations: map[string]string{
-				"cronjob.kubernetes.io/instantiate": "manual",
-			},
-			// Tie the manual Job to its CronJob the same way the
-			// kube-controller-manager does for scheduled runs. Without this
-			// owner reference the Job is absent from the CronJob's Jobs
-			// subview (which filters by ownerRef) and is not garbage-collected
-			// when the CronJob is deleted.
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(cronJob, batchv1.SchemeGroupVersion.WithKind("CronJob")),
-			},
+		Name:      jobName,
+		Namespace: namespace,
+		Annotations: map[string]string{
+			"cronjob.kubernetes.io/instantiate": "manual",
+		},
+		// Tie the manual Job to its CronJob the same way the
+		// kube-controller-manager does for scheduled runs. Without this
+		// owner reference the Job is absent from the CronJob's Jobs
+		// subview (which filters by ownerRef) and is not garbage-collected
+		// when the CronJob is deleted.
+		OwnerReferences: []metav1.OwnerReference{
+			*metav1.NewControllerRef(cronJob, batchv1.SchemeGroupVersion.WithKind("CronJob")),
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
@@ -396,7 +394,7 @@ func reorderYAMLFields(yamlStr string) string {
 	for _, line := range lines {
 		switch {
 		case len(line) > 0 && line[0] != ' ' && line[0] != '#' && strings.Contains(line, ":"):
-			key := strings.SplitN(line, ":", 2)[0]
+			key, _, _ := strings.Cut(line, ":")
 			sections = append(sections, section{key: key})
 			current = &sections[len(sections)-1]
 			current.lines = append(current.lines, line)

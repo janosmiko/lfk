@@ -21,7 +21,7 @@ import (
 
 func TestGetRightsizing_PodCurrentSpecExtracted(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pod-a", Namespace: "default"},
+		Name: "pod-a", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -99,7 +99,7 @@ func makeVPAFixture(ns, name, targetKind, targetName string, recs []map[string]a
 
 func TestGetRightsizing_VPAMatchesPopulatesRecommendations(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-aaa", Namespace: "default"},
+		Name: "frontend-aaa", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: "app",
@@ -162,8 +162,8 @@ func TestGetRightsizing_VPAMatchesPopulatesRecommendations(t *testing.T) {
 
 func TestGetRightsizing_VPATargetMismatchFallsThrough(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-aaa", Namespace: "default"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+		Name: "frontend-aaa", Namespace: "default",
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
 	}
 	cs := fake.NewSimpleClientset(pod)
 	scheme := runtime.NewScheme()
@@ -193,7 +193,7 @@ func TestGetRightsizing_VPATargetMismatchFallsThrough(t *testing.T) {
 
 func TestGetRightsizing_MetricsFallbackMaxAggregation(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "default"},
+		Name: "frontend", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "frontend"}},
 			Template: corev1.PodTemplateSpec{
@@ -208,10 +208,10 @@ func TestGetRightsizing_MetricsFallbackMaxAggregation(t *testing.T) {
 		},
 	}
 	pod1 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	pod2 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-b", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-b", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	cs := fake.NewSimpleClientset(dep, pod1, pod2)
 
@@ -276,7 +276,7 @@ func TestGetRightsizing_MetricsWindowPlumbedThrough(t *testing.T) {
 	// lets the renderer show the user what window backs the
 	// estimated recommendation.
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "default"},
+		Name: "frontend", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "frontend"}},
 			Template: corev1.PodTemplateSpec{
@@ -290,7 +290,7 @@ func TestGetRightsizing_MetricsWindowPlumbedThrough(t *testing.T) {
 		},
 	}
 	pod1 := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	cs := fake.NewSimpleClientset(dep, pod1)
 
@@ -330,7 +330,7 @@ func TestGetRightsizing_HeadroomZeroDefaults(t *testing.T) {
 	// model.DefaultRightsizingHeadroom so the recommendation column is
 	// always populated with a sane number.
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "default"},
+		Name: "frontend", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "frontend"}},
 			Template: corev1.PodTemplateSpec{
@@ -345,7 +345,7 @@ func TestGetRightsizing_HeadroomZeroDefaults(t *testing.T) {
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	cs := fake.NewSimpleClientset(dep, pod)
 
@@ -382,7 +382,7 @@ func TestGetRightsizing_HeadroomCustomMultiplier(t *testing.T) {
 	// at 1.5, the snapshot recommendation is the observed peak times 1.5
 	// (snapped to canonical units), and the Headroom field round-trips.
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend", Namespace: "default"},
+		Name: "frontend", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "frontend"}},
 			Template: corev1.PodTemplateSpec{
@@ -397,7 +397,7 @@ func TestGetRightsizing_HeadroomCustomMultiplier(t *testing.T) {
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"}},
+		Name: "frontend-a", Namespace: "default", Labels: map[string]string{"app": "frontend"},
 	}
 	cs := fake.NewSimpleClientset(dep, pod)
 
@@ -432,7 +432,7 @@ func TestGetRightsizing_VPAHeadroomMultipliesTarget(t *testing.T) {
 	// headroom factor. At 1.0, the recommendation is the raw VPA target;
 	// at 1.5, it's target × 1.5 (snapped to canonical units).
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-aaa", Namespace: "default"},
+		Name: "frontend-aaa", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: "app",
@@ -476,7 +476,7 @@ func TestGetRightsizing_VPAHeadroomMultipliesTarget(t *testing.T) {
 func TestGetRightsizing_VPAHeadroom1RawTarget(t *testing.T) {
 	// At headroom = 1.0 the VPA path returns the raw recommender target.
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-aaa", Namespace: "default"},
+		Name: "frontend-aaa", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: "app",
@@ -516,8 +516,8 @@ func TestAvailableRightsizingStrategies(t *testing.T) {
 	t.Cleanup(func() { model.ConfigMonitoring = prevCfg })
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "frontend-aaa", Namespace: "default"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+		Name: "frontend-aaa", Namespace: "default",
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
 	}
 	matchVPA := makeVPAFixture("default", "vpa-frontend", "Pod", "frontend-aaa", nil)
 	otherVPA := makeVPAFixture("default", "vpa-other", "Deployment", "different", nil)

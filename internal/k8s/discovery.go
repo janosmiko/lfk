@@ -69,8 +69,7 @@ func (c *Client) DiscoverAPIResources(ctx context.Context, contextName string) (
 
 	lists, err := discovery.ServerPreferredResources(dc)
 	if err != nil {
-		var gdf *discovery.ErrGroupDiscoveryFailed
-		if errors.As(err, &gdf) {
+		if gdf, ok := errors.AsType[*discovery.ErrGroupDiscoveryFailed](err); ok {
 			for gv, gerr := range gdf.Groups {
 				logger.Warn("Discovery: group failed", "groupVersion", gv.String(), "error", gerr)
 			}

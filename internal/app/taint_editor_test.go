@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -276,7 +275,7 @@ func TestCloseTaintEditor_ClearsPreviousOverlay(t *testing.T) {
 
 func TestTaintEditor_EndToEndApply(t *testing.T) {
 	node := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: "worker-1"},
+		Name: "worker-1",
 		Spec: corev1.NodeSpec{Taints: []corev1.Taint{
 			{Key: "dedicated", Value: "gpu", Effect: corev1.TaintEffectNoSchedule},
 		}},

@@ -21,9 +21,9 @@ func TestExecuteActionSecurityFindingsLoading(t *testing.T) {
 }
 
 func TestExecuteActionSecurityFindingsNoFindings(t *testing.T) {
-	m := Model{securityModelState: securityModelState{
+	m := Model{
 		securityIndex: security.BuildFindingIndex(nil),
-	}}
+	}
 	m.actionCtx = actionContext{kind: "Pod", name: "nginx", namespace: "default"}
 
 	updated, _ := m.executeActionSecurityFindings()

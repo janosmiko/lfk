@@ -35,7 +35,7 @@ func newFakeClient(cs *k8sfake.Clientset, dc *dynamicfake.FakeDynamicClient) *Cl
 
 func TestGetSecretData(t *testing.T) {
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
+		Name: "my-secret", Namespace: "default",
 		Data: map[string][]byte{
 			"password": []byte("s3cret"),
 			"username": []byte("admin"),
@@ -64,8 +64,8 @@ func TestGetSecretData_NotFound(t *testing.T) {
 
 func TestUpdateSecretData(t *testing.T) {
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
-		Data:       map[string][]byte{"old-key": []byte("old-value")},
+		Name: "my-secret", Namespace: "default",
+		Data: map[string][]byte{"old-key": []byte("old-value")},
 	}
 	cs := k8sfake.NewClientset(secret)
 	c := newFakeClient(cs, nil)
@@ -96,7 +96,7 @@ func TestUpdateSecretData_NotFound(t *testing.T) {
 
 func TestGetConfigMapData(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cm", Namespace: "default"},
+		Name: "my-cm", Namespace: "default",
 		Data: map[string]string{
 			"config.yaml": "key: value",
 			"app.conf":    "setting=1",
@@ -124,8 +124,8 @@ func TestGetConfigMapData_NotFound(t *testing.T) {
 
 func TestUpdateConfigMapData(t *testing.T) {
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cm", Namespace: "default"},
-		Data:       map[string]string{"old": "data"},
+		Name: "my-cm", Namespace: "default",
+		Data: map[string]string{"old": "data"},
 	}
 	cs := k8sfake.NewClientset(cm)
 	c := newFakeClient(cs, nil)
@@ -155,7 +155,7 @@ func TestUpdateConfigMapData_NotFound(t *testing.T) {
 
 func TestGetPodResourceRequests(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -200,7 +200,7 @@ func TestGetPodResourceRequests(t *testing.T) {
 
 func TestGetPodResourceRequests_NoResources(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "bare-pod", Namespace: "default"},
+		Name: "bare-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "app"}},
 		},
@@ -229,7 +229,7 @@ func TestGetPodResourceRequests_NotFound(t *testing.T) {
 
 func TestTriggerCronJob(t *testing.T) {
 	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cron", Namespace: "default", UID: "cj-uid"},
+		Name: "my-cron", Namespace: "default", UID: "cj-uid",
 		Spec: batchv1.CronJobSpec{
 			Schedule: "*/5 * * * *",
 			JobTemplate: batchv1.JobTemplateSpec{
@@ -279,8 +279,8 @@ func TestTriggerCronJob_NotFound(t *testing.T) {
 
 func TestToggleCronJobSuspend(t *testing.T) {
 	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cron", Namespace: "default"},
-		Spec:       batchv1.CronJobSpec{Schedule: "*/5 * * * *"},
+		Name: "my-cron", Namespace: "default",
+		Spec: batchv1.CronJobSpec{Schedule: "*/5 * * * *"},
 	}
 	cs := k8sfake.NewClientset(cronJob)
 	c := newFakeClient(cs, nil)
@@ -316,7 +316,7 @@ func TestToggleCronJobSuspend_NotFound(t *testing.T) {
 // --- ToggleNodeSchedulable ---
 
 func TestToggleNodeSchedulable(t *testing.T) {
-	node := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
+	node := &corev1.Node{Name: "node-1"}
 	cs := k8sfake.NewClientset(node)
 	c := newFakeClient(cs, nil)
 
@@ -351,7 +351,7 @@ func TestToggleNodeSchedulable_NotFound(t *testing.T) {
 func TestGetContainers(t *testing.T) {
 	alwaysRestart := corev1.ContainerRestartPolicyAlways
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
 				{Name: "init-db", Image: "busybox:latest"},
@@ -393,17 +393,15 @@ func TestGetContainers_NotFound(t *testing.T) {
 
 func TestGetContainers_WithEphemeralContainers(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{Name: "app", Image: "myapp:v1"},
 			},
 			EphemeralContainers: []corev1.EphemeralContainer{
 				{
-					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-						Name:  "debugger",
-						Image: "busybox:latest",
-					},
+					Name:                "debugger",
+					Image:               "busybox:latest",
 					TargetContainerName: "app",
 				},
 			},
@@ -440,7 +438,7 @@ func TestGetContainers_WithEphemeralContainers(t *testing.T) {
 
 func TestGetContainerPorts(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -467,7 +465,7 @@ func TestGetContainerPorts(t *testing.T) {
 
 func TestGetServicePorts(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
+		Name: "my-svc", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{Name: "http", Port: 80, Protocol: corev1.ProtocolTCP},
@@ -488,7 +486,7 @@ func TestGetServicePorts(t *testing.T) {
 
 func TestGetDeploymentPorts(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-deploy", Namespace: "default"},
+		Name: "my-deploy", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -519,7 +517,7 @@ func TestGetDeploymentPorts(t *testing.T) {
 
 func TestGetStatefulSetPorts(t *testing.T) {
 	sts := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-sts", Namespace: "default"},
+		Name: "my-sts", Namespace: "default",
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "sts"}},
 			Template: corev1.PodTemplateSpec{
@@ -550,7 +548,7 @@ func TestGetStatefulSetPorts(t *testing.T) {
 
 func TestGetDaemonSetPorts(t *testing.T) {
 	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-ds", Namespace: "default"},
+		Name: "my-ds", Namespace: "default",
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "ds"}},
 			Template: corev1.PodTemplateSpec{
@@ -581,12 +579,12 @@ func TestGetDaemonSetPorts(t *testing.T) {
 
 func TestGetNamespaces(t *testing.T) {
 	ns1 := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "default"},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name:   "default",
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 	ns2 := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: "kube-system"},
-		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+		Name:   "kube-system",
+		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
 	cs := k8sfake.NewClientset(ns1, ns2)
 	c := newFakeClient(cs, nil)
@@ -603,8 +601,8 @@ func TestGetNamespaces(t *testing.T) {
 // --- ListServiceAccounts ---
 
 func TestListServiceAccounts(t *testing.T) {
-	sa1 := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "deployer", Namespace: "default"}}
-	sa2 := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "admin", Namespace: "default"}}
+	sa1 := &corev1.ServiceAccount{Name: "deployer", Namespace: "default"}
+	sa2 := &corev1.ServiceAccount{Name: "admin", Namespace: "default"}
 	cs := k8sfake.NewClientset(sa1, sa2)
 	c := newFakeClient(cs, nil)
 
@@ -616,8 +614,8 @@ func TestListServiceAccounts(t *testing.T) {
 }
 
 func TestListServiceAccounts_AllNamespaces(t *testing.T) {
-	sa1 := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "sa1", Namespace: "ns1"}}
-	sa2 := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "sa2", Namespace: "ns2"}}
+	sa1 := &corev1.ServiceAccount{Name: "sa1", Namespace: "ns1"}
+	sa2 := &corev1.ServiceAccount{Name: "sa2", Namespace: "ns2"}
 	cs := k8sfake.NewClientset(sa1, sa2)
 	c := newFakeClient(cs, nil)
 
@@ -632,7 +630,7 @@ func TestListServiceAccounts_AllNamespaces(t *testing.T) {
 
 func TestListRBACSubjects(t *testing.T) {
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "admin-binding"},
+		Name: "admin-binding",
 		Subjects: []rbacv1.Subject{
 			{Kind: "User", Name: "alice"},
 			{Kind: "Group", Name: "devs"},
@@ -640,7 +638,7 @@ func TestListRBACSubjects(t *testing.T) {
 		},
 	}
 	rb := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "ns-binding", Namespace: "production"},
+		Name: "ns-binding", Namespace: "production",
 		Subjects: []rbacv1.Subject{
 			{Kind: "User", Name: "bob"},
 			{Kind: "ServiceAccount", Name: "ci-sa"},
@@ -681,7 +679,7 @@ func TestListRBACSubjects(t *testing.T) {
 func TestGetDeploymentRevisions(t *testing.T) {
 	uid := k8stypes.UID("deploy-uid")
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-deploy", Namespace: "default", UID: uid},
+		Name: "my-deploy", Namespace: "default", UID: uid,
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -691,11 +689,9 @@ func TestGetDeploymentRevisions(t *testing.T) {
 		},
 	}
 	rs1 := &appsv1.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-deploy-abc", Namespace: "default",
-			Annotations:     map[string]string{"deployment.kubernetes.io/revision": "1"},
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "my-deploy", UID: uid}},
-		},
+		Name: "my-deploy-abc", Namespace: "default",
+		Annotations:     map[string]string{"deployment.kubernetes.io/revision": "1"},
+		OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "my-deploy", UID: uid}},
 		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -706,11 +702,9 @@ func TestGetDeploymentRevisions(t *testing.T) {
 		Status: appsv1.ReplicaSetStatus{Replicas: 0},
 	}
 	rs2 := &appsv1.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-deploy-def", Namespace: "default",
-			Annotations:     map[string]string{"deployment.kubernetes.io/revision": "2"},
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "my-deploy", UID: uid}},
-		},
+		Name: "my-deploy-def", Namespace: "default",
+		Annotations:     map[string]string{"deployment.kubernetes.io/revision": "2"},
+		OwnerReferences: []metav1.OwnerReference{{Kind: "Deployment", Name: "my-deploy", UID: uid}},
 		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -722,10 +716,8 @@ func TestGetDeploymentRevisions(t *testing.T) {
 	}
 	// Unowned RS should be excluded.
 	rsOther := &appsv1.ReplicaSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "other-rs", Namespace: "default",
-			Annotations: map[string]string{"deployment.kubernetes.io/revision": "1"},
-		},
+		Name: "other-rs", Namespace: "default",
+		Annotations: map[string]string{"deployment.kubernetes.io/revision": "1"},
 		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "other"}},
 			Template: corev1.PodTemplateSpec{
@@ -763,7 +755,7 @@ func TestGetDeploymentRevisions_NotFound(t *testing.T) {
 
 func TestRestartResource_DeploymentWithFake(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-deploy", Namespace: "default"},
+		Name: "my-deploy", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -781,7 +773,7 @@ func TestRestartResource_DeploymentWithFake(t *testing.T) {
 
 func TestRestartResource_StatefulSetWithFake(t *testing.T) {
 	sts := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-sts", Namespace: "default"},
+		Name: "my-sts", Namespace: "default",
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -799,7 +791,7 @@ func TestRestartResource_StatefulSetWithFake(t *testing.T) {
 
 func TestRestartResource_DaemonSetWithFake(t *testing.T) {
 	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-ds", Namespace: "default"},
+		Name: "my-ds", Namespace: "default",
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
@@ -819,7 +811,7 @@ func TestRestartResource_DaemonSetWithFake(t *testing.T) {
 
 func TestGetPodSelector_Deployment(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-deploy", Namespace: "default"},
+		Name: "my-deploy", Namespace: "default",
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test", "env": "prod"}},
 			Template: corev1.PodTemplateSpec{
@@ -839,7 +831,7 @@ func TestGetPodSelector_Deployment(t *testing.T) {
 
 func TestGetPodSelector_StatefulSet(t *testing.T) {
 	sts := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-sts", Namespace: "default"},
+		Name: "my-sts", Namespace: "default",
 		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "db"}},
 			Template: corev1.PodTemplateSpec{
@@ -858,7 +850,7 @@ func TestGetPodSelector_StatefulSet(t *testing.T) {
 
 func TestGetPodSelector_DaemonSet(t *testing.T) {
 	ds := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-ds", Namespace: "default"},
+		Name: "my-ds", Namespace: "default",
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "agent"}},
 			Template: corev1.PodTemplateSpec{
@@ -877,7 +869,7 @@ func TestGetPodSelector_DaemonSet(t *testing.T) {
 
 func TestGetPodSelector_Job(t *testing.T) {
 	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-job", Namespace: "default"},
+		Name: "my-job", Namespace: "default",
 		Spec: batchv1.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-name": "my-job"}},
 			Template: corev1.PodTemplateSpec{
@@ -898,7 +890,7 @@ func TestGetPodSelector_Job(t *testing.T) {
 
 func TestGetPodSelector_Service(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
+		Name: "my-svc", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": "web"},
 			Ports:    []corev1.ServicePort{{Port: 80}},
@@ -923,8 +915,8 @@ func TestGetPodSelector_UnknownKind(t *testing.T) {
 
 func TestGetPodSelector_NoSelector(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "headless", Namespace: "default"},
-		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+		Name: "headless", Namespace: "default",
+		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
 	}
 	cs := k8sfake.NewClientset(svc)
 	c := newFakeClient(cs, nil)
@@ -939,28 +931,22 @@ func TestGetPodSelector_NoSelector(t *testing.T) {
 func TestGetHelmReleases(t *testing.T) {
 	now := time.Now()
 	s1 := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.myapp.v1",
-			Namespace:         "default",
-			Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "1"},
-			CreationTimestamp: metav1.NewTime(now.Add(-1 * time.Hour)),
-		},
+		Name:              "sh.helm.release.v1.myapp.v1",
+		Namespace:         "default",
+		Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "1"},
+		CreationTimestamp: metav1.NewTime(now.Add(-1 * time.Hour)),
 	}
 	s2 := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.myapp.v2",
-			Namespace:         "default",
-			Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "2"},
-			CreationTimestamp: metav1.NewTime(now),
-		},
+		Name:              "sh.helm.release.v1.myapp.v2",
+		Namespace:         "default",
+		Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "2"},
+		CreationTimestamp: metav1.NewTime(now),
 	}
 	s3 := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.other.v1",
-			Namespace:         "default",
-			Labels:            map[string]string{"owner": "helm", "name": "other", "status": "superseded", "version": "1"},
-			CreationTimestamp: metav1.NewTime(now.Add(-2 * time.Hour)),
-		},
+		Name:              "sh.helm.release.v1.other.v1",
+		Namespace:         "default",
+		Labels:            map[string]string{"owner": "helm", "name": "other", "status": "superseded", "version": "1"},
+		CreationTimestamp: metav1.NewTime(now.Add(-2 * time.Hour)),
 	}
 	cs := k8sfake.NewClientset(s1, s2, s3)
 	c := newFakeClient(cs, nil)
@@ -976,11 +962,9 @@ func TestGetHelmReleases(t *testing.T) {
 
 func TestGetHelmReleases_NoNamespace(t *testing.T) {
 	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sh.helm.release.v1.app.v1",
-			Namespace: "prod",
-			Labels:    map[string]string{"owner": "helm", "name": "app", "status": "deployed", "version": "1"},
-		},
+		Name:      "sh.helm.release.v1.app.v1",
+		Namespace: "prod",
+		Labels:    map[string]string{"owner": "helm", "name": "app", "status": "deployed", "version": "1"},
 	}
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
@@ -993,11 +977,9 @@ func TestGetHelmReleases_NoNamespace(t *testing.T) {
 
 func TestGetHelmReleases_SkipsNoName(t *testing.T) {
 	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "helm-secret-noname",
-			Namespace: "default",
-			Labels:    map[string]string{"owner": "helm", "status": "deployed"},
-		},
+		Name:      "helm-secret-noname",
+		Namespace: "default",
+		Labels:    map[string]string{"owner": "helm", "status": "deployed"},
 	}
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
@@ -1012,12 +994,10 @@ func TestGetHelmReleases_SkipsNoName(t *testing.T) {
 func TestGetHelmReleaseYAML(t *testing.T) {
 	now := time.Now()
 	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.myapp.v1",
-			Namespace:         "default",
-			Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "1"},
-			CreationTimestamp: metav1.NewTime(now),
-		},
+		Name:              "sh.helm.release.v1.myapp.v1",
+		Namespace:         "default",
+		Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "1"},
+		CreationTimestamp: metav1.NewTime(now),
 	}
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
@@ -1041,20 +1021,16 @@ func TestGetHelmReleaseYAML_NotFound(t *testing.T) {
 
 func TestGetHelmReleaseYAML_PicksLatest(t *testing.T) {
 	old := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.myapp.v1",
-			Namespace:         "default",
-			Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "superseded", "version": "1"},
-			CreationTimestamp: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
-		},
+		Name:              "sh.helm.release.v1.myapp.v1",
+		Namespace:         "default",
+		Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "superseded", "version": "1"},
+		CreationTimestamp: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
 	}
 	newer := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "sh.helm.release.v1.myapp.v2",
-			Namespace:         "default",
-			Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "2"},
-			CreationTimestamp: metav1.NewTime(time.Now()),
-		},
+		Name:              "sh.helm.release.v1.myapp.v2",
+		Namespace:         "default",
+		Labels:            map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "2"},
+		CreationTimestamp: metav1.NewTime(time.Now()),
 	}
 	cs := k8sfake.NewClientset(old, newer)
 	c := newFakeClient(cs, nil)
@@ -1075,11 +1051,9 @@ func TestGetPodStartupAnalysis(t *testing.T) {
 	ready := now.Add(-18 * time.Second)
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "my-pod",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "my-pod",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
 				{Name: "init-db", Image: "busybox"},
@@ -1136,11 +1110,9 @@ func TestGetPodStartupAnalysis(t *testing.T) {
 func TestGetPodStartupAnalysis_PendingPod(t *testing.T) {
 	created := time.Now().Add(-10 * time.Second)
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "pending-pod",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "pending-pod",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "app", Image: "app:v1"}},
 		},
@@ -1168,11 +1140,9 @@ func TestGetPodStartupAnalysis_WithImagePullEvents(t *testing.T) {
 	pullEnd := now.Add(-20 * time.Second)
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "pull-pod",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "pull-pod",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "app", Image: "myapp:latest"}},
 		},
@@ -1191,14 +1161,14 @@ func TestGetPodStartupAnalysis_WithImagePullEvents(t *testing.T) {
 
 	// Image pull events.
 	pullingEvent := &corev1.Event{
-		ObjectMeta:     metav1.ObjectMeta{Name: "pull-pod.pulling", Namespace: "default"},
+		Name: "pull-pod.pulling", Namespace: "default",
 		InvolvedObject: corev1.ObjectReference{Name: "pull-pod", Kind: "Pod"},
 		Reason:         "Pulling",
 		Message:        `Pulling image "myapp:latest"`,
 		LastTimestamp:  metav1.NewTime(pullStart),
 	}
 	pulledEvent := &corev1.Event{
-		ObjectMeta:     metav1.ObjectMeta{Name: "pull-pod.pulled", Namespace: "default"},
+		Name: "pull-pod.pulled", Namespace: "default",
 		InvolvedObject: corev1.ObjectReference{Name: "pull-pod", Kind: "Pod"},
 		Reason:         "Pulled",
 		Message:        `Successfully pulled image "myapp:latest"`,
@@ -1236,11 +1206,9 @@ func TestGetPodStartupAnalysis_InitContainerRunning(t *testing.T) {
 	scheduled := now.Add(-58 * time.Second)
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "init-running-pod",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "init-running-pod",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
 				{Name: "init-slow"},
@@ -1301,11 +1269,9 @@ func TestGetPodStartupAnalysis_TerminatedContainer(t *testing.T) {
 	ready := now.Add(-109 * time.Second)
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "terminated-pod",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "terminated-pod",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "worker"}},
 		},
@@ -1344,11 +1310,9 @@ func TestGetPodStartupAnalysis_ContainersReadyNoReady(t *testing.T) {
 	containersReady := now.Add(-20 * time.Second)
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "readiness-waiting",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "readiness-waiting",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "app"}},
 		},
@@ -1388,11 +1352,9 @@ func TestGetPodStartupAnalysis_InProgressImagePull(t *testing.T) {
 	created := now.Add(-10 * time.Second)
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "pulling-pod",
-			Namespace:         "default",
-			CreationTimestamp: metav1.NewTime(created),
-		},
+		Name:              "pulling-pod",
+		Namespace:         "default",
+		CreationTimestamp: metav1.NewTime(created),
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "app", Image: "large-image:latest"}},
 		},
@@ -1404,7 +1366,7 @@ func TestGetPodStartupAnalysis_InProgressImagePull(t *testing.T) {
 		},
 	}
 	pullingEvent := &corev1.Event{
-		ObjectMeta:     metav1.ObjectMeta{Name: "pulling-pod.pulling", Namespace: "default"},
+		Name: "pulling-pod.pulling", Namespace: "default",
 		InvolvedObject: corev1.ObjectReference{Name: "pulling-pod", Kind: "Pod"},
 		Reason:         "Pulling",
 		Message:        `Pulling image "large-image:latest"`,
@@ -1628,11 +1590,9 @@ func TestGetResourceYAML_ClusterScoped(t *testing.T) {
 
 func TestGetResourceYAML_HelmVirtualType(t *testing.T) {
 	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sh.helm.release.v1.myapp.v1",
-			Namespace: "default",
-			Labels:    map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "1"},
-		},
+		Name:      "sh.helm.release.v1.myapp.v1",
+		Namespace: "default",
+		Labels:    map[string]string{"owner": "helm", "name": "myapp", "status": "deployed", "version": "1"},
 	}
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
@@ -2371,19 +2331,17 @@ func TestMetricsGVR(t *testing.T) {
 
 func TestGetPodsForService(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
+		Name: "my-svc", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{"app": "web"},
 			Ports:    []corev1.ServicePort{{Port: 80}},
 		},
 	}
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "web-pod",
-			Namespace: "default",
-			Labels:    map[string]string{"app": "web"},
-		},
-		Status: corev1.PodStatus{Phase: corev1.PodRunning},
+		Name:      "web-pod",
+		Namespace: "default",
+		Labels:    map[string]string{"app": "web"},
+		Status:    corev1.PodStatus{Phase: corev1.PodRunning},
 	}
 	cs := k8sfake.NewClientset(svc, pod)
 	c := newFakeClient(cs, nil)
@@ -2396,7 +2354,7 @@ func TestGetPodsForService(t *testing.T) {
 
 func TestGetPodsForService_NoSelector(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "headless", Namespace: "default"},
+		Name: "headless", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{Port: 80}},
 		},
@@ -2413,16 +2371,14 @@ func TestGetPodsForService_NoSelector(t *testing.T) {
 
 func TestBuildPodTree_WithEphemeralContainers(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			AutomountServiceAccountToken: new(false), // suppress the default SA child to keep assertion focused
 			Containers:                   []corev1.Container{{Name: "app"}},
 			EphemeralContainers: []corev1.EphemeralContainer{
 				{
-					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-						Name:  "debugger",
-						Image: "busybox:latest",
-					},
+					Name:                "debugger",
+					Image:               "busybox:latest",
 					TargetContainerName: "app",
 				},
 			},
@@ -2461,7 +2417,7 @@ func TestBuildPodTree_WithEphemeralContainers(t *testing.T) {
 
 func TestBuildPodTree(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{{Name: "init"}},
 			Containers:     []corev1.Container{{Name: "app"}},
@@ -2495,18 +2451,18 @@ func TestBuildPodTree(t *testing.T) {
 
 func TestBuildPodTree_RefsMissingAndPresent(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			AutomountServiceAccountToken: new(false), // suppress the default SA child to keep the assertion focused
 			Containers: []corev1.Container{{
 				Name: "app",
 				EnvFrom: []corev1.EnvFromSource{
-					{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "present"}}},
-					{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "missing"}}},
+					{SecretRef: &corev1.SecretEnvSource{Name: "present"}},
+					{SecretRef: &corev1.SecretEnvSource{Name: "missing"}},
 					{
 						SecretRef: &corev1.SecretEnvSource{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "missing-but-optional"},
-							Optional:             new(true),
+							Name:     "missing-but-optional",
+							Optional: new(true),
 						},
 					},
 				},
@@ -2656,11 +2612,9 @@ func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
 
 func TestGetHelmManagedResources(t *testing.T) {
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "myapp-deploy",
-			Namespace: "default",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
-		},
+		Name:      "myapp-deploy",
+		Namespace: "default",
+		Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
@@ -2672,12 +2626,10 @@ func TestGetHelmManagedResources(t *testing.T) {
 		Status: appsv1.DeploymentStatus{AvailableReplicas: 1, ReadyReplicas: 1},
 	}
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "myapp-svc",
-			Namespace: "default",
-			Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
-		},
-		Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+		Name:      "myapp-svc",
+		Namespace: "default",
+		Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
+		Spec:      corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
 	}
 	cs := k8sfake.NewClientset(dep, svc)
 	c := newFakeClient(cs, nil)

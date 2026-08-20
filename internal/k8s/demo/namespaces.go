@@ -24,15 +24,13 @@ func buildNamespaces() []*corev1.Namespace {
 
 func namespace(name, uid string, created time.Time) *corev1.Namespace {
 	return &corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			UID:               k8stypes.UID(uid),
-			Labels:            map[string]string{"kubernetes.io/metadata.name": name},
-			CreationTimestamp: metav1.NewTime(created),
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kube-apiserver", "Update", `{"f:status":{"f:phase":{}}}`, created),
-			},
+		APIVersion: "v1", Kind: "Namespace",
+		Name:              name,
+		UID:               k8stypes.UID(uid),
+		Labels:            map[string]string{"kubernetes.io/metadata.name": name},
+		CreationTimestamp: metav1.NewTime(created),
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kube-apiserver", "Update", `{"f:status":{"f:phase":{}}}`, created),
 		},
 		Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}

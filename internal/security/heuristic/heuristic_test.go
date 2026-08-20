@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/janosmiko/lfk/internal/security"
@@ -14,8 +13,8 @@ import (
 
 func podWith(container corev1.Container) *corev1.Pod {
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "api-abc"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{container}},
+		Namespace: "prod", Name: "api-abc",
+		Spec: corev1.PodSpec{Containers: []corev1.Container{container}},
 	}
 }
 
@@ -57,8 +56,8 @@ func TestSourceUnavailableWithoutClient(t *testing.T) {
 func TestAllChecksRegistered(t *testing.T) {
 	assert.NotEmpty(t, allChecks, "allChecks must contain at least one check")
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
+		Namespace: "prod", Name: "p",
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
 	}
 	for i, fn := range allChecks {
 		assert.NotNil(t, fn, "allChecks[%d] must not be nil", i)
@@ -114,8 +113,8 @@ func TestCheckHostNamespaces(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-				Spec:       tc.spec,
+				Namespace: "prod", Name: "p",
+				Spec: tc.spec,
 			}
 			findings := checkHostNamespaces(pod, pod.Spec.Containers[0])
 			gotIDs := make([]string, 0, len(findings))
@@ -134,11 +133,11 @@ func TestCheckHostNamespaces(t *testing.T) {
 // empty Containers slice must not panic on Containers[0].
 func TestFirstContainerChecks_NoRegularContainers(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+		Namespace: "prod", Name: "p",
 		Spec: corev1.PodSpec{
 			HostPID:        true,
 			InitContainers: []corev1.Container{{Name: "init"}},
-			Volumes:        []corev1.Volume{{Name: "v", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/"}}}},
+			Volumes:        []corev1.Volume{{Name: "v", HostPath: &corev1.HostPathVolumeSource{Path: "/"}}},
 		},
 	}
 	init := pod.Spec.InitContainers[0]
@@ -149,16 +148,18 @@ func TestFirstContainerChecks_NoRegularContainers(t *testing.T) {
 
 func TestCheckHostPath(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+		Namespace: "prod", Name: "p",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{Name: "c"}},
 			Volumes: []corev1.Volume{
-				{Name: "etc", VolumeSource: corev1.VolumeSource{
+				{
+					Name:     "etc",
 					HostPath: &corev1.HostPathVolumeSource{Path: "/etc"},
-				}},
-				{Name: "data", VolumeSource: corev1.VolumeSource{
+				},
+				{
+					Name:     "data",
 					EmptyDir: &corev1.EmptyDirVolumeSource{},
-				}},
+				},
 			},
 		},
 	}
@@ -177,7 +178,7 @@ func TestCheckReadOnlyRootFilesystem(t *testing.T) {
 	readOnly := corev1.Container{Name: "c", SecurityContext: &corev1.SecurityContext{
 		ReadOnlyRootFilesystem: new(true),
 	}}
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 
 	assert.Len(t, checkReadOnlyRootFilesystem(pod, writable), 1)
 	assert.Len(t, checkReadOnlyRootFilesystem(pod, explicitFalse), 1)
@@ -185,7 +186,7 @@ func TestCheckReadOnlyRootFilesystem(t *testing.T) {
 }
 
 func TestCheckRunAsRoot(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name      string
 		pod       corev1.PodSecurityContext
@@ -211,7 +212,7 @@ func TestCheckRunAsRoot(t *testing.T) {
 }
 
 func TestCheckAllowPrivilegeEscalation(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name string
 		sc   *corev1.SecurityContext
@@ -234,7 +235,7 @@ func TestCheckAllowPrivilegeEscalation(t *testing.T) {
 func resourceQuantity(s string) resource.Quantity { return resource.MustParse(s) }
 
 func TestCheckDangerousCapabilities(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name     string
 		caps     *corev1.Capabilities
@@ -262,7 +263,7 @@ func TestCheckDangerousCapabilities(t *testing.T) {
 }
 
 func TestCheckResourceLimits(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	resCPU := resourceQuantity("100m")
 	resMem := resourceQuantity("128Mi")
 
@@ -300,8 +301,8 @@ func TestCheckDefaultServiceAccount(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-				Spec:       corev1.PodSpec{ServiceAccountName: tc.sa, Containers: []corev1.Container{{Name: "c"}}},
+				Namespace: "prod", Name: "p",
+				Spec: corev1.PodSpec{ServiceAccountName: tc.sa, Containers: []corev1.Container{{Name: "c"}}},
 			}
 			findings := checkDefaultServiceAccount(pod, pod.Spec.Containers[0])
 			assert.Len(t, findings, tc.want)
@@ -310,7 +311,7 @@ func TestCheckDefaultServiceAccount(t *testing.T) {
 }
 
 func TestCheckLatestImageTag(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name, image string
 		want        int

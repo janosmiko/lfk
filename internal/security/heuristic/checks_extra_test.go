@@ -11,7 +11,7 @@ import (
 )
 
 func TestCheckEnvFromSecret(t *testing.T) {
-	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	cases := []struct {
 		name    string
 		envFrom []corev1.EnvFromSource
@@ -19,14 +19,14 @@ func TestCheckEnvFromSecret(t *testing.T) {
 	}{
 		{"no envFrom", nil, 0},
 		{"configMapRef only", []corev1.EnvFromSource{
-			{ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "cm"}}},
+			{ConfigMapRef: &corev1.ConfigMapEnvSource{Name: "cm"}},
 		}, 0},
 		{"secretRef", []corev1.EnvFromSource{
-			{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "db-creds"}}},
+			{SecretRef: &corev1.SecretEnvSource{Name: "db-creds"}},
 		}, 1},
 		{"two secretRefs produce one finding", []corev1.EnvFromSource{
-			{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "a"}}},
-			{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "b"}}},
+			{SecretRef: &corev1.SecretEnvSource{Name: "a"}},
+			{SecretRef: &corev1.SecretEnvSource{Name: "b"}},
 		}, 1},
 	}
 	for _, tc := range cases {
@@ -50,7 +50,7 @@ func TestCheckEnvFromSecret(t *testing.T) {
 func TestCheckEphemeralContainers(t *testing.T) {
 	makePod := func(eph ...corev1.EphemeralContainer) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+			Namespace: "prod", Name: "p",
 			Spec: corev1.PodSpec{
 				Containers:          []corev1.Container{{Name: "c1"}, {Name: "c2"}},
 				EphemeralContainers: eph,
@@ -63,7 +63,7 @@ func TestCheckEphemeralContainers(t *testing.T) {
 	})
 	t.Run("debug container flagged once on first container", func(t *testing.T) {
 		pod := makePod(corev1.EphemeralContainer{
-			EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "debugger"},
+			Name: "debugger",
 		})
 		findings := checkEphemeralContainers(pod, pod.Spec.Containers[0])
 		assert.Len(t, findings, 1)
@@ -78,8 +78,8 @@ func TestCheckEphemeralContainers(t *testing.T) {
 func TestCheckBarePod(t *testing.T) {
 	makePod := func(owners ...metav1.OwnerReference) *corev1.Pod {
 		return &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p", OwnerReferences: owners},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c1"}, {Name: "c2"}}},
+			Namespace: "prod", Name: "p", OwnerReferences: owners,
+			Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c1"}, {Name: "c2"}}},
 		}
 	}
 	t.Run("bare pod flagged once as reliability", func(t *testing.T) {
@@ -118,8 +118,8 @@ func TestCheckHostProcess(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
-				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
+				Namespace: "prod", Name: "p",
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
 			}
 			if tc.podWin != nil {
 				pod.Spec.SecurityContext = &corev1.PodSecurityContext{WindowsOptions: tc.podWin}

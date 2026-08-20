@@ -25,16 +25,14 @@ func node(name, uid string, labels map[string]string) *corev1.Node {
 	created := demoEpoch.Add(-30 * 24 * time.Hour)
 	heartbeat := demoEpoch.Add(-time.Minute)
 	return &corev1.Node{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Node"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			UID:               k8stypes.UID(uid),
-			Labels:            labels,
-			CreationTimestamp: metav1.NewTime(created),
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				managedField("kubectl-client-side-apply", "Update", `{"f:metadata":{"f:labels":{}}}`, created),
-				managedField("kubelet", "Update", `{"f:status":{"f:conditions":{},"f:nodeInfo":{}}}`, heartbeat),
-			},
+		APIVersion: "v1", Kind: "Node",
+		Name:              name,
+		UID:               k8stypes.UID(uid),
+		Labels:            labels,
+		CreationTimestamp: metav1.NewTime(created),
+		ManagedFields: []metav1.ManagedFieldsEntry{
+			managedField("kubectl-client-side-apply", "Update", `{"f:metadata":{"f:labels":{}}}`, created),
+			managedField("kubelet", "Update", `{"f:status":{"f:conditions":{},"f:nodeInfo":{}}}`, heartbeat),
 		},
 		Status: corev1.NodeStatus{
 			NodeInfo: corev1.NodeSystemInfo{

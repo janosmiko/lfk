@@ -16,8 +16,8 @@ func runningPod(namespace, name, node string, labels map[string]string, ready bo
 		cond = corev1.ConditionTrue
 	}
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name, Labels: labels},
-		Spec:       corev1.PodSpec{NodeName: node},
+		Namespace: namespace, Name: name, Labels: labels,
+		Spec: corev1.PodSpec{NodeName: node},
 		Status: corev1.PodStatus{
 			Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: cond}},
 		},
@@ -40,7 +40,7 @@ func TestEvictedPodsFrom_CarriesLabelsNamespaceAndReadiness(t *testing.T) {
 }
 
 func TestEvictedPodsFrom_MissingReadyConditionIsNotReady(t *testing.T) {
-	pods := []corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}}
+	pods := []corev1.Pod{{Namespace: "prod", Name: "p"}}
 
 	got := EvictedPodsFrom(pods)
 

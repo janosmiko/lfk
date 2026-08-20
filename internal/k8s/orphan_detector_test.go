@@ -40,22 +40,22 @@ func TestDetectOrphans_PodNoOwner(t *testing.T) {
 
 	pods := []corev1.Pod{
 		// Orphan: no ownerRef, not a mirror pod, not terminal.
-		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "naked-pod", CreationTimestamp: now}},
+		{Namespace: "default", Name: "naked-pod", CreationTimestamp: now},
 		// Not orphan: has owner.
-		{ObjectMeta: metav1.ObjectMeta{
+		{
 			Namespace: "default", Name: "owned-pod",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
-		}},
+		},
 		// Not orphan: static (mirror) pod.
-		{ObjectMeta: metav1.ObjectMeta{
+		{
 			Namespace:   "kube-system",
 			Name:        "kube-apiserver-foo",
 			Annotations: map[string]string{mirrorPodAnnotation: "abc"},
-		}},
+		},
 		// Orphan with terminal tag: Succeeded + age > 1h, no owner.
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "old-job-pod", CreationTimestamp: twoHoursAgo},
-			Status:     corev1.PodStatus{Phase: corev1.PodSucceeded},
+			Namespace: "default", Name: "old-job-pod", CreationTimestamp: twoHoursAgo,
+			Status: corev1.PodStatus{Phase: corev1.PodSucceeded},
 		},
 	}
 
@@ -82,25 +82,23 @@ func TestDetectOrphans_SecretExclusions(t *testing.T) {
 	secrets := []corev1.Secret{
 		// Excluded: helm release storage.
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "sh.helm.release.v1.foo.v1"},
-			Type:       corev1.SecretType("helm.sh/release.v1"),
+			Namespace: "default", Name: "sh.helm.release.v1.foo.v1",
+			Type: corev1.SecretType("helm.sh/release.v1"),
 		},
 		// Excluded: SA token.
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "default-token-x"},
-			Type:       corev1.SecretTypeServiceAccountToken,
+			Namespace: "default", Name: "default-token-x",
+			Type: corev1.SecretTypeServiceAccountToken,
 		},
 		// Excluded: owner-managed.
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default", Name: "managed",
-				OwnerReferences: []metav1.OwnerReference{{Kind: "Certificate", Name: "cm"}},
-			},
+			Namespace: "default", Name: "managed",
+			OwnerReferences: []metav1.OwnerReference{{Kind: "Certificate", Name: "cm"}},
 		},
 		// Mounted (not orphan).
-		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "db-creds"}},
+		{Namespace: "default", Name: "db-creds"},
 		// Orphan.
-		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "old-tls-cert"}},
+		{Namespace: "default", Name: "old-tls-cert"},
 	}
 
 	objs := append(podsToRuntimeObjects(pods), secretsToRuntimeObjects(secrets)...)
@@ -121,18 +119,16 @@ func TestDetectOrphans_ConfigMapExclusions(t *testing.T) {
 	}
 	cms := []corev1.ConfigMap{
 		// Excluded: kube-root-ca.crt is auto-injected by the API server.
-		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "kube-root-ca.crt"}},
+		{Namespace: "default", Name: "kube-root-ca.crt"},
 		// Excluded: owner-managed.
 		{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default", Name: "managed-by-flux",
-				OwnerReferences: []metav1.OwnerReference{{Kind: "Kustomization", Name: "k"}},
-			},
+			Namespace: "default", Name: "managed-by-flux",
+			OwnerReferences: []metav1.OwnerReference{{Kind: "Kustomization", Name: "k"}},
 		},
 		// Mounted (not orphan).
-		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "feature-flags"}},
+		{Namespace: "default", Name: "feature-flags"},
 		// Orphan.
-		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deprecated-grafana-cfg"}},
+		{Namespace: "default", Name: "deprecated-grafana-cfg"},
 	}
 
 	objs := append(podsToRuntimeObjects(pods), cmsToRuntimeObjects(cms)...)
@@ -202,31 +198,29 @@ func TestDetectOrphans_ServiceNoEndpoints(t *testing.T) {
 	services := []corev1.Service{
 		// Orphan: ClusterIP without backing endpoint slice.
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "legacy-api"},
-			Spec:       corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, ClusterIP: "10.0.0.1"},
+			Namespace: "default", Name: "legacy-api",
+			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, ClusterIP: "10.0.0.1"},
 		},
 		// Excluded: Headless.
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stateful"},
-			Spec:       corev1.ServiceSpec{ClusterIP: "None"},
+			Namespace: "default", Name: "stateful",
+			Spec: corev1.ServiceSpec{ClusterIP: "None"},
 		},
 		// Excluded: ExternalName.
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "extern"},
-			Spec:       corev1.ServiceSpec{Type: corev1.ServiceTypeExternalName, ExternalName: "example.com"},
+			Namespace: "default", Name: "extern",
+			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeExternalName, ExternalName: "example.com"},
 		},
 		// Not orphan: has backing slice (added below).
 		{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "live-api"},
-			Spec:       corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, ClusterIP: "10.0.0.2"},
+			Namespace: "default", Name: "live-api",
+			Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP, ClusterIP: "10.0.0.2"},
 		},
 	}
 	ready := true
 	slices := []discoveryv1.EndpointSlice{{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default", Name: "live-api-abc",
-			Labels: map[string]string{"kubernetes.io/service-name": "live-api"},
-		},
+		Namespace: "default", Name: "live-api-abc",
+		Labels:      map[string]string{"kubernetes.io/service-name": "live-api"},
 		AddressType: discoveryv1.AddressTypeIPv4,
 		Endpoints: []discoveryv1.Endpoint{{
 			Addresses:  []string{"10.244.0.10"},
@@ -262,8 +256,8 @@ func TestDetectOrphans_WorkloadTemplatesPreventFalsePositives(t *testing.T) {
 	mountSecret := func(name string) corev1.PodSpec {
 		return corev1.PodSpec{
 			Volumes: []corev1.Volume{{
-				Name:         "creds",
-				VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: name}},
+				Name:   "creds",
+				Secret: &corev1.SecretVolumeSource{SecretName: name},
 			}},
 		}
 	}
@@ -271,17 +265,15 @@ func TestDetectOrphans_WorkloadTemplatesPreventFalsePositives(t *testing.T) {
 		return corev1.PodSpec{
 			Volumes: []corev1.Volume{{
 				Name: "cfg",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{Name: name},
-					},
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					Name: name,
 				},
 			}},
 		}
 	}
 
 	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "nightly-backup"},
+		Namespace: "default", Name: "nightly-backup",
 		Spec: batchv1.CronJobSpec{
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
@@ -291,32 +283,32 @@ func TestDetectOrphans_WorkloadTemplatesPreventFalsePositives(t *testing.T) {
 		},
 	}
 	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api"},
+		Namespace: "default", Name: "api",
 		Spec: appsv1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{Spec: mountSecret("api-creds")},
 		},
 	}
 	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "migrate"},
+		Namespace: "default", Name: "migrate",
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{Spec: mountCM("migrate-cm")},
 		},
 	}
 	statefulSet := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "db"},
+		Namespace: "default", Name: "db",
 		Spec: appsv1.StatefulSetSpec{
 			Template: corev1.PodTemplateSpec{Spec: mountSecret("db-pass")},
 		},
 	}
 
 	secrets := []runtime.Object{
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "backup-creds"}},
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api-creds"}},
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "db-pass"}},
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "actually-orphan"}},
+		&corev1.Secret{Namespace: "default", Name: "backup-creds"},
+		&corev1.Secret{Namespace: "default", Name: "api-creds"},
+		&corev1.Secret{Namespace: "default", Name: "db-pass"},
+		&corev1.Secret{Namespace: "default", Name: "actually-orphan"},
 	}
 	configMaps := []runtime.Object{
-		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "migrate-cm"}},
+		&corev1.ConfigMap{Namespace: "default", Name: "migrate-cm"},
 	}
 
 	objs := append([]runtime.Object{cronJob, deployment, job, statefulSet}, secrets...)
@@ -372,46 +364,40 @@ func filterLenient(items []OrphanItem, lenientOnly bool) []OrphanItem {
 // StatefulSet (excluded via ownerRef).
 func TestDetectOrphans_PVC(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "live"},
+		Namespace: "default", Name: "live",
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{{
 				Name: "data",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "live-data",
-					},
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: "live-data",
 				},
 			}},
 		},
 	}
 	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api"},
+		Namespace: "default", Name: "api",
 		Spec: appsv1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
 				Volumes: []corev1.Volume{{
 					Name: "data",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "api-data",
-						},
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "api-data",
 					},
 				}},
 			}},
 		},
 	}
 	pvcs := []runtime.Object{
-		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "live-data"}},
-		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api-data"}},
+		&corev1.PersistentVolumeClaim{Namespace: "default", Name: "live-data"},
+		&corev1.PersistentVolumeClaim{Namespace: "default", Name: "api-data"},
 		&corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stuck"},
-			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimPending},
+			Namespace: "default", Name: "stuck",
+			Status: corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimPending},
 		},
-		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "abandoned"}},
+		&corev1.PersistentVolumeClaim{Namespace: "default", Name: "abandoned"},
 		&corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default", Name: "owned-by-sts",
-				OwnerReferences: []metav1.OwnerReference{{Kind: "StatefulSet", Name: "db"}},
-			},
+			Namespace: "default", Name: "owned-by-sts",
+			OwnerReferences: []metav1.OwnerReference{{Kind: "StatefulSet", Name: "db"}},
 		},
 	}
 
@@ -440,10 +426,10 @@ func TestDetectOrphans_PVC(t *testing.T) {
 // existing one is not.
 func TestDetectOrphans_HPA(t *testing.T) {
 	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api"},
+		Namespace: "default", Name: "api",
 	}
 	live := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "api-hpa"},
+		Namespace: "default", Name: "api-hpa",
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 				Kind: "Deployment", Name: "api", APIVersion: "apps/v1",
@@ -451,7 +437,7 @@ func TestDetectOrphans_HPA(t *testing.T) {
 		},
 	}
 	stale := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "ghost-hpa"},
+		Namespace: "default", Name: "ghost-hpa",
 		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 				Kind: "Deployment", Name: "deleted", APIVersion: "apps/v1",
@@ -477,7 +463,7 @@ func TestDetectOrphans_HPA(t *testing.T) {
 // firings.
 func TestDetectOrphans_PDB_NetPolSelector(t *testing.T) {
 	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "nightly"},
+		Namespace: "default", Name: "nightly",
 		Spec: batchv1.CronJobSpec{
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
@@ -489,19 +475,19 @@ func TestDetectOrphans_PDB_NetPolSelector(t *testing.T) {
 		},
 	}
 	pdbMatches := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "matches-cron"},
+		Namespace: "default", Name: "matches-cron",
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "nightly"}},
 		},
 	}
 	pdbStale := &policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-pdb"},
+		Namespace: "default", Name: "stale-pdb",
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "deleted"}},
 		},
 	}
 	netpolStale := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-np"},
+		Namespace: "default", Name: "stale-np",
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"app": "deleted"}},
 		},
@@ -529,30 +515,30 @@ func TestDetectOrphans_PDB_NetPolSelector(t *testing.T) {
 // AggregationRule ClusterRole (excluded), a system: ClusterRole
 // (excluded), and a regular unbound ClusterRole (orphan).
 func TestDetectOrphans_RBAC(t *testing.T) {
-	roleBound := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deployer"}}
-	roleUnbound := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "leftover"}}
+	roleBound := &rbacv1.Role{Namespace: "default", Name: "deployer"}
+	roleUnbound := &rbacv1.Role{Namespace: "default", Name: "leftover"}
 
 	rbValid := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deployer-rb"},
-		Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: "ci"}},
-		RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: "deployer"},
+		Namespace: "default", Name: "deployer-rb",
+		Subjects: []rbacv1.Subject{{Kind: "ServiceAccount", Name: "ci"}},
+		RoleRef:  rbacv1.RoleRef{Kind: "Role", Name: "deployer"},
 	}
 	rbEmpty := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "empty"},
-		RoleRef:    rbacv1.RoleRef{Kind: "Role", Name: "deployer"},
+		Namespace: "default", Name: "empty",
+		RoleRef: rbacv1.RoleRef{Kind: "Role", Name: "deployer"},
 	}
 	rbMissingRole := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "broken"},
-		Subjects:   []rbacv1.Subject{{Kind: "User", Name: "alice"}},
-		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "does-not-exist"},
+		Namespace: "default", Name: "broken",
+		Subjects: []rbacv1.Subject{{Kind: "User", Name: "alice"}},
+		RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "does-not-exist"},
 	}
 
 	crAggregate := &rbacv1.ClusterRole{
-		ObjectMeta:      metav1.ObjectMeta{Name: "aggregate"},
+		Name:            "aggregate",
 		AggregationRule: &rbacv1.AggregationRule{},
 	}
-	crSystem := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "system:foo"}}
-	crUnbound := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "leftover-cluster"}}
+	crSystem := &rbacv1.ClusterRole{Name: "system:foo"}
+	crUnbound := &rbacv1.ClusterRole{Name: "leftover-cluster"}
 
 	cs := k8sfake.NewSimpleClientset(
 		roleBound, roleUnbound, rbValid, rbEmpty, rbMissingRole,
@@ -590,7 +576,7 @@ func orphanNames(items []OrphanItem) []string {
 
 func TestDetectOrphans_PartialDenial(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(
-		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "naked"}},
+		&corev1.Pod{Namespace: "default", Name: "naked"},
 	)
 	cs.PrependReactor("list", "ingresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("forbidden")
@@ -616,14 +602,14 @@ func TestDetectOrphans_PartialDenial(t *testing.T) {
 // this is the boundary between "too narrow" (only guard the kind whose
 // own list failed) and "too broad" (drop the whole report).
 func TestDetectOrphans_IngressListFailureSkipsSecrets(t *testing.T) {
-	tlsSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "tls-cert"}}
+	tlsSecret := &corev1.Secret{Namespace: "default", Name: "tls-cert"}
 	ingress := &networkingv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "web"},
+		Namespace: "default", Name: "web",
 		Spec: networkingv1.IngressSpec{
 			TLS: []networkingv1.IngressTLS{{SecretName: "tls-cert"}},
 		},
 	}
-	unmountedCM := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "stale-config"}}
+	unmountedCM := &corev1.ConfigMap{Namespace: "default", Name: "stale-config"}
 
 	cs := k8sfake.NewSimpleClientset(tlsSecret, ingress, unmountedCM)
 	cs.PrependReactor("list", "ingresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -650,8 +636,8 @@ func TestDetectOrphans_IngressListFailureSkipsSecrets(t *testing.T) {
 // RoleBinding's own report (which depends on the Role/ClusterRole
 // lists, not on itself) is unaffected by this particular failure.
 func TestDetectOrphans_RoleBindingListFailureSkipsRoleAndClusterRole(t *testing.T) {
-	boundRole := &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "deployer"}}
-	boundClusterRole := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "viewer"}}
+	boundRole := &rbacv1.Role{Namespace: "default", Name: "deployer"}
+	boundClusterRole := &rbacv1.ClusterRole{Name: "viewer"}
 
 	cs := k8sfake.NewSimpleClientset(boundRole, boundClusterRole)
 	cs.PrependReactor("list", "rolebindings", func(action k8stesting.Action) (bool, runtime.Object, error) {

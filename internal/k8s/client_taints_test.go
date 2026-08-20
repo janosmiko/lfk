@@ -16,7 +16,7 @@ import (
 func taintedNode() *corev1.Node {
 	added := metav1.NewTime(time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC))
 	return &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: "worker-1"},
+		Name: "worker-1",
 		Spec: corev1.NodeSpec{
 			Taints: []corev1.Taint{
 				{Key: "dedicated", Value: "gpu", Effect: corev1.TaintEffectNoSchedule},

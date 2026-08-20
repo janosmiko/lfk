@@ -5,12 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func ingress(ns, name string, tls bool, hosts ...string) *networkingv1.Ingress {
-	ing := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name}}
+	ing := &networkingv1.Ingress{Namespace: ns, Name: name}
 	if tls {
 		ing.Spec.TLS = []networkingv1.IngressTLS{{Hosts: hosts}}
 	}

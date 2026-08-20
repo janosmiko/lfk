@@ -160,11 +160,9 @@ func TestNetpolWheelMultiPolicyView(t *testing.T) {
 		netpolsData: &k8s.NetpolsForResource{
 			Kind: "Pod", Name: "web-0", Namespace: "default",
 			Policies: []k8s.NetpolForResource{{
-				NetworkPolicyInfo: k8s.NetworkPolicyInfo{
-					Name: "p1", Namespace: "default",
-					PolicyTypes:  []string{"Ingress"},
-					IngressRules: rules,
-				},
+				Name: "p1", Namespace: "default",
+				PolicyTypes:  []string{"Ingress"},
+				IngressRules: rules,
 			}},
 		},
 		tabs:   []TabState{{}},

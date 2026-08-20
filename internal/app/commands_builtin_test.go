@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCov80ClassifyInputKubectl(t *testing.T) {
@@ -60,8 +59,8 @@ func TestCovLoadCanISAList(t *testing.T) {
 
 func TestCovLoadPodStartup(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "main", Image: "nginx"}}},
+		Name: "my-pod", Namespace: "default",
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "main", Image: "nginx"}}},
 	}
 	m := baseModelWithFakeClientAndScheduler(t, pod)
 	m = withActionCtx(m, "my-pod", "default", "Pod", model.ResourceTypeEntry{})
@@ -94,7 +93,7 @@ func TestCovLoadNetworkPolicy(t *testing.T) {
 
 func TestCovLoadContainerPorts(t *testing.T) {
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Name: "my-pod", Namespace: "default",
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
@@ -120,7 +119,7 @@ func TestCovLoadContainerPorts(t *testing.T) {
 
 func TestCovLoadContainerPortsService(t *testing.T) {
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-svc", Namespace: "default"},
+		Name: "my-svc", Namespace: "default",
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{Name: "http", Port: 80, Protocol: corev1.ProtocolTCP},

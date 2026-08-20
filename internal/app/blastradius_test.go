@@ -356,9 +356,9 @@ func TestScaleBlastRadius_CountsAgainstTheBudget(t *testing.T) {
 			{Namespace: "prod", Labels: map[string]string{"app": "web"}, Ready: true},
 		},
 		pdbs: []policyv1.PodDisruptionBudget{{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "web-pdb"},
-			Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}}},
-			Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+			Namespace: "prod", Name: "web-pdb",
+			Spec:   policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}}},
+			Status: policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
 		}},
 	}
 
@@ -634,9 +634,9 @@ func TestUsesNodePods(t *testing.T) {
 
 func pdb(namespace, name string, allowed int32, matchLabels map[string]string) policyv1.PodDisruptionBudget {
 	return policyv1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
-		Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: matchLabels}},
-		Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: allowed},
+		Namespace: namespace, Name: name,
+		Spec:   policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: matchLabels}},
+		Status: policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: allowed},
 	}
 }
 
@@ -718,8 +718,8 @@ func TestBulkBlastRadius_MergesBudgetsAcrossNamespaces(t *testing.T) {
 	got, err := bulkBlastRadius(byNS, 3,
 		func(ns string) ([]k8s.NamedPod, error) {
 			return []k8s.NamedPod{{
-				Name:       "web-1",
-				EvictedPod: k8s.EvictedPod{Namespace: ns, Labels: map[string]string{"app": "web"}, Ready: true},
+				Name:      "web-1",
+				Namespace: ns, Labels: map[string]string{"app": "web"}, Ready: true,
 			}}, nil
 		},
 		func(ns string) ([]policyv1.PodDisruptionBudget, error) {

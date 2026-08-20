@@ -51,7 +51,7 @@ func TestRenderTableCursorlessHonorsHiddenBuiltinColumns(t *testing.T) {
 		{Name: "pod-b", Kind: "Pod", Status: "Pending", Age: "1m"},
 	}
 	out := stripANSI(RenderTable("POD", items, -1, 60, 10, false, "", "", false))
-	header := strings.SplitN(out, "\n", 2)[0]
+	header, _, _ := strings.Cut(out, "\n")
 	if strings.Contains(header, "STATUS") || strings.Contains(header, "AGE") {
 		t.Fatalf("hidden built-in columns rendered in cursor-less preview header: %q", header)
 	}
@@ -65,7 +65,7 @@ func TestRenderTableCursorlessHonorsColumnOrder(t *testing.T) {
 		{Name: "pod-a", Kind: "Pod", Status: "Running", Age: "5m"},
 	}
 	out := stripANSI(RenderTable("POD", items, -1, 60, 10, false, "", "", false))
-	header := strings.SplitN(out, "\n", 2)[0]
+	header, _, _ := strings.Cut(out, "\n")
 	ageIdx := strings.Index(header, "AGE")
 	statusIdx := strings.Index(header, "STATUS")
 	if ageIdx < 0 || statusIdx < 0 {
@@ -84,7 +84,7 @@ func TestRenderTableCursorlessHonorsHiddenNameColumn(t *testing.T) {
 		{Name: "pod-a", Kind: "Pod", Status: "Running"},
 	}
 	out := stripANSI(RenderTable("POD", items, -1, 60, 10, false, "", "", false))
-	header := strings.SplitN(out, "\n", 2)[0]
+	header, _, _ := strings.Cut(out, "\n")
 	if strings.Contains(header, "POD") {
 		t.Fatalf("hidden Name column rendered in cursor-less preview header: %q", header)
 	}

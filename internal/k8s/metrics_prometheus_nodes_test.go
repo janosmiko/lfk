@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
@@ -254,7 +253,7 @@ func TestGetNodeUptimes_EnabledQueriesPrometheus(t *testing.T) {
 	}
 
 	cs := fake.NewSimpleClientset(&corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "prometheus", Namespace: "monitoring"},
+		Name: "prometheus", Namespace: "monitoring",
 	})
 	cs.PrependProxyReactor("services", func(clienttesting.Action) (bool, restclient.ResponseWrapper, error) {
 		body := []byte(`{"status":"success","data":{"resultType":"vector","result":[
@@ -313,7 +312,7 @@ func TestGetNodeUptimes_NameAddrKeyspacesStayIndependent(t *testing.T) {
 	}
 
 	cs := fake.NewSimpleClientset(&corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "prometheus", Namespace: "monitoring"},
+		Name: "prometheus", Namespace: "monitoring",
 	})
 	cs.PrependProxyReactor("services", func(clienttesting.Action) (bool, restclient.ResponseWrapper, error) {
 		body := []byte(`{"status":"success","data":{"resultType":"vector","result":[

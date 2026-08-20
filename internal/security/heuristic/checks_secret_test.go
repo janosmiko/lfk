@@ -40,9 +40,9 @@ func certPEM(t *testing.T, notAfter time.Time) []byte {
 
 func tlsSecret(ns, name string, cert []byte) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
-		Type:       corev1.SecretTypeTLS,
-		Data:       map[string][]byte{corev1.TLSCertKey: cert},
+		Namespace: ns, Name: name,
+		Type: corev1.SecretTypeTLS,
+		Data: map[string][]byte{corev1.TLSCertKey: cert},
 	}
 }
 
@@ -63,13 +63,13 @@ func TestSecretChecks(t *testing.T) {
 	garbage := tlsSecret("prod", "garbage-cert", []byte("not a pem"))
 	ignored := tlsSecret("ignored-ns", "ignored-cert", certPEM(t, time.Now().Add(-24*time.Hour)))
 	legacy := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "old-token"},
-		Type:       corev1.SecretTypeServiceAccountToken,
+		Namespace: "prod", Name: "old-token",
+		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	opaque := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "plain"},
-		Type:       corev1.SecretTypeOpaque,
-		Data:       map[string][]byte{"PASSWORD": []byte("x")},
+		Namespace: "prod", Name: "plain",
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{"PASSWORD": []byte("x")},
 	}
 
 	s := scanningSource(expired, expiring, healthy, garbage, legacy, opaque, ignored)
@@ -99,8 +99,8 @@ func TestSecretChecks(t *testing.T) {
 // must never list Secrets.
 func TestSecretChecksDisabledByDefault(t *testing.T) {
 	legacy := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "old-token"},
-		Type:       corev1.SecretTypeServiceAccountToken,
+		Namespace: "prod", Name: "old-token",
+		Type: corev1.SecretTypeServiceAccountToken,
 	}
 	client := fake.NewSimpleClientset(legacy)
 	listed := false
@@ -119,16 +119,14 @@ func TestSecretChecksDisabledByDefault(t *testing.T) {
 func TestSecretListBestEffort(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "old-token"},
-			Type:       corev1.SecretTypeServiceAccountToken,
+			Namespace: "prod", Name: "old-token",
+			Type: corev1.SecretTypeServiceAccountToken,
 		},
 		// A pod with a finding proves the rest of the scan survives the
 		// forbidden secret list.
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "prod", Name: "p",
-				OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
-			},
+			Namespace: "prod", Name: "p",
+			OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
 			Spec: corev1.PodSpec{Containers: []corev1.Container{{
 				Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)},
 			}}},
@@ -151,9 +149,9 @@ func TestSecretListBestEffort(t *testing.T) {
 // bytes.
 func TestSecretSummariesNeverLeakData(t *testing.T) {
 	legacy := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "old-token"},
-		Type:       corev1.SecretTypeServiceAccountToken,
-		Data:       map[string][]byte{"token": []byte("super-secret-token-bytes")},
+		Namespace: "prod", Name: "old-token",
+		Type: corev1.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{"token": []byte("super-secret-token-bytes")},
 	}
 	s := scanningSource(legacy)
 	findings, err := s.Fetch(t.Context(), "", "")
