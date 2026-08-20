@@ -109,8 +109,15 @@ func (m *Model) cleanupExecPTY() {
 // closeAllExecPTYs closes the active exec PTY plus every backgrounded
 // tab's exec PTY, mirroring cancelAllTabLogStreams.
 func (m *Model) closeAllExecPTYs() {
+	closedPTY := m.execPTY
 	m.cleanupExecPTY()
 	if m.activeTab >= 0 && m.activeTab < len(m.tabs) {
+		// A stale saveCurrentTab snapshot, or a PTY start landing after a
+		// tab switch, can leave this mirror pointing at a different PTY
+		// than the one cleanupExecPTY just closed.
+		if p := m.tabs[m.activeTab].execPTY; p != nil && p != closedPTY {
+			_ = p.Close()
+		}
 		m.tabs[m.activeTab].execPTY = nil
 	}
 	for i := range m.tabs {

@@ -116,6 +116,29 @@ func TestSignalShutdown_ClosesActiveExecPTY(t *testing.T) {
 	assert.True(t, isClosedFile(t, w), "signalShutdown must close the active exec PTY")
 }
 
+// A stale saveCurrentTab snapshot or a late-landing async PTY start can
+// leave the active tab's mirror pointing at a different PTY than
+// m.execPTY. Both must be closed, not just the live one.
+func TestSignalShutdown_ClosesActiveTabMirrorWhenDistinctFromModelPTY(t *testing.T) {
+	m := baseModelWithFakeClient()
+
+	_, wLive, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = wLive.Close() })
+	_, wStale, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = wStale.Close() })
+
+	m.execPTY = wLive
+	m.tabs = []TabState{{execPTY: wStale}}
+
+	m.signalShutdown()
+
+	assert.True(t, isClosedFile(t, wLive), "signalShutdown must close the live exec PTY")
+	assert.True(t, isClosedFile(t, wStale), "signalShutdown must close the stale mirrored exec PTY too")
+	assert.Nil(t, m.tabs[0].execPTY, "signalShutdown must nil out the active tab's mirrored exec PTY")
+}
+
 func TestSignalShutdown_ClosesBackgroundTabExecPTY(t *testing.T) {
 	m := baseModelWithFakeClient()
 
