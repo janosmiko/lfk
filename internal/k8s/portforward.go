@@ -59,6 +59,10 @@ type PortForwardManager struct {
 	// tick is already waiting on, so repeated arm attempts between renders
 	// don't stack duplicate timers. Zero means nothing armed.
 	evictionArmedAt time.Time
+	// superseded is closed by the next SetUpdateCallback call, so a
+	// listener goroutine blocked on the callback it registered exits
+	// instead of leaking once a newer listener takes the single callback slot.
+	superseded chan struct{}
 }
 
 // NewPortForwardManager creates a new port forward manager.
@@ -75,11 +79,18 @@ func NewPortForwardManagerWithClock(now func() time.Time) *PortForwardManager {
 	}
 }
 
-// SetUpdateCallback sets a callback that is invoked when entries change.
-func (m *PortForwardManager) SetUpdateCallback(fn func()) {
+// SetUpdateCallback sets a callback that is invoked when entries change. The
+// returned channel closes when a later call replaces this callback, letting
+// a superseded listener stop waiting instead of leaking.
+func (m *PortForwardManager) SetUpdateCallback(fn func()) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.superseded != nil {
+		close(m.superseded)
+	}
 	m.onUpdate = fn
+	m.superseded = make(chan struct{})
+	return m.superseded
 }
 
 // Entries returns a copy of all port forward entries.

@@ -112,7 +112,7 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 func (m Model) waitForPortForwardUpdate() tea.Cmd {
 	ch := make(chan struct{}, 1)
 	mgr := m.portForwardMgr
-	mgr.SetUpdateCallback(func() {
+	superseded := mgr.SetUpdateCallback(func() {
 		select {
 		case ch <- struct{}{}:
 		default:
@@ -129,6 +129,8 @@ func (m Model) waitForPortForwardUpdate() tea.Cmd {
 		select {
 		case <-ch:
 		case <-deadlineC:
+		case <-superseded:
+			return nil
 		}
 		return portForwardUpdateMsg{}
 	}

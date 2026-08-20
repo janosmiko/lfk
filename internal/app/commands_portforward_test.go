@@ -94,3 +94,28 @@ func TestWaitForPortForwardUpdate_FiresOnEvictionDeadlineWithoutCallback(t *test
 		t.Fatal("waitForPortForwardUpdate did not fire on the eviction deadline without a manager callback")
 	}
 }
+
+// SetUpdateCallback keeps only one slot, so an older listener must be
+// released rather than blocking forever once a newer one is armed.
+func TestWaitForPortForwardUpdate_SupersededListenerExits(t *testing.T) {
+	m := basePush80Model()
+	m.portForwardMgr = k8s.NewPortForwardManager()
+
+	firstCmd := m.waitForPortForwardUpdate()
+	require.NotNil(t, firstCmd)
+
+	firstDone := make(chan tea.Msg, 1)
+	go func() { firstDone <- firstCmd() }()
+
+	// Give the first goroutine time to reach its select before it is superseded.
+	time.Sleep(20 * time.Millisecond)
+
+	secondCmd := m.waitForPortForwardUpdate()
+	require.NotNil(t, secondCmd)
+
+	select {
+	case <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("superseded waitForPortForwardUpdate listener did not exit when a new listener was armed")
+	}
+}
