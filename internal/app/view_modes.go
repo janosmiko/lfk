@@ -545,7 +545,7 @@ func renderScrollbackView(sb *scrollback, offset, viewH, viewW int) string {
 
 // viewExecTerminal renders the embedded PTY terminal view.
 func (m Model) viewExecTerminal() string {
-	title := ui.TitleStyle.Render(m.execTitle)
+	title := ui.TitleStyle.Render(ui.SanitizeTerminalText(m.execTitle))
 
 	// Render hints. shift+drag is a host-terminal shortcut, not an lfk
 	// binding, but it's the only way to copy text out of an embedded PTY

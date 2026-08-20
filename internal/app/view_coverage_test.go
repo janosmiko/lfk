@@ -45,6 +45,24 @@ func TestViewExecTerminalNoSideBorders(t *testing.T) {
 	assert.Contains(t, stripped, "─", "PTY pane must keep horizontal rules")
 }
 
+// TestViewExecTerminalSanitizesTitle uses an OSC escape (ESC ] ... BEL)
+// because stripANSI only strips CSI sequences, so it would otherwise reach
+// a real terminal and rewrite its window title.
+func TestViewExecTerminalSanitizesTitle(t *testing.T) {
+	m := Model{
+		width:     40,
+		height:    10,
+		mode:      modeExec,
+		execTitle: "Exec: \x1b]0;evil\x07ns/pod",
+		tabs:      []TabState{{}},
+	}
+	out := m.viewExecTerminal()
+
+	assert.NotContains(t, out, "\x1b]0;evil\x07", "OSC escape must be stripped from the exec title")
+	assert.Contains(t, out, "Exec:", "printable title text must survive sanitization")
+	assert.Contains(t, out, "ns/pod", "printable title text must survive sanitization")
+}
+
 // TestViewExecTerminalScrolledShowsScrollback verifies the scrollback
 // path: when m.execScrollOffset > 0, the rendered pane must contain
 // captured lines, not blank padding.
