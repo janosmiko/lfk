@@ -101,9 +101,12 @@ func isClosedFile(t *testing.T, f *os.File) bool {
 func TestSignalShutdown_ClosesActiveExecPTY(t *testing.T) {
 	m := baseModelWithFakeClient()
 
-	_, w, err := os.Pipe()
+	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = w.Close() })
+	t.Cleanup(func() {
+		_ = r.Close()
+		_ = w.Close()
+	})
 	m.execPTY = w
 	// TabState mirrors Model's exec state after saveCurrentTab. The mirror
 	// must be nilled too, so a later restore can't re-close the same fd.
@@ -122,12 +125,18 @@ func TestSignalShutdown_ClosesActiveExecPTY(t *testing.T) {
 func TestSignalShutdown_ClosesActiveTabMirrorWhenDistinctFromModelPTY(t *testing.T) {
 	m := baseModelWithFakeClient()
 
-	_, wLive, err := os.Pipe()
+	rLive, wLive, err := os.Pipe()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = wLive.Close() })
-	_, wStale, err := os.Pipe()
+	t.Cleanup(func() {
+		_ = rLive.Close()
+		_ = wLive.Close()
+	})
+	rStale, wStale, err := os.Pipe()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = wStale.Close() })
+	t.Cleanup(func() {
+		_ = rStale.Close()
+		_ = wStale.Close()
+	})
 
 	m.execPTY = wLive
 	m.tabs = []TabState{{execPTY: wStale}}
@@ -142,9 +151,12 @@ func TestSignalShutdown_ClosesActiveTabMirrorWhenDistinctFromModelPTY(t *testing
 func TestSignalShutdown_ClosesBackgroundTabExecPTY(t *testing.T) {
 	m := baseModelWithFakeClient()
 
-	_, wBg, err := os.Pipe()
+	rBg, wBg, err := os.Pipe()
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = wBg.Close() })
+	t.Cleanup(func() {
+		_ = rBg.Close()
+		_ = wBg.Close()
+	})
 
 	m.tabs = []TabState{
 		{execPTY: wBg},
