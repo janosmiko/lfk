@@ -287,6 +287,12 @@ func TestRedact(t *testing.T) {
 			wantNotContains: []string{"s3cret-single-quoted-header"},
 		},
 		{
+			name:            "YAML block scalar in a sequence item",
+			input:           "- password: |\n    s3cret-sequence-body",
+			wantContains:    []string{"[REDACTED]"},
+			wantNotContains: []string{"s3cret-sequence-body"},
+		},
+		{
 			name:            "base64 blob under a generic data key is not redacted (documented stance)",
 			input:           "data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I=",
 			wantContains:    []string{"data: dGVzdC1zM2NyZXQtYmFzZTY0LWJsb2I="},
@@ -318,6 +324,13 @@ func TestRedact(t *testing.T) {
 			assert.Equal(t, got, Redact(got), "Redact must be idempotent")
 		})
 	}
+}
+
+func TestRedact_CRLFBlockScalarKeepsLineEndings(t *testing.T) {
+	// The header's |- marker is swallowed by the generic value pattern, a
+	// documented harmless side effect. The point here: every line keeps \r.
+	got := Redact("password: |-\r\n  s3cret-crlf-body\r\nnext: ok\r\n")
+	assert.Equal(t, "password: [REDACTED]\r\n  [REDACTED]\r\nnext: ok\r\n", got)
 }
 
 func TestRedactErr(t *testing.T) {

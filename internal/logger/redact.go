@@ -42,7 +42,7 @@ var redactPatterns = []struct {
 
 // A header this regex misses leaves its whole block body unredacted, so it
 // must accept "|2" / ">4-" indicators and trailing YAML comments too.
-var blockScalarHeaderRe = regexp.MustCompile(`(?i)^(\s*)["']?[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*:\s*[|>][0-9+-]{0,2}\s*(?:#.*)?$`)
+var blockScalarHeaderRe = regexp.MustCompile(`(?i)^(\s*)(?:-\s+)?["']?[A-Za-z0-9_-]*` + secretKeyAlt + `["']?\s*:\s*[|>][0-9+-]{0,2}\s*(?:#.*)?$`)
 
 // Quoted bodies are walked by redactQuotedValues, not matched greedily: a
 // value whose raw text ends in a backslash would overrun its closing quote,
@@ -75,7 +75,11 @@ func Redact(s string) string {
 				continue
 			}
 			if indent := leadingIndent(line); indent > blockIndent {
-				out = append(out, line[:indent]+"[REDACTED]")
+				eol := ""
+				if strings.HasSuffix(line, "\r") {
+					eol = "\r"
+				}
+				out = append(out, line[:indent]+"[REDACTED]"+eol)
 				continue
 			}
 			inBlock = false
