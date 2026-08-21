@@ -99,88 +99,7 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 				return yamlClipboardMsg{content: content, count: 1, err: err}
 			})
 	case model.LevelOwned:
-		// Bulk path mirrors LevelResources: gate on visible selection so a
-		// selection that's been filtered out of view falls through to the
-		// cursor branch instead of dispatching an empty fetch. Per-item Kind
-		// dispatch (Pod -> GetPodYAML; others -> resolveOwnedResourceType +
-		// GetResourceYAML) is resolved before the closure runs to keep the
-		// goroutine off the model.
-		if items := m.selectedItemsList(); len(items) > 0 {
-			type fetchTarget struct {
-				ns, name string
-				isPod    bool
-				rt       model.ResourceTypeEntry
-				resolved bool
-				kind     string
-			}
-			targets := make([]fetchTarget, len(items))
-			for i, it := range items {
-				itemNs := ns
-				if it.Namespace != "" {
-					itemNs = it.Namespace
-				}
-				t := fetchTarget{ns: itemNs, name: it.Name, kind: it.Kind, isPod: it.Kind == "Pod"}
-				if !t.isPod {
-					t.rt, t.resolved = m.resolveOwnedResourceType(&items[i])
-				}
-				targets[i] = t
-			}
-			return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
-				fmt.Sprintf("Copy YAML (%d items)", len(targets)), target,
-				func(ctx context.Context) tea.Msg {
-					docs := make([]string, 0, len(targets))
-					var failures []string
-					for _, t := range targets {
-						var (
-							content string
-							err     error
-						)
-						switch {
-						case t.isPod:
-							content, err = m.client.GetPodYAML(ctx, kctx, t.ns, t.name)
-						case t.resolved:
-							content, err = m.client.GetResourceYAML(ctx, kctx, t.ns, t.rt, t.name)
-						default:
-							err = fmt.Errorf("unknown resource type: %s", t.kind)
-						}
-						if err != nil {
-							failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
-							continue
-						}
-						docs = append(docs, strings.TrimRight(content, "\n"))
-					}
-					return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
-				})
-		}
-		sel := m.selectedMiddleItem()
-		if sel == nil {
-			return nil
-		}
-		name := sel.Name
-		itemNs := ns
-		if sel.Namespace != "" {
-			itemNs = sel.Namespace
-		}
-		if sel.Kind == "Pod" {
-			return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
-				"Copy YAML: "+name, target,
-				func(ctx context.Context) tea.Msg {
-					content, err := m.client.GetPodYAML(ctx, kctx, itemNs, name)
-					return yamlClipboardMsg{content: content, count: 1, err: err}
-				})
-		}
-		rt, ok := m.resolveOwnedResourceType(sel)
-		if !ok {
-			return func() tea.Msg {
-				return yamlClipboardMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
-			}
-		}
-		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
-			"Copy YAML: "+name, target,
-			func(ctx context.Context) tea.Msg {
-				content, err := m.client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
-				return yamlClipboardMsg{content: content, count: 1, err: err}
-			})
+		return m.copyYAMLToClipboardOwned(kctx, ns, target)
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
 		// Bulk path: if the user has selected N containers in this Pod,
@@ -215,6 +134,89 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 			})
 	}
 	return nil
+}
+
+// copyYAMLToClipboardOwned handles the LevelOwned case of
+// copyYAMLToClipboard, split out to keep cyclomatic complexity under 30.
+// The bulk path gates on visible selection so a selection filtered out of
+// view falls through to the cursor branch instead of an empty fetch.
+func (m Model) copyYAMLToClipboardOwned(kctx, ns, target string) tea.Cmd {
+	if items := m.selectedItemsList(); len(items) > 0 {
+		type fetchTarget struct {
+			ns, name string
+			isPod    bool
+			rt       model.ResourceTypeEntry
+			resolved bool
+			kind     string
+		}
+		targets := make([]fetchTarget, len(items))
+		for i, it := range items {
+			itemNs := ns
+			if it.Namespace != "" {
+				itemNs = it.Namespace
+			}
+			t := fetchTarget{ns: itemNs, name: it.Name, kind: it.Kind, isPod: it.Kind == "Pod"}
+			if !t.isPod {
+				t.rt, t.resolved = m.resolveOwnedResourceType(&items[i])
+			}
+			targets[i] = t
+		}
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			fmt.Sprintf("Copy YAML (%d items)", len(targets)), target,
+			func(ctx context.Context) tea.Msg {
+				docs := make([]string, 0, len(targets))
+				var failures []string
+				for _, t := range targets {
+					var (
+						content string
+						err     error
+					)
+					switch {
+					case t.isPod:
+						content, err = m.client.GetPodYAML(ctx, kctx, t.ns, t.name)
+					case t.resolved:
+						content, err = m.client.GetResourceYAML(ctx, kctx, t.ns, t.rt, t.name)
+					default:
+						err = fmt.Errorf("unknown resource type: %s", t.kind)
+					}
+					if err != nil {
+						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+						continue
+					}
+					docs = append(docs, strings.TrimRight(content, "\n"))
+				}
+				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
+			})
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return nil
+	}
+	name := sel.Name
+	itemNs := ns
+	if sel.Namespace != "" {
+		itemNs = sel.Namespace
+	}
+	if sel.Kind == "Pod" {
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			"Copy YAML: "+name, target,
+			func(ctx context.Context) tea.Msg {
+				content, err := m.client.GetPodYAML(ctx, kctx, itemNs, name)
+				return yamlClipboardMsg{content: content, count: 1, err: err}
+			})
+	}
+	rt, ok := m.resolveOwnedResourceType(sel)
+	if !ok {
+		return func() tea.Msg {
+			return yamlClipboardMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
+		}
+	}
+	return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+		"Copy YAML: "+name, target,
+		func(ctx context.Context) tea.Msg {
+			content, err := m.client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
+			return yamlClipboardMsg{content: content, count: 1, err: err}
+		})
 }
 
 // copyYAMLForScope is the scope-driven sibling of copyYAMLToClipboard.

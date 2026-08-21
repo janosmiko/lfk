@@ -92,6 +92,14 @@ func (m Model) handleLogTopKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) { //nol
 		m.logTop.cursor = 0
 		m.logTopSyncScroll()
 		return m, nil
+	}
+	return m.handleLogTopKeyExtended(msg, kb)
+}
+
+// handleLogTopKeyExtended handles the second half of Log Top normal-mode
+// keys, split from handleLogTopKey to keep cyclomatic complexity under 30.
+func (m Model) handleLogTopKeyExtended(msg tea.KeyPressMsg, kb ui.Keybindings) (tea.Model, tea.Cmd) { //nolint:unparam // tea.Cmd return is part of the action-key handler convention; may carry cmds in future
+	switch msg.String() {
 	case ".":
 		m.logTop.lineInput = ""
 		return m.openLogTopGroupBy(), nil

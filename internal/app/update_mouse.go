@@ -76,63 +76,12 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		m = next
 	}
 
-	// Mouse wheel inside the embedded PTY pane scrolls the scrollback
-	// ring (when present). One line per tick matches what most native
-	// terminals do for their own scrollback. We only intercept the
-	// wheel — clicks and other mouse input fall through so tab-bar
-	// clicks and host-terminal selection (shift+drag) keep working.
-	if m.mode == modeExec {
-		switch mouse.Button {
-		case tea.MouseWheelUp:
-			return m.execScrollBy(-1), nil
-		case tea.MouseWheelDown:
-			return m.execScrollBy(1), nil
-		}
-		// Fall through for non-wheel mouse events (tab-bar clicks etc.)
+	if mdl, cmd, handled := m.handleModeWheel(msg, mouse); handled {
+		return mdl, cmd
 	}
 
-	// Handle mouse scroll in log viewer mode.
-	if m.mode == modeLogs {
-		return m.handleLogsMouse(msg)
-	}
-
-	// Object Explorer wheel: route by the pointer column. Over the right
-	// (preview) pane the wheel scrolls the YAML preview. Over the left and
-	// middle panes it moves the tree cursor — mirroring the main explorer's
-	// per-pane wheel routing (#379). Non-wheel mouse falls through so
-	// tab-bar clicks keep working.
-	if m.mode == modeObjectExplorer {
-		switch mouse.Button {
-		case tea.MouseWheelUp:
-			return m.handleObjectExplorerWheel(mouse.X, -1)
-		case tea.MouseWheelDown:
-			return m.handleObjectExplorerWheel(mouse.X, 1)
-		}
-	}
-
-	// Wheel scroll in the other full-screen viewer modes (YAML, Describe,
-	// Diff, Help, Explain). Synthesize 3 j/k key presses per tick so the
-	// existing per-mode scroll logic — cursor advance, ensure-visible,
-	// clamps, page-X tracking, sub-mode dispatch — runs unchanged.
-	// Other mouse buttons fall through so tab-bar clicks still work.
-	if isViewerMode(m.mode) {
-		switch mouse.Button {
-		case tea.MouseWheelUp:
-			return m.dispatchWheelKey("k")
-		case tea.MouseWheelDown:
-			return m.dispatchWheelKey("j")
-		}
-	}
-
-	// Handle tab bar clicks in any mode — but only when no centered
-	// overlay is open. A modal overlay covers the rest of the screen
-	// and owns mouse input. Without this guard a click on row 1 would
-	// switch tabs underneath the modal.
-	if m.overlay == overlayNone && len(m.tabs) > 1 && mouse.Button == tea.MouseLeft && isMousePress(msg) && mouse.Y == 1 {
-		if tab := m.tabAtX(mouse.X); tab >= 0 && tab != m.activeTab {
-			return m.switchToTab(tab)
-		}
-		return m, nil
+	if mdl, cmd, handled := m.handleTabBarClick(msg, mouse); handled {
+		return mdl, cmd
 	}
 
 	// Don't handle mouse outside the explorer mode.
@@ -165,6 +114,72 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.handleMouseRightClick(mouse.X, mouse.Y)
 	}
 	return m, nil
+}
+
+// handleModeWheel routes a wheel tick to the mode-owned pane (exec, logs,
+// object explorer, viewer), split from handleMouse to keep gocyclo under 30.
+// Unhandled input falls through so tab-bar clicks still work.
+func (m Model) handleModeWheel(msg tea.MouseMsg, mouse tea.Mouse) (tea.Model, tea.Cmd, bool) {
+	// Mouse wheel in the exec pane scrolls the scrollback ring, one line per
+	// tick like native terminals. Only the wheel is intercepted — clicks fall
+	// through so tab-bar clicks and host-terminal selection keep working.
+	if m.mode == modeExec {
+		switch mouse.Button {
+		case tea.MouseWheelUp:
+			return m.execScrollBy(-1), nil, true
+		case tea.MouseWheelDown:
+			return m.execScrollBy(1), nil, true
+		}
+		// Fall through for non-wheel mouse events (tab-bar clicks etc.)
+	}
+
+	// Handle mouse scroll in log viewer mode.
+	if m.mode == modeLogs {
+		mdl, cmd := m.handleLogsMouse(msg)
+		return mdl, cmd, true
+	}
+
+	// Object Explorer wheel: pointer column decides the pane — right
+	// (preview) scrolls YAML, left/middle move the tree cursor, mirroring
+	// the main explorer's per-pane routing (#379). Non-wheel falls through.
+	if m.mode == modeObjectExplorer {
+		switch mouse.Button {
+		case tea.MouseWheelUp:
+			return m.handleObjectExplorerWheel(mouse.X, -1), nil, true
+		case tea.MouseWheelDown:
+			return m.handleObjectExplorerWheel(mouse.X, 1), nil, true
+		}
+	}
+
+	// Viewer-mode wheel synthesizes 3 j/k presses per tick so per-mode
+	// scroll logic (cursor, clamps, sub-mode dispatch) runs unchanged.
+	// Non-wheel buttons fall through so tab-bar clicks still work.
+	if isViewerMode(m.mode) {
+		switch mouse.Button {
+		case tea.MouseWheelUp:
+			mdl, cmd := m.dispatchWheelKey("k")
+			return mdl, cmd, true
+		case tea.MouseWheelDown:
+			mdl, cmd := m.dispatchWheelKey("j")
+			return mdl, cmd, true
+		}
+	}
+
+	return m, nil, false
+}
+
+// handleTabBarClick switches tabs on a row-1 click, but only when no
+// centered overlay is open — an overlay covers the screen and owns mouse
+// input, so this guard stops a click reaching tabs underneath it.
+func (m Model) handleTabBarClick(msg tea.MouseMsg, mouse tea.Mouse) (tea.Model, tea.Cmd, bool) {
+	if m.overlay == overlayNone && len(m.tabs) > 1 && mouse.Button == tea.MouseLeft && isMousePress(msg) && mouse.Y == 1 {
+		if tab := m.tabAtX(mouse.X); tab >= 0 && tab != m.activeTab {
+			mdl, cmd := m.switchToTab(tab)
+			return mdl, cmd, true
+		}
+		return m, nil, true
+	}
+	return m, nil, false
 }
 
 // wheelQuietGap is how long the wheel must be silent before a tick counts as a
@@ -321,9 +336,9 @@ func (m *Model) markWheelBurstDeadIfClamped(before, after int) {
 // handleObjectExplorerWheel routes a wheel tick in the Object Explorer to
 // the pane under the pointer at x. Over the right (preview) pane it scrolls
 // the YAML preview, mirroring the J/K keys. Over the left and middle panes
-// it moves the tree cursor, mirroring j/k. dir is -1 (up) or +1 (down);
-// each tick moves wheelStep lines to match the other viewers' wheel feel.
-func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
+// it moves the tree cursor, mirroring j/k. dir is -1 (up) or +1 (down).
+// The tree and preview are fully in memory, so this never needs a Cmd.
+func (m Model) handleObjectExplorerWheel(x, dir int) tea.Model {
 	const wheelStep = 3
 	rt := &m.objectExplorerView
 	if x >= m.objectExplorerRightPaneStart() {
@@ -340,13 +355,13 @@ func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 			m.clampObjectExplorerPreviewScroll()
 		}
 		m.markWheelBurstDeadIfClamped(before, rt.previewScroll)
-		return m, nil
+		return m
 	}
 	before := rt.cursor
 	m.moveObjectExplorerCursor(dir * wheelStep)
 	m.clampObjectExplorerScroll()
 	m.markWheelBurstDeadIfClamped(before, rt.cursor)
-	return m, nil
+	return m
 }
 
 // handleLogsMouse routes a mouse event in the log viewer. The wheel scrolls

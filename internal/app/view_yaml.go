@@ -38,57 +38,7 @@ func (m Model) viewYAML() string {
 		}
 	}
 	title := ui.ViewTitle(m.width, yamlTitleText)
-	var yamlHints []ui.HintEntry
-	if m.yamlView.visualMode {
-		yamlHints = []ui.HintEntry{
-			{Key: "j/k", Desc: "extend selection"},
-			{Key: "y", Desc: "copy selected"},
-			{Key: "v/V/ctrl+v", Desc: "switch mode"},
-			{Key: "esc", Desc: "cancel"},
-		}
-	} else {
-		yamlHints = []ui.HintEntry{
-			{Key: "j/k", Desc: "scroll"},
-			{Key: "g/G", Desc: "top/bottom"},
-			{Key: "ctrl+d/u", Desc: "half page"},
-			{Key: "ctrl+f/b", Desc: "page"},
-			{Key: ui.ActiveKeybindings.Search, Desc: "search"},
-			{Key: "123G", Desc: "goto"},
-			{Key: "v/V/ctrl+v", Desc: "visual select"},
-			{Key: "y", Desc: "copy"},
-			{Key: ui.ActiveKeybindings.ToggleFold, Desc: "fold"},
-			{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
-			{Key: "m", Desc: "blame"},
-			{Key: "ctrl+e", Desc: "edit"},
-			{Key: "O", Desc: "object explorer"},
-			{Key: "I", Desc: "explain"},
-			{Key: ui.ActiveKeybindings.FieldDoc, Desc: "schema"},
-			{Key: "q/esc", Desc: "back"},
-		}
-	}
-	hint := ui.RenderHintBar(yamlHints, fullWidth)
-
-	// Status messages (e.g. copy feedback) take precedence over the hint
-	// bar and any search prompt \u2014 same pattern the log viewer uses.
-	switch {
-	case m.hasStatusMessage():
-		hint = m.renderStatusHint()
-	case m.yamlView.searchMode:
-		yamlModeInd := ui.SearchModeIndicator(m.yamlView.searchText.Value)
-		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
-		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
-	case m.yamlView.searchText.Value != "":
-		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlView.matchIdx+1, len(m.yamlView.matchLines))
-		if len(m.yamlView.matchLines) == 0 {
-			matchInfo = " [no matches]"
-		}
-		nav := ""
-		if len(m.yamlView.matchLines) > 0 {
-			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render(ui.ActiveKeybindings.NextMatch+"/"+ui.ActiveKeybindings.PrevMatch) + ui.BarDimStyle.Render(": next/prev")
-		}
-		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.yamlView.searchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
-		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
-	}
+	hint := m.yamlHintBar(fullWidth)
 
 	maxLines := max(m.height-4, 3)
 
@@ -204,6 +154,62 @@ func (m Model) viewYAML() string {
 		return lipgloss.JoinVertical(lipgloss.Left, panes, hint)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
+}
+
+// yamlHintBar builds the YAML viewer's hint bar, split from viewYAML to keep
+// cyclomatic complexity under 30. Status messages and search prompts take
+// precedence over the plain hint bar — same pattern the log viewer uses.
+func (m Model) yamlHintBar(fullWidth int) string {
+	var yamlHints []ui.HintEntry
+	if m.yamlView.visualMode {
+		yamlHints = []ui.HintEntry{
+			{Key: "j/k", Desc: "extend selection"},
+			{Key: "y", Desc: "copy selected"},
+			{Key: "v/V/ctrl+v", Desc: "switch mode"},
+			{Key: "esc", Desc: "cancel"},
+		}
+	} else {
+		yamlHints = []ui.HintEntry{
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "g/G", Desc: "top/bottom"},
+			{Key: "ctrl+d/u", Desc: "half page"},
+			{Key: "ctrl+f/b", Desc: "page"},
+			{Key: ui.ActiveKeybindings.Search, Desc: "search"},
+			{Key: "123G", Desc: "goto"},
+			{Key: "v/V/ctrl+v", Desc: "visual select"},
+			{Key: "y", Desc: "copy"},
+			{Key: ui.ActiveKeybindings.ToggleFold, Desc: "fold"},
+			{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+			{Key: "m", Desc: "blame"},
+			{Key: "ctrl+e", Desc: "edit"},
+			{Key: "O", Desc: "object explorer"},
+			{Key: "I", Desc: "explain"},
+			{Key: ui.ActiveKeybindings.FieldDoc, Desc: "schema"},
+			{Key: "q/esc", Desc: "back"},
+		}
+	}
+	hint := ui.RenderHintBar(yamlHints, fullWidth)
+
+	switch {
+	case m.hasStatusMessage():
+		hint = m.renderStatusHint()
+	case m.yamlView.searchMode:
+		yamlModeInd := ui.SearchModeIndicator(m.yamlView.searchText.Value)
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
+		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
+	case m.yamlView.searchText.Value != "":
+		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlView.matchIdx+1, len(m.yamlView.matchLines))
+		if len(m.yamlView.matchLines) == 0 {
+			matchInfo = " [no matches]"
+		}
+		nav := ""
+		if len(m.yamlView.matchLines) > 0 {
+			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render(ui.ActiveKeybindings.NextMatch+"/"+ui.ActiveKeybindings.PrevMatch) + ui.BarDimStyle.Render(": next/prev")
+		}
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.yamlView.searchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
+		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
+	}
+	return hint
 }
 
 func (m Model) yamlTitle() string {

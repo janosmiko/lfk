@@ -89,6 +89,15 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
+	}
+	return m.handleColorschemeNormalModeExtended(msg, filtered, selectableCount)
+}
+
+// handleColorschemeNormalModeExtended handles the second half of colorscheme
+// normal-mode keys, split from handleColorschemeNormalMode to keep
+// cyclomatic complexity under 30.
+func (m Model) handleColorschemeNormalModeExtended(msg tea.KeyPressMsg, filtered []string, selectableCount int) (tea.Model, tea.Cmd) {
+	switch msg.String() {
 	case "ctrl+f", "pgdown":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, 20, selectableCount-1)
 		m.previewSchemeAtCursor(filtered)
