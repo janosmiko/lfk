@@ -113,6 +113,43 @@ func TestWaitForPortForwardSignal_SupersededDoesNotDropPendingUpdate(t *testing.
 	}
 }
 
+// A superseded waiter tears down after its replacement took over, so its
+// teardown must leave the replacement's eviction deadline alone. Otherwise
+// the terminal entry never gets the render that evicts it.
+func TestWaitForPortForwardUpdate_SupersededTeardownKeepsTheEvictionDeadline(t *testing.T) {
+	m := basePush80Model()
+	current := time.Now()
+	mgr := k8s.NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.SeedTerminalEntryForTest(1, current.Add(-2750*time.Millisecond))
+	m.portForwardMgr = mgr
+
+	older := m.waitForPortForwardUpdate()
+	require.NotNil(t, older)
+	olderDone := make(chan tea.Msg, 1)
+	go func() { olderDone <- older() }()
+
+	// Give the older waiter time to arm the deadline before it is superseded.
+	time.Sleep(30 * time.Millisecond)
+
+	newer := m.waitForPortForwardUpdate()
+	require.NotNil(t, newer)
+	newerDone := make(chan tea.Msg, 1)
+	go func() { newerDone <- newer() }()
+
+	select {
+	case <-olderDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the superseded waitForPortForwardUpdate waiter did not exit")
+	}
+
+	select {
+	case msg := <-newerDone:
+		assert.IsType(t, portForwardUpdateMsg{}, msg)
+	case <-time.After(3 * time.Second):
+		t.Fatal("the newer waiter never fired: the superseded waiter's teardown took the eviction deadline with it")
+	}
+}
+
 // SetUpdateListener keeps only one slot, so an older listener must be
 // released rather than blocking forever once a newer one is armed.
 func TestWaitForPortForwardUpdate_SupersededListenerExits(t *testing.T) {

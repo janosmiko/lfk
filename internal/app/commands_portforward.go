@@ -115,10 +115,10 @@ func (m Model) waitForPortForwardUpdate() tea.Cmd {
 	superseded := mgr.SetUpdateListener(ch)
 	return func() tea.Msg {
 		var deadlineC <-chan time.Time
-		if d, ok := mgr.ArmEvictionRefresh(); ok {
+		if d, arm, ok := mgr.ArmEvictionRefresh(); ok {
 			timer := time.NewTimer(d)
 			defer timer.Stop()
-			defer mgr.DisarmEvictionRefresh()
+			defer mgr.DisarmEvictionRefresh(arm)
 			deadlineC = timer.C
 		}
 		return waitForPortForwardSignal(ch, deadlineC, superseded)

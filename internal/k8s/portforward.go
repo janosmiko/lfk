@@ -62,6 +62,10 @@ type PortForwardManager struct {
 	// tick is already waiting on, so repeated arm attempts between renders
 	// don't stack duplicate timers. Zero means nothing armed.
 	evictionArmedAt time.Time
+	// evictionArm names the waiter holding evictionArmedAt. A superseded
+	// waiter tears down after its replacement armed, so it must be told apart
+	// from the current owner or it clears a deadline nobody re-arms.
+	evictionArm uint64
 }
 
 // NewPortForwardManager creates a new port forward manager.
@@ -84,6 +88,9 @@ func NewPortForwardManagerWithClock(now func() time.Time) *PortForwardManager {
 func (m *PortForwardManager) SetUpdateListener(ch chan<- struct{}) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	// The retired waiter drops its eviction timer, so release the deadline
+	// for the incoming one to arm.
+	m.evictionArmedAt = time.Time{}
 	return m.listener.setLocked(ch)
 }
 
@@ -142,29 +149,35 @@ func isTerminalPortForwardStatus(s PortForwardStatus) bool {
 
 // ArmEvictionRefresh returns the delay until the earliest terminal,
 // already-shown entry is evictable, arming that deadline so concurrent
-// callers dedupe onto one pending timer until DisarmEvictionRefresh runs.
-func (m *PortForwardManager) ArmEvictionRefresh() (time.Duration, bool) {
+// callers dedupe onto one timer. The arm id passed back to DisarmEvictionRefresh
+// releases it.
+func (m *PortForwardManager) ArmEvictionRefresh() (time.Duration, uint64, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	deadline, found := m.earliestEvictionDeadlineLocked()
 	if !found {
-		return 0, false
+		return 0, 0, false
 	}
 	if !m.evictionArmedAt.IsZero() && !deadline.Before(m.evictionArmedAt) {
-		return 0, false
+		return 0, 0, false
 	}
 	m.evictionArmedAt = deadline
+	m.evictionArm++
 
 	d := max(deadline.Sub(m.now()), 0)
-	return d, true
+	return d, m.evictionArm, true
 }
 
 // DisarmEvictionRefresh clears the armed deadline, allowing the next
-// ArmEvictionRefresh call to schedule again.
-func (m *PortForwardManager) DisarmEvictionRefresh() {
+// ArmEvictionRefresh call to schedule again. A stale arm is ignored, so a
+// waiter tearing down late cannot release its successor's deadline.
+func (m *PortForwardManager) DisarmEvictionRefresh(arm uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if arm != m.evictionArm {
+		return
+	}
 	m.evictionArmedAt = time.Time{}
 }
 
