@@ -145,11 +145,9 @@ func (m Model) handleModeWheel(msg tea.MouseMsg, mouse tea.Mouse) (tea.Model, te
 	if m.mode == modeObjectExplorer {
 		switch mouse.Button {
 		case tea.MouseWheelUp:
-			mdl, cmd := m.handleObjectExplorerWheel(mouse.X, -1)
-			return mdl, cmd, true
+			return m.handleObjectExplorerWheel(mouse.X, -1), nil, true
 		case tea.MouseWheelDown:
-			mdl, cmd := m.handleObjectExplorerWheel(mouse.X, 1)
-			return mdl, cmd, true
+			return m.handleObjectExplorerWheel(mouse.X, 1), nil, true
 		}
 	}
 
@@ -338,9 +336,9 @@ func (m *Model) markWheelBurstDeadIfClamped(before, after int) {
 // handleObjectExplorerWheel routes a wheel tick in the Object Explorer to
 // the pane under the pointer at x. Over the right (preview) pane it scrolls
 // the YAML preview, mirroring the J/K keys. Over the left and middle panes
-// it moves the tree cursor, mirroring j/k. dir is -1 (up) or +1 (down);
-// each tick moves wheelStep lines to match the other viewers' wheel feel.
-func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
+// it moves the tree cursor, mirroring j/k. dir is -1 (up) or +1 (down).
+// The tree and preview are fully in memory, so this never needs a Cmd.
+func (m Model) handleObjectExplorerWheel(x, dir int) tea.Model {
 	const wheelStep = 3
 	rt := &m.objectExplorerView
 	if x >= m.objectExplorerRightPaneStart() {
@@ -357,13 +355,13 @@ func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
 			m.clampObjectExplorerPreviewScroll()
 		}
 		m.markWheelBurstDeadIfClamped(before, rt.previewScroll)
-		return m, nil
+		return m
 	}
 	before := rt.cursor
 	m.moveObjectExplorerCursor(dir * wheelStep)
 	m.clampObjectExplorerScroll()
 	m.markWheelBurstDeadIfClamped(before, rt.cursor)
-	return m, nil
+	return m
 }
 
 // handleLogsMouse routes a mouse event in the log viewer. The wheel scrolls
