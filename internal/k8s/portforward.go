@@ -53,19 +53,15 @@ type PortForwardManager struct {
 	mu      sync.Mutex
 	entries []*PortForwardEntry
 	nextID  int
-	// updates carries one token per change. The manager sends on it while
-	// holding m.mu, so no SetUpdateListener can close superseded between the
-	// choice of listener and the delivery to it.
-	updates chan<- struct{}
-	now     func() time.Time
+	// listener carries one token per change. The manager sends while holding
+	// m.mu, so no SetUpdateListener can retire the listener between the choice
+	// of it and the delivery to it.
+	listener updateListener
+	now      func() time.Time
 	// evictionArmedAt is the deadline an in-flight waitForPortForwardUpdate
 	// tick is already waiting on, so repeated arm attempts between renders
 	// don't stack duplicate timers. Zero means nothing armed.
 	evictionArmedAt time.Time
-	// superseded is closed by the next SetUpdateListener call, so a
-	// listener goroutine waiting on the channel it registered exits
-	// instead of leaking once a newer listener takes the single slot.
-	superseded chan struct{}
 }
 
 // NewPortForwardManager creates a new port forward manager.
@@ -88,25 +84,13 @@ func NewPortForwardManagerWithClock(now func() time.Time) *PortForwardManager {
 func (m *PortForwardManager) SetUpdateListener(ch chan<- struct{}) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.superseded != nil {
-		close(m.superseded)
-	}
-	m.updates = ch
-	m.superseded = make(chan struct{})
-	return m.superseded
+	return m.listener.setLocked(ch)
 }
 
 // notifyLocked delivers one update to the current listener. Callers must hold
-// m.mu. The send is non-blocking: a listener that already returned must never
-// stall the manager.
+// m.mu.
 func (m *PortForwardManager) notifyLocked() {
-	if m.updates == nil {
-		return
-	}
-	select {
-	case m.updates <- struct{}{}:
-	default:
-	}
+	m.listener.notifyLocked()
 }
 
 // Entries returns a copy of all port forward entries.

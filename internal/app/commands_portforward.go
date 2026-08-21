@@ -128,17 +128,8 @@ func (m Model) waitForPortForwardUpdate() tea.Cmd {
 // waitForPortForwardSignal blocks until an update, the eviction deadline, or
 // supersession, whichever is first.
 func waitForPortForwardSignal(ch chan struct{}, deadlineC <-chan time.Time, superseded <-chan struct{}) tea.Msg {
-	select {
-	case <-ch:
-	case <-deadlineC:
-	case <-superseded:
-		// select can pick superseded over a racing write to ch. Drain once
-		// more so that pending update is not dropped.
-		select {
-		case <-ch:
-		default:
-			return nil
-		}
+	if !waitForUpdateSignal(ch, deadlineC, superseded) {
+		return nil
 	}
 	return portForwardUpdateMsg{}
 }

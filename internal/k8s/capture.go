@@ -58,18 +58,20 @@ type CaptureEntry struct {
 	OutputPath  string
 	LastError   string
 
-	cmd      *exec.Cmd
-	cancel   context.CancelFunc
-	decoder  *packetDecoder
-	onUpdate func()
+	cmd     *exec.Cmd
+	cancel  context.CancelFunc
+	decoder *packetDecoder
 }
 
 // CaptureManager tracks running captures across the lfk session.
 type CaptureManager struct {
-	mu       sync.Mutex
-	entries  []*CaptureEntry
-	nextID   int
-	onUpdate func()
+	mu      sync.Mutex
+	entries []*CaptureEntry
+	nextID  int
+	// listener carries one token per change. The manager sends while holding
+	// m.mu, so no SetUpdateListener can retire the listener between the choice
+	// of it and the delivery to it.
+	listener updateListener
 
 	// backendFactory builds backend implementations. Defaults to
 	// defaultBackendFactory. Tests inject fakes via SetBackendFactory.
@@ -89,16 +91,23 @@ func (m *CaptureManager) SetBackendFactory(f func(CaptureBackend) (captureBacken
 	m.backendFactory = f
 }
 
-// SetUpdateCallback registers a no-arg notifier fired when entry state changes.
-func (m *CaptureManager) SetUpdateCallback(fn func()) {
+// SetUpdateListener registers ch as the single listener for entry changes. The
+// returned channel closes when a later call replaces this listener, so the
+// superseded one stops waiting instead of leaking.
+func (m *CaptureManager) SetUpdateListener(ch chan<- struct{}) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.onUpdate = fn
+	return m.listener.setLocked(ch)
 }
 
-// Entries returns a snapshot of all entries (running and stopped). Only
-// the public fields are populated — the internal control handles (cmd,
-// cancel, decoder, onUpdate) stay zero-valued in the snapshot so callers
+// notifyLocked delivers one update to the current listener. Callers must hold
+// m.mu.
+func (m *CaptureManager) notifyLocked() {
+	m.listener.notifyLocked()
+}
+
+// Entries returns a snapshot of all entries (running and stopped). The
+// internal control handles (cmd, cancel, decoder) stay zero-valued so callers
 // can't accidentally drive lifecycle from a stale copy.
 //
 // PacketCount and ByteCount are read via atomic.LoadInt64 because the decoder
@@ -226,7 +235,6 @@ func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket
 		OutputPath: outPath,
 		cmd:        cmd,
 		cancel:     cancel,
-		onUpdate:   m.onUpdate,
 	}
 	d := &packetDecoder{
 		file:        f,
@@ -236,11 +244,8 @@ func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket
 	}
 	entry.decoder = d
 	m.entries = append(m.entries, entry)
-	cb := m.onUpdate
+	m.notifyLocked()
 	m.mu.Unlock()
-	if cb != nil {
-		cb()
-	}
 
 	// Decoder goroutine: tees pcap to file + decodes. After the stream
 	// closes, reap the child process and surface any non-zero exit + stderr
@@ -266,11 +271,8 @@ func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket
 		m.mu.Lock()
 		entry.Status, entry.LastError = classifyCaptureExit(req.Backend, runErr, waitErr, stderrTxt, ctx.Err())
 		entry.StoppedAt = &now
-		cb := m.onUpdate
+		m.notifyLocked()
 		m.mu.Unlock()
-		if cb != nil {
-			cb()
-		}
 	}()
 
 	// Flip Starting -> Running once the decoder has had a chance to consume the pcap header.
@@ -281,11 +283,8 @@ func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket
 			if entry.Status == CaptureStarting {
 				entry.Status = CaptureRunning
 			}
-			cb := m.onUpdate
+			m.notifyLocked()
 			m.mu.Unlock()
-			if cb != nil {
-				cb()
-			}
 		case <-ctx.Done():
 		}
 	}()

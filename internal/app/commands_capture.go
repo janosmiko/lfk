@@ -85,23 +85,19 @@ type kubesharkLaunchedMsg struct {
 // pattern.
 type captureUpdateMsg struct{}
 
-// waitForCaptureUpdate registers a manager-level update callback and returns a
-// tea.Cmd that blocks until the next state change. The handler is responsible
-// for re-arming via another waitForCaptureUpdate() — same pattern as
+// waitForCaptureUpdate blocks until the next capture state change. The handler
+// must re-arm it with another waitForCaptureUpdate(), same as
 // waitForPortForwardUpdate.
 func (m Model) waitForCaptureUpdate() tea.Cmd {
 	if m.captureMgr == nil {
 		return nil
 	}
 	ch := make(chan struct{}, 1)
-	m.captureMgr.SetUpdateCallback(func() {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	})
+	superseded := m.captureMgr.SetUpdateListener(ch)
 	return func() tea.Msg {
-		<-ch
+		if !waitForUpdateSignal(ch, nil, superseded) {
+			return nil
+		}
 		return captureUpdateMsg{}
 	}
 }
