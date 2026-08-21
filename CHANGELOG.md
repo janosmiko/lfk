@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.18.0](https://github.com/janosmiko/lfk/compare/v0.17.5...v0.18.0) (2026-08-21)
+
+
+### Features
+
+* require Go 1.27.0 ([#662](https://github.com/janosmiko/lfk/issues/662)) ([4cfd6e1](https://github.com/janosmiko/lfk/commit/4cfd6e17f2cb10941c3c55f2a0b3b6658ace02ff))
+
+
+### Bug Fixes
+
+* bound local-cluster List calls and thread reqCtx into kubectl apply ([#650](https://github.com/janosmiko/lfk/issues/650)) ([b54be9f](https://github.com/janosmiko/lfk/commit/b54be9f4fcdcb05842df50984e6dfc9a2b691c64))
+* cancel superseded update listeners in the port-forward and capture managers ([#664](https://github.com/janosmiko/lfk/issues/664)) ([ab1e7b4](https://github.com/janosmiko/lfk/commit/ab1e7b494a77d0d5e50ca9b32fc9e2e19fbf15e0))
+* close exec PTYs on shutdown and evict dead port-forward entries ([#654](https://github.com/janosmiko/lfk/issues/654)) ([749ae45](https://github.com/janosmiko/lfk/commit/749ae45c54b2cefa058dab94a75afefe39d1d208))
+* harden the log redactor against structured secret shapes ([#658](https://github.com/janosmiko/lfk/issues/658)) ([5aa651e](https://github.com/janosmiko/lfk/commit/5aa651e9f62e6736a1bebbd7fca3694c9aeb617a))
+* keep the discovery-error fallback from clobbering a deeper level ([#667](https://github.com/janosmiko/lfk/issues/667)) ([9bd2ba9](https://github.com/janosmiko/lfk/commit/9bd2ba9b837ded430046f65d0ab429a741594e0f))
+* log the pod sub-fetch error in the CronJob resource tree ([#653](https://github.com/janosmiko/lfk/issues/653)) ([5938ad7](https://github.com/janosmiko/lfk/commit/5938ad7dc5fbbaad3997da63efe8a11bbe0d1bbe))
+* redact subprocess output before it reaches logs and the status bar ([#647](https://github.com/janosmiko/lfk/issues/647)) ([4b4b29b](https://github.com/janosmiko/lfk/commit/4b4b29b83468408e4bf3efbf1b1dc120f7d4348d))
+* sanitize the exec terminal title before rendering ([#651](https://github.com/janosmiko/lfk/issues/651)) ([0fbc0ca](https://github.com/janosmiko/lfk/commit/0fbc0ca5d45486a8b1f5154a0500db1dc63899d7))
+* score fuzzy-filtered items on the field that matched them ([#668](https://github.com/janosmiko/lfk/issues/668)) ([5889618](https://github.com/janosmiko/lfk/commit/588961896baac333767ac2763dfc437673ecc7b2))
+
+
+### Performance Improvements
+
+* cache the per-frame recomputation in the explorer render path ([#655](https://github.com/janosmiko/lfk/issues/655)) ([d60cddd](https://github.com/janosmiko/lfk/commit/d60cdddf1fb4ff7d0fa7f4950910fe6457452655))
+* serve watch-tick refreshes from the informer cache ([#659](https://github.com/janosmiko/lfk/issues/659)) ([de7a51d](https://github.com/janosmiko/lfk/commit/de7a51d105a31335ae19b409fe002bc9b1464227))
+* skip preview refetch when the hovered object is unchanged ([#656](https://github.com/janosmiko/lfk/issues/656)) ([612da6f](https://github.com/janosmiko/lfk/commit/612da6f926ef7fb3c7b2890c519ae45308eaa1dd))
+* throttle list metrics refresh to a minimum interval ([#661](https://github.com/janosmiko/lfk/issues/661)) ([4abb7a6](https://github.com/janosmiko/lfk/commit/4abb7a6b313ab206d7bbf6e719c4e9fe212cbde4))
+
 ## [0.17.5](https://github.com/janosmiko/lfk/compare/v0.17.4...v0.17.5) (2026-08-19)
 
 
