@@ -50,18 +50,21 @@ const portForwardEvictionGrace = 3 * time.Second
 
 // PortForwardManager manages active port forwards.
 type PortForwardManager struct {
-	mu       sync.Mutex
-	entries  []*PortForwardEntry
-	nextID   int
-	onUpdate func() // callback when entries change
-	now      func() time.Time
+	mu      sync.Mutex
+	entries []*PortForwardEntry
+	nextID  int
+	// updates carries one token per change. The manager sends on it while
+	// holding m.mu, so no SetUpdateListener can close superseded between the
+	// choice of listener and the delivery to it.
+	updates chan<- struct{}
+	now     func() time.Time
 	// evictionArmedAt is the deadline an in-flight waitForPortForwardUpdate
 	// tick is already waiting on, so repeated arm attempts between renders
 	// don't stack duplicate timers. Zero means nothing armed.
 	evictionArmedAt time.Time
-	// superseded is closed by the next SetUpdateCallback call, so a
-	// listener goroutine blocked on the callback it registered exits
-	// instead of leaking once a newer listener takes the single callback slot.
+	// superseded is closed by the next SetUpdateListener call, so a
+	// listener goroutine waiting on the channel it registered exits
+	// instead of leaking once a newer listener takes the single slot.
 	superseded chan struct{}
 }
 
@@ -79,18 +82,31 @@ func NewPortForwardManagerWithClock(now func() time.Time) *PortForwardManager {
 	}
 }
 
-// SetUpdateCallback sets a callback that is invoked when entries change. The
-// returned channel closes when a later call replaces this callback, letting
-// a superseded listener stop waiting instead of leaking.
-func (m *PortForwardManager) SetUpdateCallback(fn func()) <-chan struct{} {
+// SetUpdateListener registers ch as the single listener for entry changes. The
+// returned channel closes when a later call replaces this listener, so the
+// superseded one stops waiting instead of leaking.
+func (m *PortForwardManager) SetUpdateListener(ch chan<- struct{}) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.superseded != nil {
 		close(m.superseded)
 	}
-	m.onUpdate = fn
+	m.updates = ch
 	m.superseded = make(chan struct{})
 	return m.superseded
+}
+
+// notifyLocked delivers one update to the current listener. Callers must hold
+// m.mu. The send is non-blocking: a listener that already returned must never
+// stall the manager.
+func (m *PortForwardManager) notifyLocked() {
+	if m.updates == nil {
+		return
+	}
+	select {
+	case m.updates <- struct{}{}:
+	default:
+	}
 }
 
 // Entries returns a copy of all port forward entries.
@@ -269,12 +285,8 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 
 	m.mu.Lock()
 	m.entries = append(m.entries, entry)
-	onUpdate := m.onUpdate
+	m.notifyLocked()
 	m.mu.Unlock()
-
-	if onUpdate != nil {
-		onUpdate()
-	}
 
 	// Monitor stdout for readiness confirmation and process lifecycle.
 	go func() {
@@ -303,11 +315,8 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 				if entry.Status == PortForwardStarting {
 					entry.Status = PortForwardRunning
 				}
-				onUpdate := m.onUpdate
+				m.notifyLocked()
 				m.mu.Unlock()
-				if onUpdate != nil {
-					onUpdate()
-				}
 			}
 		}
 
@@ -328,11 +337,8 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 				entry.Status = PortForwardStopped
 			}
 		}
-		onUpdate := m.onUpdate
+		m.notifyLocked()
 		m.mu.Unlock()
-		if onUpdate != nil {
-			onUpdate()
-		}
 	}()
 
 	return id, nil
@@ -357,9 +363,7 @@ func (m *PortForwardManager) Stop(id int) error {
 				"context", e.Context,
 				"localPort", e.LocalPort,
 				"remotePort", e.RemotePort)
-			if m.onUpdate != nil {
-				m.onUpdate()
-			}
+			m.notifyLocked()
 			return nil
 		}
 	}
@@ -385,9 +389,7 @@ func (m *PortForwardManager) Remove(id int) {
 				"namespace", e.Namespace,
 				"context", e.Context,
 				"wasRunning", wasRunning)
-			if m.onUpdate != nil {
-				m.onUpdate()
-			}
+			m.notifyLocked()
 			return
 		}
 	}

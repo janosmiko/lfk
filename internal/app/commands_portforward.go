@@ -112,12 +112,7 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 func (m Model) waitForPortForwardUpdate() tea.Cmd {
 	ch := make(chan struct{}, 1)
 	mgr := m.portForwardMgr
-	superseded := mgr.SetUpdateCallback(func() {
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
-	})
+	superseded := mgr.SetUpdateListener(ch)
 	return func() tea.Msg {
 		var deadlineC <-chan time.Time
 		if d, ok := mgr.ArmEvictionRefresh(); ok {

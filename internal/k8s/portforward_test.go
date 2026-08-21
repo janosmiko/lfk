@@ -36,13 +36,11 @@ func TestPortForwardManagerStopNonexistent(t *testing.T) {
 
 func TestPortForwardManagerUpdateCallback(t *testing.T) {
 	mgr := NewPortForwardManager()
-	called := false
-	mgr.SetUpdateCallback(func() {
-		called = true
-	})
-	// Remove triggers callback path but does nothing since entry doesn't exist.
+	updates := make(chan struct{}, 4)
+	mgr.SetUpdateListener(updates)
+	// Remove triggers the notify path but does nothing since entry doesn't exist.
 	mgr.Remove(1)
-	// StopAll triggers callback path.
+	// StopAll triggers the notify path.
 	mgr.StopAll()
-	assert.False(t, called) // No actual entries to trigger on.
+	assert.Empty(t, updates) // No actual entries to trigger on.
 }

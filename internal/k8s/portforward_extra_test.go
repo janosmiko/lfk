@@ -95,10 +95,8 @@ func TestPortForwardManagerStop_RunningEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
 	_, cancel := context.WithCancel(t.Context())
 
-	callbackCalled := false
-	mgr.SetUpdateCallback(func() {
-		callbackCalled = true
-	})
+	updates := make(chan struct{}, 4)
+	mgr.SetUpdateListener(updates)
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -115,7 +113,7 @@ func TestPortForwardManagerStop_RunningEntry(t *testing.T) {
 
 	entry := mgr.Entries()
 	assert.Equal(t, PortForwardStopped, entry[0].Status)
-	assert.True(t, callbackCalled, "update callback should be called on Stop")
+	assert.Len(t, updates, 1, "the listener should be notified on Stop")
 }
 
 func TestPortForwardManagerStop_StartingEntry(t *testing.T) {
@@ -203,10 +201,8 @@ func TestPortForwardManagerRemove_StoppedEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
 	_, cancel := context.WithCancel(t.Context())
 
-	callbackCalled := false
-	mgr.SetUpdateCallback(func() {
-		callbackCalled = true
-	})
+	updates := make(chan struct{}, 4)
+	mgr.SetUpdateListener(updates)
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -218,7 +214,7 @@ func TestPortForwardManagerRemove_StoppedEntry(t *testing.T) {
 	mgr.Remove(1)
 	assert.Len(t, mgr.Entries(), 1)
 	assert.Equal(t, 2, mgr.Entries()[0].ID)
-	assert.True(t, callbackCalled)
+	assert.Len(t, updates, 1)
 }
 
 func TestPortForwardManagerRemove_RunningEntry(t *testing.T) {

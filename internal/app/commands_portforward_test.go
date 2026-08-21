@@ -113,7 +113,7 @@ func TestWaitForPortForwardSignal_SupersededDoesNotDropPendingUpdate(t *testing.
 	}
 }
 
-// SetUpdateCallback keeps only one slot, so an older listener must be
+// SetUpdateListener keeps only one slot, so an older listener must be
 // released rather than blocking forever once a newer one is armed.
 func TestWaitForPortForwardUpdate_SupersededListenerExits(t *testing.T) {
 	m := basePush80Model()
