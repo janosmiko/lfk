@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/paths"
 )
 
@@ -348,7 +349,9 @@ func classifyCaptureExit(backend CaptureBackend, runErr, waitErr error, stderrTx
 		// to limit incidental leakage of kubeconfig paths or API server URLs
 		// that kubectl errors sometimes embed. The user can re-run with
 		// kubectl directly to see the full message.
-		txt := stderrTxt
+		// Redact before the trim: trimming a secret first leaves a tail no
+		// pattern matches any more.
+		txt := logger.Redact(stderrTxt)
 		if len(txt) > captureLastErrorMaxLen {
 			txt = "…" + txt[len(txt)-captureLastErrorMaxLen:]
 		}

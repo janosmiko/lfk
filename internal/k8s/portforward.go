@@ -337,10 +337,13 @@ func (m *PortForwardManager) recordProcessExit(entry *PortForwardEntry, err erro
 	}
 	if err != nil {
 		entry.Status = PortForwardFailed
+		// An exec credential plugin (AWS SSO, gke auth) writes its token to
+		// kubectl's stderr on failure. Redact here, not at the log call:
+		// entry.Error also reaches the port-forward overlay.
 		if stderrText != "" {
-			entry.Error = stderrText
+			entry.Error = logger.Redact(stderrText)
 		} else {
-			entry.Error = err.Error()
+			entry.Error = logger.Redact(err.Error())
 		}
 		logger.Error("port-forward failed", "id", entry.ID, "error", entry.Error)
 	} else {
