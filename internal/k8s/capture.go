@@ -174,6 +174,15 @@ func defaultBackendFactory(b CaptureBackend) (captureBackend, error) {
 	}
 }
 
+// captureRunningFlipDelay is the wait before a Starting entry flips to
+// Running. atomic.Int64 (nanoseconds) so tests can shrink it without racing
+// the concurrent flip-goroutine readers.
+var captureRunningFlipDelay atomic.Int64
+
+func init() {
+	captureRunningFlipDelay.Store(int64(100 * time.Millisecond))
+}
+
 // Start spawns a streaming capture. Not used for kubeshark hand-off.
 func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket func(PacketSummary)) (int, error) {
 	if req.Backend == BackendKubeshark {
@@ -278,7 +287,7 @@ func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket
 	// Flip Starting -> Running once the decoder has had a chance to consume the pcap header.
 	go func() {
 		select {
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(time.Duration(captureRunningFlipDelay.Load())):
 			m.mu.Lock()
 			if entry.Status == CaptureStarting {
 				entry.Status = CaptureRunning
