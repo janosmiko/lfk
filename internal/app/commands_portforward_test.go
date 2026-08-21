@@ -95,6 +95,24 @@ func TestWaitForPortForwardUpdate_FiresOnEvictionDeadlineWithoutCallback(t *test
 	}
 }
 
+// select picks pseudo-randomly among ready cases, so with ch and superseded
+// both ready every call, a version that returns nil on superseded drops the
+// pending update about half the time. 4000 iterations makes that certain.
+func TestWaitForPortForwardSignal_SupersededDoesNotDropPendingUpdate(t *testing.T) {
+	superseded := make(chan struct{})
+	close(superseded)
+
+	for i := range 4000 {
+		ch := make(chan struct{}, 1)
+		ch <- struct{}{}
+
+		msg := waitForPortForwardSignal(ch, nil, superseded)
+
+		require.NotNilf(t, msg, "iteration %d: pending update on ch was lost when superseded also fired", i)
+		assert.IsType(t, portForwardUpdateMsg{}, msg)
+	}
+}
+
 // SetUpdateCallback keeps only one slot, so an older listener must be
 // released rather than blocking forever once a newer one is armed.
 func TestWaitForPortForwardUpdate_SupersededListenerExits(t *testing.T) {
