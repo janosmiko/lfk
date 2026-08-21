@@ -185,7 +185,10 @@ func (m Model) handleAPIResourceDiscoveryError(msg apiResourceDiscoveryMsg, isCu
 		m.dropDeferredSessionRestore()
 	}
 	m.finishSessionRestoreForContext(isCurrentContext)
-	if isCurrentContext && m.loading {
+	// The level guard mirrors the success branch: a request fired on context
+	// entry can land after the user drilled in, and m.loading is true there
+	// for the resource list, so without it the seed types overwrite that list.
+	if isCurrentContext && m.nav.Level == model.LevelResourceTypes && m.loading {
 		// Mirror the success branch's wasInitial guard. m.loading alone
 		// is unreliable as an "is this the initial discovery" signal
 		// because invalidatePreviewForCursorChange flips it true on
@@ -196,7 +199,7 @@ func (m Model) handleAPIResourceDiscoveryError(msg apiResourceDiscoveryMsg, isCu
 		wasInitial := len(m.middleItems) == 0
 		m.loading = false
 		m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
-		m.itemCache[m.navKey()] = m.middleItems
+		m.itemCache[m.nav.Context] = m.middleItems
 		if wasInitial {
 			m.restoreCursor()
 		} else {
