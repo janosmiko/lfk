@@ -68,7 +68,7 @@ func TestLaunchKubeshark_ReturnsTeaCmd(t *testing.T) {
 	// Don't call cmd() — would try to actually port-forward + open browser.
 }
 
-func TestWaitForCaptureUpdate_DispatchesMsgWhenCallbackFires(t *testing.T) {
+func TestWaitForCaptureUpdate_StaysBlockedWithoutAStateChange(t *testing.T) {
 	m := baseFinalModel()
 	m.captureMgr = k8s.NewCaptureManager()
 
@@ -80,34 +80,50 @@ func TestWaitForCaptureUpdate_DispatchesMsgWhenCallbackFires(t *testing.T) {
 	got := make(chan tea.Msg, 1)
 	go func() { got <- cmd() }()
 
-	// Drain any installed callback by triggering a state transition. Since the
-	// callback is wired into the manager, calling it directly via the
-	// manager's own callback hook is the cleanest path: re-register a
-	// shim that forwards into the wait channel and then invoke the
-	// registered callback by triggering Stop on a non-existent ID — no.
-	// The manager's onUpdate is fired only on real lifecycle events.
-	//
-	// Instead exercise the wiring by re-installing a callback that writes
-	// to a separate channel, confirming SetUpdateCallback overwrites work.
-	fired := make(chan struct{}, 1)
-	m.captureMgr.SetUpdateCallback(func() { fired <- struct{}{} })
-
-	// Manually fire the latest callback through a real state mutation.
-	// StopAll fires onUpdate when at least one entry transitions. The
-	// manager has no entries here, so we assert no spurious fire instead.
+	// StopAll has no entry to transition, so nothing should be reported.
 	m.captureMgr.StopAll()
 
 	select {
-	case <-fired:
-		t.Error("StopAll fired update callback on empty manager")
+	case msg := <-got:
+		t.Errorf("waitForCaptureUpdate returned spurious msg: %T", msg)
 	case <-time.After(20 * time.Millisecond):
 	}
 
-	// The original cmd is still blocked on the prior callback channel; it
-	// must not have fired spuriously either.
+	// Release the waiter so it does not outlive the test.
+	m.captureMgr.SetUpdateListener(make(chan struct{}, 1))
 	select {
 	case msg := <-got:
-		t.Errorf("waitForCaptureUpdate returned spurious msg: %T", msg)
-	case <-time.After(10 * time.Millisecond):
+		if msg != nil {
+			t.Errorf("superseded waiter reported an update it never received: %T", msg)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("superseded waitForCaptureUpdate listener did not exit")
+	}
+}
+
+// SetUpdateListener keeps only one slot, so an older listener must be
+// released rather than blocking forever once a newer one is armed.
+func TestWaitForCaptureUpdate_SupersededListenerExits(t *testing.T) {
+	m := baseFinalModel()
+	m.captureMgr = k8s.NewCaptureManager()
+
+	firstCmd := m.waitForCaptureUpdate()
+	if firstCmd == nil {
+		t.Fatal("waitForCaptureUpdate returned nil cmd")
+	}
+	firstDone := make(chan tea.Msg, 1)
+	go func() { firstDone <- firstCmd() }()
+
+	// Give the first goroutine time to reach its select before it is superseded.
+	time.Sleep(20 * time.Millisecond)
+
+	if second := m.waitForCaptureUpdate(); second == nil {
+		t.Fatal("waitForCaptureUpdate returned nil cmd on re-arm")
+	}
+
+	select {
+	case <-firstDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("superseded waitForCaptureUpdate listener did not exit when a new listener was armed")
 	}
 }

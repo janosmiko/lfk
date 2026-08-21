@@ -50,15 +50,22 @@ const portForwardEvictionGrace = 3 * time.Second
 
 // PortForwardManager manages active port forwards.
 type PortForwardManager struct {
-	mu       sync.Mutex
-	entries  []*PortForwardEntry
-	nextID   int
-	onUpdate func() // callback when entries change
+	mu      sync.Mutex
+	entries []*PortForwardEntry
+	nextID  int
+	// listener carries one token per change. The manager sends while holding
+	// m.mu, so no SetUpdateListener can retire the listener between the choice
+	// of it and the delivery to it.
+	listener updateListener
 	now      func() time.Time
 	// evictionArmedAt is the deadline an in-flight waitForPortForwardUpdate
 	// tick is already waiting on, so repeated arm attempts between renders
 	// don't stack duplicate timers. Zero means nothing armed.
 	evictionArmedAt time.Time
+	// evictionArm names the waiter holding evictionArmedAt. A superseded
+	// waiter tears down after its replacement armed, so it must be told apart
+	// from the current owner or it clears a deadline nobody re-arms.
+	evictionArm uint64
 }
 
 // NewPortForwardManager creates a new port forward manager.
@@ -75,11 +82,22 @@ func NewPortForwardManagerWithClock(now func() time.Time) *PortForwardManager {
 	}
 }
 
-// SetUpdateCallback sets a callback that is invoked when entries change.
-func (m *PortForwardManager) SetUpdateCallback(fn func()) {
+// SetUpdateListener registers ch as the single listener for entry changes. The
+// returned channel closes when a later call replaces this listener, so the
+// superseded one stops waiting instead of leaking.
+func (m *PortForwardManager) SetUpdateListener(ch chan<- struct{}) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.onUpdate = fn
+	// The retired waiter drops its eviction timer, so release the deadline
+	// for the incoming one to arm.
+	m.evictionArmedAt = time.Time{}
+	return m.listener.setLocked(ch)
+}
+
+// notifyLocked delivers one update to the current listener. Callers must hold
+// m.mu.
+func (m *PortForwardManager) notifyLocked() {
+	m.listener.notifyLocked()
 }
 
 // Entries returns a copy of all port forward entries.
@@ -131,29 +149,35 @@ func isTerminalPortForwardStatus(s PortForwardStatus) bool {
 
 // ArmEvictionRefresh returns the delay until the earliest terminal,
 // already-shown entry is evictable, arming that deadline so concurrent
-// callers dedupe onto one pending timer until DisarmEvictionRefresh runs.
-func (m *PortForwardManager) ArmEvictionRefresh() (time.Duration, bool) {
+// callers dedupe onto one timer. The arm id passed back to DisarmEvictionRefresh
+// releases it.
+func (m *PortForwardManager) ArmEvictionRefresh() (time.Duration, uint64, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	deadline, found := m.earliestEvictionDeadlineLocked()
 	if !found {
-		return 0, false
+		return 0, 0, false
 	}
 	if !m.evictionArmedAt.IsZero() && !deadline.Before(m.evictionArmedAt) {
-		return 0, false
+		return 0, 0, false
 	}
 	m.evictionArmedAt = deadline
+	m.evictionArm++
 
 	d := max(deadline.Sub(m.now()), 0)
-	return d, true
+	return d, m.evictionArm, true
 }
 
 // DisarmEvictionRefresh clears the armed deadline, allowing the next
-// ArmEvictionRefresh call to schedule again.
-func (m *PortForwardManager) DisarmEvictionRefresh() {
+// ArmEvictionRefresh call to schedule again. A stale arm is ignored, so a
+// waiter tearing down late cannot release its successor's deadline.
+func (m *PortForwardManager) DisarmEvictionRefresh(arm uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if arm != m.evictionArm {
+		return
+	}
 	m.evictionArmedAt = time.Time{}
 }
 
@@ -258,12 +282,8 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 
 	m.mu.Lock()
 	m.entries = append(m.entries, entry)
-	onUpdate := m.onUpdate
+	m.notifyLocked()
 	m.mu.Unlock()
-
-	if onUpdate != nil {
-		onUpdate()
-	}
 
 	// Monitor stdout for readiness confirmation and process lifecycle.
 	go func() {
@@ -292,39 +312,44 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 				if entry.Status == PortForwardStarting {
 					entry.Status = PortForwardRunning
 				}
-				onUpdate := m.onUpdate
+				m.notifyLocked()
 				m.mu.Unlock()
-				if onUpdate != nil {
-					onUpdate()
-				}
 			}
 		}
 
 		// Wait for process to finish.
 		err := cmd.Wait()
-		m.mu.Lock()
-		if entry.Status == PortForwardRunning || entry.Status == PortForwardStarting {
-			if err != nil {
-				entry.Status = PortForwardFailed
-				errMsg := strings.TrimSpace(stderrBuf.String())
-				if errMsg != "" {
-					entry.Error = errMsg
-				} else {
-					entry.Error = err.Error()
-				}
-				logger.Error("port-forward failed", "id", id, "error", entry.Error)
-			} else {
-				entry.Status = PortForwardStopped
-			}
-		}
-		onUpdate := m.onUpdate
-		m.mu.Unlock()
-		if onUpdate != nil {
-			onUpdate()
-		}
+		m.recordProcessExit(entry, err, strings.TrimSpace(stderrBuf.String()))
 	}()
 
 	return id, nil
+}
+
+// recordProcessExit moves a still-live forward to its terminal state after the
+// kubectl process exits. A forward Stop or StopAll already retired stays as it
+// is, and reports nothing: those callers announced the change themselves.
+func (m *PortForwardManager) recordProcessExit(entry *PortForwardEntry, err error, stderrText string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if entry.Status != PortForwardRunning && entry.Status != PortForwardStarting {
+		return
+	}
+	if err != nil {
+		entry.Status = PortForwardFailed
+		// An exec credential plugin (AWS SSO, gke auth) writes its token to
+		// kubectl's stderr on failure. Redact here, not at the log call:
+		// entry.Error also reaches the port-forward overlay.
+		if stderrText != "" {
+			entry.Error = logger.Redact(stderrText)
+		} else {
+			entry.Error = logger.Redact(err.Error())
+		}
+		logger.Error("port-forward failed", "id", entry.ID, "error", entry.Error)
+	} else {
+		entry.Status = PortForwardStopped
+	}
+	m.notifyLocked()
 }
 
 // Stop stops a port forward by its ID.
@@ -346,9 +371,7 @@ func (m *PortForwardManager) Stop(id int) error {
 				"context", e.Context,
 				"localPort", e.LocalPort,
 				"remotePort", e.RemotePort)
-			if m.onUpdate != nil {
-				m.onUpdate()
-			}
+			m.notifyLocked()
 			return nil
 		}
 	}
@@ -374,9 +397,7 @@ func (m *PortForwardManager) Remove(id int) {
 				"namespace", e.Namespace,
 				"context", e.Context,
 				"wasRunning", wasRunning)
-			if m.onUpdate != nil {
-				m.onUpdate()
-			}
+			m.notifyLocked()
 			return
 		}
 	}
@@ -400,11 +421,16 @@ func (m *PortForwardManager) StopAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	stopped := false
 	for _, e := range m.entries {
 		if e.Status == PortForwardRunning || e.Status == PortForwardStarting {
 			e.cancel()
 			e.Status = PortForwardStopped
+			stopped = true
 		}
+	}
+	if stopped {
+		m.notifyLocked()
 	}
 }
 

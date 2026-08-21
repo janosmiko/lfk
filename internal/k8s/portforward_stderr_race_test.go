@@ -3,7 +3,6 @@ package k8s
 import (
 	"os"
 	"path/filepath"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,11 +30,10 @@ func TestPortForwardStderrCaptureNoRace(t *testing.T) {
 	require.NoError(t, os.WriteFile(fake, []byte(script), 0o700))
 
 	mgr := NewPortForwardManager()
-	// The callback runs on the monitor goroutine. Counting it keeps that
-	// concurrent write under the race detector without letting a slow reader
-	// block the monitor, which a channel would.
-	var updates atomic.Int64
-	mgr.SetUpdateCallback(func() { updates.Add(1) })
+	// Buffered past the two expected reports: the manager's send is
+	// non-blocking, so a full channel would silently drop one.
+	updates := make(chan struct{}, 8)
+	mgr.SetUpdateListener(updates)
 
 	_, err := mgr.Start(fake, "/dev/null", "Pod", "p", "ns", "ctx", "ctx", "8080", "80")
 	require.NoError(t, err, "Start should launch the fake binary")
@@ -57,10 +55,8 @@ func TestPortForwardStderrCaptureNoRace(t *testing.T) {
 	assert.Contains(t, entries[0].Error, "unable to listen on port",
 		"captured stderr must surface in entry.Error")
 	// Start reports once before it returns, the monitor once more after
-	// cmd.Wait. Reading the count here would be a race the other way: the
-	// monitor calls back after it releases the lock, so the status can be
-	// visible before the report is.
-	require.Eventually(t, func() bool { return updates.Load() >= 2 },
-		portForwardSettleTimeout, 10*time.Millisecond,
+	// cmd.Wait. Both reports land in the same critical section as the status
+	// they announce, so an observed Failed means both have already arrived.
+	require.GreaterOrEqual(t, len(updates), 2,
 		"the manager must report the move to Failed, not only the start")
 }

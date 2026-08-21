@@ -245,21 +245,18 @@ func TestStderrBuffer_SingleOversizedWriteKeepsTail(t *testing.T) {
 // TestCaptureManager_Entries_StripsInternalControlHandles guards the
 // encapsulation contract: callers of Entries() get a public-only snapshot,
 // not a back-door to the lifecycle handles. A regression that re-copies
-// cmd / cancel / decoder / onUpdate would let a stale snapshot drive
-// state changes (or hold references after Stop), which is the kind of
-// subtle bug CodeRabbit flagged on review.
+// cmd / cancel / decoder would let a stale snapshot drive state changes,
+// or hold references after Stop.
 func TestCaptureManager_Entries_StripsInternalControlHandles(t *testing.T) {
 	m := NewCaptureManager()
 	cancelCalls := 0
-	updateCalls := 0
 	m.mu.Lock()
 	m.entries = append(m.entries, &CaptureEntry{
-		ID:       1,
-		Status:   CaptureRunning,
-		cmd:      &exec.Cmd{},
-		cancel:   func() { cancelCalls++ },
-		decoder:  &packetDecoder{},
-		onUpdate: func() { updateCalls++ },
+		ID:      1,
+		Status:  CaptureRunning,
+		cmd:     &exec.Cmd{},
+		cancel:  func() { cancelCalls++ },
+		decoder: &packetDecoder{},
 	})
 	m.mu.Unlock()
 
@@ -276,11 +273,8 @@ func TestCaptureManager_Entries_StripsInternalControlHandles(t *testing.T) {
 	if es[0].decoder != nil {
 		t.Errorf("snapshot.decoder should be nil; got %+v", es[0].decoder)
 	}
-	if es[0].onUpdate != nil {
-		t.Errorf("snapshot.onUpdate should be nil; got non-nil func")
-	}
-	if cancelCalls != 0 || updateCalls != 0 {
-		t.Errorf("Entries() must not invoke control handles; cancel=%d update=%d", cancelCalls, updateCalls)
+	if cancelCalls != 0 {
+		t.Errorf("Entries() must not invoke control handles; cancel=%d", cancelCalls)
 	}
 }
 

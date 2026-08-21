@@ -108,7 +108,7 @@ func TestArmEvictionRefresh_NothingPendingForActiveOrUnshownEntries(t *testing.T
 	}
 	mgr.mu.Unlock()
 
-	_, ok := mgr.ArmEvictionRefresh()
+	_, _, ok := mgr.ArmEvictionRefresh()
 	assert.False(t, ok, "a running or never-shown entry must not arm an eviction tick")
 }
 
@@ -119,7 +119,7 @@ func TestArmEvictionRefresh_SchedulesAtTheEntrysDeadline(t *testing.T) {
 	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current.Add(-time.Second)}}
 	mgr.mu.Unlock()
 
-	d, ok := mgr.ArmEvictionRefresh()
+	d, _, ok := mgr.ArmEvictionRefresh()
 	require.True(t, ok)
 	assert.Equal(t, portForwardEvictionGrace-time.Second, d)
 }
@@ -131,14 +131,14 @@ func TestArmEvictionRefresh_DedupesUntilDisarmed(t *testing.T) {
 	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current}}
 	mgr.mu.Unlock()
 
-	_, ok := mgr.ArmEvictionRefresh()
+	_, arm, ok := mgr.ArmEvictionRefresh()
 	require.True(t, ok, "first call must arm")
 
-	_, ok = mgr.ArmEvictionRefresh()
+	_, _, ok = mgr.ArmEvictionRefresh()
 	assert.False(t, ok, "a repeat call before the armed deadline fires must not stack another timer")
 
-	mgr.DisarmEvictionRefresh()
-	_, ok = mgr.ArmEvictionRefresh()
+	mgr.DisarmEvictionRefresh(arm)
+	_, _, ok = mgr.ArmEvictionRefresh()
 	assert.True(t, ok, "disarming must allow re-arming for the still-pending entry")
 }
 
@@ -148,16 +148,44 @@ func TestArmEvictionRefresh_ReArmsForAnEarlierDeadline(t *testing.T) {
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current}}
 	mgr.mu.Unlock()
-	_, ok := mgr.ArmEvictionRefresh()
+	_, _, ok := mgr.ArmEvictionRefresh()
 	require.True(t, ok)
 
 	mgr.mu.Lock()
 	mgr.entries = append(mgr.entries, &PortForwardEntry{ID: 2, Status: PortForwardFailed, shownAt: current.Add(-2 * time.Second)})
 	mgr.mu.Unlock()
 
-	d, ok := mgr.ArmEvictionRefresh()
+	d, _, ok := mgr.ArmEvictionRefresh()
 	require.True(t, ok, "an earlier deadline must supersede the already-armed one")
 	assert.Equal(t, portForwardEvictionGrace-2*time.Second, d)
+}
+
+// The waiter holding the listener slot owns the armed deadline. Its
+// predecessor tears down afterwards and must not release it, or the entry
+// waits for a tick nobody scheduled.
+func TestArmEvictionRefresh_SupersededWaiterKeepsItsHandsOffTheNewArm(t *testing.T) {
+	current := time.Now()
+	mgr := NewPortForwardManagerWithClock(func() time.Time { return current })
+	mgr.mu.Lock()
+	mgr.entries = []*PortForwardEntry{{ID: 1, Status: PortForwardStopped, shownAt: current}}
+	mgr.mu.Unlock()
+
+	mgr.SetUpdateListener(make(chan struct{}, 1))
+	_, older, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok)
+
+	mgr.SetUpdateListener(make(chan struct{}, 1))
+	d, newer, ok := mgr.ArmEvictionRefresh()
+	require.True(t, ok, "the waiter taking over the listener slot must get a deadline of its own")
+	assert.Equal(t, portForwardEvictionGrace, d)
+
+	mgr.DisarmEvictionRefresh(older)
+	_, _, ok = mgr.ArmEvictionRefresh()
+	assert.False(t, ok, "a superseded waiter must not release the deadline its successor armed")
+
+	mgr.DisarmEvictionRefresh(newer)
+	_, _, ok = mgr.ArmEvictionRefresh()
+	assert.True(t, ok, "the owner must still be able to release its own deadline")
 }
 
 // EntriesForDisplay only evicts on the next call. ArmEvictionRefresh is the
@@ -171,7 +199,7 @@ func TestPortForward_StaysVisibleWithoutArming(t *testing.T) {
 
 	current = current.Add(portForwardEvictionGrace + time.Second)
 
-	d, ok := mgr.ArmEvictionRefresh()
+	d, _, ok := mgr.ArmEvictionRefresh()
 	require.True(t, ok, "a shown, expired terminal entry must arm a refresh")
 	assert.Equal(t, time.Duration(0), d, "a deadline already in the past must fire immediately, not be missed")
 }
