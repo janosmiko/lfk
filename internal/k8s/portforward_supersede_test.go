@@ -59,6 +59,75 @@ func TestPortForwardManager_NotifyDoesNotBlockOnAbandonedListener(t *testing.T) 
 		time.Second, 5*time.Millisecond, "notifyLocked blocked on an abandoned listener")
 }
 
+// A notify that picks its listener under the lock and sends after releasing it
+// hands the update to a channel nobody reads any more. Only the public API can
+// catch that: notifyLocked under a held lock excludes the race by construction.
+func TestPortForwardManager_SupersededListenerNeverLosesAnUpdate(t *testing.T) {
+	const rounds = 2000
+
+	mgr := NewPortForwardManager()
+	var retired []chan struct{}
+
+	for i := range rounds {
+		id := i + 1
+		mgr.mu.Lock()
+		mgr.entries = []*PortForwardEntry{{ID: id, Status: PortForwardRunning, cancel: func() {}}}
+		mgr.mu.Unlock()
+
+		ch := make(chan struct{}, 1)
+		superseded := mgr.SetUpdateListener(ch)
+
+		// One gate for both goroutines so the change and the supersession
+		// reach the manager together instead of in a fixed order.
+		start := make(chan struct{})
+		changed := make(chan struct{})
+		go func() {
+			<-start
+			if id%2 == 0 {
+				mgr.Remove(id)
+			} else {
+				_ = mgr.Stop(id)
+			}
+			close(changed)
+		}()
+		swapped := make(chan struct{})
+		go func() {
+			<-start
+			mgr.SetUpdateListener(make(chan struct{}, 1))
+			close(swapped)
+		}()
+		close(start)
+
+		delivered := awaitUpdate(ch, superseded)
+		<-changed
+		<-swapped
+		if !delivered {
+			retired = append(retired, ch)
+		}
+	}
+
+	for i, ch := range retired {
+		require.Emptyf(t, ch, "retired listener %d was handed an update after its supersession, so nobody read it", i)
+	}
+}
+
+// awaitUpdate mirrors the app-side waiter. It reports false only when the
+// listener was retired with nothing pending, so a token found in its channel
+// afterwards is one the manager delivered too late for anyone to read.
+func awaitUpdate(ch <-chan struct{}, superseded <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	case <-superseded:
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}
+}
+
 func isClosed(ch <-chan struct{}) bool {
 	select {
 	case <-ch:
