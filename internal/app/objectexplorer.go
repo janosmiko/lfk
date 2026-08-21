@@ -255,7 +255,6 @@ func (m Model) handleObjectExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 func (m Model) handleObjectExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	kb := ui.ActiveKeybindings
 	rt := &m.objectExplorerView
-	n := len(rt.visible())
 	switch msg.String() {
 	case "q":
 		m.exitObjectExplorer()
@@ -311,6 +310,18 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.C
 		return m.copySelectedNodeYAML()
 	case "P":
 		return m.openSelectedResourceYAML()
+	}
+	return m.handleObjectExplorerNavKeyExtended(msg)
+}
+
+// handleObjectExplorerNavKeyExtended handles the preview-scroll and
+// cursor-movement keys, split from handleObjectExplorerNavKey to keep
+// cyclomatic complexity under 30.
+func (m Model) handleObjectExplorerNavKeyExtended(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	kb := ui.ActiveKeybindings
+	rt := &m.objectExplorerView
+	n := len(rt.visible())
+	switch msg.String() {
 	case kb.PreviewDown:
 		rt.previewScroll++
 		m.clampObjectExplorerPreviewScroll()

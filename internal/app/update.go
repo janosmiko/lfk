@@ -285,6 +285,14 @@ func (m Model) updateEasterEggMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		m.mode = modeExplorer
 		m.creditsStopped = false
 		return m, nil, true
+	}
+	return m.updateKubetrisTickMsg(msg)
+}
+
+// updateKubetrisTickMsg handles kubetris animation/lock/gravity ticks,
+// split from updateEasterEggMsg to keep cyclomatic complexity under 30.
+func (m Model) updateKubetrisTickMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg.(type) {
 	case kubetrisAnimTickMsg:
 		// Visual-only animation countdown -- doesn't block gameplay.
 		if m.mode == modeKubetris && m.kubetrisGame != nil && m.kubetrisGame.animating {
@@ -409,6 +417,14 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		captureUpdateMsg:
 		mdl, cmd := m.routeCaptureMsg(msg)
 		return mdl, cmd, true
+	}
+	return m.updateActionResultMsgExtended(msg)
+}
+
+// updateActionResultMsgExtended handles the second half of action result messages,
+// split from updateActionResultMsg to keep cyclomatic complexity under 30.
+func (m Model) updateActionResultMsgExtended(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
 	case quotaLoadedMsg:
 		mdl, cmd := m.updateQuotaLoaded(msg)
 		return mdl, cmd, true
@@ -493,6 +509,14 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case templateApplyMsg:
 		mdl, cmd := m.updateTemplateApply(msg)
 		return mdl, cmd, true
+	}
+	return m.updateExecAndLogResultMsg(msg)
+}
+
+// updateExecAndLogResultMsg handles exec PTY and log streaming messages,
+// split from updateEditorResultMsg to keep cyclomatic complexity under 30.
+func (m Model) updateExecAndLogResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
 	case execPTYTickMsg:
 		mdl, cmd := m.updateExecPTYTick(msg)
 		return mdl, cmd, true

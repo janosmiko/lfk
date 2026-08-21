@@ -239,6 +239,14 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 	case overlayQuitConfirm:
 		mdl, cmd := m.handleQuitConfirmOverlayKey(msg)
 		return mdl, cmd, true
+	}
+	return m.handleOverlayKeyTertiary(msg)
+}
+
+// handleOverlayKeyTertiary dispatches the remaining overlay keys, split from
+// handleOverlayKeySecondary to keep cyclomatic complexity under 30.
+func (m Model) handleOverlayKeyTertiary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.overlay {
 	case overlayLogPodSelect:
 		mdl, cmd := m.handleLogPodSelectOverlayKey(msg)
 		return mdl, cmd, true
