@@ -306,26 +306,34 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 
 		// Wait for process to finish.
 		err := cmd.Wait()
-		m.mu.Lock()
-		if entry.Status == PortForwardRunning || entry.Status == PortForwardStarting {
-			if err != nil {
-				entry.Status = PortForwardFailed
-				errMsg := strings.TrimSpace(stderrBuf.String())
-				if errMsg != "" {
-					entry.Error = errMsg
-				} else {
-					entry.Error = err.Error()
-				}
-				logger.Error("port-forward failed", "id", id, "error", entry.Error)
-			} else {
-				entry.Status = PortForwardStopped
-			}
-		}
-		m.notifyLocked()
-		m.mu.Unlock()
+		m.recordProcessExit(entry, err, strings.TrimSpace(stderrBuf.String()))
 	}()
 
 	return id, nil
+}
+
+// recordProcessExit moves a still-live forward to its terminal state after the
+// kubectl process exits. A forward Stop or StopAll already retired stays as it
+// is, and reports nothing: those callers announced the change themselves.
+func (m *PortForwardManager) recordProcessExit(entry *PortForwardEntry, err error, stderrText string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if entry.Status != PortForwardRunning && entry.Status != PortForwardStarting {
+		return
+	}
+	if err != nil {
+		entry.Status = PortForwardFailed
+		if stderrText != "" {
+			entry.Error = stderrText
+		} else {
+			entry.Error = err.Error()
+		}
+		logger.Error("port-forward failed", "id", entry.ID, "error", entry.Error)
+	} else {
+		entry.Status = PortForwardStopped
+	}
+	m.notifyLocked()
 }
 
 // Stop stops a port forward by its ID.

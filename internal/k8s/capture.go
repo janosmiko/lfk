@@ -288,17 +288,25 @@ func (m *CaptureManager) Start(ctx context.Context, req CaptureRequest, onPacket
 	go func() {
 		select {
 		case <-time.After(time.Duration(captureRunningFlipDelay.Load())):
-			m.mu.Lock()
-			if entry.Status == CaptureStarting {
-				entry.Status = CaptureRunning
-			}
-			m.notifyLocked()
-			m.mu.Unlock()
+			m.markCaptureRunning(entry)
 		case <-ctx.Done():
 		}
 	}()
 
 	return id, nil
+}
+
+// markCaptureRunning flips a still-starting capture to Running. A capture the
+// watchdog already finished stays as it is, and reports nothing: that terminal
+// transition announced itself.
+func (m *CaptureManager) markCaptureRunning(entry *CaptureEntry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if entry.Status != CaptureStarting {
+		return
+	}
+	entry.Status = CaptureRunning
+	m.notifyLocked()
 }
 
 // classifyCaptureExit folds the multiple error sources the watchdog sees
