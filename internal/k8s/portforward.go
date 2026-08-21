@@ -397,11 +397,16 @@ func (m *PortForwardManager) StopAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	stopped := false
 	for _, e := range m.entries {
 		if e.Status == PortForwardRunning || e.Status == PortForwardStarting {
 			e.cancel()
 			e.Status = PortForwardStopped
+			stopped = true
 		}
+	}
+	if stopped {
+		m.notifyLocked()
 	}
 }
 

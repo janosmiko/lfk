@@ -329,6 +329,9 @@ func TestPortForwardManagerStopAll_MixedStatuses(t *testing.T) {
 	_, cancel2 := context.WithCancel(t.Context())
 	_, cancel3 := context.WithCancel(t.Context())
 
+	updates := make(chan struct{}, 4)
+	mgr.SetUpdateListener(updates)
+
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
 		{ID: 1, Status: PortForwardRunning, cancel: cancel1},
@@ -344,6 +347,7 @@ func TestPortForwardManagerStopAll_MixedStatuses(t *testing.T) {
 		assert.Equal(t, PortForwardStopped, e.Status,
 			"entry %d should be stopped after StopAll", e.ID)
 	}
+	assert.Len(t, updates, 1, "the listener should be notified on StopAll")
 }
 
 func TestPortForwardManagerStopAll_AllRunning(t *testing.T) {
