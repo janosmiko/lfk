@@ -89,21 +89,21 @@ func (m *Model) applyTextFilter(items []model.Item) []model.Item {
 	// When in fuzzy mode, sort results by fuzzy score (best matches first).
 	mode, query := ui.DetectSearchMode(rawQuery)
 	if mode == ui.SearchFuzzy && query != "" {
-		items = sortItemsByFuzzyScore(items, query)
+		items = sortItemsByFuzzyScore(items, query, expandByCategory, matchedCategories, m.filterBroadMode)
 	}
 
 	return items
 }
 
 // sortItemsByFuzzyScore is the fuzzy re-sort inside applyTextFilter.
-func sortItemsByFuzzyScore(items []model.Item, query string) []model.Item {
+func sortItemsByFuzzyScore(items []model.Item, query string, expandByCategory bool, matchedCategories map[string]bool, broadMode bool) []model.Item {
 	type scoredItem struct {
 		item  model.Item
 		score int
 	}
 	scored := make([]scoredItem, 0, len(items))
 	for _, item := range items {
-		s := ui.FuzzyScore(item.Name, query)
+		s := fuzzyFieldScore(item, query, expandByCategory, matchedCategories, broadMode)
 		scored = append(scored, scoredItem{item: item, score: s})
 	}
 	sort.SliceStable(scored, func(i, j int) bool {
@@ -114,6 +114,31 @@ func sortItemsByFuzzyScore(items []model.Item, query string) []model.Item {
 		sortedItems[i] = si.item
 	}
 	return sortedItems
+}
+
+// fuzzyFieldScore mirrors the matching pass above: Category alone for a
+// category-expanded item, otherwise the best of namespace/name and (broad
+// mode) column values.
+func fuzzyFieldScore(item model.Item, query string, expandByCategory bool, matchedCategories map[string]bool, broadMode bool) int {
+	if expandByCategory && item.Category != "" && matchedCategories[item.Category] {
+		return ui.FuzzyScore(item.Category, query)
+	}
+	searchText := item.Name
+	if item.Namespace != "" {
+		searchText = item.Namespace + "/" + searchText
+	}
+	best := ui.FuzzyScore(searchText, query)
+	if broadMode {
+		for _, kv := range item.Columns {
+			if isInternalColumnKey(kv.Key) {
+				continue
+			}
+			if s := ui.FuzzyScore(kv.Value, query); s > best {
+				best = s
+			}
+		}
+	}
+	return best
 }
 
 // applyGroupCollapse is the accordion collapse pass of computeVisibleMiddleItems.
