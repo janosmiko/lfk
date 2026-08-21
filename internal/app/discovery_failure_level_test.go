@@ -14,8 +14,10 @@ import (
 // type before the apiserver answers. A failure arriving then must not paint the
 // seed resource types over the resource list, nor cache them as "test-ctx/pods".
 func TestDiscoveryFailureAtResourceLevelLeavesMiddleColumnAlone(t *testing.T) {
-	t.Parallel()
-	m := baseModelCov()
+	// Not t.Parallel(): View() writes ui.ActiveCollapsedCategories, a
+	// package-level render global, so two Model.View() calls racing across
+	// goroutines trip -race.
+	m := basePush80Model()
 	m.nav.Level = model.LevelResources
 	m.nav.Context = "test-ctx"
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"}
@@ -46,13 +48,21 @@ func TestDiscoveryFailureAtResourceLevelLeavesMiddleColumnAlone(t *testing.T) {
 	assert.False(t, cached,
 		"the fallback must not write resource-type items into the item "+
 			"cache under the resource-level navKey (test-ctx/pods)")
+
+	view := stripANSI(updated.View().Content)
+	assert.Contains(t, view, "api-0")
+	assert.Contains(t, view, "api-1")
+	assert.Contains(t, view, "api-2")
+	assert.NotContains(t, view, "Deployments",
+		"a discovery failure at LevelResources must not paint the resource-type "+
+			"sidebar into the middle column")
 }
 
 // The fallback belongs to LevelResourceTypes: there it must still paint the
 // seed list and cache it under the context key.
 func TestDiscoveryFailureAtResourceTypesLevelSeedsAndCachesUnderContext(t *testing.T) {
-	t.Parallel()
-	m := baseModelCov()
+	// Not t.Parallel(): see the sibling test above.
+	m := basePush80Model()
 	m.nav.Level = model.LevelResourceTypes
 	m.nav.Context = "test-ctx"
 	m.allGroupsExpanded = true
@@ -70,4 +80,8 @@ func TestDiscoveryFailureAtResourceTypesLevelSeedsAndCachesUnderContext(t *testi
 	assert.Equal(t, updated.middleItems, updated.itemCache["test-ctx"],
 		"the seed list must be cached under the resource-types key")
 	assert.False(t, updated.loading)
+
+	view := stripANSI(updated.View().Content)
+	assert.Contains(t, view, "Deployments")
+	assert.Contains(t, view, "ConfigMaps")
 }
