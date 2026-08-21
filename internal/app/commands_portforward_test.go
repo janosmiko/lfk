@@ -73,8 +73,8 @@ func TestRestartLocalPort(t *testing.T) {
 }
 
 // A terminal port-forward, once shown, must be evicted after its grace
-// period even if the manager never fires another update callback.
-func TestWaitForPortForwardUpdate_FiresOnEvictionDeadlineWithoutCallback(t *testing.T) {
+// period even if the manager never reports another update.
+func TestWaitForPortForwardUpdate_FiresOnEvictionDeadlineWithoutAnUpdate(t *testing.T) {
 	m := basePush80Model()
 	current := time.Now()
 	mgr := k8s.NewPortForwardManagerWithClock(func() time.Time { return current })
@@ -91,7 +91,7 @@ func TestWaitForPortForwardUpdate_FiresOnEvictionDeadlineWithoutCallback(t *test
 	case msg := <-done:
 		assert.IsType(t, portForwardUpdateMsg{}, msg)
 	case <-time.After(2 * time.Second):
-		t.Fatal("waitForPortForwardUpdate did not fire on the eviction deadline without a manager callback")
+		t.Fatal("waitForPortForwardUpdate did not fire on the eviction deadline without a manager update")
 	}
 }
 
