@@ -57,10 +57,14 @@ func TestExplainFetchesStopWhenTheViewCloses(t *testing.T) {
 			// The stub writes its argv first, so the file appearing means the
 			// process is really running. Closing the view before that would
 			// only prove that a cancelled context never spawns one.
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(argvPath)
-				return err == nil
-			}, 10*time.Second, 20*time.Millisecond, "the stub kubectl never started")
+			//
+			// Watch done alongside the file. A spawn that fails outright (a
+			// PATH miss, ETXTBSY on the freshly written script) sends its
+			// error there immediately, and polling on alone would spend the
+			// whole ceiling before reporting "never started" without saying
+			// why. That message was the whole content of two flakes in a
+			// loaded ./... run that no one could reproduce afterwards.
+			waitForStub(t, argvPath, done)
 
 			closedAt := time.Now()
 			m.exitExplainView()
@@ -182,4 +186,23 @@ func TestExplainRequestCtxFallsBackToTheRequestContext(t *testing.T) {
 	m.cancelExplainSession()
 
 	assert.Equal(t, m.reqCtx, m.explainRequestCtx())
+}
+
+// waitForStub blocks until the stub kubectl has written its argv file, and
+// fails with whatever the fetch returned if it gave up first.
+func waitForStub(t *testing.T, argvPath string, done <-chan tea.Msg) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for {
+		if _, err := os.Stat(argvPath); err == nil {
+			return
+		}
+		select {
+		case msg := <-done:
+			t.Fatalf("the fetch returned before the stub started: %#v", msg)
+		case <-deadline:
+			t.Fatal("the stub kubectl never started, and the fetch is still running")
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
 }
