@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -260,18 +259,12 @@ func TestCaptureManager_Entries_StripsInternalControlHandles(t *testing.T) {
 	})
 	m.mu.Unlock()
 
+	// CaptureSnapshot has no cmd/cancel/decoder fields at all, so the compiler
+	// now carries the half of this guarantee the assertions used to. What is
+	// left to check is that building the snapshot touches none of them.
 	es := m.Entries()
 	if len(es) != 1 {
 		t.Fatalf("entries len = %d, want 1", len(es))
-	}
-	if es[0].cmd != nil {
-		t.Errorf("snapshot.cmd should be nil; got %+v", es[0].cmd)
-	}
-	if es[0].cancel != nil {
-		t.Errorf("snapshot.cancel should be nil; got non-nil func")
-	}
-	if es[0].decoder != nil {
-		t.Errorf("snapshot.decoder should be nil; got %+v", es[0].decoder)
 	}
 	if cancelCalls != 0 {
 		t.Errorf("Entries() must not invoke control handles; cancel=%d", cancelCalls)
@@ -279,8 +272,8 @@ func TestCaptureManager_Entries_StripsInternalControlHandles(t *testing.T) {
 }
 
 // TestCaptureManager_Entries_AtomicCountersRace exercises Entries() against
-// concurrent atomic.AddInt64 writes on PacketCount/ByteCount. Without atomic
-// reads in the snapshot, `go test -race` flags this as a data race.
+// concurrent counter writes. Without atomic reads in the snapshot, `go test
+// -race` flags this as a data race.
 func TestCaptureManager_Entries_AtomicCountersRace(t *testing.T) {
 	m := NewCaptureManager()
 	m.mu.Lock()
@@ -298,8 +291,8 @@ func TestCaptureManager_Entries_AtomicCountersRace(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				atomic.AddInt64(&entry.PacketCount, 1)
-				atomic.AddInt64(&entry.ByteCount, 64)
+				entry.PacketCount.Add(1)
+				entry.ByteCount.Add(64)
 			}
 		}
 	}()
@@ -481,5 +474,30 @@ func emptyPcapHeader() []byte {
 		0x00, 0x00, 0x00, 0x00, // sigfigs
 		0xff, 0xff, 0x00, 0x00, // snaplen 65535
 		0x01, 0x00, 0x00, 0x00, // linktype Ethernet
+	}
+}
+
+// A snapshot that shared the manager's *time.Time would let a caller rewrite
+// the entry's stop time and change every later snapshot.
+func TestCaptureManagerEntriesCopiesStoppedAt(t *testing.T) {
+	m := NewCaptureManager()
+	stopped := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	m.mu.Lock()
+	m.entries = append(m.entries, &CaptureEntry{ID: 1, Status: CaptureStopped, StoppedAt: &stopped})
+	m.mu.Unlock()
+
+	// want is read before the mutation: an aliased snapshot rewrites `stopped`
+	// too, so comparing against it would compare the mutation with itself.
+	want := stopped
+
+	first := m.Entries()
+	if len(first) != 1 || first[0].StoppedAt == nil {
+		t.Fatalf("first snapshot = %+v, want one entry with a stop time", first)
+	}
+	*first[0].StoppedAt = want.Add(time.Hour)
+
+	second := m.Entries()
+	if second[0].StoppedAt == nil || !second[0].StoppedAt.Equal(want) {
+		t.Errorf("stop time after mutating the snapshot = %v, want %v", second[0].StoppedAt, want)
 	}
 }

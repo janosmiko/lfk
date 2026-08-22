@@ -116,21 +116,21 @@ func dnsSummary(d *layers.DNS) string {
 // into an on-disk file for export, and decodes each packet for the live UI table.
 type packetDecoder struct {
 	file        io.WriteCloser
-	packetCount *int64 // atomic counter shared with CaptureEntry
-	byteCount   *int64 // atomic counter shared with CaptureEntry
+	packetCount *atomic.Int64 // shared with CaptureEntry
+	byteCount   *atomic.Int64 // shared with CaptureEntry
 	onPacket    func(PacketSummary)
 }
 
 // countingWriter wraps an io.Writer and atomically accumulates written byte totals.
 type countingWriter struct {
 	w io.Writer
-	n *int64
+	n *atomic.Int64
 }
 
 func (c *countingWriter) Write(p []byte) (int, error) {
 	n, err := c.w.Write(p)
 	if c.n != nil {
-		atomic.AddInt64(c.n, int64(n))
+		c.n.Add(int64(n))
 	}
 	return n, err
 }
@@ -191,7 +191,7 @@ func (d *packetDecoder) Run(ctx context.Context, src io.Reader) error {
 		// nil-guard mirrors countingWriter.Write so callers can pass a
 		// decoder without a counter without crashing the read loop.
 		if d.packetCount != nil {
-			atomic.AddInt64(d.packetCount, 1)
+			d.packetCount.Add(1)
 		}
 		// SLL2 (linktype 276) is what tcpdump uses for `-i any` on libpcap
 		// >= 1.10. gopacket v1.1.19 has no SLL2 decoder, so without this
