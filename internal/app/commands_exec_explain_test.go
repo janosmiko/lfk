@@ -196,10 +196,10 @@ func waitForStub(t *testing.T, argvPath string, done <-chan tea.Msg) {
 	t.Helper()
 	// The ceiling only bounds how long the stub may take to get scheduled. It
 	// is not the thing under test: the assertion that closing the view ends the
-	// fetch measures from the close and is unaffected. The one failure anyone
-	// has captured reported the fetch still running with no spawn error, which
-	// is a stub that was slow rather than one that never ran, so this is
-	// generous. It costs nothing on the passing path.
+	// fetch measures from the close and is unaffected. The one captured failure
+	// had the fetch still running with no spawn error, which suggests delayed
+	// scheduling without proving it, so the ceiling is generous. It costs
+	// nothing on the passing path.
 	deadline := time.After(30 * time.Second)
 	for {
 		if _, err := os.Stat(argvPath); err == nil {
@@ -209,11 +209,16 @@ func waitForStub(t *testing.T, argvPath string, done <-chan tea.Msg) {
 		case msg := <-done:
 			t.Fatalf("the fetch returned before the stub started: %#v", msg)
 		case <-deadline:
-			resolved, lookErr := k8s.KubectlPath()
-			_, statErr := os.Stat(filepath.Join(filepath.Dir(argvPath), "kubectl"))
+			// KubectlPath returns KUBECTL_BIN unchanged and without an error
+			// when it is set, so report the override and whether the path
+			// exists rather than presenting the result as resolved.
+			path, pathErr := k8s.KubectlPath()
+			_, pathStat := os.Stat(path)
+			_, stubStat := os.Stat(filepath.Join(filepath.Dir(argvPath), "kubectl"))
 			t.Fatalf("the stub kubectl never started, and the fetch is still running "+
-				"(resolved=%q lookErr=%v stubPresent=%v PATH=%s)",
-				resolved, lookErr, statErr == nil, os.Getenv("PATH"))
+				"(kubectlPath=%q err=%v exists=%v KUBECTL_BIN=%q stubPresent=%v PATH=%s)",
+				path, pathErr, pathStat == nil, os.Getenv("KUBECTL_BIN"),
+				stubStat == nil, os.Getenv("PATH"))
 		case <-time.After(20 * time.Millisecond):
 		}
 	}
