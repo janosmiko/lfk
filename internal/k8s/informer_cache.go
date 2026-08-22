@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,14 +38,14 @@ const defaultSweepInterval = time.Minute
 // new information beyond what the watch already delivers.
 const informerResyncPeriod = time.Duration(0)
 
-// defaultInitialSyncTimeout caps how long the first GetResources call after
-// enabling the cache will block waiting for the informer's initial LIST to
-// complete. On a sluggish API server this prevents the UI from hanging
-// indefinitely on the first namespace switch — instead we fall back to a
-// direct list and try the cache again on the next request, by which time it
-// has typically synced. Stored on informerCache so tests can dial it down
-// without hard-coding a long sleep into the suite.
-const defaultInitialSyncTimeout = 30 * time.Second
+// defaultInitialSyncTimeout caps how long a GetResources call will block
+// waiting for the informer's initial LIST to complete. On a sluggish API server
+// this prevents the UI from hanging on the first namespace switch: we fall back
+// to a direct list and try the cache again on the next request, by which time
+// it has typically synced. Only one call per entry ever pays it, so the cost of
+// a wait that does not pay off is a single duplicate list. Stored on
+// informerCache so tests can dial it down without a long sleep in the suite.
+const defaultInitialSyncTimeout = 5 * time.Second
 
 // InformerCacheMode controls how GetResources is routed: never use the cache,
 // always use it, or auto-promote to it on large lists and auto-demote back
@@ -123,6 +124,12 @@ type informerEntry struct {
 	informer cache.SharedIndexInformer
 	stopCh   chan struct{}
 	synced   chan struct{} // closed when the informer's first LIST has completed
+
+	// syncGaveUp is set the first time waitForSync times out on this entry.
+	// A watch that cannot finish its initial stream never closes `synced`, so
+	// without this every later call would pay the timeout again and stall the
+	// caller for the rest of the session (#646).
+	syncGaveUp atomic.Bool
 
 	// memoMu guards memo. Keys are "<namespace>/<name>" (or "/<name>"
 	// for cluster-scoped resources). Entries outside the current list's
@@ -658,6 +665,15 @@ func waitForSync(ctx context.Context, entry *informerEntry, timeout time.Duratio
 	default:
 	}
 
+	// One entry gets one wait. A watch that cannot finish its initial stream
+	// never closes `synced`, and paying the timeout on every call stalls the
+	// caller for the rest of the session (#646). The informer keeps warming in
+	// the background, so the fast path above puts the cache back in service the
+	// moment it does sync.
+	if entry.syncGaveUp.Load() {
+		return fmt.Errorf("informer cache: initial sync still pending")
+	}
+
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
@@ -669,6 +685,7 @@ func waitForSync(ctx context.Context, entry *informerEntry, timeout time.Duratio
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-timer.C:
+		entry.syncGaveUp.Store(true)
 		return fmt.Errorf("informer cache: initial sync timed out after %s", timeout)
 	}
 }
