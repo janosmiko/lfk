@@ -14,9 +14,8 @@ import (
 // type before the apiserver answers. A failure arriving then must not paint the
 // seed resource types over the resource list, nor cache them as "test-ctx/pods".
 func TestDiscoveryFailureAtResourceLevelLeavesMiddleColumnAlone(t *testing.T) {
-	// Not t.Parallel(): View() writes ui.ActiveCollapsedCategories, a
-	// package-level render global, so two Model.View() calls racing across
-	// goroutines trip -race.
+	t.Parallel()
+
 	m := basePush80Model()
 	m.nav.Level = model.LevelResources
 	m.nav.Context = "test-ctx"
@@ -61,7 +60,8 @@ func TestDiscoveryFailureAtResourceLevelLeavesMiddleColumnAlone(t *testing.T) {
 // The fallback belongs to LevelResourceTypes: there it must still paint the
 // seed list and cache it under the context key.
 func TestDiscoveryFailureAtResourceTypesLevelSeedsAndCachesUnderContext(t *testing.T) {
-	// Not t.Parallel(): see the sibling test above.
+	t.Parallel()
+
 	m := basePush80Model()
 	m.nav.Level = model.LevelResourceTypes
 	m.nav.Context = "test-ctx"
