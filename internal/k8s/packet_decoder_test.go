@@ -131,7 +131,7 @@ func TestPacketDecoder_Run_CountsPacketsAndBytes(t *testing.T) {
 	}
 
 	var fileSink bytes.Buffer
-	var pkt, byt int64
+	var pkt, byt atomic.Int64
 	var got []PacketSummary
 	d := &packetDecoder{
 		file:        nopCloser{&fileSink},
@@ -143,10 +143,10 @@ func TestPacketDecoder_Run_CountsPacketsAndBytes(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	if n := atomic.LoadInt64(&pkt); n != 2 {
+	if n := pkt.Load(); n != 2 {
 		t.Errorf("packetCount = %d, want 2", n)
 	}
-	if atomic.LoadInt64(&byt) == 0 {
+	if byt.Load() == 0 {
 		t.Errorf("byteCount = 0, want > 0 (TeeReader should have piped to fileSink)")
 	}
 	if fileSink.Len() == 0 {
@@ -214,7 +214,7 @@ func TestPacketDecoder_LinuxSLL_LinkTypeDispatch(t *testing.T) {
 	}
 
 	var fileSink bytes.Buffer
-	var pkt, byt int64
+	var pkt, byt atomic.Int64
 	var got []PacketSummary
 	d := &packetDecoder{
 		file:        nopCloser{&fileSink},
@@ -298,7 +298,7 @@ func TestPacketDecoder_LinuxSLL2_DecodesIPv4(t *testing.T) {
 	pcapBuf.Write(pktBytes)
 
 	var fileSink bytes.Buffer
-	var pkt, byt int64
+	var pkt, byt atomic.Int64
 	var got []PacketSummary
 	d := &packetDecoder{
 		file:        nopCloser{&fileSink},
@@ -369,7 +369,7 @@ func TestPacketDecoder_LinuxSLL2_BigEndianMagic(t *testing.T) {
 	pcapBuf.Write(pktBytes)
 
 	var fileSink bytes.Buffer
-	var pkt, byt int64
+	var pkt, byt atomic.Int64
 	var got []PacketSummary
 	d := &packetDecoder{
 		file:        nopCloser{&fileSink},

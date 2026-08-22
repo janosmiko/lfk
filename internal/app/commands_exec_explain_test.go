@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -57,10 +59,14 @@ func TestExplainFetchesStopWhenTheViewCloses(t *testing.T) {
 			// The stub writes its argv first, so the file appearing means the
 			// process is really running. Closing the view before that would
 			// only prove that a cancelled context never spawns one.
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(argvPath)
-				return err == nil
-			}, 10*time.Second, 20*time.Millisecond, "the stub kubectl never started")
+			//
+			// Watch done alongside the file. A spawn that fails outright (a
+			// PATH miss, ETXTBSY on the freshly written script) sends its
+			// error there immediately, and polling on alone would spend the
+			// whole ceiling before reporting "never started" without saying
+			// why. That message was the whole content of two flakes in a
+			// loaded ./... run that no one could reproduce afterwards.
+			waitForStub(t, argvPath, done)
 
 			closedAt := time.Now()
 			m.exitExplainView()
@@ -182,4 +188,38 @@ func TestExplainRequestCtxFallsBackToTheRequestContext(t *testing.T) {
 	m.cancelExplainSession()
 
 	assert.Equal(t, m.reqCtx, m.explainRequestCtx())
+}
+
+// waitForStub blocks until the stub kubectl has written its argv file, and
+// fails with whatever the fetch returned if it gave up first.
+func waitForStub(t *testing.T, argvPath string, done <-chan tea.Msg) {
+	t.Helper()
+	// The ceiling only bounds how long the stub may take to get scheduled. It
+	// is not the thing under test: the assertion that closing the view ends the
+	// fetch measures from the close and is unaffected. The one captured failure
+	// had the fetch still running with no spawn error, which suggests delayed
+	// scheduling without proving it, so the ceiling is generous. It costs
+	// nothing on the passing path.
+	deadline := time.After(30 * time.Second)
+	for {
+		if _, err := os.Stat(argvPath); err == nil {
+			return
+		}
+		select {
+		case msg := <-done:
+			t.Fatalf("the fetch returned before the stub started: %#v", msg)
+		case <-deadline:
+			// KubectlPath returns KUBECTL_BIN unchanged and without an error
+			// when it is set, so report the override and whether the path
+			// exists rather than presenting the result as resolved.
+			path, pathErr := k8s.KubectlPath()
+			_, pathStat := os.Stat(path)
+			_, stubStat := os.Stat(filepath.Join(filepath.Dir(argvPath), "kubectl"))
+			t.Fatalf("the stub kubectl never started, and the fetch is still running "+
+				"(kubectlPath=%q err=%v exists=%v KUBECTL_BIN=%q stubPresent=%v PATH=%s)",
+				path, pathErr, pathStat == nil, os.Getenv("KUBECTL_BIN"),
+				stubStat == nil, os.Getenv("PATH"))
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
 }
