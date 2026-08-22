@@ -251,7 +251,10 @@ func TestDemoModeCronJobLogs(t *testing.T) {
 	// list exists. Same reasoning as the cluster test.
 	at = waitForNewThenSend(t, out, at, demo.JobNightlyBackupRun, ptmx, "\x0c", startupTimeout)
 
-	at = waitForAfter2(t, out, at, "half page", startupTimeout)
+	// Both waits run from the offset ctrl+l was sent at: the viewer paints its
+	// body and its footer in one frame, so advancing past the footer would step
+	// over the content this is looking for.
+	waitForAfter(t, out, at, "half page", startupTimeout)
 	waitForAfter(t, out, at, demo.JobNightlyBackupRun, startupTimeout)
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {

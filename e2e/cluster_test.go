@@ -54,7 +54,11 @@ func TestClusterModeCronJobLogs(t *testing.T) {
 	// way here draws it, so this separates "ctrl+l did not land" from "the logs
 	// never arrived". The failure that prompted this reported a missing marker
 	// while the app was still in the explorer.
-	at = waitForAfter2(t, out, at, "half page", clusterStartupTimeout)
+	//
+	// Both waits run from the offset ctrl+l was sent at. The viewer paints its
+	// body and its footer in one frame, so advancing past the footer would step
+	// over the log line this is looking for.
+	waitForAfter(t, out, at, "half page", clusterStartupTimeout)
 	waitForAfter(t, out, at, marker, clusterStartupTimeout)
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
