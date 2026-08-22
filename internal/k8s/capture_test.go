@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -260,18 +259,12 @@ func TestCaptureManager_Entries_StripsInternalControlHandles(t *testing.T) {
 	})
 	m.mu.Unlock()
 
+	// CaptureSnapshot has no cmd/cancel/decoder fields at all, so the compiler
+	// now carries the half of this guarantee the assertions used to. What is
+	// left to check is that building the snapshot touches none of them.
 	es := m.Entries()
 	if len(es) != 1 {
 		t.Fatalf("entries len = %d, want 1", len(es))
-	}
-	if es[0].cmd != nil {
-		t.Errorf("snapshot.cmd should be nil; got %+v", es[0].cmd)
-	}
-	if es[0].cancel != nil {
-		t.Errorf("snapshot.cancel should be nil; got non-nil func")
-	}
-	if es[0].decoder != nil {
-		t.Errorf("snapshot.decoder should be nil; got %+v", es[0].decoder)
 	}
 	if cancelCalls != 0 {
 		t.Errorf("Entries() must not invoke control handles; cancel=%d", cancelCalls)
@@ -279,8 +272,8 @@ func TestCaptureManager_Entries_StripsInternalControlHandles(t *testing.T) {
 }
 
 // TestCaptureManager_Entries_AtomicCountersRace exercises Entries() against
-// concurrent atomic.AddInt64 writes on PacketCount/ByteCount. Without atomic
-// reads in the snapshot, `go test -race` flags this as a data race.
+// concurrent counter writes. Without atomic reads in the snapshot, `go test
+// -race` flags this as a data race.
 func TestCaptureManager_Entries_AtomicCountersRace(t *testing.T) {
 	m := NewCaptureManager()
 	m.mu.Lock()
@@ -298,8 +291,8 @@ func TestCaptureManager_Entries_AtomicCountersRace(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				atomic.AddInt64(&entry.PacketCount, 1)
-				atomic.AddInt64(&entry.ByteCount, 64)
+				entry.PacketCount.Add(1)
+				entry.ByteCount.Add(64)
 			}
 		}
 	}()

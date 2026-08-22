@@ -49,19 +49,38 @@ type CaptureRequest struct {
 
 // CaptureEntry is one running or completed capture.
 type CaptureEntry struct {
+	ID         int
+	Request    CaptureRequest
+	Status     CaptureStatus
+	StartedAt  time.Time
+	StoppedAt  *time.Time
+	OutputPath string
+	LastError  string
+
+	// The decoder goroutine writes these outside m.mu, so a plain copy of the
+	// entry would tear a counter. atomic.Int64 embeds noCopy, which makes
+	// `copy := *entry` a go vet copylocks failure instead of a silent tear.
+	// CaptureSnapshot is the shape callers read.
+	PacketCount atomic.Int64
+	ByteCount   atomic.Int64
+
+	cmd     *exec.Cmd
+	cancel  context.CancelFunc
+	decoder *packetDecoder
+}
+
+// CaptureSnapshot is one entry as callers outside the manager see it: the
+// counters resolved to plain values and the lifecycle handles left behind.
+type CaptureSnapshot struct {
 	ID          int
 	Request     CaptureRequest
 	Status      CaptureStatus
 	StartedAt   time.Time
 	StoppedAt   *time.Time
-	PacketCount int64 // atomic
-	ByteCount   int64 // atomic
+	PacketCount int64
+	ByteCount   int64
 	OutputPath  string
 	LastError   string
-
-	cmd     *exec.Cmd
-	cancel  context.CancelFunc
-	decoder *packetDecoder
 }
 
 // CaptureManager tracks running captures across the lfk session.
@@ -108,25 +127,21 @@ func (m *CaptureManager) notifyLocked() {
 }
 
 // Entries returns a snapshot of all entries (running and stopped). The
-// internal control handles (cmd, cancel, decoder) stay zero-valued so callers
+// internal control handles (cmd, cancel, decoder) are left behind so callers
 // can't accidentally drive lifecycle from a stale copy.
-//
-// PacketCount and ByteCount are read via atomic.LoadInt64 because the decoder
-// goroutine writes them via atomic.AddInt64 outside m.mu — a plain struct copy
-// would race the decoder's writes.
-func (m *CaptureManager) Entries() []CaptureEntry {
+func (m *CaptureManager) Entries() []CaptureSnapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	out := make([]CaptureEntry, len(m.entries))
+	out := make([]CaptureSnapshot, len(m.entries))
 	for i, e := range m.entries {
-		out[i] = CaptureEntry{
+		out[i] = CaptureSnapshot{
 			ID:          e.ID,
 			Request:     e.Request,
 			Status:      e.Status,
 			StartedAt:   e.StartedAt,
 			StoppedAt:   e.StoppedAt,
-			PacketCount: atomic.LoadInt64(&e.PacketCount),
-			ByteCount:   atomic.LoadInt64(&e.ByteCount),
+			PacketCount: e.PacketCount.Load(),
+			ByteCount:   e.ByteCount.Load(),
 			OutputPath:  e.OutputPath,
 			LastError:   e.LastError,
 		}
