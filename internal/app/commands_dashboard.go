@@ -86,18 +86,6 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	client := m.client
 	base := bgtaskTarget(kctx, "")
 
-	// A prior fan-out for this same (context, gen) may still be mid-flight
-	// (e.g. this reload was triggered by a pin toggle before the previous
-	// dashboard load finished). Its accumulator's `expected` count was seeded
-	// from *that* fan-out's total. If this fresh fan-out has a different
-	// total (a different pin count), letting both feed the same accumulator
-	// would mix section data across fan-outs or complete against the wrong
-	// count. Evict it so this fan-out always starts from a clean slate. The
-	// nil check guards test fixtures that build a bare Model{}.
-	if m.dashboardAcc != nil {
-		delete(m.dashboardAcc, dashboardAccKey(kctx, gen))
-	}
-
 	// Each section gets a unique target so the coalesce-by-sig logic
 	// treats them as distinct tasks rather than collapsing them into one.
 	sectionTarget := func(key string) string { return base + "#" + key }
@@ -120,6 +108,28 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 		scheduledPins = countResolvedPins(pins, discovered)
 	}
 	total := 6 + scheduledPins
+
+	// A prior fan-out for this same (context, gen) may still be mid-flight: a
+	// watch tick re-issues this every interval, and a pin toggle can too.
+	//
+	// A changed pin count gives a different total than the one that seeded the
+	// accumulator's `expected`, so reusing it would mix section data across
+	// fan-outs or complete against the wrong count. Start clean.
+	//
+	// Otherwise let the fan-out finish. Re-issuing cannot speed it up, because
+	// every section coalesces against the submission already in flight, and
+	// dropping the accumulator would throw away the sections that already
+	// arrived. A cluster slower than the watch interval would then never reach
+	// a full frame (#646). The nil check guards a bare Model{} in tests.
+	if m.dashboardAcc != nil {
+		key := dashboardAccKey(kctx, gen)
+		if acc, ok := m.dashboardAcc[key]; ok {
+			if acc.expected == total && time.Since(acc.startedAt) < dashboardFanOutStuckAfter {
+				return nil
+			}
+			delete(m.dashboardAcc, key)
+		}
+	}
 
 	fixed := []struct {
 		section dashboardSection
@@ -158,80 +168,6 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 
 	cmds = append(cmds, m.pinnedSummaryCmds(kctx, gen, client, pins, discovered, total, silentSkip, sectionTarget)...)
 	return tea.Batch(cmds...)
-}
-
-// dashboardAccumulator collects partial section results until all expected
-// sections (msg.total: 6 fixed + one per pinned summary) have arrived, then
-// composes the final dashboardLoadedMsg.
-type dashboardAccumulator struct {
-	gen      uint64
-	data     dashboardData
-	received map[string]bool // by dashboardPartialMsg.key
-	expected int
-	count    int
-}
-
-func dashboardAccKey(kctx string, gen uint64) string {
-	return kctx + ":" + strconv.FormatUint(gen, 10)
-}
-
-// handleDashboardPartial accumulates a section result and emits a
-// single dashboardLoadedMsg only after all expected sections have arrived.
-// This avoids flickering the dashboard layout on every watch tick
-// (each tick fires one partial fetch per section. Rendering on each one
-// would repeatedly clear sections that haven't arrived yet).
-//
-// Stale messages (different context or different requestGen) are
-// dropped silently AND any half-built accumulator for that stale
-// (context, gen) is evicted — otherwise navigating away mid-refresh
-// would leak partial entries in m.dashboardAcc forever.
-func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) {
-	if msg.context != m.dashboardPreviewTargetContext() || msg.gen != m.requestGen {
-		// Drop any partial accumulator left behind for this stale
-		// (context, gen). The guarded m.dashboardAcc init lets us skip
-		// the delete when the map is nil (test fixtures).
-		if m.dashboardAcc != nil {
-			delete(m.dashboardAcc, dashboardAccKey(msg.context, msg.gen))
-		}
-		return m, nil
-	}
-	key := dashboardAccKey(msg.context, msg.gen)
-	if m.dashboardAcc == nil {
-		// Lazy-init: production app_init.go pre-allocates this map, but
-		// test fixtures with bare Model{} don't. The stale-drop branch
-		// above already guards a nil map. Mirror that here so a current
-		// partial arriving before init can't panic.
-		m.dashboardAcc = make(map[string]*dashboardAccumulator)
-	}
-	acc, ok := m.dashboardAcc[key]
-	if !ok {
-		acc = &dashboardAccumulator{gen: msg.gen, received: make(map[string]bool), expected: msg.total}
-		m.dashboardAcc[key] = acc
-	} else {
-		// A coalesced old fan-out (smaller total) can race a fresh one (larger
-		// total, e.g. a pin added mid-flight) on the same (context, gen).
-		// Awaiting the larger fan-out guarantees a full frame. The smaller
-		// fan-out's keys are a subset delivered by surviving coalesced tasks.
-		acc.expected = max(acc.expected, msg.total)
-	}
-	if !acc.received[msg.key] {
-		acc.received[msg.key] = true
-		acc.count++
-		mergeDashboardSection(&acc.data, msg.data)
-	}
-
-	// Defer the render until every section has arrived so the user sees
-	// either the prior (still-valid) dashboard frame or the new one in
-	// full — never a half-populated state.
-	if acc.count < acc.expected {
-		return m, nil
-	}
-
-	data := acc.data
-	delete(m.dashboardAcc, key)
-	return m, func() tea.Msg {
-		return dashboardLoadedMsg{data: data, context: msg.context}
-	}
 }
 
 // nodeSummaryStr is the inline status summary for the Nodes row, e.g.

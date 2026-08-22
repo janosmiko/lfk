@@ -17,6 +17,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// withDashboardFrameUp puts a frame on screen so handleDashboardPartial takes
+// its steady-state path, where the repaint waits for every section. With no
+// frame up it paints each section as it lands instead, so the page never sits
+// on its loading placeholder.
+func withDashboardFrameUp(m Model) Model {
+	m.dashboardPreview = "CLUSTER DASHBOARD"
+	return m
+}
+
 // newTestModelForDashboard returns a minimal Model with dashboardAcc
 // initialised for use in dashboard handler tests.
 func newTestModelForDashboard(_ *testing.T) Model {
@@ -814,6 +823,7 @@ func TestFinalFormatTimeAgoExact(t *testing.T) {
 
 func TestHandleDashboardPartial_AccumulatesSections(t *testing.T) {
 	m := newTestModelForDashboard(t)
+	m = withDashboardFrameUp(m)
 	m.nav.Context = "test-ctx"
 	m.requestGen = 7
 
@@ -851,6 +861,7 @@ func TestHandleDashboardPartial_AccumulatesSections(t *testing.T) {
 
 func TestHandleDashboardPartial_EmitsCmdOnlyAfterAllSections(t *testing.T) {
 	m := newTestModelForDashboard(t)
+	m = withDashboardFrameUp(m)
 	m.nav.Context = "test-ctx"
 	m.requestGen = 1
 
@@ -929,6 +940,7 @@ func TestHandleDashboardPartial_DropsAccumulatorWhenAll6Arrive(t *testing.T) {
 // complete at 6 unique keys and drop the 7th fan-out's section entirely.
 func TestHandleDashboardPartial_MixedTotalTakesMax(t *testing.T) {
 	m := newTestModelForDashboard(t)
+	m = withDashboardFrameUp(m)
 	m.nav.Context = "test-ctx"
 	m.requestGen = 1
 
@@ -1008,6 +1020,7 @@ func TestLoadDashboard_FanOutToBatch(t *testing.T) {
 // its (context, gen) before returning, so every fan-out starts clean.
 func TestLoadDashboardFor_EvictsStaleAccumulatorForSameContextAndGen(t *testing.T) {
 	m := newTestModelWithScheduler()
+	m = withDashboardFrameUp(m)
 	m.nav.Context = "test-ctx"
 	m.dashboardAcc = make(map[string]*dashboardAccumulator)
 	m.scheduler.StopWorkers()
@@ -1015,12 +1028,14 @@ func TestLoadDashboardFor_EvictsStaleAccumulatorForSameContextAndGen(t *testing.
 
 	gen := m.requestGen
 	key := dashboardAccKey("test-ctx", gen)
-	// Half-built accumulator from a prior (now stale) fan-out: 2 of 6
-	// sections already arrived, seeded with the OLD total.
+	// Half-built accumulator from a prior (now stale) fan-out: 2 sections
+	// already arrived, seeded with the OLD total. The 7 stands for a pin that
+	// was dropped between the two loads, so it no longer matches the fresh
+	// fan-out's 6 and the accumulator cannot be reused.
 	m.dashboardAcc[key] = &dashboardAccumulator{
 		gen:      gen,
 		received: map[string]bool{"nodes": true, "pods": true},
-		expected: 6,
+		expected: 7,
 		count:    2,
 	}
 
@@ -1069,6 +1084,7 @@ func TestLoadDashboardFor_EvictsStaleAccumulatorForSameContextAndGen(t *testing.
 // their pin order via index.
 func TestHandleDashboardPartial_PinnedSectionsCountTowardTotal(t *testing.T) {
 	m := newTestModelForDashboard(t)
+	m = withDashboardFrameUp(m)
 	m.nav.Context = "test-ctx"
 	m.requestGen = 1
 	total := 8 // 6 fixed + 2 pinned
@@ -1126,6 +1142,7 @@ func TestFetchPinnedSummary_UsesDisplayNameForDiscoveryEntry(t *testing.T) {
 // Duplicate delivery of the same section key must not double-count.
 func TestHandleDashboardPartial_DuplicateKeyIgnored(t *testing.T) {
 	m := newTestModelForDashboard(t)
+	m = withDashboardFrameUp(m)
 	m.nav.Context = "test-ctx"
 	m.requestGen = 1
 	var cmd tea.Cmd
