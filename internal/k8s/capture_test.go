@@ -476,3 +476,28 @@ func emptyPcapHeader() []byte {
 		0x01, 0x00, 0x00, 0x00, // linktype Ethernet
 	}
 }
+
+// A snapshot that shared the manager's *time.Time would let a caller rewrite
+// the entry's stop time and change every later snapshot.
+func TestCaptureManagerEntriesCopiesStoppedAt(t *testing.T) {
+	m := NewCaptureManager()
+	stopped := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	m.mu.Lock()
+	m.entries = append(m.entries, &CaptureEntry{ID: 1, Status: CaptureStopped, StoppedAt: &stopped})
+	m.mu.Unlock()
+
+	// want is read before the mutation: an aliased snapshot rewrites `stopped`
+	// too, so comparing against it would compare the mutation with itself.
+	want := stopped
+
+	first := m.Entries()
+	if len(first) != 1 || first[0].StoppedAt == nil {
+		t.Fatalf("first snapshot = %+v, want one entry with a stop time", first)
+	}
+	*first[0].StoppedAt = want.Add(time.Hour)
+
+	second := m.Entries()
+	if second[0].StoppedAt == nil || !second[0].StoppedAt.Equal(want) {
+		t.Errorf("stop time after mutating the snapshot = %v, want %v", second[0].StoppedAt, want)
+	}
+}

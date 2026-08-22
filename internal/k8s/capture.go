@@ -69,6 +69,16 @@ type CaptureEntry struct {
 	decoder *packetDecoder
 }
 
+// cloneTime copies the pointed-to timestamp so a caller mutating
+// snapshot.StoppedAt cannot reach back into the manager's entry.
+func cloneTime(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	c := *t
+	return &c
+}
+
 // CaptureSnapshot is one entry as callers outside the manager see it: the
 // counters resolved to plain values and the lifecycle handles left behind.
 type CaptureSnapshot struct {
@@ -139,7 +149,7 @@ func (m *CaptureManager) Entries() []CaptureSnapshot {
 			Request:     e.Request,
 			Status:      e.Status,
 			StartedAt:   e.StartedAt,
-			StoppedAt:   e.StoppedAt,
+			StoppedAt:   cloneTime(e.StoppedAt),
 			PacketCount: e.PacketCount.Load(),
 			ByteCount:   e.ByteCount.Load(),
 			OutputPath:  e.OutputPath,
