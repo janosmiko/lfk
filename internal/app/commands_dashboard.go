@@ -128,7 +128,9 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 		// partial still arrives for it, and a cancelled section answers
 		// nothing, so evict it here instead of leaving it in the map.
 		for k, acc := range m.dashboardAcc {
-			if acc.gen != gen && strings.HasPrefix(k, kctx+":") {
+			// Exact key, not a kctx prefix: a context may itself contain a
+			// colon, so "prod:" also prefixes the key for "prod:staging".
+			if acc.gen != gen && k == dashboardAccKey(kctx, acc.gen) {
 				delete(m.dashboardAcc, k)
 			}
 		}

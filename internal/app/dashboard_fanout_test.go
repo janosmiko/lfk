@@ -134,8 +134,10 @@ func TestLoadDashboardForEvictsAccumulatorsFromAnOlderGeneration(t *testing.T) {
 		gen: m.requestGen, received: map[string]bool{"nodes": true},
 		expected: 6, count: 1, startedAt: time.Now(),
 	}
-	other := dashboardAccKey("other-ctx", m.requestGen)
-	m.dashboardAcc[other] = &dashboardAccumulator{
+	// A context name may contain a colon, so this key starts with "test-ctx:"
+	// and a prefix match would take it with the stale one.
+	sibling := dashboardAccKey("test-ctx:secondary", m.requestGen)
+	m.dashboardAcc[sibling] = &dashboardAccumulator{
 		gen: m.requestGen, received: map[string]bool{"nodes": true},
 		expected: 6, count: 1, startedAt: time.Now(),
 	}
@@ -146,7 +148,7 @@ func TestLoadDashboardForEvictsAccumulatorsFromAnOlderGeneration(t *testing.T) {
 
 	_, ok := m.dashboardAcc[stale]
 	assert.False(t, ok, "an accumulator from an older generation must be evicted")
-	_, ok = m.dashboardAcc[other]
+	_, ok = m.dashboardAcc[sibling]
 	assert.True(t, ok, "another context's accumulator must be left alone")
 
 	drainBatch(t, cmd, m.scheduler.Close)

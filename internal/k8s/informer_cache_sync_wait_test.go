@@ -69,14 +69,24 @@ func TestWaitForSyncLetsOnlyOneCallerWait(t *testing.T) {
 
 	const timeout = 300 * time.Millisecond
 	waited := make(chan time.Duration, 2)
+	// Both callers must be inside waitForSync before either can time out, or
+	// the second one arrives after the first gave up and the old
+	// load-then-store code would pass this too.
+	start := make(chan struct{})
+	var ready sync.WaitGroup
+	ready.Add(2)
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Go(func() {
-			start := time.Now()
+			ready.Done()
+			<-start
+			began := time.Now()
 			_ = waitForSync(t.Context(), entry, timeout)
-			waited <- time.Since(start)
+			waited <- time.Since(began)
 		})
 	}
+	ready.Wait()
+	close(start)
 	wg.Wait()
 	close(waited)
 
