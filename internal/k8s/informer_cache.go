@@ -125,11 +125,13 @@ type informerEntry struct {
 	stopCh   chan struct{}
 	synced   chan struct{} // closed when the informer's first LIST has completed
 
-	// syncGaveUp is set the first time waitForSync times out on this entry.
-	// A watch that cannot finish its initial stream never closes `synced`, so
-	// without this every later call would pay the timeout again and stall the
-	// caller for the rest of the session (#646).
-	syncGaveUp atomic.Bool
+	// syncWaitClaimed is taken by the one caller allowed to wait for this
+	// entry's initial sync. A watch that cannot finish its initial stream never
+	// closes `synced`, so without the claim every later call would pay the
+	// timeout again and stall for the rest of the session (#646). It is a
+	// CompareAndSwap rather than a flag set after the timeout, or two callers
+	// arriving together would both wait the timeout out.
+	syncWaitClaimed atomic.Bool
 
 	// memoMu guards memo. Keys are "<namespace>/<name>" (or "/<name>"
 	// for cluster-scoped resources). Entries outside the current list's
@@ -665,12 +667,11 @@ func waitForSync(ctx context.Context, entry *informerEntry, timeout time.Duratio
 	default:
 	}
 
-	// One entry gets one wait. A watch that cannot finish its initial stream
-	// never closes `synced`, and paying the timeout on every call stalls the
-	// caller for the rest of the session (#646). The informer keeps warming in
-	// the background, so the fast path above puts the cache back in service the
+	// One entry gets one wait, whoever claims it first. Everyone else falls
+	// straight through to a direct list. The informer keeps warming in the
+	// background, so the fast path above puts the cache back in service the
 	// moment it does sync.
-	if entry.syncGaveUp.Load() {
+	if !entry.syncWaitClaimed.CompareAndSwap(false, true) {
 		return fmt.Errorf("informer cache: initial sync still pending")
 	}
 
@@ -685,7 +686,6 @@ func waitForSync(ctx context.Context, entry *informerEntry, timeout time.Duratio
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-timer.C:
-		entry.syncGaveUp.Store(true)
 		return fmt.Errorf("informer cache: initial sync timed out after %s", timeout)
 	}
 }

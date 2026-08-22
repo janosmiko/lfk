@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -56,4 +57,34 @@ func TestShouldUseCacheHonoursADeniedGVRInAlwaysMode(t *testing.T) {
 
 	assert.False(t, shouldUseCache(InformerCacheAlways, ic, "test-ctx", gvr),
 		"a denied GVR must take the direct path in every mode")
+}
+
+// Two callers arriving before the first timeout must not both wait it out: the
+// claim is what keeps a stuck informer from stalling a whole dashboard fan-out.
+func TestWaitForSyncLetsOnlyOneCallerWait(t *testing.T) {
+	entry := &informerEntry{
+		stopCh: make(chan struct{}),
+		synced: make(chan struct{}),
+	}
+
+	const timeout = 300 * time.Millisecond
+	waited := make(chan time.Duration, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Go(func() {
+			start := time.Now()
+			_ = waitForSync(t.Context(), entry, timeout)
+			waited <- time.Since(start)
+		})
+	}
+	wg.Wait()
+	close(waited)
+
+	slow := 0
+	for d := range waited {
+		if d >= timeout {
+			slow++
+		}
+	}
+	assert.Equal(t, 1, slow, "exactly one caller may pay the timeout")
 }

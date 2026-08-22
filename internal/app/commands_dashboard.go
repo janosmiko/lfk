@@ -123,6 +123,15 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	// a full frame (#646). The nil check guards a bare Model{} in tests.
 	if m.dashboardAcc != nil {
 		key := dashboardAccKey(kctx, gen)
+		// Navigation bumps requestGen, which retires the fan-out feeding the
+		// old key. handleDashboardPartial drops that accumulator only when a
+		// partial still arrives for it, and a cancelled section answers
+		// nothing, so evict it here instead of leaving it in the map.
+		for k, acc := range m.dashboardAcc {
+			if acc.gen != gen && strings.HasPrefix(k, kctx+":") {
+				delete(m.dashboardAcc, k)
+			}
+		}
 		if acc, ok := m.dashboardAcc[key]; ok {
 			if acc.expected == total && time.Since(acc.startedAt) < dashboardFanOutStuckAfter {
 				return nil

@@ -66,7 +66,7 @@ func TestDashboardPartialPaintsWhileTheScreenIsEmpty(t *testing.T) {
 	m := newTestModelForDashboard(t)
 	m.nav.Context = "test-ctx"
 
-	_, cmd := m.handleDashboardPartial(dashboardPartialMsg{
+	m, cmd := m.handleDashboardPartial(dashboardPartialMsg{
 		context: "test-ctx", key: "nodes", total: 6,
 		data: dashboardData{nodeItems: []model.Item{{Name: "n1"}}, nodeCount: 1, readyNodes: 1},
 	})
@@ -75,6 +75,12 @@ func TestDashboardPartialPaintsWhileTheScreenIsEmpty(t *testing.T) {
 	loaded, ok := cmd().(dashboardLoadedMsg)
 	require.True(t, ok)
 	assert.Equal(t, 1, loaded.data.nodeCount)
+
+	// Painting must not consume the accumulator: the sections still in flight
+	// have to be able to complete this same frame.
+	acc, ok := m.dashboardAcc[dashboardAccKey("test-ctx", m.requestGen)]
+	require.True(t, ok, "an incremental paint must keep the accumulator")
+	assert.Equal(t, 1, acc.count)
 }
 
 // Once a frame is up, a mid-fill repaint would only cost renders: the fan-out
@@ -112,4 +118,36 @@ func TestDashboardAccumulatorStartsFromTheLastFrame(t *testing.T) {
 	assert.Equal(t, 7, acc.data.nodeCount, "an unarrived section keeps its previous value")
 	assert.Empty(t, acc.data.pinnedSummaries,
 		"pinned summaries append, so carrying them over would duplicate every row")
+}
+
+// Navigation bumps requestGen and the scheduler cancels the sections feeding
+// the old accumulator, so no partial arrives to clear it. Left in the map it
+// would outlive the fan-out it belongs to.
+func TestLoadDashboardForEvictsAccumulatorsFromAnOlderGeneration(t *testing.T) {
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.dashboardAcc = make(map[string]*dashboardAccumulator)
+	m.scheduler.StopWorkers()
+
+	stale := dashboardAccKey("test-ctx", m.requestGen)
+	m.dashboardAcc[stale] = &dashboardAccumulator{
+		gen: m.requestGen, received: map[string]bool{"nodes": true},
+		expected: 6, count: 1, startedAt: time.Now(),
+	}
+	other := dashboardAccKey("other-ctx", m.requestGen)
+	m.dashboardAcc[other] = &dashboardAccumulator{
+		gen: m.requestGen, received: map[string]bool{"nodes": true},
+		expected: 6, count: 1, startedAt: time.Now(),
+	}
+
+	m.requestGen++
+	cmd := m.loadDashboardFor("test-ctx")
+	require.NotNil(t, cmd)
+
+	_, ok := m.dashboardAcc[stale]
+	assert.False(t, ok, "an accumulator from an older generation must be evicted")
+	_, ok = m.dashboardAcc[other]
+	assert.True(t, ok, "another context's accumulator must be left alone")
+
+	drainBatch(t, cmd, m.scheduler.Close)
 }

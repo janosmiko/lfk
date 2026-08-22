@@ -176,14 +176,15 @@ func (q *ctxQueue) dropStaleByGen(keepGen uint64) {
 func (q *ctxQueue) enqueueAtLocked(t *queuedTask, slot int) {
 	prio := int(t.req.Priority)
 	lane := q.lanes[prio]
+	next := make([]*queuedTask, 0, len(lane)+1)
 	if slot < 0 || slot > len(lane) {
-		lane = append(lane, t)
+		next = append(append(next, lane...), t)
 	} else {
-		lane = append(lane, nil)
-		copy(lane[slot+1:], lane[slot:])
-		lane[slot] = t
+		next = append(next, lane[:slot]...)
+		next = append(next, t)
+		next = append(next, lane[slot:]...)
 	}
-	q.lanes[prio] = lane
+	q.lanes[prio] = next
 	select {
 	case q.wake <- struct{}{}:
 	default: // already signaled

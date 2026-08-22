@@ -15,20 +15,14 @@ import (
 // 10 FPS spinner loop running for the life of the process, and every tick
 // re-renders the whole screen (issue #646).
 
+// The assertions below read previewLoading rather than stripANSI(view) because
+// the flag is what arms the spinner tick loop. A single frame cannot show the
+// difference: the glyph looks the same whether the loop is running or stuck.
 func newSpinnerStuckModel() Model {
-	return Model{
-		nav:                 model.NavigationState{Context: "test-ctx"},
-		tabs:                []TabState{{}},
-		selectedItems:       make(map[string]bool),
-		cursorMemory:        make(map[string]int),
-		itemCache:           make(map[string][]model.Item),
-		discoveredResources: make(map[string][]model.ResourceTypeEntry),
-		dashboardAcc:        make(map[string]*dashboardAccumulator),
-		width:               120,
-		height:              40,
-		execMu:              &sync.Mutex{},
-		previewLoading:      true,
-	}
+	m := basePush80Model()
+	m.dashboardAcc = make(map[string]*dashboardAccumulator)
+	m.previewLoading = true
+	return m
 }
 
 // Discovery writes the resource-type list straight into middleItems, so the

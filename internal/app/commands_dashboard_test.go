@@ -1037,6 +1037,9 @@ func TestLoadDashboardFor_EvictsStaleAccumulatorForSameContextAndGen(t *testing.
 		received: map[string]bool{"nodes": true, "pods": true},
 		expected: 7,
 		count:    2,
+		// Recent, so only the expected mismatch can evict it. The age clause
+		// has its own test.
+		startedAt: time.Now(),
 	}
 
 	cmd := m.loadDashboardFor("test-ctx")
