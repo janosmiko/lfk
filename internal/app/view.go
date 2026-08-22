@@ -83,6 +83,11 @@ func (m Model) renderView() string {
 		return "Loading..."
 	}
 
+	// The assignments below and every renderer they feed share ui's per-frame
+	// globals, so the whole pass has to be exclusive. See ui.RenderMu.
+	ui.RenderMu.Lock()
+	defer ui.RenderMu.Unlock()
+
 	// Sync nyan mode state to UI globals for rendering.
 	ui.NyanMode = m.nyanMode
 	ui.NyanTick = m.nyanTick
