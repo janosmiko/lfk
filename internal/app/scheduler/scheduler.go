@@ -106,7 +106,14 @@ func newCtxQueue(agingThreshold int) *ctxQueue {
 // Walks all priority lanes — coalesce is signature-based, not lane-
 // based, so a Low task is correctly displaced by a same-Sig High
 // resubmission (and vice versa).
-func (q *ctxQueue) coalesceBySigLocked(sig Sig) {
+//
+// Returns the index in ownLane that the incoming task must take so it inherits
+// its twin's queue position, or -1 when no twin sat in that lane. Appending
+// instead starves a task that a timer resubmits: the dashboard re-issues its
+// fan-out every watch interval, so a section sent to the back of the lane is
+// coalesced away again before a worker ever reaches it (#646).
+func (q *ctxQueue) coalesceBySigLocked(sig Sig, ownLane int) int {
+	slot := -1
 	for prio := range q.lanes {
 		lane := q.lanes[prio]
 		if len(lane) == 0 {
@@ -115,6 +122,9 @@ func (q *ctxQueue) coalesceBySigLocked(sig Sig) {
 		kept := lane[:0]
 		for _, t := range lane {
 			if sig.CoalescesWith(t.req.Sig()) {
+				if prio == ownLane && slot < 0 {
+					slot = len(kept)
+				}
 				t.future <- Result{Err: ErrCoalesced}
 				close(t.future)
 				continue
@@ -123,6 +133,7 @@ func (q *ctxQueue) coalesceBySigLocked(sig Sig) {
 		}
 		q.lanes[prio] = kept
 	}
+	return slot
 }
 
 // staleByGen reports whether a queued/running req should be reclaimed by
@@ -159,11 +170,20 @@ func (q *ctxQueue) dropStaleByGen(keepGen uint64) {
 	}
 }
 
-// enqueueLocked appends to the priority lane and signals wake. Caller
-// must hold q.mu.
-func (q *ctxQueue) enqueueLocked(t *queuedTask) {
+// enqueueAtLocked appends t to its priority lane and signals wake, or inserts
+// it at slot when coalesceBySigLocked found a twin there whose position t
+// inherits. Caller must hold q.mu.
+func (q *ctxQueue) enqueueAtLocked(t *queuedTask, slot int) {
 	prio := int(t.req.Priority)
-	q.lanes[prio] = append(q.lanes[prio], t)
+	lane := q.lanes[prio]
+	if slot < 0 || slot > len(lane) {
+		lane = append(lane, t)
+	} else {
+		lane = append(lane, nil)
+		copy(lane[slot+1:], lane[slot:])
+		lane[slot] = t
+	}
+	q.lanes[prio] = lane
 	select {
 	case q.wake <- struct{}{}:
 	default: // already signaled
@@ -328,10 +348,11 @@ func (r *Registry) Submit(req SubmitReq) Future {
 		return fut
 	default:
 	}
+	slot := -1
 	if !sig.NeverCoalesce() {
-		q.coalesceBySigLocked(sig)
+		slot = q.coalesceBySigLocked(sig, int(req.Priority))
 	}
-	q.enqueueLocked(t)
+	q.enqueueAtLocked(t, slot)
 	q.mu.Unlock()
 
 	r.mu.Lock()

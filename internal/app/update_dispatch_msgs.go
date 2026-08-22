@@ -223,6 +223,10 @@ func (m Model) updateEventTimeline(msg eventTimelineMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 	if msg.context == m.dashboardPreviewTargetContext() {
+		// The dashboard fan-out is the preview load clearRight() armed the flag
+		// for. Leaving it armed keeps the 10 FPS spinner loop re-rendering the
+		// whole screen for as long as the user parks here (#646).
+		m.previewLoading = false
 		if msg.content != "" {
 			// Static override (e.g. "Cluster dashboard disabled"): no data to
 			// recompose, so show it verbatim.
@@ -242,6 +246,7 @@ func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 
 func (m Model) updateMonitoringDashboard(msg monitoringDashboardMsg) Model {
 	if msg.context == m.dashboardPreviewTargetContext() {
+		m.previewLoading = false
 		if m.monitoringData == nil {
 			m.monitoringData = make(map[string]monitoringData)
 		}
