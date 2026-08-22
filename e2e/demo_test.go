@@ -246,9 +246,15 @@ func TestDemoModeCronJobLogs(t *testing.T) {
 	sendKeys(t, ptmx, "\r")
 	at := waitForThenSend(t, out, "CronJobs", ptmx, "/CronJobs\r", startupTimeout)
 	at = waitForNewThenSend(t, out, at, demo.CronJobNightlyBackup, ptmx, "\r", startupTimeout)
-	// ctrl+l opens the fullscreen log viewer.
-	at = waitForNewThenSend(t, out, at, demo.CronJobNightlyBackup, ptmx, "\x0c", startupTimeout)
+	// The Job row, not the CronJob name: the latter prefixes the former, so a
+	// details-pane repaint would satisfy the shorter wait before the drilled-in
+	// list exists. Same reasoning as the cluster test.
+	at = waitForNewThenSend(t, out, at, demo.JobNightlyBackupRun, ptmx, "\x0c", startupTimeout)
 
+	// Both waits run from the offset ctrl+l was sent at: the viewer paints its
+	// body and its footer in one frame, so advancing past the footer would step
+	// over the content this is looking for.
+	waitForAfter(t, out, at, "half page", startupTimeout)
 	waitForAfter(t, out, at, demo.JobNightlyBackupRun, startupTimeout)
 
 	if strings.Contains(out.String(), "panic:") || strings.Contains(stderr.String(), "panic:") {
