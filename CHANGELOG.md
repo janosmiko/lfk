@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.1](https://github.com/janosmiko/lfk/compare/v0.18.0...v0.18.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* cut idle CPU on the cluster dashboard ([#669](https://github.com/janosmiko/lfk/issues/669)) ([b2ef440](https://github.com/janosmiko/lfk/commit/b2ef44069f9e211b609addeadcbd879ee6df16fc))
+* let two tests render under t.Parallel without racing ([#671](https://github.com/janosmiko/lfk/issues/671)) ([251b36f](https://github.com/janosmiko/lfk/commit/251b36fe6e287e7a0300badd01b6b5ec79f6d858))
+
 ## [0.18.0](https://github.com/janosmiko/lfk/compare/v0.17.5...v0.18.0) (2026-08-21)
 
 
