@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -192,7 +194,13 @@ func TestExplainRequestCtxFallsBackToTheRequestContext(t *testing.T) {
 // fails with whatever the fetch returned if it gave up first.
 func waitForStub(t *testing.T, argvPath string, done <-chan tea.Msg) {
 	t.Helper()
-	deadline := time.After(10 * time.Second)
+	// The ceiling only bounds how long the stub may take to get scheduled. It
+	// is not the thing under test: the assertion that closing the view ends the
+	// fetch measures from the close and is unaffected. The one failure anyone
+	// has captured reported the fetch still running with no spawn error, which
+	// is a stub that was slow rather than one that never ran, so this is
+	// generous. It costs nothing on the passing path.
+	deadline := time.After(30 * time.Second)
 	for {
 		if _, err := os.Stat(argvPath); err == nil {
 			return
@@ -201,7 +209,11 @@ func waitForStub(t *testing.T, argvPath string, done <-chan tea.Msg) {
 		case msg := <-done:
 			t.Fatalf("the fetch returned before the stub started: %#v", msg)
 		case <-deadline:
-			t.Fatal("the stub kubectl never started, and the fetch is still running")
+			resolved, lookErr := k8s.KubectlPath()
+			_, statErr := os.Stat(filepath.Join(filepath.Dir(argvPath), "kubectl"))
+			t.Fatalf("the stub kubectl never started, and the fetch is still running "+
+				"(resolved=%q lookErr=%v stubPresent=%v PATH=%s)",
+				resolved, lookErr, statErr == nil, os.Getenv("PATH"))
 		case <-time.After(20 * time.Millisecond):
 		}
 	}
