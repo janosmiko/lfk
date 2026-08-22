@@ -86,6 +86,10 @@ func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
 		// sees *something* (seeds or real) while hovering a context.
 		m.rightItems = msg.items
 		m.loading = false
+		// This list IS the preview clearRight() armed the flag for. Leaving it
+		// armed keeps spinnerNeeded() true for the life of the process, and the
+		// 10 FPS spinner loop then re-renders the whole screen forever (#646).
+		m.previewLoading = false
 		return m, nil
 	}
 	// Middle pane at LevelResourceTypes: if discovery is still in flight
@@ -111,6 +115,10 @@ func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
 		m.suppressBgtasks = true
 	}
 	cmd := m.loadPreview()
+	// Same alignment as updateResourcesLoadedMain: the flag may only stay armed
+	// while a preview result is still coming. Without this a cursor sitting on
+	// a type that dispatches nothing pins the 10 FPS spinner loop on (#646).
+	m.previewLoading = cmd != nil && !msg.silent
 	m.suppressBgtasks = savedSuppress
 	return m, cmd
 }
@@ -272,7 +280,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	// "Loading..." forever instead of letting the right pane fall through
 	// to its empty/details branches.
 	previewCmd := m.loadPreview()
-	m.previewLoading = previewCmd != nil
+	m.previewLoading = previewCmd != nil && !msg.silent
 	if previewCmd != nil {
 		cmds = append(cmds, previewCmd)
 	}
@@ -414,7 +422,7 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 	// kinds without further owned children (or empty Helm releases) make
 	// loadPreview return nil. Without this the right pane spins forever.
 	previewCmd := m.loadPreview()
-	m.previewLoading = previewCmd != nil
+	m.previewLoading = previewCmd != nil && !msg.silent
 	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
@@ -475,7 +483,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	// preview cmd is dispatched the flag must stay true so the spinner
 	// keeps showing until the reply clears it.
 	previewCmd := m.loadPreview()
-	m.previewLoading = previewCmd != nil
+	m.previewLoading = previewCmd != nil && !msg.silent
 	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }

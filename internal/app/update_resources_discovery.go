@@ -69,6 +69,10 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			// j/k press.
 			wasInitial := len(m.middleItems) == 0
 			m.loading = false
+			// No preview load follows, so nothing else can disarm the flag
+			// clearRight() set, and the 10 FPS spinner loop would re-render the
+			// whole screen for the life of the process (#646).
+			m.previewLoading = false
 			m.setMiddleItems(merged)
 			if wasInitial {
 				m.restoreCursor()
@@ -198,6 +202,8 @@ func (m Model) handleAPIResourceDiscoveryError(msg apiResourceDiscoveryMsg, isCu
 		// saved by session-restore), undoing the user's navigation.
 		wasInitial := len(m.middleItems) == 0
 		m.loading = false
+		// Same reason as the success branch: no preview load follows (#646).
+		m.previewLoading = false
 		m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
 		m.itemCache[m.nav.Context] = m.middleItems
 		if wasInitial {
