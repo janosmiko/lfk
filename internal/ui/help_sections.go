@@ -114,6 +114,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.Fullscreen, "Cycle layout: sidebar, fullscreen, restore"},
 				{kb.ResourceMap, "Toggle resource relationship map"},
 				{kb.ColumnToggle, "Show / hide and reorder columns"},
+				{kb.MetricsSparkCycle, "Cycle CPU/MEM columns: numeric or sparkline"},
 				{kb.PinGroup, "Pin / unpin resource type"},
 				{kb.ToggleRare, "Toggle rare + hidden resource types"},
 				{kb.APIExplorer, "API Explorer (resource structure)"},

@@ -265,6 +265,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 - Node uptime column: [config-reference.md](docs/config-reference.md#node-uptime-column)
 - Namespace resource quota dashboard with `Q`
 - Watch mode auto-refresh with `w`: [usage.md](docs/usage.md#watch-mode-interval)
+- CPU and MEM sparklines from Prometheus history with `~`: [keybindings.md](docs/keybindings.md#modes-and-settings)
 - Random startup tips: [config-reference.md](docs/config-reference.md#top-level-fields)
 
 ## Navigation hierarchy

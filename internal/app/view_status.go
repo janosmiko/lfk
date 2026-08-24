@@ -630,6 +630,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	if hasResourceContext {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.MetricsSparkCycle, Desc: "cpu/mem view"})
 	}
 	hintEntries = append(hintEntries,
 		ui.HintEntry{Key: kb.Filter, Desc: "filter"},

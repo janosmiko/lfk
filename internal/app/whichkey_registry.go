@@ -524,6 +524,7 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.OrphanOverlay }, Label: "Orphan overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},
 	{Key: func(kb ui.Keybindings) string { return kb.SessionManager }, Label: "Session manager", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.ColumnToggle }, Label: "Column visibility", Group: wkViews, Avail: wkLevelResourcesUp},
+	{Key: func(kb ui.Keybindings) string { return kb.MetricsSparkCycle }, Label: "CPU/MEM display mode", Group: wkViews, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.Monitoring }, Label: "Monitoring dashboard", Group: wkViews, Avail: func(c *wkCtx) bool { return c.level >= model.LevelResourceTypes }},
 	{Key: func(kb ui.Keybindings) string { return kb.QuotaDashboard }, Label: "Quota dashboard", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.TasksOverlay }, Label: "Task queue", Group: wkViews},
@@ -624,9 +625,6 @@ func whichKeyExcludedBindings() map[string]string {
 		// Tabs: muscle-memory keys that would crowd out the actions.
 		"NewTab": "tab management", "NextTab": "tab management", "PrevTab": "tab management",
 		"MoveTabLeft": "tab management", "MoveTabRight": "tab management",
-
-		// TODO(task-10): remove once the which-key entry is registered.
-		"MetricsSparkCycle": "which-key entry lands in task 10",
 
 		// Goto chords (whichkey.go): each is a full "g<x>" chord dispatched by
 		// handleGotoChord while the g prefix is armed, and already has its own
