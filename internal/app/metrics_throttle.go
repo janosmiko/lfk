@@ -18,6 +18,11 @@ func (m *Model) listMetricsCmds(kind string) []tea.Cmd {
 		if m.allowMetricsFetch(kind) {
 			cmds = append(cmds, m.loadPodMetricsForList())
 		}
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark && m.allowSparklineFetch(kind) {
+			if cmd := m.loadPodMetricsRangeForList(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
 	case "Node":
 		if m.allowMetricsFetch(kind) {
 			cmds = append(cmds, m.loadNodeMetricsForList())
@@ -34,6 +39,23 @@ func (m *Model) listMetricsCmds(kind string) []tea.Cmd {
 func (m *Model) allowMetricsFetch(kind string) bool {
 	key := m.nav.Context + "/" + kind
 	if interval := ui.ConfigMetricsInterval; interval > 0 && m.suppressBgtasks {
+		if last, ok := m.metricsLastFetch[key]; ok && time.Since(last) < interval {
+			return false
+		}
+	}
+	if m.metricsLastFetch == nil {
+		m.metricsLastFetch = make(map[string]time.Time)
+	}
+	m.metricsLastFetch[key] = time.Now()
+	return true
+}
+
+// allowSparklineFetch throttles the range fetch harder than allowMetricsFetch,
+// since a range query reads a whole window per series, and stamps it under a
+// separate key so the two throttles cannot starve each other.
+func (m *Model) allowSparklineFetch(kind string) bool {
+	key := m.nav.Context + "/spark/" + kind
+	if interval := ui.ConfigSparklineInterval; interval > 0 {
 		if last, ok := m.metricsLastFetch[key]; ok && time.Since(last) < interval {
 			return false
 		}

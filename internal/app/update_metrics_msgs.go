@@ -286,8 +286,14 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		cpuUse := ui.FormatCPU(pm.CPU)
 		memUse := ui.FormatMemory(pm.Memory)
 
-		// Detect significant usage trends (arrows before value).
-		if m.prevPodMetrics != nil {
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
+			// The sparkline replaces the trend arrow rather than stacking
+			// with it: it shows the same trend in more detail, and both
+			// together would cost the column another two characters.
+			cpuUse = sparklineCell(m.metricsSeries.cpu[key], cpuUse)
+			memUse = sparklineCell(m.metricsSeries.mem[key], memUse)
+		} else if m.prevPodMetrics != nil {
+			// Detect significant usage trends (arrows before value).
 			if prev, ok := m.prevPodMetrics[key]; ok {
 				cpuDiff := pm.CPU - prev.CPU
 				memDiff := pm.Memory - prev.Memory

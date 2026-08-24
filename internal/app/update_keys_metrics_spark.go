@@ -16,18 +16,14 @@ func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 	if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
 		// Bypass the throttle: the user just asked for this window, so a
 		// stamped recent fetch must not swallow the request.
-		cmds = append(cmds, m.loadMetricsRangeForList()...)
+		if cmd := m.loadPodMetricsRangeForList(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	} else {
-		// Leaving sparkline mode drops the series so the columns repaint as
-		// plain values on the next tick instead of keeping stale glyphs.
 		m.metricsSeries = metricsSeriesCache{}
-		cmds = append(cmds, m.refreshMetricsForList()...)
 	}
+	// Leaving sparkline mode repaints as plain values immediately rather
+	// than waiting for the next watch tick.
+	m.middleItemsRev++
 	return m, tea.Batch(cmds...)
 }
-
-// TODO(task-9): replaced by the real loaders in Task 9.
-func (m Model) loadMetricsRangeForList() []tea.Cmd { return nil }
-func (m Model) refreshMetricsForList() []tea.Cmd   { return nil }
-
-type metricsSeriesCache struct{}
