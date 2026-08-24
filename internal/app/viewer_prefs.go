@@ -174,8 +174,18 @@ func (m *Model) setViewerPref(p viewerPref, v bool) {
 // never drops another. It deliberately leaves the ui global alone: the global
 // is the startup seed, and rewriting it here would make one viewer's keypress
 // change what an unrelated viewer opens with later in the same session.
+//
+// The load and the save sit inside one interprocess lock. Two lfk instances
+// share a state directory, so an unlocked merge lets the later writer drop a
+// toggle the other instance recorded between its read and its write.
 func persistViewerPref(p viewerPref, v bool) {
-	s := loadViewerPrefsState()
-	*viewerPrefBindings[p].field(&s) = &v
-	saveViewerPrefs(s)
+	path := viewerPrefsFilePath()
+	if path == "" {
+		return
+	}
+	withStateFileLock(path, func() {
+		s := loadViewerPrefsState()
+		*viewerPrefBindings[p].field(&s) = &v
+		saveViewerPrefs(s)
+	})
 }
