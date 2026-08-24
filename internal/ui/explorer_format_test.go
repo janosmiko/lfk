@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -718,4 +719,48 @@ func TestRestartsCells_SanitizeValue(t *testing.T) {
 		})
 	}
 	assert.Contains(t, stripANSI(styledRestartsCell(model.Item{Restarts: "3"}, 20, false)), "3")
+}
+
+// A sparkline sits in the same prefix position as the trend arrow. Without
+// stripping it, every CPU and MEM sort in sparkline mode compares glyphs
+// instead of numbers.
+func TestParseResourceValueOK_StripsSparklinePrefix(t *testing.T) {
+	tests := []struct {
+		name  string
+		val   string
+		isCPU bool
+		want  int64
+	}{
+		{"cpu millicores", "▁▂▃▅▇ 240m", true, 240},
+		{"cpu cores", "▁▂▃▅▇ 1.5", true, 1500},
+		{"memory", "▃▃▄▄▄ 512Mi", false, 512 * 1024 * 1024},
+		{"sparkline with gap", "▁▂ ▅▇ 240m", true, 240},
+		{"leading gap", " ▁▂▅▇ 240m", true, 240},
+		{"single glyph", "█ 80m", true, 80},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ParseResourceValueOK(tt.val, tt.isCPU)
+			require.True(t, ok, "value %q must parse", tt.val)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParseResourceValueOK_SparklineOnlyIsNotAValue(t *testing.T) {
+	_, ok := ParseResourceValueOK("▁▂▃▅▇", true)
+	assert.False(t, ok, "glyphs with no number must sort as missing, not as 0")
+}
+
+func TestParseResourceValueOK_PlainValuesUnaffected(t *testing.T) {
+	v, ok := ParseResourceValueOK("240m", true)
+	require.True(t, ok)
+	assert.Equal(t, int64(240), v)
+
+	v, ok = ParseResourceValueOK("↑ 240m", true)
+	require.True(t, ok)
+	assert.Equal(t, int64(240), v)
+
+	_, ok = ParseResourceValueOK("n/a", true)
+	assert.False(t, ok)
 }
