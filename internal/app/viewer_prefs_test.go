@@ -15,6 +15,10 @@ func isolateViewerPrefs(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", dir)
+	// LFK_STATE_DIR outranks XDG_STATE_HOME in paths.resolve. TestMain unsets it
+	// for the package, but pinning it here keeps a stray value from sending a
+	// persistViewerPref write to the developer's real state directory.
+	t.Setenv("LFK_STATE_DIR", filepath.Join(dir, "lfk"))
 
 	saved := make([]bool, len(viewerPrefBindings))
 	for i, b := range viewerPrefBindings {
