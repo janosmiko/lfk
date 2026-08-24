@@ -28,6 +28,7 @@ func baseFinalModel() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -67,6 +68,7 @@ func baseFinalModelWithDynamic() Model {
 	dyn := newFinalDynClient()
 
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -102,6 +104,7 @@ func baseFinalModelWithDynamic() Model {
 
 func baseModelActions() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -130,6 +133,7 @@ func baseModelBoost2() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -175,6 +179,7 @@ func colKey(kind string) string {
 // baseModelCov returns a minimal Model for coverage tests.
 func baseModelCov() Model {
 	return Model{
+		viewerPrefs:                newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                        model.NavigationState{Level: model.LevelResources},
 		tabs:                       []TabState{{}},
 		selectedItems:              make(map[string]bool),
@@ -205,6 +210,7 @@ func baseModelWithFakeClientAndScheduler(t *testing.T, objs ...runtime.Object) M
 
 func baseModelDescribe() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -223,6 +229,7 @@ func baseModelDescribe() Model {
 
 func baseModelExplain() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -249,6 +256,7 @@ func baseModelExplain() Model {
 
 func baseModelFinalizer() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -272,6 +280,7 @@ func baseModelFinalizer() Model {
 
 func baseModelHandlers2() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -288,6 +297,7 @@ func baseModelHandlers2() Model {
 
 func baseModelNav() Model {
 	m := Model{
+		viewerPrefs: newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav: model.NavigationState{
 			Level:   model.LevelResources,
 			Context: "test-ctx",
@@ -318,6 +328,7 @@ func baseModelNav() Model {
 
 func baseModelOverlay() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -334,6 +345,7 @@ func baseModelOverlay() Model {
 
 func baseModelSearch() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -354,6 +366,7 @@ func baseModelUpdate() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -412,6 +425,7 @@ func baseModelWithFakeDynamic(
 
 func basePush4Model() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -442,6 +456,7 @@ func basePush4Model() Model {
 // basePush80Model returns a model with a fake k8s client for coverage tests.
 func basePush80Model() Model {
 	m := Model{
+		viewerPrefs: newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav: model.NavigationState{
 			Level:   model.LevelResources,
 			Context: "test-ctx",
@@ -483,6 +498,7 @@ func basePush80Model() Model {
 
 func basePush80v2Model() Model {
 	m := Model{
+		viewerPrefs: newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav: model.NavigationState{
 			Level:   model.LevelResources,
 			Context: "test-ctx",
@@ -521,6 +537,7 @@ func basePush80v2Model() Model {
 
 func basePush80v3Model() Model {
 	m := Model{
+		viewerPrefs: newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav: model.NavigationState{
 			Level:   model.LevelResources,
 			Context: "test-ctx",
@@ -561,6 +578,7 @@ func baseRichModel() Model {
 	dyn := newRichDynClient()
 
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -596,6 +614,7 @@ func baseRichModel() Model {
 
 func bp4() Model {
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),
@@ -847,6 +866,7 @@ func testModelExec() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
+		viewerPrefs:         newViewerPrefValues(), // production toggle defaults, as NewModel seeds them
 		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
 		tabs:                []TabState{{}},
 		selectedItems:       make(map[string]bool),

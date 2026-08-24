@@ -2,9 +2,10 @@ package ui
 
 // Runtime globals for fullscreen-viewer startup-toggle defaults. These are set
 // from the log_viewer / yaml_viewer / diff_viewer / describe_viewer config
-// groups (see config_apply.go) and read by the app package when it constructs
-// or re-opens each viewer. Kept in their own file to keep config.go under the
-// 800-line limit.
+// groups (see config_apply.go), then overlaid with the toggles the user last
+// pressed (app.ApplyViewerPrefs, which outranks the config file). NewModel
+// snapshots them once; a runtime toggle updates its own model, never these.
+// Kept in their own file to keep config.go under the 800-line limit.
 
 // ConfigLogShowPreview is the startup default for the log viewer's structured
 // preview side panel (runtime toggle: P). Default true (panel shown).

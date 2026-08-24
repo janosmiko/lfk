@@ -233,12 +233,12 @@ type Model struct {
 	watchTickGen uint64
 
 	// objectExplorerLive controls whether the Object Explorer re-syncs its
-	// browsed object on list refreshes (issue #391). Defaults from
-	// ui.ConfigObjectExplorerLive. Runtime toggle is w inside the explorer.
+	// browsed object on list refreshes (issue #391). Runtime toggle is w.
 	// objectExplorerForceSync forces a single re-sync on the next list refresh
 	// even when live is off, so manual refresh (R) updates the view once.
 	objectExplorerLive, objectExplorerForceSync bool
-	objectExplorerTree                          bool // session tree-view pref (T). Seeded from ui.ConfigObjectExplorerTree
+	objectExplorerTree                          bool             // session tree-view pref (T)
+	viewerPrefs                                 viewerPrefValues // live viewer toggles; see viewer_prefs.go
 
 	// Read-only mode: blocks all mutating actions for the active tab. Mirrors
 	// the active TabState.readOnly. Re-evaluated on context switch and tab

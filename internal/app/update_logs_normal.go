@@ -249,6 +249,7 @@ func (m Model) handleLogKeyF() Model {
 func (m Model) handleLogKeyTab() Model {
 	m.logView.lineInput = ""
 	m.logView.wrap = !m.logView.wrap
+	m.setViewerPref(prefLogWrap, m.logView.wrap)
 	// Re-pin to the bottom on toggle: maxScroll and topSkip both depend on
 	// wrap mode, so the previous values are stale. ensureLogCursorVisible
 	// snaps to the follow position when m.logView.follow is true and otherwise
@@ -384,12 +385,14 @@ func (m Model) handleLogKeyN2() Model {
 func (m Model) handleLogKeyP() Model {
 	m.logView.lineInput = ""
 	m.logView.hidePrefixes = !m.logView.hidePrefixes
+	m.setViewerPref(prefLogShowPrefixes, !m.logView.hidePrefixes)
 	return m
 }
 
 func (m Model) handleLogKeyP2() Model {
 	m.logView.lineInput = ""
 	m.logView.previewVisible = !m.logView.previewVisible
+	m.setViewerPref(prefLogShowPreview, m.logView.previewVisible)
 	m.logView.previewScroll = 0
 	// Effective viewer width changes when the panel toggles, so wrap-aware
 	// scroll/skip values need recomputing for the new geometry.
@@ -439,6 +442,7 @@ func (m Model) handleLogKeyHash() Model {
 func (m Model) handleLogKeyS() Model {
 	m.logView.lineInput = ""
 	m.logView.timestamps = !m.logView.timestamps
+	m.setViewerPref(prefLogShowTimestamps, m.logView.timestamps)
 	return m
 }
 

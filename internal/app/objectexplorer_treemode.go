@@ -20,7 +20,8 @@ func (m Model) toggleObjectExplorerTree() (tea.Model, tea.Cmd) {
 		if rows := rt.visibleTreeRows(); rt.cursor >= 0 && rt.cursor < len(rows) {
 			topKey = rows[rt.cursor].Segs[0]
 		}
-		m.objectExplorerTree = false // session preference for the next open
+		m.setViewerPref(prefObjectExplorerTree, false)
+		m.objectExplorerTree = false // this tab keeps it; the pref above seeds new ones
 		rt.tree = false
 		rt.treeRows = nil
 		rt.treeCollapsed = nil
@@ -43,7 +44,8 @@ func (m Model) toggleObjectExplorerTree() (tea.Model, tea.Cmd) {
 	if f, ok := rt.selected(); ok {
 		flatKey = f.Key
 	}
-	m.objectExplorerTree = true // session preference for the next open
+	m.setViewerPref(prefObjectExplorerTree, true)
+	m.objectExplorerTree = true // this tab keeps it; the pref above seeds new ones
 	rt.tree = true
 	rt.rebuildTreeRows()
 	rt.cursor = 0
