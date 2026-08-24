@@ -8,6 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -742,4 +743,43 @@ func TestFinal3LoadDashboardReturnsCmdRichTwo(t *testing.T) {
 	m := baseRichModel()
 	cmd := m.loadDashboard()
 	require.NotNil(t, cmd)
+}
+
+func TestDashboardResourcesSection_DrawsSparklineInSparkMode(t *testing.T) {
+	data := dashboardData{
+		totalCPUUsed: 1000, totalCPUAlloc: 4000,
+		totalMemUsed: 1024 * 1024 * 512, totalMemAlloc: 1024 * 1024 * 1024,
+		cpuSeries: k8s.MetricSeries{Points: []float64{1, 5, 9}},
+		memSeries: k8s.MetricSeries{Points: []float64{9, 5, 1}},
+	}
+	// content must be set: dashboardMetricLines truncates every line to it,
+	// so a zero value renders empty lines regardless of the sparkline.
+	w := dashboardWidths{bar: 20, node: 20, sep: 60, label: 6, content: 80}
+
+	lines := dashboardResourcesSection(nil, data, w, true)
+
+	joined := stripANSI(strings.Join(lines, "\n"))
+	assert.Contains(t, joined, "█", "a series reaching its maximum must draw the top glyph")
+	assert.Contains(t, joined, "1.0 / 4.0", "the numeric total must still be shown")
+}
+
+func TestDashboardResourcesSection_NumericModeDrawsNoGlyphs(t *testing.T) {
+	// totalCPUUsed is 0 so renderBar's fill is empty: a nonzero fill also
+	// draws "█", which is both renderBar's fill glyph and the sparkline
+	// alphabet's top glyph, and would falsely fail this assertion.
+	data := dashboardData{
+		totalCPUUsed: 0, totalCPUAlloc: 4000,
+		cpuSeries: k8s.MetricSeries{Points: []float64{1, 5, 9}},
+	}
+	// content must be set: dashboardMetricLines truncates every line to it,
+	// so a zero value renders empty lines regardless of the sparkline.
+	w := dashboardWidths{bar: 20, node: 20, sep: 60, label: 6, content: 80}
+
+	lines := dashboardResourcesSection(nil, data, w, false)
+
+	joined := stripANSI(strings.Join(lines, "\n"))
+	for _, g := range ui.SparklineGlyphs {
+		assert.NotContains(t, joined, string(g),
+			"numeric mode must render identically to before this feature")
+	}
 }

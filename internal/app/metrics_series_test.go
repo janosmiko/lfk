@@ -241,5 +241,61 @@ func TestLoadMetricsRangeForKind_DispatchesByKind(t *testing.T) {
 
 	assert.NotNil(t, m.loadMetricsRangeForKind("Pod"), "Pod has CPU/MEM columns and must load history")
 	assert.NotNil(t, m.loadMetricsRangeForKind("Node"), "Node has CPU/MEM columns and must load history")
+	assert.NotNil(t, m.loadMetricsRangeForKind("Cluster"), "Cluster dashboard has a CPU/Mem section and must load history")
 	assert.Nil(t, m.loadMetricsRangeForKind("Deployment"), "a kind with no CPU/MEM columns must be inert")
+}
+
+func TestUpdateClusterMetricsRange_FallsBackToNumericOnError(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+}
+
+func TestUpdateClusterMetricsRange_StoresSeries(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+		gen: m.requestGen,
+		cpu: k8s.MetricSeries{Points: []float64{1, 5, 9}},
+	})
+
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
+	assert.Equal(t, []float64{1, 5, 9}, m.metricsSeries.clusterCPU.Points)
+}
+
+// Unlike the pod/node fallback, only the two cluster fields are cleared: a
+// cluster fallback must not discard a pod or node mode's row maps, which
+// metricsSeriesCache also holds.
+func TestUpdateClusterMetricsRange_EmptyResultFallsBackAndKeepsOtherSeries(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+	m.metricsSeries = metricsSeriesCache{
+		cpu:        map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{1, 2}}},
+		mem:        map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{3, 4}}},
+		clusterCPU: k8s.MetricSeries{Points: []float64{1, 2}},
+		clusterMem: k8s.MetricSeries{Points: []float64{3, 4}},
+	}
+
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+	assert.Empty(t, m.metricsSeries.clusterCPU.Points)
+	assert.Empty(t, m.metricsSeries.clusterMem.Points)
+	assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["default/api-1"].Points,
+		"a cluster fallback must not discard the pod/node row maps sharing this cache")
+	assert.Equal(t, []float64{3, 4}, m.metricsSeries.mem["default/api-1"].Points)
+}
+
+func TestUpdateClusterMetricsRange_IgnoresStaleGeneration(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
+
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
+		"a stale response must not revert the mode the user just chose")
 }

@@ -449,7 +449,9 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 }
 
 // dashboardResourcesSection renders the cluster resources (CPU/Mem) section.
-func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWidths) []string {
+// spark draws a usage-history sparkline under each bar. False renders the
+// section exactly as it did before sparklines existed.
+func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWidths, spark bool) []string {
 	if data.totalCPUAlloc <= 0 && data.totalMemAlloc <= 0 {
 		return lines
 	}
@@ -462,13 +464,32 @@ func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWi
 	if data.totalCPUAlloc > 0 {
 		cpuBar := renderBar(data.totalCPUUsed, data.totalCPUAlloc, w.bar)
 		lines = append(lines, dashboardMetricLines("CPU", cpuBar, cpuSummaryStr(data), w)...)
+		lines = appendDashboardSparkline(lines, data.cpuSeries, w, spark)
 	}
 	if data.totalMemAlloc > 0 {
 		memBar := renderBar(data.totalMemUsed, data.totalMemAlloc, w.bar)
 		lines = append(lines, dashboardMetricLines("Mem", memBar, memSummaryStr(data), w)...)
+		lines = appendDashboardSparkline(lines, data.memSeries, w, spark)
 	}
 	lines = append(lines, "")
 	return lines
+}
+
+// appendDashboardSparkline adds a usage-history line under a resource bar,
+// sized to the bar's full width rather than the table's column cap: nothing
+// truncates this section, unlike a table cell.
+func appendDashboardSparkline(lines []string, series k8s.MetricSeries, w dashboardWidths, spark bool) []string {
+	if !spark {
+		return lines
+	}
+	drawn := ui.RenderSparkline(series.Points, w.bar)
+	if drawn == "" {
+		return lines
+	}
+	// Matches the lead dashboardMetricLines gives its summary line, so the
+	// sparkline sits under the bar rather than under the label.
+	lead := strings.Repeat(" ", 2+w.label+2)
+	return append(lines, ui.DimStyle.Render(lead+drawn))
 }
 
 // dashboardNodesSection renders the per-node breakdown.

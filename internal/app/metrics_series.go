@@ -23,11 +23,14 @@ const sparklineColumnCap = 20
 
 // metricsSeriesCache holds the CPU and memory history the current sparkline
 // mode draws from, keyed the same way the instant metrics maps are:
-// "namespace/pod" for pods, node name for nodes, container name for
-// containers.
+// "namespace/pod" for pods, node name for nodes. clusterCPU/clusterMem are
+// single series, not maps: a cluster total has only one series per metric.
 type metricsSeriesCache struct {
 	cpu map[string]k8s.MetricSeries
 	mem map[string]k8s.MetricSeries
+
+	clusterCPU k8s.MetricSeries
+	clusterMem k8s.MetricSeries
 }
 
 // podMetricsRangeMsg carries a pod CPU/memory history fetch back to the update
@@ -180,6 +183,72 @@ func (m Model) updateNodeMetricsRange(msg nodeMetricsRangeMsg) Model {
 	return m
 }
 
+// clusterMetricsRangeMsg carries a cluster history fetch back to the update
+// loop. See podMetricsRangeMsg for the fallback contract.
+type clusterMetricsRangeMsg struct {
+	cpu k8s.MetricSeries
+	mem k8s.MetricSeries
+	gen uint64
+	err error
+}
+
+// loadClusterMetricsRangeForDashboard fetches cluster-wide CPU and memory
+// history for the CLUSTER RESOURCES sparklines.
+func (m Model) loadClusterMetricsRangeForDashboard() tea.Cmd {
+	if m.isUnionSentinel() {
+		return nil
+	}
+	window := m.metricsSpark.Window()
+	if window <= 0 {
+		return nil
+	}
+	points := ui.ClampSparklineWidth(ui.ConfigSparklineWidth)
+	step := window / time.Duration(points)
+
+	kctx := m.nav.Context
+	gen := m.requestGen
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
+		"Cluster metrics history",
+		bgtaskTarget(kctx, ""),
+		func(ctx context.Context) tea.Msg {
+			cpu, mem, err := client.GetClusterMetricsRange(ctx, kctx, window, step)
+			if err != nil {
+				logger.WarnOnce("cluster-metrics-range-load", kctx,
+					"cluster metrics history unavailable: no Prometheus source",
+					"context", kctx, "error", logger.Redact(err.Error()))
+				return clusterMetricsRangeMsg{gen: gen, err: err}
+			}
+			return clusterMetricsRangeMsg{cpu: cpu, mem: mem, gen: gen}
+		},
+	)
+}
+
+// updateClusterMetricsRange stores a history fetch, or returns the section to
+// numeric when Prometheus produced nothing. See updatePodMetricsRange for why
+// it reverts rather than showing a placeholder.
+//
+// Only clusterCPU/clusterMem are cleared on fallback, not the whole cache:
+// metricsSeriesCache also holds the pod/node row maps, and a cluster fallback
+// must not discard a mode those still need.
+func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response, and the mode may have moved on since
+	}
+	if msg.err != nil || (len(msg.cpu.Points) == 0 && len(msg.mem.Points) == 0) {
+		m.metricsSpark = ui.MetricsSparkState{}
+		m.metricsSeries.clusterCPU = k8s.MetricSeries{}
+		m.metricsSeries.clusterMem = k8s.MetricSeries{}
+		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
+		return m
+	}
+	m.metricsSeries.clusterCPU = msg.cpu
+	m.metricsSeries.clusterMem = msg.mem
+	return m
+}
+
 // loadMetricsRangeForKind picks the history loader for kind. A kind with no
 // CPU/MEM columns returns nil, so the hotkey is inert there rather than
 // firing a query whose result nothing draws.
@@ -189,6 +258,8 @@ func (m Model) loadMetricsRangeForKind(kind string) tea.Cmd {
 		return m.loadPodMetricsRangeForList()
 	case "Node":
 		return m.loadNodeMetricsRangeForList()
+	case "Cluster":
+		return m.loadClusterMetricsRangeForDashboard()
 	default:
 		return nil
 	}

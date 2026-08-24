@@ -243,3 +243,48 @@ func TestGetNodeMetricsRange_BothQueriesFail(t *testing.T) {
 	_, _, err := c.GetNodeMetricsRange(t.Context(), "ctx", time.Minute, time.Second)
 	require.Error(t, err)
 }
+
+func TestGetClusterMetricsRange_ReturnsOneSeriesEach(t *testing.T) {
+	var queries []string
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
+			queries = append(queries, query)
+			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[
+			  {"metric":{},"values":[[1,"1000"],[2,"2000"]]}]}}`), nil
+		},
+	}
+
+	cpu, mem, err := c.GetClusterMetricsRange(t.Context(), "ctx", 15*time.Minute, 45*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []float64{1000, 2000}, cpu.Points)
+	assert.Equal(t, []float64{1000, 2000}, mem.Points)
+	require.Len(t, queries, 2)
+	// A cluster total aggregates everything, so neither query may carry a
+	// "by" clause: one would split the result into several series and the
+	// parser would keep only the last.
+	assert.NotContains(t, queries[0], "by (")
+	assert.NotContains(t, queries[1], "by (")
+}
+
+func TestGetClusterMetricsRange_BothQueriesFail(t *testing.T) {
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, _ string, _, _ time.Duration) ([]byte, error) {
+			return nil, errors.New("prometheus down")
+		},
+	}
+
+	_, _, err := c.GetClusterMetricsRange(t.Context(), "ctx", time.Minute, time.Second)
+	require.Error(t, err)
+}
+
+func TestGetClusterMetricsRange_EmptyResultIsNotAnError(t *testing.T) {
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, _ string, _, _ time.Duration) ([]byte, error) {
+			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[]}}`), nil
+		},
+	}
+
+	cpu, _, err := c.GetClusterMetricsRange(t.Context(), "ctx", time.Minute, time.Second)
+	require.NoError(t, err)
+	assert.Empty(t, cpu.Points, "no data is an empty series, and the caller reverts to numeric")
+}

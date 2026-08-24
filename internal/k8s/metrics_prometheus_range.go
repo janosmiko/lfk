@@ -211,3 +211,45 @@ func (c *Client) queryNodeRange(ctx context.Context, contextName, query string, 
 	}
 	return series, nil
 }
+
+// GetClusterMetricsRange fetches cluster-wide CPU and memory usage history.
+// It returns one series each rather than a map: a cluster total is a single
+// series, and a one-entry map would leave callers guessing its key. The
+// expressions match GetNodeMetricsRange with the "by (node)" grouping removed.
+func (c *Client) GetClusterMetricsRange(ctx context.Context, contextName string, window, step time.Duration) (cpu, mem MetricSeries, err error) {
+	const (
+		cpuQuery = `sum(rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
+		memQuery = `sum(container_memory_working_set_bytes{container!=""})`
+	)
+	cpu, cpuErr := c.queryClusterRange(ctx, contextName, cpuQuery, window, step)
+	if cpuErr != nil {
+		logger.Debug("Prometheus cluster CPU range query failed", "context", contextName, "error", cpuErr)
+	}
+	mem, memErr := c.queryClusterRange(ctx, contextName, memQuery, window, step)
+	if memErr != nil {
+		logger.Debug("Prometheus cluster memory range query failed", "context", contextName, "error", memErr)
+	}
+	if cpuErr != nil && memErr != nil {
+		return MetricSeries{}, MetricSeries{}, fmt.Errorf("prometheus cluster range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
+	}
+	return cpu, mem, nil
+}
+
+// queryClusterRange runs one aggregate range query and returns its single
+// series. An aggregate with no "by" clause yields at most one series, so any
+// label set is accepted and the first result wins.
+func (c *Client) queryClusterRange(ctx context.Context, contextName, query string, window, step time.Duration) (MetricSeries, error) {
+	body, err := c.runPrometheusRangeQuery(ctx, contextName, query, window, step)
+	if err != nil {
+		return MetricSeries{}, err
+	}
+	series, err := parsePrometheusMatrix(body, func(map[string]string) (string, bool) {
+		return "total", true
+	})
+	if err != nil {
+		return MetricSeries{}, err
+	}
+	s := series["total"]
+	s.Step = step
+	return s, nil
+}
