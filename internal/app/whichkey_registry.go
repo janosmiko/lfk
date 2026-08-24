@@ -625,6 +625,9 @@ func whichKeyExcludedBindings() map[string]string {
 		"NewTab": "tab management", "NextTab": "tab management", "PrevTab": "tab management",
 		"MoveTabLeft": "tab management", "MoveTabRight": "tab management",
 
+		// TODO(task-10): remove once the which-key entry is registered.
+		"MetricsSparkCycle": "which-key entry lands in task 10",
+
 		// Goto chords (whichkey.go): each is a full "g<x>" chord dispatched by
 		// handleGotoChord while the g prefix is armed, and already has its own
 		// which-key-style popup (renderWhichKey) distinct from the leader

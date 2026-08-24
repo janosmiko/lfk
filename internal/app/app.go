@@ -438,9 +438,10 @@ type Model struct {
 	// watch-mode auto-refreshes don't flash the title-bar indicator.
 	suppressBgtasks bool
 
-	// metricsLastFetch stamps the last list-wide CPU/MEM fetch per
-	// "context/kind". Not in TabState: metrics-server is cluster-wide.
+	// metricsLastFetch stamps the last CPU/MEM fetch per "context/kind" (cluster-wide, so not in TabState).
 	metricsLastFetch map[string]time.Time
+	metricsSpark     ui.MetricsSparkState
+	metricsSeries    metricsSeriesCache
 
 	// :scheduler overlay state: tasksOverlayShowCompleted (Tab) flips
 	// running ↔ history. tasksOverlayShowAll (`a`, history only) lifts

@@ -1,0 +1,87 @@
+package app
+
+import (
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/janosmiko/lfk/internal/ui"
+)
+
+func TestHandleMetricsSparkCycle_AdvancesAndReportsMode(t *testing.T) {
+	prev := ui.ConfigSparklineWindows
+	t.Cleanup(func() { ui.ConfigSparklineWindows = prev })
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute, time.Hour}
+
+	m := basePush80Model()
+	require.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+
+	m, _ = m.handleMetricsSparkCycle()
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
+	assert.Equal(t, 5*time.Minute, m.metricsSpark.Window())
+	assert.Contains(t, m.statusMessage, "sparkline 5m")
+
+	m, _ = m.handleMetricsSparkCycle()
+	assert.Equal(t, time.Hour, m.metricsSpark.Window())
+
+	m, _ = m.handleMetricsSparkCycle()
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+	assert.Contains(t, m.statusMessage, "numeric")
+}
+
+// The mode is per tab. A mode set in one tab must not follow the user into
+// another, the way every other view-shaped piece of tab state behaves.
+func TestMetricsSparkMode_DoesNotLeakBetweenTabs(t *testing.T) {
+	prev := ui.ConfigSparklineWindows
+	t.Cleanup(func() { ui.ConfigSparklineWindows = prev })
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+
+	m := basePush80Model()
+	m, _ = m.handleMetricsSparkCycle()
+	require.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
+
+	m.saveCurrentTab()
+	saved := m.tabs[m.activeTab].metricsSpark
+	assert.Equal(t, ui.MetricsDisplaySpark, saved.Mode, "saveCurrentTab must persist the mode")
+
+	clone := m.cloneCurrentTab()
+	assert.Equal(t, ui.MetricsDisplaySpark, clone.metricsSpark.Mode, "a cloned tab inherits the mode")
+
+	// A tab whose saved state is numeric must restore numeric, not inherit
+	// the live model's sparkline mode.
+	m.tabs[m.activeTab].metricsSpark = ui.MetricsSparkState{}
+	m.loadTab(m.activeTab)
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode, "loadTab must restore the tab's own mode")
+}
+
+// allDefaultKeybindingValues mirrors the reflection walk in
+// TestDefaultKeybindingsNoUnreachableControlAliases (internal/ui), which is
+// unexported and lives in a different package.
+func allDefaultKeybindingValues(kb ui.Keybindings) []string {
+	v := reflect.ValueOf(kb)
+	values := make([]string, 0, v.NumField())
+	for _, f := range v.Fields() {
+		if f.Kind() != reflect.String {
+			continue
+		}
+		values = append(values, f.String())
+	}
+	return values
+}
+
+// The tilde must stay free of every other default binding.
+func TestMetricsSparkCycle_DefaultBindingIsUnique(t *testing.T) {
+	kb := ui.DefaultKeybindings()
+	assert.Equal(t, "~", kb.MetricsSparkCycle)
+
+	seen := 0
+	for _, key := range allDefaultKeybindingValues(kb) {
+		if key == "~" {
+			seen++
+		}
+	}
+	assert.Equal(t, 1, seen, "the tilde is bound more than once")
+}

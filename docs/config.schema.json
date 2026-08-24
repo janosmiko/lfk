@@ -478,6 +478,7 @@
         "expand_collapse": { "type": "string" },
         "pin_group": { "type": "string" },
         "column_toggle": { "type": "string" },
+        "metrics_spark_cycle": { "type": "string" },
         "toggle_rare": { "type": "string" },
         "orphan_overlay": { "type": "string" },
         "session_manager": { "type": "string" },

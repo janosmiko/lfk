@@ -542,6 +542,9 @@ type TabState struct {
 	metricsData       *metricsInputs
 	previewEventsData []ui.EventTimelineEntry
 	metricsLoading    bool
+	// metricsSpark is this tab's CPU/MEM column display mode, so a sparkline
+	// turned on in one tab does not follow the user into another.
+	metricsSpark ui.MetricsSparkState
 
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool
