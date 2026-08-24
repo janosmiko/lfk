@@ -106,3 +106,20 @@ func TestRenderSparkline_ContainsNoEscapeSequences(t *testing.T) {
 
 	assert.NotContains(t, got, "\x1b")
 }
+
+// A spike at the very start must survive downsampling. Without this
+// assertion, a resampling scheme that keeps only the last `width` samples
+// still passes TestRenderSparkline_DownsampleKeepsNewest while discarding 59
+// of 60 samples, so a 1h window would silently draw only its final minutes.
+func TestRenderSparkline_DownsampleSpansWholeHistory(t *testing.T) {
+	points := make([]float64, 60)
+	points[0] = 100
+	points[59] = 50
+
+	got := RenderSparkline(points, 10)
+
+	require.Equal(t, 10, lipgloss.Width(got))
+	runes := []rune(got)
+	assert.Equal(t, '█', runes[0], "the earliest sample is the series maximum, so it must draw the top glyph")
+	assert.Equal(t, '▅', runes[9], "the newest sample is half the maximum")
+}
