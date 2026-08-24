@@ -702,3 +702,60 @@ func TestApplyMemo_PerNamespaceListDoesNotPruneOtherNamespaces(t *testing.T) {
 	assert.Contains(t, entry.memo, "team-b/worker-1",
 		"per-namespace list must not prune entries from other namespaces")
 }
+
+// nodeRT is the cluster-scoped counterpart of podRT. Nodes carry no
+// .metadata.namespace, so a namespace-keyed cache read finds nothing.
+var nodeRT = model.ResourceTypeEntry{
+	APIGroup:   "",
+	APIVersion: "v1",
+	Resource:   "nodes",
+	Kind:       "Node",
+	Namespaced: false,
+}
+
+// nodeObj builds a minimal cluster-scoped Node object.
+func nodeObj(name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Node",
+			"metadata": map[string]any{
+				"name":              name,
+				"creationTimestamp": "2026-04-01T00:00:00Z",
+			},
+		},
+	}
+}
+
+// TestGetResources_ClusterScopedIgnoresNamespace is the regression guard for
+// issue #676. The direct-list path drops the namespace for a cluster-scoped
+// kind, but the informer-cache path passed it through to
+// ListAllByNamespace, which matched nothing because a Node has no
+// namespace. The user saw an empty Nodes view for every namespace except
+// "All Namespaces".
+func TestGetResources_ClusterScopedIgnoresNamespace(t *testing.T) {
+	dc := newFakeDynClientWith(
+		map[schema.GroupVersionResource]string{
+			{Group: "", Version: "v1", Resource: "nodes"}: "NodeList",
+		},
+		nodeObj("worker-1"),
+		nodeObj("worker-2"),
+	)
+	c := NewTestClient(nil, dc)
+	c.SetInformerCacheMode(InformerCacheAlways)
+	t.Cleanup(c.Shutdown)
+
+	// Warm the cache with an all-namespaces list, the state the user reaches
+	// before they pick a namespace.
+	warm, err := c.GetResources(t.Context(), "", "", nodeRT)
+	require.NoError(t, err)
+	require.Len(t, warm, 2)
+
+	// Pick a namespace. A cluster-scoped kind must ignore it.
+	scoped, err := c.GetResources(t.Context(), "", "team-a", nodeRT)
+	require.NoError(t, err)
+	require.Len(t, scoped, 2,
+		"cluster-scoped resources must ignore the selected namespace (issue #676)")
+	assert.Equal(t, []string{"worker-1", "worker-2"},
+		[]string{scoped[0].Name, scoped[1].Name})
+}

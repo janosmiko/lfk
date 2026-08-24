@@ -50,6 +50,14 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		return c.listSecretsMetadata(ctx, contextName, namespace, rt)
 	}
 
+	// Issue #676: a cluster-scoped kind has no .metadata.namespace, so the
+	// informer cache's ListAllByNamespace matches nothing and the user sees
+	// an empty Nodes view for every namespace but "All Namespaces". Drop the
+	// namespace here so the cache path and the direct list below agree.
+	if !rt.Namespaced {
+		namespace = ""
+	}
+
 	gvr := schema.GroupVersionResource{
 		Group:    rt.APIGroup,
 		Version:  rt.APIVersion,
