@@ -35,7 +35,7 @@
 
             src = ./.;
 
-            vendorHash = "sha256-6ggE3voXdV8Yfv9fzdXFTI2zVPMfdPy6D8bWASRMc1g=";
+            vendorHash = "sha256-dwKDeKERX3grVdxIYGjTxk6NQLevMjv2+YiDifM1B/o=";
 
             subPackages = [ "." ];
 
