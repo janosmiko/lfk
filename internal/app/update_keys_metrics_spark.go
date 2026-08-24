@@ -22,8 +22,9 @@ func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 	} else {
 		m.metricsSeries = metricsSeriesCache{}
 	}
-	// Leaving sparkline mode repaints as plain values immediately rather
-	// than waiting for the next watch tick.
+	// Both branches need a repaint now rather than at the next watch tick:
+	// leaving mode drops the series above, entering it changes what the
+	// cells should show as soon as the fetch lands.
 	m.middleItemsRev++
 	return m, tea.Batch(cmds...)
 }

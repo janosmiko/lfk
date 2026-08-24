@@ -115,8 +115,15 @@ func TestUpdatePodMetricsRange_StoresSeriesAndKeepsMode(t *testing.T) {
 func TestUpdatePodMetricsEnriched_SparkModeLeavesMissingRowsAsNA(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+	// Seed history under the metrics-less row's OWN key, deliberately. A
+	// fixture that seeds only some other key cannot catch the likely
+	// regression: if the continue guard were removed, the sparklineCell
+	// lookup would miss, fall back to the bare value, and the test would
+	// still pass. Seeding the row's own key means such a regression renders
+	// glyphs and fails.
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"default/someone-else": {Points: []float64{1, 9}}},
+		cpu: map[string]k8s.MetricSeries{"default/no-metrics": {Points: []float64{1, 9}}},
+		mem: map[string]k8s.MetricSeries{"default/no-metrics": {Points: []float64{3, 7}}},
 	}
 	m.middleItems = []model.Item{{Name: "no-metrics", Namespace: "default"}}
 
