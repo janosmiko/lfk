@@ -97,7 +97,18 @@ func (c *Client) runPrometheusRangeQuery(ctx context.Context, contextName, query
 		// string form keeps a failed request legible in a redacted log.
 		"start": end.Add(-window).Format(time.RFC3339),
 		"end":   end.Format(time.RFC3339),
-		"step":  strconv.FormatFloat(step.Seconds(), 'f', -1, 64) + "s",
+		"step":  formatPromStep(step),
 	}
 	return c.runPrometheusProxy(ctx, contextName, "/api/v1/query_range", params)
+}
+
+// Plain float seconds, with no unit suffix. Prometheus accepts step
+// either as a duration literal or as a float number of seconds, and
+// a duration literal must be an integer per unit. step is
+// window/points where points is the user-configurable sparkline
+// width, so most widths yield a fraction: 5m over 7 columns is
+// 42.857142857s, which a duration literal rejects. The suffixless
+// float form is valid for every value.
+func formatPromStep(step time.Duration) string {
+	return strconv.FormatFloat(step.Seconds(), 'f', -1, 64)
 }

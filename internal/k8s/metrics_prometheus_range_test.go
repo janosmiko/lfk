@@ -130,3 +130,14 @@ func TestRunPrometheusRangeQuery_UsesTestSeam(t *testing.T) {
 	assert.Equal(t, 45*time.Second, gotStep)
 	assert.Contains(t, string(body), "matrix")
 }
+
+// 5m/7 is fractional. A "s"-suffixed literal must be a whole number.
+func TestFormatPromStep_FractionalSecondsHasNoUnitSuffix(t *testing.T) {
+	step := 5 * time.Minute / 7
+
+	assert.Equal(t, "42.857142857", formatPromStep(step))
+}
+
+func TestFormatPromStep_WholeSecondsHasNoUnitSuffix(t *testing.T) {
+	assert.Equal(t, "45", formatPromStep(45*time.Second))
+}
