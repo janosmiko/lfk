@@ -659,6 +659,10 @@ func (m *Model) rescopeNamespaceForContext(ctxName string) {
 	m.previousNsScope = nil
 	if resolveStartupAllNamespaces(m.client, ctxName) {
 		m.allNamespaces = true
+		// The A-toggle only resolves the new context's default namespace when
+		// this is empty, so a leftover value scopes the new cluster to the old
+		// cluster's namespace.
+		m.namespace = ""
 		return
 	}
 	m.allNamespaces = false

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -162,7 +163,7 @@ func TestRescopeNamespaceForContext_DropsAllNamespacesStash(t *testing.T) {
 		wantNamespace string
 	}{
 		{name: "context pins a namespace", pinnedNs: "team-a", wantAllNs: false, wantNamespace: "team-a"},
-		{name: "context pins nothing", pinnedNs: "", wantAllNs: true, wantNamespace: "stale"},
+		{name: "context pins nothing", pinnedNs: "", wantAllNs: true, wantNamespace: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := baseModelWithFakeClient()
@@ -185,4 +186,34 @@ func TestRescopeNamespaceForContext_DropsAllNamespacesStash(t *testing.T) {
 			assert.Nil(t, m.previousNsScope, "a previous-namespace jump would land in the old cluster's namespace")
 		})
 	}
+}
+
+// A context switch into all-namespaces mode must clear m.namespace too. The
+// A-toggle only falls back to the new context's default when m.namespace is
+// empty (update_keys_actions.go), so a leftover value silently scopes the new
+// cluster to a namespace from the old one.
+func TestRescopeNamespaceForContext_AllNamespacesClearsStaleNamespace(t *testing.T) {
+	orig, origSet := ui.ConfigAllNamespaces, ui.ConfigAllNamespacesSet
+	defer func() { ui.ConfigAllNamespaces, ui.ConfigAllNamespacesSet = orig, origSet }()
+	ui.ConfigAllNamespaces = true
+	ui.ConfigAllNamespacesSet = false
+
+	m := baseModelWithFakeClient()
+	m.client.AddTestContextWithNamespace("staging", "https://staging.example.local:6443", "")
+	m.nav.Level = model.LevelResourceTypes
+	m.namespace = "old-cluster-ns"
+	m.allNamespaces = false
+
+	m.nav.Context = "staging"
+	m.rescopeNamespaceForContext("staging")
+	require.True(t, m.allNamespaces)
+	require.Empty(t, m.namespace, "the old cluster's namespace must not survive the switch")
+
+	// Toggle all-namespaces off in the new cluster.
+	toggled, _, _ := m.handleExplorerActionKeyAllNamespaces()
+	after, ok := toggled.(Model)
+	require.True(t, ok)
+
+	assert.False(t, after.allNamespaces)
+	assert.Equal(t, "default", after.namespace, "the toggle must resolve the new context's default namespace")
 }
