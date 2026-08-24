@@ -689,6 +689,13 @@ confirm_on_exit: true
 # fetch on every tick. A manual refresh always fetches. Default: 15s
 # metrics_interval: 15s
 
+# ─── Metrics Sparkline ────────────────────────────────────────────────────────
+# Cycle the CPU/MEM columns to a Prometheus-backed sparkline with
+# metrics_spark_cycle. Without Prometheus the columns stay numeric.
+# metrics_sparkline_windows: ["5m", "15m", "1h"]
+# metrics_sparkline_width: 12
+# metrics_sparkline_interval: 30s
+
 # ─── Watch Throttle ───────────────────────────────────────────────────────────
 # Master switch for the focus/idle throttling above. Set to false to disable it
 # entirely: the watch tick always uses watch_interval regardless of focus or

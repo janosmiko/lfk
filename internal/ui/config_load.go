@@ -171,6 +171,17 @@ type configFile struct {
 	// on a watch-tick refresh. Go duration, clamped to [2s, 10m]. 0 fetches on
 	// every tick. Manual refresh always fetches. Defaults to 15s.
 	MetricsInterval string `json:"metrics_interval" yaml:"metrics_interval"`
+	// MetricsSparklineWindows is the ordered window list the CPU/MEM display
+	// hotkey cycles through. Unparseable entries are dropped. Defaults to
+	// 5m, 15m, 1h.
+	MetricsSparklineWindows []string `json:"metrics_sparkline_windows" yaml:"metrics_sparkline_windows"`
+	// MetricsSparklineWidth is the preferred sparkline glyph count in the
+	// CPU/MEM columns, clamped to [4, 40]. Defaults to 12.
+	MetricsSparklineWidth *int `json:"metrics_sparkline_width" yaml:"metrics_sparkline_width"`
+	// MetricsSparklineInterval floors higher than MetricsInterval because a
+	// range query reads a whole window per series. Clamped to [10s, 10m].
+	// Defaults to 30s.
+	MetricsSparklineInterval string `json:"metrics_sparkline_interval" yaml:"metrics_sparkline_interval"`
 	// WatchThrottle enables focus/idle watch throttling. Set false to fully
 	// disable it: the watch tick then always uses watch_interval. Default true.
 	WatchThrottle *bool `json:"watch_throttle" yaml:"watch_throttle"`

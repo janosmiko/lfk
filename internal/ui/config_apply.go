@@ -177,6 +177,7 @@ func applyConfigOptions(cfg configFile) {
 	applyBackgroundWatchIntervalConfig(cfg.BackgroundWatchInterval)
 	applyForegroundIdleTimeoutConfig(cfg.ForegroundIdleTimeout)
 	applyMetricsIntervalConfig(cfg.MetricsInterval)
+	applySparklineConfig(cfg.MetricsSparklineWindows, cfg.MetricsSparklineWidth, cfg.MetricsSparklineInterval)
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
