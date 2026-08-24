@@ -7,6 +7,8 @@ import (
 	"math"
 	"strconv"
 	"time"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 // MetricSeries holds one metric's samples over a window, oldest first.
@@ -111,4 +113,59 @@ func (c *Client) runPrometheusRangeQuery(ctx context.Context, contextName, query
 // float form is valid for every value.
 func formatPromStep(step time.Duration) string {
 	return strconv.FormatFloat(step.Seconds(), 'f', -1, 64)
+}
+
+// GetPodMetricsRange fetches per-pod CPU and memory history from Prometheus
+// over the last window, sampled every step. namespace == "" queries every
+// namespace. Both maps are keyed by "namespace/pod", matching
+// GetAllPodMetrics, so the app-side lookup is identical for both paths.
+// CPU points are millicores and memory points are bytes, matching
+// model.PodMetrics.
+//
+// It errors only when both queries fail, so a partial Prometheus outage
+// still shows whatever is available. This matches
+// getAllPodMetricsFromPrometheus.
+func (c *Client) GetPodMetricsRange(ctx context.Context, contextName, namespace string, window, step time.Duration) (cpu, mem map[string]MetricSeries, err error) {
+	cpu, cpuErr := c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "cpu"), window, step)
+	if cpuErr != nil {
+		logger.Debug("Prometheus pod CPU range query failed",
+			"context", contextName, "namespace", namespace, "error", cpuErr)
+	}
+	mem, memErr := c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "memory"), window, step)
+	if memErr != nil {
+		logger.Debug("Prometheus pod memory range query failed",
+			"context", contextName, "namespace", namespace, "error", memErr)
+	}
+	if cpuErr != nil && memErr != nil {
+		return nil, nil, fmt.Errorf("prometheus pod range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
+	}
+	return cpu, mem, nil
+}
+
+// queryPodRange runs one pod range query and parses it into a
+// "namespace/pod" -> series map, stamping the step on every series so the
+// renderer does not need to be told separately.
+func (c *Client) queryPodRange(ctx context.Context, contextName, query string, window, step time.Duration) (map[string]MetricSeries, error) {
+	if query == "" {
+		return nil, fmt.Errorf("empty prometheus query, refusing to send")
+	}
+	body, err := c.runPrometheusRangeQuery(ctx, contextName, query, window, step)
+	if err != nil {
+		return nil, err
+	}
+	series, err := parsePrometheusMatrix(body, func(labels map[string]string) (string, bool) {
+		ns, pod := labels["namespace"], labels["pod"]
+		if ns == "" || pod == "" {
+			return "", false
+		}
+		return ns + "/" + pod, true
+	})
+	if err != nil {
+		return nil, err
+	}
+	for key, s := range series {
+		s.Step = step
+		series[key] = s
+	}
+	return series, nil
 }
