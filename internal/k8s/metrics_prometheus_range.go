@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -56,7 +57,7 @@ func parsePrometheusMatrix(data []byte, keyFunc func(labels map[string]string) (
 		}
 		points := make([]float64, 0, len(series.Values))
 		for _, pair := range series.Values {
-			// Each pair is [timestamp, "value"]; only the value is needed
+			// Each pair is [timestamp, "value"]. Only the value is needed
 			// because the step is uniform and known by the caller.
 			if len(pair) < 2 {
 				points = append(points, math.NaN())
@@ -77,4 +78,26 @@ func parsePrometheusMatrix(data []byte, keyFunc func(labels map[string]string) (
 		result[key] = MetricSeries{Points: points}
 	}
 	return result, nil
+}
+
+// runPrometheusRangeQuery sends a PromQL range query covering the last
+// window, sampled every step, through the shared Prometheus proxy. Tests
+// override via testPromRangeQuery.
+func (c *Client) runPrometheusRangeQuery(ctx context.Context, contextName, query string, window, step time.Duration) ([]byte, error) {
+	if c.testPromRangeQuery != nil {
+		return c.testPromRangeQuery(ctx, contextName, query, window, step)
+	}
+	if c.demo {
+		return nil, errPrometheusUnavailableDemo
+	}
+	end := time.Now()
+	params := map[string]string{
+		"query": query,
+		// RFC3339 rather than a Unix float: Prometheus accepts both, and the
+		// string form keeps a failed request legible in a redacted log.
+		"start": end.Add(-window).Format(time.RFC3339),
+		"end":   end.Format(time.RFC3339),
+		"step":  strconv.FormatFloat(step.Seconds(), 'f', -1, 64) + "s",
+	}
+	return c.runPrometheusProxy(ctx, contextName, "/api/v1/query_range", params)
 }

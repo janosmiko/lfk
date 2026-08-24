@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"golang.org/x/sync/singleflight"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -109,6 +110,10 @@ type Client struct {
 	// needing a working Service object on the fake clientset.
 	// Signature: ctx, contextName, promQL -> JSON body bytes.
 	testPromQuery func(ctx context.Context, contextName, query string) ([]byte, error)
+
+	// testPromRangeQuery overrides the Prometheus range-query transport in
+	// tests, the way testPromQuery overrides the instant one.
+	testPromRangeQuery func(ctx context.Context, contextName, query string, window, step time.Duration) ([]byte, error)
 
 	// testHostByDisplay, when set, lets tests bypass kubeconfig host
 	// resolution in HostForContext. Most fake test clients are constructed

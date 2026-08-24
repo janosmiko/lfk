@@ -1,8 +1,10 @@
 package k8s
 
 import (
+	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,4 +103,30 @@ func TestParsePrometheusMatrix_EmptyResult(t *testing.T) {
 	got, err := parsePrometheusMatrix(data, podKeyFunc)
 	require.NoError(t, err)
 	assert.Empty(t, got)
+}
+
+func TestRunPrometheusRangeQuery_DemoModeRefuses(t *testing.T) {
+	c := &Client{demo: true}
+
+	_, err := c.runPrometheusRangeQuery(t.Context(), "ctx", "up", 15*time.Minute, 45*time.Second)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errPrometheusUnavailableDemo)
+}
+
+func TestRunPrometheusRangeQuery_UsesTestSeam(t *testing.T) {
+	var gotQuery string
+	var gotWindow, gotStep time.Duration
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, query string, window, step time.Duration) ([]byte, error) {
+			gotQuery, gotWindow, gotStep = query, window, step
+			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[]}}`), nil
+		},
+	}
+
+	body, err := c.runPrometheusRangeQuery(t.Context(), "ctx", "up", 15*time.Minute, 45*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, "up", gotQuery)
+	assert.Equal(t, 15*time.Minute, gotWindow)
+	assert.Equal(t, 45*time.Second, gotStep)
+	assert.Contains(t, string(body), "matrix")
 }
