@@ -214,3 +214,32 @@ func TestGetPodMetricsRange_RejectsUnsafeNamespace(t *testing.T) {
 	require.Error(t, err)
 	assert.False(t, called, "an unsafe namespace must never reach the transport")
 }
+
+func TestGetNodeMetricsRange_KeysByNodeName(t *testing.T) {
+	var queries []string
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
+			queries = append(queries, query)
+			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[
+			  {"metric":{"node":"node-1"},"values":[[1,"100"],[2,"200"]]}]}}`), nil
+		},
+	}
+
+	cpu, mem, err := c.GetNodeMetricsRange(t.Context(), "ctx", 15*time.Minute, 45*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []float64{100, 200}, cpu["node-1"].Points)
+	assert.Equal(t, []float64{100, 200}, mem["node-1"].Points)
+	require.Len(t, queries, 2)
+	assert.Contains(t, queries[0], "by (node)")
+}
+
+func TestGetNodeMetricsRange_BothQueriesFail(t *testing.T) {
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, _ string, _, _ time.Duration) ([]byte, error) {
+			return nil, errors.New("prometheus down")
+		},
+	}
+
+	_, _, err := c.GetNodeMetricsRange(t.Context(), "ctx", time.Minute, time.Second)
+	require.Error(t, err)
+}

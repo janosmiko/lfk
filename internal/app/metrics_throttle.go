@@ -28,6 +28,11 @@ func (m *Model) listMetricsCmds(kind string) []tea.Cmd {
 			cmds = append(cmds, m.loadNodeMetricsForList())
 		}
 		cmds = append(cmds, m.loadNodeUptimeForList())
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark && m.allowSparklineFetch(kind) {
+			if cmd := m.loadNodeMetricsRangeForList(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
 	}
 	return cmds
 }

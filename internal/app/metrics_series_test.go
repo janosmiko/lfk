@@ -144,3 +144,102 @@ func TestUpdatePodMetricsRange_IgnoresStaleGeneration(t *testing.T) {
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
 		"a stale response must not revert the mode the user just chose")
 }
+
+func TestUpdateNodeMetricsRange_FallsBackToNumericOnError(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode,
+		"a failed range query must return the columns to numeric")
+	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
+	assert.Nil(t, m.metricsSeries.cpu)
+}
+
+// An empty result is the "Prometheus is there but has no data for these
+// nodes" case. It reverts too, because a sparkline mode with no series draws
+// nothing.
+func TestUpdateNodeMetricsRange_EmptyResultFallsBack(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+}
+
+func TestUpdateNodeMetricsRange_StoresSeries(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{
+		gen: m.requestGen,
+		cpu: map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2}}},
+	})
+
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
+	assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["node-1"].Points)
+}
+
+func TestUpdateNodeMetricsRange_IgnoresStaleGeneration(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
+
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
+		"a stale response must not revert the mode the user just chose")
+}
+
+// A metrics-less node row must keep rendering exactly "n/a" in sparkline
+// mode, with no glyph prefix. See
+// TestUpdatePodMetricsEnriched_SparkModeLeavesMissingRowsAsNA for why the
+// value is asserted directly rather than inside a conditional.
+func TestUpdateNodeMetricsEnriched_SparkModeLeavesMissingRowsAsNA(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+	m.metricsSeries = metricsSeriesCache{
+		cpu: map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{1, 9}}},
+		mem: map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{3, 7}}},
+	}
+	m.middleItems = []model.Item{{Name: "no-metrics"}}
+
+	got := m.updateNodeMetricsEnriched(nodeMetricsEnrichedMsg{gen: m.requestGen})
+
+	assert.Equal(t, "n/a", getColumnValue(got.middleItems[0], "CPU"),
+		"CPU must stay exactly n/a in sparkline mode, with no glyph prefix")
+	assert.Equal(t, "n/a", getColumnValue(got.middleItems[0], "MEM"),
+		"MEM must stay exactly n/a in sparkline mode, with no glyph prefix")
+}
+
+// The node list is not namespaced, so the lookup key is the bare node name.
+func TestUpdateNodeMetricsEnriched_SparkModeKeysByNodeName(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+	ui.ConfigSparklineWidth = 5
+	t.Cleanup(func() { ui.ConfigSparklineWidth = ui.DefaultSparklineWidth })
+	m.metricsSeries = metricsSeriesCache{
+		cpu: map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2, 3, 4, 5}}},
+		mem: map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2, 3, 4, 5}}},
+	}
+	m.middleItems = []model.Item{{Name: "node-1"}}
+
+	got := m.updateNodeMetricsEnriched(nodeMetricsEnrichedMsg{
+		gen:     m.requestGen,
+		metrics: map[string]model.PodMetrics{"node-1": {CPU: 240, Memory: 1024}},
+	})
+
+	cpu := getColumnValue(got.middleItems[0], "CPU")
+	assert.NotEqual(t, "n/a", cpu)
+	assert.Contains(t, cpu, "▁", "the sparkline glyphs must replace the trend arrow, not stack with it")
+}
+
+func TestLoadMetricsRangeForKind_DispatchesByKind(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	assert.NotNil(t, m.loadMetricsRangeForKind("Pod"), "Pod has CPU/MEM columns and must load history")
+	assert.NotNil(t, m.loadMetricsRangeForKind("Node"), "Node has CPU/MEM columns and must load history")
+	assert.Nil(t, m.loadMetricsRangeForKind("Deployment"), "a kind with no CPU/MEM columns must be inert")
+}

@@ -169,3 +169,45 @@ func (c *Client) queryPodRange(ctx context.Context, contextName, query string, w
 	}
 	return series, nil
 }
+
+// GetNodeMetricsRange fetches per-node CPU and memory history, keyed by node
+// name. The expressions match getNodeMetricsFromPrometheus's instant queries.
+func (c *Client) GetNodeMetricsRange(ctx context.Context, contextName string, window, step time.Duration) (cpu, mem map[string]MetricSeries, err error) {
+	const (
+		cpuQuery = `sum by (node) (rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
+		memQuery = `sum by (node) (container_memory_working_set_bytes{container!=""})`
+	)
+	cpu, cpuErr := c.queryNodeRange(ctx, contextName, cpuQuery, window, step)
+	if cpuErr != nil {
+		logger.Debug("Prometheus node CPU range query failed", "context", contextName, "error", cpuErr)
+	}
+	mem, memErr := c.queryNodeRange(ctx, contextName, memQuery, window, step)
+	if memErr != nil {
+		logger.Debug("Prometheus node memory range query failed", "context", contextName, "error", memErr)
+	}
+	if cpuErr != nil && memErr != nil {
+		return nil, nil, fmt.Errorf("prometheus node range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
+	}
+	return cpu, mem, nil
+}
+
+// queryNodeRange runs one node range query and parses it into a node-name ->
+// series map.
+func (c *Client) queryNodeRange(ctx context.Context, contextName, query string, window, step time.Duration) (map[string]MetricSeries, error) {
+	body, err := c.runPrometheusRangeQuery(ctx, contextName, query, window, step)
+	if err != nil {
+		return nil, err
+	}
+	series, err := parsePrometheusMatrix(body, func(labels map[string]string) (string, bool) {
+		node := labels["node"]
+		return node, node != ""
+	})
+	if err != nil {
+		return nil, err
+	}
+	for key, s := range series {
+		s.Step = step
+		series[key] = s
+	}
+	return series, nil
+}

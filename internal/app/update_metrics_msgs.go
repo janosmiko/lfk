@@ -535,8 +535,14 @@ func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 		cpuUse := ui.FormatCPU(nm.CPU)
 		memUse := ui.FormatMemory(nm.Memory)
 
-		// Detect significant usage trends (arrows before value).
-		if m.prevNodeMetrics != nil {
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
+			// The sparkline replaces the trend arrow rather than stacking
+			// with it: it shows the same trend in more detail, and both
+			// together would cost the column another two characters.
+			cpuUse = sparklineCell(m.metricsSeries.cpu[item.Name], cpuUse)
+			memUse = sparklineCell(m.metricsSeries.mem[item.Name], memUse)
+		} else if m.prevNodeMetrics != nil {
+			// Detect significant usage trends (arrows before value).
 			if prev, ok := m.prevNodeMetrics[item.Name]; ok {
 				cpuDiff := nm.CPU - prev.CPU
 				memDiff := nm.Memory - prev.Memory

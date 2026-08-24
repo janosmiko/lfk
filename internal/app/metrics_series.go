@@ -117,3 +117,79 @@ func (m Model) updatePodMetricsRange(msg podMetricsRangeMsg) Model {
 	m.middleItemsRev++
 	return m
 }
+
+// nodeMetricsRangeMsg carries a node CPU/memory history fetch back to the
+// update loop. See podMetricsRangeMsg for the fallback contract.
+type nodeMetricsRangeMsg struct {
+	cpu map[string]k8s.MetricSeries
+	mem map[string]k8s.MetricSeries
+	gen uint64
+	err error
+}
+
+// loadNodeMetricsRangeForList fetches node CPU and memory history for the
+// current sparkline window. The node list is not namespaced, so it passes ""
+// where loadPodMetricsRangeForList passes the effective namespace.
+func (m Model) loadNodeMetricsRangeForList() tea.Cmd {
+	if m.isUnionSentinel() {
+		return nil
+	}
+	window := m.metricsSpark.Window()
+	if window <= 0 {
+		return nil
+	}
+	points := ui.ClampSparklineWidth(ui.ConfigSparklineWidth)
+	step := window / time.Duration(points)
+
+	kctx := m.nav.Context
+	gen := m.requestGen
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
+		"Node metrics history",
+		bgtaskTarget(kctx, ""),
+		func(ctx context.Context) tea.Msg {
+			cpu, mem, err := client.GetNodeMetricsRange(ctx, kctx, window, step)
+			if err != nil {
+				logger.WarnOnce("node-metrics-range-load", kctx,
+					"node metrics history unavailable: no Prometheus source",
+					"context", kctx, "error", logger.Redact(err.Error()))
+				return nodeMetricsRangeMsg{gen: gen, err: err}
+			}
+			return nodeMetricsRangeMsg{cpu: cpu, mem: mem, gen: gen}
+		},
+	)
+}
+
+// updateNodeMetricsRange stores a history fetch, or returns the columns to
+// numeric when Prometheus produced nothing. See updatePodMetricsRange for why
+// it reverts rather than showing a placeholder.
+func (m Model) updateNodeMetricsRange(msg nodeMetricsRangeMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response, and the mode may have moved on since
+	}
+	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
+		m.metricsSpark = ui.MetricsSparkState{}
+		m.metricsSeries = metricsSeriesCache{}
+		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
+		return m
+	}
+	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
+	m.middleItemsRev++
+	return m
+}
+
+// loadMetricsRangeForKind picks the history loader for kind. A kind with no
+// CPU/MEM columns returns nil, so the hotkey is inert there rather than
+// firing a query whose result nothing draws.
+func (m Model) loadMetricsRangeForKind(kind string) tea.Cmd {
+	switch kind {
+	case "Pod":
+		return m.loadPodMetricsRangeForList()
+	case "Node":
+		return m.loadNodeMetricsRangeForList()
+	default:
+		return nil
+	}
+}

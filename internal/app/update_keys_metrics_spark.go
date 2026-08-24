@@ -16,7 +16,7 @@ func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 	if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
 		// Bypass the throttle: the user just asked for this window, so a
 		// stamped recent fetch must not swallow the request.
-		if cmd := m.loadPodMetricsRangeForList(); cmd != nil {
+		if cmd := m.loadMetricsRangeForKind(m.nav.ResourceType.Kind); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	} else {
