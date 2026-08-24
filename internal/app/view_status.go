@@ -568,14 +568,20 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	isDashboard := sel != nil && m.nav.Level == model.LevelResourceTypes &&
 		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__")
 	if isDashboard {
-		return []ui.HintEntry{
+		hints := []ui.HintEntry{
 			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
-			{Key: kb.NewTab, Desc: "new tab"},
-			{Key: helpHintKey(kb), Desc: "help"},
-			{Key: "q", Desc: "quit"},
 		}
+		// Only the cluster overview has a CPU/Mem section, not monitoring.
+		if m.metricsSparkAvailable() {
+			hints = append(hints, ui.HintEntry{Key: kb.MetricsSparkCycle, Desc: "cpu/mem view"})
+		}
+		return append(hints,
+			ui.HintEntry{Key: kb.NewTab, Desc: "new tab"},
+			ui.HintEntry{Key: helpHintKey(kb), Desc: "help"},
+			ui.HintEntry{Key: "q", Desc: "quit"},
+		)
 	}
 
 	hintEntries := []ui.HintEntry{
@@ -630,6 +636,10 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	if hasResourceContext {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
+	}
+	// Pod and Node are the only kinds with CPU/Mem columns. A union dashboard
+	// member list has none of its own but previews one via dashboardMetricsKind.
+	if m.metricsSparkAvailable() {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.MetricsSparkCycle, Desc: "cpu/mem view"})
 	}
 	hintEntries = append(hintEntries,

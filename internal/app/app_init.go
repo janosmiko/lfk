@@ -150,6 +150,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		orphans:                    orphanState{strict: true},
 		rightsizingCache:           make(map[string]*model.Rightsizing),
 		discoveryRefreshedContexts: make(map[string]bool),
+		metricsLastFetch:           make(map[string]time.Time),
 		allGroupsExpanded:          true,
 		warningEventsOnly:          ui.ConfigEventsWarningsOnly,
 		eventGrouping:              ui.ConfigEventsGrouping,

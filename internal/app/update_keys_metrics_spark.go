@@ -23,6 +23,11 @@ func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 		}
 	} else {
 		m.metricsSeries = metricsSeriesCache{}
+		// Bypass the throttle here too: leaving spark mode must not leave the
+		// prior glyph cells on screen until the next throttled tick.
+		if cmd := m.loadInstantMetricsForKind(kind); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 	if kind == "Cluster" {
 		// The dashboard bakes its sparkline lines into a cached preview
@@ -52,4 +57,15 @@ func (m Model) dashboardMetricsKind() string {
 		return "Cluster"
 	}
 	return m.nav.ResourceType.Kind
+}
+
+// metricsSparkAvailable reports whether the current view has CPU/MEM columns
+// for the tilde key to cycle: a cluster dashboard (either shape
+// dashboardMetricsKind recognises), or the pod/node list itself.
+func (m Model) metricsSparkAvailable() bool {
+	kind := m.dashboardMetricsKind()
+	if kind == "Cluster" {
+		return true
+	}
+	return m.nav.Level == model.LevelResources && (kind == "Pod" || kind == "Node")
 }

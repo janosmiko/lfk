@@ -23,18 +23,19 @@ const sparklineColumnCap = 20
 
 // metricsSeriesCache holds the CPU and memory history the current sparkline
 // mode draws from, keyed the same way the instant metrics maps are:
-// "namespace/pod" for pods, node name for nodes. clusterCPU/clusterMem are
-// single series, not maps: a cluster total has only one series per metric.
+// "namespace/pod" for pods, node name for nodes.
 type metricsSeriesCache struct {
+	// cpu and mem hold either pod or node series depending on which list is
+	// active, never both: a "namespace/pod" key always contains a slash and a
+	// node name never does, so the two key spaces cannot collide.
 	cpu map[string]k8s.MetricSeries
 	mem map[string]k8s.MetricSeries
 
-	// clusterCPU and clusterMem are not cleared on a context switch, so a
-	// stale series can render under the new cluster's numbers until the next
-	// fetch lands. Accepted: it self-heals within one round trip, same as the
-	// cpu/mem maps above, which have the same gap for a reused pod/node name.
-	clusterCPU k8s.MetricSeries
-	clusterMem k8s.MetricSeries
+	// clusterCPU and clusterMem are keyed by context so a union dashboard
+	// member switch cannot draw one member's history under another's numbers
+	// on a cursor move, the way an unkeyed single series would.
+	clusterCPU map[string]k8s.MetricSeries
+	clusterMem map[string]k8s.MetricSeries
 }
 
 // podMetricsRangeMsg carries a pod CPU/memory history fetch back to the update
@@ -105,24 +106,25 @@ func (m Model) loadPodMetricsRangeForList() tea.Cmd {
 }
 
 // updatePodMetricsRange stores a history fetch, or returns the columns to
-// numeric when Prometheus produced nothing.
+// numeric when Prometheus produced nothing. Reverting rather than showing a
+// placeholder keeps a cluster with no Prometheus free of layout shift.
 //
-// Reverting rather than showing a placeholder is deliberate: the columns keep
-// exactly the rendering they have without this feature, so a cluster with no
-// Prometheus sees no layout shift and no empty glyph cells.
-func (m Model) updatePodMetricsRange(msg podMetricsRangeMsg) Model {
+// The returned Cmd re-runs the instant fetch: only updatePodMetricsEnriched
+// builds the cell strings, so without it the new series sits unused until
+// the next throttled tick.
+func (m Model) updatePodMetricsRange(msg podMetricsRangeMsg) (Model, tea.Cmd) {
 	if msg.gen != m.requestGen {
-		return m // stale response, and the mode may have moved on since
+		return m, nil // stale response, and the mode may have moved on since
 	}
 	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
 		m.metricsSeries = metricsSeriesCache{}
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m
+		return m, nil
 	}
 	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
 	m.middleItemsRev++
-	return m
+	return m, m.loadPodMetricsForList()
 }
 
 // nodeMetricsRangeMsg carries a node CPU/memory history fetch back to the
@@ -171,37 +173,39 @@ func (m Model) loadNodeMetricsRangeForList() tea.Cmd {
 
 // updateNodeMetricsRange stores a history fetch, or returns the columns to
 // numeric when Prometheus produced nothing. See updatePodMetricsRange for why
-// it reverts rather than showing a placeholder.
-func (m Model) updateNodeMetricsRange(msg nodeMetricsRangeMsg) Model {
+// it reverts rather than showing a placeholder, and why it returns a Cmd.
+func (m Model) updateNodeMetricsRange(msg nodeMetricsRangeMsg) (Model, tea.Cmd) {
 	if msg.gen != m.requestGen {
-		return m // stale response, and the mode may have moved on since
+		return m, nil // stale response, and the mode may have moved on since
 	}
 	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
 		m.metricsSeries = metricsSeriesCache{}
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m
+		return m, nil
 	}
 	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
 	m.middleItemsRev++
-	return m
+	return m, m.loadNodeMetricsForList()
 }
 
 // clusterMetricsRangeMsg carries a cluster history fetch back to the update
-// loop. See podMetricsRangeMsg for the fallback contract.
+// loop. context is the target cluster the fetch was for, since a union
+// dashboard member switch does not wait for the previous member's fetch to
+// land. See podMetricsRangeMsg for the fallback contract.
 type clusterMetricsRangeMsg struct {
-	cpu k8s.MetricSeries
-	mem k8s.MetricSeries
-	gen uint64
-	err error
+	context string
+	cpu     k8s.MetricSeries
+	mem     k8s.MetricSeries
+	gen     uint64
+	err     error
 }
 
 // loadClusterMetricsRangeForDashboard fetches cluster-wide CPU and memory
-// history for the CLUSTER RESOURCES sparklines.
-func (m Model) loadClusterMetricsRangeForDashboard() tea.Cmd {
-	if m.isUnionSentinel() {
-		return nil
-	}
+// history for the CLUSTER RESOURCES sparklines, for the target context kctx
+// (the union dashboard's preview target, or the active context, never the
+// union sentinel, since both callers resolve a real context first).
+func (m Model) loadClusterMetricsRangeForDashboard(kctx string) tea.Cmd {
 	window := m.metricsSpark.Window()
 	if window <= 0 {
 		return nil
@@ -209,7 +213,6 @@ func (m Model) loadClusterMetricsRangeForDashboard() tea.Cmd {
 	points := ui.ClampSparklineWidth(ui.ConfigSparklineWidth)
 	step := window / time.Duration(points)
 
-	kctx := m.nav.Context
 	gen := m.requestGen
 	client := m.client
 	return m.scheduleK8sCall(
@@ -223,35 +226,38 @@ func (m Model) loadClusterMetricsRangeForDashboard() tea.Cmd {
 				logger.WarnOnce("cluster-metrics-range-load", kctx,
 					"cluster metrics history unavailable: no Prometheus source",
 					"context", kctx, "error", logger.Redact(err.Error()))
-				return clusterMetricsRangeMsg{gen: gen, err: err}
+				return clusterMetricsRangeMsg{context: kctx, gen: gen, err: err}
 			}
-			return clusterMetricsRangeMsg{cpu: cpu, mem: mem, gen: gen}
+			return clusterMetricsRangeMsg{context: kctx, cpu: cpu, mem: mem, gen: gen}
 		},
 	)
 }
 
-// updateClusterMetricsRange stores a history fetch, or returns the section to
-// numeric when Prometheus produced nothing. See updatePodMetricsRange for why
-// it reverts rather than showing a placeholder.
-//
-// Only clusterCPU/clusterMem are cleared on fallback, not the whole cache:
-// metricsSeriesCache also holds the pod/node row maps, and a cluster fallback
-// must not discard a mode those still need. Both branches end in
-// recomposeDashboard, since dashboardPreview is a cached string that would
-// otherwise stay stale until the next unrelated recompose.
+// updateClusterMetricsRange stores a history fetch under its own context key,
+// or clears that context's entry when Prometheus produced nothing. See
+// updatePodMetricsRange for why it reverts rather than showing a placeholder.
+// Only msg.context's entry is touched, leaving other contexts' cluster
+// history and the pod/node row maps alone. Both branches end in
+// recomposeDashboard, since dashboardPreview is a cached string.
 func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response, and the mode may have moved on since
 	}
 	if msg.err != nil || (len(msg.cpu.Points) == 0 && len(msg.mem.Points) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
-		m.metricsSeries.clusterCPU = k8s.MetricSeries{}
-		m.metricsSeries.clusterMem = k8s.MetricSeries{}
+		delete(m.metricsSeries.clusterCPU, msg.context)
+		delete(m.metricsSeries.clusterMem, msg.context)
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
 		return m.recomposeDashboard()
 	}
-	m.metricsSeries.clusterCPU = msg.cpu
-	m.metricsSeries.clusterMem = msg.mem
+	if m.metricsSeries.clusterCPU == nil {
+		m.metricsSeries.clusterCPU = make(map[string]k8s.MetricSeries)
+	}
+	if m.metricsSeries.clusterMem == nil {
+		m.metricsSeries.clusterMem = make(map[string]k8s.MetricSeries)
+	}
+	m.metricsSeries.clusterCPU[msg.context] = msg.cpu
+	m.metricsSeries.clusterMem[msg.context] = msg.mem
 	return m.recomposeDashboard()
 }
 
@@ -265,7 +271,22 @@ func (m Model) loadMetricsRangeForKind(kind string) tea.Cmd {
 	case "Node":
 		return m.loadNodeMetricsRangeForList()
 	case "Cluster":
-		return m.loadClusterMetricsRangeForDashboard()
+		return m.loadClusterMetricsRangeForDashboard(m.dashboardPreviewTargetContext())
+	default:
+		return nil
+	}
+}
+
+// loadInstantMetricsForKind picks the list-wide enrichment loader for kind,
+// used to repaint CPU/MEM cells right away on a mode change instead of
+// waiting for the next throttled tick. Cluster has no entry: composeDashboard
+// already redraws from cached data via recomposeDashboard.
+func (m Model) loadInstantMetricsForKind(kind string) tea.Cmd {
+	switch kind {
+	case "Pod":
+		return m.loadPodMetricsForList()
+	case "Node":
+		return m.loadNodeMetricsForList()
 	default:
 		return nil
 	}

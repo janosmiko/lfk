@@ -219,14 +219,14 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 		mdl := m.updatePodMetricsEnriched(msg)
 		return mdl, nil, true
 	case podMetricsRangeMsg:
-		mdl := m.updatePodMetricsRange(msg)
-		return mdl, nil, true
+		mdl, cmd := m.updatePodMetricsRange(msg)
+		return mdl, cmd, true
 	case nodeMetricsEnrichedMsg:
 		mdl := m.updateNodeMetricsEnriched(msg)
 		return mdl, nil, true
 	case nodeMetricsRangeMsg:
-		mdl := m.updateNodeMetricsRange(msg)
-		return mdl, nil, true
+		mdl, cmd := m.updateNodeMetricsRange(msg)
+		return mdl, cmd, true
 	case clusterMetricsRangeMsg:
 		mdl := m.updateClusterMetricsRange(msg)
 		return mdl, nil, true

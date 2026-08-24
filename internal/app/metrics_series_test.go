@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -66,12 +67,13 @@ func TestUpdatePodMetricsRange_FallsBackToNumericOnError(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
+	m, cmd := m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode,
 		"a failed range query must return the columns to numeric")
 	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
 	assert.Nil(t, m.metricsSeries.cpu)
+	assert.Nil(t, cmd, "a fallback must not also fire the instant loader")
 }
 
 // An empty result is the "Prometheus is there but has no data for these pods"
@@ -80,7 +82,7 @@ func TestUpdatePodMetricsRange_EmptyResultFallsBack(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen})
+	m, _ = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
 }
@@ -89,7 +91,7 @@ func TestUpdatePodMetricsRange_StoresSeriesAndKeepsMode(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updatePodMetricsRange(podMetricsRangeMsg{
+	m, cmd := m.updatePodMetricsRange(podMetricsRangeMsg{
 		gen: m.requestGen,
 		cpu: map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{1, 2}}},
 		mem: map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{3, 4}}},
@@ -97,6 +99,7 @@ func TestUpdatePodMetricsRange_StoresSeriesAndKeepsMode(t *testing.T) {
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
 	assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["default/api-1"].Points)
+	assert.NotNil(t, cmd, "a new series must trigger an instant repaint of the cells")
 }
 
 // A metrics-less row must keep rendering exactly "n/a" in sparkline mode, with
@@ -139,7 +142,7 @@ func TestUpdatePodMetricsRange_IgnoresStaleGeneration(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
+	m, _ = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
 		"a stale response must not revert the mode the user just chose")
@@ -149,12 +152,13 @@ func TestUpdateNodeMetricsRange_FallsBackToNumericOnError(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
+	m, cmd := m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode,
 		"a failed range query must return the columns to numeric")
 	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
 	assert.Nil(t, m.metricsSeries.cpu)
+	assert.Nil(t, cmd, "a fallback must not also fire the instant loader")
 }
 
 // An empty result is the "Prometheus is there but has no data for these
@@ -164,7 +168,7 @@ func TestUpdateNodeMetricsRange_EmptyResultFallsBack(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen})
+	m, _ = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
 }
@@ -173,20 +177,21 @@ func TestUpdateNodeMetricsRange_StoresSeries(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{
+	m, cmd := m.updateNodeMetricsRange(nodeMetricsRangeMsg{
 		gen: m.requestGen,
 		cpu: map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2}}},
 	})
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
 	assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["node-1"].Points)
+	assert.NotNil(t, cmd, "a new series must trigger an instant repaint of the cells")
 }
 
 func TestUpdateNodeMetricsRange_IgnoresStaleGeneration(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
+	m, _ = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
 		"a stale response must not revert the mode the user just chose")
@@ -259,32 +264,57 @@ func TestUpdateClusterMetricsRange_StoresSeries(t *testing.T) {
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
 	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
-		gen: m.requestGen,
-		cpu: k8s.MetricSeries{Points: []float64{1, 5, 9}},
+		context: m.nav.Context,
+		gen:     m.requestGen,
+		cpu:     k8s.MetricSeries{Points: []float64{1, 5, 9}},
 	})
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
-	assert.Equal(t, []float64{1, 5, 9}, m.metricsSeries.clusterCPU.Points)
+	assert.Equal(t, []float64{1, 5, 9}, m.metricsSeries.clusterCPU[m.nav.Context].Points)
 }
 
-// Unlike the pod/node fallback, only the two cluster fields are cleared: a
-// cluster fallback must not discard a pod or node mode's row maps, which
-// metricsSeriesCache also holds.
+// A union member switch must not lose the previous member's cached history:
+// unkeyed clusterCPU/clusterMem could only ever hold one context's series, so
+// hovering member A then B would draw A's history under B's numbers.
+func TestUpdateClusterMetricsRange_KeyedByContext_DoesNotClobberOtherContext(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+		context: "member-a", gen: m.requestGen, cpu: k8s.MetricSeries{Points: []float64{1, 1, 1}},
+	})
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+		context: "member-b", gen: m.requestGen, cpu: k8s.MetricSeries{Points: []float64{9, 9, 9}},
+	})
+
+	assert.Equal(t, []float64{1, 1, 1}, m.metricsSeries.clusterCPU["member-a"].Points,
+		"member-b's fetch must not overwrite member-a's cached history")
+	assert.Equal(t, []float64{9, 9, 9}, m.metricsSeries.clusterCPU["member-b"].Points)
+}
+
+// Unlike the pod/node fallback, only the failed context's cluster entry is
+// cleared: a fallback for one member must not discard a pod or node mode's
+// row maps, nor another member's still-good cluster history.
 func TestUpdateClusterMetricsRange_EmptyResultFallsBackAndKeepsOtherSeries(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 	m.metricsSeries = metricsSeriesCache{
-		cpu:        map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{1, 2}}},
-		mem:        map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{3, 4}}},
-		clusterCPU: k8s.MetricSeries{Points: []float64{1, 2}},
-		clusterMem: k8s.MetricSeries{Points: []float64{3, 4}},
+		cpu: map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{1, 2}}},
+		mem: map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{3, 4}}},
+		clusterCPU: map[string]k8s.MetricSeries{
+			m.nav.Context:  {Points: []float64{1, 2}},
+			"other-member": {Points: []float64{7, 7}},
+		},
+		clusterMem: map[string]k8s.MetricSeries{m.nav.Context: {Points: []float64{3, 4}}},
 	}
 
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen})
+	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{context: m.nav.Context, gen: m.requestGen})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
-	assert.Empty(t, m.metricsSeries.clusterCPU.Points)
-	assert.Empty(t, m.metricsSeries.clusterMem.Points)
+	assert.Empty(t, m.metricsSeries.clusterCPU[m.nav.Context].Points)
+	assert.Empty(t, m.metricsSeries.clusterMem[m.nav.Context].Points)
+	assert.Equal(t, []float64{7, 7}, m.metricsSeries.clusterCPU["other-member"].Points,
+		"a fallback for one member must not discard another member's cluster history")
 	assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["default/api-1"].Points,
 		"a cluster fallback must not discard the pod/node row maps sharing this cache")
 	assert.Equal(t, []float64{3, 4}, m.metricsSeries.mem["default/api-1"].Points)
@@ -298,4 +328,21 @@ func TestUpdateClusterMetricsRange_IgnoresStaleGeneration(t *testing.T) {
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
 		"a stale response must not revert the mode the user just chose")
+}
+
+// A union dashboard member's context is real, but m.nav.Context is the union
+// sentinel while browsing the member list. The loader must target the
+// member's own context rather than bail on the sentinel or query it.
+func TestLoadClusterMetricsRangeForDashboard_TargetsGivenContextAtUnionSentinel(t *testing.T) {
+	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	cmd := m.loadClusterMetricsRangeForDashboard("member-b")
+	require.NotNil(t, cmd)
+	msg, ok := execScheduled(t, m, cmd).(clusterMetricsRangeMsg)
+	require.True(t, ok, "must return a clusterMetricsRangeMsg rather than bail on the sentinel")
+	assert.Equal(t, "member-b", msg.context)
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -31,6 +32,28 @@ func TestHandleMetricsSparkCycle_AdvancesAndReportsMode(t *testing.T) {
 	m, _ = m.handleMetricsSparkCycle()
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
 	assert.Contains(t, m.statusMessage, "numeric")
+}
+
+// Leaving spark mode must repaint the cells right away rather than leave the
+// old glyphs on screen until the next throttled tick, so the numeric branch
+// must also fire the instant list loader (bypassing the fetch throttle).
+func TestHandleMetricsSparkCycle_LeavingSparkRefetchesInstantly(t *testing.T) {
+	prev := ui.ConfigSparklineWindows
+	t.Cleanup(func() { ui.ConfigSparklineWindows = prev })
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+
+	m := basePush80Model()
+	m, _ = m.handleMetricsSparkCycle() // Numeric -> Spark
+	require.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
+
+	m, cmd := m.handleMetricsSparkCycle() // Spark -> Numeric
+	require.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+	require.NotNil(t, cmd)
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	require.True(t, ok, "leaving spark mode must batch more than the status-clear cmd")
+	assert.Len(t, batch, 2, "must include both the status-clear and the instant metrics repaint")
 }
 
 // The mode is per tab. A mode set in one tab must not follow the user into

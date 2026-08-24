@@ -188,7 +188,7 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	// clusterMetricsRangeMsg rather than dashboardPartialMsg, so it does not
 	// count toward total.
 	if m.metricsSpark.Mode == ui.MetricsDisplaySpark && m.allowSparklineFetch("Cluster") {
-		if cmd := m.loadClusterMetricsRangeForDashboard(); cmd != nil {
+		if cmd := m.loadClusterMetricsRangeForDashboard(kctx); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
@@ -283,8 +283,9 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// everything stacks in the single column.
 	twoCol := m.fullscreenDashboard
 	w := m.dashboardWidths(twoCol, maxPinnedLabelWidth(data))
-	data.cpuSeries = m.metricsSeries.clusterCPU
-	data.memSeries = m.metricsSeries.clusterMem
+	ctx := m.dashboardPreviewTargetContext()
+	data.cpuSeries = m.metricsSeries.clusterCPU[ctx]
+	data.memSeries = m.metricsSeries.clusterMem[ctx]
 
 	var left []string
 	left = append(left, "")
