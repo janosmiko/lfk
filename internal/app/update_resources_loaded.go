@@ -375,16 +375,7 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
-	// Filter by selected namespaces when multi-select is active.
-	if len(m.selectedNamespaces) > 1 {
-		filtered := make([]model.Item, 0, len(msg.items))
-		for _, item := range msg.items {
-			if m.selectedNamespaces[item.Namespace] {
-				filtered = append(filtered, item)
-			}
-		}
-		msg.items = filtered
-	}
+	msg.items = m.filterLoadedItemsBySelectedNamespaces(msg.items)
 	if msg.forPreview {
 		m.previewLoading = false
 		m.rightItems = msg.items

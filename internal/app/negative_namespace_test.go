@@ -514,3 +514,41 @@ func newNamespaceOverlayModel() Model {
 		height:        40,
 	}
 }
+
+// TestUpdateOwnedLoadedUsesSharedNamespaceFilter guards the owned-resources
+// list against the two defects a hand-rolled copy of the namespace filter
+// carried: it dropped cluster-scoped items (issue #676), and under EXCLUDE
+// mode it kept exactly the namespaces the user had excluded.
+func TestUpdateOwnedLoadedUsesSharedNamespaceFilter(t *testing.T) {
+	items := []model.Item{
+		{Name: "pod-a", Namespace: "default"},
+		{Name: "pod-b", Namespace: "kube-system"},
+		{Name: "pod-c", Namespace: "monitoring"},
+		{Name: "node-1", Namespace: ""},
+	}
+
+	t.Run("include mode keeps cluster-scoped items", func(t *testing.T) {
+		m := Model{
+			selectedNamespaces: map[string]bool{"default": true, "monitoring": true},
+		}
+		updated, _ := m.updateOwnedLoaded(ownedLoadedMsg{items: items, forPreview: true})
+		names := negNsItemNames(updated.(Model).rightItems)
+		assert.Contains(t, names, "pod-a")
+		assert.NotContains(t, names, "pod-b")
+		assert.Contains(t, names, "pod-c")
+		assert.Contains(t, names, "node-1")
+	})
+
+	t.Run("exclude mode drops the excluded namespaces", func(t *testing.T) {
+		m := Model{
+			selectedNamespaces: map[string]bool{"default": true, "monitoring": true},
+			nsSelectionNegated: true,
+		}
+		updated, _ := m.updateOwnedLoaded(ownedLoadedMsg{items: items, forPreview: true})
+		names := negNsItemNames(updated.(Model).rightItems)
+		assert.NotContains(t, names, "pod-a")
+		assert.Contains(t, names, "pod-b")
+		assert.NotContains(t, names, "pod-c")
+		assert.Contains(t, names, "node-1")
+	})
+}

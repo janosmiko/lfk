@@ -702,3 +702,108 @@ func TestApplyMemo_PerNamespaceListDoesNotPruneOtherNamespaces(t *testing.T) {
 	assert.Contains(t, entry.memo, "team-b/worker-1",
 		"per-namespace list must not prune entries from other namespaces")
 }
+
+// clusterScopedObj builds a minimal cluster-scoped object of any kind.
+func clusterScopedObj(apiVersion, kind, name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": apiVersion,
+			"kind":       kind,
+			"metadata": map[string]any{
+				"name":              name,
+				"creationTimestamp": "2026-04-01T00:00:00Z",
+			},
+		},
+	}
+}
+
+// TestGetResources_ClusterScopedIgnoresNamespace is the regression guard for
+// issue #676. The direct-list path drops the namespace for a cluster-scoped
+// kind, but the informer-cache path passed it through to
+// ListAllByNamespace, which matched nothing because these objects carry no
+// .metadata.namespace. The user saw an empty Nodes view for every namespace
+// but "All Namespaces".
+//
+// The table covers a core kind, storage, RBAC, apiextensions, and a
+// cluster-scoped CRD, because the fix keys on rt.Namespaced rather than on
+// any kind name. A per-kind special case would pass the Node row alone.
+func TestGetResources_ClusterScopedIgnoresNamespace(t *testing.T) {
+	tests := []struct {
+		name       string
+		group      string
+		version    string
+		resource   string
+		listKind   string
+		kind       string
+		apiVersion string
+	}{
+		{"Node", "", "v1", "nodes", "NodeList", "Node", "v1"},
+		{"PersistentVolume", "", "v1", "persistentvolumes", "PersistentVolumeList", "PersistentVolume", "v1"},
+		{"StorageClass", "storage.k8s.io", "v1", "storageclasses", "StorageClassList", "StorageClass", "storage.k8s.io/v1"},
+		{"ClusterRole", "rbac.authorization.k8s.io", "v1", "clusterroles", "ClusterRoleList", "ClusterRole", "rbac.authorization.k8s.io/v1"},
+		{
+			"CustomResourceDefinition", "apiextensions.k8s.io", "v1", "customresourcedefinitions",
+			"CustomResourceDefinitionList", "CustomResourceDefinition", "apiextensions.k8s.io/v1",
+		},
+		{"NodePool", "karpenter.sh", "v1", "nodepools", "NodePoolList", "NodePool", "karpenter.sh/v1"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gvr := schema.GroupVersionResource{Group: tc.group, Version: tc.version, Resource: tc.resource}
+			dc := newFakeDynClientWith(
+				map[schema.GroupVersionResource]string{gvr: tc.listKind},
+				clusterScopedObj(tc.apiVersion, tc.kind, "obj-1"),
+				clusterScopedObj(tc.apiVersion, tc.kind, "obj-2"),
+			)
+			c := NewTestClient(nil, dc)
+			c.SetInformerCacheMode(InformerCacheAlways)
+			t.Cleanup(c.Shutdown)
+
+			rt := model.ResourceTypeEntry{
+				APIGroup:   tc.group,
+				APIVersion: tc.version,
+				Resource:   tc.resource,
+				Kind:       tc.kind,
+				Namespaced: false,
+			}
+
+			// Warm the cache with an all-namespaces list, the state the user
+			// reaches before they pick a namespace.
+			warm, err := c.GetResources(t.Context(), "", "", rt)
+			require.NoError(t, err)
+			require.Len(t, warm, 2)
+
+			// Pick a namespace. A cluster-scoped kind must ignore it.
+			scoped, err := c.GetResources(t.Context(), "", "team-a", rt)
+			require.NoError(t, err)
+			require.Len(t, scoped, 2,
+				"cluster-scoped resources must ignore the selected namespace (issue #676)")
+			assert.Equal(t, []string{"obj-1", "obj-2"},
+				[]string{scoped[0].Name, scoped[1].Name})
+		})
+	}
+}
+
+// TestGetResources_NamespacedStillFiltersByNamespace is the counterweight to
+// the test above: clearing the namespace must apply to cluster-scoped kinds
+// only. A blanket clear would turn every namespaced list into an
+// all-namespaces list.
+func TestGetResources_NamespacedStillFiltersByNamespace(t *testing.T) {
+	dc := newFakeDynClient(
+		pod("api-1", "team-a"),
+		pod("worker-1", "team-b"),
+	)
+	c := NewTestClient(nil, dc)
+	c.SetInformerCacheMode(InformerCacheAlways)
+	t.Cleanup(c.Shutdown)
+
+	all, err := c.GetResources(t.Context(), "", "", podRT)
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+
+	scoped, err := c.GetResources(t.Context(), "", "team-a", podRT)
+	require.NoError(t, err)
+	require.Len(t, scoped, 1)
+	assert.Equal(t, "api-1", scoped[0].Name)
+}
