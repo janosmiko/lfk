@@ -330,6 +330,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.nav.Context = sel.Name
 	m.invalidateOrphanCacheForContext(oldCtx)
 	m.recomputeReadOnly(sel.Name)
+	m.rescopeNamespaceForContext(sel.Name)
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""

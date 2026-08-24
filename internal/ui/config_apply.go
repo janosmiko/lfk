@@ -396,6 +396,7 @@ func applySessionDefaults(cfg configFile) {
 	applyBoolPtr(cfg.WatchMode, &ConfigWatchMode)
 	applyBoolPtr(cfg.WatchThrottle, &ConfigWatchThrottle)
 	applyBoolPtr(cfg.AllNamespaces, &ConfigAllNamespaces)
+	ConfigAllNamespacesSet = cfg.AllNamespaces != nil
 	if ev := cfg.Events; ev != nil {
 		applyBoolPtr(ev.WarningsOnly, &ConfigEventsWarningsOnly)
 		applyBoolPtr(ev.Grouping, &ConfigEventsGrouping)

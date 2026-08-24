@@ -16,6 +16,22 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// resolveStartupAllNamespaces reports whether the app opens in all-namespaces
+// mode. An explicit all_namespaces in config wins. Otherwise a kubeconfig
+// context that pins a namespace scopes the view to it, matching kubectl.
+func resolveStartupAllNamespaces(client *k8s.Client, contextName string) bool {
+	if ui.ConfigAllNamespacesSet {
+		return ui.ConfigAllNamespaces
+	}
+	if client == nil {
+		return ui.ConfigAllNamespaces
+	}
+	if _, pinned := client.ContextNamespace(contextName); pinned {
+		return false
+	}
+	return ui.ConfigAllNamespaces
+}
+
 // NewModel creates the initial model.
 func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	s := spinner.New()
@@ -27,6 +43,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		contextName = opts.Context
 	}
 	defaultNS := client.DefaultNamespace(contextName)
+	startupAllNamespaces := resolveStartupAllNamespaces(client, contextName)
 
 	// Watch interval precedence: CLI flag > config > default.
 	watchInterval := ui.ConfigWatchInterval
@@ -90,7 +107,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		foregroundIdleTimeout:      resolveForegroundIdle(opts),
 		fullLogPreview:             ui.ConfigLogPreviewLive,
 		splitPreview:               ui.ConfigSplitPreview,
-		allNamespaces:              ui.ConfigAllNamespaces,
+		allNamespaces:              startupAllNamespaces,
 		watchMode:                  ui.ConfigWatchMode,
 		objectExplorerLive:         ui.ConfigObjectExplorerLive,
 		objectExplorerTree:         ui.ConfigObjectExplorerTree,
@@ -147,7 +164,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			nav:                        model.NavigationState{Level: model.LevelClusters},
 			namespace:                  defaultNS,
 			splitPreview:               ui.ConfigSplitPreview,
-			allNamespaces:              ui.ConfigAllNamespaces,
+			allNamespaces:              startupAllNamespaces,
 			watchMode:                  ui.ConfigWatchMode,
 			objectExplorerLive:         ui.ConfigObjectExplorerLive,
 			objectExplorerTree:         ui.ConfigObjectExplorerTree,
@@ -205,7 +222,10 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			tab.Namespace = opts.Namespaces[0]
 			tab.SelectedNamespaces = opts.Namespaces
 		} else {
-			tab.AllNamespaces = true
+			tab.AllNamespaces = startupAllNamespaces
+			if !startupAllNamespaces {
+				tab.Namespace = defaultNS
+			}
 		}
 		m.pendingSession = &SessionState{
 			Context: contextName,

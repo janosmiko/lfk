@@ -78,6 +78,8 @@ func newTestClientForOptions(t *testing.T) *k8s.Client {
 	return k8s.NewTestClient(nil, nil)
 }
 
+// test-ctx pins namespace "default" (see NewTestClient), so the pinned
+// namespace must win over the all-namespaces startup default (issue #686).
 func TestNewModel_CLIOverrideContextOnly(t *testing.T) {
 	client := newTestClientForOptions(t)
 
@@ -87,8 +89,9 @@ func TestNewModel_CLIOverrideContextOnly(t *testing.T) {
 	require.NotNil(t, m.pendingSession, "pendingSession should be set when Context CLI override is provided")
 	assert.Equal(t, "test-ctx", m.pendingSession.Context)
 	require.Len(t, m.pendingSession.Tabs, 1)
-	assert.True(t, m.pendingSession.Tabs[0].AllNamespaces,
-		"AllNamespaces should be true when no namespaces are provided")
+	assert.False(t, m.pendingSession.Tabs[0].AllNamespaces,
+		"AllNamespaces should be false when the context pins a namespace and no override applies")
+	assert.Equal(t, "default", m.pendingSession.Tabs[0].Namespace)
 	assert.Equal(t, "test-ctx", m.pendingSession.Tabs[0].Context)
 }
 
@@ -367,12 +370,16 @@ func TestNewModel_WatchIntervalPrecedence(t *testing.T) {
 func TestNewModel_BasicFieldsInitialized(t *testing.T) {
 	// allNamespaces / splitPreview are seeded from config globals; pin them to
 	// their defaults so a sibling test mutating the globals can't leak in.
-	origNs, origSplit := ui.ConfigAllNamespaces, ui.ConfigSplitPreview
+	origNs, origNsSet, origSplit := ui.ConfigAllNamespaces, ui.ConfigAllNamespacesSet, ui.ConfigSplitPreview
 	t.Cleanup(func() {
 		ui.ConfigAllNamespaces = origNs
+		ui.ConfigAllNamespacesSet = origNsSet
 		ui.ConfigSplitPreview = origSplit
 	})
 	ui.ConfigAllNamespaces = true
+	// Explicitly set so the seeded default wins over test-ctx's pinned
+	// "default" namespace (see resolveStartupAllNamespaces).
+	ui.ConfigAllNamespacesSet = true
 	ui.ConfigSplitPreview = true
 
 	client := newTestClientForOptions(t)

@@ -8,7 +8,9 @@ CLI flags, environment variables, and runtime tuning options for `lfk`.
 # Use default kubeconfig (~/.kube/config + ~/.kube/config.d/*)
 lfk
 
-# Start in a specific context
+# Start in a specific context. Without -n, lfk opens in the namespace that the
+# context pins in the kubeconfig. Switching context inside the app re-scopes the
+# same way. Set all_namespaces in the config file to override both.
 lfk --context my-cluster
 
 # Start in a specific namespace (disables all-namespaces mode)

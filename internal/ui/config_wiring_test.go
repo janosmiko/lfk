@@ -236,6 +236,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigWatchMode, "watch_mode")
 	assert.False(t, ConfigWatchThrottle, "watch_throttle")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
+	assert.True(t, ConfigAllNamespacesSet, "all_namespaces (set flag)")
 	assert.False(t, ConfigEventsWarningsOnly, "events.warnings_only")
 	assert.False(t, ConfigEventsGrouping, "events.grouping")
 	assert.Equal(t, 9, ConfigScrollOff, "scrolloff")
@@ -363,6 +364,40 @@ func TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset(t *testing.T) {
 	assert.Empty(t, ConfigPinnedSummaries)
 }
 
+// TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset verifies the key
+// being absent from the config file leaves ConfigAllNamespacesSet false, so
+// resolveStartupAllNamespaces falls through to a kubeconfig-pinned namespace.
+func TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("dashboard: true\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.False(t, ConfigAllNamespacesSet, "an absent key must not set the flag")
+	assert.True(t, ConfigAllNamespaces, "an absent key must keep the compiled default")
+}
+
+// TestLoadConfig_AllNamespacesExplicitFalseSetsFlag verifies an explicit
+// `all_namespaces: false` sets ConfigAllNamespacesSet, distinguishing it from
+// the key being absent.
+func TestLoadConfig_AllNamespacesExplicitFalseSetsFlag(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("all_namespaces: false\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.True(t, ConfigAllNamespacesSet, "an explicit false must set the flag")
+	assert.False(t, ConfigAllNamespaces)
+}
+
 // wiringCoveredFields records, for every configFile json field, where its
 // YAML->runtime wiring is asserted. TestConfigFile_EveryFieldHasWiringCoverage
 // fails if a field is added (or removed) without updating this map, forcing new
@@ -400,7 +435,7 @@ var wiringCoveredFields = map[string]string{
 	"split_preview":             "TestLoadConfig_AllSettingsWired",
 	"watch_mode":                "TestLoadConfig_AllSettingsWired",
 	"watch_throttle":            "TestLoadConfig_AllSettingsWired",
-	"all_namespaces":            "TestLoadConfig_AllSettingsWired",
+	"all_namespaces":            "TestLoadConfig_AllSettingsWired + TestLoadConfig_AllNamespacesExplicitFalseSetsFlag + TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset",
 	"events":                    "TestLoadConfig_AllSettingsWired",
 	"scrolloff":                 "TestLoadConfig_AllSettingsWired",
 	"confirm_on_exit":           "TestLoadConfig_AllSettingsWired",
@@ -499,6 +534,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origWatchMode := ConfigWatchMode
 	origWatchThrottle := ConfigWatchThrottle
 	origAllNamespaces := ConfigAllNamespaces
+	origAllNamespacesSet := ConfigAllNamespacesSet
 	origEventsWarn := ConfigEventsWarningsOnly
 	origEventsGroup := ConfigEventsGrouping
 	origScrollOff := ConfigScrollOff
@@ -593,6 +629,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigWatchMode = origWatchMode
 		ConfigWatchThrottle = origWatchThrottle
 		ConfigAllNamespaces = origAllNamespaces
+		ConfigAllNamespacesSet = origAllNamespacesSet
 		ConfigEventsWarningsOnly = origEventsWarn
 		ConfigEventsGrouping = origEventsGroup
 		ConfigScrollOff = origScrollOff

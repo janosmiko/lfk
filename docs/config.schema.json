@@ -222,7 +222,7 @@
     },
     "all_namespaces": {
       "type": "boolean",
-      "description": "Startup namespace scope: true shows all namespaces, false scopes to the context's default namespace. The --namespace CLI flag and per-bookmark/session scope override this.",
+      "description": "Startup namespace scope: true shows all namespaces, false scopes to the context's default namespace. Unset, a kubeconfig context that pins a namespace scopes to it instead. The --namespace CLI flag and per-bookmark/session scope override this.",
       "default": true
     },
     "events": {
