@@ -29,6 +29,10 @@ type metricsSeriesCache struct {
 	cpu map[string]k8s.MetricSeries
 	mem map[string]k8s.MetricSeries
 
+	// clusterCPU and clusterMem are not cleared on a context switch, so a
+	// stale series can render under the new cluster's numbers until the next
+	// fetch lands. Accepted: it self-heals within one round trip, same as the
+	// cpu/mem maps above, which have the same gap for a reused pod/node name.
 	clusterCPU k8s.MetricSeries
 	clusterMem k8s.MetricSeries
 }
@@ -232,7 +236,9 @@ func (m Model) loadClusterMetricsRangeForDashboard() tea.Cmd {
 //
 // Only clusterCPU/clusterMem are cleared on fallback, not the whole cache:
 // metricsSeriesCache also holds the pod/node row maps, and a cluster fallback
-// must not discard a mode those still need.
+// must not discard a mode those still need. Both branches end in
+// recomposeDashboard, since dashboardPreview is a cached string that would
+// otherwise stay stale until the next unrelated recompose.
 func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response, and the mode may have moved on since
@@ -242,11 +248,11 @@ func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) Model {
 		m.metricsSeries.clusterCPU = k8s.MetricSeries{}
 		m.metricsSeries.clusterMem = k8s.MetricSeries{}
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m
+		return m.recomposeDashboard()
 	}
 	m.metricsSeries.clusterCPU = msg.cpu
 	m.metricsSeries.clusterMem = msg.mem
-	return m
+	return m.recomposeDashboard()
 }
 
 // loadMetricsRangeForKind picks the history loader for kind. A kind with no

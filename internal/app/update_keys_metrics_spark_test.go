@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -70,6 +71,30 @@ func allDefaultKeybindingValues(kb ui.Keybindings) []string {
 		values = append(values, f.String())
 	}
 	return values
+}
+
+// A union dashboard member does not clear ResourceType like the plain
+// dashboard does - it sets Kind to unionClusterDashboardKind instead - so the
+// tilde key must recognise that shape too, or it goes silently inert there.
+func TestDashboardMetricsKind_UnionClusterMember(t *testing.T) {
+	m := basePush80Model()
+	m.unionMode = true
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: unionClusterDashboardKind}
+
+	assert.Equal(t, "Cluster", m.dashboardMetricsKind())
+}
+
+// The union monitoring dashboard shares the member-list shape but has no
+// CPU/Mem section, so it must stay excluded the same way "__monitoring__" is
+// excluded for the non-union dashboard.
+func TestDashboardMetricsKind_UnionMonitoringMemberStaysExcluded(t *testing.T) {
+	m := basePush80Model()
+	m.unionMode = true
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: unionMonitoringDashboardKind}
+
+	assert.NotEqual(t, "Cluster", m.dashboardMetricsKind())
 }
 
 // The tilde must stay free of every other default binding.

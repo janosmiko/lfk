@@ -274,8 +274,8 @@ const dashboardSummarySep = " · "
 
 // composeDashboard renders the dashboard content + events column for the given
 // data at the current display width. Pure w.r.t. the model except for width,
-// fullscreen state, and the cluster CPU/Mem series, so it can be re-run
-// whenever those change.
+// fullscreen state, the sparkline mode, and the cluster CPU/Mem series, so it
+// can be re-run whenever those change.
 func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// The fullscreen cluster dashboard is always two-column (the right column
 	// always shows at least "RECENT EVENTS"). There, warnings move to the top

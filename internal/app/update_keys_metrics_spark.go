@@ -37,14 +37,18 @@ func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// dashboardMetricsKind reports "Cluster" when the CLUSTER RESOURCES dashboard
-// is on screen. nav.ResourceType stays empty there in both preview and
-// fullscreen (see navigateChildResourceType), so the kind comes from the
-// hovered pseudo-item instead, mirroring explorerHintEntries' isDashboard
-// check. "__monitoring__" has no CPU/Mem section, so it is excluded.
+// dashboardMetricsKind reports "Cluster" for the CLUSTER RESOURCES dashboard
+// in either shape it can take: plain preview/fullscreen, where ResourceType
+// stays empty and the kind comes from the hovered pseudo-item (mirroring
+// explorerHintEntries' isDashboard check), or a union-mode member, where
+// ResourceType.Kind is unionClusterDashboardKind. Both exclude
+// "__monitoring__", which has no CPU/Mem section.
 func (m Model) dashboardMetricsKind() string {
 	sel := m.selectedMiddleItem()
 	if sel != nil && m.nav.Level == model.LevelResourceTypes && sel.Extra == "__overview__" {
+		return "Cluster"
+	}
+	if mode, ok := unionDashboardModeFromKind(m.nav.ResourceType.Kind); ok && mode == unionDashboardCluster {
 		return "Cluster"
 	}
 	return m.nav.ResourceType.Kind

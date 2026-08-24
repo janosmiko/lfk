@@ -764,11 +764,8 @@ func TestDashboardResourcesSection_DrawsSparklineInSparkMode(t *testing.T) {
 }
 
 func TestDashboardResourcesSection_NumericModeDrawsNoGlyphs(t *testing.T) {
-	// totalCPUUsed is 0 so renderBar's fill is empty: a nonzero fill also
-	// draws "█", which is both renderBar's fill glyph and the sparkline
-	// alphabet's top glyph, and would falsely fail this assertion.
 	data := dashboardData{
-		totalCPUUsed: 0, totalCPUAlloc: 4000,
+		totalCPUUsed: 1000, totalCPUAlloc: 4000,
 		cpuSeries: k8s.MetricSeries{Points: []float64{1, 5, 9}},
 	}
 	// content must be set: dashboardMetricLines truncates every line to it,
@@ -778,7 +775,13 @@ func TestDashboardResourcesSection_NumericModeDrawsNoGlyphs(t *testing.T) {
 	lines := dashboardResourcesSection(nil, data, w, false)
 
 	joined := stripANSI(strings.Join(lines, "\n"))
+	// "█" is excluded: renderBar's fill uses it too, and a nonzero usage bar
+	// (a more realistic fixture than an all-empty one) draws it regardless of
+	// sparklines. The other seven glyphs are unique to the sparkline alphabet.
 	for _, g := range ui.SparklineGlyphs {
+		if g == '█' {
+			continue
+		}
 		assert.NotContains(t, joined, string(g),
 			"numeric mode must render identically to before this feature")
 	}
