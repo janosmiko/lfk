@@ -302,7 +302,7 @@
     },
     "metrics_sparkline_interval": {
       "type": "string",
-      "description": "Minimum gap between two Prometheus range fetches on a watch-tick refresh. Go duration, clamped to 10s..10m.",
+      "description": "Minimum gap between two Prometheus range fetches on a watch-tick refresh. Go duration, clamped to [10s, 10m]. Default 30s.",
       "default": "30s"
     },
     "watch_throttle": {

@@ -178,9 +178,10 @@ type configFile struct {
 	// MetricsSparklineWidth is the preferred sparkline glyph count in the
 	// CPU/MEM columns, clamped to [4, 40]. Defaults to 12.
 	MetricsSparklineWidth *int `json:"metrics_sparkline_width" yaml:"metrics_sparkline_width"`
-	// MetricsSparklineInterval floors higher than MetricsInterval because a
-	// range query reads a whole window per series. Clamped to [10s, 10m].
-	// Defaults to 30s.
+	// MetricsSparklineInterval is the minimum gap between two Prometheus range
+	// fetches on a watch-tick refresh. Its floor is higher than
+	// MetricsInterval's because a range query reads a whole window per series.
+	// Clamped to [10s, 10m]. Defaults to 30s.
 	MetricsSparklineInterval string `json:"metrics_sparkline_interval" yaml:"metrics_sparkline_interval"`
 	// WatchThrottle enables focus/idle watch throttling. Set false to fully
 	// disable it: the watch tick then always uses watch_interval. Default true.
