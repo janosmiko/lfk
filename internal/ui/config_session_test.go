@@ -12,18 +12,21 @@ func snapshotSessionDefaultGlobals(t *testing.T) {
 	prevSplit := ConfigSplitPreview
 	prevWatch := ConfigWatchMode
 	prevAllNs := ConfigAllNamespaces
+	prevAllNsSet := ConfigAllNamespacesSet
 	prevWarn := ConfigEventsWarningsOnly
 	prevGroup := ConfigEventsGrouping
 	t.Cleanup(func() {
 		ConfigSplitPreview = prevSplit
 		ConfigWatchMode = prevWatch
 		ConfigAllNamespaces = prevAllNs
+		ConfigAllNamespacesSet = prevAllNsSet
 		ConfigEventsWarningsOnly = prevWarn
 		ConfigEventsGrouping = prevGroup
 	})
 	ConfigSplitPreview = true
 	ConfigWatchMode = true
 	ConfigAllNamespaces = true
+	ConfigAllNamespacesSet = false
 	ConfigEventsWarningsOnly = true
 	ConfigEventsGrouping = true
 }
@@ -45,6 +48,7 @@ events:
 	assert.False(t, ConfigSplitPreview, "split_preview")
 	assert.False(t, ConfigWatchMode, "watch_mode")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
+	assert.True(t, ConfigAllNamespacesSet, "all_namespaces (set flag)")
 	assert.False(t, ConfigEventsWarningsOnly, "events.warnings_only")
 	assert.False(t, ConfigEventsGrouping, "events.grouping")
 }
@@ -63,6 +67,7 @@ events:
 	assert.False(t, ConfigWatchMode, "watch_mode applied")
 	assert.True(t, ConfigSplitPreview, "split_preview default preserved")
 	assert.True(t, ConfigAllNamespaces, "all_namespaces default preserved")
+	assert.False(t, ConfigAllNamespacesSet, "all_namespaces (set flag) stays unset when the key is absent")
 	assert.False(t, ConfigEventsGrouping, "events.grouping applied")
 	assert.True(t, ConfigEventsWarningsOnly, "events.warnings_only default preserved")
 }

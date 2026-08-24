@@ -330,6 +330,7 @@ func (m Model) executeContextCommand(arg string) (tea.Model, tea.Cmd) {
 	m.nav.Context = arg
 	m.invalidateOrphanCacheForContext(oldCtx)
 	m.recomputeReadOnly(arg)
+	m.rescopeNamespaceForContext(arg)
 	m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
 	cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {

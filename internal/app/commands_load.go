@@ -641,6 +641,34 @@ func (m Model) defaultNamespaceForContext() string {
 	return "default"
 }
 
+// rescopeNamespaceForContext re-applies the namespace scope after a plain
+// context switch, so each cluster opens in the namespace its kubeconfig
+// context pins. An explicit all_namespaces in config still wins.
+func (m *Model) rescopeNamespaceForContext(ctxName string) {
+	if m.client == nil || m.unionMode {
+		return
+	}
+	// Every namespace selection here belongs to the cluster we just left. Those
+	// names rarely exist in the new one, so a later A-toggle or previous-namespace
+	// jump would scope this cluster to a namespace the user never picked.
+	m.selectedNamespaces = nil
+	m.nsSelectionNegated = false
+	m.savedSelectedNamespaces = nil
+	m.savedNsSelectionNegated = false
+	m.nsSelectionModified = false
+	m.previousNsScope = nil
+	if resolveStartupAllNamespaces(m.client, ctxName) {
+		m.allNamespaces = true
+		// The A-toggle only resolves the new context's default namespace when
+		// this is empty, so a leftover value scopes the new cluster to the old
+		// cluster's namespace.
+		m.namespace = ""
+		return
+	}
+	m.allNamespaces = false
+	m.namespace = m.client.DefaultNamespace(ctxName)
+}
+
 // loadRevisions fetches the revision history for a deployment.
 func (m Model) loadRevisions() tea.Cmd {
 	sel := m.selectedMiddleItem()

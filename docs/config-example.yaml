@@ -234,10 +234,9 @@ log_path: /tmp/lfk.log
 #   tree: false  # open in the ASCII-art tree view (toggle: T)
 
 # ─── Session Defaults ────────────────────────────────────────────────────────
-# Startup state for the main view. split_preview toggles the preview pane;
-# watch_mode toggles live polling; all_namespaces sets the namespace scope
-# (false starts scoped to the context's default namespace). The --namespace CLI
-# flag and per-bookmark/session scope override all_namespaces.
+# Startup state for the main view. split_preview toggles the preview pane,
+# watch_mode toggles live polling, all_namespaces sets the namespace scope
+# (unset, a pinned kubeconfig namespace wins). CLI/session scope overrides it.
 # split_preview: true
 # watch_mode: true
 # all_namespaces: true

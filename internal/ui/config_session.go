@@ -17,6 +17,10 @@ var ConfigWatchMode = true
 // Default true.
 var ConfigAllNamespaces = true
 
+// ConfigAllNamespacesSet reports whether the config file set all_namespaces
+// at all. Absent, a kubeconfig context that pins a namespace wins instead.
+var ConfigAllNamespacesSet bool
+
 // ConfigEventsWarningsOnly is the startup default for the events view's
 // warning-only filter. Default true.
 var ConfigEventsWarningsOnly = true
