@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 )
 
 // schemaDoc is the minimal shape of docs/config.schema.json needed to assert
@@ -71,4 +72,23 @@ func TestConfigSchemaKeybindingsInSync(t *testing.T) {
 		_, ok := def.Properties[name]
 		require.Truef(t, ok, "keybinding %q missing from schema definitions.keybindings.properties", name)
 	}
+}
+
+// TestConfigExampleParses is the fifth forcing function over the config
+// surface, next to the two schema-sync tests here and the two wiring tests in
+// config_wiring_test.go. Nothing else reads docs/config-example.yaml, so a
+// syntax error or a mistyped value in the documented example used to ship
+// unnoticed.
+//
+// It unmarshals into configFile rather than map[string]any: that catches a
+// documented key whose value no longer matches the field's type, which is the
+// way the example actually goes stale. Unknown keys still pass, so this does
+// not double up on the schema-sync tests above.
+func TestConfigExampleParses(t *testing.T) {
+	path := filepath.Join("..", "..", "docs", "config-example.yaml")
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "read %s", path)
+
+	var cfg configFile
+	require.NoError(t, yaml.Unmarshal(data, &cfg), "%s does not parse as a config file", path)
 }

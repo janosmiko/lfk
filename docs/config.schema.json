@@ -2,13 +2,13 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/janosmiko/lfk/main/docs/config.schema.json",
   "title": "lfk configuration",
-  "description": "Schema for the lfk config file (config.yaml). All fields are optional; only the values you set override the defaults. See docs/config-reference.md for full descriptions.",
+  "description": "Schema for the lfk config file (config.yaml). All fields are optional. Only the values you set override the defaults. See docs/config-reference.md for full descriptions.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "appearance": {
       "type": ["object", "null"],
-      "description": "Visual settings group (colorscheme, icons, no_color, transparent_background, min_contrast_ratio, dim_overlay). Canonical home for these knobs; the flat keys of the same name are deprecated aliases. When both are set, appearance wins.",
+      "description": "Visual settings group (colorscheme, icons, no_color, transparent_background, min_contrast_ratio, dim_overlay). Canonical home for these knobs. The flat keys of the same name are deprecated aliases. When both are set, appearance wins.",
       "$ref": "#/definitions/appearanceConfig"
     },
     "colorscheme": {
@@ -100,7 +100,7 @@
     },
     "which_key_enabled": {
       "type": "boolean",
-      "description": "Show the which-key popup while a chord prefix (g) is pending, and the leader action panel while the which-key leader (?) is armed. false hides both panels; the keys keep working — g still starts a goto chord, and the leader key falls through to whatever else claims it (the help screen, by default).",
+      "description": "Show the which-key popup while a chord prefix (g) is pending, and the leader action panel while the which-key leader (?) is armed. false hides both panels. The keys keep working — g still starts a goto chord, and the leader key falls through to whatever else claims it (the help screen, by default).",
       "default": true
     },
     "which_key_delay_ms": {
@@ -146,7 +146,7 @@
     "pinned_summaries": {
       "type": ["array", "null"],
       "maxItems": 10,
-      "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"batch/jobs\") whose status summaries render on the cluster dashboard. Also manageable in-app from the resource-type action menu. Max 10 per scope. Unset uses built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates); an explicit [] disables them.",
+      "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"batch/jobs\") whose status summaries render on the cluster dashboard. Also manageable in-app from the resource-type action menu. Max 10 per scope. Unset uses built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates). An explicit [] disables them.",
       "items": { "type": "string" }
     },
     "monitoring": {
@@ -161,7 +161,7 @@
     },
     "log_viewer": {
       "type": ["object", "null"],
-      "description": "Log viewer settings: tail sizes, ANSI rendering, and the startup-toggle defaults for preview/prefixes/timestamps. Canonical home for these knobs; the flat log_tail_lines, log_tail_lines_short, and log_render_ansi keys are deprecated aliases. Note: log_path is the application's own log file and is NOT a log_viewer setting.",
+      "description": "Log viewer settings: tail sizes, ANSI rendering, and the startup-toggle defaults for preview/prefixes/timestamps. Canonical home for these knobs. The flat log_tail_lines, log_tail_lines_short, and log_render_ansi keys are deprecated aliases. Note: log_path is the application's own log file and is NOT a log_viewer setting.",
       "$ref": "#/definitions/logViewerConfig"
     },
     "log_tail_lines": {
@@ -279,12 +279,12 @@
     },
     "foreground_idle_timeout": {
       "type": "string",
-      "description": "No-input window before a focused window throttles to background_watch_interval. Go duration; 0 disables. Default 120s.",
+      "description": "No-input window before a focused window throttles to background_watch_interval. Go duration. 0 disables. Default 120s.",
       "default": "120s"
     },
     "metrics_interval": {
       "type": "string",
-      "description": "Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh. Go duration, clamped to [2s, 10m]; 0 fetches every tick. Manual refresh always fetches. Default 15s.",
+      "description": "Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh. Go duration, clamped to [2s, 10m]. 0 fetches every tick. Manual refresh always fetches. Default 15s.",
       "default": "15s"
     },
     "watch_throttle": {
@@ -330,7 +330,7 @@
     },
     "field_manager": {
       "type": "string",
-      "description": "Field manager name sent on every write. The apiserver stores it in metadata.managedFields, which the YAML blame view reads. Empty uses lfk:<os-user>; set \"lfk\" to keep the username off the cluster. Cut to 128 characters.",
+      "description": "Field manager name sent on every write. The apiserver stores it in metadata.managedFields, which the YAML blame view reads. Empty uses lfk:<os-user>. Set \"lfk\" to keep the username off the cluster. Cut to 128 characters.",
       "default": ""
     },
     "show_rare_types": {
@@ -398,7 +398,7 @@
     },
     "keybindings": {
       "type": "object",
-      "description": "Custom keybinding overrides. Each value is a key string (e.g. \"j\", \"ctrl+d\", \"ctrl+alt+y\", \"ctrl+shift+x\"). Modifiers are ordered ctrl, alt, shift, meta, hyper, super; other orders are accepted and normalised. Case is significant except in a shift chord, where the key is folded to the shifted character (\"ctrl+shift+x\" -> \"ctrl+shift+X\", \"shift+x\" -> \"X\"). Use \"space\" for the space bar. Ctrl+Shift chords need a terminal that reports them (see docs/keybindings.md). Avoid ctrl+i / ctrl+m / ctrl+[ (terminals emit these as tab/enter/esc).",
+      "description": "Custom keybinding overrides. Each value is a key string (e.g. \"j\", \"ctrl+d\", \"ctrl+alt+y\", \"ctrl+shift+x\"). Modifiers are ordered ctrl, alt, shift, meta, hyper, super. Other orders are accepted and normalised. Case is significant except in a shift chord, where the key is folded to the shifted character (\"ctrl+shift+x\" -> \"ctrl+shift+X\", \"shift+x\" -> \"X\"). Use \"space\" for the space bar. Ctrl+Shift chords need a terminal that reports them (see docs/keybindings.md). Avoid ctrl+i / ctrl+m / ctrl+[ (terminals emit these as tab/enter/esc).",
       "additionalProperties": false,
       "properties": {
         "left": { "type": "string" },
@@ -529,7 +529,7 @@
       "properties": {
         "columns": {
           "type": "array",
-          "description": "Ordered column specs. Each is a built-in name or a custom \"Name:.jsonPath\" spec; append flags after \"|\" (e.g. \"|W\" for wide-only).",
+          "description": "Ordered column specs. Each is a built-in name or a custom \"Name:.jsonPath\" spec. Append flags after \"|\" (e.g. \"|W\" for wide-only).",
           "items": { "type": "string" }
         },
         "sort_column": {
@@ -544,7 +544,7 @@
       "required": ["label", "command", "key"],
       "properties": {
         "label": { "type": "string", "description": "Action menu label." },
-        "command": { "type": "string", "description": "Shell command template (supports template variables; see config-reference.md)." },
+        "command": { "type": "string", "description": "Shell command template (supports template variables, see config-reference.md)." },
         "key": { "type": "string", "description": "Shortcut key that triggers the action." },
         "description": { "type": "string", "description": "Help text shown in the action menu." },
         "read_only_safe": {
@@ -652,7 +652,7 @@
         },
         "hide_badges": {
           "type": "boolean",
-          "description": "Hide the per-resource SEC severity badge by default. The dashboard still scans; only the inline row badge is suppressed (toggleable at runtime). Settable globally and per-cluster (clusters.<name>.security.hide_badges overrides the global default for that context).",
+          "description": "Hide the per-resource SEC severity badge by default. The dashboard still scans. Only the inline row badge is suppressed (toggleable at runtime). Settable globally and per-cluster (clusters.<name>.security.hide_badges overrides the global default for that context).",
           "default": false
         },
         "sources": {
@@ -701,7 +701,7 @@
         "namespace": { "type": "string", "description": "Globs the resource namespace. Empty or * = any namespace." },
         "labels": {
           "type": "object",
-          "description": "Match the target resource's Kubernetes labels: each entry is a label key mapped to a glob value pattern; ALL entries must match (AND). Resource-scoped (hides matching resources within a group, never the whole group). Matches when labels are available on the finding's resource: heuristic-observed pods (and same-pod findings from other sources), plus workload labels resolved from the live object for standard kinds (Pod, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob) when a label pattern is configured.",
+          "description": "Match the target resource's Kubernetes labels: each entry is a label key mapped to a glob value pattern. ALL entries must match (AND). Resource-scoped (hides matching resources within a group, never the whole group). Matches when labels are available on the finding's resource: heuristic-observed pods (and same-pod findings from other sources), plus workload labels resolved from the live object for standard kinds (Pod, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob) when a label pattern is configured.",
           "additionalProperties": { "type": "string" }
         },
         "comment": { "type": "string", "description": "Free-text note explaining why the rule exists." }
@@ -725,7 +725,7 @@
     },
     "logViewerConfig": {
       "type": "object",
-      "description": "Log viewer settings. All fields optional; missing keys fall back to compiled defaults (or a deprecated flat alias).",
+      "description": "Log viewer settings. All fields optional. Missing keys fall back to compiled defaults (or a deprecated flat alias).",
       "additionalProperties": false,
       "properties": {
         "tail_lines": {
@@ -765,7 +765,7 @@
         },
         "max_lines": {
           "type": "integer",
-          "description": "Maximum streamed log lines retained per tab; once exceeded, the oldest lines are dropped so a long-running follow does not grow memory without bound. Clamped to [1000, 1000000].",
+          "description": "Maximum streamed log lines retained per tab. Once exceeded, the oldest lines are dropped so a long-running follow does not grow memory without bound. Clamped to [1000, 1000000].",
           "default": 50000
         },
         "wrap": {
@@ -777,7 +777,7 @@
     },
     "yamlViewerConfig": {
       "type": "object",
-      "description": "YAML viewer settings. All fields optional; missing keys keep compiled defaults.",
+      "description": "YAML viewer settings. All fields optional. Missing keys keep compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "wrap": {
@@ -789,7 +789,7 @@
     },
     "diffViewerConfig": {
       "type": "object",
-      "description": "Diff viewer settings. All fields optional; missing keys keep compiled defaults.",
+      "description": "Diff viewer settings. All fields optional. Missing keys keep compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "wrap": {
@@ -811,7 +811,7 @@
     },
     "describeViewerConfig": {
       "type": "object",
-      "description": "Describe viewer settings. All fields optional; missing keys keep compiled defaults.",
+      "description": "Describe viewer settings. All fields optional. Missing keys keep compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "wrap": {
@@ -823,7 +823,7 @@
     },
     "objectExplorerConfig": {
       "type": "object",
-      "description": "Object Explorer settings. All fields optional; missing keys keep compiled defaults.",
+      "description": "Object Explorer settings. All fields optional. Missing keys keep compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "live": {
@@ -840,7 +840,7 @@
     },
     "apiExplorerConfig": {
       "type": "object",
-      "description": "API Explorer settings. All fields optional; missing keys keep compiled defaults.",
+      "description": "API Explorer settings. All fields optional. Missing keys keep compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "tree": {
@@ -852,7 +852,7 @@
     },
     "appearanceConfig": {
       "type": "object",
-      "description": "Visual settings. All fields optional; missing keys fall back to a deprecated flat alias or the compiled default.",
+      "description": "Visual settings. All fields optional. Missing keys fall back to a deprecated flat alias or the compiled default.",
       "additionalProperties": false,
       "properties": {
         "colorscheme": {
@@ -878,7 +878,7 @@
         },
         "min_contrast_ratio": {
           "type": "number",
-          "description": "Readability knob in [0.0, 1.0]; nudges foreground lightness to a minimum WCAG contrast ratio.",
+          "description": "Readability knob in [0.0, 1.0]. Nudges foreground lightness to a minimum WCAG contrast ratio.",
           "minimum": 0,
           "maximum": 1,
           "default": 0
@@ -898,7 +898,7 @@
     },
     "eventsConfig": {
       "type": "object",
-      "description": "Events view settings. All fields optional; missing keys keep compiled defaults.",
+      "description": "Events view settings. All fields optional. Missing keys keep compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "warnings_only": {
@@ -927,7 +927,7 @@
     },
     "scheduler": {
       "type": "object",
-      "description": "Runtime knobs for the priority task scheduler. All fields optional; missing keys fall back to compiled defaults.",
+      "description": "Runtime knobs for the priority task scheduler. All fields optional. Missing keys fall back to compiled defaults.",
       "additionalProperties": false,
       "properties": {
         "workers_per_context": { "type": "integer" },
@@ -963,7 +963,7 @@
       }
     },
     "unionSetContext": {
-      "description": "One cluster within a union set. A bare string is the context name; an object adds an optional per-set color and namespace.",
+      "description": "One cluster within a union set. A bare string is the context name. An object adds an optional per-set color and namespace.",
       "oneOf": [
         { "type": "string" },
         {
