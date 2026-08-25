@@ -512,6 +512,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 
 	origTheme := ActiveTheme
 	origScheme := ActiveSchemeName
+	origDarkScheme := ConfigDarkColorscheme
+	origLightScheme := ConfigLightColorscheme
 	origKB := ActiveKeybindings
 	origAbbr := SearchAbbreviations
 	origLogPath := ConfigLogPath
@@ -607,6 +609,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 
 	return func() {
 		ActiveSchemeName = origScheme
+		ConfigDarkColorscheme = origDarkScheme
+		ConfigLightColorscheme = origLightScheme
 		ActiveKeybindings = origKB
 		SearchAbbreviations = origAbbr
 		ConfigLogPath = origLogPath
