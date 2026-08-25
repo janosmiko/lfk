@@ -247,7 +247,104 @@ func TestLoadMetricsRangeForKind_DispatchesByKind(t *testing.T) {
 	assert.NotNil(t, m.loadMetricsRangeForKind("Pod"), "Pod has CPU/MEM columns and must load history")
 	assert.NotNil(t, m.loadMetricsRangeForKind("Node"), "Node has CPU/MEM columns and must load history")
 	assert.NotNil(t, m.loadMetricsRangeForKind("Cluster"), "Cluster dashboard has a CPU/Mem section and must load history")
+	assert.NotNil(t, m.loadMetricsRangeForKind("Container"), "Container has CPU/MEM columns and must load history")
 	assert.Nil(t, m.loadMetricsRangeForKind("Deployment"), "a kind with no CPU/MEM columns must be inert")
+}
+
+func TestLoadInstantMetricsForKind_DispatchesByKind(t *testing.T) {
+	m := basePush80Model()
+
+	assert.NotNil(t, m.loadInstantMetricsForKind("Pod"))
+	assert.NotNil(t, m.loadInstantMetricsForKind("Node"))
+	assert.NotNil(t, m.loadInstantMetricsForKind("Container"), "Container has CPU/MEM columns and must repaint instantly")
+	assert.Nil(t, m.loadInstantMetricsForKind("Cluster"), "Cluster repaints via recomposeDashboard, not a list loader")
+	assert.Nil(t, m.loadInstantMetricsForKind("Deployment"))
+}
+
+func TestLoadContainerMetricsRangeForListReturnsCmd(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.OwnedName = "pod-1"
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	cmd := m.loadContainerMetricsRangeForList()
+	assert.NotNil(t, cmd)
+}
+
+func TestLoadContainerMetricsRangeForListSkipsAtUnionSentinel(t *testing.T) {
+	m := basePush80Model()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	cmd := m.loadContainerMetricsRangeForList()
+	assert.Nil(t, cmd)
+}
+
+func TestUpdateContainerMetricsRange_FallsBackToNumericOnError(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m, cmd := m.updateContainerMetricsRange(containerMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode,
+		"a failed range query must return the columns to numeric")
+	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
+	assert.Nil(t, m.metricsSeries.cpu)
+	assert.Nil(t, cmd, "a fallback must not also fire the instant loader")
+}
+
+// An empty result is the "Prometheus is there but has no data for this pod's
+// containers" case. It reverts too, because a sparkline mode with no series
+// draws nothing.
+func TestUpdateContainerMetricsRange_EmptyResultFallsBack(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m, _ = m.updateContainerMetricsRange(containerMetricsRangeMsg{gen: m.requestGen})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+}
+
+func TestUpdateContainerMetricsRange_StoresSeriesAndKeepsMode(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m, cmd := m.updateContainerMetricsRange(containerMetricsRangeMsg{
+		gen: m.requestGen,
+		cpu: map[string]k8s.MetricSeries{"app": {Points: []float64{1, 2}}},
+		mem: map[string]k8s.MetricSeries{"app": {Points: []float64{3, 4}}},
+	})
+
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode)
+	assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["app"].Points)
+	assert.NotNil(t, cmd, "a new series must trigger an instant repaint of the cells")
+}
+
+func TestUpdateContainerMetricsRange_IgnoresStaleGeneration(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	m, _ = m.updateContainerMetricsRange(containerMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
+
+	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
+		"a stale response must not revert the mode the user just chose")
+}
+
+// Proves the message routes through m.Update to updateContainerMetricsRange,
+// not merely that the handler works when called directly.
+func TestUpdate_RoutesContainerMetricsRangeMsg(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	result, cmd := m.Update(containerMetricsRangeMsg{
+		gen: m.requestGen,
+		cpu: map[string]k8s.MetricSeries{"app": {Points: []float64{1, 2}}},
+		mem: map[string]k8s.MetricSeries{"app": {Points: []float64{3, 4}}},
+	})
+	mdl := result.(Model)
+	assert.Equal(t, []float64{1, 2}, mdl.metricsSeries.cpu["app"].Points)
+	assert.NotNil(t, cmd)
 }
 
 func TestUpdateClusterMetricsRange_FallsBackToNumericOnError(t *testing.T) {

@@ -415,7 +415,13 @@ func (m Model) updateContainerMetricsEnriched(msg containerMetricsEnrichedMsg) M
 			clearStaleContainerMetricsColumns(item)
 			continue
 		}
-		setContainerMetricsColumns(item, ui.FormatCPU(cu.CPUMilli), ui.FormatMemory(cu.MemBytes))
+		cpuUse := ui.FormatCPU(cu.CPUMilli)
+		memUse := ui.FormatMemory(cu.MemBytes)
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
+			cpuUse = sparklineCell(m.metricsSeries.cpu[item.Name], cpuUse)
+			memUse = sparklineCell(m.metricsSeries.mem[item.Name], memUse)
+		}
+		setContainerMetricsColumns(item, cpuUse, memUse)
 	}
 	m.itemCache[m.navKey()] = m.middleItems
 	return m

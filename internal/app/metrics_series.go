@@ -270,6 +270,8 @@ func (m Model) loadMetricsRangeForKind(kind string) tea.Cmd {
 		return m.loadPodMetricsRangeForList()
 	case "Node":
 		return m.loadNodeMetricsRangeForList()
+	case "Container":
+		return m.loadContainerMetricsRangeForList()
 	case "Cluster":
 		return m.loadClusterMetricsRangeForDashboard(m.dashboardPreviewTargetContext())
 	default:
@@ -287,7 +289,77 @@ func (m Model) loadInstantMetricsForKind(kind string) tea.Cmd {
 		return m.loadPodMetricsForList()
 	case "Node":
 		return m.loadNodeMetricsForList()
+	case "Container":
+		return m.loadContainerMetricsForList()
 	default:
 		return nil
 	}
+}
+
+// containerMetricsRangeMsg carries a container CPU/memory history fetch back
+// to the update loop, keyed by container name. See podMetricsRangeMsg for
+// the fallback contract.
+type containerMetricsRangeMsg struct {
+	cpu map[string]k8s.MetricSeries
+	mem map[string]k8s.MetricSeries
+	gen uint64
+	err error
+}
+
+// loadContainerMetricsRangeForList fetches per-container CPU and memory
+// history for the current sparkline window. Namespace/pod resolution mirrors
+// loadContainerMetricsForList exactly, since both target the same pod.
+func (m Model) loadContainerMetricsRangeForList() tea.Cmd {
+	if m.isUnionSentinel() {
+		return nil
+	}
+	window := m.metricsSpark.Window()
+	if window <= 0 {
+		return nil
+	}
+	points := ui.ClampSparklineWidth(ui.ConfigSparklineWidth)
+	step := window / time.Duration(points)
+
+	kctx := m.nav.Context
+	ns := m.effectiveNamespace()
+	if ns == "" && m.nav.Namespace != "" {
+		ns = m.nav.Namespace
+	}
+	podName := m.nav.OwnedName
+	gen := m.requestGen
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
+		"Container metrics history",
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			cpu, mem, err := client.GetContainerMetricsRange(ctx, kctx, ns, podName, window, step)
+			if err != nil {
+				logger.WarnOnce("container-metrics-range-load", kctx+"/"+ns+"/"+podName,
+					"container metrics history unavailable: no Prometheus source",
+					"context", kctx, "namespace", ns, "pod", podName, "error", logger.Redact(err.Error()))
+				return containerMetricsRangeMsg{gen: gen, err: err}
+			}
+			return containerMetricsRangeMsg{cpu: cpu, mem: mem, gen: gen}
+		},
+	)
+}
+
+// updateContainerMetricsRange stores a history fetch, or returns the columns
+// to numeric when Prometheus produced nothing. See updatePodMetricsRange for
+// why it reverts rather than showing a placeholder, and why it returns a Cmd.
+func (m Model) updateContainerMetricsRange(msg containerMetricsRangeMsg) (Model, tea.Cmd) {
+	if msg.gen != m.requestGen {
+		return m, nil // stale response, and the mode may have moved on since
+	}
+	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
+		m.metricsSpark = ui.MetricsSparkState{}
+		m.metricsSeries = metricsSeriesCache{}
+		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
+		return m, nil
+	}
+	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
+	m.middleItemsRev++
+	return m, m.loadContainerMetricsForList()
 }

@@ -642,7 +642,7 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Orphan overview", "", "", allLevels},
 		{"Session manager", "", "", allLevels},
 		{"Column visibility", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"CPU/MEM display mode", "Pod", "", []model.Level{model.LevelResources}},
+		{"CPU/MEM display mode", "Pod", "", []model.Level{model.LevelResources, model.LevelContainers}},
 		{"Monitoring dashboard", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Quota dashboard", "", "", allLevels},
 		{"Task queue", "", "", allLevels},

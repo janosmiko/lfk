@@ -56,16 +56,23 @@ func (m Model) dashboardMetricsKind() string {
 	if mode, ok := unionDashboardModeFromKind(m.nav.ResourceType.Kind); ok && mode == unionDashboardCluster {
 		return "Cluster"
 	}
+	// nav.ResourceType stays "Pod" at LevelContainers: navigating into
+	// containers only changes nav.Level (see selectedResourceKind).
+	if m.nav.Level == model.LevelContainers {
+		return "Container"
+	}
 	return m.nav.ResourceType.Kind
 }
 
 // metricsSparkAvailable reports whether the current view has CPU/MEM columns
-// for the tilde key to cycle: a cluster dashboard (either shape
-// dashboardMetricsKind recognises), or the pod/node list itself.
+// for the tilde key to cycle.
 func (m Model) metricsSparkAvailable() bool {
 	kind := m.dashboardMetricsKind()
 	if kind == "Cluster" {
 		return true
+	}
+	if m.nav.Level == model.LevelContainers {
+		return kind == "Container"
 	}
 	return m.nav.Level == model.LevelResources && (kind == "Pod" || kind == "Node")
 }

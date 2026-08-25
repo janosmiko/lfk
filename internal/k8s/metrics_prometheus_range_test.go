@@ -288,3 +288,110 @@ func TestGetClusterMetricsRange_EmptyResultIsNotAnError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, cpu.Points, "no data is an empty series, and the caller reverts to numeric")
 }
+
+func TestBuildPromContainerRangeQuery(t *testing.T) {
+	cpu := buildPromContainerRangeQuery("dev", "web-1", "cpu")
+	assert.Contains(t, cpu, "container_cpu_usage_seconds_total")
+	assert.Contains(t, cpu, "sum by (container)")
+	assert.Contains(t, cpu, `namespace="dev"`)
+	assert.Contains(t, cpu, `pod="web-1"`)
+	assert.Contains(t, cpu, `container!="POD"`, "the pause container must be excluded")
+	assert.Contains(t, cpu, "* 1000", "CPU converted cores->millicores")
+
+	mem := buildPromContainerRangeQuery("dev", "web-1", "memory")
+	assert.Contains(t, mem, "container_memory_working_set_bytes")
+	assert.NotContains(t, mem, "rate(", "memory is a gauge")
+
+	assert.Empty(t, buildPromContainerRangeQuery("dev", "web-1", "bogus"))
+	assert.Empty(t, buildPromContainerRangeQuery(`evil"} or up{`, "web-1", "cpu"),
+		"namespace with PromQL metacharacters is rejected")
+	assert.Empty(t, buildPromContainerRangeQuery("dev", `evil"} or up{`, "cpu"),
+		"pod with PromQL metacharacters is rejected")
+}
+
+func TestGetContainerMetricsRange_ReturnsCPUAndMemorySeries(t *testing.T) {
+	var queries []string
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
+			queries = append(queries, query)
+			return []byte(`{
+			  "status":"success",
+			  "data":{"resultType":"matrix","result":[
+			    {"metric":{"container":"app"},"values":[[1,"5"],[2,"10"]]}
+			  ]}
+			}`), nil
+		},
+	}
+
+	cpu, mem, err := c.GetContainerMetricsRange(t.Context(), "ctx", "default", "web-1", 15*time.Minute, 45*time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []float64{5, 10}, cpu["app"].Points)
+	assert.Equal(t, []float64{5, 10}, mem["app"].Points)
+	assert.Equal(t, 45*time.Second, cpu["app"].Step)
+	require.Len(t, queries, 2, "one query for cpu, one for memory")
+	assert.Contains(t, queries[0], "container_cpu_usage_seconds_total")
+	assert.Contains(t, queries[1], "container_memory_working_set_bytes")
+}
+
+// A partial outage still shows what is available, matching GetPodMetricsRange,
+// which errors only when both queries fail.
+func TestGetContainerMetricsRange_PartialFailureStillReturnsData(t *testing.T) {
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
+			if strings.Contains(query, "container_memory_working_set_bytes") {
+				return nil, errors.New("memory query exploded")
+			}
+			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[
+			  {"metric":{"container":"app"},"values":[[1,"5"]]}]}}`), nil
+		},
+	}
+
+	cpu, mem, err := c.GetContainerMetricsRange(t.Context(), "ctx", "default", "web-1", time.Minute, time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, []float64{5}, cpu["app"].Points)
+	assert.Empty(t, mem)
+}
+
+func TestGetContainerMetricsRange_BothQueriesFail(t *testing.T) {
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, _ string, _, _ time.Duration) ([]byte, error) {
+			return nil, errors.New("prometheus down")
+		},
+	}
+
+	_, _, err := c.GetContainerMetricsRange(t.Context(), "ctx", "default", "web-1", time.Minute, time.Second)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prometheus down")
+}
+
+// buildPromContainerRangeQuery returns "" for a namespace carrying PromQL
+// metacharacters. An empty query must not be sent, proving the transport is
+// never reached for an unsafe namespace.
+func TestGetContainerMetricsRange_RejectsUnsafeNamespace(t *testing.T) {
+	called := false
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, _ string, _, _ time.Duration) ([]byte, error) {
+			called = true
+			return nil, nil
+		},
+	}
+
+	_, _, err := c.GetContainerMetricsRange(t.Context(), "ctx", `bad"ns`, "web-1", time.Minute, time.Second)
+	require.Error(t, err)
+	assert.False(t, called, "an unsafe namespace must never reach the transport")
+}
+
+// Same guard, but for the pod name half of the interpolation.
+func TestGetContainerMetricsRange_RejectsUnsafePodName(t *testing.T) {
+	called := false
+	c := &Client{
+		testPromRangeQuery: func(_ context.Context, _, _ string, _, _ time.Duration) ([]byte, error) {
+			called = true
+			return nil, nil
+		},
+	}
+
+	_, _, err := c.GetContainerMetricsRange(t.Context(), "ctx", "default", `bad"pod`, time.Minute, time.Second)
+	require.Error(t, err)
+	assert.False(t, called, "an unsafe pod name must never reach the transport")
+}

@@ -221,6 +221,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case containerMetricsEnrichedMsg:
 		mdl := m.updateContainerMetricsEnriched(msg)
 		return mdl, nil, true
+	case containerMetricsRangeMsg:
+		mdl, cmd := m.updateContainerMetricsRange(msg)
+		return mdl, cmd, true
 	case podMetricsRangeMsg:
 		mdl, cmd := m.updatePodMetricsRange(msg)
 		return mdl, cmd, true

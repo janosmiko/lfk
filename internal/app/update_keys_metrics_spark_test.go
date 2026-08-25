@@ -120,6 +120,32 @@ func TestDashboardMetricsKind_UnionMonitoringMemberStaysExcluded(t *testing.T) {
 	assert.NotEqual(t, "Cluster", m.dashboardMetricsKind())
 }
 
+// Navigating into containers only changes nav.Level, never nav.ResourceType,
+// so dashboardMetricsKind must check the level itself or it stays "Pod".
+func TestDashboardMetricsKind_ContainerLevel(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+
+	assert.Equal(t, "Container", m.dashboardMetricsKind())
+}
+
+func TestMetricsSparkAvailable_ContainerLevel(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+
+	assert.True(t, m.metricsSparkAvailable(), "the container level must advertise the key once it works there")
+}
+
+func TestMetricsSparkAvailable_KindWithNoColumnsStaysUnavailable(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment"}
+
+	assert.False(t, m.metricsSparkAvailable())
+}
+
 // The tilde must stay free of every other default binding.
 func TestMetricsSparkCycle_DefaultBindingIsUnique(t *testing.T) {
 	kb := ui.DefaultKeybindings()

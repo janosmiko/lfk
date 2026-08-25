@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -252,4 +253,66 @@ func (c *Client) queryClusterRange(ctx context.Context, contextName, query strin
 	s := series["total"]
 	s.Step = step
 	return s, nil
+}
+
+// buildPromContainerRangeQuery interpolates namespace and pod into the
+// query, so both are rejected if they carry a PromQL metacharacter, matching
+// buildPromPodQuery's guard.
+func buildPromContainerRangeQuery(namespace, pod, resourceKind string) string {
+	if strings.ContainsAny(namespace, "\"\\\n") || strings.ContainsAny(pod, "\"\\\n") {
+		return ""
+	}
+	labels := fmt.Sprintf(`namespace="%s",pod="%s",container!="POD",container!=""`, namespace, pod)
+	switch resourceKind {
+	case "cpu":
+		return fmt.Sprintf(`sum by (container) (rate(container_cpu_usage_seconds_total{%s}[3m])) * 1000`, labels)
+	case "memory":
+		return fmt.Sprintf(`sum by (container) (container_memory_working_set_bytes{%s})`, labels)
+	default:
+		return ""
+	}
+}
+
+// GetContainerMetricsRange keys both maps by container name, matching
+// GetPodContainerMetrics. It errors only when both queries fail, matching
+// GetPodMetricsRange.
+func (c *Client) GetContainerMetricsRange(ctx context.Context, contextName, namespace, pod string, window, step time.Duration) (cpu, mem map[string]MetricSeries, err error) {
+	cpu, cpuErr := c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "cpu"), window, step)
+	if cpuErr != nil {
+		logger.Debug("Prometheus container CPU range query failed",
+			"context", contextName, "namespace", namespace, "pod", pod, "error", cpuErr)
+	}
+	mem, memErr := c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "memory"), window, step)
+	if memErr != nil {
+		logger.Debug("Prometheus container memory range query failed",
+			"context", contextName, "namespace", namespace, "pod", pod, "error", memErr)
+	}
+	if cpuErr != nil && memErr != nil {
+		return nil, nil, fmt.Errorf("prometheus container range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
+	}
+	return cpu, mem, nil
+}
+
+// queryContainerRange refuses query=="" (an unsafe namespace or pod rejected
+// by buildPromContainerRangeQuery) rather than send it, matching queryPodRange.
+func (c *Client) queryContainerRange(ctx context.Context, contextName, query string, window, step time.Duration) (map[string]MetricSeries, error) {
+	if query == "" {
+		return nil, fmt.Errorf("empty prometheus query, refusing to send")
+	}
+	body, err := c.runPrometheusRangeQuery(ctx, contextName, query, window, step)
+	if err != nil {
+		return nil, err
+	}
+	series, err := parsePrometheusMatrix(body, func(labels map[string]string) (string, bool) {
+		container := labels["container"]
+		return container, container != ""
+	})
+	if err != nil {
+		return nil, err
+	}
+	for key, s := range series {
+		s.Step = step
+		series[key] = s
+	}
+	return series, nil
 }
