@@ -472,10 +472,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	m.sortMiddleItems()
 	m.clampCursor()
 
-	var metricsCmd tea.Cmd
-	if m.allowMetricsFetch("Container") {
-		metricsCmd = m.loadContainerMetricsForList()
-	}
+	metricsCmds := m.containerMetricsCmds()
 
 	// Propagate the silent flag to the downstream preview cmd.
 	savedSuppress := m.suppressBgtasks
@@ -491,7 +488,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	previewCmd := m.loadPreview()
 	m.previewLoading = previewCmd != nil && !msg.silent
 	m.suppressBgtasks = savedSuppress
-	return m, tea.Batch(previewCmd, metricsCmd)
+	return m, tea.Batch(append(metricsCmds, previewCmd)...)
 }
 
 func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.Cmd) {

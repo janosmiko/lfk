@@ -71,3 +71,21 @@ func (m *Model) allowSparklineFetch(kind string) bool {
 	m.metricsLastFetch[key] = time.Now()
 	return true
 }
+
+// containerMetricsCmds returns the metrics loaders for a freshly listed
+// container list. Containers need their own entry point because they load
+// through updateContainersLoaded and never reach listMetricsCmds, so without
+// this the range fetch only ever fired from the hotkey handler and arriving at
+// the container level in sparkline mode drew nothing.
+func (m *Model) containerMetricsCmds() []tea.Cmd {
+	var cmds []tea.Cmd
+	if m.allowMetricsFetch("Container") {
+		cmds = append(cmds, m.loadContainerMetricsForList())
+	}
+	if m.metricsSpark.Mode == ui.MetricsDisplaySpark && m.allowSparklineFetch("Container") {
+		if cmd := m.loadContainerMetricsRangeForList(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	return cmds
+}
