@@ -324,6 +324,16 @@ func (ic *informerCache) markHot(contextName string, gvr schema.GroupVersionReso
 	return true
 }
 
+// informerRunning reports whether a shared informer for the (context, GVR) is
+// already up. GetResources asks before markHot so it can tell a call that will
+// start the informer from one that will read a running cache.
+func (ic *informerCache) informerRunning(contextName string, gvr schema.GroupVersionResource) bool {
+	ic.mu.Lock()
+	defer ic.mu.Unlock()
+	_, exists := ic.entries[contextName][gvr]
+	return exists
+}
+
 // maybeSweepStaleHot runs the sweep at most once per sweepInterval. markHot
 // fires per pinned view per watch tick, so an unconditional sweep would walk
 // every (context, GVR) entry dozens of times a tick under ic.mu.
