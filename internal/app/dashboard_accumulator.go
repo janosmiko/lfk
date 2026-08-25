@@ -85,20 +85,21 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 		mergeDashboardSection(&acc.data, msg.data)
 	}
 
-	// With a frame already on screen, hold the repaint until every section has
-	// arrived: the user keeps a complete (if slightly stale) dashboard instead
-	// of watching sections blink in one by one.
+	// With a complete frame already on screen, hold the repaint until every
+	// section has arrived: the user keeps a complete (if slightly stale)
+	// dashboard instead of watching sections blink in one by one.
 	//
-	// With nothing on screen there is no frame to protect, and waiting is what
-	// leaves the page on its loading placeholder for as long as the slowest
-	// section takes, or forever when one never answers (#646). Paint each
-	// section as it lands instead.
+	// Only a complete frame earns that. An incomplete one is what the first
+	// partial of a fresh load paints, and treating it as finished froze the
+	// dashboard on its one arrived section until the slowest one answered.
+	// While no complete frame is up, paint each section as it lands (#646).
 	done := acc.count >= acc.expected
-	if !done && m.dashboardPreview != "" {
+	if !done && m.dashboardPreview != "" && m.dashboardData[msg.context].complete {
 		return m, nil
 	}
 
 	data := acc.data
+	data.complete = done
 	if done {
 		delete(m.dashboardAcc, key)
 	}

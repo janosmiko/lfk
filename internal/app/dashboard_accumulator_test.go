@@ -14,12 +14,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// withDashboardFrameUp puts a frame on screen so handleDashboardPartial takes
-// its steady-state path, where the repaint waits for every section. With no
-// frame up it paints each section as it lands instead, so the page never sits
-// on its loading placeholder.
+// withDashboardFrameUp puts a complete frame on screen so
+// handleDashboardPartial takes its steady-state path, where the repaint waits
+// for every section. Both halves matter: without the complete flag the handler
+// treats the frame as a partial paint and keeps painting each section as it
+// lands, so the page never sits on its loading placeholder.
 func withDashboardFrameUp(m Model) Model {
 	m.dashboardPreview = "CLUSTER DASHBOARD"
+	if m.dashboardData == nil {
+		m.dashboardData = make(map[string]dashboardData)
+	}
+	m.dashboardData["test-ctx"] = dashboardData{complete: true}
 	return m
 }
 

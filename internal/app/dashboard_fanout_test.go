@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,12 +85,12 @@ func TestDashboardPartialPaintsWhileTheScreenIsEmpty(t *testing.T) {
 	assert.Equal(t, 1, acc.count)
 }
 
-// Once a frame is up, a mid-fill repaint would only cost renders: the fan-out
-// completes on its own a moment later.
+// Once a complete frame is up, a mid-fill repaint would only cost renders: the
+// fan-out completes on its own a moment later.
 func TestDashboardPartialWaitsForTheRestOnceAFrameIsUp(t *testing.T) {
 	m := newTestModelForDashboard(t)
 	m.nav.Context = "test-ctx"
-	m.dashboardPreview = "CLUSTER DASHBOARD"
+	m = withDashboardFrameUp(m)
 
 	_, cmd := m.handleDashboardPartial(dashboardPartialMsg{
 		context: "test-ctx", key: "nodes", total: 6,
@@ -152,4 +154,33 @@ func TestLoadDashboardForEvictsAccumulatorsFromAnOlderGeneration(t *testing.T) {
 	assert.True(t, ok, "another context's accumulator must be left alone")
 
 	drainBatch(t, cmd, m.scheduler.Close)
+}
+
+// The first partial to answer paints, which fills dashboardPreview. Reading
+// that as "a full frame is on screen" froze the dashboard on a one-row frame
+// until the slowest section answered - about 8 seconds on an EKS cluster, with
+// only "Namespaces: 29" visible for 7.6 of them. Every section must paint until
+// the first complete frame lands.
+func TestDashboardPartialPaintsEverySectionUntilTheFirstFullFrame(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+
+	keys := []string{"namespaces", "pdbs", "events", "nodes", "metrics", "pods"}
+	for i, key := range keys {
+		var cmd tea.Cmd
+		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
+			context: "test-ctx", key: key, total: len(keys),
+			data: dashboardData{nsCount: i + 1},
+		})
+		require.NotNil(t, cmd, "section %q must paint: no complete frame is on screen yet", key)
+		m = m.updateDashboardLoaded(cmd().(dashboardLoadedMsg))
+	}
+
+	// The frame is complete now, so a watch-tick partial must not repaint it
+	// section by section.
+	_, cmd := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", key: "nodes", total: len(keys),
+		data: dashboardData{nodeItems: []model.Item{{Name: "n1"}}, nodeCount: 1},
+	})
+	assert.Nil(t, cmd, "a partial fill must not repaint over a complete frame")
 }
