@@ -80,11 +80,11 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	m.resetLogBuffer()
 	m.logView.scroll = 0
 	m.logView.follow = true
-	m.logView.wrap = ui.ConfigLogWrap
+	m.logView.wrap = m.viewerPrefs[prefLogWrap]
 	m.logView.lineNumbers = true
-	m.logView.timestamps = ui.ConfigLogShowTimestamps
-	m.logView.hidePrefixes = !ui.ConfigLogShowPrefixes
-	m.logView.previewVisible = ui.ConfigLogShowPreview
+	m.logView.timestamps = m.viewerPrefs[prefLogShowTimestamps]
+	m.logView.hidePrefixes = !m.viewerPrefs[prefLogShowPrefixes]
+	m.logView.previewVisible = m.viewerPrefs[prefLogShowPreview]
 	m.logView.previous = false
 	m.logView.isMulti = false
 	m.logView.multiItems = nil

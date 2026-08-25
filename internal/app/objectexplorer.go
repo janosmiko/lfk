@@ -216,6 +216,7 @@ func (m *Model) syncObjectExplorerLive() {
 // current state instead of waiting for the next watch tick.
 func (m Model) toggleObjectExplorerLive() (tea.Model, tea.Cmd) {
 	m.objectExplorerLive = !m.objectExplorerLive
+	m.setViewerPref(prefObjectExplorerLive, m.objectExplorerLive)
 	if m.objectExplorerLive {
 		m.setStatusMessage("Object Explorer live refresh: on", false)
 		m.objectExplorerForceSync = true

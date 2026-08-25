@@ -116,6 +116,7 @@ func (m Model) handleDiffNormalKey(msg tea.KeyPressMsg, foldRegions []ui.DiffFol
 		return m, nil
 	case kb.ToggleWrap:
 		m.diffView.wrap = !m.diffView.wrap
+		m.setViewerPref(prefDiffViewerWrap, m.diffView.wrap)
 		return m, nil
 	case "q", "esc":
 		return m.handleDiffQuit()
@@ -189,11 +190,13 @@ func (m Model) handleDiffNormalKey(msg tea.KeyPressMsg, foldRegions []ui.DiffFol
 	case kb.ToggleUnified:
 		m.diffView.lineInput = ""
 		m.diffView.unified = !m.diffView.unified
+		m.setViewerPref(prefDiffViewerUnified, m.diffView.unified)
 		m.diffView.scroll = 0
 		return m, nil
 	case kb.ToggleLineNumbers:
 		m.diffView.lineInput = ""
 		m.diffView.lineNumbers = !m.diffView.lineNumbers
+		m.setViewerPref(prefDiffViewerLineNumbers, m.diffView.lineNumbers)
 		return m, nil
 	case kb.Search:
 		m.diffView.lineInput = ""
@@ -237,7 +240,7 @@ func (m Model) handleDiffQuit() (tea.Model, tea.Cmd) {
 	m.diffView.cursor = 0
 	m.diffView.cursorSide = 0
 	m.diffView.lineInput = ""
-	m.diffView.wrap = ui.ConfigDiffViewerWrap
+	m.diffView.wrap = m.viewerPrefs[prefDiffViewerWrap]
 	m.diffView.searchQuery = ""
 	m.diffView.searchText.Clear()
 	m.diffView.matchLines = nil

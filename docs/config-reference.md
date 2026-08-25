@@ -231,7 +231,7 @@ api_explorer:
 | `object_explorer.tree` | bool | `false` | `tree_view` (`T`) | Open the Object Explorer in the ASCII-art tree view. |
 | `api_explorer.tree` | bool | `false` | `tree_view` (`T`) | Open the API Explorer in the ASCII-art tree view (sticky across navigation). |
 
-A toggle changed at runtime sticks for the session and resets to the configured default the next time the viewer opens.
+A toggle changed at runtime sticks for the rest of the session and persists across restarts, recorded in `viewer_prefs.yaml` in the state directory. It outranks the value set here, so the fields above seed a viewer you never toggled. To go back to the configured defaults, delete that file.
 
 ## Events
 
@@ -1193,6 +1193,7 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `$XDG_STATE_HOME/lfk/pinned.yaml` | Per-context and per-union-set pinned CRD groups, managed via `p` key (default: `~/.local/state/lfk/pinned.yaml`) |
 | `$XDG_STATE_HOME/lfk/hidden_types.yaml` | Per-context and per-union-set hidden resource types, managed via the action menu (`x`) at the resource types level (default: `~/.local/state/lfk/hidden_types.yaml`) |
 | `$XDG_STATE_HOME/lfk/pinned_summaries.yaml` | Per-context and per-union-set resource-type summaries pinned to the cluster dashboard, managed via the action menu (default: `~/.local/state/lfk/pinned_summaries.yaml`) |
+| `$XDG_STATE_HOME/lfk/viewer_prefs.yaml` | Log, YAML, diff, describe, and explorer display toggles from their runtime keys, auto-managed; outranks the `log_viewer` and viewer-default config groups (default: `~/.local/state/lfk/viewer_prefs.yaml`) |
 | `$XDG_STATE_HOME/lfk/whichkey_prefs.yaml` | Which-key panel entry order from the leader-key toggle, auto-managed; outranks `which_key_grouped` (default: `~/.local/state/lfk/whichkey_prefs.yaml`) |
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
 

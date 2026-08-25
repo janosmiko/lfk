@@ -347,6 +347,7 @@ func (m Model) updatePreviewLogRestart(msg previewLogRestartMsg) (tea.Model, tea
 // and cancels the stream on disable.
 func (m Model) handleExplorerToggleLogPreview() (tea.Model, tea.Cmd) {
 	m.fullLogPreview = !m.fullLogPreview
+	m.setViewerPref(prefLogPreviewLive, m.fullLogPreview)
 	// Log preview is mutually exclusive with YAML preview and resource map.
 	m.fullYAMLPreview = false
 	m.mapView = false

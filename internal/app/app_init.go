@@ -34,6 +34,7 @@ func resolveStartupAllNamespaces(client *k8s.Client, contextName string) bool {
 
 // NewModel creates the initial model.
 func NewModel(client *k8s.Client, opts StartupOptions) Model {
+	vp := newViewerPrefValues()
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(ui.ThemeColor("62"))
@@ -88,10 +89,10 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		queryHistory:        loadInputHistory(historyFileQuery),
 		logView: logViewState{
 			searchHistory:  loadInputHistory(historyFileLogSearch),
-			previewVisible: ui.ConfigLogShowPreview,
-			hidePrefixes:   !ui.ConfigLogShowPrefixes,
-			timestamps:     ui.ConfigLogShowTimestamps,
-			wrap:           ui.ConfigLogWrap,
+			previewVisible: vp[prefLogShowPreview],
+			hidePrefixes:   !vp[prefLogShowPrefixes],
+			timestamps:     vp[prefLogShowTimestamps],
+			wrap:           vp[prefLogWrap],
 		},
 		pinnedState:                pinnedSt,
 		pinnedSummariesState:       pinnedSummariesSt,
@@ -105,13 +106,14 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		backgroundWatchInterval:    resolveBackgroundInterval(opts),
 		watchThrottle:              ui.ConfigWatchThrottle,
 		foregroundIdleTimeout:      resolveForegroundIdle(opts),
-		fullLogPreview:             ui.ConfigLogPreviewLive,
+		viewerPrefs:                vp,
+		fullLogPreview:             vp[prefLogPreviewLive],
 		splitPreview:               ui.ConfigSplitPreview,
 		allNamespaces:              startupAllNamespaces,
 		watchMode:                  ui.ConfigWatchMode,
-		objectExplorerLive:         ui.ConfigObjectExplorerLive,
-		objectExplorerTree:         ui.ConfigObjectExplorerTree,
-		explainTreeWanted:          ui.ConfigAPIExplorerTree,
+		objectExplorerLive:         vp[prefObjectExplorerLive],
+		objectExplorerTree:         vp[prefObjectExplorerTree],
+		explainTreeWanted:          vp[prefAPIExplorerTree],
 		readOnly:                   ui.ResolveReadOnly(contextName, opts.ReadOnly),
 		cliReadOnly:                opts.ReadOnly,
 		showRareResources:          ui.ConfigShowRareTypes,
@@ -135,8 +137,8 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		perms:                      newPermissionState(),
 		selectedItems:              make(map[string]bool),
 		selectionAnchor:            -1,
-		yamlView:                   yamlViewState{collapsed: make(map[string]bool), wrap: ui.ConfigYAMLViewerWrap},
-		describeView:               describeViewState{wrap: ui.ConfigDescribeViewerWrap},
+		yamlView:                   yamlViewState{collapsed: make(map[string]bool), wrap: vp[prefYAMLViewerWrap]},
+		describeView:               describeViewState{wrap: vp[prefDescribeViewerWrap]},
 		dashboardAcc:               make(map[string]*dashboardAccumulator),
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts:        make(map[string]bool),
@@ -152,7 +154,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		warningEventsOnly:          ui.ConfigEventsWarningsOnly,
 		eventGrouping:              ui.ConfigEventsGrouping,
 		scheduler:                  scheduler.New(scheduler.DefaultThreshold),
-		diffView:                   diffViewState{wrap: ui.ConfigDiffViewerWrap, lineNumbers: ui.ConfigDiffViewerLineNumbers, unified: ui.ConfigDiffViewerUnified, diffCache: &ui.DiffCache{}},
+		diffView:                   diffViewState{wrap: vp[prefDiffViewerWrap], lineNumbers: vp[prefDiffViewerLineNumbers], unified: vp[prefDiffViewerUnified], diffCache: &ui.DiffCache{}},
 		fieldDoc:                   fieldDocState{cache: newFieldDocCache()},
 		execTickGen:                &atomic.Uint64{},
 		logReaderInFlight:          make(map[chan string]bool),
@@ -166,8 +168,8 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			splitPreview:               ui.ConfigSplitPreview,
 			allNamespaces:              startupAllNamespaces,
 			watchMode:                  ui.ConfigWatchMode,
-			objectExplorerLive:         ui.ConfigObjectExplorerLive,
-			objectExplorerTree:         ui.ConfigObjectExplorerTree,
+			objectExplorerLive:         vp[prefObjectExplorerLive],
+			objectExplorerTree:         vp[prefObjectExplorerTree],
 			readOnly:                   ui.ResolveReadOnly(contextName, opts.ReadOnly),
 			sortColumnName:             sortColDefault,
 			sortAscending:              true,

@@ -178,6 +178,8 @@ func runTUI(opts app.StartupOptions) error {
 		}
 	}
 	ui.LoadConfig(opts.Config)
+	// Viewer toggles the user pressed last session outrank the config file.
+	app.ApplyViewerPrefs()
 
 	if opts.Kubeconfig != "" {
 		if _, err := os.Stat(opts.Kubeconfig); err != nil {

@@ -44,6 +44,7 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	case kb.ToggleWrap:
 		m.describeView.lineInput = ""
 		m.describeView.wrap = !m.describeView.wrap
+		m.setViewerPref(prefDescribeViewerWrap, m.describeView.wrap)
 		return m, nil
 	case "q", "esc":
 		return m.handleDescribeQuit()
@@ -174,7 +175,7 @@ func (m Model) handleDescribeQuit() (tea.Model, tea.Cmd) {
 	m.describeView.scroll = 0
 	m.describeView.cursor = 0
 	m.describeView.cursorCol = 0
-	m.describeView.wrap = ui.ConfigDescribeViewerWrap
+	m.describeView.wrap = m.viewerPrefs[prefDescribeViewerWrap]
 	m.describeView.autoRefresh = false
 	m.describeView.refreshFunc = nil
 	m.describeView.visualMode = 0

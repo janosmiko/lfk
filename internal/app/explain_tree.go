@@ -64,6 +64,7 @@ type explainTreeState struct {
 func (m Model) toggleExplainTree() (tea.Model, tea.Cmd) {
 	if m.explainTree {
 		m.explainTreeWanted = false
+		m.setViewerPref(prefAPIExplorerTree, false)
 		m.restoreExplainFlatLevel()
 		return m, nil
 	}
@@ -72,9 +73,11 @@ func (m Model) toggleExplainTree() (tea.Model, tea.Cmd) {
 		// a second press cancels instead of firing a duplicate fetch. The
 		// in-flight result is dropped by the wanted guard on arrival.
 		m.explainTreeWanted = false
+		m.setViewerPref(prefAPIExplorerTree, false)
 		return m, nil
 	}
 	m.explainTreeWanted = true
+	m.setViewerPref(prefAPIExplorerTree, true)
 	m.loading = true
 	m.setStatusMessage("Loading field tree...", false)
 	return m, m.execKubectlExplainTree(m.explainResource, m.explainAPIVersion, m.explainPath)
