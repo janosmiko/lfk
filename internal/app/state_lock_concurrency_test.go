@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gofrs/flock"
 )
@@ -112,5 +113,82 @@ func TestPersistForgottenSort_DeletesInsideTheLock(t *testing.T) {
 		func() bool {
 			_, ok := loadSortMemory()["ctx\x00v1/doomed"]
 			return !ok
+		})
+}
+
+// assertReadHappensInsideLock proves the load is inside the lock, not just the
+// save. assertWritesOnlyUnlocked above cannot tell the two apart: an
+// implementation that reads first and locks only around the update and the save
+// still writes nothing while the lock is held, yet it writes back state that
+// predates the other writer and loses their entry.
+//
+// The trick needs no test hook in production code. Hold the lock, start the
+// writer, and only then add a rival entry to the file. A writer that reads
+// inside the lock cannot have read yet, so it picks the rival up and preserves
+// it. A writer that read before locking already holds the older copy and
+// overwrites the rival away.
+func assertReadHappensInsideLock(t *testing.T, path string, write func(), addRival func(), rivalSurvived func() bool) {
+	t.Helper()
+	release := holdStateLock(t, path)
+
+	started := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		close(started)
+		write()
+		close(done)
+	}()
+	<-started
+	// Give the writer time to reach its first file access. A writer that reads
+	// outside the lock has taken its stale copy by now.
+	time.Sleep(50 * time.Millisecond)
+
+	addRival()
+	release()
+	<-done
+
+	if !rivalSurvived() {
+		t.Error("the writer overwrote an entry added after it started, so it read the file before taking the lock")
+	}
+}
+
+func TestPersistColumnPrefsEntry_ReadsInsideTheLock(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+
+	assertReadHappensInsideLock(t, columnPrefsFilePath(),
+		func() {
+			persistColumnPrefsEntry("ctx\x00Mine", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+		},
+		func() {
+			// Stands in for the other process's committed layout.
+			state := loadColumnPrefsState()
+			state.Contexts["ctx"]["Rival"] = persistedColumnPrefs{VisibleExtras: []string{"col"}}
+			if err := saveColumnPrefsState(state); err != nil {
+				t.Errorf("test setup: %v", err)
+			}
+		},
+		func() bool {
+			_, ok := loadColumnPrefsState().Contexts["ctx"]["Rival"]
+			return ok
+		})
+}
+
+func TestPersistRememberedSort_ReadsInsideTheLock(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
+
+	assertReadHappensInsideLock(t, sortMemoryFilePath(),
+		func() { persistRememberedSort("ctx\x00v1/mine", sortPref{column: "AGE", ascending: false}) },
+		func() {
+			mem := loadSortMemory()
+			mem["ctx\x00v1/rival"] = sortPref{column: "AGE", ascending: true}
+			if err := saveSortMemory(mem); err != nil {
+				t.Errorf("test setup: %v", err)
+			}
+		},
+		func() bool {
+			_, ok := loadSortMemory()["ctx\x00v1/rival"]
+			return ok
 		})
 }
