@@ -219,6 +219,38 @@ func (m Model) loadNodeMetricsForList() tea.Cmd {
 	)
 }
 
+// loadContainerMetricsForList fetches per-container CPU/MEM usage, keyed by
+// container name. Namespace/pod resolution mirrors loadContainers exactly.
+func (m Model) loadContainerMetricsForList() tea.Cmd {
+	// See loadPodMetricsForList: skip at the union sentinel.
+	if m.isUnionSentinel() {
+		return nil
+	}
+	kctx := m.nav.Context
+	ns := m.effectiveNamespace()
+	if ns == "" && m.nav.Namespace != "" {
+		ns = m.nav.Namespace
+	}
+	podName := m.nav.OwnedName
+	gen := m.requestGen
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
+		"Container metrics",
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			metrics, err := client.GetPodContainerMetrics(ctx, kctx, ns, podName)
+			if err != nil {
+				logger.WarnOnce("container-metrics-list-load", kctx+"/"+ns+"/"+podName,
+					"container metrics unavailable: no metrics-server or Prometheus source", "context", kctx, "namespace", ns, "pod", podName, "error", logger.Redact(err.Error()))
+				return containerMetricsEnrichedMsg{gen: gen}
+			}
+			return containerMetricsEnrichedMsg{metrics: metrics, gen: gen}
+		},
+	)
+}
+
 // loadNodeUptimeForList fetches Prometheus node uptimes and returns them to
 // enrich the middle pane items with an Uptime column. A nil/empty result is
 // not an error: it means Prometheus isn't the configured monitoring source.

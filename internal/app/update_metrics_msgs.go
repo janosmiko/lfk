@@ -401,6 +401,49 @@ func clearStalePodMetricsColumns(item *model.Item) {
 	item.Columns = newCols
 }
 
+// updateContainerMetricsEnriched writes CPU/MEM usage columns onto each
+// container row, looked up by container name (item.Name).
+func (m Model) updateContainerMetricsEnriched(msg containerMetricsEnrichedMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response
+	}
+	m.middleItemsRev++
+	for i := range m.middleItems {
+		item := &m.middleItems[i]
+		cu, ok := msg.metrics[item.Name]
+		if !ok {
+			clearStaleContainerMetricsColumns(item)
+			continue
+		}
+		setContainerMetricsColumns(item, ui.FormatCPU(cu.CPUMilli), ui.FormatMemory(cu.MemBytes))
+	}
+	m.itemCache[m.navKey()] = m.middleItems
+	return m
+}
+
+// clearStaleContainerMetricsColumns sets the exact "n/a" metricValueMissing
+// matches to sort metrics-less rows last, never FormatCPU/FormatMemory's
+// fabricated "0m"/"0B" (see clearStalePodMetricsColumns).
+func clearStaleContainerMetricsColumns(item *model.Item) {
+	setContainerMetricsColumns(item, "n/a", "n/a")
+}
+
+// setContainerMetricsColumns rewrites item's CPU/MEM columns in place,
+// preserving the rest of the column order across ticks.
+func setContainerMetricsColumns(item *model.Item, cpu, mem string) {
+	removeCols := map[string]bool{"CPU": true, "MEM": true}
+	newCols := []model.KeyValue{
+		{Key: "CPU", Value: cpu},
+		{Key: "MEM", Value: mem},
+	}
+	for _, kv := range item.Columns {
+		if !removeCols[kv.Key] {
+			newCols = append(newCols, kv)
+		}
+	}
+	item.Columns = newCols
+}
+
 // ensureNodeMetricsColumnsPlaceholder adds CPU/CPU%/MEM/MEM% columns to a node
 // item using "n/a" placeholders when metrics-server returned no data for it.
 // Stable column visibility is the contract — without these placeholders,

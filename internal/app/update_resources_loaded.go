@@ -462,6 +462,12 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	// tiebreaker still provides a stable order across refreshes.
 	m.sortMiddleItems()
 	m.clampCursor()
+
+	var metricsCmd tea.Cmd
+	if m.allowMetricsFetch("Container") {
+		metricsCmd = m.loadContainerMetricsForList()
+	}
+
 	// Propagate the silent flag to the downstream preview cmd.
 	savedSuppress := m.suppressBgtasks
 	if msg.silent {
@@ -476,7 +482,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	previewCmd := m.loadPreview()
 	m.previewLoading = previewCmd != nil && !msg.silent
 	m.suppressBgtasks = savedSuppress
-	return m, previewCmd
+	return m, tea.Batch(previewCmd, metricsCmd)
 }
 
 func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.Cmd) {
