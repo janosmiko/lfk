@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.2](https://github.com/janosmiko/lfk/compare/v0.18.1...v0.18.2) (2026-08-25)
+
+
+### Features
+
+* remember viewer display toggles across restarts ([#690](https://github.com/janosmiko/lfk/issues/690)) ([2bbc6b4](https://github.com/janosmiko/lfk/commit/2bbc6b4fb9ad3f8c19c9bd1b4d440bde8a879c64))
+
+
+### Bug Fixes
+
+* cluster-scoped views ignore the namespace selection ([#677](https://github.com/janosmiko/lfk/issues/677)) ([d7651e7](https://github.com/janosmiko/lfk/commit/d7651e7371d99abbc1bbfc185840992c0dd1ea83))
+* lock the load-modify-save in column prefs and sort memory ([#693](https://github.com/janosmiko/lfk/issues/693)) ([68113b6](https://github.com/janosmiko/lfk/commit/68113b63b13711f08517c6f80dc1f92a6e012101))
+* respect the kubeconfig context namespace at startup ([#688](https://github.com/janosmiko/lfk/issues/688)) ([dab5baf](https://github.com/janosmiko/lfk/commit/dab5baf6012813ff21019c50ca56ecccb9066f29))
+
 ## [0.18.1](https://github.com/janosmiko/lfk/compare/v0.18.0...v0.18.1) (2026-08-22)
 
 
