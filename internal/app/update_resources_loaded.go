@@ -449,10 +449,19 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
+	// Fresh GetContainers rows carry no usage, so without this CPU/MEM blink
+	// out each tick until the throttled fetch lands. Kind-guarded so another
+	// kind's stale preview cannot donate columns to a same-named container.
 	if msg.forPreview {
 		m.previewLoading = false
+		if len(m.rightItems) > 0 && m.rightItems[0].Kind == "Container" {
+			carryOverMetricsColumnsFrom(m.rightItems, msg.items)
+		}
 		m.rightItems = msg.items
 		return m, nil
+	}
+	if len(m.middleItems) > 0 && m.middleItems[0].Kind == "Container" {
+		m.carryOverMetricsColumns(msg.items)
 	}
 	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
