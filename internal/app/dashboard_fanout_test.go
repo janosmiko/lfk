@@ -61,19 +61,26 @@ func dashboardModelWithFillingFanOut(t *testing.T, startedAt time.Time) (Model, 
 	return m, key
 }
 
-// Waiting for all sections leaves the page on its loading placeholder for as
-// long as the slowest section takes, and forever when one never answers. While
-// nothing is on screen yet, each partial must paint what it has (issue #646).
-func TestDashboardPartialPaintsWhileTheScreenIsEmpty(t *testing.T) {
+// A section that answers nothing would otherwise pin the page on its loading
+// placeholder for the life of the process (issue #646). Once the fan-out is old
+// enough that loadDashboardFor writes it off, a partial paints what did arrive.
+func TestDashboardPartialPaintsOnceTheFanOutIsStuck(t *testing.T) {
 	m := newTestModelForDashboard(t)
 	m.nav.Context = "test-ctx"
+	m.dashboardAcc[dashboardAccKey("test-ctx", m.requestGen)] = &dashboardAccumulator{
+		gen:       m.requestGen,
+		received:  map[string]bool{"pods": true},
+		expected:  6,
+		count:     1,
+		startedAt: time.Now().Add(-2 * dashboardFanOutStuckAfter),
+	}
 
 	m, cmd := m.handleDashboardPartial(dashboardPartialMsg{
 		context: "test-ctx", key: "nodes", total: 6,
 		data: dashboardData{nodeItems: []model.Item{{Name: "n1"}}, nodeCount: 1, readyNodes: 1},
 	})
 
-	require.NotNil(t, cmd, "the first section must paint instead of waiting for the rest")
+	require.NotNil(t, cmd, "a stuck fan-out must paint what it has")
 	loaded, ok := cmd().(dashboardLoadedMsg)
 	require.True(t, ok)
 	assert.Equal(t, 1, loaded.data.nodeCount)
@@ -81,16 +88,15 @@ func TestDashboardPartialPaintsWhileTheScreenIsEmpty(t *testing.T) {
 	// Painting must not consume the accumulator: the sections still in flight
 	// have to be able to complete this same frame.
 	acc, ok := m.dashboardAcc[dashboardAccKey("test-ctx", m.requestGen)]
-	require.True(t, ok, "an incremental paint must keep the accumulator")
-	assert.Equal(t, 1, acc.count)
+	require.True(t, ok, "an incomplete paint must keep the accumulator")
+	assert.Equal(t, 2, acc.count)
 }
 
-// Once a complete frame is up, a mid-fill repaint would only cost renders: the
-// fan-out completes on its own a moment later.
+// A mid-fill repaint would only cost renders and show the dashboard filling in
+// row by row: the fan-out completes on its own a moment later.
 func TestDashboardPartialWaitsForTheRestOnceAFrameIsUp(t *testing.T) {
 	m := newTestModelForDashboard(t)
 	m.nav.Context = "test-ctx"
-	m = withDashboardFrameUp(m)
 
 	_, cmd := m.handleDashboardPartial(dashboardPartialMsg{
 		context: "test-ctx", key: "nodes", total: 6,
@@ -156,31 +162,31 @@ func TestLoadDashboardForEvictsAccumulatorsFromAnOlderGeneration(t *testing.T) {
 	drainBatch(t, cmd, m.scheduler.Close)
 }
 
-// The first partial to answer paints, which fills dashboardPreview. Reading
-// that as "a full frame is on screen" froze the dashboard on a one-row frame
-// until the slowest section answered - about 8 seconds on an EKS cluster, with
-// only "Namespaces: 29" visible for 7.6 of them. Every section must paint until
-// the first complete frame lands.
-func TestDashboardPartialPaintsEverySectionUntilTheFirstFullFrame(t *testing.T) {
+// The dashboard used to paint the first section that answered and then hold
+// every later one, so the user watched it sit on a single row for the eight
+// seconds the slowest section took. It must show one loader instead, then the
+// whole frame at once.
+func TestDashboardPartialHoldsEverySectionUntilTheFrameIsWhole(t *testing.T) {
 	m := newTestModelForDashboard(t)
 	m.nav.Context = "test-ctx"
 
 	keys := []string{"namespaces", "pdbs", "events", "nodes", "metrics", "pods"}
-	for i, key := range keys {
+	for _, key := range keys[:len(keys)-1] {
 		var cmd tea.Cmd
 		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
 			context: "test-ctx", key: key, total: len(keys),
-			data: dashboardData{nsCount: i + 1},
+			data: dashboardData{nsCount: 1},
 		})
-		require.NotNil(t, cmd, "section %q must paint: no complete frame is on screen yet", key)
-		m = m.updateDashboardLoaded(cmd().(dashboardLoadedMsg))
+		require.Nil(t, cmd, "section %q must not paint on its own", key)
+		assert.Empty(t, m.dashboardPreview, "the loader must stay up until the frame is whole")
 	}
 
-	// The frame is complete now, so a watch-tick partial must not repaint it
-	// section by section.
 	_, cmd := m.handleDashboardPartial(dashboardPartialMsg{
-		context: "test-ctx", key: "nodes", total: len(keys),
+		context: "test-ctx", key: keys[len(keys)-1], total: len(keys),
 		data: dashboardData{nodeItems: []model.Item{{Name: "n1"}}, nodeCount: 1},
 	})
-	assert.Nil(t, cmd, "a partial fill must not repaint over a complete frame")
+	require.NotNil(t, cmd, "the last section completes the frame and paints it")
+	loaded, ok := cmd().(dashboardLoadedMsg)
+	require.True(t, ok)
+	assert.Equal(t, 1, loaded.data.nodeCount)
 }

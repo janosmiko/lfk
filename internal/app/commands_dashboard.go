@@ -59,10 +59,6 @@ type dashboardData struct {
 	totalMemAlloc   int64
 	nodeMetricsErr  error
 	pinnedSummaries []pinnedSummaryResult
-	// complete marks a frame every section answered for. A partial paint
-	// leaves it false, so handleDashboardPartial keeps painting instead of
-	// mistaking the one-row frame it just drew for a finished dashboard.
-	complete bool
 }
 
 // monitoringData retains the raw alert payload behind monitoringPreview so the
