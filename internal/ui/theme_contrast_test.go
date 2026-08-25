@@ -452,6 +452,7 @@ func TestEnforceMinContrastInvalidInputUnchanged(t *testing.T) {
 // ---- Config loading tests ----
 
 func TestLoadConfig_MinContrastRatio(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	orig := ConfigMinContrastRatio
 	t.Cleanup(func() { ConfigMinContrastRatio = orig })
 

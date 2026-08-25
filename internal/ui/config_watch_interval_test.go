@@ -34,6 +34,8 @@ func TestClampWatchInterval(t *testing.T) {
 }
 
 func TestLoadConfig_WatchInterval(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
+
 	tests := []struct {
 		name    string
 		yaml    string

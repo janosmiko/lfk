@@ -19,6 +19,7 @@ import (
 // parse error, masking unrelated keybinding/colorscheme settings. The
 // "typo doesn't nuke unrelated keys" subtest is the regression guard.
 func TestLoadConfig_InformerCache(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	orig := ConfigInformerCacheMode
 	t.Cleanup(func() { ConfigInformerCacheMode = orig })
 
@@ -79,12 +80,10 @@ func TestLoadConfig_InformerCache(t *testing.T) {
 // After the warn-and-fallback fix, only informer_cache resets while
 // every other key in the file lands as written.
 func TestLoadConfig_InformerCacheTypoDoesNotPoisonRestOfFile(t *testing.T) {
-	origMode := ConfigInformerCacheMode
-	origScheme := ConfigDarkColorscheme
-	t.Cleanup(func() {
-		ConfigInformerCacheMode = origMode
-		ConfigDarkColorscheme = origScheme
-	})
+	// The shared helper rather than a hand-rolled pair: LoadConfig also applies
+	// the theme and the keybindings, which this test does not assert but does
+	// change.
+	t.Cleanup(snapshotAllConfigGlobals(t))
 
 	ConfigInformerCacheMode = InformerCacheAuto
 	ConfigDarkColorscheme = ""
