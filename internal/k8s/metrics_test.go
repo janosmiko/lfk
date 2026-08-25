@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	k8stesting "k8s.io/client-go/testing"
@@ -618,4 +619,56 @@ func TestParsePodMetricsByContainer_NoContainers(t *testing.T) {
 	}}
 	_, err := parsePodMetricsByContainer(obj)
 	assert.Error(t, err, "no containers field is an error so callers can distinguish from zero-usage")
+}
+
+// --- GetPodContainerMetrics ---
+
+// metricsPodObject builds a metrics.k8s.io PodMetrics object with the given
+// per-container usage, shaped the way the API server returns it. containers is
+// []any rather than []map[string]any because unstructured's DeepCopyJSON walks
+// only []any and panics on a typed slice.
+func metricsPodObject(ns, name string, containers []any) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "metrics.k8s.io/v1beta1",
+		"kind":       "PodMetrics",
+		"metadata":   map[string]any{"name": name, "namespace": ns},
+		"containers": containers,
+	}}
+}
+
+func TestGetPodContainerMetrics_ReturnsPerContainerUsage(t *testing.T) {
+	obj := metricsPodObject("default", "api-1", []any{
+		map[string]any{"name": "app", "usage": map[string]any{"cpu": "120m", "memory": "200Mi"}},
+		map[string]any{"name": "sidecar", "usage": map[string]any{"cpu": "30m", "memory": "64Mi"}},
+	})
+	// A reactor rather than a seeded object: metrics.k8s.io serves PodMetrics
+	// at the "pods" resource, and the fake client derives a resource name by
+	// pluralising the kind, so a seeded PodMetrics lands at "podmetrics" and
+	// the Get never finds it.
+	dc := newFakeDynClient()
+	dc.PrependReactor("get", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, obj, nil
+	})
+	c := newFakeClient(nil, dc)
+
+	got, err := c.GetPodContainerMetrics(t.Context(), "", "default", "api-1")
+
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, int64(120), got["app"].CPUMilli)
+	assert.Equal(t, int64(200*1024*1024), got["app"].MemBytes)
+	assert.Equal(t, int64(30), got["sidecar"].CPUMilli)
+	assert.Equal(t, int64(64*1024*1024), got["sidecar"].MemBytes)
+}
+
+// The error must name the metrics API rather than the pod, so a caller can
+// tell "metrics-server is absent" apart from "this pod does not exist".
+func TestGetPodContainerMetrics_MetricsAPIUnavailable(t *testing.T) {
+	dc := newFakeDynClient()
+	c := newFakeClient(nil, dc)
+
+	_, err := c.GetPodContainerMetrics(t.Context(), "", "default", "api-1")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "metrics API unavailable")
 }

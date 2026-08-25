@@ -648,3 +648,28 @@ func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
 		return node, node != ""
 	})
 }
+
+// GetPodContainerMetrics fetches one pod's per-container CPU and memory usage
+// from the metrics.k8s.io API, keyed by container name.
+//
+// It is the per-container counterpart to GetPodMetrics, which sums the same
+// reading into a pod total. The parsing is shared with the right-sizing
+// advisor through parsePodMetricsByContainer, so both read the breakdown the
+// same way.
+func (c *Client) GetPodContainerMetrics(ctx context.Context, contextName, namespace, podName string) (map[string]ContainerUsage, error) {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, gvr := range c.metricsGVR("pods") {
+		obj, err := dynClient.Resource(gvr).Namespace(namespace).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			continue
+		}
+		return parsePodMetricsByContainer(obj)
+	}
+	// Name the API rather than the pod: a caller must be able to tell
+	// "metrics-server is absent" apart from "this pod does not exist".
+	return nil, fmt.Errorf("fetching pod container metrics: metrics API unavailable")
+}
