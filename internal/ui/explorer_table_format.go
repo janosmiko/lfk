@@ -1,12 +1,30 @@
 package ui
 
 import (
+	"sort"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// stableDetailColumns returns cols ordered by canonicalColumnPriority, with
+// unpinned keys keeping their relative order. Same rule stabilizeColumnOrder
+// applies to the list table, so both surfaces agree.
+func stableDetailColumns(cols []model.KeyValue) []model.KeyValue {
+	out := make([]model.KeyValue, len(cols))
+	copy(out, cols)
+	sort.SliceStable(out, func(i, j int) bool {
+		ri, iPinned := canonicalColumnPriority[out[i].Key]
+		rj, jPinned := canonicalColumnPriority[out[j].Key]
+		if iPinned && jPinned {
+			return ri < rj
+		}
+		return iPinned && !jPinned
+	})
+	return out
+}
 
 // RenderContainerDetail renders detailed information about a container.
 func RenderContainerDetail(item *model.Item, width, height int) string {
@@ -42,7 +60,10 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 		rows = append(rows, row{"Age", age, AgeStyle(age)})
 	}
 
-	for _, kv := range item.Columns {
+	// Separate handlers each prepend their own block to Columns, so Changed and
+	// the metrics pair swap position depending on which ran last. Order on the
+	// key, as the list table does, or these rows jump every few seconds.
+	for _, kv := range stableDetailColumns(item.Columns) {
 		if strings.HasPrefix(kv.Key, "__") || strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "secret:") || strings.HasPrefix(kv.Key, "data:") {
 			continue
 		}

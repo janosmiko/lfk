@@ -64,3 +64,27 @@ func TestRenderContainerDetail_OrdinaryValuesUnchanged(t *testing.T) {
 	assert.Contains(t, plain, "nginx:1.27")
 	assert.Contains(t, plain, "1/1")
 }
+
+// Two Update handlers each prepend their own block to item.Columns without
+// knowing about the other: the watch-tick relist ends up with Changed ahead of
+// CPU and MEM, while an async metrics reply puts CPU and MEM ahead of Changed.
+// Whichever ran last decides the physical order, so a renderer that walks
+// Columns as-is makes those rows swap places every few seconds. The list table
+// is immune because it orders on the KEY via canonicalColumnPriority. This
+// panel must do the same.
+func TestRenderContainerDetail_OrderIsIndependentOfColumnPosition(t *testing.T) {
+	cols := func(kv ...model.KeyValue) []model.KeyValue { return kv }
+	changed := model.KeyValue{Key: "Changed", Value: "5m"}
+	cpu := model.KeyValue{Key: "CPU", Value: "50m"}
+	mem := model.KeyValue{Key: "MEM", Value: "64Mi"}
+	req := model.KeyValue{Key: "CPU Request", Value: "100m"}
+
+	afterRelist := model.Item{Name: "app", Columns: cols(changed, cpu, mem, req)}
+	afterMetrics := model.Item{Name: "app", Columns: cols(cpu, mem, changed, req)}
+
+	got := RenderContainerDetail(&afterRelist, 60, 20)
+	want := RenderContainerDetail(&afterMetrics, 60, 20)
+
+	assert.Equal(t, want, got,
+		"the same fields in a different physical order must render identically")
+}
