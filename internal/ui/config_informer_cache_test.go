@@ -19,6 +19,7 @@ import (
 // parse error, masking unrelated keybinding/colorscheme settings. The
 // "typo doesn't nuke unrelated keys" subtest is the regression guard.
 func TestLoadConfig_InformerCache(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	orig := ConfigInformerCacheMode
 	t.Cleanup(func() { ConfigInformerCacheMode = orig })
 

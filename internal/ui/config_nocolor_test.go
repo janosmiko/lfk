@@ -11,6 +11,7 @@ import (
 )
 
 func TestLoadConfig_NoColor(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	origNoColor := ConfigNoColor
 	t.Cleanup(func() {
 		ConfigNoColor = origNoColor

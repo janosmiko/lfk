@@ -131,6 +131,8 @@ func TestLoadConfig_GotoTargets_InvalidSkipped(t *testing.T) {
 // keybinding-merge ordering bug: a custom jump_top prefix must be used when
 // validating goto_targets chords in the same config.
 func TestLoadConfig_GotoTargets_CustomJumpTop(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
 	// Custom jump_top = "f"; chord "fA" should be valid; "gA" (old default) should not.

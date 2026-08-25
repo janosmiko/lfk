@@ -495,6 +495,18 @@ func TestConfigFile_EveryFieldHasWiringCoverage(t *testing.T) {
 // can mutate and returns a restore closure. Scalars are restored first, then
 // ApplyTheme(origTheme) last so it rebuilds style globals against the restored
 // no-color / contrast settings.
+//
+// Every test that calls LoadConfig needs this, including one that asserts a
+// single unrelated scalar. Saving just that scalar is not enough: LoadConfig
+// also applies the theme and the keybindings, and several tests pass
+// "colorscheme: dracula" as the filler key that proves their own value stayed
+// at its default. ColorError and its siblings derive from the theme, so putting
+// the scalar back leaves them holding the other scheme's colours.
+//
+// Two seeds reproduced that before the callers below were fixed:
+// -shuffle=1787629791574481000 failed TestNoColor_StripsAgeStyleColors with
+// ColorError #fdd6dd instead of #f7768e, and -shuffle=1000013 failed
+// TestHelpSections_EveryEntryHasAKey on leaked keybindings. Both pass now.
 func snapshotAllConfigGlobals(t *testing.T) func() {
 	t.Helper()
 

@@ -17,6 +17,7 @@ import (
 //     `kubeshark:` block from accidentally clobbering an env-set override,
 //   - unset (no kubeshark: block) leaves the default in place.
 func TestLoadConfig_KubesharkNamespace(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	orig := ConfigKubesharkNamespace
 	t.Cleanup(func() { ConfigKubesharkNamespace = orig })
 

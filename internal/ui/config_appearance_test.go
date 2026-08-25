@@ -16,6 +16,7 @@ func snapshotAppearanceGlobals(t *testing.T) {
 	prevDim := ConfigDimOverlay
 	prevIcon := IconMode
 	prevRowTint := ConfigRowStatusTint
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	t.Cleanup(func() {
 		ConfigNoColor = prevNoColor
 		ConfigTransparentBg = prevTransparent

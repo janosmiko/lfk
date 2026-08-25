@@ -9,6 +9,7 @@ import (
 )
 
 func TestLoadConfig_SecretLazyLoading(t *testing.T) {
+	t.Cleanup(snapshotAllConfigGlobals(t))
 	orig := ConfigSecretLazyLoading
 	t.Cleanup(func() { ConfigSecretLazyLoading = orig })
 
