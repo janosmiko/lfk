@@ -77,6 +77,40 @@ func TestMetricsSparkState_OutOfRangeIndexIsNumeric(t *testing.T) {
 	assert.Equal(t, "numeric", s.Label())
 }
 
+func TestResolveMetricsSparkState_EmptyStringIsNumeric(t *testing.T) {
+	t.Cleanup(resetSparklineConfigForTest)
+	ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+
+	assert.Equal(t, MetricsSparkState{}, ResolveMetricsSparkState(""))
+}
+
+func TestResolveMetricsSparkState_MatchesConfiguredWindow(t *testing.T) {
+	t.Cleanup(resetSparklineConfigForTest)
+	ConfigSparklineWindows = []time.Duration{5 * time.Minute, 15 * time.Minute, time.Hour}
+
+	got := ResolveMetricsSparkState((15 * time.Minute).String())
+	assert.Equal(t, MetricsDisplaySpark, got.Mode)
+	assert.Equal(t, 15*time.Minute, got.Window())
+}
+
+// A persisted window that is no longer in the configured list must not
+// silently select a neighbour.
+func TestResolveMetricsSparkState_UnmatchedWindowFallsBackToNumeric(t *testing.T) {
+	t.Cleanup(resetSparklineConfigForTest)
+	ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+
+	got := ResolveMetricsSparkState((15 * time.Minute).String())
+	assert.Equal(t, MetricsDisplayNumeric, got.Mode)
+}
+
+func TestResolveMetricsSparkState_UnparseableFallsBackToNumeric(t *testing.T) {
+	t.Cleanup(resetSparklineConfigForTest)
+	ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+
+	got := ResolveMetricsSparkState("not-a-duration")
+	assert.Equal(t, MetricsDisplayNumeric, got.Mode)
+}
+
 func TestClampSparklineWidth(t *testing.T) {
 	assert.Equal(t, MinSparklineWidth, ClampSparklineWidth(0))
 	assert.Equal(t, MinSparklineWidth, ClampSparklineWidth(-5))

@@ -576,7 +576,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `F1` | Full help |
 | `q` / `Esc` | Close log viewer |
 
-The display toggles (`>` wrap, `s` timestamps, `p` prefixes, `P` preview panel, and their counterparts in the YAML, diff, describe, and explorer views) are remembered across restarts in `~/.local/state/lfk/viewer_prefs.yaml`, so a layout you set once survives the next open and the next launch. They outrank the `log_viewer` and viewer-default config groups. Delete that file to go back to the configured defaults.
+The display toggles (`>` wrap, `s` timestamps, `p` prefixes, `P` preview panel, `~` CPU/MEM columns, and their counterparts in the YAML, diff, describe, and explorer views) are remembered across restarts in `~/.local/state/lfk/viewer_prefs.yaml`, so a layout you set once survives the next open and the next launch. They outrank the `log_viewer` and viewer-default config groups. Delete that file to go back to the configured defaults.
 
 `i` / `o` cycle the minimum severity through `off`, `INFO+`, `WARN+`, and `ERROR+`. All source levels merge into these three tiers. Structured logs use the parsed level. Plain-text logs are classified by keyword (error/warn/debug), defaulting to INFO. `INFO+` hides debug/trace lines, `WARN+` shows only warn and error lines, and `ERROR+` shows only error and failure lines.
 

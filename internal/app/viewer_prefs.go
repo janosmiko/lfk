@@ -30,6 +30,11 @@ type ViewerPrefsState struct {
 	ObjectExplorerLive    *bool `json:"object_explorer_live,omitempty" yaml:"object_explorer_live,omitempty"`
 	ObjectExplorerTree    *bool `json:"object_explorer_tree,omitempty" yaml:"object_explorer_tree,omitempty"`
 	APIExplorerTree       *bool `json:"api_explorer_tree,omitempty" yaml:"api_explorer_tree,omitempty"`
+	// MetricsSparkWindow is the chosen sparkline window as a duration, or the
+	// empty string for numeric. It is not a bool, so it sits outside
+	// viewerPrefBindings. A pointer to "" still marshals, which is what keeps
+	// explicit numeric distinct from never chosen.
+	MetricsSparkWindow *string `json:"metrics_spark_window,omitempty" yaml:"metrics_spark_window,omitempty"`
 }
 
 // viewerPref names one persisted toggle. It indexes both viewerPrefBindings and
@@ -138,6 +143,28 @@ func ApplyViewerPrefs() {
 			*b.global = *v
 		}
 	}
+	if s.MetricsSparkWindow != nil {
+		ui.MetricsSparkStartupState = ui.ResolveMetricsSparkState(*s.MetricsSparkWindow)
+	}
+}
+
+// persistMetricsSparkPref records the display mode for the next start. It
+// stores the window DURATION rather than an index, so a shortened
+// metrics_sparkline_windows falls back to numeric instead of selecting a
+// different window. Same locked read-modify-write as persistViewerPref: two lfk
+// instances share a state directory, and an unlocked merge lets the later
+// writer drop what the other recorded.
+func persistMetricsSparkPref(state ui.MetricsSparkState) {
+	path := viewerPrefsFilePath()
+	if path == "" {
+		return
+	}
+	withStateFileLock(path, func() {
+		s := loadViewerPrefsState()
+		w := state.PersistedWindow()
+		s.MetricsSparkWindow = &w
+		saveViewerPrefs(s)
+	})
 }
 
 // saveViewerPrefs writes the state file. Best effort: losing a UI preference is

@@ -169,3 +169,39 @@ func applySparklineConfig(windows []string, width *int, interval string) {
 		}
 	}
 }
+
+// MetricsSparkStartupState is the display mode a new tab opens with. It is the
+// seed ApplyViewerPrefs writes and NewModel reads, so a remembered keypress
+// survives a restart without becoming a user-authored config key.
+var MetricsSparkStartupState MetricsSparkState
+
+// ResolveMetricsSparkState turns a persisted window duration back into a state.
+// It matches against the CONFIGURED windows rather than trusting a stored
+// index, so shortening metrics_sparkline_windows cannot silently select a
+// different window than the user chose. Anything unrecognised, including an
+// empty string, resolves to numeric.
+func ResolveMetricsSparkState(window string) MetricsSparkState {
+	if window == "" {
+		return MetricsSparkState{}
+	}
+	d, err := time.ParseDuration(window)
+	if err != nil {
+		return MetricsSparkState{}
+	}
+	for i, w := range ConfigSparklineWindows {
+		if w == d {
+			return MetricsSparkState{Mode: MetricsDisplaySpark, WindowIdx: i}
+		}
+	}
+	return MetricsSparkState{}
+}
+
+// PersistedWindow renders the state for the prefs file: the chosen window's
+// duration, or the empty string for numeric. Empty is EXPLICIT numeric, which
+// the caller must keep distinct from an absent field meaning never chosen.
+func (s MetricsSparkState) PersistedWindow() string {
+	if w := s.Window(); w > 0 {
+		return w.String()
+	}
+	return ""
+}

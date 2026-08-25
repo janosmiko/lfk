@@ -11,6 +11,7 @@ import (
 // the new mode has data to draw.
 func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 	m.metricsSpark = m.metricsSpark.Next()
+	persistMetricsSparkPref(m.metricsSpark)
 	m.setStatusMessage("CPU/MEM: "+m.metricsSpark.Label(), false)
 
 	cmds := []tea.Cmd{scheduleStatusClear()}

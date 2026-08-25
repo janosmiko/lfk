@@ -14,6 +14,9 @@ import (
 )
 
 func TestHandleMetricsSparkCycle_AdvancesAndReportsMode(t *testing.T) {
+	// Pressing the key persists the mode, so keep that out of the real
+	// state directory.
+	isolateMetricsSparkPref(t)
 	prev := ui.ConfigSparklineWindows
 	t.Cleanup(func() { ui.ConfigSparklineWindows = prev })
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute, time.Hour}
@@ -38,6 +41,9 @@ func TestHandleMetricsSparkCycle_AdvancesAndReportsMode(t *testing.T) {
 // old glyphs on screen until the next throttled tick, so the numeric branch
 // must also fire the instant list loader (bypassing the fetch throttle).
 func TestHandleMetricsSparkCycle_LeavingSparkRefetchesInstantly(t *testing.T) {
+	// Pressing the key persists the mode, so keep that out of the real
+	// state directory.
+	isolateMetricsSparkPref(t)
 	prev := ui.ConfigSparklineWindows
 	t.Cleanup(func() { ui.ConfigSparklineWindows = prev })
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
@@ -59,6 +65,9 @@ func TestHandleMetricsSparkCycle_LeavingSparkRefetchesInstantly(t *testing.T) {
 // The mode is per tab. A mode set in one tab must not follow the user into
 // another, the way every other view-shaped piece of tab state behaves.
 func TestMetricsSparkMode_DoesNotLeakBetweenTabs(t *testing.T) {
+	// Pressing the key persists the mode, so keep that out of the real
+	// state directory.
+	isolateMetricsSparkPref(t)
 	prev := ui.ConfigSparklineWindows
 	t.Cleanup(func() { ui.ConfigSparklineWindows = prev })
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
