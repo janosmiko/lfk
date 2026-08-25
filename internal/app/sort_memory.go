@@ -110,26 +110,39 @@ func saveSortMemory(mem map[string]sortPref) error {
 // Best-effort: a write failure means the sort won't survive the next restart, so
 // log it for disk-full / permissions diagnosis from lfk.log.
 //
-// The load-modify-save is unsynchronised. Callers run on the single Bubble Tea
-// Update goroutine (rememberSort/forgetSort from key and mouse handlers), so the
-// sequence is never concurrent; do not call this from a background goroutine.
+// Callers run on the single Bubble Tea Update goroutine (rememberSort and
+// forgetSort from key and mouse handlers). The lock extends that across
+// processes, so a second lfk instance cannot drop the sort this one just
+// recorded. Do not call this from a background goroutine.
 func persistRememberedSort(key string, pref sortPref) {
-	mem := loadSortMemory()
-	mem[key] = pref
-	if err := saveSortMemory(mem); err != nil {
-		logger.Error("Failed to persist sort memory", "error", err)
+	path := sortMemoryFilePath()
+	if path == "" {
+		return
 	}
+	withStateFileLock(path, func() {
+		mem := loadSortMemory()
+		mem[key] = pref
+		if err := saveSortMemory(mem); err != nil {
+			logger.Error("Failed to persist sort memory", "error", err)
+		}
+	})
 }
 
 // persistForgottenSort removes a single sort pref from disk (the sort-reset
 // action), leaving every other remembered sort intact. Best-effort.
 func persistForgottenSort(key string) {
-	mem := loadSortMemory()
-	if _, ok := mem[key]; !ok {
+	path := sortMemoryFilePath()
+	if path == "" {
 		return
 	}
-	delete(mem, key)
-	if err := saveSortMemory(mem); err != nil {
-		logger.Error("Failed to persist sort memory", "error", err)
-	}
+	withStateFileLock(path, func() {
+		mem := loadSortMemory()
+		if _, ok := mem[key]; !ok {
+			return
+		}
+		delete(mem, key)
+		if err := saveSortMemory(mem); err != nil {
+			logger.Error("Failed to persist sort memory", "error", err)
+		}
+	})
 }

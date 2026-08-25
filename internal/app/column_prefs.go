@@ -120,21 +120,29 @@ func loadColumnPrefs() columnPrefMaps {
 
 // persistColumnPrefsEntry writes one kind's committed column layout to disk,
 // merging with other contexts/kinds so a commit for one never drops another's.
-// Best-effort. Runs only on the single Bubble Tea Update goroutine (commit/reset
-// handlers), so the load-modify-save is never concurrent.
+// Best-effort. Callers run on the single Bubble Tea Update goroutine, and the
+// lock extends that guarantee across processes: two lfk instances sharing a
+// state directory would otherwise read the same file and the later writer would
+// drop the layout the other one just committed.
 func persistColumnPrefsEntry(key string, p persistedColumnPrefs) {
 	ctx, kind, ok := strings.Cut(key, "\x00")
 	if !ok {
 		return
 	}
-	state := loadColumnPrefsState()
-	if state.Contexts[ctx] == nil {
-		state.Contexts[ctx] = map[string]persistedColumnPrefs{}
+	path := columnPrefsFilePath()
+	if path == "" {
+		return
 	}
-	state.Contexts[ctx][kind] = p
-	if err := saveColumnPrefsState(state); err != nil {
-		logger.Error("Failed to persist column prefs", "error", err)
-	}
+	withStateFileLock(path, func() {
+		state := loadColumnPrefsState()
+		if state.Contexts[ctx] == nil {
+			state.Contexts[ctx] = map[string]persistedColumnPrefs{}
+		}
+		state.Contexts[ctx][kind] = p
+		if err := saveColumnPrefsState(state); err != nil {
+			logger.Error("Failed to persist column prefs", "error", err)
+		}
+	})
 }
 
 // persistForgottenColumnPrefs removes one kind's column layout from disk (the
@@ -144,21 +152,27 @@ func persistForgottenColumnPrefs(key string) {
 	if !ok {
 		return
 	}
-	state := loadColumnPrefsState()
-	kinds, ok := state.Contexts[ctx]
-	if !ok {
+	path := columnPrefsFilePath()
+	if path == "" {
 		return
 	}
-	if _, ok := kinds[kind]; !ok {
-		return
-	}
-	delete(kinds, kind)
-	if len(kinds) == 0 {
-		delete(state.Contexts, ctx)
-	}
-	if err := saveColumnPrefsState(state); err != nil {
-		logger.Error("Failed to persist column prefs", "error", err)
-	}
+	withStateFileLock(path, func() {
+		state := loadColumnPrefsState()
+		kinds, ok := state.Contexts[ctx]
+		if !ok {
+			return
+		}
+		if _, ok := kinds[kind]; !ok {
+			return
+		}
+		delete(kinds, kind)
+		if len(kinds) == 0 {
+			delete(state.Contexts, ctx)
+		}
+		if err := saveColumnPrefsState(state); err != nil {
+			logger.Error("Failed to persist column prefs", "error", err)
+		}
+	})
 }
 
 // persistColumnPrefs persists (or clears) the committed column layout for the
