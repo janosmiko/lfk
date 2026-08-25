@@ -603,6 +603,9 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origGotoTargets := ConfigGotoTargets
 	origWhichKeyEnabled := ConfigWhichKeyEnabled
 	origWhichKeyDelayMs := ConfigWhichKeyDelayMs
+	origSparkWindows := ConfigSparklineWindows
+	origSparkWidth := ConfigSparklineWidth
+	origSparkInterval := ConfigSparklineInterval
 
 	origMonitoring := model.ConfigMonitoring
 	origRSStrategy := model.ConfigDefaultRightsizingStrategy
@@ -700,6 +703,9 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigGotoTargets = origGotoTargets
 		ConfigWhichKeyEnabled = origWhichKeyEnabled
 		ConfigWhichKeyDelayMs = origWhichKeyDelayMs
+		ConfigSparklineWindows = origSparkWindows
+		ConfigSparklineWidth = origSparkWidth
+		ConfigSparklineInterval = origSparkInterval
 
 		model.ConfigMonitoring = origMonitoring
 		model.ConfigDefaultRightsizingStrategy = origRSStrategy
