@@ -479,13 +479,29 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 	defer cancel()
 
 	cpuQuery := `sum by (node) (rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
-	cpuMap, cpuErr := c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, cpuQuery)
+	memQuery := `sum by (node) (container_memory_working_set_bytes{container!=""})`
+
+	// Both queries share the 10s budget above, so running one after the other
+	// let the first spend what the second still needs. They go out together
+	// instead - see getAllPodMetricsFromPrometheus for the same change.
+	var (
+		cpuMap, memMap map[string]float64
+		cpuErr, memErr error
+		wg             sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		cpuMap, cpuErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, cpuQuery)
+	}()
+	go func() {
+		defer wg.Done()
+		memMap, memErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, memQuery)
+	}()
+	wg.Wait()
 	if cpuErr != nil {
 		logger.Debug("Prometheus node CPU query failed", "error", cpuErr)
 	}
-
-	memQuery := `sum by (node) (container_memory_working_set_bytes{container!=""})`
-	memMap, memErr := c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, memQuery)
 	if memErr != nil {
 		logger.Debug("Prometheus node memory query failed", "error", memErr)
 	}
