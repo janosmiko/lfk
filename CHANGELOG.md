@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.3](https://github.com/janosmiko/lfk/compare/v0.18.2...v0.18.3) (2026-08-26)
+
+
+### Features
+
+* show cpu and memory history as sparklines in the resource columns ([#698](https://github.com/janosmiko/lfk/issues/698)) ([610e341](https://github.com/janosmiko/lfk/commit/610e34183df6d1d70f8ca6b6ff9f8cbc032fb5ce))
+
+
+### Bug Fixes
+
+* scope multi-select keys by kind ([#697](https://github.com/janosmiko/lfk/issues/697)) ([db1192f](https://github.com/janosmiko/lfk/commit/db1192f4c6eb955110b26b2e1c5432ef2183cf87))
+* show the cluster dashboard as one frame, and load it faster ([#695](https://github.com/janosmiko/lfk/issues/695)) ([bbf7c68](https://github.com/janosmiko/lfk/commit/bbf7c685e0557c635f8e734295a8539f1a1e3401))
+* survive a proxy that resets long-lived watch connections ([#701](https://github.com/janosmiko/lfk/issues/701)) ([62ab9fe](https://github.com/janosmiko/lfk/commit/62ab9fe9ae931994bba86839f2ba2a6f6af497a2))
+* use interactive bash when available ([#700](https://github.com/janosmiko/lfk/issues/700)) ([59ed623](https://github.com/janosmiko/lfk/commit/59ed62382ba40d7b0a9526d91da35ab9e97840ca))
+
 ## [0.18.2](https://github.com/janosmiko/lfk/compare/v0.18.1...v0.18.2) (2026-08-25)
 
 
