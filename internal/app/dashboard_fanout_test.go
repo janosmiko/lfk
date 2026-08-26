@@ -165,28 +165,48 @@ func TestLoadDashboardForEvictsAccumulatorsFromAnOlderGeneration(t *testing.T) {
 // The dashboard used to paint the first section that answered and then hold
 // every later one, so the user watched it sit on a single row for the eight
 // seconds the slowest section took. It must show one loader instead, then the
-// whole frame at once.
+// whole frame at once. Asserted on the rendered pane, because what the user
+// sees is the whole point of the change.
 func TestDashboardPartialHoldsEverySectionUntilTheFrameIsWhole(t *testing.T) {
-	m := newTestModelForDashboard(t)
-	m.nav.Context = "test-ctx"
+	m := dashboardOverviewModel()
 
 	keys := []string{"namespaces", "pdbs", "events", "nodes", "metrics", "pods"}
 	for _, key := range keys[:len(keys)-1] {
 		var cmd tea.Cmd
 		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
 			context: "test-ctx", key: key, total: len(keys),
-			data: dashboardData{nsCount: 1},
+			data: dashboardData{nsCount: 29},
 		})
 		require.Nil(t, cmd, "section %q must not paint on its own", key)
-		assert.Empty(t, m.dashboardPreview, "the loader must stay up until the frame is whole")
+		assert.Contains(t, stripANSI(m.renderRightResourceTypes(60, 20)),
+			"Loading cluster dashboard", "the loader must stay up until the frame is whole")
 	}
 
-	_, cmd := m.handleDashboardPartial(dashboardPartialMsg{
+	var cmd tea.Cmd
+	m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
 		context: "test-ctx", key: keys[len(keys)-1], total: len(keys),
-		data: dashboardData{nodeItems: []model.Item{{Name: "n1"}}, nodeCount: 1},
+		data: dashboardData{nodeItems: []model.Item{{Name: "n1"}}, nodeCount: 1, readyNodes: 1},
 	})
 	require.NotNil(t, cmd, "the last section completes the frame and paints it")
 	loaded, ok := cmd().(dashboardLoadedMsg)
 	require.True(t, ok)
-	assert.Equal(t, 1, loaded.data.nodeCount)
+	m = m.updateDashboardLoaded(loaded)
+
+	view := stripANSI(m.renderRightResourceTypes(60, 20))
+	assert.NotContains(t, view, "Loading cluster dashboard", "the loader must be gone")
+	assert.Contains(t, view, "Namespaces: 29",
+		"every section arrives in the same frame, not one at a time")
+	assert.Contains(t, view, "1 Ready", "including the one that completed it")
+}
+
+// dashboardOverviewModel parks the cursor on the Cluster dashboard entry, the
+// only place renderRightResourceTypes renders the dashboard or its loader.
+func dashboardOverviewModel() Model {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.Context = "test-ctx"
+	m.dashboardAcc = make(map[string]*dashboardAccumulator)
+	m.middleItems = []model.Item{{Name: "Cluster", Extra: "__overview__"}}
+	m.setCursor(0)
+	return m
 }
