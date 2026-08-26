@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -127,12 +128,26 @@ func formatPromStep(step time.Duration) string {
 // still shows whatever is available. This matches
 // getAllPodMetricsFromPrometheus.
 func (c *Client) GetPodMetricsRange(ctx context.Context, contextName, namespace string, window, step time.Duration) (cpu, mem map[string]MetricSeries, err error) {
-	cpu, cpuErr := c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "cpu"), window, step)
+	// Two sequential proxy round trips add up past the watch interval, so the
+	// fetch is cancelled before it finishes and the columns never fill in.
+	var (
+		cpuErr, memErr error
+		wg             sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		cpu, cpuErr = c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "cpu"), window, step)
+	}()
+	go func() {
+		defer wg.Done()
+		mem, memErr = c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "memory"), window, step)
+	}()
+	wg.Wait()
 	if cpuErr != nil {
 		logger.Debug("Prometheus pod CPU range query failed",
 			"context", contextName, "namespace", namespace, "error", logger.Redact(cpuErr.Error()))
 	}
-	mem, memErr := c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "memory"), window, step)
 	if memErr != nil {
 		logger.Debug("Prometheus pod memory range query failed",
 			"context", contextName, "namespace", namespace, "error", logger.Redact(memErr.Error()))
@@ -178,11 +193,24 @@ func (c *Client) GetNodeMetricsRange(ctx context.Context, contextName string, wi
 		cpuQuery = `sum by (node) (rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
 		memQuery = `sum by (node) (container_memory_working_set_bytes{container!=""})`
 	)
-	cpu, cpuErr := c.queryNodeRange(ctx, contextName, cpuQuery, window, step)
+	// Concurrent for the reason GetPodMetricsRange documents.
+	var (
+		cpuErr, memErr error
+		wg             sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		cpu, cpuErr = c.queryNodeRange(ctx, contextName, cpuQuery, window, step)
+	}()
+	go func() {
+		defer wg.Done()
+		mem, memErr = c.queryNodeRange(ctx, contextName, memQuery, window, step)
+	}()
+	wg.Wait()
 	if cpuErr != nil {
 		logger.Debug("Prometheus node CPU range query failed", "context", contextName, "error", logger.Redact(cpuErr.Error()))
 	}
-	mem, memErr := c.queryNodeRange(ctx, contextName, memQuery, window, step)
 	if memErr != nil {
 		logger.Debug("Prometheus node memory range query failed", "context", contextName, "error", logger.Redact(memErr.Error()))
 	}
@@ -222,11 +250,24 @@ func (c *Client) GetClusterMetricsRange(ctx context.Context, contextName string,
 		cpuQuery = `sum(rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
 		memQuery = `sum(container_memory_working_set_bytes{container!=""})`
 	)
-	cpu, cpuErr := c.queryClusterRange(ctx, contextName, cpuQuery, window, step)
+	// Concurrent for the reason GetPodMetricsRange documents.
+	var (
+		cpuErr, memErr error
+		wg             sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		cpu, cpuErr = c.queryClusterRange(ctx, contextName, cpuQuery, window, step)
+	}()
+	go func() {
+		defer wg.Done()
+		mem, memErr = c.queryClusterRange(ctx, contextName, memQuery, window, step)
+	}()
+	wg.Wait()
 	if cpuErr != nil {
 		logger.Debug("Prometheus cluster CPU range query failed", "context", contextName, "error", logger.Redact(cpuErr.Error()))
 	}
-	mem, memErr := c.queryClusterRange(ctx, contextName, memQuery, window, step)
 	if memErr != nil {
 		logger.Debug("Prometheus cluster memory range query failed", "context", contextName, "error", logger.Redact(memErr.Error()))
 	}
@@ -277,12 +318,25 @@ func buildPromContainerRangeQuery(namespace, pod, resourceKind string) string {
 // GetPodContainerMetrics. It errors only when both queries fail, matching
 // GetPodMetricsRange.
 func (c *Client) GetContainerMetricsRange(ctx context.Context, contextName, namespace, pod string, window, step time.Duration) (cpu, mem map[string]MetricSeries, err error) {
-	cpu, cpuErr := c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "cpu"), window, step)
+	// Concurrent for the reason GetPodMetricsRange documents.
+	var (
+		cpuErr, memErr error
+		wg             sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		cpu, cpuErr = c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "cpu"), window, step)
+	}()
+	go func() {
+		defer wg.Done()
+		mem, memErr = c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "memory"), window, step)
+	}()
+	wg.Wait()
 	if cpuErr != nil {
 		logger.Debug("Prometheus container CPU range query failed",
 			"context", contextName, "namespace", namespace, "pod", pod, "error", logger.Redact(cpuErr.Error()))
 	}
-	mem, memErr := c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "memory"), window, step)
 	if memErr != nil {
 		logger.Debug("Prometheus container memory range query failed",
 			"context", contextName, "namespace", namespace, "pod", pod, "error", logger.Redact(memErr.Error()))

@@ -4,13 +4,35 @@ import (
 	"context"
 	"errors"
 	"math"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// queryRecorder captures the queries one range call issues. The CPU and memory
+// queries now go out together, so the slice needs a lock and their arrival
+// order is not fixed.
+type queryRecorder struct {
+	mu      sync.Mutex
+	queries []string
+}
+
+func (r *queryRecorder) record(query string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.queries = append(r.queries, query)
+}
+
+func (r *queryRecorder) all() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.queries)
+}
 
 // podKeyFunc mirrors the keying parsePrometheusPodResponse uses, so the
 // matrix parser is exercised through a real caller's key shape.
@@ -148,10 +170,10 @@ func TestFormatPromStep_WholeSecondsHasNoUnitSuffix(t *testing.T) {
 }
 
 func TestGetPodMetricsRange_ReturnsCPUAndMemorySeries(t *testing.T) {
-	var queries []string
+	var rec queryRecorder
 	c := &Client{
 		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
-			queries = append(queries, query)
+			rec.record(query)
 			return []byte(`{
 			  "status":"success",
 			  "data":{"resultType":"matrix","result":[
@@ -166,9 +188,11 @@ func TestGetPodMetricsRange_ReturnsCPUAndMemorySeries(t *testing.T) {
 	assert.Equal(t, []float64{5, 10}, cpu["default/api-1"].Points)
 	assert.Equal(t, []float64{5, 10}, mem["default/api-1"].Points)
 	assert.Equal(t, 45*time.Second, cpu["default/api-1"].Step)
-	require.Len(t, queries, 2, "one query for cpu, one for memory")
-	assert.Contains(t, queries[0], "container_cpu_usage_seconds_total")
-	assert.Contains(t, queries[1], "container_memory_working_set_bytes")
+	got := rec.all()
+	require.Len(t, got, 2, "one query for cpu, one for memory")
+	joined := strings.Join(got, "\n")
+	assert.Contains(t, joined, "container_cpu_usage_seconds_total")
+	assert.Contains(t, joined, "container_memory_working_set_bytes")
 }
 
 // A partial outage still shows what is available, matching
@@ -219,10 +243,10 @@ func TestGetPodMetricsRange_RejectsUnsafeNamespace(t *testing.T) {
 }
 
 func TestGetNodeMetricsRange_KeysByNodeName(t *testing.T) {
-	var queries []string
+	var rec queryRecorder
 	c := &Client{
 		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
-			queries = append(queries, query)
+			rec.record(query)
 			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[
 			  {"metric":{"node":"node-1"},"values":[[1,"100"],[2,"200"]]}]}}`), nil
 		},
@@ -232,8 +256,11 @@ func TestGetNodeMetricsRange_KeysByNodeName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []float64{100, 200}, cpu["node-1"].Points)
 	assert.Equal(t, []float64{100, 200}, mem["node-1"].Points)
-	require.Len(t, queries, 2)
-	assert.Contains(t, queries[0], "by (node)")
+	got := rec.all()
+	require.Len(t, got, 2)
+	for _, q := range got {
+		assert.Contains(t, q, "by (node)", "both node queries group by node")
+	}
 }
 
 func TestGetNodeMetricsRange_BothQueriesFail(t *testing.T) {
@@ -248,10 +275,10 @@ func TestGetNodeMetricsRange_BothQueriesFail(t *testing.T) {
 }
 
 func TestGetClusterMetricsRange_ReturnsOneSeriesEach(t *testing.T) {
-	var queries []string
+	var rec queryRecorder
 	c := &Client{
 		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
-			queries = append(queries, query)
+			rec.record(query)
 			return []byte(`{"status":"success","data":{"resultType":"matrix","result":[
 			  {"metric":{},"values":[[1,"1000"],[2,"2000"]]}]}}`), nil
 		},
@@ -261,12 +288,14 @@ func TestGetClusterMetricsRange_ReturnsOneSeriesEach(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []float64{1000, 2000}, cpu.Points)
 	assert.Equal(t, []float64{1000, 2000}, mem.Points)
-	require.Len(t, queries, 2)
+	got := rec.all()
+	require.Len(t, got, 2)
 	// A cluster total aggregates everything, so neither query may carry a
 	// "by" clause: one would split the result into several series and the
 	// parser would keep only the last.
-	assert.NotContains(t, queries[0], "by (")
-	assert.NotContains(t, queries[1], "by (")
+	for _, q := range got {
+		assert.NotContains(t, q, "by (")
+	}
 }
 
 func TestGetClusterMetricsRange_BothQueriesFail(t *testing.T) {
@@ -313,10 +342,10 @@ func TestBuildPromContainerRangeQuery(t *testing.T) {
 }
 
 func TestGetContainerMetricsRange_ReturnsCPUAndMemorySeries(t *testing.T) {
-	var queries []string
+	var rec queryRecorder
 	c := &Client{
 		testPromRangeQuery: func(_ context.Context, _, query string, _, _ time.Duration) ([]byte, error) {
-			queries = append(queries, query)
+			rec.record(query)
 			return []byte(`{
 			  "status":"success",
 			  "data":{"resultType":"matrix","result":[
@@ -331,9 +360,11 @@ func TestGetContainerMetricsRange_ReturnsCPUAndMemorySeries(t *testing.T) {
 	assert.Equal(t, []float64{5, 10}, cpu["app"].Points)
 	assert.Equal(t, []float64{5, 10}, mem["app"].Points)
 	assert.Equal(t, 45*time.Second, cpu["app"].Step)
-	require.Len(t, queries, 2, "one query for cpu, one for memory")
-	assert.Contains(t, queries[0], "container_cpu_usage_seconds_total")
-	assert.Contains(t, queries[1], "container_memory_working_set_bytes")
+	got := rec.all()
+	require.Len(t, got, 2, "one query for cpu, one for memory")
+	joined := strings.Join(got, "\n")
+	assert.Contains(t, joined, "container_cpu_usage_seconds_total")
+	assert.Contains(t, joined, "container_memory_working_set_bytes")
 }
 
 // A partial outage still shows what is available, matching GetPodMetricsRange,
