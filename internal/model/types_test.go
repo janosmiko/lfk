@@ -480,6 +480,16 @@ func TestItemSelectionKey(t *testing.T) {
 			item: Item{Name: "node-1", ClusterName: "prod"},
 			want: "prod:node-1",
 		},
+		{
+			name: "kinded row appends the kind",
+			item: Item{Name: "app", Namespace: "default", Kind: "Role"},
+			want: "default/app|Role",
+		},
+		{
+			name: "same name and namespace with a different kind is a different key",
+			item: Item{Name: "app", Namespace: "default", Kind: "RoleBinding"},
+			want: "default/app|RoleBinding",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

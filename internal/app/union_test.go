@@ -671,7 +671,7 @@ func TestToggleSelect_AllowedAtUnionSentinel(t *testing.T) {
 	assert.Len(t, result.selectedItems, 1, "the green row should be selected")
 	// selectionKey must include ClusterName so the green selection does not
 	// collide with the blue one when they share name+namespace.
-	assert.True(t, result.selectedItems["green:cloud-cd/my-pod"],
+	assert.True(t, result.selectedItems["green:cloud-cd/my-pod|Pod"],
 		"selection key must encode ClusterName; got: %v", result.selectedItems)
 }
 
@@ -1797,4 +1797,34 @@ func TestUnionDashboardMemberOpensContextAndBackReturnsToUnionView(t *testing.T)
 	assert.Empty(t, um.nav.ResourceType.Resource)
 	require.Len(t, um.middleItems, 2)
 	assert.Equal(t, "Monitoring", um.middleItems[1].Name)
+}
+
+// TestSelectionKey_MixedKindListKeepsRowsDistinct reproduces the ArgoCD
+// components bug: an application's resource list holds a Role and a
+// RoleBinding that share a namespace and a name. Before the kind entered
+// the key, both rows mapped to "ns/name", so the status bar counted one
+// selection for two marked rows and untoggling either row cleared both.
+func TestSelectionKey_MixedKindListKeepsRowsDistinct(t *testing.T) {
+	items := []model.Item{
+		{Name: "app", Kind: "Role", Namespace: "cloud-cd"},
+		{Name: "app", Kind: "RoleBinding", Namespace: "cloud-cd"},
+	}
+	m := Model{
+		nav:             model.NavigationState{Level: model.LevelResources},
+		middleItems:     items,
+		cursors:         [5]int{},
+		selectedItems:   make(map[string]bool),
+		selectionAnchor: -1,
+	}
+
+	m.toggleSelection(items[0])
+	m.toggleSelection(items[1])
+	assert.Len(t, m.selectedItems, 2, "each kind must own its own key")
+	assert.True(t, m.isSelected(items[0]))
+	assert.True(t, m.isSelected(items[1]))
+
+	m.toggleSelection(items[1])
+	assert.True(t, m.isSelected(items[0]), "untoggling the RoleBinding must not clear the Role")
+	assert.False(t, m.isSelected(items[1]))
+	assert.Len(t, m.selectedItems, 1)
 }
