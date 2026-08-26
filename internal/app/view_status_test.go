@@ -329,7 +329,7 @@ func TestStatusBarKeyHints(t *testing.T) {
 	// 210, not 200: the help slot now advertises the key that actually opens
 	// the help screen, which at the default bindings is "f1" (the leader owns
 	// "?"), one column wider than the old label. At 200 the full keymap no
-	// longer fits and FormatHintPartsFit drops the last entry — the assertion
+	// longer fits and FormatHintPartsFit drops the last entry - the assertion
 	// below is about both hints rendering, not about the exact width they
 	// stop fitting at.
 	m := Model{
@@ -344,6 +344,21 @@ func TestStatusBarKeyHints(t *testing.T) {
 	stripped := stripANSI(bar)
 	assert.Contains(t, stripped, "help")
 	assert.Contains(t, stripped, "quit")
+}
+
+// Assert the full "key: desc" unit, not bare "~" - that's also Truncate()'s
+// overflow marker elsewhere in the UI and would pass vacuously.
+func TestStatusBarKeyHints_ShowsMetricsSparkCycle(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+	m.middleItems = []model.Item{{Name: "pod"}}
+	m.width = 210
+	m.height = 40
+
+	bar := m.statusBar()
+	stripped := stripANSI(bar)
+	assert.Contains(t, stripped, "~: cpu/mem view")
 }
 
 // User-reported bug: "When I select multiple items, the hint bar is

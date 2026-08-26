@@ -271,6 +271,13 @@ func wkLevelResourcesUp(c *wkCtx) bool {
 	return c.level >= model.LevelResources
 }
 
+// wkMetricsSparkAvailable gates the CPU/MEM display mode entry on the view
+// actually having CPU/MEM columns, reusing dashboardMetricsKind rather than
+// re-deriving the pod/node/dashboard cases it already covers.
+func wkMetricsSparkAvailable(c *wkCtx) bool {
+	return c.m.metricsSparkAvailable()
+}
+
 // wkNotFullscreenDashboard excludes the one state handleKeyFilter and
 // handleKeySearch (update_keys_explorer.go) swallow the key for: the
 // fullscreen dashboard scrolls a rendered preview, not a list, so there is
@@ -524,6 +531,7 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.OrphanOverlay }, Label: "Orphan overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},
 	{Key: func(kb ui.Keybindings) string { return kb.SessionManager }, Label: "Session manager", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.ColumnToggle }, Label: "Column visibility", Group: wkViews, Avail: wkLevelResourcesUp},
+	{Key: func(kb ui.Keybindings) string { return kb.MetricsSparkCycle }, Label: "CPU/MEM display mode", Group: wkViews, Avail: wkMetricsSparkAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.Monitoring }, Label: "Monitoring dashboard", Group: wkViews, Avail: func(c *wkCtx) bool { return c.level >= model.LevelResourceTypes }},
 	{Key: func(kb ui.Keybindings) string { return kb.QuotaDashboard }, Label: "Quota dashboard", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.TasksOverlay }, Label: "Task queue", Group: wkViews},

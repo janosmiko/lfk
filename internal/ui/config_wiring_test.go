@@ -74,6 +74,9 @@ watch_interval: 3s
 background_watch_interval: 45s
 foreground_idle_timeout: 300s
 metrics_interval: 25s
+metrics_sparkline_windows: ["2m", "30m"]
+metrics_sparkline_width: 8
+metrics_sparkline_interval: 45s
 no_color: true
 secret_lazy_loading: true
 informer_cache: always
@@ -250,6 +253,9 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 45*time.Second, ConfigBackgroundWatchInterval, "background_watch_interval")
 	assert.Equal(t, 300*time.Second, ConfigForegroundIdleTimeout, "foreground_idle_timeout")
 	assert.Equal(t, 25*time.Second, ConfigMetricsInterval, "metrics_interval")
+	assert.Equal(t, []time.Duration{2 * time.Minute, 30 * time.Minute}, ConfigSparklineWindows, "metrics_sparkline_windows")
+	assert.Equal(t, 8, ConfigSparklineWidth, "metrics_sparkline_width")
+	assert.Equal(t, 45*time.Second, ConfigSparklineInterval, "metrics_sparkline_interval")
 	assert.True(t, ConfigNoColor, "no_color")
 	assert.True(t, ConfigSecretLazyLoading, "secret_lazy_loading")
 	assert.Equal(t, InformerCacheAlways, ConfigInformerCacheMode, "informer_cache")
@@ -403,71 +409,74 @@ func TestLoadConfig_AllNamespacesExplicitFalseSetsFlag(t *testing.T) {
 // fails if a field is added (or removed) without updating this map, forcing new
 // settings to ship with a wiring test.
 var wiringCoveredFields = map[string]string{
-	"appearance":                "config_appearance_test.go (TestAppearance_*)",
-	"colorscheme":               "TestLoadConfig_AllSettingsWired + TestApplyColorscheme_*",
-	"theme":                     "TestMergeThemeOverrides (mergeThemeOverrides is the LoadConfig wiring point)",
-	"keybindings":               "TestLoadConfig_AllSettingsWired + config_keybindings_test.go",
-	"log_path":                  "TestLoadConfig_AllSettingsWired",
-	"abbreviations":             "TestLoadConfig_AllSettingsWired",
-	"icons":                     "TestLoadConfig_AllSettingsWired",
-	"resource_columns":          "TestLoadConfig_AllSettingsWired",
-	"views":                     "TestLoadConfig_AllSettingsWired",
-	"dashboard":                 "TestLoadConfig_AllSettingsWired",
-	"custom_actions":            "TestLoadConfig_AllSettingsWired",
-	"filter_presets":            "TestLoadConfig_AllSettingsWired",
-	"terminal":                  "TestLoadConfig_AllSettingsWired",
-	"scrollback_lines":          "TestLoadConfig_AllSettingsWired",
-	"pinned_groups":             "TestLoadConfig_AllSettingsWired",
-	"pinned_types":              "TestLoadConfig_AllSettingsWired",
-	"pinned_summaries":          "TestLoadConfig_AllSettingsWired + TestLoadConfig_PinnedSummariesEmptyListSetsFlag + TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset",
-	"monitoring":                "TestLoadConfig_AllSettingsWired",
-	"tips":                      "TestLoadConfig_AllSettingsWired",
-	"log_tail_lines":            "TestLoadConfig_AllSettingsWired",
-	"log_tail_lines_short":      "TestLoadConfig_AllSettingsWired",
-	"log_render_ansi":           "TestLoadConfig_AllSettingsWired (deprecated flat alias)",
-	"log_top_default_profile":   "TestLoadConfig_AllSettingsWired",
-	"log_viewer":                "TestLoadConfig_AllSettingsWired + config_log_viewer_test.go (TestLogViewer_*)",
-	"yaml_viewer":               "TestLoadConfig_AllSettingsWired",
-	"diff_viewer":               "TestLoadConfig_AllSettingsWired",
-	"describe_viewer":           "TestLoadConfig_AllSettingsWired",
-	"object_explorer":           "TestLoadConfig_AllSettingsWired",
-	"api_explorer":              "TestLoadConfig_AllSettingsWired",
-	"split_preview":             "TestLoadConfig_AllSettingsWired",
-	"watch_mode":                "TestLoadConfig_AllSettingsWired",
-	"watch_throttle":            "TestLoadConfig_AllSettingsWired",
-	"all_namespaces":            "TestLoadConfig_AllSettingsWired + TestLoadConfig_AllNamespacesExplicitFalseSetsFlag + TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset",
-	"events":                    "TestLoadConfig_AllSettingsWired",
-	"scrolloff":                 "TestLoadConfig_AllSettingsWired",
-	"confirm_on_exit":           "TestLoadConfig_AllSettingsWired",
-	"delete_propagation_policy": "TestLoadConfig_AllSettingsWired + TestDeletePropagationPolicy_InvalidFallsBack",
-	"dim_overlay":               "TestLoadConfig_AllSettingsWired",
-	"row_status_tint":           "TestLoadConfig_AllSettingsWired + TestRowStatusTint_InvalidFallsBack",
-	"transparent_background":    "TestLoadConfig_AllSettingsWired",
-	"mouse":                     "TestLoadConfig_AllSettingsWired",
-	"watch_interval":            "TestLoadConfig_AllSettingsWired",
-	"background_watch_interval": "TestLoadConfig_AllSettingsWired",
-	"foreground_idle_timeout":   "TestLoadConfig_AllSettingsWired",
-	"metrics_interval":          "TestLoadConfig_AllSettingsWired + TestApplyMetricsIntervalConfig",
-	"clusters":                  "TestLoadConfig_AllSettingsWired",
-	"no_color":                  "TestLoadConfig_AllSettingsWired",
-	"secret_lazy_loading":       "TestLoadConfig_AllSettingsWired",
-	"informer_cache":            "TestLoadConfig_AllSettingsWired",
-	"min_contrast_ratio":        "TestLoadConfig_AllSettingsWired",
-	"read_only":                 "TestLoadConfig_AllSettingsWired",
-	"field_manager":             "TestLoadConfig_AllSettingsWired + TestLoadConfig_FieldManagerBlankKeepsDefault",
-	"show_rare_types":           "TestLoadConfig_AllSettingsWired",
-	"security":                  "TestLoadConfig_AllSettingsWired",
-	"rightsizing_defaults":      "TestLoadConfig_AllSettingsWired",
-	"kubeshark":                 "TestLoadConfig_AllSettingsWired",
-	"scheduler":                 "TestLoadConfig_AllSettingsWired",
-	"kubeconfig_dir":            "TestLoadConfig_AllSettingsWired",
-	"kubeconfig_exclusive":      "TestLoadConfig_AllSettingsWired",
-	"union_sets":                "TestLoadConfig_AllSettingsWired",
-	"goto_targets":              "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
-	"which_key_enabled":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
-	"which_key_delay_ms":        "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
-	"which_key_leader_delay_ms": "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyLeaderDelay*",
-	"which_key_grouped":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyGrouped",
+	"appearance":                 "config_appearance_test.go (TestAppearance_*)",
+	"colorscheme":                "TestLoadConfig_AllSettingsWired + TestApplyColorscheme_*",
+	"theme":                      "TestMergeThemeOverrides (mergeThemeOverrides is the LoadConfig wiring point)",
+	"keybindings":                "TestLoadConfig_AllSettingsWired + config_keybindings_test.go",
+	"log_path":                   "TestLoadConfig_AllSettingsWired",
+	"abbreviations":              "TestLoadConfig_AllSettingsWired",
+	"icons":                      "TestLoadConfig_AllSettingsWired",
+	"resource_columns":           "TestLoadConfig_AllSettingsWired",
+	"views":                      "TestLoadConfig_AllSettingsWired",
+	"dashboard":                  "TestLoadConfig_AllSettingsWired",
+	"custom_actions":             "TestLoadConfig_AllSettingsWired",
+	"filter_presets":             "TestLoadConfig_AllSettingsWired",
+	"terminal":                   "TestLoadConfig_AllSettingsWired",
+	"scrollback_lines":           "TestLoadConfig_AllSettingsWired",
+	"pinned_groups":              "TestLoadConfig_AllSettingsWired",
+	"pinned_types":               "TestLoadConfig_AllSettingsWired",
+	"pinned_summaries":           "TestLoadConfig_AllSettingsWired + TestLoadConfig_PinnedSummariesEmptyListSetsFlag + TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset",
+	"monitoring":                 "TestLoadConfig_AllSettingsWired",
+	"tips":                       "TestLoadConfig_AllSettingsWired",
+	"log_tail_lines":             "TestLoadConfig_AllSettingsWired",
+	"log_tail_lines_short":       "TestLoadConfig_AllSettingsWired",
+	"log_render_ansi":            "TestLoadConfig_AllSettingsWired (deprecated flat alias)",
+	"log_top_default_profile":    "TestLoadConfig_AllSettingsWired",
+	"log_viewer":                 "TestLoadConfig_AllSettingsWired + config_log_viewer_test.go (TestLogViewer_*)",
+	"yaml_viewer":                "TestLoadConfig_AllSettingsWired",
+	"diff_viewer":                "TestLoadConfig_AllSettingsWired",
+	"describe_viewer":            "TestLoadConfig_AllSettingsWired",
+	"object_explorer":            "TestLoadConfig_AllSettingsWired",
+	"api_explorer":               "TestLoadConfig_AllSettingsWired",
+	"split_preview":              "TestLoadConfig_AllSettingsWired",
+	"watch_mode":                 "TestLoadConfig_AllSettingsWired",
+	"watch_throttle":             "TestLoadConfig_AllSettingsWired",
+	"all_namespaces":             "TestLoadConfig_AllSettingsWired + TestLoadConfig_AllNamespacesExplicitFalseSetsFlag + TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset",
+	"events":                     "TestLoadConfig_AllSettingsWired",
+	"scrolloff":                  "TestLoadConfig_AllSettingsWired",
+	"confirm_on_exit":            "TestLoadConfig_AllSettingsWired",
+	"delete_propagation_policy":  "TestLoadConfig_AllSettingsWired + TestDeletePropagationPolicy_InvalidFallsBack",
+	"dim_overlay":                "TestLoadConfig_AllSettingsWired",
+	"row_status_tint":            "TestLoadConfig_AllSettingsWired + TestRowStatusTint_InvalidFallsBack",
+	"transparent_background":     "TestLoadConfig_AllSettingsWired",
+	"mouse":                      "TestLoadConfig_AllSettingsWired",
+	"watch_interval":             "TestLoadConfig_AllSettingsWired",
+	"background_watch_interval":  "TestLoadConfig_AllSettingsWired",
+	"foreground_idle_timeout":    "TestLoadConfig_AllSettingsWired",
+	"metrics_interval":           "TestLoadConfig_AllSettingsWired + TestApplyMetricsIntervalConfig",
+	"metrics_sparkline_windows":  "TestLoadConfig_AllSettingsWired",
+	"metrics_sparkline_width":    "TestLoadConfig_AllSettingsWired + TestClampSparklineWidth",
+	"metrics_sparkline_interval": "TestLoadConfig_AllSettingsWired + TestClampSparklineInterval",
+	"clusters":                   "TestLoadConfig_AllSettingsWired",
+	"no_color":                   "TestLoadConfig_AllSettingsWired",
+	"secret_lazy_loading":        "TestLoadConfig_AllSettingsWired",
+	"informer_cache":             "TestLoadConfig_AllSettingsWired",
+	"min_contrast_ratio":         "TestLoadConfig_AllSettingsWired",
+	"read_only":                  "TestLoadConfig_AllSettingsWired",
+	"field_manager":              "TestLoadConfig_AllSettingsWired + TestLoadConfig_FieldManagerBlankKeepsDefault",
+	"show_rare_types":            "TestLoadConfig_AllSettingsWired",
+	"security":                   "TestLoadConfig_AllSettingsWired",
+	"rightsizing_defaults":       "TestLoadConfig_AllSettingsWired",
+	"kubeshark":                  "TestLoadConfig_AllSettingsWired",
+	"scheduler":                  "TestLoadConfig_AllSettingsWired",
+	"kubeconfig_dir":             "TestLoadConfig_AllSettingsWired",
+	"kubeconfig_exclusive":       "TestLoadConfig_AllSettingsWired",
+	"union_sets":                 "TestLoadConfig_AllSettingsWired",
+	"goto_targets":               "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
+	"which_key_enabled":          "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"which_key_delay_ms":         "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKey",
+	"which_key_leader_delay_ms":  "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyLeaderDelay*",
+	"which_key_grouped":          "TestLoadConfig_AllSettingsWired + TestLoadConfig_WhichKeyGrouped",
 }
 
 // TestConfigFile_EveryFieldHasWiringCoverage is a forcing function: it fails if
@@ -594,6 +603,9 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origGotoTargets := ConfigGotoTargets
 	origWhichKeyEnabled := ConfigWhichKeyEnabled
 	origWhichKeyDelayMs := ConfigWhichKeyDelayMs
+	origSparkWindows := ConfigSparklineWindows
+	origSparkWidth := ConfigSparklineWidth
+	origSparkInterval := ConfigSparklineInterval
 
 	origMonitoring := model.ConfigMonitoring
 	origRSStrategy := model.ConfigDefaultRightsizingStrategy
@@ -691,6 +703,9 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigGotoTargets = origGotoTargets
 		ConfigWhichKeyEnabled = origWhichKeyEnabled
 		ConfigWhichKeyDelayMs = origWhichKeyDelayMs
+		ConfigSparklineWindows = origSparkWindows
+		ConfigSparklineWidth = origSparkWidth
+		ConfigSparklineInterval = origSparkInterval
 
 		model.ConfigMonitoring = origMonitoring
 		model.ConfigDefaultRightsizingStrategy = origRSStrategy

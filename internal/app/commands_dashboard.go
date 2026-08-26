@@ -59,6 +59,11 @@ type dashboardData struct {
 	totalMemAlloc   int64
 	nodeMetricsErr  error
 	pinnedSummaries []pinnedSummaryResult
+
+	// cpuSeries and memSeries hold cluster-wide usage history for the
+	// CLUSTER RESOURCES sparklines. Empty in numeric mode.
+	cpuSeries k8s.MetricSeries
+	memSeries k8s.MetricSeries
 }
 
 // monitoringData retains the raw alert payload behind monitoringPreview so the
@@ -178,6 +183,15 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	}
 
 	cmds = append(cmds, m.pinnedSummaryCmds(kctx, gen, client, pins, discovered, total, silentSkip, sectionTarget)...)
+
+	// Independent of the fan-out above: it reports through
+	// clusterMetricsRangeMsg rather than dashboardPartialMsg, so it does not
+	// count toward total.
+	if m.metricsSpark.Mode == ui.MetricsDisplaySpark && m.allowSparklineFetch("Cluster") {
+		if cmd := m.loadClusterMetricsRangeForDashboard(kctx); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
 	return tea.Batch(cmds...)
 }
 
@@ -259,8 +273,9 @@ func memSummaryStr(d dashboardData) string {
 const dashboardSummarySep = " · "
 
 // composeDashboard renders the dashboard content + events column for the given
-// data at the current display width. Pure w.r.t. the model except for reading
-// width / fullscreen state, so it can be re-run whenever those change.
+// data at the current display width. Pure w.r.t. the model except for width,
+// fullscreen state, the sparkline mode, and the cluster CPU/Mem series, so it
+// can be re-run whenever those change.
 func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// The fullscreen cluster dashboard is always two-column (the right column
 	// always shows at least "RECENT EVENTS"). There, warnings move to the top
@@ -268,6 +283,9 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// everything stacks in the single column.
 	twoCol := m.fullscreenDashboard
 	w := m.dashboardWidths(twoCol, maxPinnedLabelWidth(data))
+	ctx := m.dashboardPreviewTargetContext()
+	data.cpuSeries = m.metricsSeries.clusterCPU[ctx]
+	data.memSeries = m.metricsSeries.clusterMem[ctx]
 
 	var left []string
 	left = append(left, "")
@@ -277,7 +295,7 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	// dashboardHeaderSection is added here instead, after the pinned rows.
 	left = dashboardPinnedRows(left, data, w)
 	left = append(left, "")
-	left = dashboardResourcesSection(left, data, w)
+	left = dashboardResourcesSection(left, data, w, m.metricsSpark.Mode == ui.MetricsDisplaySpark)
 	left = dashboardNodesSection(left, data, w)
 	if !twoCol {
 		left = dashboardWarningsSection(left, data, w)

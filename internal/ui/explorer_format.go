@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -479,15 +480,12 @@ func ParseResourceValue(val string, isCPU bool) int64 {
 	return v
 }
 
-// ParseResourceValueOK parses a CPU (millicores) or memory (bytes) string back
-// to int64, reporting whether the value was a real numeric quantity. A leading
-// trend arrow ("↑ " / "↓ ") is stripped first — it is a cosmetic decoration the
-// metrics path prepends to the CPU/MEM columns, never part of the number. The
-// ok flag is false for empty, "n/a", or otherwise unparseable input, letting
-// sort comparators push metrics-less rows to the bottom instead of treating
-// them as 0 (which is indistinguishable from a genuine "0m").
+// ParseResourceValueOK parses a CPU (millicores) or memory (bytes) string,
+// after stripping its trend-arrow or sparkline decoration. ok is false for
+// empty, "n/a", or unparseable input, so sort comparators push metrics-less
+// rows to the bottom instead of treating them as a genuine 0.
 func ParseResourceValueOK(val string, isCPU bool) (int64, bool) {
-	val = strings.TrimSpace(stripTrendArrow(val))
+	val = strings.TrimSpace(stripValueDecoration(val))
 	if val == "" || val == "n/a" {
 		return 0, false
 	}
@@ -525,14 +523,53 @@ func ParseResourceValueOK(val string, isCPU bool) (int64, bool) {
 	return int64(n * mult), true
 }
 
-// stripTrendArrow removes the leading "↑ " / "↓ " trend decoration the metrics
-// refresh prepends to CPU/MEM usage values, returning the bare quantity.
-func stripTrendArrow(val string) string {
+// stripValueDecoration removes the cosmetic prefix the metrics refresh
+// prepends to a CPU or MEM column value, returning the bare quantity. Two
+// decorations exist and they never appear together: the "↑ " / "↓ " trend
+// arrow in numeric mode, and a block sparkline in sparkline mode, where the
+// sparkline replaces the arrow because it shows the same trend in more
+// detail.
+//
+// Sort correctness depends on this. compareResourceValuesCmp parses these
+// values through ParseResourceValueOK, so a decoration left in place makes
+// every CPU and MEM sort compare glyphs instead of numbers.
+func stripValueDecoration(val string) string {
 	if rest, ok := strings.CutPrefix(val, "↑ "); ok {
 		return rest
 	}
 	if rest, ok := strings.CutPrefix(val, "↓ "); ok {
 		return rest
+	}
+	return stripSparklinePrefix(val)
+}
+
+// stripSparklinePrefix drops a leading run of sparkline glyphs and the blanks
+// standing in for gaps. It stops at the first rune that is neither, which is
+// the start of the quantity.
+func stripSparklinePrefix(val string) string {
+	i := 0
+	sawGlyph := false
+	for i < len(val) {
+		r, size := utf8.DecodeRuneInString(val[i:])
+		switch {
+		case strings.ContainsRune(SparklineGlyphs, r):
+			sawGlyph = true
+		case r == ' ':
+			// A blank is a gap inside the sparkline, or the separator before
+			// the value. Either way it is safe to skip.
+		default:
+			if !sawGlyph {
+				return val
+			}
+			return val[i:]
+		}
+		i += size
+	}
+	if sawGlyph {
+		// Glyphs with no quantity after them. Returning "" makes
+		// ParseResourceValueOK report ok=false, so the row sorts as missing
+		// rather than as a genuine 0.
+		return ""
 	}
 	return val
 }

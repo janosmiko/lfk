@@ -73,6 +73,17 @@ func TestNewModel_SeedsHideSecurityBadgesFromConfig(t *testing.T) {
 	}
 }
 
+// A nil map here makes allowSparklineFetch's pointer-receiver stamp land on a
+// discarded copy through the value-receiver call chain, so the cluster range
+// query fires unthrottled on every watch tick (metrics_throttle.go).
+func TestNewModel_InitializesMetricsLastFetch(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := NewModel(k8s.NewTestClient(nil, nil), StartupOptions{})
+	if m.metricsLastFetch == nil {
+		t.Fatal("NewModel must initialize metricsLastFetch, or the metrics throttle stamps a discarded copy")
+	}
+}
+
 // recomputeReadOnly runs on every context switch and must resolve the badge
 // default per context: a per-context config override beats the global default,
 // and a runtime toggle (recorded per context) beats config and never leaks to

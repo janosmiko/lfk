@@ -8,6 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -742,4 +743,38 @@ func TestFinal3LoadDashboardReturnsCmdRichTwo(t *testing.T) {
 	m := baseRichModel()
 	cmd := m.loadDashboard()
 	require.NotNil(t, cmd)
+}
+
+// composeDashboard must read the previewed union member's own cluster series,
+// not whichever member happened to answer first: hovering member A then
+// member B must draw B's history, not A's stale one.
+func TestComposeDashboard_ClusterSeriesKeyedByPreviewTarget(t *testing.T) {
+	base := Model{
+		width: 120, height: 40,
+		unionMode: true,
+		nav: model.NavigationState{
+			Context:      UnionContextSentinel,
+			Level:        model.LevelResources,
+			ResourceType: model.ResourceTypeEntry{Kind: unionClusterDashboardKind},
+		},
+		metricsSpark: ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark},
+		metricsSeries: metricsSeriesCache{
+			clusterCPU: map[string]k8s.MetricSeries{
+				"member-a": {Points: []float64{1, 2, 3, 4, 5}},
+				"member-b": {Points: []float64{5, 4, 3, 2, 1}},
+			},
+		},
+	}
+	data := dashboardData{totalCPUUsed: 500, totalCPUAlloc: 1000}
+
+	a := base
+	a.middleItems = []model.Item{{Name: "member-a", ClusterName: "member-a"}}
+	contentA, _ := a.composeDashboard(data)
+
+	b := base
+	b.middleItems = []model.Item{{Name: "member-b", ClusterName: "member-b"}}
+	contentB, _ := b.composeDashboard(data)
+
+	assert.NotEqual(t, stripANSI(contentA), stripANSI(contentB),
+		"the cluster sparkline must reflect the previewed member's own history")
 }

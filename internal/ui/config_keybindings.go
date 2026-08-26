@@ -74,6 +74,10 @@ type Keybindings struct {
 	ExpandCollapse    string `json:"expand_collapse" yaml:"expand_collapse"`
 	PinGroup          string `json:"pin_group" yaml:"pin_group"`
 	ColumnToggle      string `json:"column_toggle" yaml:"column_toggle"`
+	// MetricsSparkCycle advances the CPU/MEM columns through numeric and each
+	// configured sparkline window. Sparklines need Prometheus, and without it the
+	// columns stay numeric.
+	MetricsSparkCycle string `json:"metrics_spark_cycle" yaml:"metrics_spark_cycle"`
 	ToggleRare        string `json:"toggle_rare" yaml:"toggle_rare"`
 	OrphanOverlay     string `json:"orphan_overlay" yaml:"orphan_overlay"`
 	SessionManager    string `json:"session_manager" yaml:"session_manager"`
@@ -243,8 +247,9 @@ func DefaultKeybindings() Keybindings {
 		QuotaDashboard: "Q", TasksOverlay: "`",
 		ExpandCollapse: "z", PinGroup: "p",
 		ColumnToggle: ",", ToggleRare: "H",
-		OrphanOverlay:  "Z",
-		SessionManager: "C",
+		MetricsSparkCycle: "~",
+		OrphanOverlay:     "Z",
+		SessionManager:    "C",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",

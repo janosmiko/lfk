@@ -286,8 +286,15 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		cpuUse := ui.FormatCPU(pm.CPU)
 		memUse := ui.FormatMemory(pm.Memory)
 
-		// Detect significant usage trends (arrows before value).
-		if m.prevPodMetrics != nil {
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
+			// The sparkline replaces the trend arrow rather than stacking
+			// with it: it shows the same trend in more detail, and both
+			// together would cost the column another two characters.
+			cpuSeries, memSeries := m.rowSeries(key)
+			cpuUse = sparklineCell(cpuSeries, cpuUse)
+			memUse = sparklineCell(memSeries, memUse)
+		} else if m.prevPodMetrics != nil {
+			// Detect significant usage trends (arrows before value).
 			if prev, ok := m.prevPodMetrics[key]; ok {
 				cpuDiff := pm.CPU - prev.CPU
 				memDiff := pm.Memory - prev.Memory
@@ -386,6 +393,56 @@ func clearStalePodMetricsColumns(item *model.Item) {
 		{Key: "MEM", Value: "n/a"},
 		{Key: "MEM/R", Value: "n/a"},
 		{Key: "MEM/L", Value: "n/a"},
+	}
+	for _, kv := range item.Columns {
+		if !removeCols[kv.Key] {
+			newCols = append(newCols, kv)
+		}
+	}
+	item.Columns = newCols
+}
+
+// updateContainerMetricsEnriched writes CPU/MEM usage columns onto each
+// container row, looked up by container name (item.Name).
+func (m Model) updateContainerMetricsEnriched(msg containerMetricsEnrichedMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response
+	}
+	m.middleItemsRev++
+	for i := range m.middleItems {
+		item := &m.middleItems[i]
+		cu, ok := msg.metrics[item.Name]
+		if !ok {
+			clearStaleContainerMetricsColumns(item)
+			continue
+		}
+		cpuUse := ui.FormatCPU(cu.CPUMilli)
+		memUse := ui.FormatMemory(cu.MemBytes)
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
+			cpuSeries, memSeries := m.rowSeries(item.Name)
+			cpuUse = sparklineCell(cpuSeries, cpuUse)
+			memUse = sparklineCell(memSeries, memUse)
+		}
+		setContainerMetricsColumns(item, cpuUse, memUse)
+	}
+	m.itemCache[m.navKey()] = m.middleItems
+	return m
+}
+
+// clearStaleContainerMetricsColumns sets the exact "n/a" metricValueMissing
+// matches to sort metrics-less rows last, never FormatCPU/FormatMemory's
+// fabricated "0m"/"0B" (see clearStalePodMetricsColumns).
+func clearStaleContainerMetricsColumns(item *model.Item) {
+	setContainerMetricsColumns(item, "n/a", "n/a")
+}
+
+// setContainerMetricsColumns rewrites item's CPU/MEM columns in place,
+// preserving the rest of the column order across ticks.
+func setContainerMetricsColumns(item *model.Item, cpu, mem string) {
+	removeCols := map[string]bool{"CPU": true, "MEM": true}
+	newCols := []model.KeyValue{
+		{Key: "CPU", Value: cpu},
+		{Key: "MEM", Value: mem},
 	}
 	for _, kv := range item.Columns {
 		if !removeCols[kv.Key] {
@@ -529,8 +586,15 @@ func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 		cpuUse := ui.FormatCPU(nm.CPU)
 		memUse := ui.FormatMemory(nm.Memory)
 
-		// Detect significant usage trends (arrows before value).
-		if m.prevNodeMetrics != nil {
+		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
+			// The sparkline replaces the trend arrow rather than stacking
+			// with it: it shows the same trend in more detail, and both
+			// together would cost the column another two characters.
+			cpuSeries, memSeries := m.rowSeries(item.Name)
+			cpuUse = sparklineCell(cpuSeries, cpuUse)
+			memUse = sparklineCell(memSeries, memUse)
+		} else if m.prevNodeMetrics != nil {
+			// Detect significant usage trends (arrows before value).
 			if prev, ok := m.prevNodeMetrics[item.Name]; ok {
 				cpuDiff := nm.CPU - prev.CPU
 				memDiff := nm.Memory - prev.Memory

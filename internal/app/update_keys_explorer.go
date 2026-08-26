@@ -412,6 +412,9 @@ func (m Model) handleExplorerUIKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, boo
 	case kb.ColumnToggle:
 		mdl := m.handleKeyColumnToggle()
 		return mdl, nil, true
+	case kb.MetricsSparkCycle:
+		mdl, cmd := m.handleMetricsSparkCycle()
+		return mdl, cmd, true
 	case kb.ResourceMap:
 		mdl, cmd := m.handleExplorerResourceMap()
 		return mdl, cmd, true

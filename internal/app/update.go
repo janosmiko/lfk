@@ -218,9 +218,24 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case podMetricsEnrichedMsg:
 		mdl := m.updatePodMetricsEnriched(msg)
 		return mdl, nil, true
+	case containerMetricsEnrichedMsg:
+		mdl := m.updateContainerMetricsEnriched(msg)
+		return mdl, nil, true
+	case containerMetricsRangeMsg:
+		mdl, cmd := m.updateContainerMetricsRange(msg)
+		return mdl, cmd, true
+	case podMetricsRangeMsg:
+		mdl, cmd := m.updatePodMetricsRange(msg)
+		return mdl, cmd, true
 	case nodeMetricsEnrichedMsg:
 		mdl := m.updateNodeMetricsEnriched(msg)
 		return mdl, nil, true
+	case nodeMetricsRangeMsg:
+		mdl, cmd := m.updateNodeMetricsRange(msg)
+		return mdl, cmd, true
+	case clusterMetricsRangeMsg:
+		mdl, cmd := m.updateClusterMetricsRange(msg)
+		return mdl, cmd, true
 	case nodeUptimeEnrichedMsg:
 		mdl := m.updateNodeUptimeEnriched(msg)
 		return mdl, nil, true

@@ -4,6 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -152,6 +157,90 @@ func TestPersistViewerPref_MergesWithExistingFile(t *testing.T) {
 	if !ui.ConfigDiffViewerUnified {
 		t.Error("the second toggle was not persisted")
 	}
+}
+
+// isolateMetricsSparkPref points the state directory at a fresh temp dir and
+// restores ui.MetricsSparkStartupState and ui.ConfigSparklineWindows, so one
+// case cannot leak into the next under -shuffle=on.
+func isolateMetricsSparkPref(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", dir)
+	t.Setenv("LFK_STATE_DIR", filepath.Join(dir, "lfk"))
+
+	prevSeed := ui.MetricsSparkStartupState
+	prevWindows := ui.ConfigSparklineWindows
+	t.Cleanup(func() {
+		ui.MetricsSparkStartupState = prevSeed
+		ui.ConfigSparklineWindows = prevWindows
+	})
+}
+
+func TestApplyViewerPrefs_MetricsSparkWindow_RoundTrips(t *testing.T) {
+	isolateMetricsSparkPref(t)
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute, 15 * time.Minute, time.Hour}
+
+	persistMetricsSparkPref(ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 1})
+	ui.MetricsSparkStartupState = ui.MetricsSparkState{}
+
+	ApplyViewerPrefs()
+
+	assert.Equal(t, ui.MetricsDisplaySpark, ui.MetricsSparkStartupState.Mode)
+	assert.Equal(t, 15*time.Minute, ui.MetricsSparkStartupState.Window())
+}
+
+// A persisted numeric choice must overwrite a stale sparkline seed on
+// reload, which only happens if it round-tripped as explicit, not "never touched".
+func TestApplyViewerPrefs_MetricsSparkNumeric_RoundTripsAsExplicitNumeric(t *testing.T) {
+	isolateMetricsSparkPref(t)
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+
+	persistMetricsSparkPref(ui.MetricsSparkState{})
+	ui.MetricsSparkStartupState = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 0}
+
+	ApplyViewerPrefs()
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, ui.MetricsSparkStartupState.Mode)
+}
+
+func TestApplyViewerPrefs_MetricsSparkWindow_NoLongerConfiguredFallsBackToNumeric(t *testing.T) {
+	isolateMetricsSparkPref(t)
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute, 15 * time.Minute}
+
+	persistMetricsSparkPref(ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 1})
+
+	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
+	ApplyViewerPrefs()
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, ui.MetricsSparkStartupState.Mode)
+}
+
+func TestApplyViewerPrefs_MetricsSparkNeverTouched_LeavesNumericWithoutError(t *testing.T) {
+	isolateMetricsSparkPref(t)
+
+	assert.NotPanics(t, ApplyViewerPrefs)
+	assert.Equal(t, ui.MetricsDisplayNumeric, ui.MetricsSparkStartupState.Mode)
+}
+
+// Pins the mechanism rule 3 depends on: nil is omitted (never touched) while
+// a pointer to "" still encodes (explicit numeric), and both must decode
+// back to their original shape.
+func TestViewerPrefsState_MetricsSparkWindow_NilVsEmptyStringSurviveRoundTrip(t *testing.T) {
+	untouched := ViewerPrefsState{}
+	data, err := yaml.Marshal(untouched)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "metrics_spark_window")
+
+	empty := ""
+	explicitNumeric := ViewerPrefsState{MetricsSparkWindow: &empty}
+	data, err = yaml.Marshal(explicitNumeric)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "metrics_spark_window")
+
+	var back ViewerPrefsState
+	require.NoError(t, yaml.Unmarshal(data, &back))
+	require.NotNil(t, back.MetricsSparkWindow)
+	assert.Equal(t, "", *back.MetricsSparkWindow)
 }
 
 func writeViewerPrefsFile(t *testing.T, path, body string) {

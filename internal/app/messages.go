@@ -393,6 +393,12 @@ type nodeMetricsEnrichedMsg struct {
 	gen     uint64
 }
 
+// containerMetricsEnrichedMsg carries per-container metrics, keyed by name.
+type containerMetricsEnrichedMsg struct {
+	metrics map[string]k8s.ContainerUsage
+	gen     uint64
+}
+
 // nodeUptimeEnrichedMsg carries Prometheus node uptimes to enrich the middle
 // pane items. uptimes separates name-keyed from address-keyed (IP/hostname)
 // results (see k8s.GetNodeUptimes) since node_exporter series aren't

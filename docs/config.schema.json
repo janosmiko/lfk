@@ -287,6 +287,24 @@
       "description": "Minimum gap between two list-wide CPU/MEM fetches on a watch-tick refresh. Go duration, clamped to [2s, 10m]. 0 fetches every tick. Manual refresh always fetches. Default 15s.",
       "default": "15s"
     },
+    "metrics_sparkline_windows": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ordered window list the CPU/MEM display hotkey cycles through. Go durations. Unparseable entries are dropped.",
+      "default": ["5m", "15m", "1h"]
+    },
+    "metrics_sparkline_width": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 40,
+      "description": "Preferred sparkline glyph count in the CPU/MEM columns. The drawn width is still bounded by the space left after the value.",
+      "default": 12
+    },
+    "metrics_sparkline_interval": {
+      "type": "string",
+      "description": "Minimum gap between two Prometheus range fetches on a watch-tick refresh. Go duration, clamped to [10s, 10m]. Default 30s.",
+      "default": "30s"
+    },
     "watch_throttle": {
       "type": "boolean",
       "description": "Master switch for focus/idle watch throttling. Set false to disable it entirely (watch_interval used unconditionally). Default true.",
@@ -460,6 +478,7 @@
         "expand_collapse": { "type": "string" },
         "pin_group": { "type": "string" },
         "column_toggle": { "type": "string" },
+        "metrics_spark_cycle": { "type": "string" },
         "toggle_rare": { "type": "string" },
         "orphan_overlay": { "type": "string" },
         "session_manager": { "type": "string" },

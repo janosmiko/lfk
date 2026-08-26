@@ -275,7 +275,9 @@ func TestExplorerHintBar_AdvertisesTheWorkingHelpKey(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 
 	m := whichKeyTestModel()
-	m.width, m.height = 200, 24
+	// 220, not 200: whichKeyTestModel sits on a Pod row, where "~: cpu/mem
+	// view" legitimately renders, and the hint occupies part of that budget.
+	m.width, m.height = 220, 24
 	bar := stripANSI(m.statusBar())
 	if !strings.Contains(bar, "?: help") {
 		t.Errorf("hint bar must advertise the key that opens help (%q):\n%s", "?: help", bar)

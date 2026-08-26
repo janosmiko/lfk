@@ -159,6 +159,17 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 	if c.testPromQuery != nil {
 		return c.testPromQuery(ctx, contextName, query)
 	}
+	return c.runPrometheusProxy(ctx, contextName, "/api/v1/query", map[string]string{"query": query})
+}
+
+// runPrometheusProxy sends one request to the discovered Prometheus Service
+// through the API server proxy and returns the raw body. It owns the four
+// behaviors both the instant and the range path need: the cached
+// namespace+service hit, eviction of a stale cache entry, the
+// namespace-by-service discovery loop, and a per-request timeout so one hung
+// probe cannot spend the whole context budget and leave the fallback loop
+// unable to succeed.
+func (c *Client) runPrometheusProxy(ctx context.Context, contextName, path string, params map[string]string) ([]byte, error) {
 	if c.demo {
 		return nil, errPrometheusUnavailableDemo
 	}
@@ -168,14 +179,10 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 	}
 	promNs, promSvc, promPort, _, _, _ := resolveMonitoringEndpoints(contextName)
 
-	params := map[string]string{"query": query}
-	// Per-request 10s timeout — a single shared context would burn its
-	// budget on the first hung probe and leave the fallback loop unable
-	// to succeed (every later DoRaw would fail with context.Canceled).
 	doQuery := func(ns, svc string) ([]byte, error) {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		return safeProxyGetRaw(rctx, cs, ns, svc, promPort, "/api/v1/query", params)
+		return safeProxyGetRaw(rctx, cs, ns, svc, promPort, path, params)
 	}
 	// Keyed by contextName (not the clientset): clientsetForContext builds a
 	// fresh clientset per call, so a clientset key would never hit and re-run
