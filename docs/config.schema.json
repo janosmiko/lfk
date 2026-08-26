@@ -331,6 +331,11 @@
       "description": "When true, Secret listing fetches metadata only and decoded values load on hover. Faster in clusters with many large Secrets.",
       "default": false
     },
+    "disable_http2": {
+      "type": "boolean",
+      "description": "When true, lfk talks HTTP/1.1 to the API server instead of HTTP/2. Use behind a proxy or VPN that resets long-lived watch connections.",
+      "default": false
+    },
     "informer_cache": {
       "description": "List strategy: \"off\" round-trips every list, \"auto\" promotes a resource type to a shared informer above 1000 items, \"always\" opens a watch eagerly. Legacy bool form: true -> always, false -> off.",
       "oneOf": [

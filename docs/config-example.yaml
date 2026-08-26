@@ -725,6 +725,12 @@ confirm_on_exit: true
 # Default: auto
 # informer_cache: auto
 
+# ─── Disable HTTP/2 ───────────────────────────────────────────────────────────
+# Talk HTTP/1.1 to the API server, for a proxy or VPN that resets long-lived
+# watch connections. The DISABLE_HTTP2 env var overrides this field.
+# Default: false
+# disable_http2: true
+
 # ─── Scrolloff ────────────────────────────────────────────────────────────────
 # Lines to keep visible above/below the cursor when scrolling. Used by all
 # views with cursor-based navigation.

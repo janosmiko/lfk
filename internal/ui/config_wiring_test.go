@@ -80,6 +80,7 @@ metrics_sparkline_width: 8
 metrics_sparkline_interval: 45s
 no_color: true
 secret_lazy_loading: true
+disable_http2: true
 informer_cache: always
 min_contrast_ratio: 0.5
 read_only: true
@@ -260,6 +261,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 45*time.Second, ConfigSparklineInterval, "metrics_sparkline_interval")
 	assert.True(t, ConfigNoColor, "no_color")
 	assert.True(t, ConfigSecretLazyLoading, "secret_lazy_loading")
+	assert.True(t, ConfigDisableHTTP2, "disable_http2")
 	assert.Equal(t, InformerCacheAlways, ConfigInformerCacheMode, "informer_cache")
 	assert.InDelta(t, 0.5, ConfigMinContrastRatio, 1e-9, "min_contrast_ratio")
 	assert.True(t, ConfigReadOnly, "read_only")
@@ -463,6 +465,7 @@ var wiringCoveredFields = map[string]string{
 	"clusters":                   "TestLoadConfig_AllSettingsWired",
 	"no_color":                   "TestLoadConfig_AllSettingsWired",
 	"secret_lazy_loading":        "TestLoadConfig_AllSettingsWired",
+	"disable_http2":              "TestLoadConfig_AllSettingsWired",
 	"informer_cache":             "TestLoadConfig_AllSettingsWired",
 	"min_contrast_ratio":         "TestLoadConfig_AllSettingsWired",
 	"read_only":                  "TestLoadConfig_AllSettingsWired",
@@ -577,6 +580,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origKubeconfig := ConfigKubeconfigDirs
 	origKubeconfigExclusive := ConfigKubeconfigExclusive
 	origSecretLazy := ConfigSecretLazyLoading
+	origDisableHTTP2 := ConfigDisableHTTP2
 	origKubeshark := ConfigKubesharkNamespace
 	origInformer := ConfigInformerCacheMode
 	origContrast := ConfigMinContrastRatio
@@ -678,6 +682,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigKubeconfigDirs = origKubeconfig
 		ConfigKubeconfigExclusive = origKubeconfigExclusive
 		ConfigSecretLazyLoading = origSecretLazy
+		ConfigDisableHTTP2 = origDisableHTTP2
 		ConfigKubesharkNamespace = origKubeshark
 		ConfigInformerCacheMode = origInformer
 		ConfigMinContrastRatio = origContrast

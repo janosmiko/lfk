@@ -205,6 +205,10 @@ type configFile struct {
 	// the trade-off is a per-hover GET and a brief blank-data frame until the
 	// fetch resolves.
 	SecretLazyLoading *bool `json:"secret_lazy_loading" yaml:"secret_lazy_loading"`
+	// DisableHTTP2 drops API-server connections to HTTP/1.1. On HTTP/2 one
+	// connection carries every list and watch, so a proxy that resets a
+	// long-lived watch resets the lists beside it (issue #694).
+	DisableHTTP2 *bool `json:"disable_http2" yaml:"disable_http2"`
 	// InformerCache controls how lists are routed: "off" round-trips every
 	// time (matches kubectl), "auto" (default) starts in direct mode per
 	// (context, GVR) and promotes to a shared informer once a list crosses
