@@ -62,9 +62,39 @@ func (m Model) updateExecPodOSResolved(msg execPodOSResolvedMsg) (tea.Model, tea
 	return m, m.execKubectlExec()
 }
 
-// linuxExecShellCmd is the POSIX shell bootstrap used to exec into Linux
-// containers: clear the screen, then prefer bash, then ash, then plain sh.
-const linuxExecShellCmd = "clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }"
+// execClearScreenCmd is guarded because minimal images ship no `clear` binary,
+// and an unguarded call printed "clear: not found" before the shell started.
+const execClearScreenCmd = "command -v clear >/dev/null 2>&1 && clear; "
+
+// buildLinuxExecShellCmd renders the POSIX shell bootstrap for Linux
+// containers from a shell preference order. The last entry runs
+// unconditionally, so a one-entry order needs no probe at all.
+func buildLinuxExecShellCmd(shells []string) string {
+	if len(shells) == 0 {
+		shells = ui.DefaultExecShells
+	}
+	var b strings.Builder
+	b.WriteString(execClearScreenCmd)
+	last := len(shells) - 1
+	for i, entry := range shells[:last] {
+		if i == 0 {
+			b.WriteString("if ")
+		} else {
+			b.WriteString("elif ")
+		}
+		binary, _, _ := strings.Cut(entry, " ")
+		b.WriteString("command -v " + binary + " >/dev/null 2>&1; then exec " + entry + "; ")
+	}
+	if last == 0 {
+		return b.String() + "exec " + shells[0]
+	}
+	return b.String() + "else exec " + shells[last] + "; fi"
+}
+
+// linuxExecShellCmd renders the bootstrap from the user's configured order.
+func linuxExecShellCmd() string {
+	return buildLinuxExecShellCmd(ui.ConfigExecShells)
+}
 
 // windowsExecShellCmd prefers PowerShell and falls back to cmd.exe when it is
 // absent (e.g. nanoserver base images, which ship only cmd.exe). cmd's `||`
@@ -84,7 +114,7 @@ func execShellArgs(name, namespace, displayCtx, container, podOS string) []strin
 	if strings.EqualFold(podOS, "windows") {
 		return append(args, "--", "cmd.exe", "/c", windowsExecShellCmd)
 	}
-	return append(args, "--", "/bin/sh", "-c", linuxExecShellCmd)
+	return append(args, "--", "/bin/sh", "-c", linuxExecShellCmd())
 }
 
 func (m Model) execKubectlExec() tea.Cmd {

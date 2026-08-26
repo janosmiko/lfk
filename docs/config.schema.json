@@ -128,6 +128,12 @@
       "enum": ["pty", "exec", "mux"],
       "default": "pty"
     },
+    "exec_shells": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9 ._/+=:-]+$" },
+      "description": "Shell preference order for exec into a Linux container. Entries may carry arguments. The last entry runs even when it is absent, so it must be a shell every image ships. Entries with shell metacharacters are dropped.",
+      "default": ["bash -i", "ash", "sh"]
+    },
     "scrollback_lines": {
       "type": "integer",
       "description": "Per-tab capacity of the embedded PTY scrollback ring buffer. Clamped to [100, 100000]. Only meaningful in pty mode.",

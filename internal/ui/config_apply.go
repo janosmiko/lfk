@@ -4,7 +4,6 @@ import (
 	"maps"
 	"math"
 	"os"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -104,19 +103,8 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.Dashboard != nil {
 		ConfigDashboard = *cfg.Dashboard
 	}
-	if cfg.Terminal != "" {
-		mode, warning := resolveTerminalMode(cfg.Terminal, runtime.GOOS, ConfigTerminalMode)
-		if warning != "" {
-			// Raw cfg.Terminal is intentionally not logged — log
-			// redaction policy. The "valid" list tells the user what
-			// is accepted. Their own config file is the source of
-			// truth for what they typed.
-			logger.Warn(warning,
-				"valid", []string{TerminalModePTY, TerminalModeExec, TerminalModeMux},
-				"applied", mode)
-		}
-		ConfigTerminalMode = mode
-	}
+	applyTerminalConfig(cfg.Terminal)
+	applyExecShellsConfig(cfg.ExecShells)
 	if cfg.ScrollbackLines != 0 {
 		v := cfg.ScrollbackLines
 		clamped := v
