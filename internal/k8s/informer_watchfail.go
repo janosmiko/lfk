@@ -17,6 +17,10 @@ import (
 const (
 	defaultMaxWatchFailures     = 3
 	defaultWatchFailureCooldown = 10 * time.Minute
+	// The reflector backs off to at most 30s between retries, so failures
+	// from one broken connection land inside two minutes. A wider gap means
+	// the watch ran in between, which is a recovery client-go never reports.
+	defaultWatchFailureWindow = 2 * time.Minute
 )
 
 // blockedLocked reports whether a watch give-up still holds. Caller holds
@@ -41,6 +45,7 @@ func (ic *informerCache) noteWatchSuccess(contextName string, gvr schema.GroupVe
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
 	state.watchFailures = 0
+	state.lastWatchFailure = time.Time{}
 	state.mu.Unlock()
 }
 
@@ -48,19 +53,27 @@ func (ic *informerCache) noteWatchSuccess(contextName string, gvr schema.GroupVe
 // the informer matters more than blocking the cache: while it lives, the
 // reflector retries and re-breaks the shared connection.
 func (ic *informerCache) noteWatchFailure(contextName string, gvr schema.GroupVersionResource, err error) {
+	now := time.Now()
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
 	if state.denied || state.blockedLocked() {
 		state.mu.Unlock()
 		return
 	}
+	// noteWatchSuccess only fires at the initial sync, so a stale previous
+	// failure is the sole evidence that the watch recovered in between.
+	if !state.lastWatchFailure.IsZero() && now.Sub(state.lastWatchFailure) > ic.watchFailureWindow {
+		state.watchFailures = 0
+	}
+	state.lastWatchFailure = now
 	state.watchFailures++
 	trip := state.watchFailures >= ic.maxWatchFailures
 	if trip {
 		state.watchFailures = 0
+		state.lastWatchFailure = time.Time{}
 		state.hot = false
 		state.promoted = false
-		state.cooldownUntil = time.Now().Add(ic.watchFailureCooldown)
+		state.cooldownUntil = now.Add(ic.watchFailureCooldown)
 	}
 	state.mu.Unlock()
 

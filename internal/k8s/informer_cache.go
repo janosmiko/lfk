@@ -99,11 +99,11 @@ type gvrAutoState struct {
 	// MethodNotSupported, or NotFound -- RBAC or API surface that will
 	// not change mid-session. Permanent for the life of the Client.
 	denied bool
-	// watchFailures counts consecutive non-status watch errors, cleared by
-	// a successful sync. cooldownUntil blocks the cache once the count
-	// trips maxWatchFailures. See noteWatchFailure.
-	watchFailures int
-	cooldownUntil time.Time
+	// watchFailures counts consecutive non-status watch errors. A sync or a
+	// gap wider than watchFailureWindow clears it. See noteWatchFailure.
+	watchFailures    int
+	lastWatchFailure time.Time
+	cooldownUntil    time.Time
 }
 
 // itemMemoEntry caches one converted model.Item alongside the
@@ -187,6 +187,7 @@ type informerCache struct {
 	// reflector retries nor the production cooldown.
 	maxWatchFailures     int
 	watchFailureCooldown time.Duration
+	watchFailureWindow   time.Duration
 
 	// sweepInterval rate-limits sweepStaleHot off the watch-tick path.
 	// lastSweep is guarded by ic.mu. Tests set sweepInterval to zero to
@@ -221,6 +222,7 @@ func newInformerCache(clientFactory func(string) (dynamic.Interface, error)) *in
 
 		maxWatchFailures:     defaultMaxWatchFailures,
 		watchFailureCooldown: defaultWatchFailureCooldown,
+		watchFailureWindow:   defaultWatchFailureWindow,
 	}
 }
 

@@ -102,6 +102,31 @@ func TestInformerCache_WatchSuccessResetsFailureCount(t *testing.T) {
 	assert.True(t, c.informers.cacheBlocked("", gvr))
 }
 
+// client-go retries ListAndWatch itself and calls nothing back when a retry
+// works, so noteWatchSuccess never sees a recovery after the initial sync.
+// Age is the only signal left that the watch ran fine in between.
+func TestInformerCache_WatchFailuresExpireBetweenOutages(t *testing.T) {
+	c := NewTestClient(nil, newFakeDynClient(pod("api-1", "team-a")))
+	c.SetInformerCacheMode(InformerCacheAuto)
+	t.Cleanup(c.Shutdown)
+	withWatchFailureTuning(c, 3, time.Hour)
+	c.informers.watchFailureWindow = 20 * time.Millisecond
+	gvr := podGVR()
+
+	c.informers.noteWatchFailure("", gvr, errReset)
+	c.informers.noteWatchFailure("", gvr, errReset)
+	time.Sleep(40 * time.Millisecond)
+
+	c.informers.noteWatchFailure("", gvr, errReset)
+	assert.False(t, c.informers.cacheBlocked("", gvr),
+		"a failure after the window starts a new run instead of finishing the old one")
+
+	c.informers.noteWatchFailure("", gvr, errReset)
+	c.informers.noteWatchFailure("", gvr, errReset)
+	assert.True(t, c.informers.cacheBlocked("", gvr),
+		"three failures inside the window must still trip the give-up")
+}
+
 // TestInformerCache_WatchFailureLogsOnce keeps the reflector's retry storm
 // out of the user's log. The give-up is worth one line, not one per retry.
 func TestInformerCache_WatchFailureLogsOnce(t *testing.T) {
