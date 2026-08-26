@@ -130,12 +130,12 @@ func (c *Client) GetPodMetricsRange(ctx context.Context, contextName, namespace 
 	cpu, cpuErr := c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "cpu"), window, step)
 	if cpuErr != nil {
 		logger.Debug("Prometheus pod CPU range query failed",
-			"context", contextName, "namespace", namespace, "error", cpuErr)
+			"context", contextName, "namespace", namespace, "error", logger.Redact(cpuErr.Error()))
 	}
 	mem, memErr := c.queryPodRange(ctx, contextName, buildPromPodQuery(namespace, "memory"), window, step)
 	if memErr != nil {
 		logger.Debug("Prometheus pod memory range query failed",
-			"context", contextName, "namespace", namespace, "error", memErr)
+			"context", contextName, "namespace", namespace, "error", logger.Redact(memErr.Error()))
 	}
 	if cpuErr != nil && memErr != nil {
 		return nil, nil, fmt.Errorf("prometheus pod range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
@@ -180,11 +180,11 @@ func (c *Client) GetNodeMetricsRange(ctx context.Context, contextName string, wi
 	)
 	cpu, cpuErr := c.queryNodeRange(ctx, contextName, cpuQuery, window, step)
 	if cpuErr != nil {
-		logger.Debug("Prometheus node CPU range query failed", "context", contextName, "error", cpuErr)
+		logger.Debug("Prometheus node CPU range query failed", "context", contextName, "error", logger.Redact(cpuErr.Error()))
 	}
 	mem, memErr := c.queryNodeRange(ctx, contextName, memQuery, window, step)
 	if memErr != nil {
-		logger.Debug("Prometheus node memory range query failed", "context", contextName, "error", memErr)
+		logger.Debug("Prometheus node memory range query failed", "context", contextName, "error", logger.Redact(memErr.Error()))
 	}
 	if cpuErr != nil && memErr != nil {
 		return nil, nil, fmt.Errorf("prometheus node range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
@@ -224,11 +224,11 @@ func (c *Client) GetClusterMetricsRange(ctx context.Context, contextName string,
 	)
 	cpu, cpuErr := c.queryClusterRange(ctx, contextName, cpuQuery, window, step)
 	if cpuErr != nil {
-		logger.Debug("Prometheus cluster CPU range query failed", "context", contextName, "error", cpuErr)
+		logger.Debug("Prometheus cluster CPU range query failed", "context", contextName, "error", logger.Redact(cpuErr.Error()))
 	}
 	mem, memErr := c.queryClusterRange(ctx, contextName, memQuery, window, step)
 	if memErr != nil {
-		logger.Debug("Prometheus cluster memory range query failed", "context", contextName, "error", memErr)
+		logger.Debug("Prometheus cluster memory range query failed", "context", contextName, "error", logger.Redact(memErr.Error()))
 	}
 	if cpuErr != nil && memErr != nil {
 		return MetricSeries{}, MetricSeries{}, fmt.Errorf("prometheus cluster range queries failed: cpu: %w, mem: %w", cpuErr, memErr)
@@ -280,12 +280,12 @@ func (c *Client) GetContainerMetricsRange(ctx context.Context, contextName, name
 	cpu, cpuErr := c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "cpu"), window, step)
 	if cpuErr != nil {
 		logger.Debug("Prometheus container CPU range query failed",
-			"context", contextName, "namespace", namespace, "pod", pod, "error", cpuErr)
+			"context", contextName, "namespace", namespace, "pod", pod, "error", logger.Redact(cpuErr.Error()))
 	}
 	mem, memErr := c.queryContainerRange(ctx, contextName, buildPromContainerRangeQuery(namespace, pod, "memory"), window, step)
 	if memErr != nil {
 		logger.Debug("Prometheus container memory range query failed",
-			"context", contextName, "namespace", namespace, "pod", pod, "error", memErr)
+			"context", contextName, "namespace", namespace, "pod", pod, "error", logger.Redact(memErr.Error()))
 	}
 	if cpuErr != nil && memErr != nil {
 		return nil, nil, fmt.Errorf("prometheus container range queries failed: cpu: %w, mem: %w", cpuErr, memErr)

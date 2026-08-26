@@ -71,7 +71,7 @@ func TestParsePrometheusMatrix_UnparseableSampleBecomesNaN(t *testing.T) {
 	    "result": [
 	      {
 	        "metric": {"namespace": "default", "pod": "api-1"},
-	        "values": [[1, "1"], [2, "NaN"], [3, "3"]]
+	        "values": [[1, "1"], [2, "NaN"], [3, "3"], [4, "not-a-number"]]
 	      }
 	    ]
 	  }
@@ -80,10 +80,13 @@ func TestParsePrometheusMatrix_UnparseableSampleBecomesNaN(t *testing.T) {
 	got, err := parsePrometheusMatrix(data, podKeyFunc)
 	require.NoError(t, err)
 	pts := got["default/api-1"].Points
-	require.Len(t, pts, 3)
+	require.Len(t, pts, 4)
 	assert.Equal(t, 1.0, pts[0])
+	// "NaN" parses cleanly to NaN, so it proves the gap passes through, not
+	// that the parse-error branch runs. "not-a-number" is what reaches that.
 	assert.True(t, math.IsNaN(pts[1]), "gap sample must be NaN, got %v", pts[1])
 	assert.Equal(t, 3.0, pts[2])
+	assert.True(t, math.IsNaN(pts[3]), "unparseable sample must become NaN, got %v", pts[3])
 }
 
 func TestParsePrometheusMatrix_NonSuccessStatus(t *testing.T) {

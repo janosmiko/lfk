@@ -349,17 +349,13 @@ func TestStatusBarKeyHints(t *testing.T) {
 // Assert the full "key: desc" unit, not bare "~" - that's also Truncate()'s
 // overflow marker elsewhere in the UI and would pass vacuously.
 func TestStatusBarKeyHints_ShowsMetricsSparkCycle(t *testing.T) {
-	m := Model{
-		nav: model.NavigationState{
-			Level:        model.LevelResources,
-			ResourceType: model.ResourceTypeEntry{Kind: "Pod"},
-		},
-		middleItems:   []model.Item{{Name: "pod"}},
-		width:         210,
-		height:        40,
-		tabs:          []TabState{{}},
-		selectedItems: make(map[string]bool),
-	}
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+	m.middleItems = []model.Item{{Name: "pod"}}
+	m.width = 210
+	m.height = 40
+
 	bar := m.statusBar()
 	stripped := stripANSI(bar)
 	assert.Contains(t, stripped, "~: cpu/mem view")

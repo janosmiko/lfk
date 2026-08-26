@@ -117,7 +117,7 @@ Your chosen sort is remembered per resource kind and per cluster context, and pe
 | `Ctrl+R` | Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab) |
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+T` | Cycle terminal mode (pty/exec/mux — mux skipped without tmux/zellij) |
-| `~` | Cycle CPU/MEM columns between values and sparklines over 5m, 15m, 1h (needs Prometheus) |
+| `~` | Cycle CPU/MEM columns between values and sparklines over 5m, 15m, 1h by default (needs Prometheus) |
 | `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `B` | Show / hide the per-resource SEC severity badge on explorer rows |
 | `i` | Show / hide ignored security findings (security view only — shadows the Label Editor there, which is a no-op on synthetic finding rows) |
