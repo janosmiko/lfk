@@ -24,7 +24,7 @@ func TestExecShellArgs_LinuxWithContainer(t *testing.T) {
 	got := execShellArgs("pod-1", "ns", "ctx", "app", "linux")
 	assert.Equal(t, []string{
 		"exec", "-it", "pod-1", "-n", "ns", "--context", "ctx", "-c", "app",
-		"--", "/bin/sh", "-c", linuxExecShellCmd,
+		"--", "/bin/sh", "-c", linuxExecShellCmd(),
 	}, got)
 }
 
@@ -33,7 +33,7 @@ func TestExecShellArgs_LinuxDefaultWhenUnknown(t *testing.T) {
 	got := execShellArgs("pod-1", "ns", "ctx", "", "")
 	assert.Equal(t, []string{
 		"exec", "-it", "pod-1", "-n", "ns", "--context", "ctx",
-		"--", "/bin/sh", "-c", linuxExecShellCmd,
+		"--", "/bin/sh", "-c", linuxExecShellCmd(),
 	}, got)
 }
 

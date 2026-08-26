@@ -651,6 +651,10 @@ confirm_on_exit: true
 # Cycle at runtime with Ctrl+T (mux is skipped when no multiplexer is detected).
 # terminal: pty
 
+# ─── Exec Shells ──────────────────────────────────────────────────────────────
+# lfk starts the first shell that exists. The last entry runs even when absent.
+# exec_shells: ["bash -i", "ash", "sh"]
+
 # ─── PTY Scrollback ───────────────────────────────────────────────────────────
 # Per-tab capacity of the embedded PTY scrollback ring (in lines). Only
 # affects pty mode; exec and mux delegate scrollback to the host terminal.

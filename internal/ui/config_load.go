@@ -59,6 +59,10 @@ type configFile struct {
 	// tmux/zellij window or pane — requires lfk to be running inside a
 	// supported multiplexer).
 	Terminal string `json:"terminal" yaml:"terminal"`
+	// ExecShells is the shell preference order for exec into a Linux
+	// container, entries optionally carrying arguments. The last entry runs
+	// even when absent, so it must be a shell every image ships.
+	ExecShells []string `json:"exec_shells" yaml:"exec_shells"`
 	// ScrollbackLines is the per-tab capacity of the embedded PTY
 	// scrollback ring buffer. Default 5000. Clamped to
 	// [ScrollbackLinesMin, ScrollbackLinesMax]. Only meaningful in pty

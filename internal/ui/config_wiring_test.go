@@ -74,6 +74,7 @@ watch_interval: 3s
 background_watch_interval: 45s
 foreground_idle_timeout: 300s
 metrics_interval: 25s
+exec_shells: ["zsh", "sh"]
 metrics_sparkline_windows: ["2m", "30m"]
 metrics_sparkline_width: 8
 metrics_sparkline_interval: 45s
@@ -253,6 +254,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 45*time.Second, ConfigBackgroundWatchInterval, "background_watch_interval")
 	assert.Equal(t, 300*time.Second, ConfigForegroundIdleTimeout, "foreground_idle_timeout")
 	assert.Equal(t, 25*time.Second, ConfigMetricsInterval, "metrics_interval")
+	assert.Equal(t, []string{"zsh", "sh"}, ConfigExecShells, "exec_shells")
 	assert.Equal(t, []time.Duration{2 * time.Minute, 30 * time.Minute}, ConfigSparklineWindows, "metrics_sparkline_windows")
 	assert.Equal(t, 8, ConfigSparklineWidth, "metrics_sparkline_width")
 	assert.Equal(t, 45*time.Second, ConfigSparklineInterval, "metrics_sparkline_interval")
@@ -454,6 +456,7 @@ var wiringCoveredFields = map[string]string{
 	"background_watch_interval":  "TestLoadConfig_AllSettingsWired",
 	"foreground_idle_timeout":    "TestLoadConfig_AllSettingsWired",
 	"metrics_interval":           "TestLoadConfig_AllSettingsWired + TestApplyMetricsIntervalConfig",
+	"exec_shells":                "TestLoadConfig_AllSettingsWired",
 	"metrics_sparkline_windows":  "TestLoadConfig_AllSettingsWired",
 	"metrics_sparkline_width":    "TestLoadConfig_AllSettingsWired + TestClampSparklineWidth",
 	"metrics_sparkline_interval": "TestLoadConfig_AllSettingsWired + TestClampSparklineInterval",
@@ -529,6 +532,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origIcon := IconMode
 	origDashboard := ConfigDashboard
 	origTerminal := ConfigTerminalMode
+	origExecShells := ConfigExecShells
 	origScrollback := ConfigScrollbackLines
 	origPinnedGroups := ConfigPinnedGroups
 	origPinnedTypes := ConfigPinnedTypes
@@ -629,6 +633,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		IconMode = origIcon
 		ConfigDashboard = origDashboard
 		ConfigTerminalMode = origTerminal
+		ConfigExecShells = origExecShells
 		ConfigScrollbackLines = origScrollback
 		ConfigPinnedGroups = origPinnedGroups
 		ConfigPinnedTypes = origPinnedTypes
