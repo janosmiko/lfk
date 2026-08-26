@@ -164,3 +164,59 @@ func TestUpdateResourcesLoadedMain_ThrottleKeepsNodeUptime(t *testing.T) {
 	setMetricsInterval(t, time.Hour)
 	assert.Contains(t, secondTickQueue(t, "Node", time.Hour, true), "Node uptime")
 }
+
+// The throttle key must identify the series, not just the kind. A namespace
+// switch inside the interval used to reuse the previous stamp, so the new list
+// drew no history until the interval expired.
+func TestAllowSparklineFetch_NamespaceSwitchIsNotThrottled(t *testing.T) {
+	prev := ui.ConfigSparklineInterval
+	t.Cleanup(func() { ui.ConfigSparklineInterval = prev })
+	ui.ConfigSparklineInterval = time.Hour
+
+	m := basePush80Model()
+	m.nav.Context = "ctx"
+	m.allNamespaces = false
+	m.namespace = "ns-a"
+	require.True(t, m.allowSparklineFetch("Pod"), "the first fetch must run")
+	require.False(t, m.allowSparklineFetch("Pod"), "an immediate repeat must be throttled")
+
+	m.namespace = "ns-b"
+	assert.True(t, m.allowSparklineFetch("Pod"),
+		"another namespace asks for different series, so it must not be throttled")
+}
+
+func TestAllowSparklineFetch_AnotherPodsContainersAreNotThrottled(t *testing.T) {
+	prev := ui.ConfigSparklineInterval
+	t.Cleanup(func() { ui.ConfigSparklineInterval = prev })
+	ui.ConfigSparklineInterval = time.Hour
+
+	m := basePush80Model()
+	m.nav.Context = "ctx"
+	m.allNamespaces = false
+	m.namespace = "ns-a"
+	m.nav.OwnedName = "api-1"
+	require.True(t, m.allowSparklineFetch("Container"))
+	require.False(t, m.allowSparklineFetch("Container"))
+
+	m.nav.OwnedName = "api-2"
+	assert.True(t, m.allowSparklineFetch("Container"),
+		"another pod's containers are different series, so they must not be throttled")
+}
+
+// Node queries are not namespaced, so a namespace switch must not force a
+// pointless refetch of the same cluster-wide series.
+func TestAllowSparklineFetch_NodeIgnoresTheNamespace(t *testing.T) {
+	prev := ui.ConfigSparklineInterval
+	t.Cleanup(func() { ui.ConfigSparklineInterval = prev })
+	ui.ConfigSparklineInterval = time.Hour
+
+	m := basePush80Model()
+	m.nav.Context = "ctx"
+	m.allNamespaces = false
+	m.namespace = "ns-a"
+	require.True(t, m.allowSparklineFetch("Node"))
+
+	m.namespace = "ns-b"
+	assert.False(t, m.allowSparklineFetch("Node"),
+		"node history is cluster-wide, so a namespace switch must stay throttled")
+}

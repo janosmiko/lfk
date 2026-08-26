@@ -55,11 +55,28 @@ func (m *Model) allowMetricsFetch(kind string) bool {
 	return true
 }
 
+// sparklineScope returns the part of the throttle key that identifies which
+// series the range query asks for. Without it a namespace switch, or opening a
+// second pod's containers, reuses the previous stamp and the new view sits
+// without history until the interval expires.
+func sparklineScope(m *Model, kind string) string {
+	switch kind {
+	case "Pod":
+		return "/" + m.effectiveNamespace()
+	case "Container":
+		return "/" + m.effectiveNamespace() + "/" + m.nav.OwnedName
+	default:
+		// Node and Cluster queries are not namespaced, so the context already
+		// identifies them.
+		return ""
+	}
+}
+
 // allowSparklineFetch throttles the range fetch harder than allowMetricsFetch,
 // since a range query reads a whole window per series, and stamps it under a
 // separate key so the two throttles cannot starve each other.
 func (m *Model) allowSparklineFetch(kind string) bool {
-	key := m.nav.Context + "/spark/" + kind
+	key := m.nav.Context + "/spark/" + kind + sparklineScope(m, kind)
 	if interval := ui.ConfigSparklineInterval; interval > 0 {
 		if last, ok := m.metricsLastFetch[key]; ok && time.Since(last) < interval {
 			return false
