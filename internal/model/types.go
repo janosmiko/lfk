@@ -303,17 +303,23 @@ type Item struct {
 // SelectionKey returns the stable map key identifying this item in a
 // multi-selection set. Union-mode rows carry a non-empty ClusterName, which
 // is prepended so the same name+namespace appearing in two clusters stays
-// distinct. Non-union rows produce the legacy "namespace/name" (or bare
-// "name") form. This is the single source of truth for the key: both the
-// app's selection store and the ui renderer's selected-row check derive
-// their keys here so the two can never drift.
+// distinct. Kind is appended when set, because a mixed-kind list (an ArgoCD
+// application's components, for one) can hold a Role and a RoleBinding that
+// share a namespace and a name. Without the kind those two rows collapse
+// onto one key, so the count under-reports and toggling either row clears
+// both. This is the single source of truth for the key: both the app's
+// selection store and the ui renderer's selected-row check derive their keys
+// here so the two can never drift.
 func (i Item) SelectionKey() string {
 	base := i.Name
 	if i.Namespace != "" {
 		base = i.Namespace + "/" + i.Name
 	}
 	if i.ClusterName != "" {
-		return i.ClusterName + ":" + base
+		base = i.ClusterName + ":" + base
+	}
+	if i.Kind != "" {
+		base += "|" + i.Kind
 	}
 	return base
 }

@@ -381,8 +381,8 @@ func TestCov80DirectActionRefresh(t *testing.T) {
 func TestCov80OpenActionMenuBulkMode(t *testing.T) {
 	m := basePush80Model()
 	m.selectedItems = map[string]bool{
-		"default/pod-1": true,
-		"ns-2/pod-2":    true,
+		selectionKey(m.middleItems[0]): true,
+		selectionKey(m.middleItems[1]): true,
 	}
 	rm := m.openActionMenu()
 	assert.True(t, rm.bulkMode)
@@ -585,7 +585,7 @@ func TestCovOpenActionMenuNoSelection(t *testing.T) {
 
 func TestCovOpenActionMenuBulk(t *testing.T) {
 	m := baseModelActions()
-	m.selectedItems["default/pod-1"] = true
+	m.selectedItems[selectionKey(m.middleItems[0])] = true
 	rm := m.openActionMenu()
 	assert.True(t, rm.bulkMode)
 }

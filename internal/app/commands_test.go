@@ -338,10 +338,9 @@ func TestCov80OpenBulkActionDirectNoSelection(t *testing.T) {
 
 func TestCov80OpenBulkActionDirectWithSelection(t *testing.T) {
 	m := basePush80Model()
-	// Selection keys use "namespace/name" format (see selectionKey()).
 	m.selectedItems = map[string]bool{
-		"default/pod-1": true,
-		"ns-2/pod-2":    true,
+		selectionKey(m.middleItems[0]): true,
+		selectionKey(m.middleItems[1]): true,
 	}
 	result, _ := m.openBulkActionDirect("Delete")
 	rm := result.(Model)
@@ -351,7 +350,7 @@ func TestCov80OpenBulkActionDirectWithSelection(t *testing.T) {
 func TestCov80OpenBulkActionDirectLogs(t *testing.T) {
 	m := basePush80Model()
 	m.selectedItems = map[string]bool{
-		"default/pod-1": true,
+		selectionKey(m.middleItems[0]): true,
 	}
 	result, _ := m.openBulkActionDirect("Logs")
 	// executeBulkAction("Logs") may return *Model.
