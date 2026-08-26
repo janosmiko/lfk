@@ -99,6 +99,11 @@ type gvrAutoState struct {
 	// MethodNotSupported, or NotFound -- RBAC or API surface that will
 	// not change mid-session. Permanent for the life of the Client.
 	denied bool
+	// watchFailures counts consecutive non-status watch errors. A sync or a
+	// gap wider than watchFailureWindow clears it. See noteWatchFailure.
+	watchFailures    int
+	lastWatchFailure time.Time
+	cooldownUntil    time.Time
 }
 
 // itemMemoEntry caches one converted model.Item alongside the
@@ -177,6 +182,13 @@ type informerCache struct {
 	// multi-minute sleep.
 	hotTTL time.Duration
 
+	// maxWatchFailures / watchFailureCooldown bound how long a broken watch
+	// is retried. Stored on the struct so tests need neither three real
+	// reflector retries nor the production cooldown.
+	maxWatchFailures     int
+	watchFailureCooldown time.Duration
+	watchFailureWindow   time.Duration
+
 	// sweepInterval rate-limits sweepStaleHot off the watch-tick path.
 	// lastSweep is guarded by ic.mu. Tests set sweepInterval to zero to
 	// force a sweep on the next markHot.
@@ -207,6 +219,10 @@ func newInformerCache(clientFactory func(string) (dynamic.Interface, error)) *in
 		hotTTL:             defaultHotTTL,
 		sweepInterval:      defaultSweepInterval,
 		lastSweep:          time.Now(),
+
+		maxWatchFailures:     defaultMaxWatchFailures,
+		watchFailureCooldown: defaultWatchFailureCooldown,
+		watchFailureWindow:   defaultWatchFailureWindow,
 	}
 }
 
@@ -283,19 +299,18 @@ func (ic *informerCache) isPromoted(contextName string, gvr schema.GroupVersionR
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	if state.denied {
+	if state.denied || state.blockedLocked() {
 		return false
 	}
 	return state.hot || state.promoted
 }
 
-// isDenied reports whether (contextName, gvr) has been permanently denied
-// informer routing for the session -- see denyGVR.
-func (ic *informerCache) isDenied(contextName string, gvr schema.GroupVersionResource) bool {
-	state := ic.getAutoState(contextName, gvr)
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	return state.denied
+// isDenied separates denyGVR's permanent verdict from noteWatchFailure's
+// expiring one, which cacheBlocked folds together.
+func (s *gvrAutoState) isDenied() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.denied
 }
 
 // markHot marks (contextName, gvr) hot and starts its informer if needed.
@@ -304,7 +319,7 @@ func (ic *informerCache) isDenied(contextName string, gvr schema.GroupVersionRes
 func (ic *informerCache) markHot(contextName string, gvr schema.GroupVersionResource) bool {
 	state := ic.getAutoState(contextName, gvr)
 	state.mu.Lock()
-	if state.denied {
+	if state.denied || state.blockedLocked() {
 		state.mu.Unlock()
 		return false
 	}
@@ -611,7 +626,9 @@ func (ic *informerCache) getOrStart(contextName string, gvr schema.GroupVersionR
 	_ = informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *cache.Reflector, err error) {
 		if apierrors.IsForbidden(err) || apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) {
 			ic.denyGVR(contextName, gvr)
+			return
 		}
+		ic.noteWatchFailure(contextName, gvr, err)
 	})
 	// managedFields is never read by buildResourceItem. Drop it before
 	// objects enter the store to keep the cache's footprint down.
@@ -649,6 +666,7 @@ func (ic *informerCache) getOrStart(contextName string, gvr schema.GroupVersionR
 		// list() caller still inside waitForSync will pick up the stopCh
 		// signal instead.
 		if cache.WaitForCacheSync(stopCh, inf.HasSynced) {
+			ic.noteWatchSuccess(contextName, gvr)
 			close(synced)
 		}
 	}(informer, entry.stopCh, entry.synced)

@@ -325,6 +325,13 @@ func withTunedThresholds(c *Client, promoteAt, demoteBelow, demoteAfterN int) {
 	c.informers.demoteAfterN = demoteAfterN
 }
 
+// withWatchFailureTuning dials the watch give-up down so a test need not
+// wait out three reflector retries or a 10-minute cooldown.
+func withWatchFailureTuning(c *Client, maxFailures int, cooldown time.Duration) {
+	c.informers.maxWatchFailures = maxFailures
+	c.informers.watchFailureCooldown = cooldown
+}
+
 // TestGetResources_InformerCache_AutoPromote drives the auto-promote arc
 // of the state machine: a direct list returning ≥ promoteAt items must
 // flip the (context, GVR) into informer mode, so the next call goes to

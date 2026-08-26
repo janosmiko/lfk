@@ -112,13 +112,13 @@ func TestInformerCache_WatchForbiddenFallsBackPermanentlyAndLogsOnce(t *testing.
 	for time.Now().Before(deadline) {
 		items, err = c.GetResources(t.Context(), "", "team-a", podRT)
 		require.NoError(t, err)
-		if c.informers.isDenied("", gvr) {
+		if c.informers.getAutoState("", gvr).isDenied() {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	require.True(t, c.informers.isDenied("", gvr), "watch forbidden must permanently deny the GVR")
+	require.True(t, c.informers.getAutoState("", gvr).isDenied(), "watch forbidden must permanently deny the GVR")
 	require.False(t, c.informers.isPromoted("", gvr))
 	require.Len(t, items, 1, "denied GVR must still return items via direct list")
 	assert.Equal(t, "api-1", items[0].Name)

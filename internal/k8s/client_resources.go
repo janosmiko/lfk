@@ -160,10 +160,10 @@ func cacheEnabled(mode InformerCacheMode, infs *informerCache) bool {
 // short-circuits to true. Auto-mode consults the per-(context, GVR) state
 // machine maintained by observeDirectListSize / observeCachedListSize.
 func shouldUseCache(mode InformerCacheMode, infs *informerCache, contextName string, gvr schema.GroupVersionResource) bool {
-	// denyGVR stops the watch for the session. Routing a denied GVR back
-	// through the cache branch restarts the informer on every list and makes
-	// the caller pay the sync wait again (#646).
-	if infs != nil && infs.isDenied(contextName, gvr) {
+	// A given-up watch stays given up. Routing it back through the cache
+	// branch restarts the informer on every list and makes the caller pay
+	// the sync wait again (#646).
+	if infs != nil && infs.cacheBlocked(contextName, gvr) {
 		return false
 	}
 	if mode == InformerCacheAlways {

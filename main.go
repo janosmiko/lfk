@@ -126,6 +126,21 @@ func newDemoKubectlCommand() *cobra.Command {
 // --context validation entirely — the demo cluster has no kubeconfig to
 // read and a fixed set of contexts. This is the only place startup diverts
 // on opts.Demo. Otherwise it runs the real kubeconfig discovery path.
+// applyHTTP2Preference relays disable_http2 to the env var apimachinery reads
+// in SetTransportDefaults. Must run before resolveStartupClient builds the
+// first REST client. An env value already set wins, to keep the per-run override.
+func applyHTTP2Preference() {
+	if !ui.ConfigDisableHTTP2 {
+		return
+	}
+	if os.Getenv("DISABLE_HTTP2") != "" {
+		return
+	}
+	if err := os.Setenv("DISABLE_HTTP2", "1"); err != nil {
+		logger.Warn("Could not disable HTTP/2", "error", err)
+	}
+}
+
 func resolveStartupClient(opts app.StartupOptions) (*k8s.Client, error) {
 	if opts.Demo {
 		// Redirect every kubectl call site (internal/k8s.KubectlPath) at this
@@ -180,6 +195,7 @@ func runTUI(opts app.StartupOptions) error {
 	ui.LoadConfig(opts.Config)
 	// Viewer toggles the user pressed last session outrank the config file.
 	app.ApplyViewerPrefs()
+	applyHTTP2Preference()
 
 	if opts.Kubeconfig != "" {
 		if _, err := os.Stat(opts.Kubeconfig); err != nil {

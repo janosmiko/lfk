@@ -293,6 +293,7 @@ func applyDataAccessConfig(cfg configFile) {
 	if cfg.SecretLazyLoading != nil {
 		ConfigSecretLazyLoading = *cfg.SecretLazyLoading
 	}
+	applyDisableHTTP2(cfg)
 	if cfg.Kubeshark != nil {
 		// Trim before checking emptiness so a YAML value like `namespace: " "`
 		// doesn't silently overwrite the default with whitespace — the K8s
