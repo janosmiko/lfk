@@ -138,7 +138,7 @@ func (m Model) updatePodMetricsRange(msg podMetricsRangeMsg) (Model, tea.Cmd) {
 		m.metricsSeries.cpu = nil
 		m.metricsSeries.mem = nil
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m, nil
+		return m, scheduleStatusClear()
 	}
 	m.metricsSeries.rowContext = m.nav.Context
 	m.metricsSeries.cpu = msg.cpu
@@ -204,7 +204,7 @@ func (m Model) updateNodeMetricsRange(msg nodeMetricsRangeMsg) (Model, tea.Cmd) 
 		m.metricsSeries.cpu = nil
 		m.metricsSeries.mem = nil
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m, nil
+		return m, scheduleStatusClear()
 	}
 	m.metricsSeries.rowContext = m.nav.Context
 	m.metricsSeries.cpu = msg.cpu
@@ -263,16 +263,16 @@ func (m Model) loadClusterMetricsRangeForDashboard(kctx string) tea.Cmd {
 // Only msg.context's entry is touched, leaving other contexts' cluster
 // history and the pod/node row maps alone. Both branches end in
 // recomposeDashboard, since dashboardPreview is a cached string.
-func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) Model {
+func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) (Model, tea.Cmd) {
 	if msg.gen != m.requestGen {
-		return m // stale response, and the mode may have moved on since
+		return m, nil // stale response, and the mode may have moved on since
 	}
 	if msg.err != nil || (len(msg.cpu.Points) == 0 && len(msg.mem.Points) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
 		delete(m.metricsSeries.clusterCPU, msg.context)
 		delete(m.metricsSeries.clusterMem, msg.context)
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m.recomposeDashboard()
+		return m.recomposeDashboard(), scheduleStatusClear()
 	}
 	if m.metricsSeries.clusterCPU == nil {
 		m.metricsSeries.clusterCPU = make(map[string]k8s.MetricSeries)
@@ -282,7 +282,7 @@ func (m Model) updateClusterMetricsRange(msg clusterMetricsRangeMsg) Model {
 	}
 	m.metricsSeries.clusterCPU[msg.context] = msg.cpu
 	m.metricsSeries.clusterMem[msg.context] = msg.mem
-	return m.recomposeDashboard()
+	return m.recomposeDashboard(), nil
 }
 
 // loadMetricsRangeForKind picks the history loader for kind. A kind with no
@@ -383,7 +383,7 @@ func (m Model) updateContainerMetricsRange(msg containerMetricsRangeMsg) (Model,
 		m.metricsSeries.cpu = nil
 		m.metricsSeries.mem = nil
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
-		return m, nil
+		return m, scheduleStatusClear()
 	}
 	m.metricsSeries.rowContext = m.nav.Context
 	m.metricsSeries.cpu = msg.cpu

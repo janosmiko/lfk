@@ -234,8 +234,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 		mdl, cmd := m.updateNodeMetricsRange(msg)
 		return mdl, cmd, true
 	case clusterMetricsRangeMsg:
-		mdl := m.updateClusterMetricsRange(msg)
-		return mdl, nil, true
+		mdl, cmd := m.updateClusterMetricsRange(msg)
+		return mdl, cmd, true
 	case nodeUptimeEnrichedMsg:
 		mdl := m.updateNodeUptimeEnriched(msg)
 		return mdl, nil, true

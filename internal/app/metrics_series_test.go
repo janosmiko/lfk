@@ -4,7 +4,9 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,7 +75,7 @@ func TestUpdatePodMetricsRange_FallsBackToNumericOnError(t *testing.T) {
 		"a failed range query must return the columns to numeric")
 	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
 	assert.Nil(t, m.metricsSeries.cpu)
-	assert.Nil(t, cmd, "a fallback must not also fire the instant loader")
+	assertLoneStatusClear(t, cmd)
 }
 
 // An empty result is the "Prometheus is there but has no data for these pods"
@@ -159,7 +161,7 @@ func TestUpdateNodeMetricsRange_FallsBackToNumericOnError(t *testing.T) {
 		"a failed range query must return the columns to numeric")
 	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
 	assert.Nil(t, m.metricsSeries.cpu)
-	assert.Nil(t, cmd, "a fallback must not also fire the instant loader")
+	assertLoneStatusClear(t, cmd)
 }
 
 // An empty result is the "Prometheus is there but has no data for these
@@ -294,7 +296,7 @@ func TestUpdateContainerMetricsRange_FallsBackToNumericOnError(t *testing.T) {
 		"a failed range query must return the columns to numeric")
 	assert.NotEmpty(t, m.statusMessage, "the user must be told once why the mode reverted")
 	assert.Nil(t, m.metricsSeries.cpu)
-	assert.Nil(t, cmd, "a fallback must not also fire the instant loader")
+	assertLoneStatusClear(t, cmd)
 }
 
 // An empty result is the "Prometheus is there but has no data for this pod's
@@ -354,7 +356,7 @@ func TestUpdateClusterMetricsRange_FallsBackToNumericOnError(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
+	m, _ = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen, err: assert.AnError})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
 }
@@ -363,7 +365,7 @@ func TestUpdateClusterMetricsRange_StoresSeries(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+	m, _ = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
 		context: m.nav.Context,
 		gen:     m.requestGen,
 		cpu:     k8s.MetricSeries{Points: []float64{1, 5, 9}},
@@ -380,10 +382,10 @@ func TestUpdateClusterMetricsRange_KeyedByContext_DoesNotClobberOtherContext(t *
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+	m, _ = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
 		context: "member-a", gen: m.requestGen, cpu: k8s.MetricSeries{Points: []float64{1, 1, 1}},
 	})
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+	m, _ = m.updateClusterMetricsRange(clusterMetricsRangeMsg{
 		context: "member-b", gen: m.requestGen, cpu: k8s.MetricSeries{Points: []float64{9, 9, 9}},
 	})
 
@@ -409,7 +411,7 @@ func TestUpdateClusterMetricsRange_EmptyResultFallsBackAndKeepsOtherSeries(t *te
 		clusterMem: map[string]k8s.MetricSeries{m.nav.Context: {Points: []float64{3, 4}}},
 	}
 
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{context: m.nav.Context, gen: m.requestGen})
+	m, _ = m.updateClusterMetricsRange(clusterMetricsRangeMsg{context: m.nav.Context, gen: m.requestGen})
 
 	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
 	assert.Empty(t, m.metricsSeries.clusterCPU[m.nav.Context].Points)
@@ -425,7 +427,7 @@ func TestUpdateClusterMetricsRange_IgnoresStaleGeneration(t *testing.T) {
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 
-	m = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
+	m, _ = m.updateClusterMetricsRange(clusterMetricsRangeMsg{gen: m.requestGen + 1, err: assert.AnError})
 
 	assert.Equal(t, ui.MetricsDisplaySpark, m.metricsSpark.Mode,
 		"a stale response must not revert the mode the user just chose")
@@ -535,4 +537,46 @@ func TestRowSeries_IgnoresAnotherContextsHistory(t *testing.T) {
 	cpu, mem = m.rowSeries("default/nginx")
 	assert.Nil(t, cpu.Points, "another context must not inherit this history")
 	assert.Nil(t, mem.Points)
+}
+
+// Every fallback shows a status message, so each must also schedule its clear.
+// Returning nil left the error text on the bar until something else replaced it.
+func TestMetricsRangeFallback_SchedulesTheStatusClear(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+
+	t.Run("pod", func(t *testing.T) {
+		_, cmd := m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen})
+		assert.NotNil(t, cmd, "the fallback status must be scheduled to clear")
+	})
+	t.Run("node", func(t *testing.T) {
+		_, cmd := m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen})
+		assert.NotNil(t, cmd, "the fallback status must be scheduled to clear")
+	})
+	t.Run("container", func(t *testing.T) {
+		_, cmd := m.updateContainerMetricsRange(containerMetricsRangeMsg{gen: m.requestGen})
+		assert.NotNil(t, cmd, "the fallback status must be scheduled to clear")
+	})
+	t.Run("cluster", func(t *testing.T) {
+		_, cmd := m.updateClusterMetricsRange(clusterMetricsRangeMsg{
+			context: m.nav.Context, gen: m.requestGen, err: assert.AnError,
+		})
+		assert.NotNil(t, cmd, "the fallback status must be scheduled to clear")
+	})
+}
+
+// assertLoneStatusClear checks a fallback returns its status clear and nothing
+// else. scheduleStatusClear is a five second tea.Tick, so calling it blocks,
+// while tea.Batch hands back its BatchMsg at once. A batch here means a loader
+// was added to the fallback, which is the thing this guards against.
+func assertLoneStatusClear(t *testing.T, cmd tea.Cmd) {
+	t.Helper()
+	require.NotNil(t, cmd, "the fallback status must be scheduled to clear")
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+	select {
+	case msg := <-done:
+		t.Fatalf("a fallback must return only the status clear, got %T", msg)
+	case <-time.After(250 * time.Millisecond):
+	}
 }
