@@ -290,8 +290,9 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 			// The sparkline replaces the trend arrow rather than stacking
 			// with it: it shows the same trend in more detail, and both
 			// together would cost the column another two characters.
-			cpuUse = sparklineCell(m.metricsSeries.cpu[key], cpuUse)
-			memUse = sparklineCell(m.metricsSeries.mem[key], memUse)
+			cpuSeries, memSeries := m.rowSeries(key)
+			cpuUse = sparklineCell(cpuSeries, cpuUse)
+			memUse = sparklineCell(memSeries, memUse)
 		} else if m.prevPodMetrics != nil {
 			// Detect significant usage trends (arrows before value).
 			if prev, ok := m.prevPodMetrics[key]; ok {
@@ -418,8 +419,9 @@ func (m Model) updateContainerMetricsEnriched(msg containerMetricsEnrichedMsg) M
 		cpuUse := ui.FormatCPU(cu.CPUMilli)
 		memUse := ui.FormatMemory(cu.MemBytes)
 		if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
-			cpuUse = sparklineCell(m.metricsSeries.cpu[item.Name], cpuUse)
-			memUse = sparklineCell(m.metricsSeries.mem[item.Name], memUse)
+			cpuSeries, memSeries := m.rowSeries(item.Name)
+			cpuUse = sparklineCell(cpuSeries, cpuUse)
+			memUse = sparklineCell(memSeries, memUse)
 		}
 		setContainerMetricsColumns(item, cpuUse, memUse)
 	}
@@ -588,8 +590,9 @@ func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 			// The sparkline replaces the trend arrow rather than stacking
 			// with it: it shows the same trend in more detail, and both
 			// together would cost the column another two characters.
-			cpuUse = sparklineCell(m.metricsSeries.cpu[item.Name], cpuUse)
-			memUse = sparklineCell(m.metricsSeries.mem[item.Name], memUse)
+			cpuSeries, memSeries := m.rowSeries(item.Name)
+			cpuUse = sparklineCell(cpuSeries, cpuUse)
+			memUse = sparklineCell(memSeries, memUse)
 		} else if m.prevNodeMetrics != nil {
 			// Detect significant usage trends (arrows before value).
 			if prev, ok := m.prevNodeMetrics[item.Name]; ok {

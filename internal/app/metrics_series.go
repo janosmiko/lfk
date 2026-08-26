@@ -28,8 +28,14 @@ type metricsSeriesCache struct {
 	// cpu and mem hold either pod or node series depending on which list is
 	// active, never both: a "namespace/pod" key always contains a slash and a
 	// node name never does, so the two key spaces cannot collide.
-	cpu map[string]k8s.MetricSeries
-	mem map[string]k8s.MetricSeries
+	//
+	// rowContext names the context the two maps were fetched for. The keys
+	// carry no context of their own, and this cache is model-wide while the
+	// display mode is per tab, so without it a tab on another cluster draws
+	// this cluster's history for any row sharing a name.
+	rowContext string
+	cpu        map[string]k8s.MetricSeries
+	mem        map[string]k8s.MetricSeries
 
 	// clusterCPU and clusterMem are keyed by context so a union dashboard
 	// member switch cannot draw one member's history under another's numbers
@@ -105,6 +111,16 @@ func (m Model) loadPodMetricsRangeForList() tea.Cmd {
 	)
 }
 
+// rowSeries returns the CPU and memory history for a pod, node or container
+// row, and nothing at all when the cache belongs to another context. Returning
+// an empty series makes the cell fall back to the plain number.
+func (m Model) rowSeries(key string) (k8s.MetricSeries, k8s.MetricSeries) {
+	if m.metricsSeries.rowContext != m.nav.Context {
+		return k8s.MetricSeries{}, k8s.MetricSeries{}
+	}
+	return m.metricsSeries.cpu[key], m.metricsSeries.mem[key]
+}
+
 // updatePodMetricsRange stores a history fetch, or returns the columns to
 // numeric when Prometheus produced nothing. Reverting rather than showing a
 // placeholder keeps a cluster with no Prometheus free of layout shift.
@@ -118,11 +134,15 @@ func (m Model) updatePodMetricsRange(msg podMetricsRangeMsg) (Model, tea.Cmd) {
 	}
 	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
-		m.metricsSeries = metricsSeriesCache{}
+		m.metricsSeries.rowContext = ""
+		m.metricsSeries.cpu = nil
+		m.metricsSeries.mem = nil
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
 		return m, nil
 	}
-	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
+	m.metricsSeries.rowContext = m.nav.Context
+	m.metricsSeries.cpu = msg.cpu
+	m.metricsSeries.mem = msg.mem
 	m.middleItemsRev++
 	return m, m.loadPodMetricsForList()
 }
@@ -180,11 +200,15 @@ func (m Model) updateNodeMetricsRange(msg nodeMetricsRangeMsg) (Model, tea.Cmd) 
 	}
 	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
-		m.metricsSeries = metricsSeriesCache{}
+		m.metricsSeries.rowContext = ""
+		m.metricsSeries.cpu = nil
+		m.metricsSeries.mem = nil
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
 		return m, nil
 	}
-	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
+	m.metricsSeries.rowContext = m.nav.Context
+	m.metricsSeries.cpu = msg.cpu
+	m.metricsSeries.mem = msg.mem
 	m.middleItemsRev++
 	return m, m.loadNodeMetricsForList()
 }
@@ -355,11 +379,15 @@ func (m Model) updateContainerMetricsRange(msg containerMetricsRangeMsg) (Model,
 	}
 	if msg.err != nil || (len(msg.cpu) == 0 && len(msg.mem) == 0) {
 		m.metricsSpark = ui.MetricsSparkState{}
-		m.metricsSeries = metricsSeriesCache{}
+		m.metricsSeries.rowContext = ""
+		m.metricsSeries.cpu = nil
+		m.metricsSeries.mem = nil
 		m.setStatusMessage("CPU/MEM history needs Prometheus, showing values", true)
 		return m, nil
 	}
-	m.metricsSeries = metricsSeriesCache{cpu: msg.cpu, mem: msg.mem}
+	m.metricsSeries.rowContext = m.nav.Context
+	m.metricsSeries.cpu = msg.cpu
+	m.metricsSeries.mem = msg.mem
 	m.middleItemsRev++
 	return m, m.loadContainerMetricsForList()
 }

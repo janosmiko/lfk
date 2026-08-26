@@ -125,8 +125,9 @@ func TestUpdatePodMetricsEnriched_SparkModeLeavesMissingRowsAsNA(t *testing.T) {
 	// still pass. Seeding the row's own key means such a regression renders
 	// glyphs and fails.
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"default/no-metrics": {Points: []float64{1, 9}}},
-		mem: map[string]k8s.MetricSeries{"default/no-metrics": {Points: []float64{3, 7}}},
+		rowContext: m.nav.Context,
+		cpu:        map[string]k8s.MetricSeries{"default/no-metrics": {Points: []float64{1, 9}}},
+		mem:        map[string]k8s.MetricSeries{"default/no-metrics": {Points: []float64{3, 7}}},
 	}
 	m.middleItems = []model.Item{{Name: "no-metrics", Namespace: "default"}}
 
@@ -205,8 +206,9 @@ func TestUpdateNodeMetricsEnriched_SparkModeLeavesMissingRowsAsNA(t *testing.T) 
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{1, 9}}},
-		mem: map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{3, 7}}},
+		rowContext: m.nav.Context,
+		cpu:        map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{1, 9}}},
+		mem:        map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{3, 7}}},
 	}
 	m.middleItems = []model.Item{{Name: "no-metrics"}}
 
@@ -225,8 +227,9 @@ func TestUpdateNodeMetricsEnriched_SparkModeKeysByNodeName(t *testing.T) {
 	ui.ConfigSparklineWidth = 5
 	t.Cleanup(func() { ui.ConfigSparklineWidth = ui.DefaultSparklineWidth })
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2, 3, 4, 5}}},
-		mem: map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2, 3, 4, 5}}},
+		rowContext: m.nav.Context,
+		cpu:        map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2, 3, 4, 5}}},
+		mem:        map[string]k8s.MetricSeries{"node-1": {Points: []float64{1, 2, 3, 4, 5}}},
 	}
 	m.middleItems = []model.Item{{Name: "node-1"}}
 
@@ -396,8 +399,9 @@ func TestUpdateClusterMetricsRange_EmptyResultFallsBackAndKeepsOtherSeries(t *te
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{1, 2}}},
-		mem: map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{3, 4}}},
+		rowContext: m.nav.Context,
+		cpu:        map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{1, 2}}},
+		mem:        map[string]k8s.MetricSeries{"default/api-1": {Points: []float64{3, 4}}},
 		clusterCPU: map[string]k8s.MetricSeries{
 			m.nav.Context:  {Points: []float64{1, 2}},
 			"other-member": {Points: []float64{7, 7}},
@@ -442,4 +446,93 @@ func TestLoadClusterMetricsRangeForDashboard_TargetsGivenContextAtUnionSentinel(
 	msg, ok := execScheduled(t, m, cmd).(clusterMetricsRangeMsg)
 	require.True(t, ok, "must return a clusterMetricsRangeMsg rather than bail on the sentinel")
 	assert.Equal(t, "member-b", msg.context)
+}
+
+// The dashboard owns clusterCPU and clusterMem, keyed per context. A pod, node
+// or container reply shares the same cache, so it must write only the row maps.
+// Replacing the whole cache value dropped the dashboard's history and forced it
+// to refetch before it could draw again.
+func TestUpdateRowMetricsRange_KeepsTheClusterHistory(t *testing.T) {
+	seeded := func(m Model) Model {
+		m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+		m.metricsSeries.clusterCPU = map[string]k8s.MetricSeries{
+			m.nav.Context: {Points: []float64{1, 5, 9}},
+		}
+		m.metricsSeries.clusterMem = map[string]k8s.MetricSeries{
+			m.nav.Context: {Points: []float64{9, 5, 1}},
+		}
+		return m
+	}
+	cpu := map[string]k8s.MetricSeries{"row": {Points: []float64{1, 2}}}
+	mem := map[string]k8s.MetricSeries{"row": {Points: []float64{3, 4}}}
+
+	tests := []struct {
+		name string
+		call func(Model) Model
+	}{
+		{"pod", func(m Model) Model {
+			m, _ = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen, cpu: cpu, mem: mem})
+			return m
+		}},
+		{"node", func(m Model) Model {
+			m, _ = m.updateNodeMetricsRange(nodeMetricsRangeMsg{gen: m.requestGen, cpu: cpu, mem: mem})
+			return m
+		}},
+		{"container", func(m Model) Model {
+			m, _ = m.updateContainerMetricsRange(containerMetricsRangeMsg{gen: m.requestGen, cpu: cpu, mem: mem})
+			return m
+		}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := tc.call(seeded(basePush80Model()))
+
+			assert.Equal(t, []float64{1, 5, 9}, m.metricsSeries.clusterCPU[m.nav.Context].Points,
+				"a row reply must not discard the dashboard's cluster CPU history")
+			assert.Equal(t, []float64{9, 5, 1}, m.metricsSeries.clusterMem[m.nav.Context].Points,
+				"a row reply must not discard the dashboard's cluster memory history")
+			assert.Equal(t, []float64{1, 2}, m.metricsSeries.cpu["row"].Points,
+				"the row series must still be stored")
+		})
+	}
+}
+
+// The Prometheus fallback reverts the mode, and must clear only the row maps.
+// updateClusterMetricsRange already keeps the row maps on its own fallback.
+func TestUpdateRowMetricsRange_FallbackKeepsTheClusterHistory(t *testing.T) {
+	m := basePush80Model()
+	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
+	m.metricsSeries.cpu = map[string]k8s.MetricSeries{"row": {Points: []float64{1, 2}}}
+	m.metricsSeries.clusterCPU = map[string]k8s.MetricSeries{
+		m.nav.Context: {Points: []float64{1, 5, 9}},
+	}
+
+	m, _ = m.updatePodMetricsRange(podMetricsRangeMsg{gen: m.requestGen})
+
+	assert.Equal(t, ui.MetricsDisplayNumeric, m.metricsSpark.Mode)
+	assert.Nil(t, m.metricsSeries.cpu, "the fallback must drop the row series")
+	assert.Equal(t, []float64{1, 5, 9}, m.metricsSeries.clusterCPU[m.nav.Context].Points,
+		"a row fallback must not discard the dashboard's cluster history")
+}
+
+// The row keys carry no context, and this cache is model-wide while the display
+// mode is per tab. A tab on another cluster must not draw this cluster's
+// history for a row that happens to share a name.
+func TestRowSeries_IgnoresAnotherContextsHistory(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Context = "ctx-a"
+	m, _ = m.updatePodMetricsRange(podMetricsRangeMsg{
+		gen: m.requestGen,
+		cpu: map[string]k8s.MetricSeries{"default/nginx": {Points: []float64{1, 2}}},
+		mem: map[string]k8s.MetricSeries{"default/nginx": {Points: []float64{3, 4}}},
+	})
+
+	cpu, mem := m.rowSeries("default/nginx")
+	require.Equal(t, []float64{1, 2}, cpu.Points, "the fetching context must see its own history")
+	require.Equal(t, []float64{3, 4}, mem.Points)
+
+	m.nav.Context = "ctx-b"
+	cpu, mem = m.rowSeries("default/nginx")
+	assert.Nil(t, cpu.Points, "another context must not inherit this history")
+	assert.Nil(t, mem.Points)
 }

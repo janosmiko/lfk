@@ -72,8 +72,9 @@ func TestUpdateContainerMetricsEnriched_SparkModeAddsSparkline(t *testing.T) {
 	ui.ConfigSparklineWidth = 5
 	t.Cleanup(func() { ui.ConfigSparklineWidth = ui.DefaultSparklineWidth })
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"app": {Points: []float64{1, 2, 3, 4, 5}}},
-		mem: map[string]k8s.MetricSeries{"app": {Points: []float64{1, 2, 3, 4, 5}}},
+		rowContext: m.nav.Context,
+		cpu:        map[string]k8s.MetricSeries{"app": {Points: []float64{1, 2, 3, 4, 5}}},
+		mem:        map[string]k8s.MetricSeries{"app": {Points: []float64{1, 2, 3, 4, 5}}},
 	}
 	m.middleItems = []model.Item{{Name: "app", Kind: "Container"}}
 
@@ -93,8 +94,9 @@ func TestUpdateContainerMetricsEnriched_SparkModeLeavesMissingRowsAsNA(t *testin
 	m := basePush80Model()
 	m.metricsSpark = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark}
 	m.metricsSeries = metricsSeriesCache{
-		cpu: map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{1, 9}}},
-		mem: map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{3, 7}}},
+		rowContext: m.nav.Context,
+		cpu:        map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{1, 9}}},
+		mem:        map[string]k8s.MetricSeries{"no-metrics": {Points: []float64{3, 7}}},
 	}
 	m.middleItems = []model.Item{{Name: "no-metrics", Kind: "Container"}}
 
