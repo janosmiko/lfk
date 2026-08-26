@@ -489,7 +489,10 @@ func appendDashboardSparkline(lines []string, series k8s.MetricSeries, w dashboa
 	// Matches the lead dashboardMetricLines gives its summary line, so the
 	// sparkline sits under the bar rather than under the label.
 	lead := strings.Repeat(" ", 2+w.label+2)
-	return append(lines, ui.DimStyle.Render(lead+drawn))
+	// Truncated like every sibling line: w.bar has a floor of 8, so a narrow
+	// pane with a long label leaves lead+bar wider than the content column.
+	line := ansi.Truncate(lead+drawn, w.content, "")
+	return append(lines, ui.DimStyle.Render(line))
 }
 
 // dashboardNodesSection renders the per-node breakdown.
