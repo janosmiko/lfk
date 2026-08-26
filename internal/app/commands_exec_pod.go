@@ -62,8 +62,9 @@ func (m Model) updateExecPodOSResolved(msg execPodOSResolvedMsg) (tea.Model, tea
 	return m, m.execKubectlExec()
 }
 
-// linuxExecShellCmd is the POSIX shell bootstrap used to exec into Linux
-// containers: clear the screen, then prefer bash, then ash, then plain sh.
+// linuxExecShellCmd is the POSIX shell bootstrap for Linux containers. The
+// `clear` call is guarded because minimal images ship no `clear` binary, and an
+// unguarded call printed "clear: not found" before the shell started.
 const linuxExecShellCmd = "command -v clear >/dev/null 2>&1 && clear; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v ash >/dev/null 2>&1; then exec ash; else exec sh; fi"
 
 // windowsExecShellCmd prefers PowerShell and falls back to cmd.exe when it is

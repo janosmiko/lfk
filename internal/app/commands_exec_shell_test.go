@@ -24,8 +24,7 @@ func TestExecShellArgs_LinuxWithContainer(t *testing.T) {
 	got := execShellArgs("pod-1", "ns", "ctx", "app", "linux")
 	assert.Equal(t, []string{
 		"exec", "-it", "pod-1", "-n", "ns", "--context", "ctx", "-c", "app",
-		"--", "/bin/sh", "-c",
-		"clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }",
+		"--", "/bin/sh", "-c", linuxExecShellCmd,
 	}, got)
 }
 
@@ -34,8 +33,7 @@ func TestExecShellArgs_LinuxDefaultWhenUnknown(t *testing.T) {
 	got := execShellArgs("pod-1", "ns", "ctx", "", "")
 	assert.Equal(t, []string{
 		"exec", "-it", "pod-1", "-n", "ns", "--context", "ctx",
-		"--", "/bin/sh", "-c",
-		"clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }",
+		"--", "/bin/sh", "-c", linuxExecShellCmd,
 	}, got)
 }
 
@@ -43,7 +41,7 @@ func TestExecShellArgs_Windows(t *testing.T) {
 	got := execShellArgs("win-pod", "ns", "ctx", "app", "windows")
 	assert.Equal(t, []string{
 		"exec", "-it", "win-pod", "-n", "ns", "--context", "ctx", "-c", "app",
-		"--", "cmd.exe", "/c", "powershell.exe -NoLogo -NoProfile || cmd.exe",
+		"--", "cmd.exe", "/c", windowsExecShellCmd,
 	}, got)
 }
 
