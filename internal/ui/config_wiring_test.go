@@ -125,6 +125,7 @@ monitoring:
       namespaces: [monitoring]
       services: [prom]
       port: "9090"
+      path_prefix: /select/0/prometheus
 kubeshark:
   namespace: traffic-ns
 security:
@@ -302,6 +303,8 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	// monitoring.
 	require.Contains(t, model.ConfigMonitoring, "_global", "monitoring")
 	assert.Equal(t, "prometheus", model.ConfigMonitoring["_global"].NodeMetrics)
+	require.NotNil(t, model.ConfigMonitoring["_global"].Prometheus, "monitoring.prometheus")
+	assert.Equal(t, "/select/0/prometheus", model.ConfigMonitoring["_global"].Prometheus.PathPrefix, "monitoring.prometheus.path_prefix")
 
 	// union_sets (map form).
 	require.Len(t, ConfigUnionSets, 1, "union_sets")

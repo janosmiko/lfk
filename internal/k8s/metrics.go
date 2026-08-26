@@ -29,13 +29,8 @@ import (
 // before that call rather than after it fails.
 var errPrometheusUnavailableDemo = errors.New("prometheus/alertmanager queries are unavailable in demo mode")
 
-// promSvcCache caches the working namespace+service for Prometheus ProxyGet per context.
-var promSvcCache sync.Map // key: contextName, value: promSvcEntry
-
-type promSvcEntry struct {
-	namespace string
-	service   string
-}
+// promSvcCache caches the working target for Prometheus ProxyGet per context.
+var promSvcCache sync.Map // key: contextName, value: monitoringTarget
 
 // safeProxyGetRaw calls Services(ns).ProxyGet(...).DoRaw(ctx), recovering
 // from any panic the underlying REST client raises. This is defense in
@@ -473,10 +468,10 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 		return nil, fmt.Errorf("failed to get clientset: %w", err)
 	}
 
-	promNs, promSvc, promPort, _, _, _ := resolveMonitoringEndpoints(contextName)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	promTargets, _ := monitoringTargetsFor(ctx, clientset, contextName)
 
 	cpuQuery := `sum by (node) (rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
 	memQuery := `sum by (node) (container_memory_working_set_bytes{container!=""})`
@@ -492,11 +487,11 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		cpuMap, cpuErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, cpuQuery)
+		cpuMap, cpuErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promTargets, cpuQuery)
 	}()
 	go func() {
 		defer wg.Done()
-		memMap, memErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, memQuery)
+		memMap, memErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promTargets, memQuery)
 	}()
 	wg.Wait()
 	if cpuErr != nil {
@@ -533,8 +528,8 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 
 // queryPrometheusNodeMetric runs a PromQL instant query via Kubernetes service proxy
 // and returns a map of node name -> float64 value.
-func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
-	return queryPrometheusMetric(ctx, contextName, cs, c.demo, namespaces, services, port, query, parsePrometheusNodeResponse)
+func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, targets []monitoringTarget, query string) (map[string]float64, error) {
+	return queryPrometheusMetric(ctx, contextName, cs, c.demo, targets, query, parsePrometheusNodeResponse)
 }
 
 // queryPrometheusMetric runs a PromQL instant query via Kubernetes service proxy
@@ -546,20 +541,19 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName stri
 // (rather than accessed via a *Client) for the same reason: it's a plain
 // value the caller already has, and keeps this function testable without a
 // full Client.
-func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, isDemo bool, namespaces, services []string, port, query string, parse func([]byte) (T, error)) (T, error) {
+func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, isDemo bool, targets []monitoringTarget, query string, parse func([]byte) (T, error)) (T, error) {
 	var zero T
 	if isDemo {
 		return zero, errPrometheusUnavailableDemo
 	}
 	params := map[string]string{"query": query}
 
-	// Check cache for a known working namespace+service. Keyed by contextName
-	// (not the clientset): clientsetForContext builds a fresh clientset per
-	// call, so a clientset key would never hit and re-run service discovery
-	// on every poll.
+	// Check cache for a known working target. Keyed by contextName (not the
+	// clientset): clientsetForContext builds a fresh clientset per call, so a
+	// clientset key would never hit and re-run service discovery on every poll.
 	if cached, ok := promSvcCache.Load(contextName); ok {
-		entry := cached.(promSvcEntry)
-		data, err := safeProxyGetRaw(ctx, cs, entry.namespace, entry.service, port, "/api/v1/query", params)
+		entry := cached.(monitoringTarget)
+		data, err := safeProxyGetRaw(ctx, cs, entry.Namespace, entry.Service, entry.Port, entry.path("/api/v1/query"), params)
 		if err == nil {
 			parsed, err := parse(data)
 			if err == nil {
@@ -571,22 +565,20 @@ func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs ku
 	}
 
 	var lastErr error
-	for _, ns := range namespaces {
-		for _, svc := range services {
-			data, err := safeProxyGetRaw(ctx, cs, ns, svc, port, "/api/v1/query", params)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-
-			parsed, err := parse(data)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-			promSvcCache.Store(contextName, promSvcEntry{namespace: ns, service: svc})
-			return parsed, nil
+	for _, t := range targets {
+		data, err := safeProxyGetRaw(ctx, cs, t.Namespace, t.Service, t.Port, t.path("/api/v1/query"), params)
+		if err != nil {
+			lastErr = err
+			continue
 		}
+
+		parsed, err := parse(data)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		promSvcCache.Store(contextName, t)
+		return parsed, nil
 	}
 
 	if lastErr != nil {

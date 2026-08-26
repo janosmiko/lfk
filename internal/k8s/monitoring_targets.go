@@ -1,0 +1,256 @@
+package k8s
+
+import (
+	"context"
+	"strconv"
+	"sync"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+
+	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/model"
+)
+
+// monitoringTarget is one candidate monitoring endpoint reachable through the
+// API server proxy. Prefix goes in front of the Prometheus API path, because
+// VictoriaMetrics serves that API below a tenant path instead of at the root.
+type monitoringTarget struct {
+	Namespace string
+	Service   string
+	Port      string
+	Prefix    string
+}
+
+// path returns the proxy path for one Prometheus or Alertmanager API path.
+func (t monitoringTarget) path(apiPath string) string {
+	return t.Prefix + apiPath
+}
+
+// Well-known namespaces and service names to probe when discovery finds
+// nothing. They cover Prometheus installed by the kube-prometheus-stack chart,
+// by the Prometheus operator, and by the upstream prometheus chart.
+var (
+	defaultMonitoringNamespaces = []string{"monitoring", "prometheus", "observability", "kube-prometheus-stack"}
+	defaultPrometheusServices   = []string{
+		"kube-prometheus-stack-prometheus", "prometheus-kube-prometheus-prometheus",
+		"prometheus-server", "prometheus", "prometheus-operated",
+	}
+	defaultAlertmanagerServices = []string{
+		"alertmanager-operated", "alertmanager",
+		"prometheus-kube-prometheus-alertmanager", "alertmanager-main",
+	}
+)
+
+const (
+	defaultPrometheusPort   = "9090"
+	defaultAlertmanagerPort = "9093"
+
+	// The VictoriaMetrics operator stamps the component name on every object
+	// it creates. The Service name carries the custom resource name as a
+	// suffix (vmselect-vmks), so only the label is stable enough to match on.
+	appNameLabel = "app.kubernetes.io/name"
+
+	// vmselect serves the Prometheus querying API below a tenant path. Account
+	// 0 is what the victoria-metrics-k8s-stack chart writes, and the
+	// multitenant path covers an install that uses a different account.
+	vmSelectTenantPrefix      = "/select/0/prometheus"
+	vmSelectMultitenantPrefix = "/select/multitenant/prometheus"
+)
+
+// monitoringDiscoveryTTL bounds how long a discovery result is reused. A
+// monitoring stack that moves namespace is rare, so a long TTL keeps the
+// extra Service list off the metrics poll path.
+const monitoringDiscoveryTTL = 10 * time.Minute
+
+type monitoringDiscoveryEntry struct {
+	prom []monitoringTarget
+	am   []monitoringTarget
+	at   time.Time
+}
+
+var monitoringDiscoveryCache sync.Map // key: contextName, value: monitoringDiscoveryEntry
+
+// monitoringTargetsFor returns the targets to probe for a cluster context.
+// Discovered services come first: each wrong name guess costs a full proxy
+// timeout, and a discovered Service is known to exist.
+func monitoringTargetsFor(ctx context.Context, cs kubernetes.Interface, contextName string) (prom, am []monitoringTarget) {
+	prom, am = resolveMonitoringEndpoints(contextName)
+	if !monitoringDiscoveryWanted(contextName) {
+		return prom, am
+	}
+	dProm, dAm := cachedMonitoringDiscovery(ctx, cs, contextName, namespacesOf(prom, am))
+	return concatTargets(dProm, prom), concatTargets(dAm, am)
+}
+
+// concatTargets joins two target lists into a new slice. Appending onto the
+// cached discovery result would write into its backing array, which two
+// callers share.
+func concatTargets(a, b []monitoringTarget) []monitoringTarget {
+	out := make([]monitoringTarget, 0, len(a)+len(b))
+	out = append(out, a...)
+	return append(out, b...)
+}
+
+// monitoringDiscoveryWanted reports whether discovery can still add anything.
+// A config that names the services for both roles states the user's intent,
+// so lfk probes those names and skips the Service list.
+func monitoringDiscoveryWanted(contextName string) bool {
+	mc, ok := monitoringConfigFor(contextName)
+	if !ok {
+		return true
+	}
+	promNamed := mc.Prometheus != nil && len(mc.Prometheus.Services) > 0
+	amNamed := mc.Alertmanager != nil && len(mc.Alertmanager.Services) > 0
+	return !promNamed || !amNamed
+}
+
+func cachedMonitoringDiscovery(ctx context.Context, cs kubernetes.Interface, contextName string, namespaces []string) (prom, am []monitoringTarget) {
+	if cached, ok := monitoringDiscoveryCache.Load(contextName); ok {
+		entry := cached.(monitoringDiscoveryEntry)
+		if time.Since(entry.at) < monitoringDiscoveryTTL {
+			return entry.prom, entry.am
+		}
+		monitoringDiscoveryCache.Delete(contextName)
+	}
+	prom, am = discoverMonitoringServices(ctx, cs, namespaces)
+	monitoringDiscoveryCache.Store(contextName, monitoringDiscoveryEntry{prom: prom, am: am, at: time.Now()})
+	return prom, am
+}
+
+// namespacesOf collects the namespaces of the fallback targets, so the
+// per-namespace discovery path searches the same places the guesses cover.
+func namespacesOf(targetLists ...[]monitoringTarget) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(defaultMonitoringNamespaces))
+	for _, targets := range targetLists {
+		for _, t := range targets {
+			if !seen[t.Namespace] {
+				seen[t.Namespace] = true
+				out = append(out, t.Namespace)
+			}
+		}
+	}
+	return out
+}
+
+// discoverMonitoringServices finds monitoring Services by their component
+// label. The cluster-wide list comes first because it also finds a stack
+// outside the well-known namespaces, but a user may lack that permission.
+func discoverMonitoringServices(ctx context.Context, cs kubernetes.Interface, namespaces []string) (prom, am []monitoringTarget) {
+	opts := metav1.ListOptions{LabelSelector: appNameLabel + " in (prometheus,alertmanager,vmsingle,vmselect,vmalertmanager)"}
+
+	list, err := cs.CoreV1().Services(metav1.NamespaceAll).List(ctx, opts)
+	if err == nil {
+		return targetsFromServices(list.Items)
+	}
+	logger.Debug("cluster-wide monitoring service discovery failed", "error", err)
+
+	var found []corev1.Service
+	for _, ns := range namespaces {
+		list, err := cs.CoreV1().Services(ns).List(ctx, opts)
+		if err != nil {
+			logger.Debug("monitoring service discovery failed", "namespace", ns, "error", err)
+			continue
+		}
+		found = append(found, list.Items...)
+	}
+	return targetsFromServices(found)
+}
+
+// targetsFromServices turns discovered Services into probe targets. The port
+// comes from the Service itself, so a stack on a non-default port still works.
+func targetsFromServices(services []corev1.Service) (prom, am []monitoringTarget) {
+	for i := range services {
+		svc := &services[i]
+		p := servicePort(svc)
+		if p == "" {
+			continue
+		}
+		base := monitoringTarget{Namespace: svc.Namespace, Service: svc.Name, Port: p}
+		switch svc.Labels[appNameLabel] {
+		case "prometheus", "vmsingle":
+			prom = append(prom, base)
+		case "vmselect":
+			prom = append(prom,
+				withPrefix(base, vmSelectTenantPrefix),
+				withPrefix(base, vmSelectMultitenantPrefix))
+		case "alertmanager", "vmalertmanager":
+			am = append(am, base)
+		}
+	}
+	return prom, am
+}
+
+func withPrefix(t monitoringTarget, prefix string) monitoringTarget {
+	t.Prefix = prefix
+	return t
+}
+
+// servicePort picks the HTTP port of a monitoring Service. The named port wins
+// because an Alertmanager Service also exposes its gossip port, and that one
+// answers no API request.
+func servicePort(svc *corev1.Service) string {
+	for _, p := range svc.Spec.Ports {
+		if p.Name == "http" || p.Name == "web" {
+			return strconv.Itoa(int(p.Port))
+		}
+	}
+	for _, p := range svc.Spec.Ports {
+		if p.Protocol == "" || p.Protocol == corev1.ProtocolTCP {
+			return strconv.Itoa(int(p.Port))
+		}
+	}
+	return ""
+}
+
+// monitoringConfigFor returns the monitoring config that applies to a cluster
+// context: the entry for that context, else the "_global" entry.
+func monitoringConfigFor(contextName string) (model.MonitoringConfig, bool) {
+	cfg := model.ConfigMonitoring
+	if cfg == nil {
+		return model.MonitoringConfig{}, false
+	}
+	if mc, ok := cfg[contextName]; ok {
+		return mc, true
+	}
+	mc, ok := cfg["_global"]
+	return mc, ok
+}
+
+// resolveMonitoringEndpoints returns the name-guess targets for a cluster
+// context: the configured namespaces, services, port, and path prefix if the
+// user set them, otherwise the built-in defaults.
+func resolveMonitoringEndpoints(contextName string) (prom, am []monitoringTarget) {
+	mc, _ := monitoringConfigFor(contextName)
+	return endpointTargets(mc.Prometheus, defaultPrometheusServices, defaultPrometheusPort),
+		endpointTargets(mc.Alertmanager, defaultAlertmanagerServices, defaultAlertmanagerPort)
+}
+
+// endpointTargets expands one endpoint config into the namespace-by-service
+// probe list. An unset field keeps its default.
+func endpointTargets(ep *model.MonitoringEndpoint, defaultServices []string, defaultPort string) []monitoringTarget {
+	namespaces, services, port, prefix := defaultMonitoringNamespaces, defaultServices, defaultPort, ""
+	if ep != nil {
+		if len(ep.Namespaces) > 0 {
+			namespaces = ep.Namespaces
+		}
+		if len(ep.Services) > 0 {
+			services = ep.Services
+		}
+		if ep.Port != "" {
+			port = ep.Port
+		}
+		prefix = ep.PathPrefix
+	}
+
+	targets := make([]monitoringTarget, 0, len(namespaces)*len(services))
+	for _, ns := range namespaces {
+		for _, svc := range services {
+			targets = append(targets, monitoringTarget{Namespace: ns, Service: svc, Port: port, Prefix: prefix})
+		}
+	}
+	return targets
+}

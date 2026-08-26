@@ -151,17 +151,17 @@ func (c *Client) GetNodeUptimes(ctx context.Context, contextName string) (NodeUp
 		return NodeUptimes{}, fmt.Errorf("failed to get clientset: %w", err)
 	}
 
-	promNs, promSvc, promPort, _, _, _ := resolveMonitoringEndpoints(contextName)
-
 	// Bounded like the sibling node CPU/mem queries, so a hung proxy can't
 	// block the caller forever.
 	qctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	promTargets, _ := monitoringTargetsFor(qctx, clientset, contextName)
+
 	// Subtracted server-side so the result is independent of clock skew
 	// between this machine and the cluster.
 	const query = `time() - node_boot_time_seconds`
-	seconds, err := queryPrometheusMetric(qctx, contextName, clientset, c.demo, promNs, promSvc, promPort, query, parseNodeUptimeVector)
+	seconds, err := queryPrometheusMetric(qctx, contextName, clientset, c.demo, promTargets, query, parseNodeUptimeVector)
 	if err != nil {
 		logger.Debug("Prometheus node uptime query failed", "context", contextName, "error", err)
 		return NodeUptimes{}, fmt.Errorf("prometheus node uptime query failed: %w", err)

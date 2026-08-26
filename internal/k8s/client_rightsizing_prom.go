@@ -177,35 +177,32 @@ func (c *Client) runPrometheusProxy(ctx context.Context, contextName, path strin
 	if err != nil {
 		return nil, fmt.Errorf("clientset: %w", err)
 	}
-	promNs, promSvc, promPort, _, _, _ := resolveMonitoringEndpoints(contextName)
+	promTargets, _ := monitoringTargetsFor(ctx, cs, contextName)
 
-	doQuery := func(ns, svc string) ([]byte, error) {
+	doQuery := func(t monitoringTarget) ([]byte, error) {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		return safeProxyGetRaw(rctx, cs, ns, svc, promPort, path, params)
+		return safeProxyGetRaw(rctx, cs, t.Namespace, t.Service, t.Port, t.path(path), params)
 	}
 	// Keyed by contextName (not the clientset): clientsetForContext builds a
 	// fresh clientset per call, so a clientset key would never hit and re-run
 	// service discovery on every query.
 	if cached, ok := promSvcCache.Load(contextName); ok {
-		entry := cached.(promSvcEntry)
-		data, err := doQuery(entry.namespace, entry.service)
+		data, err := doQuery(cached.(monitoringTarget))
 		if err == nil {
 			return data, nil
 		}
 		promSvcCache.Delete(contextName)
 	}
 	var lastErr error
-	for _, ns := range promNs {
-		for _, svc := range promSvc {
-			data, err := doQuery(ns, svc)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-			promSvcCache.Store(contextName, promSvcEntry{namespace: ns, service: svc})
-			return data, nil
+	for _, t := range promTargets {
+		data, err := doQuery(t)
+		if err != nil {
+			lastErr = err
+			continue
 		}
+		promSvcCache.Store(contextName, t)
+		return data, nil
 	}
 	if lastErr != nil {
 		return nil, lastErr

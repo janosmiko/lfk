@@ -255,7 +255,7 @@ events:
 
 ## Monitoring
 
-Configure Prometheus and Alertmanager endpoints for the monitoring dashboard (`@` key) and alert views. By default, lfk auto-discovers monitoring services by trying common service names across common namespaces. Use this section to override the endpoints per cluster or set a default for all clusters.
+Configure Prometheus and Alertmanager endpoints for the monitoring dashboard (`@` key) and alert views. By default, lfk discovers monitoring services by their `app.kubernetes.io/name` label, then falls back to common service names in common namespaces. Use this section to override the endpoints per cluster or set a default for all clusters.
 
 Keys are kubeconfig context names. The special key `"_global"` applies to any cluster without an explicit entry.
 
@@ -318,13 +318,48 @@ Each endpoint (`prometheus` and `alertmanager`) accepts:
 | `namespaces` | list[string] | *(auto-discovery)* | Namespaces to search for the service. Tried in order. |
 | `services` | list[string] | *(auto-discovery)* | Service names to try. Tried in order within each namespace. |
 | `port` | string | `"9090"` / `"9093"` | Service port (default: `9090` for Prometheus, `9093` for Alertmanager). |
+| `path_prefix` | string | `""` | URL prefix in front of the API path. See [VictoriaMetrics](#victoriametrics). |
 
-When not configured, the following defaults are used for auto-discovery:
+### Auto-discovery
+
+lfk first lists Services that carry one of these `app.kubernetes.io/name` labels, and reads the port from the Service:
+
+| Label | Role | API prefix |
+|---|---|---|
+| `prometheus` | Prometheus | *(none)* |
+| `alertmanager` | Alertmanager | *(none)* |
+| `vmsingle` | Prometheus | *(none)* |
+| `vmselect` | Prometheus | `/select/0/prometheus`, then `/select/multitenant/prometheus` |
+| `vmalertmanager` | Alertmanager | *(none)* |
+
+The result is cached per context for 10 minutes. If a Service list across the cluster is denied, lfk lists the namespaces below instead.
+
+When discovery finds nothing, lfk probes these names:
 
 | Component | Default Namespaces | Default Services |
 |---|---|---|
-| Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
+| Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `kube-prometheus-stack-prometheus`, `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
+
+### VictoriaMetrics
+
+The operator names each Service after its custom resource, so lfk matches the component label instead of the name. A stack that carries no operator label needs an explicit entry:
+
+```yaml
+monitoring:
+  _global:
+    prometheus:
+      namespaces: ["monitoring"]
+      services: ["vmselect-vmks"]
+      port: "8481"
+      path_prefix: "/select/0/prometheus"
+    alertmanager:
+      namespaces: ["monitoring"]
+      services: ["vmalertmanager-vmks"]
+      port: "9093"
+```
+
+VictoriaMetrics keeps alert state in vmalert and vmalertmanager, not in vmselect. Alerts come from the Alertmanager endpoint there.
 
 ## Clusters
 

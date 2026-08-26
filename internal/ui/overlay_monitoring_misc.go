@@ -251,9 +251,11 @@ func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string 
 		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("  No active alerts found"))
 		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("  Prometheus was queried in well-known namespaces"))
+		b.WriteString(OverlayDimStyle.Render("  Searched for a Service labelled prometheus, alertmanager,"))
 		b.WriteString("\n")
-		b.WriteString(OverlayDimStyle.Render("  (monitoring, prometheus, observability, kube-prometheus-stack)"))
+		b.WriteString(OverlayDimStyle.Render("  vmsingle, vmselect, or vmalertmanager, then well-known names in"))
+		b.WriteString("\n")
+		b.WriteString(OverlayDimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
 		return b.String()
 	}
 

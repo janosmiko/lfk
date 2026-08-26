@@ -636,6 +636,10 @@
         "port": {
           "type": "string",
           "description": "Port number (default: \"9090\" for prometheus, \"9093\" for alertmanager)."
+        },
+        "path_prefix": {
+          "type": "string",
+          "description": "URL prefix in front of the API path. VictoriaMetrics vmselect serves the Prometheus API below \"/select/<accountID>/prometheus\"."
         }
       }
     },
