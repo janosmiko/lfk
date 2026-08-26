@@ -64,7 +64,7 @@ func (m Model) updateExecPodOSResolved(msg execPodOSResolvedMsg) (tea.Model, tea
 
 // linuxExecShellCmd is the POSIX shell bootstrap used to exec into Linux
 // containers: clear the screen, then prefer bash, then ash, then plain sh.
-const linuxExecShellCmd = "clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }"
+const linuxExecShellCmd = "command -v clear >/dev/null 2>&1 && clear; if command -v bash >/dev/null 2>&1; then exec bash -i; elif command -v ash >/dev/null 2>&1; then exec ash; else exec sh; fi"
 
 // windowsExecShellCmd prefers PowerShell and falls back to cmd.exe when it is
 // absent (e.g. nanoserver base images, which ship only cmd.exe). cmd's `||`
