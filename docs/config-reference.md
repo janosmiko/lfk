@@ -85,7 +85,8 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `security.heuristic.scan_secrets` | bool | `true` | Allow the heuristic source to list Secret objects, enabling the `legacy_sa_token_secret` and `tls_secret_expiry` checks and Secret-reference verification. `false` means the source never reads Secrets. Top-level `security` section only. |
 | `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled`, `hide_badges`, and/or `sources`). Wins over the global `security` settings for that context. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
-| `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
+| `disable_http2` | bool | `false` | When `true`, lfk talks HTTP/1.1 to the API server. Use behind a proxy or VPN that resets long-lived watch connections. The `DISABLE_HTTP2` env var overrides this field. |
+| `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items or a repeated refresh keeps it hot, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
 | `min_contrast_ratio` | float | `0.0` | **Deprecated** — use `appearance.min_contrast_ratio`. Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 
 ### Auto dark/light mode
@@ -994,7 +995,7 @@ the next render even though we never re-issue a `LIST`.
 | | `off` | `auto` (default) | `always` |
 |---|---|---|---|
 | Namespace switch on 7k-pod list | 1–2 s API round trip | In-process walk (after first list) | In-process walk (after first list) |
-| API server load (small clusters) | One LIST per nav | One LIST per nav (never promoted) | One LIST + one watch per opened type |
+| API server load (small clusters) | One LIST per nav | One LIST per nav, plus a watch per refreshed type | One LIST + one watch per opened type |
 | API server load (large clusters) | One LIST per nav | One initial LIST then one watch per promoted type | Same as `auto` |
 | Memory in lfk | View only | Cached objects for promoted types | Cached objects for every opened type |
 | One-off large list strands a watch | n/a | No (auto-demote closes it) | Yes (until shutdown) |
