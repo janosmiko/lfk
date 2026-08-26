@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -56,11 +57,28 @@ func parsePrometheusPodResponse(data []byte) (map[string]float64, error) {
 // errors only when both the CPU and memory queries fail, so a partial outage
 // still surfaces whatever data is available.
 func (c *Client) getAllPodMetricsFromPrometheus(ctx context.Context, contextName, namespace string) (map[string]model.PodMetrics, error) {
-	cpuMap, cpuErr := c.queryPromPodMetric(ctx, contextName, buildPromPodQuery(namespace, "cpu"))
+	// Both queries go through the API server's proxy to Prometheus, and each
+	// round trip costs a second or two on a remote cluster. Run one after the
+	// other they add up past the watch interval, so every refresh cancelled the
+	// fetch before it finished and the CPU/MEM columns never filled in.
+	var (
+		cpuMap, memMap map[string]float64
+		cpuErr, memErr error
+		wg             sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		cpuMap, cpuErr = c.queryPromPodMetric(ctx, contextName, buildPromPodQuery(namespace, "cpu"))
+	}()
+	go func() {
+		defer wg.Done()
+		memMap, memErr = c.queryPromPodMetric(ctx, contextName, buildPromPodQuery(namespace, "memory"))
+	}()
+	wg.Wait()
 	if cpuErr != nil {
 		logger.Debug("Prometheus pod CPU query failed", "context", contextName, "namespace", namespace, "error", cpuErr)
 	}
-	memMap, memErr := c.queryPromPodMetric(ctx, contextName, buildPromPodQuery(namespace, "memory"))
 	if memErr != nil {
 		logger.Debug("Prometheus pod memory query failed", "context", contextName, "namespace", namespace, "error", memErr)
 	}

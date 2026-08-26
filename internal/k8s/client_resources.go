@@ -90,7 +90,17 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// that just began.
 	justStarted := false
 	if lo.preferCache && mode != InformerCacheOff && infs != nil && allowed {
-		justStarted = infs.markHot(contextName, gvr)
+		if infs.informerRunning(contextName, gvr) {
+			infs.markHot(contextName, gvr)
+		} else {
+			// The informer is not up yet, so this call reads nothing from the
+			// cache and lists directly. Starting the informer now would put its
+			// own initial LIST on the wire beside that list. On a first
+			// dashboard load that doubles eight lists into sixteen and the pod
+			// list went from 1.8s to 4.4s. Start it once our list is done.
+			justStarted = true
+			defer infs.markHot(contextName, gvr)
+		}
 	}
 	if !justStarted && allowed && rt.FieldSelector == "" && cacheEnabled(mode, infs) && shouldUseCache(mode, infs, contextName, gvr) {
 		build := func(obj *unstructured.Unstructured) model.Item {

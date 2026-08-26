@@ -14,10 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// withDashboardFrameUp puts a frame on screen so handleDashboardPartial takes
-// its steady-state path, where the repaint waits for every section. With no
-// frame up it paints each section as it lands instead, so the page never sits
-// on its loading placeholder.
+// withDashboardFrameUp puts a frame on screen. handleDashboardPartial holds
+// every partial until the fan-out is whole either way, so this only makes a
+// test read as the steady-state refresh it describes.
 func withDashboardFrameUp(m Model) Model {
 	m.dashboardPreview = "CLUSTER DASHBOARD"
 	return m

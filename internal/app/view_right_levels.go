@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -120,6 +121,20 @@ func (m Model) renderRightResources(width, height int) string {
 		}
 		return m.renderFallbackYAML(width, height)
 	}
+	return m.renderPreviewWithoutChildren(sel, width, height)
+}
+
+// renderPreviewWithoutChildren renders the right pane for a selected item whose
+// children have not arrived. previewLoading alone cannot answer whether they
+// ever will: the silent watch-tick refresh of the list clears it every interval
+// while the hovered item's child preview is still on the wire, so the pane read
+// an empty rightItems as "this pod has no containers" and flashed "No resources
+// found" once a second. The item's own details are the stable answer, and this
+// is what the non-Pod branch above has always done.
+func (m Model) renderPreviewWithoutChildren(sel *model.Item, width, height int) string {
+	if sel != nil && len(sel.Columns) > 0 {
+		return ui.RenderResourceSummary(sel, "", width, height)
+	}
 	return m.renderRightDefault(width, height)
 }
 
@@ -156,7 +171,7 @@ func (m Model) renderRightOwned(width, height int) string {
 		}
 		return ui.RenderResourceSummary(sel, "", width, height)
 	}
-	return m.renderRightDefault(width, height)
+	return m.renderPreviewWithoutChildren(sel, width, height)
 }
 
 func (m Model) renderRightDefault(width, height int) string {
