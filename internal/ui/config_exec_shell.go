@@ -61,7 +61,10 @@ func applyExecShellsConfig(shells []string) {
 			continue
 		}
 		if !execShellEntryAllowed(entry) {
-			logger.Warn("Ignoring exec_shells entry: only letters, digits, and ._/+=:- are allowed", "entry", entry)
+			// The rejected value stays out of the log per redaction
+			// policy. A rejected entry can hold anything, a pasted
+			// secret included.
+			logger.Warn("Ignoring an exec_shells entry: only letters, digits, spaces, and ._/+=:- are allowed")
 			continue
 		}
 		kept = append(kept, entry)
