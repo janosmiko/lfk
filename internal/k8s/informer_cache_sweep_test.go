@@ -68,5 +68,5 @@ func TestSweepStaleHot_PrunesColdAutoState(t *testing.T) {
 
 	assert.Len(t, ic.auto[""], 2, "cold auto-state entries must not survive a sweep")
 	assert.True(t, ic.isPromoted("", promoted))
-	assert.True(t, ic.isDenied("", denied))
+	assert.True(t, ic.getAutoState("", denied).isDenied())
 }
