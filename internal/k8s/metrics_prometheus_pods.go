@@ -125,9 +125,9 @@ func (c *Client) queryPromPodMetric(ctx context.Context, contextName, query stri
 // GetAllNodeMetrics' fallback behavior so a cluster with only one working
 // source still resolves. The error returned when every route fails names both
 // sources, so the single caller-side warning is actionable.
-func runPodMetricsRoutes[T any](contextName string, hasPrometheus bool, fromProm, fromAPI func() (T, error)) (T, error) {
-	nodeMetrics, _ := resolveNodeMetricsConfig(contextName)
-	routes := selectNodeMetricsRoutes(nodeMetrics, hasPrometheus)
+func runPodMetricsRoutes[T any](contextName string, availablePrometheus bool, fromProm, fromAPI func() (T, error)) (T, error) {
+	nodeMetrics, configured := resolveNodeMetricsConfig(contextName)
+	routes := selectNodeMetricsRoutes(nodeMetrics, configured, availablePrometheus)
 
 	var zero T
 	var lastErr error

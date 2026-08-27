@@ -367,27 +367,31 @@ func (r nodeMetricsRoute) String() string {
 // metrics on clusters that don't match the global routing (e.g. a
 // metrics-server-only EKS cluster picking up a shared `_global`
 // Prometheus block, then silently rendering n/a everywhere).
-func selectNodeMetricsRoutes(nodeMetrics string, hasPrometheus bool) []nodeMetricsRoute {
+// configuredPrometheus means the user named a Prometheus endpoint.
+// availablePrometheus also counts one that discovery found. The two differ so
+// that an explicit metrics-api opt-out cannot be undone by a Service lfk
+// merely noticed.
+func selectNodeMetricsRoutes(nodeMetrics string, configuredPrometheus, availablePrometheus bool) []nodeMetricsRoute {
 	switch {
 	case nodeMetrics == "prometheus":
 		// Explicit Prometheus: try Prometheus, fall back to metrics-api.
 		return []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}
 	case nodeMetrics == "metrics-api":
 		// Explicit metrics-api: try metrics-api, fall back to Prometheus
-		// only if one is even configured (avoids attempting a guaranteed-
-		// to-fail service-proxy probe).
-		if hasPrometheus {
+		// only if the user configured one. Discovery does not count here,
+		// or asking for metrics-api would still probe a Prometheus.
+		if configuredPrometheus {
 			return []nodeMetricsRoute{nodeMetricsRouteAPI, nodeMetricsRoutePrometheus}
 		}
 		return []nodeMetricsRoute{nodeMetricsRouteAPI}
-	case nodeMetrics == "" && hasPrometheus:
-		// Implicit Prometheus (typically from a shared `_global` entry):
-		// try Prometheus, fall back to metrics-api. The fallback is the
-		// fix for clusters that inherit a global Prometheus pointer but
-		// only actually have metrics-server.
+	case nodeMetrics == "" && availablePrometheus:
+		// Implicit Prometheus, from a shared `_global` entry or from
+		// discovery: try Prometheus, fall back to metrics-api. The fallback
+		// is the fix for clusters that inherit a global Prometheus pointer
+		// but only actually have metrics-server.
 		return []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}
 	default:
-		// Nothing configured: metrics-api only.
+		// No Prometheus anywhere: metrics-api only.
 		return []nodeMetricsRoute{nodeMetricsRouteAPI}
 	}
 }
@@ -401,8 +405,8 @@ func selectNodeMetricsRoutes(nodeMetrics string, hasPrometheus bool) []nodeMetri
 // the fallback is logged at Warn so users can self-diagnose missing
 // metrics from a single log read.
 func (c *Client) GetAllNodeMetrics(ctx context.Context, contextName string) (map[string]model.PodMetrics, error) {
-	nodeMetrics, _ := resolveNodeMetricsConfig(contextName)
-	routes := selectNodeMetricsRoutes(nodeMetrics, c.prometheusAvailable(ctx, contextName))
+	nodeMetrics, configured := resolveNodeMetricsConfig(contextName)
+	routes := selectNodeMetricsRoutes(nodeMetrics, configured, c.prometheusAvailable(ctx, contextName))
 
 	var lastErr error
 	for i, route := range routes {

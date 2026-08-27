@@ -68,7 +68,7 @@ func TestDiscoveredPrometheusPicksTheRoute(t *testing.T) {
 	cs := k8sfake.NewClientset(monitoringSvc("monitoring", "vmsingle-vmks", "vmsingle", port("http", 8428)))
 	c := newFakeClient(cs, nil)
 
-	routes := selectNodeMetricsRoutes("", c.prometheusAvailable(t.Context(), "ctx"))
+	routes := selectNodeMetricsRoutes("", false, c.prometheusAvailable(t.Context(), "ctx"))
 
 	assert.Equal(t, []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}, routes)
 }
