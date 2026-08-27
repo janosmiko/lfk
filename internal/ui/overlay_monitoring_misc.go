@@ -242,7 +242,9 @@ func RenderQuotaDashboardOverlay(quotas []QuotaEntry, width, height int) string 
 
 // RenderAlertsOverlay renders the Prometheus alerts overlay content.
 // scroll controls the visible portion; width and height limit the overlay size.
-func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string {
+// searchHint says where lfk looked, for the empty case; it differs by cluster,
+// so the caller supplies it (see k8s.MonitoringSearchHint).
+func RenderAlertsOverlay(alerts []AlertEntry, searchHint []string, scroll, width, height int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Monitoring Overview — Active Alerts"))
 	b.WriteString("\n")
@@ -251,11 +253,12 @@ func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string 
 		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("  No active alerts found"))
 		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("  Searched for a Service labelled prometheus, alertmanager,"))
-		b.WriteString("\n")
-		b.WriteString(OverlayDimStyle.Render("  vmsingle, vmselect, or vmalertmanager, then well-known names in"))
-		b.WriteString("\n")
-		b.WriteString(OverlayDimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
+		for i, line := range searchHint {
+			if i > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(OverlayDimStyle.Render("  " + line))
+		}
 		return b.String()
 	}
 

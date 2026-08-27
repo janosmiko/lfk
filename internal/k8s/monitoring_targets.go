@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -191,19 +192,59 @@ func withPrefix(t monitoringTarget, prefix string) monitoringTarget {
 
 // servicePort picks the HTTP port of a monitoring Service. The named port wins
 // because an Alertmanager Service also exposes its gossip port, and that one
-// answers no API request.
+// answers no API request. Its gossip port carries the same name on UDP as on
+// TCP, so the name alone is not enough.
 func servicePort(svc *corev1.Service) string {
 	for _, p := range svc.Spec.Ports {
-		if p.Name == "http" || p.Name == "web" {
+		if isTCP(p) && (p.Name == "http" || p.Name == "web") {
 			return strconv.Itoa(int(p.Port))
 		}
 	}
 	for _, p := range svc.Spec.Ports {
-		if p.Protocol == "" || p.Protocol == corev1.ProtocolTCP {
+		if isTCP(p) {
 			return strconv.Itoa(int(p.Port))
 		}
 	}
 	return ""
+}
+
+func isTCP(p corev1.ServicePort) bool {
+	return p.Protocol == "" || p.Protocol == corev1.ProtocolTCP
+}
+
+// MonitoringSearchHint says where lfk looked for a monitoring endpoint, for the
+// "not reachable" message. A config that names the services for both roles
+// turns label discovery off, so one wording cannot describe both modes.
+func MonitoringSearchHint(contextName string) []string {
+	prom, am := resolveMonitoringEndpoints(contextName)
+	namespaces := strings.Join(namespacesOf(prom, am), ", ")
+
+	if !monitoringDiscoveryWanted(contextName) {
+		return []string{
+			"Searched only the services named in the monitoring config:",
+			strings.Join(uniqueServiceNames(prom, am), ", "),
+			"in: " + namespaces,
+		}
+	}
+	return []string{
+		"Searched for a Service labelled prometheus, alertmanager,",
+		"vmsingle, vmselect, or vmalertmanager, then well-known names in:",
+		namespaces,
+	}
+}
+
+func uniqueServiceNames(targetLists ...[]monitoringTarget) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, targets := range targetLists {
+		for _, t := range targets {
+			if !seen[t.Service] {
+				seen[t.Service] = true
+				out = append(out, t.Service)
+			}
+		}
+	}
+	return out
 }
 
 // monitoringConfigFor returns the monitoring config that applies to a cluster

@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,6 +44,14 @@ func TestServicePort(t *testing.T) {
 			{Name: "udp-mesh", Port: 9094, Protocol: corev1.ProtocolUDP},
 			{Name: "tcp-mesh", Port: 9093, Protocol: corev1.ProtocolTCP},
 		}, "9093"},
+		{"skips a UDP port named http", []corev1.ServicePort{
+			{Name: "http", Port: 9094, Protocol: corev1.ProtocolUDP},
+			{Name: "web", Port: 9093, Protocol: corev1.ProtocolTCP},
+		}, "9093"},
+		{"skips a UDP port named web and takes the plain TCP port", []corev1.ServicePort{
+			{Name: "web", Port: 9094, Protocol: corev1.ProtocolUDP},
+			{Name: "mesh", Port: 9095, Protocol: corev1.ProtocolTCP},
+		}, "9095"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,8 +228,8 @@ func TestMonitoringTargetsFor(t *testing.T) {
 		prom, am := monitoringTargetsFor(t.Context(), cs, "ctx-c")
 
 		assert.Zero(t, lists)
-		assert.Equal(t, []string{"my-prom"}, uniqueServices(prom))
-		assert.Equal(t, []string{"my-am"}, uniqueServices(am))
+		assert.Equal(t, []string{"my-prom"}, uniqueServiceNames(prom))
+		assert.Equal(t, []string{"my-am"}, uniqueServiceNames(am))
 	})
 }
 
@@ -228,18 +237,6 @@ func targetServices(targets []monitoringTarget) []string {
 	out := make([]string, 0, len(targets))
 	for _, t := range targets {
 		out = append(out, t.Service)
-	}
-	return out
-}
-
-func uniqueServices(targets []monitoringTarget) []string {
-	seen := map[string]bool{}
-	out := []string{}
-	for _, t := range targets {
-		if !seen[t.Service] {
-			seen[t.Service] = true
-			out = append(out, t.Service)
-		}
 	}
 	return out
 }
@@ -379,4 +376,64 @@ func TestMonitoringTargetsForDoesNotMutateTheCache(t *testing.T) {
 	assert.Equal(t, first, second)
 	assert.Equal(t, "vmselect-vmks", second[0].Service)
 	assert.Equal(t, "vmselect-vmks", second[1].Service)
+}
+
+// --- MonitoringSearchHint ---
+
+func TestMonitoringSearchHint(t *testing.T) {
+	setConfig := func(t *testing.T, cfg map[string]model.MonitoringConfig) {
+		t.Helper()
+		orig := model.ConfigMonitoring
+		model.ConfigMonitoring = cfg
+		t.Cleanup(func() { model.ConfigMonitoring = orig })
+	}
+
+	t.Run("names the labels when discovery runs", func(t *testing.T) {
+		setConfig(t, nil)
+
+		hint := strings.Join(MonitoringSearchHint("ctx"), " ")
+
+		assert.Contains(t, hint, "vmselect")
+		assert.Contains(t, hint, "kube-prometheus-stack")
+	})
+
+	t.Run("names the configured namespaces when discovery runs", func(t *testing.T) {
+		setConfig(t, map[string]model.MonitoringConfig{
+			"_global": {
+				Prometheus:   &model.MonitoringEndpoint{Namespaces: []string{"obs-ns"}},
+				Alertmanager: &model.MonitoringEndpoint{Namespaces: []string{"obs-ns"}},
+			},
+		})
+
+		hint := strings.Join(MonitoringSearchHint("ctx"), " ")
+
+		assert.Contains(t, hint, "obs-ns")
+		assert.NotContains(t, hint, "kube-prometheus-stack")
+	})
+
+	t.Run("names every namespace it searched when only one role is configured", func(t *testing.T) {
+		setConfig(t, map[string]model.MonitoringConfig{
+			"_global": {Prometheus: &model.MonitoringEndpoint{Namespaces: []string{"obs-ns"}}},
+		})
+
+		hint := strings.Join(MonitoringSearchHint("ctx"), " ")
+
+		assert.Contains(t, hint, "obs-ns")
+		assert.Contains(t, hint, "kube-prometheus-stack")
+	})
+
+	t.Run("says discovery is off when the config names both roles", func(t *testing.T) {
+		setConfig(t, map[string]model.MonitoringConfig{
+			"_global": {
+				Prometheus:   &model.MonitoringEndpoint{Services: []string{"my-prom"}},
+				Alertmanager: &model.MonitoringEndpoint{Services: []string{"my-am"}},
+			},
+		})
+
+		hint := strings.Join(MonitoringSearchHint("ctx"), " ")
+
+		assert.Contains(t, hint, "my-prom")
+		assert.Contains(t, hint, "my-am")
+		assert.NotContains(t, hint, "vmselect")
+	})
 }

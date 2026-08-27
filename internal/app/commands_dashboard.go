@@ -502,7 +502,7 @@ func (m Model) loadMonitoringDashboardFor(kctx string) tea.Cmd {
 				alerts = nil
 			}
 			return monitoringDashboardMsg{
-				content: composeMonitoring(alerts, errMsg),
+				content: composeMonitoring(kctx, alerts, errMsg),
 				alerts:  alerts,
 				errMsg:  errMsg,
 				context: kctx,
@@ -516,7 +516,7 @@ func (m Model) loadMonitoringDashboardFor(kctx string) tea.Cmd {
 // recomposeMonitoring, where it re-renders with the current theme on a theme
 // change. errMsg, when non-empty, signals the monitoring backend was
 // unreachable and renders the connectivity hint instead of the alert table.
-func composeMonitoring(alerts []k8s.AlertInfo, errMsg string) string {
+func composeMonitoring(kubeCtx string, alerts []k8s.AlertInfo, errMsg string) string {
 	var lines []string
 	lines = append(lines, "")
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  MONITORING OVERVIEW"))
@@ -526,9 +526,9 @@ func composeMonitoring(alerts []k8s.AlertInfo, errMsg string) string {
 		lines = append(lines, ui.DimStyle.Render("  Prometheus/Alertmanager not reachable"))
 		lines = append(lines, ui.DimStyle.Render("  "+errMsg))
 		lines = append(lines, "")
-		lines = append(lines, ui.DimStyle.Render("  Searched for a Service labelled prometheus, alertmanager,"))
-		lines = append(lines, ui.DimStyle.Render("  vmsingle, vmselect, or vmalertmanager, then well-known names in:"))
-		lines = append(lines, ui.DimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
+		for _, line := range k8s.MonitoringSearchHint(kubeCtx) {
+			lines = append(lines, ui.DimStyle.Render("  "+line))
+		}
 		lines = append(lines, "")
 		return strings.Join(lines, "\n")
 	}

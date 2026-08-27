@@ -583,9 +583,15 @@ func TestPlaceOverlay(t *testing.T) {
 
 func TestRenderAlertsOverlay(t *testing.T) {
 	t.Run("empty alerts shows no-alerts message", func(t *testing.T) {
-		result := RenderAlertsOverlay(nil, 0, 80, 25)
+		result := RenderAlertsOverlay(nil, nil, 0, 80, 25)
 		assert.Contains(t, result, "No active alerts")
 		// Hint moved to status bar.
+	})
+
+	t.Run("empty alerts renders the caller's search hint", func(t *testing.T) {
+		result := RenderAlertsOverlay(nil, []string{"looked in obs-ns", "and nowhere else"}, 0, 80, 25)
+		assert.Contains(t, stripANSI(result), "looked in obs-ns")
+		assert.Contains(t, stripANSI(result), "and nowhere else")
 	})
 
 	t.Run("renders single alert", func(t *testing.T) {
@@ -599,7 +605,7 @@ func TestRenderAlertsOverlay(t *testing.T) {
 				Since:       time.Now().Add(-2 * time.Hour),
 			},
 		}
-		result := RenderAlertsOverlay(alerts, 0, 80, 25)
+		result := RenderAlertsOverlay(alerts, nil, 0, 80, 25)
 		assert.Contains(t, result, "Active Alerts")
 		assert.Contains(t, result, "HighCPU")
 		assert.Contains(t, result, "critical")
@@ -623,7 +629,7 @@ func TestRenderAlertsOverlay(t *testing.T) {
 				Summary:  "Disk running low",
 			},
 		}
-		result := RenderAlertsOverlay(alerts, 0, 80, 25)
+		result := RenderAlertsOverlay(alerts, nil, 0, 80, 25)
 		assert.Contains(t, result, "HighCPU")
 		assert.Contains(t, result, "LowDisk")
 		assert.Contains(t, result, "2 alert(s)")
@@ -638,7 +644,7 @@ func TestRenderAlertsOverlay(t *testing.T) {
 				GrafanaURL: "https://grafana.example.com/d/abc",
 			},
 		}
-		result := RenderAlertsOverlay(alerts, 0, 80, 25)
+		result := RenderAlertsOverlay(alerts, nil, 0, 80, 25)
 		assert.Contains(t, result, "grafana.example.com")
 	})
 
@@ -647,7 +653,7 @@ func TestRenderAlertsOverlay(t *testing.T) {
 			{Name: "A1", State: "firing", Severity: "warning"},
 		}
 		// Scroll beyond content should not panic.
-		result := RenderAlertsOverlay(alerts, 100, 80, 25)
+		result := RenderAlertsOverlay(alerts, nil, 100, 80, 25)
 		assert.Contains(t, result, "A1")
 	})
 
@@ -655,7 +661,7 @@ func TestRenderAlertsOverlay(t *testing.T) {
 		alerts := []AlertEntry{
 			{Name: "A1", State: "firing", Severity: "info"},
 		}
-		result := RenderAlertsOverlay(alerts, -5, 80, 25)
+		result := RenderAlertsOverlay(alerts, nil, -5, 80, 25)
 		assert.Contains(t, result, "A1")
 	})
 }
