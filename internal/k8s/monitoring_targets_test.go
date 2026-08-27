@@ -228,8 +228,14 @@ func TestMonitoringTargetsFor(t *testing.T) {
 		prom, am := monitoringTargetsFor(t.Context(), cs, "ctx-c")
 
 		assert.Zero(t, lists)
-		assert.Equal(t, []string{"my-prom"}, uniqueServiceNames(prom))
-		assert.Equal(t, []string{"my-am"}, uniqueServiceNames(am))
+		assert.NotEmpty(t, prom)
+		assert.NotEmpty(t, am)
+		for _, svc := range targetServices(prom) {
+			assert.Equal(t, "my-prom", svc)
+		}
+		for _, svc := range targetServices(am) {
+			assert.Equal(t, "my-am", svc)
+		}
 	})
 }
 
@@ -420,6 +426,19 @@ func TestMonitoringSearchHint(t *testing.T) {
 
 		assert.Contains(t, hint, "obs-ns")
 		assert.Contains(t, hint, "kube-prometheus-stack")
+	})
+
+	t.Run("names a service configured for one role while discovery still runs", func(t *testing.T) {
+		setConfig(t, map[string]model.MonitoringConfig{
+			"_global": {Prometheus: &model.MonitoringEndpoint{Services: []string{"thanos-query"}}},
+		})
+
+		hint := strings.Join(MonitoringSearchHint("ctx"), " ")
+
+		// The configured name is one lfk actually tried, so the hint must say it.
+		assert.Contains(t, hint, "thanos-query")
+		// Discovery still runs for the alertmanager role.
+		assert.Contains(t, hint, "vmselect")
 	})
 
 	t.Run("says discovery is off when the config names both roles", func(t *testing.T) {

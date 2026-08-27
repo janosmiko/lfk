@@ -999,3 +999,16 @@ func TestPadToWidth(t *testing.T) {
 		assert.Equal(t, "1234567890", result)
 	})
 }
+
+func TestRenderAlertsOverlayWrapsSearchHint(t *testing.T) {
+	const width = 40
+	long := "Tried: aaaaaaaaaa, bbbbbbbbbb, cccccccccc, dddddddddd, eeeeeeeeee, ffffffffff"
+
+	result := stripANSI(RenderAlertsOverlay(nil, []string{long}, 0, width, 25))
+
+	for line := range strings.SplitSeq(result, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(line), width, "line wider than the overlay: %q", line)
+	}
+	assert.Contains(t, result, "aaaaaaaaaa")
+	assert.Contains(t, result, "ffffffffff")
+}

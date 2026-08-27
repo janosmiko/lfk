@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // RenderRBACOverlay renders the RBAC permission check overlay content.
@@ -253,11 +254,18 @@ func RenderAlertsOverlay(alerts []AlertEntry, searchHint []string, scroll, width
 		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("  No active alerts found"))
 		b.WriteString("\n\n")
-		for i, line := range searchHint {
-			if i > 0 {
-				b.WriteString("\n")
+		// The hint carries configured service names, so a line can outrun the
+		// overlay. Wrap before styling, or the SGR codes break the measurement.
+		contentW := max(width-4, 1)
+		first := true
+		for _, hint := range searchHint {
+			for line := range strings.SplitSeq(ansi.Wordwrap(hint, contentW, ""), "\n") {
+				if !first {
+					b.WriteString("\n")
+				}
+				first = false
+				b.WriteString(OverlayDimStyle.Render("  " + Truncate(strings.TrimRight(line, " "), contentW)))
 			}
-			b.WriteString(OverlayDimStyle.Render("  " + line))
 		}
 		return b.String()
 	}

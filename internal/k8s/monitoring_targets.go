@@ -213,38 +213,30 @@ func isTCP(p corev1.ServicePort) bool {
 }
 
 // MonitoringSearchHint says where lfk looked for a monitoring endpoint, for the
-// "not reachable" message. A config that names the services for both roles
-// turns label discovery off, so one wording cannot describe both modes.
+// "not reachable" message. It reports each role on its own, because a config
+// that names the services for one role leaves the other on the built-in list,
+// and a config that names both turns label discovery off entirely.
 func MonitoringSearchHint(contextName string) []string {
+	mc, _ := monitoringConfigFor(contextName)
 	prom, am := resolveMonitoringEndpoints(contextName)
-	namespaces := strings.Join(namespacesOf(prom, am), ", ")
 
-	if !monitoringDiscoveryWanted(contextName) {
-		return []string{
-			"Searched only the services named in the monitoring config:",
-			strings.Join(uniqueServiceNames(prom, am), ", "),
-			"in: " + namespaces,
-		}
+	var lines []string
+	if monitoringDiscoveryWanted(contextName) {
+		lines = append(lines,
+			"Searched for a Service labelled prometheus, alertmanager,",
+			"vmsingle, vmselect, or vmalertmanager.")
 	}
-	return []string{
-		"Searched for a Service labelled prometheus, alertmanager,",
-		"vmsingle, vmselect, or vmalertmanager, then well-known names in:",
-		namespaces,
-	}
+	return append(lines,
+		"Prometheus names: "+endpointNames(mc.Prometheus),
+		"Alertmanager names: "+endpointNames(mc.Alertmanager),
+		"In: "+strings.Join(namespacesOf(prom, am), ", "))
 }
 
-func uniqueServiceNames(targetLists ...[]monitoringTarget) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, targets := range targetLists {
-		for _, t := range targets {
-			if !seen[t.Service] {
-				seen[t.Service] = true
-				out = append(out, t.Service)
-			}
-		}
+func endpointNames(ep *model.MonitoringEndpoint) string {
+	if ep == nil || len(ep.Services) == 0 {
+		return "the built-in list"
 	}
-	return out
+	return strings.Join(ep.Services, ", ")
 }
 
 // monitoringConfigFor returns the monitoring config that applies to a cluster
