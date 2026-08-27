@@ -16,9 +16,9 @@ import (
 // monitoring source for contextName. On a metrics-server-only cluster there
 // is no Prometheus service to find, and an unconditional fetch would re-run
 // the full namespace x service discovery sweep on every watch tick.
-func nodeUptimeQueryEnabled(contextName string) bool {
-	nodeMetrics, hasPrometheus := resolveNodeMetricsConfig(contextName)
-	return nodeMetrics == "prometheus" || hasPrometheus
+func (c *Client) nodeUptimeQueryEnabled(ctx context.Context, contextName string) bool {
+	nodeMetrics, _ := resolveNodeMetricsConfig(contextName)
+	return nodeMetrics == "prometheus" || c.prometheusAvailable(ctx, contextName)
 }
 
 // nodeUptimeNameKeys returns the Kubernetes-node-name label values a
@@ -142,7 +142,7 @@ func (n NodeUptimes) Empty() bool {
 // nil error when Prometheus isn't the configured monitoring source -- uptime
 // is simply unavailable on a metrics-server-only cluster, not an error.
 func (c *Client) GetNodeUptimes(ctx context.Context, contextName string) (NodeUptimes, error) {
-	if !nodeUptimeQueryEnabled(contextName) {
+	if !c.nodeUptimeQueryEnabled(ctx, contextName) {
 		return NodeUptimes{}, nil
 	}
 

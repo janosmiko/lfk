@@ -71,7 +71,7 @@ func (c *Client) metricsGVR(resource string) []schema.GroupVersionResource {
 // GetPodMetrics fetches CPU and memory usage for a single pod, trying the
 // configured routes (Prometheus / metrics-server) in order.
 func (c *Client) GetPodMetrics(ctx context.Context, contextName, namespace, podName string) (*model.PodMetrics, error) {
-	return runPodMetricsRoutes(contextName,
+	return runPodMetricsRoutes(contextName, c.prometheusAvailable(ctx, contextName),
 		func() (*model.PodMetrics, error) {
 			all, err := c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
 			if err != nil {
@@ -106,7 +106,7 @@ func (c *Client) getPodMetricsFromAPI(ctx context.Context, contextName, namespac
 // GetPodsMetrics fetches metrics for multiple pods, trying the configured
 // routes (Prometheus / metrics-server) in order.
 func (c *Client) GetPodsMetrics(ctx context.Context, contextName, namespace string, podNames []string) ([]model.PodMetrics, error) {
-	return runPodMetricsRoutes(contextName,
+	return runPodMetricsRoutes(contextName, c.prometheusAvailable(ctx, contextName),
 		func() ([]model.PodMetrics, error) {
 			all, err := c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
 			if err != nil {
@@ -166,7 +166,7 @@ func (c *Client) getPodsMetricsFromAPI(ctx context.Context, contextName, namespa
 // It tries the configured routes (Prometheus / metrics-server) in order, so a
 // cluster served only by Prometheus no longer reports "metrics API unavailable".
 func (c *Client) GetAllPodMetrics(ctx context.Context, contextName, namespace string) (map[string]model.PodMetrics, error) {
-	return runPodMetricsRoutes(contextName,
+	return runPodMetricsRoutes(contextName, c.prometheusAvailable(ctx, contextName),
 		func() (map[string]model.PodMetrics, error) {
 			return c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
 		},
@@ -320,6 +320,29 @@ func resolveNodeMetricsConfig(contextName string) (nodeMetrics string, hasPromet
 	return mc.NodeMetrics, mc.Prometheus != nil
 }
 
+// prometheusAvailable reports whether this context has a Prometheus worth
+// querying: one the user configured, or one the label search found. Without
+// the discovered half, a cluster that lfk can reach still gets its pod and
+// node metrics from metrics-server, because the config alone said nothing.
+// Discovery is cached per context, so this costs a Service list once every
+// ten minutes at most.
+func (c *Client) prometheusAvailable(ctx context.Context, contextName string) bool {
+	if _, configured := resolveNodeMetricsConfig(contextName); configured {
+		return true
+	}
+	// The demo cluster has no Services to search, and its Prometheus paths
+	// answer with a fixed error rather than data.
+	if c.demo {
+		return false
+	}
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return false
+	}
+	prom, _ := discoveredMonitoringTargets(ctx, cs, contextName)
+	return len(prom) > 0
+}
+
 // nodeMetricsRoute names a single attempt strategy for node metrics:
 // either the metrics.k8s.io API (metrics-server) or a Prometheus query.
 type nodeMetricsRoute int
@@ -378,8 +401,8 @@ func selectNodeMetricsRoutes(nodeMetrics string, hasPrometheus bool) []nodeMetri
 // the fallback is logged at Warn so users can self-diagnose missing
 // metrics from a single log read.
 func (c *Client) GetAllNodeMetrics(ctx context.Context, contextName string) (map[string]model.PodMetrics, error) {
-	nodeMetrics, hasPrometheus := resolveNodeMetricsConfig(contextName)
-	routes := selectNodeMetricsRoutes(nodeMetrics, hasPrometheus)
+	nodeMetrics, _ := resolveNodeMetricsConfig(contextName)
+	routes := selectNodeMetricsRoutes(nodeMetrics, c.prometheusAvailable(ctx, contextName))
 
 	var lastErr error
 	for i, route := range routes {

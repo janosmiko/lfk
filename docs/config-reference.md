@@ -255,7 +255,7 @@ events:
 
 ## Monitoring
 
-Configure Prometheus and Alertmanager endpoints for the monitoring dashboard (`@` key) and alert views. By default, lfk discovers monitoring services by their `app.kubernetes.io/name` label, then falls back to common service names in common namespaces. Use this section to override the endpoints per cluster or set a default for all clusters.
+Configure Prometheus and Alertmanager endpoints for the monitoring dashboard (`@` key) and alert views. By default, lfk discovers monitoring services by their operator labels, then falls back to common service names in common namespaces. Use this section to override the endpoints per cluster or set a default for all clusters.
 
 Keys are kubeconfig context names. The special key `"_global"` applies to any cluster without an explicit entry.
 
@@ -289,16 +289,14 @@ Each monitoring entry accepts the following top-level fields:
 | `alertmanager` | object | *(auto-discovery)* | Alertmanager endpoint configuration. See endpoint fields below. |
 | `node_metrics` | string | *(auto-detect)* | Metrics source for node **and pod** usage: `"prometheus"` or `"metrics-api"`. Empty auto-detects. |
 
-When `node_metrics` is empty, lfk uses Prometheus if a `prometheus` endpoint is configured, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus.
+When `node_metrics` is empty, lfk uses Prometheus if a `prometheus` endpoint is configured or [auto-discovery](#auto-discovery) found one, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus.
 
 ### Node uptime column
 
 The nodes list shows an `Uptime` column (how long since each node last booted)
-when Prometheus is the configured monitoring source — that is, a `prometheus`
-endpoint is set, or `node_metrics: prometheus`. One of the two is required;
-the column stays hidden on clusters with no monitoring config. With
-`node_metrics: prometheus` and no `prometheus` block, the endpoint itself is
-auto-discovered from the well-known namespaces and services listed below.
+when the cluster has a Prometheus: one that [auto-discovery](#auto-discovery)
+found, one a `prometheus` endpoint names, or `node_metrics: prometheus`. The
+column stays hidden on a cluster with none of the three.
 
 | Requirement | Detail |
 |---|---|
@@ -322,15 +320,19 @@ Each endpoint (`prometheus` and `alertmanager`) accepts:
 
 ### Auto-discovery
 
-lfk first lists Services that carry one of these `app.kubernetes.io/name` labels, and reads the port from the Service:
+lfk first lists Services that carry one of these labels, and reads the port from the Service:
 
 | Label | Role | API prefix |
 |---|---|---|
-| `prometheus` | Prometheus | *(none)* |
-| `alertmanager` | Alertmanager | *(none)* |
-| `vmsingle` | Prometheus | *(none)* |
-| `vmselect` | Prometheus | `/select/0/prometheus`, then `/select/multitenant/prometheus` |
-| `vmalertmanager` | Alertmanager | *(none)* |
+| `app.kubernetes.io/name: prometheus` | Prometheus | *(none)* |
+| `app.kubernetes.io/name: alertmanager` | Alertmanager | *(none)* |
+| `app.kubernetes.io/name: vmsingle` | Prometheus | *(none)* |
+| `app.kubernetes.io/name: vmselect` | Prometheus | `/select/0/prometheus`, then `/select/multitenant/prometheus` |
+| `app.kubernetes.io/name: vmalertmanager` | Alertmanager | *(none)* |
+| `operated-prometheus: "true"` | Prometheus | *(none)* |
+| `operated-alertmanager: "true"` | Alertmanager | *(none)* |
+
+The last two are what the Prometheus operator puts on the Service in front of each StatefulSet. kube-prometheus-stack sets no `app.kubernetes.io/name` on its own Service, so those two are what find a Prometheus on that chart.
 
 The result is cached per context for 10 minutes. If a Service list across the cluster is denied, lfk lists the namespaces below instead.
 
@@ -340,6 +342,10 @@ When discovery finds nothing, lfk probes these names:
 |---|---|---|
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `kube-prometheus-stack-prometheus`, `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
+
+### Metrics source
+
+A discovered Prometheus also decides where pod and node CPU and memory come from. With no `monitoring` config, lfk sends them to Prometheus when discovery found one, and to metrics-server otherwise. An explicit `node_metrics` still wins. The nodes-list `Uptime` column follows the same rule.
 
 ### VictoriaMetrics
 

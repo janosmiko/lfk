@@ -207,8 +207,11 @@ func TestNodeUptimeQueryEnabled(t *testing.T) {
 			prev := model.ConfigMonitoring
 			t.Cleanup(func() { model.ConfigMonitoring = prev })
 			model.ConfigMonitoring = tt.cfg
+			resetMonitoringDiscoveryCache()
 
-			assert.Equal(t, tt.want, nodeUptimeQueryEnabled(tt.ctx))
+			// An empty cluster, so these cases stay about the config alone.
+			c := newFakeClient(fake.NewClientset(), nil)
+			assert.Equal(t, tt.want, c.nodeUptimeQueryEnabled(t.Context(), tt.ctx))
 		})
 	}
 }
