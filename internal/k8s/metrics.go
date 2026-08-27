@@ -29,13 +29,8 @@ import (
 // before that call rather than after it fails.
 var errPrometheusUnavailableDemo = errors.New("prometheus/alertmanager queries are unavailable in demo mode")
 
-// promSvcCache caches the working namespace+service for Prometheus ProxyGet per context.
-var promSvcCache sync.Map // key: contextName, value: promSvcEntry
-
-type promSvcEntry struct {
-	namespace string
-	service   string
-}
+// promSvcCache caches the working target for Prometheus ProxyGet per context.
+var promSvcCache sync.Map // key: contextName, value: monitoringTarget
 
 // safeProxyGetRaw calls Services(ns).ProxyGet(...).DoRaw(ctx), recovering
 // from any panic the underlying REST client raises. This is defense in
@@ -76,7 +71,7 @@ func (c *Client) metricsGVR(resource string) []schema.GroupVersionResource {
 // GetPodMetrics fetches CPU and memory usage for a single pod, trying the
 // configured routes (Prometheus / metrics-server) in order.
 func (c *Client) GetPodMetrics(ctx context.Context, contextName, namespace, podName string) (*model.PodMetrics, error) {
-	return runPodMetricsRoutes(contextName,
+	return runPodMetricsRoutes(contextName, c.prometheusAvailable(ctx, contextName),
 		func() (*model.PodMetrics, error) {
 			all, err := c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
 			if err != nil {
@@ -111,7 +106,7 @@ func (c *Client) getPodMetricsFromAPI(ctx context.Context, contextName, namespac
 // GetPodsMetrics fetches metrics for multiple pods, trying the configured
 // routes (Prometheus / metrics-server) in order.
 func (c *Client) GetPodsMetrics(ctx context.Context, contextName, namespace string, podNames []string) ([]model.PodMetrics, error) {
-	return runPodMetricsRoutes(contextName,
+	return runPodMetricsRoutes(contextName, c.prometheusAvailable(ctx, contextName),
 		func() ([]model.PodMetrics, error) {
 			all, err := c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
 			if err != nil {
@@ -171,7 +166,7 @@ func (c *Client) getPodsMetricsFromAPI(ctx context.Context, contextName, namespa
 // It tries the configured routes (Prometheus / metrics-server) in order, so a
 // cluster served only by Prometheus no longer reports "metrics API unavailable".
 func (c *Client) GetAllPodMetrics(ctx context.Context, contextName, namespace string) (map[string]model.PodMetrics, error) {
-	return runPodMetricsRoutes(contextName,
+	return runPodMetricsRoutes(contextName, c.prometheusAvailable(ctx, contextName),
 		func() (map[string]model.PodMetrics, error) {
 			return c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
 		},
@@ -325,6 +320,29 @@ func resolveNodeMetricsConfig(contextName string) (nodeMetrics string, hasPromet
 	return mc.NodeMetrics, mc.Prometheus != nil
 }
 
+// prometheusAvailable reports whether this context has a Prometheus worth
+// querying: one the user configured, or one the label search found. Without
+// the discovered half, a cluster that lfk can reach still gets its pod and
+// node metrics from metrics-server, because the config alone said nothing.
+// Discovery is cached per context, so this costs a Service list once every
+// ten minutes at most.
+func (c *Client) prometheusAvailable(ctx context.Context, contextName string) bool {
+	if _, configured := resolveNodeMetricsConfig(contextName); configured {
+		return true
+	}
+	// The demo cluster has no Services to search, and its Prometheus paths
+	// answer with a fixed error rather than data.
+	if c.demo {
+		return false
+	}
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return false
+	}
+	prom, _ := discoveredMonitoringTargets(ctx, cs, contextName)
+	return len(prom) > 0
+}
+
 // nodeMetricsRoute names a single attempt strategy for node metrics:
 // either the metrics.k8s.io API (metrics-server) or a Prometheus query.
 type nodeMetricsRoute int
@@ -349,27 +367,31 @@ func (r nodeMetricsRoute) String() string {
 // metrics on clusters that don't match the global routing (e.g. a
 // metrics-server-only EKS cluster picking up a shared `_global`
 // Prometheus block, then silently rendering n/a everywhere).
-func selectNodeMetricsRoutes(nodeMetrics string, hasPrometheus bool) []nodeMetricsRoute {
+// configuredPrometheus means the user named a Prometheus endpoint.
+// availablePrometheus also counts one that discovery found. The two differ so
+// that an explicit metrics-api opt-out cannot be undone by a Service lfk
+// merely noticed.
+func selectNodeMetricsRoutes(nodeMetrics string, configuredPrometheus, availablePrometheus bool) []nodeMetricsRoute {
 	switch {
 	case nodeMetrics == "prometheus":
 		// Explicit Prometheus: try Prometheus, fall back to metrics-api.
 		return []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}
 	case nodeMetrics == "metrics-api":
 		// Explicit metrics-api: try metrics-api, fall back to Prometheus
-		// only if one is even configured (avoids attempting a guaranteed-
-		// to-fail service-proxy probe).
-		if hasPrometheus {
+		// only if the user configured one. Discovery does not count here,
+		// or asking for metrics-api would still probe a Prometheus.
+		if configuredPrometheus {
 			return []nodeMetricsRoute{nodeMetricsRouteAPI, nodeMetricsRoutePrometheus}
 		}
 		return []nodeMetricsRoute{nodeMetricsRouteAPI}
-	case nodeMetrics == "" && hasPrometheus:
-		// Implicit Prometheus (typically from a shared `_global` entry):
-		// try Prometheus, fall back to metrics-api. The fallback is the
-		// fix for clusters that inherit a global Prometheus pointer but
-		// only actually have metrics-server.
+	case nodeMetrics == "" && availablePrometheus:
+		// Implicit Prometheus, from a shared `_global` entry or from
+		// discovery: try Prometheus, fall back to metrics-api. The fallback
+		// is the fix for clusters that inherit a global Prometheus pointer
+		// but only actually have metrics-server.
 		return []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}
 	default:
-		// Nothing configured: metrics-api only.
+		// No Prometheus anywhere: metrics-api only.
 		return []nodeMetricsRoute{nodeMetricsRouteAPI}
 	}
 }
@@ -383,8 +405,8 @@ func selectNodeMetricsRoutes(nodeMetrics string, hasPrometheus bool) []nodeMetri
 // the fallback is logged at Warn so users can self-diagnose missing
 // metrics from a single log read.
 func (c *Client) GetAllNodeMetrics(ctx context.Context, contextName string) (map[string]model.PodMetrics, error) {
-	nodeMetrics, hasPrometheus := resolveNodeMetricsConfig(contextName)
-	routes := selectNodeMetricsRoutes(nodeMetrics, hasPrometheus)
+	nodeMetrics, configured := resolveNodeMetricsConfig(contextName)
+	routes := selectNodeMetricsRoutes(nodeMetrics, configured, c.prometheusAvailable(ctx, contextName))
 
 	var lastErr error
 	for i, route := range routes {
@@ -473,10 +495,10 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 		return nil, fmt.Errorf("failed to get clientset: %w", err)
 	}
 
-	promNs, promSvc, promPort, _, _, _ := resolveMonitoringEndpoints(contextName)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	promTargets, _ := monitoringTargetsFor(ctx, clientset, contextName)
 
 	cpuQuery := `sum by (node) (rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
 	memQuery := `sum by (node) (container_memory_working_set_bytes{container!=""})`
@@ -492,11 +514,11 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		cpuMap, cpuErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, cpuQuery)
+		cpuMap, cpuErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promTargets, cpuQuery)
 	}()
 	go func() {
 		defer wg.Done()
-		memMap, memErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, memQuery)
+		memMap, memErr = c.queryPrometheusNodeMetric(ctx, contextName, clientset, promTargets, memQuery)
 	}()
 	wg.Wait()
 	if cpuErr != nil {
@@ -533,8 +555,8 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 
 // queryPrometheusNodeMetric runs a PromQL instant query via Kubernetes service proxy
 // and returns a map of node name -> float64 value.
-func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
-	return queryPrometheusMetric(ctx, contextName, cs, c.demo, namespaces, services, port, query, parsePrometheusNodeResponse)
+func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, targets []monitoringTarget, query string) (map[string]float64, error) {
+	return queryPrometheusMetric(ctx, contextName, cs, c.demo, targets, query, parsePrometheusNodeResponse)
 }
 
 // queryPrometheusMetric runs a PromQL instant query via Kubernetes service proxy
@@ -546,20 +568,19 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName stri
 // (rather than accessed via a *Client) for the same reason: it's a plain
 // value the caller already has, and keeps this function testable without a
 // full Client.
-func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, isDemo bool, namespaces, services []string, port, query string, parse func([]byte) (T, error)) (T, error) {
+func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs kubernetes.Interface, isDemo bool, targets []monitoringTarget, query string, parse func([]byte) (T, error)) (T, error) {
 	var zero T
 	if isDemo {
 		return zero, errPrometheusUnavailableDemo
 	}
 	params := map[string]string{"query": query}
 
-	// Check cache for a known working namespace+service. Keyed by contextName
-	// (not the clientset): clientsetForContext builds a fresh clientset per
-	// call, so a clientset key would never hit and re-run service discovery
-	// on every poll.
+	// Check cache for a known working target. Keyed by contextName (not the
+	// clientset): clientsetForContext builds a fresh clientset per call, so a
+	// clientset key would never hit and re-run service discovery on every poll.
 	if cached, ok := promSvcCache.Load(contextName); ok {
-		entry := cached.(promSvcEntry)
-		data, err := safeProxyGetRaw(ctx, cs, entry.namespace, entry.service, port, "/api/v1/query", params)
+		entry := cached.(monitoringTarget)
+		data, err := safeProxyGetRaw(ctx, cs, entry.Namespace, entry.Service, entry.Port, entry.path("/api/v1/query"), params)
 		if err == nil {
 			parsed, err := parse(data)
 			if err == nil {
@@ -571,22 +592,20 @@ func queryPrometheusMetric[T any](ctx context.Context, contextName string, cs ku
 	}
 
 	var lastErr error
-	for _, ns := range namespaces {
-		for _, svc := range services {
-			data, err := safeProxyGetRaw(ctx, cs, ns, svc, port, "/api/v1/query", params)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-
-			parsed, err := parse(data)
-			if err != nil {
-				lastErr = err
-				continue
-			}
-			promSvcCache.Store(contextName, promSvcEntry{namespace: ns, service: svc})
-			return parsed, nil
+	for _, t := range targets {
+		data, err := safeProxyGetRaw(ctx, cs, t.Namespace, t.Service, t.Port, t.path("/api/v1/query"), params)
+		if err != nil {
+			lastErr = err
+			continue
 		}
+
+		parsed, err := parse(data)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		promSvcCache.Store(contextName, t)
+		return parsed, nil
 	}
 
 	if lastErr != nil {

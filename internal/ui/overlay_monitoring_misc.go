@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // RenderRBACOverlay renders the RBAC permission check overlay content.
@@ -242,7 +243,9 @@ func RenderQuotaDashboardOverlay(quotas []QuotaEntry, width, height int) string 
 
 // RenderAlertsOverlay renders the Prometheus alerts overlay content.
 // scroll controls the visible portion; width and height limit the overlay size.
-func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string {
+// searchHint says where lfk looked, for the empty case; it differs by cluster,
+// so the caller supplies it (see k8s.MonitoringSearchHint).
+func RenderAlertsOverlay(alerts []AlertEntry, searchHint []string, scroll, width, height int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Monitoring Overview — Active Alerts"))
 	b.WriteString("\n")
@@ -251,9 +254,19 @@ func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string 
 		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("  No active alerts found"))
 		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("  Prometheus was queried in well-known namespaces"))
-		b.WriteString("\n")
-		b.WriteString(OverlayDimStyle.Render("  (monitoring, prometheus, observability, kube-prometheus-stack)"))
+		// The hint carries configured service names, so a line can outrun the
+		// overlay. Wrap before styling, or the SGR codes break the measurement.
+		contentW := max(width-4, 1)
+		first := true
+		for _, hint := range searchHint {
+			for line := range strings.SplitSeq(ansi.Wordwrap(hint, contentW, ""), "\n") {
+				if !first {
+					b.WriteString("\n")
+				}
+				first = false
+				b.WriteString(OverlayDimStyle.Render("  " + Truncate(strings.TrimRight(line, " "), contentW)))
+			}
+		}
 		return b.String()
 	}
 

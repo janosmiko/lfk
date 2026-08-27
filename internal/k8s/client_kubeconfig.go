@@ -41,8 +41,10 @@ func (c *Client) kubeconfigPathForContextLocked(displayName string) string {
 		return info.sourcePath
 	}
 	// Fallback to the first file. loadingRules is set at construction and never
-	// swapped, so it needs no lock, but we are already under RLock here.
-	if len(c.loadingRules.Precedence) > 0 {
+	// swapped, so it needs no lock, but we are already under RLock here. A
+	// Client built without it has no kubeconfig, and the empty path makes the
+	// caller report that as an error instead of crashing.
+	if c.loadingRules != nil && len(c.loadingRules.Precedence) > 0 {
 		return c.loadingRules.Precedence[0]
 	}
 	return ""

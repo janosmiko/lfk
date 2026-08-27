@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -423,7 +424,7 @@ func (m Model) renderOverlayAlerts() (string, int, int) {
 		}
 	}
 	w, h := min(80, m.width-10), min(25, m.height-6)
-	return ui.RenderAlertsOverlay(entries, m.alertsScroll, w, h), w, h
+	return ui.RenderAlertsOverlay(entries, k8s.MonitoringSearchHint(m.effectiveContext()), m.alertsScroll, w, h), w, h
 }
 
 func (m Model) renderOverlayBackgroundTasks() (string, int, int) {

@@ -532,41 +532,54 @@ func TestResolveNodeMetricsConfig(t *testing.T) {
 func TestSelectNodeMetricsRoutes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name          string
-		nodeMetrics   string
-		hasPrometheus bool
-		want          []nodeMetricsRoute
+		name        string
+		nodeMetrics string
+		configured  bool
+		available   bool
+		want        []nodeMetricsRoute
 	}{
 		{
 			name:        "nothing configured tries metrics-api only",
-			nodeMetrics: "", hasPrometheus: false,
+			nodeMetrics: "", configured: false, available: false,
 			want: []nodeMetricsRoute{nodeMetricsRouteAPI},
 		},
 		{
 			name:        "implicit prometheus (e.g. _global) falls back to metrics-api",
-			nodeMetrics: "", hasPrometheus: true,
+			nodeMetrics: "", configured: true, available: true,
+			want: []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI},
+		},
+		{
+			name:        "a discovered prometheus routes there with no config at all",
+			nodeMetrics: "", configured: false, available: true,
 			want: []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI},
 		},
 		{
 			name:        "explicit prometheus falls back to metrics-api",
-			nodeMetrics: "prometheus", hasPrometheus: true,
+			nodeMetrics: "prometheus", configured: true, available: true,
 			want: []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI},
 		},
 		{
-			name:        "explicit metrics-api with prometheus available falls back to prometheus",
-			nodeMetrics: "metrics-api", hasPrometheus: true,
+			name:        "explicit metrics-api with a configured prometheus falls back to prometheus",
+			nodeMetrics: "metrics-api", configured: true, available: true,
 			want: []nodeMetricsRoute{nodeMetricsRouteAPI, nodeMetricsRoutePrometheus},
 		},
 		{
+			// Asking for metrics-api is an opt-out. A Prometheus that only
+			// discovery found must not reinstate the path the user declined.
+			name:        "explicit metrics-api ignores a merely discovered prometheus",
+			nodeMetrics: "metrics-api", configured: false, available: true,
+			want: []nodeMetricsRoute{nodeMetricsRouteAPI},
+		},
+		{
 			name:        "explicit metrics-api without prometheus does not attempt prometheus fallback",
-			nodeMetrics: "metrics-api", hasPrometheus: false,
+			nodeMetrics: "metrics-api", configured: false, available: false,
 			want: []nodeMetricsRoute{nodeMetricsRouteAPI},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := selectNodeMetricsRoutes(tt.nodeMetrics, tt.hasPrometheus)
+			got := selectNodeMetricsRoutes(tt.nodeMetrics, tt.configured, tt.available)
 			assert.Equal(t, tt.want, got)
 		})
 	}

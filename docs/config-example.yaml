@@ -256,8 +256,11 @@ dashboard: true
 # Configure Prometheus and Alertmanager endpoints per cluster context.
 # Keys are kubeconfig context names; the special key "_global" applies to
 # clusters without an explicit entry.
-# When not configured, lfk auto-discovers monitoring services by trying
-# common service names across common namespaces.
+# When not configured, lfk discovers monitoring services by their operator
+# labels (app.kubernetes.io/name for VictoriaMetrics, operated-prometheus and
+# operated-alertmanager for the Prometheus operator), then falls back to common
+# names in common namespaces. A discovered Prometheus also becomes the source
+# for pod and node CPU and memory, unless node_metrics says otherwise.
 monitoring:
 # my-prod-cluster:
 #   prometheus:
@@ -275,6 +278,19 @@ monitoring:
 #   prometheus:
 #     namespaces: ["monitoring", "observability"]
 #     services: ["prometheus-server", "prometheus"]
+# VictoriaMetrics cluster, when the Services carry no operator label.
+# path_prefix goes in front of the API path; vmselect serves the Prometheus
+# API below /select/<accountID>/prometheus.
+# vm-cluster:
+#   prometheus:
+#     namespaces: ["monitoring"]
+#     services: ["vmselect-vmks"]
+#     port: "8481"
+#     path_prefix: "/select/0/prometheus"
+#   alertmanager:
+#     namespaces: ["monitoring"]
+#     services: ["vmalertmanager-vmks"]
+#     port: "9093"
 
 # ─── Right-sizing Advisor Defaults ─────────────────────────────────────────────
 # Initial strategy + headroom that the Right-sizing overlay opens with on the

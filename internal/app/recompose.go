@@ -33,7 +33,7 @@ func (m Model) recomposeDashboard() Model {
 func (m Model) recomposeMonitoring() Model {
 	ctx := m.dashboardPreviewTargetContext()
 	if data, ok := m.monitoringData[ctx]; ok {
-		m.monitoringPreview = composeMonitoring(data.alerts, data.errMsg)
+		m.monitoringPreview = composeMonitoring(ctx, data.alerts, data.errMsg)
 	}
 	return m
 }

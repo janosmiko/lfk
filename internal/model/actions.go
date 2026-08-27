@@ -693,6 +693,9 @@ type MonitoringEndpoint struct {
 	Namespaces []string `json:"namespaces" yaml:"namespaces"` // monitoring namespaces to search
 	Services   []string `json:"services" yaml:"services"`     // service names to try
 	Port       string   `json:"port" yaml:"port"`             // port number (default: "9090" for prometheus, "9093" for alertmanager)
+	// PathPrefix goes in front of the API path. VictoriaMetrics vmselect
+	// serves the Prometheus API below "/select/<accountID>/prometheus".
+	PathPrefix string `json:"path_prefix" yaml:"path_prefix"`
 }
 
 // MonitoringConfig defines per-cluster monitoring endpoints.
