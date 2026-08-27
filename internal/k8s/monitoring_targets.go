@@ -54,6 +54,13 @@ const (
 	// suffix (vmselect-vmks), so only the label is stable enough to match on.
 	appNameLabel = "app.kubernetes.io/name"
 
+	// The Prometheus operator sets these on the headless Service it puts in
+	// front of each StatefulSet. kube-prometheus-stack leaves
+	// app.kubernetes.io/name off its own Service entirely, so these are the
+	// only labels that find a Prometheus on that chart.
+	operatedPrometheusLabel   = "operated-prometheus"
+	operatedAlertmanagerLabel = "operated-alertmanager"
+
 	// vmselect serves the Prometheus querying API below a tenant path. Account
 	// 0 is what the victoria-metrics-k8s-stack chart writes, and the
 	// multitenant path covers an install that uses a different account.
@@ -82,8 +89,17 @@ func monitoringTargetsFor(ctx context.Context, cs kubernetes.Interface, contextN
 	if !monitoringDiscoveryWanted(contextName) {
 		return prom, am
 	}
-	dProm, dAm := cachedMonitoringDiscovery(ctx, cs, contextName, namespacesOf(prom, am))
+	dProm, dAm := discoveredMonitoringTargets(ctx, cs, contextName)
 	return concatTargets(dProm, prom), concatTargets(dAm, am)
+}
+
+// discoveredMonitoringTargets returns only what the label search found, with
+// no built-in name guesses mixed in. The route decision needs that split: a
+// guess is always present, so it cannot tell a caller whether the cluster
+// actually has a Prometheus.
+func discoveredMonitoringTargets(ctx context.Context, cs kubernetes.Interface, contextName string) (prom, am []monitoringTarget) {
+	guessProm, guessAM := resolveMonitoringEndpoints(contextName)
+	return cachedMonitoringDiscovery(ctx, cs, contextName, namespacesOf(guessProm, guessAM))
 }
 
 // concatTargets joins two target lists into a new slice. Appending onto the
@@ -137,28 +153,96 @@ func namespacesOf(targetLists ...[]monitoringTarget) []string {
 	return out
 }
 
+// monitoringSelectors are the label queries discovery runs. Label selectors
+// are ANDed, so one query per label family is the only way to cover both
+// operators.
+var monitoringSelectors = []string{
+	appNameLabel + " in (prometheus,alertmanager,vmsingle,vmselect,vmalertmanager)",
+	operatedPrometheusLabel + "=true",
+	operatedAlertmanagerLabel + "=true",
+}
+
 // discoverMonitoringServices finds monitoring Services by their component
-// label. The cluster-wide list comes first because it also finds a stack
+// labels. The cluster-wide list comes first because it also finds a stack
 // outside the well-known namespaces, but a user may lack that permission.
 func discoverMonitoringServices(ctx context.Context, cs kubernetes.Interface, namespaces []string) (prom, am []monitoringTarget) {
-	opts := metav1.ListOptions{LabelSelector: appNameLabel + " in (prometheus,alertmanager,vmsingle,vmselect,vmalertmanager)"}
+	found := make([]corev1.Service, 0, len(monitoringSelectors))
+	for _, selector := range monitoringSelectors {
+		found = append(found, listMonitoringServices(ctx, cs, namespaces, selector)...)
+	}
+	return targetsFromServices(dedupeServices(found))
+}
+
+// listMonitoringServices runs one selector, cluster-wide when the user may
+// list that wide, and namespace by namespace otherwise.
+func listMonitoringServices(ctx context.Context, cs kubernetes.Interface, namespaces []string, selector string) []corev1.Service {
+	opts := metav1.ListOptions{LabelSelector: selector}
 
 	list, err := cs.CoreV1().Services(metav1.NamespaceAll).List(ctx, opts)
 	if err == nil {
-		return targetsFromServices(list.Items)
+		return list.Items
 	}
-	logger.Debug("cluster-wide monitoring service discovery failed", "error", err)
+	logger.Debug("cluster-wide monitoring service discovery failed", "selector", selector, "error", err)
 
 	var found []corev1.Service
 	for _, ns := range namespaces {
 		list, err := cs.CoreV1().Services(ns).List(ctx, opts)
 		if err != nil {
-			logger.Debug("monitoring service discovery failed", "namespace", ns, "error", err)
+			logger.Debug("monitoring service discovery failed", "namespace", ns, "selector", selector, "error", err)
 			continue
 		}
 		found = append(found, list.Items...)
 	}
-	return targetsFromServices(found)
+	return found
+}
+
+// dedupeServices drops repeats, because one Service can carry the labels of
+// two selectors.
+func dedupeServices(services []corev1.Service) []corev1.Service {
+	seen := make(map[string]bool, len(services))
+	out := make([]corev1.Service, 0, len(services))
+	for _, svc := range services {
+		key := svc.Namespace + "/" + svc.Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, svc)
+	}
+	return out
+}
+
+// monitoringRole is the half of the monitoring API a discovered Service serves.
+type monitoringRole int
+
+const (
+	roleNone monitoringRole = iota
+	rolePrometheus
+	roleAlertmanager
+	// roleVMSelect serves the Prometheus API, but below a tenant path.
+	roleVMSelect
+)
+
+// serviceRole reads the role off a Service's labels. The VictoriaMetrics
+// operator names the component in app.kubernetes.io/name. The Prometheus
+// operator marks its governing Service instead, which is what a
+// kube-prometheus-stack install carries.
+func serviceRole(svc *corev1.Service) monitoringRole {
+	switch svc.Labels[appNameLabel] {
+	case "prometheus", "vmsingle":
+		return rolePrometheus
+	case "vmselect":
+		return roleVMSelect
+	case "alertmanager", "vmalertmanager":
+		return roleAlertmanager
+	}
+	switch {
+	case svc.Labels[operatedPrometheusLabel] == "true":
+		return rolePrometheus
+	case svc.Labels[operatedAlertmanagerLabel] == "true":
+		return roleAlertmanager
+	}
+	return roleNone
 }
 
 // targetsFromServices turns discovered Services into probe targets. The port
@@ -171,15 +255,16 @@ func targetsFromServices(services []corev1.Service) (prom, am []monitoringTarget
 			continue
 		}
 		base := monitoringTarget{Namespace: svc.Namespace, Service: svc.Name, Port: p}
-		switch svc.Labels[appNameLabel] {
-		case "prometheus", "vmsingle":
+		switch serviceRole(svc) {
+		case rolePrometheus:
 			prom = append(prom, base)
-		case "vmselect":
+		case roleVMSelect:
 			prom = append(prom,
 				withPrefix(base, vmSelectTenantPrefix),
 				withPrefix(base, vmSelectMultitenantPrefix))
-		case "alertmanager", "vmalertmanager":
+		case roleAlertmanager:
 			am = append(am, base)
+		case roleNone:
 		}
 	}
 	return prom, am

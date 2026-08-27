@@ -202,9 +202,11 @@ func TestMonitoringTargetsFor(t *testing.T) {
 		})
 
 		monitoringTargetsFor(t.Context(), cs, "ctx-b")
+		afterFirst := lists
 		monitoringTargetsFor(t.Context(), cs, "ctx-b")
 
-		assert.Equal(t, 1, lists)
+		assert.Equal(t, len(monitoringSelectors), afterFirst, "one list per selector")
+		assert.Equal(t, afterFirst, lists, "the second call must list nothing")
 	})
 
 	t.Run("skips discovery when the config names services explicitly", func(t *testing.T) {
@@ -465,4 +467,64 @@ func TestMonitoringSearchHint(t *testing.T) {
 		assert.Contains(t, hint, "my-am")
 		assert.NotContains(t, hint, "vmselect")
 	})
+}
+
+// --- serviceRole ---
+
+func TestServiceRole(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels map[string]string
+		want   monitoringRole
+	}{
+		{"vm operator select", map[string]string{appNameLabel: "vmselect"}, roleVMSelect},
+		{"vm operator single", map[string]string{appNameLabel: "vmsingle"}, rolePrometheus},
+		{"vm operator alertmanager", map[string]string{appNameLabel: "vmalertmanager"}, roleAlertmanager},
+		{"chart name label", map[string]string{appNameLabel: "prometheus"}, rolePrometheus},
+		{"operator governing prometheus", map[string]string{"operated-prometheus": "true"}, rolePrometheus},
+		{"operator governing alertmanager", map[string]string{"operated-alertmanager": "true"}, roleAlertmanager},
+		{"operator label set to false", map[string]string{"operated-prometheus": "false"}, roleNone},
+		{"unrelated service", map[string]string{"app": "nginx"}, roleNone},
+		{"no labels", nil, roleNone},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &corev1.Service{Labels: tt.labels}
+			assert.Equal(t, tt.want, serviceRole(svc))
+		})
+	}
+}
+
+// TestDiscoverKubePrometheusStack covers the labels a real kube-prometheus-stack
+// install carries. Its Prometheus Service has no app.kubernetes.io/name at all,
+// so only the operator's own governing-service label finds it.
+func TestDiscoverKubePrometheusStack(t *testing.T) {
+	promOperated := monitoringSvc("monitoring", "prometheus-operated", "", port("web", 9090))
+	promOperated.Labels = map[string]string{"operated-prometheus": "true"}
+	amOperated := monitoringSvc("monitoring", "alertmanager-operated", "", port("web", 9093))
+	amOperated.Labels = map[string]string{"operated-alertmanager": "true"}
+	// The chart's own Service, which carries no label discovery matches on.
+	chartProm := monitoringSvc("monitoring", "monitoring-kube-prometheus-prometheus", "", port("http-web", 9090))
+	chartProm.Labels = map[string]string{"app": "kube-prometheus-stack-prometheus"}
+
+	cs := k8sfake.NewClientset(promOperated, amOperated, chartProm)
+
+	prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"})
+
+	require.Len(t, prom, 1)
+	assert.Equal(t, "prometheus-operated", prom[0].Service)
+	assert.Equal(t, "9090", prom[0].Port)
+	require.Len(t, am, 1)
+	assert.Equal(t, "alertmanager-operated", am[0].Service)
+	assert.Equal(t, "9093", am[0].Port)
+}
+
+func TestDiscoverMonitoringServicesDedupes(t *testing.T) {
+	// A Service that matches two selectors must yield one target, not two.
+	svc := monitoringSvc("monitoring", "prometheus-operated", "prometheus", port("web", 9090))
+	svc.Labels["operated-prometheus"] = "true"
+
+	prom, _ := discoverMonitoringServices(t.Context(), k8sfake.NewClientset(svc), []string{"monitoring"})
+
+	assert.Len(t, prom, 1)
 }

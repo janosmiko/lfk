@@ -19,16 +19,28 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-// newFakeClient creates a Client with injected fake clientset and dynamic client.
+// newFakeClient creates a Client with injected fake clientset and dynamic
+// client. A nil argument becomes an empty fake rather than a stored nil: a
+// typed nil inside the interface reads as present, so the first method call
+// on it panics, and falling through to the real client path panics too on a
+// Client with no loading rules.
 func newFakeClient(cs *k8sfake.Clientset, dc *dynamicfake.FakeDynamicClient) *Client {
-	return &Client{
-		injectedClientset: cs,
-		injectedDynClient: dc,
+	if cs == nil {
+		cs = k8sfake.NewClientset()
 	}
+	c := &Client{
+		loadingRules:      &clientcmd.ClientConfigLoadingRules{Precedence: []string{"/dev/null"}},
+		injectedClientset: cs,
+	}
+	if dc != nil {
+		c.injectedDynClient = dc
+	}
+	return c
 }
 
 // --- GetSecretData ---

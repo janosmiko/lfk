@@ -448,6 +448,9 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 		rules = &clientcmd.ClientConfigLoadingRules{Precedence: []string{path}}
 	}
 	c.configMu.RUnlock()
+	if rules == nil {
+		return nil, fmt.Errorf("building rest config for context %q: no kubeconfig loaded", displayName)
+	}
 	overrides := &clientcmd.ConfigOverrides{CurrentContext: overrideName}
 	cc := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
 	cfg, err := cc.ClientConfig()
