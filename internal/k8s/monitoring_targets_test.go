@@ -428,6 +428,16 @@ func TestMonitoringSearchHint(t *testing.T) {
 		assert.Contains(t, hint, "kube-prometheus-stack")
 	})
 
+	t.Run("ties the namespace list to the name probing, not to discovery", func(t *testing.T) {
+		setConfig(t, nil)
+
+		hint := MonitoringSearchHint("ctx")
+
+		assert.Contains(t, strings.Join(hint, " "), "Probed those names in: monitoring")
+		// The label search covers the cluster, so it must not claim the list bounds it.
+		assert.Contains(t, hint[0], "Searched the cluster")
+	})
+
 	t.Run("names a service configured for one role while discovery still runs", func(t *testing.T) {
 		setConfig(t, map[string]model.MonitoringConfig{
 			"_global": {Prometheus: &model.MonitoringEndpoint{Services: []string{"thanos-query"}}},

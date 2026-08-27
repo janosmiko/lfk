@@ -223,13 +223,15 @@ func MonitoringSearchHint(contextName string) []string {
 	var lines []string
 	if monitoringDiscoveryWanted(contextName) {
 		lines = append(lines,
-			"Searched for a Service labelled prometheus, alertmanager,",
-			"vmsingle, vmselect, or vmalertmanager.")
+			"Searched the cluster for a Service labelled prometheus,",
+			"alertmanager, vmsingle, vmselect, or vmalertmanager.")
 	}
+	// The namespace list bounds the name probing, not the label search, which
+	// covers the whole cluster unless the user cannot list Services that wide.
 	return append(lines,
 		"Prometheus names: "+endpointNames(mc.Prometheus),
 		"Alertmanager names: "+endpointNames(mc.Alertmanager),
-		"In: "+strings.Join(namespacesOf(prom, am), ", "))
+		"Probed those names in: "+strings.Join(namespacesOf(prom, am), ", "))
 }
 
 func endpointNames(ep *model.MonitoringEndpoint) string {
