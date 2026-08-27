@@ -182,13 +182,13 @@ func listMonitoringServices(ctx context.Context, cs kubernetes.Interface, namesp
 	if err == nil {
 		return list.Items
 	}
-	logger.Debug("cluster-wide monitoring service discovery failed", "selector", selector, "error", err)
+	logger.Debug("cluster-wide monitoring service discovery failed", "selector", selector, "error", logger.Redact(err.Error()))
 
 	var found []corev1.Service
 	for _, ns := range namespaces {
 		list, err := cs.CoreV1().Services(ns).List(ctx, opts)
 		if err != nil {
-			logger.Debug("monitoring service discovery failed", "namespace", ns, "selector", selector, "error", err)
+			logger.Debug("monitoring service discovery failed", "namespace", ns, "selector", selector, "error", logger.Redact(err.Error()))
 			continue
 		}
 		found = append(found, list.Items...)
