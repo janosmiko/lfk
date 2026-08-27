@@ -528,3 +528,20 @@ func TestDiscoverMonitoringServicesDedupes(t *testing.T) {
 
 	assert.Len(t, prom, 1)
 }
+
+// TestDiscoveryPrefersWellKnownNamespaces guards the order discovery hands
+// back. Any user who can create a Service can carry the labels discovery
+// matches, so a Service in a namespace an operator normally owns is probed
+// before one that merely appeared somewhere else.
+func TestDiscoveryPrefersWellKnownNamespaces(t *testing.T) {
+	cs := k8sfake.NewClientset(
+		monitoringSvc("apps", "vmsingle-squatter", "vmsingle", port("http", 8428)),
+		monitoringSvc("monitoring", "vmsingle-real", "vmsingle", port("http", 8428)),
+	)
+
+	prom, _ := discoverMonitoringServices(t.Context(), cs, defaultMonitoringNamespaces)
+
+	require.Len(t, prom, 2)
+	assert.Equal(t, "vmsingle-real", prom[0].Service, "the well-known namespace is probed first")
+	assert.Equal(t, "vmsingle-squatter", prom[1].Service)
+}

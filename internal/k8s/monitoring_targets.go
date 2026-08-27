@@ -170,7 +170,30 @@ func discoverMonitoringServices(ctx context.Context, cs kubernetes.Interface, na
 	for _, selector := range monitoringSelectors {
 		found = append(found, listMonitoringServices(ctx, cs, namespaces, selector)...)
 	}
-	return targetsFromServices(dedupeServices(found))
+	return targetsFromServices(preferWellKnownNamespaces(dedupeServices(found), namespaces))
+}
+
+// preferWellKnownNamespaces stably moves Services in the namespaces an
+// operator normally owns to the front. Any user who can create a Service can
+// carry the labels discovery matches, so the real stack gets probed, cached,
+// and answers before one that merely appeared somewhere else.
+func preferWellKnownNamespaces(services []corev1.Service, namespaces []string) []corev1.Service {
+	known := make(map[string]bool, len(namespaces))
+	for _, ns := range namespaces {
+		known[ns] = true
+	}
+	out := make([]corev1.Service, 0, len(services))
+	for _, svc := range services {
+		if known[svc.Namespace] {
+			out = append(out, svc)
+		}
+	}
+	for _, svc := range services {
+		if !known[svc.Namespace] {
+			out = append(out, svc)
+		}
+	}
+	return out
 }
 
 // listMonitoringServices runs one selector, cluster-wide when the user may
