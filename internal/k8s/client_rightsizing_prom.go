@@ -194,20 +194,32 @@ func (c *Client) runPrometheusProxy(ctx context.Context, contextName, path strin
 		}
 		promSvcCache.Delete(contextName)
 	}
-	var lastErr error
-	for _, t := range promTargets {
+	data, hit, err := probePrometheusTargets(promTargets, doQuery)
+	if err != nil {
+		return nil, err
+	}
+	promSvcCache.Store(contextName, hit)
+	return data, nil
+}
+
+// probePrometheusTargets tries each target in order and returns the first
+// answer. On failure the error lists every target with what it answered:
+// the last guess in the list is always prometheus-operated, so reporting only
+// its error hides why the discovered Service was rejected.
+func probePrometheusTargets(targets []monitoringTarget, doQuery func(monitoringTarget) ([]byte, error)) ([]byte, monitoringTarget, error) {
+	if len(targets) == 0 {
+		return nil, monitoringTarget{}, fmt.Errorf("no prometheus service found")
+	}
+	failures := make([]string, 0, len(targets))
+	for _, t := range targets {
 		data, err := doQuery(t)
-		if err != nil {
-			lastErr = err
-			continue
+		if err == nil {
+			return data, t, nil
 		}
-		promSvcCache.Store(contextName, t)
-		return data, nil
+		failures = append(failures, t.String()+": "+err.Error())
 	}
-	if lastErr != nil {
-		return nil, lastErr
-	}
-	return nil, fmt.Errorf("no prometheus service found")
+	return nil, monitoringTarget{}, fmt.Errorf("no prometheus target answered (tried %d targets): %s",
+		len(targets), strings.Join(failures, "; "))
 }
 
 // parsePrometheusContainerResponse extracts the per-container value
