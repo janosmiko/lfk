@@ -48,6 +48,18 @@ Pause and unpause ScaledObjects and ScaledJobs.
 
 Force a refresh of ExternalSecrets, ClusterExternalSecrets, and PushSecrets.
 
+## Right-sizing advisor
+
+`x` -> `z` suggests CPU and memory requests and limits per container. The suggestion is only as good as the strategy behind it, shown in the `Strategy:` chip.
+
+| Strategy | Source | Use it for |
+|---|---|---|
+| `snapshot` | One metrics-server reading over the window shown in the header (usually 10-30s) | A quick look. Two runs minutes apart can disagree by 10x on a bursty container. |
+| `1d-max`, `1d-avg`, `7d-p95` | Prometheus range queries | Sizing decisions. `7d-p95` is the safest default for requests. |
+| `vpa` | VerticalPodAutoscaler recommender | Sizing decisions when a VPA already targets the workload. |
+
+The chip shows `snapshot` with no `[N/M]` counter when it is the only strategy available. To unlock the others, point lfk at Prometheus or VictoriaMetrics (see [config-reference.md](config-reference.md#monitoring)) or create a VPA in `Off` mode for the workload. Then cycle with `[` and `]`. Keys and headroom are in [keybindings.md](keybindings.md#right-sizing-advisor).
+
 ## Embedded terminal
 
 Exec and shell sessions run in an embedded PTY by default. A session keeps running in the background when you switch tabs, so you can leave it and come back. `Ctrl+T` cycles the mode, see [config-reference.md](config-reference.md#terminal-mode).

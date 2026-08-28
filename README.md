@@ -194,7 +194,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 - Multi-select with `Space`, range with `Ctrl+Space`, then bulk delete, scale, or restart: [keybindings.md](docs/keybindings.md#multi-selection)
 - Custom shell actions per resource type: [config-reference.md](docs/config-reference.md#custom-actions)
 - Port forwarding, with active forwards listed under the Networking group: [keybindings.md](docs/keybindings.md#action-menu-items)
-- Right-sizing Advisor with `x` -> `z`: [keybindings.md](docs/keybindings.md#right-sizing-advisor)
+- Right-sizing Advisor with `x` -> `z`: [features.md](docs/features.md#right-sizing-advisor), keys in [keybindings.md](docs/keybindings.md#right-sizing-advisor)
 - Network policy visualizer with `x` -> `N`, Cilium aware: [keybindings.md](docs/keybindings.md#network-policy-visualizer)
 - Traffic capture with `c` on a Pod or Service: [usage.md](docs/usage.md#traffic-capture)
 
@@ -495,7 +495,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 - Spin up a throwaway kind, k3d, or minikube cluster with `Ctrl+N` at the cluster list
 - Capture a Pod's network traffic with `c`: live decode plus pcap export
 - Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can, every subject allowed to run a verb on a resource
-- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
+- Get per-container CPU and memory recommendations with `x` -> `z` (Right-sizing Advisor, from a VPA or Prometheus when available, see [features.md](docs/features.md#right-sizing-advisor))
 - Watch an ArgoCD Application roll out wave by wave: `x` -> `W` opens the Sync Wave Timeline
 - Try a new look without restarting: `T` live-previews 460+ themes
 - Waiting for a rollout? `:nyan` and `:kubetris` are real commands
