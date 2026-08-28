@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.4](https://github.com/janosmiko/lfk/compare/v0.18.3...v0.18.4) (2026-08-28)
+
+
+### Features
+
+* discover victoriametrics monitoring endpoints ([#702](https://github.com/janosmiko/lfk/issues/702)) ([7b79b5a](https://github.com/janosmiko/lfk/commit/7b79b5a2c5620dd5eaac1cd7bd9206b023c9017f))
+
 ## [0.18.3](https://github.com/janosmiko/lfk/compare/v0.18.2...v0.18.3) (2026-08-26)
 
 
