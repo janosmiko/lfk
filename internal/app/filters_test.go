@@ -229,17 +229,17 @@ func TestNodeCordonedPreset(t *testing.T) {
 	}
 
 	tests := []struct {
-		status string
-		want   bool
+		name string
+		item model.Item
+		want bool
 	}{
-		{"Ready,SchedulingDisabled", true},
-		{"Ready", false},
-		{"NotReady,SchedulingDisabled", true},
+		{"unschedulable column", model.Item{Status: "Ready", Columns: []model.KeyValue{{Key: "Unschedulable", Value: "true"}}}, true},
+		{"no column", model.Item{Status: "Ready"}, false},
+		{"not ready but schedulable", model.Item{Status: "NotReady"}, false},
 	}
 	for _, tt := range tests {
-		item := model.Item{Status: tt.status}
-		if got := cordoned.MatchFn(item); got != tt.want {
-			t.Errorf("Cordoned(%q) = %v, want %v", tt.status, got, tt.want)
+		if got := cordoned.MatchFn(tt.item); got != tt.want {
+			t.Errorf("Cordoned(%s) = %v, want %v", tt.name, got, tt.want)
 		}
 	}
 }
@@ -462,7 +462,7 @@ func TestCovFilterPresetsNodeCordoned(t *testing.T) {
 	presets := builtinFilterPresets("Node")
 	cordoned := findPreset(presets, "Cordoned")
 	require.NotNil(t, cordoned)
-	assert.True(t, cordoned.MatchFn(model.Item{Status: "Ready,SchedulingDisabled"}))
+	assert.True(t, cordoned.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Unschedulable", Value: "true"}}}))
 	assert.False(t, cordoned.MatchFn(model.Item{Status: "Ready"}))
 }
 

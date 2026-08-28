@@ -179,31 +179,11 @@ func nodeFilterPresets() []FilterPreset {
 	return []FilterPreset{
 		{
 			Name: "Not Ready", Description: "Node status != Ready", Key: "n",
-			MatchFn: func(item model.Item) bool {
-				status := strings.ToLower(item.Status)
-				return !strings.Contains(status, "ready") || strings.Contains(status, "notready")
-			},
+			MatchFn: func(item model.Item) bool { return strings.ToLower(item.Status) != "ready" },
 		},
 		{
 			Name: "Cordoned", Description: "Unschedulable", Key: "c",
-			MatchFn: func(item model.Item) bool {
-				status := strings.ToLower(item.Status)
-				if strings.Contains(status, "schedulingdisabled") || strings.Contains(status, "unschedulable") {
-					return true
-				}
-
-				if item.Raw == nil {
-					return false
-				}
-
-				if spec, ok := item.Raw["spec"].(map[string]any); ok {
-					if unschedulable, ok := spec["unschedulable"].(bool); ok {
-						return unschedulable
-					}
-				}
-
-				return false
-			},
+			MatchFn: func(item model.Item) bool { return item.ColumnValue("Unschedulable") == "true" },
 		},
 	}
 }
