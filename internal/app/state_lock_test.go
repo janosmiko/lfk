@@ -50,20 +50,40 @@ func TestWithStateFileLock_GivesUpWhenHeld(t *testing.T) {
 	}
 }
 
-// TestPersistViewerPref_ConcurrentTogglesAllSurvive is the case the lock exists
-// for. Each writer opens the lock file separately, the way two lfk processes
-// would. Without the lock the last writer wins and the others' toggles vanish.
-func TestPersistViewerPref_ConcurrentTogglesAllSurvive(t *testing.T) {
+// TestPersistViewerPref_ConcurrentWritersKeepEachOthersToggles is the case the
+// lock exists for. Each writer opens the lock file separately, the way two lfk
+// processes would. Without the lock the last writer wins and the others'
+// toggles vanish.
+//
+// The assertion covers the writers that got the lock, not all of them. Each
+// write loads, merges and fsyncs, so on a slow machine a writer can wait out
+// stateLockBudget and skip, which withStateFileLock documents as the right
+// move: better to drop this write than clobber the other process.
+func TestPersistViewerPref_ConcurrentWritersKeepEachOthersToggles(t *testing.T) {
 	isolateViewerPrefs(t)
 
+	wrote := make([]bool, numViewerPrefs)
 	var wg sync.WaitGroup
 	for i := range int(numViewerPrefs) {
-		wg.Go(func() { persistViewerPref(viewerPref(i), true) })
+		wg.Go(func() { wrote[i] = persistViewerPref(viewerPref(i), true) })
 	}
 	wg.Wait()
 
+	got := 0
+	for _, ok := range wrote {
+		if ok {
+			got++
+		}
+	}
+	if got < 2 {
+		t.Fatalf("%d of %d writers got the lock, too few to prove a merge", got, numViewerPrefs)
+	}
+
 	s := loadViewerPrefsState()
 	for i, b := range viewerPrefBindings {
+		if !wrote[i] {
+			continue // this writer waited out the budget and skipped
+		}
 		v := *b.field(&s)
 		if v == nil {
 			t.Errorf("pref %d was dropped: a concurrent writer overwrote it", i)
