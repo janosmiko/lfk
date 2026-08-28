@@ -193,7 +193,7 @@ func saveViewerPrefs(s ViewerPrefsState) {
 // drift apart.
 func (m *Model) setViewerPref(p viewerPref, v bool) {
 	m.viewerPrefs[p] = v
-	persistViewerPref(p, v)
+	_ = persistViewerPref(p, v)
 }
 
 // persistViewerPref records one runtime toggle so the next start reopens the
@@ -205,12 +205,14 @@ func (m *Model) setViewerPref(p viewerPref, v bool) {
 // The load and the save sit inside one interprocess lock. Two lfk instances
 // share a state directory, so an unlocked merge lets the later writer drop a
 // toggle the other instance recorded between its read and its write.
-func persistViewerPref(p viewerPref, v bool) {
+// It reports whether the toggle reached disk. A write that waits out the lock
+// budget is skipped, so the answer is not always yes.
+func persistViewerPref(p viewerPref, v bool) bool {
 	path := viewerPrefsFilePath()
 	if path == "" {
-		return
+		return false
 	}
-	withStateFileLock(path, func() {
+	return withStateFileLock(path, func() {
 		s := loadViewerPrefsState()
 		*viewerPrefBindings[p].field(&s) = &v
 		saveViewerPrefs(s)
