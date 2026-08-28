@@ -182,10 +182,8 @@ func nodeFilterPresets() []FilterPreset {
 			MatchFn: func(item model.Item) bool { return strings.ToLower(item.Status) != "ready" },
 		},
 		{
-			Name: "Cordoned", Description: "SchedulingDisabled", Key: "c",
-			MatchFn: func(item model.Item) bool {
-				return strings.Contains(strings.ToLower(item.Status), "schedulingdisabled")
-			},
+			Name: "Cordoned", Description: "Unschedulable", Key: "c",
+			MatchFn: func(item model.Item) bool { return item.ColumnValue("Unschedulable") == "true" },
 		},
 	}
 }
