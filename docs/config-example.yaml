@@ -287,10 +287,9 @@ monitoring:
 #     services: ["vmselect-vmks"]
 #     port: "8481"
 #     path_prefix: "/select/0/prometheus"
-# Or let lfk read the prefix off the pods behind the discovered Service
-# (needs pod list access):
-#   prometheus:
-#     discover_path_prefix: true
+#     # Or let lfk read the prefix off the pods behind the discovered
+#     # Service instead (needs pod list access):
+#     # discover_path_prefix: true
 #   alertmanager:
 #     namespaces: ["monitoring"]
 #     services: ["vmalertmanager-vmks"]

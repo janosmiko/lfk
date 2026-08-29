@@ -610,7 +610,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "prometheus": { "$ref": "#/definitions/monitoringEndpoint" },
+        "prometheus": { "$ref": "#/definitions/prometheusEndpoint" },
         "alertmanager": { "$ref": "#/definitions/monitoringEndpoint" },
         "node_metrics": {
           "type": "string",
@@ -640,11 +640,35 @@
         "path_prefix": {
           "type": "string",
           "description": "URL prefix in front of the API path. VictoriaMetrics vmselect serves the Prometheus API below \"/select/<accountID>/prometheus\"."
+        }
+      }
+    },
+    "prometheusEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespaces": {
+          "type": "array",
+          "description": "Namespaces to search for the monitoring service.",
+          "items": { "type": "string" }
+        },
+        "services": {
+          "type": "array",
+          "description": "Service names to try.",
+          "items": { "type": "string" }
+        },
+        "port": {
+          "type": "string",
+          "description": "Port number (default: \"9090\" for prometheus, \"9093\" for alertmanager)."
+        },
+        "path_prefix": {
+          "type": "string",
+          "description": "URL prefix in front of the API path. VictoriaMetrics vmselect serves the Prometheus API below \"/select/<accountID>/prometheus\"."
         },
         "discover_path_prefix": {
           "type": "boolean",
           "default": false,
-          "description": "Read the URL prefix (--web.route-prefix, -http.pathPrefix) off the pods behind a discovered Prometheus Service. Opt-in because it lists pods. Prometheus endpoint only."
+          "description": "Read the URL prefix (--web.route-prefix, -http.pathPrefix) off the pods behind a discovered Prometheus Service. Opt-in because it lists pods."
         }
       }
     },
