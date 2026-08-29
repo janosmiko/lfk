@@ -26,6 +26,13 @@ type monitoringTarget struct {
 }
 
 // path returns the proxy path for one Prometheus or Alertmanager API path.
+// String renders the target as namespace/service:port plus any API prefix,
+// the same pieces a user fills into the service proxy path when they probe
+// it with kubectl get --raw.
+func (t monitoringTarget) String() string {
+	return t.Namespace + "/" + t.Service + ":" + t.Port + t.Prefix
+}
+
 func (t monitoringTarget) path(apiPath string) string {
 	return t.Prefix + apiPath
 }
@@ -133,6 +140,8 @@ func cachedMonitoringDiscovery(ctx context.Context, cs kubernetes.Interface, con
 		monitoringDiscoveryCache.Delete(contextName)
 	}
 	prom, am = discoverMonitoringServices(ctx, cs, namespaces)
+	logger.Debug("monitoring service discovery finished",
+		"context", contextName, "prometheus", prom, "alertmanager", am)
 	monitoringDiscoveryCache.Store(contextName, monitoringDiscoveryEntry{prom: prom, am: am, at: time.Now()})
 	return prom, am
 }

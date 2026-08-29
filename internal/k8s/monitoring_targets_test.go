@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -544,4 +545,50 @@ func TestDiscoveryPrefersWellKnownNamespaces(t *testing.T) {
 	require.Len(t, prom, 2)
 	assert.Equal(t, "vmsingle-real", prom[0].Service, "the well-known namespace is probed first")
 	assert.Equal(t, "vmsingle-squatter", prom[1].Service)
+}
+
+func TestProbePrometheusTargetsNamesEveryTargetOnFailure(t *testing.T) {
+	targets := []monitoringTarget{
+		{Namespace: "monitoring", Service: "vmselect-vmks", Port: "8481", Prefix: vmSelectTenantPrefix},
+		{Namespace: "monitoring", Service: "prometheus-operated", Port: "9090"},
+	}
+	calls := 0
+	_, _, err := probePrometheusTargets(targets, func(monitoringTarget) ([]byte, error) {
+		calls++
+		if calls == 1 {
+			return nil, errors.New("404 page not found")
+		}
+		return nil, errors.New("the server could not find the requested resource")
+	})
+	require.Error(t, err)
+	assert.Equal(t, 2, calls)
+	// The user reads this line in the log, so it has to name what was
+	// tried and what each answered, not only the last guess.
+	assert.Contains(t, err.Error(), "monitoring/vmselect-vmks:8481/select/0/prometheus: 404 page not found")
+	assert.Contains(t, err.Error(), "monitoring/prometheus-operated:9090: the server could not find the requested resource")
+	assert.Contains(t, err.Error(), "tried 2 targets")
+}
+
+func TestProbePrometheusTargetsReturnsTheFirstHit(t *testing.T) {
+	targets := []monitoringTarget{
+		{Namespace: "monitoring", Service: "a", Port: "9090"},
+		{Namespace: "monitoring", Service: "b", Port: "9090"},
+	}
+	data, hit, err := probePrometheusTargets(targets, func(t monitoringTarget) ([]byte, error) {
+		if t.Service == "b" {
+			return []byte("ok"), nil
+		}
+		return nil, errors.New("nope")
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "ok", string(data))
+	assert.Equal(t, "b", hit.Service)
+}
+
+func TestProbePrometheusTargetsWithNothingToTry(t *testing.T) {
+	_, _, err := probePrometheusTargets(nil, func(monitoringTarget) ([]byte, error) {
+		t.Fatal("must not be called")
+		return nil, nil
+	})
+	require.ErrorContains(t, err, "no prometheus service found")
 }
