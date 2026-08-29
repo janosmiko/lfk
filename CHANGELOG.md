@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.5](https://github.com/janosmiko/lfk/compare/v0.18.4...v0.18.5) (2026-08-29)
+
+
+### Features
+
+* probe common URL prefixes when reaching Prometheus ([#710](https://github.com/janosmiko/lfk/issues/710)) ([06c7eef](https://github.com/janosmiko/lfk/commit/06c7eefbfe916bdcbfbca19533ba3458161fce7b))
+
+
+### Bug Fixes
+
+* correctly identify cordoned nodes using spec.unschedulable ([#706](https://github.com/janosmiko/lfk/issues/706)) ([7173221](https://github.com/janosmiko/lfk/commit/7173221bf7de77acf68a9602472ae1e4a357e944))
+* list every probed Prometheus target in the proxy error ([#709](https://github.com/janosmiko/lfk/issues/709)) ([288eb27](https://github.com/janosmiko/lfk/commit/288eb2752f362acd4fef108ca348b1624859aaee))
+
 ## [0.18.4](https://github.com/janosmiko/lfk/compare/v0.18.3...v0.18.4) (2026-08-28)
 
 
