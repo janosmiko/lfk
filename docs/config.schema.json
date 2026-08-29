@@ -668,7 +668,7 @@
         "discover_path_prefix": {
           "type": "boolean",
           "default": false,
-          "description": "Read the URL prefix (--web.route-prefix, -http.pathPrefix) off the pods behind a discovered Prometheus Service. Opt-in because it lists pods."
+          "description": "Read the URL prefix (--web.route-prefix, -http.pathPrefix) off the pods behind a discovered Prometheus or VictoriaMetrics vmselect Service. Opt-in because it lists pods."
         }
       }
     },
