@@ -269,7 +269,7 @@ func TestResolveMonitoringEndpointsPathPrefix(t *testing.T) {
 	prom, _ := resolveMonitoringEndpoints("any-ctx")
 
 	require.Len(t, prom, 1)
-	assert.Equal(t, monitoringTarget{Namespace: "vm", Service: "vmselect-vmks", Port: "8481", Prefix: "/select/0/prometheus"}, prom[0])
+	assert.Equal(t, monitoringTarget{Namespace: "vm", Service: "vmselect-vmks", Port: "8481", Prefix: "/select/0/prometheus", fixedPrefix: true}, prom[0])
 	assert.Equal(t, "/select/0/prometheus/api/v1/query", prom[0].path("/api/v1/query"))
 }
 
@@ -591,4 +591,35 @@ func TestProbePrometheusTargetsWithNothingToTry(t *testing.T) {
 		return nil, nil
 	})
 	require.ErrorContains(t, err, "no prometheus service found")
+}
+
+func TestWithCommonPrefixesTriesBarePathsFirst(t *testing.T) {
+	in := []monitoringTarget{
+		{Namespace: "monitoring", Service: "prometheus-operated", Port: "9090"},
+		{Namespace: "monitoring", Service: "vmselect-vmks", Port: "8481", Prefix: vmSelectTenantPrefix},
+	}
+	got := withCommonPrefixes(in)
+	want := []monitoringTarget{
+		in[0], in[1],
+		{Namespace: "monitoring", Service: "prometheus-operated", Port: "9090", Prefix: "/prometheus"},
+		{Namespace: "monitoring", Service: "vmselect-vmks", Port: "8481", Prefix: "/prometheus" + vmSelectTenantPrefix},
+		{Namespace: "monitoring", Service: "prometheus-operated", Port: "9090", Prefix: "/vm"},
+		{Namespace: "monitoring", Service: "vmselect-vmks", Port: "8481", Prefix: "/vm" + vmSelectTenantPrefix},
+	}
+	assert.Equal(t, want, got)
+}
+
+func TestWithCommonPrefixesKeepsAConfiguredPrefixAlone(t *testing.T) {
+	orig := model.ConfigMonitoring
+	t.Cleanup(func() { model.ConfigMonitoring = orig })
+	model.ConfigMonitoring = map[string]model.MonitoringConfig{
+		"ctx-fixed": {Prometheus: &model.MonitoringEndpoint{
+			Namespaces: []string{"vm"}, Services: []string{"vmselect-vmks"}, Port: "8481",
+			PathPrefix: "/vm/select/0/prometheus",
+		}},
+	}
+	prom, _ := resolveMonitoringEndpoints("ctx-fixed")
+	got := withCommonPrefixes(prom)
+	require.Len(t, got, 1)
+	assert.Equal(t, "/vm/select/0/prometheus", got[0].Prefix)
 }

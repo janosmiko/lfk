@@ -178,6 +178,7 @@ func (c *Client) runPrometheusProxy(ctx context.Context, contextName, path strin
 		return nil, fmt.Errorf("clientset: %w", err)
 	}
 	promTargets, _ := monitoringTargetsFor(ctx, cs, contextName)
+	promTargets = withCommonPrefixes(promTargets)
 
 	doQuery := func(t monitoringTarget) ([]byte, error) {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)

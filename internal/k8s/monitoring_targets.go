@@ -23,6 +23,9 @@ type monitoringTarget struct {
 	Service   string
 	Port      string
 	Prefix    string
+	// fixedPrefix marks a Prefix the user wrote in config. Discovery then
+	// probes exactly that path instead of guessing around it.
+	fixedPrefix bool
 }
 
 // path returns the proxy path for one Prometheus or Alertmanager API path.
@@ -307,6 +310,28 @@ func withPrefix(t monitoringTarget, prefix string) monitoringTarget {
 	return t
 }
 
+// commonAPIPrefixes are URL prefixes a chart commonly puts in front of the
+// query API: kube-prometheus-stack's routePrefix and the VictoriaMetrics
+// http.pathPrefix flag. Same idea as the namespace guesses.
+var commonAPIPrefixes = []string{"/prometheus", "/vm"}
+
+// withCommonPrefixes returns every target on its bare path first, then the
+// whole list again under each common prefix. Bare paths lead because most
+// installs use none, and a wrong prefix costs a fast 404 from the proxy.
+func withCommonPrefixes(targets []monitoringTarget) []monitoringTarget {
+	out := make([]monitoringTarget, 0, len(targets)*(1+len(commonAPIPrefixes)))
+	out = append(out, targets...)
+	for _, p := range commonAPIPrefixes {
+		for _, t := range targets {
+			if t.fixedPrefix {
+				continue
+			}
+			out = append(out, withPrefix(t, p+t.Prefix))
+		}
+	}
+	return out
+}
+
 // servicePort picks the HTTP port of a monitoring Service. The named port wins
 // because an Alertmanager Service also exposes its gossip port, and that one
 // answers no API request. Its gossip port carries the same name on UDP as on
@@ -401,7 +426,9 @@ func endpointTargets(ep *model.MonitoringEndpoint, defaultServices []string, def
 	targets := make([]monitoringTarget, 0, len(namespaces)*len(services))
 	for _, ns := range namespaces {
 		for _, svc := range services {
-			targets = append(targets, monitoringTarget{Namespace: ns, Service: svc, Port: port, Prefix: prefix})
+			targets = append(targets, monitoringTarget{
+				Namespace: ns, Service: svc, Port: port, Prefix: prefix, fixedPrefix: prefix != "",
+			})
 		}
 	}
 	return targets

@@ -343,6 +343,8 @@ When discovery finds nothing, lfk probes these names:
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `kube-prometheus-stack-prometheus`, `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
 
+Each Prometheus target is probed on its bare path first, then under `/prometheus` (kube-prometheus-stack `routePrefix`) and `/vm` (VictoriaMetrics `http.pathPrefix`). A configured `path_prefix` is probed as written.
+
 ### Metrics source
 
 A discovered Prometheus also decides where pod and node CPU and memory come from. With no `monitoring` config, lfk sends them to Prometheus when discovery found one, and to metrics-server otherwise. An explicit `node_metrics` still wins. The nodes-list `Uptime` column follows the same rule.
