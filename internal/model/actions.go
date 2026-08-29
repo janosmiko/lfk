@@ -696,6 +696,9 @@ type MonitoringEndpoint struct {
 	// PathPrefix goes in front of the API path. VictoriaMetrics vmselect
 	// serves the Prometheus API below "/select/<accountID>/prometheus".
 	PathPrefix string `json:"path_prefix" yaml:"path_prefix"`
+	// DiscoverPathPrefix reads the prefix off the pods behind a discovered
+	// Service (--web.route-prefix, -http.pathPrefix). Opt-in: it lists pods.
+	DiscoverPathPrefix bool `json:"discover_path_prefix" yaml:"discover_path_prefix"`
 }
 
 // MonitoringConfig defines per-cluster monitoring endpoints.

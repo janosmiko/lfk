@@ -142,7 +142,7 @@ func cachedMonitoringDiscovery(ctx context.Context, cs kubernetes.Interface, con
 		}
 		monitoringDiscoveryCache.Delete(contextName)
 	}
-	prom, am = discoverMonitoringServices(ctx, cs, namespaces)
+	prom, am = discoverMonitoringServices(ctx, cs, namespaces, pathPrefixDiscoverer(ctx, cs, contextName))
 	logger.Debug("monitoring service discovery finished",
 		"context", contextName, "prometheus", prom, "alertmanager", am)
 	monitoringDiscoveryCache.Store(contextName, monitoringDiscoveryEntry{prom: prom, am: am, at: time.Now()})
@@ -177,12 +177,22 @@ var monitoringSelectors = []string{
 // discoverMonitoringServices finds monitoring Services by their component
 // labels. The cluster-wide list comes first because it also finds a stack
 // outside the well-known namespaces, but a user may lack that permission.
-func discoverMonitoringServices(ctx context.Context, cs kubernetes.Interface, namespaces []string) (prom, am []monitoringTarget) {
+func discoverMonitoringServices(ctx context.Context, cs kubernetes.Interface, namespaces []string, prefixFor func(*corev1.Service) string) (prom, am []monitoringTarget) {
 	found := make([]corev1.Service, 0, len(monitoringSelectors))
 	for _, selector := range monitoringSelectors {
 		found = append(found, listMonitoringServices(ctx, cs, namespaces, selector)...)
 	}
-	return targetsFromServices(preferWellKnownNamespaces(dedupeServices(found), namespaces))
+	return targetsFromServices(preferWellKnownNamespaces(dedupeServices(found), namespaces), prefixFor)
+}
+
+// pathPrefixDiscoverer returns the pod-args lookup when the context opted in
+// with discover_path_prefix, and nil otherwise.
+func pathPrefixDiscoverer(ctx context.Context, cs kubernetes.Interface, contextName string) func(*corev1.Service) string {
+	mc, ok := monitoringConfigFor(contextName)
+	if !ok || mc.Prometheus == nil || !mc.Prometheus.DiscoverPathPrefix {
+		return nil
+	}
+	return func(svc *corev1.Service) string { return discoveredPathPrefix(ctx, cs, svc) }
 }
 
 // preferWellKnownNamespaces stably moves Services in the namespaces an
@@ -282,7 +292,7 @@ func serviceRole(svc *corev1.Service) monitoringRole {
 
 // targetsFromServices turns discovered Services into probe targets. The port
 // comes from the Service itself, so a stack on a non-default port still works.
-func targetsFromServices(services []corev1.Service) (prom, am []monitoringTarget) {
+func targetsFromServices(services []corev1.Service, prefixFor func(*corev1.Service) string) (prom, am []monitoringTarget) {
 	for i := range services {
 		svc := &services[i]
 		p := servicePort(svc)
@@ -290,13 +300,19 @@ func targetsFromServices(services []corev1.Service) (prom, am []monitoringTarget
 			continue
 		}
 		base := monitoringTarget{Namespace: svc.Namespace, Service: svc.Name, Port: p}
-		switch serviceRole(svc) {
+		role := serviceRole(svc)
+		if prefixFor != nil && (role == rolePrometheus || role == roleVMSelect) {
+			if found := prefixFor(svc); found != "" {
+				base.Prefix, base.fixedPrefix = found, true
+			}
+		}
+		switch role {
 		case rolePrometheus:
 			prom = append(prom, base)
 		case roleVMSelect:
 			prom = append(prom,
-				withPrefix(base, vmSelectTenantPrefix),
-				withPrefix(base, vmSelectMultitenantPrefix))
+				withPrefix(base, base.Prefix+vmSelectTenantPrefix),
+				withPrefix(base, base.Prefix+vmSelectMultitenantPrefix))
 		case roleAlertmanager:
 			am = append(am, base)
 		case roleNone:

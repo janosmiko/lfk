@@ -317,6 +317,7 @@ Each endpoint (`prometheus` and `alertmanager`) accepts:
 | `services` | list[string] | *(auto-discovery)* | Service names to try. Tried in order within each namespace. |
 | `port` | string | `"9090"` / `"9093"` | Service port (default: `9090` for Prometheus, `9093` for Alertmanager). |
 | `path_prefix` | string | `""` | URL prefix in front of the API path. See [VictoriaMetrics](#victoriametrics). |
+| `discover_path_prefix` | bool | `false` | Read the prefix off the pods behind a discovered Service (`--web.route-prefix`, `-http.pathPrefix`). Needs pod list access. `prometheus` only. |
 
 ### Auto-discovery
 
@@ -343,7 +344,7 @@ When discovery finds nothing, lfk probes these names:
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `kube-prometheus-stack-prometheus`, `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
 
-Each Prometheus target is probed on its bare path first, then under `/prometheus` (kube-prometheus-stack `routePrefix`) and `/vm` (VictoriaMetrics `http.pathPrefix`). A configured `path_prefix` is probed as written.
+Each Prometheus target is probed on its bare path first, then under `/prometheus` (kube-prometheus-stack `routePrefix`) and `/vm` (VictoriaMetrics `http.pathPrefix`). A configured `path_prefix` is probed as written. With `discover_path_prefix: true` lfk reads the prefix off the pods behind each discovered Service instead of guessing.
 
 ### Metrics source
 
