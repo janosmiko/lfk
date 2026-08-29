@@ -26,8 +26,9 @@ type monitoringTarget struct {
 }
 
 // path returns the proxy path for one Prometheus or Alertmanager API path.
-// String renders the target the way the API server proxy path does, so a log
-// line can be pasted into a kubectl get --raw probe.
+// String renders the target as namespace/service:port plus any API prefix,
+// the same pieces a user fills into the service proxy path when they probe
+// it with kubectl get --raw.
 func (t monitoringTarget) String() string {
 	return t.Namespace + "/" + t.Service + ":" + t.Port + t.Prefix
 }
