@@ -399,19 +399,20 @@ func TestLoadConfig_KubeconfigIgnoreEmptyListSkipsNothing(t *testing.T) {
 	assert.Empty(t, ConfigKubeconfigIgnore)
 }
 
-func TestLoadConfig_KubeconfigIgnoreDropsBlankEntries(t *testing.T) {
+func TestLoadConfig_KubeconfigIgnoreTrimsAndDropsBlanks(t *testing.T) {
 	restore := snapshotAllConfigGlobals(t)
 	defer restore()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	require.NoError(t, os.WriteFile(path, []byte("kubeconfig_ignore:\n  - \"*.log\"\n  - \"   \"\n  - \"\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(path,
+		[]byte("kubeconfig_ignore:\n  - \"*.log\"\n  - \" *.tmp \"\n  - \"   \"\n  - \"\"\n"), 0o600))
 
 	LoadConfig(path)
 
-	// A blank pattern would match nothing, but a lone "*" typo'd as " * "
-	// trimmed to "*" would hide the directory, so blanks go rather than trim.
-	assert.Equal(t, []string{"*.log"}, ConfigKubeconfigIgnore)
+	// filepath.Match reads a surrounding space as a literal, so an untrimmed
+	// " *.tmp " would silently match nothing.
+	assert.Equal(t, []string{"*.log", "*.tmp"}, ConfigKubeconfigIgnore)
 }
 
 func TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset(t *testing.T) {

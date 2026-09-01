@@ -24,8 +24,9 @@ var ConfigKubeconfigExclusive = true
 // non-nil empty slice is a deliberate "ignore nothing".
 var ConfigKubeconfigIgnore []string
 
-// applyKubeconfigIgnoreSetting drops blank entries so a stray "- " in YAML
-// cannot match every file and hide the whole directory.
+// applyKubeconfigIgnoreSetting trims each pattern because filepath.Match reads
+// a surrounding space as a literal character, so " *.log " would silently match
+// nothing. Entries left empty by the trim are dropped.
 func applyKubeconfigIgnoreSetting(patterns *[]string) {
 	if patterns == nil {
 		return
