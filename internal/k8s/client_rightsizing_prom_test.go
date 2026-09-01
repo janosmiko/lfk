@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,28 +24,28 @@ import (
 // --- buildPromContainerQuery ---
 
 func TestBuildPromContainerQuery_StrategyToPromQL(t *testing.T) {
-	maxQ := buildPromContainerQuery("default", "Deployment", "frontend", model.StrategyPromMax1D, "cpu")
+	maxQ := buildPromContainerQuery("default", "Deployment", "frontend", false, model.StrategyPromMax1D, "cpu")
 	assert.Contains(t, maxQ, "max_over_time", "1d-max strategy must use max_over_time")
 	assert.Contains(t, maxQ, "[1d:", "1d window in subquery range")
 	assert.Contains(t, maxQ, "container_cpu_usage_seconds_total", "CPU query targets cpu metric")
 	assert.Contains(t, maxQ, `namespace="default"`, "namespace label filter")
 	assert.Contains(t, maxQ, "frontend", "workload name in pod regex")
 
-	avgQ := buildPromContainerQuery("default", "Deployment", "frontend", model.StrategyPromAvg1D, "cpu")
+	avgQ := buildPromContainerQuery("default", "Deployment", "frontend", false, model.StrategyPromAvg1D, "cpu")
 	assert.Contains(t, avgQ, "avg_over_time", "1d-avg strategy must use avg_over_time")
 	assert.Contains(t, avgQ, "[1d:")
 
-	p95Q := buildPromContainerQuery("default", "Deployment", "frontend", model.StrategyPromP957D, "cpu")
+	p95Q := buildPromContainerQuery("default", "Deployment", "frontend", false, model.StrategyPromP957D, "cpu")
 	assert.Contains(t, p95Q, "quantile_over_time(0.95", "p95 strategy uses quantile_over_time")
 	assert.Contains(t, p95Q, "[7d:", "7d window in subquery range")
 
-	memQ := buildPromContainerQuery("default", "Deployment", "frontend", model.StrategyPromMax1D, "memory")
+	memQ := buildPromContainerQuery("default", "Deployment", "frontend", false, model.StrategyPromMax1D, "memory")
 	assert.Contains(t, memQ, "container_memory_working_set_bytes", "memory query targets memory metric")
 	assert.NotContains(t, memQ, "rate(", "memory uses gauge, no rate() wrapper")
 }
 
 func TestBuildPromContainerQuery_PodRegexEscapesSpecialChars(t *testing.T) {
-	q := buildPromContainerQuery("default", "Deployment", "app.v1", model.StrategyPromMax1D, "cpu")
+	q := buildPromContainerQuery("default", "Deployment", "app.v1", false, model.StrategyPromMax1D, "cpu")
 	assert.Contains(t, q, `app\.v1`, "regex metacharacters must be escaped")
 	assert.Contains(t, q, "pod=~`", "the matcher uses a raw PromQL literal so `\\.` survives unprocessed")
 }
@@ -237,10 +238,11 @@ func TestGetRightsizing_PrometheusQueryFailureLeavesSuggestionEmpty(t *testing.T
 
 func TestPodsRegexForWorkload_MatchesControllerPodShapes(t *testing.T) {
 	cases := []struct {
-		kind   string
-		name   string
-		match  []string
-		reject []string
+		kind    string
+		name    string
+		indexed bool
+		match   []string
+		reject  []string
 	}{
 		{
 			kind:  "Deployment",
@@ -266,18 +268,32 @@ func TestPodsRegexForWorkload_MatchesControllerPodShapes(t *testing.T) {
 			reject: []string{"postgres", "postgres-k4n2p"},
 		},
 		{
-			kind:   "Job",
-			name:   "backup",
-			match:  []string{"backup-k4n2p", "backup-3-k4n2p"},
-			reject: []string{"backup", "backup-k4n2p-x5tqm"},
+			kind:  "Job",
+			name:  "backup",
+			match: []string{"backup-k4n2p"},
+			// The last entry is a pod of a sibling Job "backup-3".
+			reject: []string{"backup", "backup-k4n2p-x5tqm", "backup-3-k4n2p"},
 		},
 		{
-			kind: "CronJob",
-			name: "nightly",
-			// The second form is a CronJob whose job template sets
-			// completionMode: Indexed, which inserts the index.
-			match:  []string{"nightly-29358720-k4n2p", "nightly-29358720-3-k4n2p"},
-			reject: []string{"nightly", "nightly-k4n2p"},
+			kind:    "Job",
+			name:    "backup",
+			indexed: true,
+			match:   []string{"backup-3-k4n2p"},
+			reject:  []string{"backup", "backup-k4n2p"},
+		},
+		{
+			kind:  "CronJob",
+			name:  "nightly",
+			match: []string{"nightly-29358720-k4n2p"},
+			// The last entry is a pod of a sibling CronJob "nightly-2".
+			reject: []string{"nightly", "nightly-k4n2p", "nightly-2-29358720-k4n2p"},
+		},
+		{
+			kind:    "CronJob",
+			name:    "nightly",
+			indexed: true,
+			match:   []string{"nightly-29358720-3-k4n2p"},
+			reject:  []string{"nightly", "nightly-29358720-k4n2p"},
 		},
 		{
 			kind:   "Pod",
@@ -287,8 +303,12 @@ func TestPodsRegexForWorkload_MatchesControllerPodShapes(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		t.Run(tc.kind, func(t *testing.T) {
-			re, err := regexp.Compile(podsRegexForWorkload(tc.kind, tc.name))
+		label := tc.kind
+		if tc.indexed {
+			label += "_indexed"
+		}
+		t.Run(label, func(t *testing.T) {
+			re, err := regexp.Compile(podsRegexForWorkload(tc.kind, tc.name, tc.indexed))
 			require.NoError(t, err, "generated regex must compile")
 			for _, p := range tc.match {
 				assert.True(t, re.MatchString(p), "%s should match", p)
@@ -303,7 +323,7 @@ func TestPodsRegexForWorkload_MatchesControllerPodShapes(t *testing.T) {
 func TestPodsRegexForWorkload_SurvivesRollout(t *testing.T) {
 	// Applying a recommendation rolls the workload, so every pod name
 	// changes and a selector pinned to the old names loses the window.
-	re := regexp.MustCompile(podsRegexForWorkload("Deployment", "frontend"))
+	re := regexp.MustCompile(podsRegexForWorkload("Deployment", "frontend", false))
 	assert.True(t, re.MatchString("frontend-5x9dkm2t7b-q4wzn"), "pod from the revision before the edit")
 	assert.True(t, re.MatchString("frontend-7fkp2xz4d9-m5tqb"), "pod from the revision after the edit")
 }
@@ -311,18 +331,18 @@ func TestPodsRegexForWorkload_SurvivesRollout(t *testing.T) {
 func TestPodsRegexForWorkload_EscapesDotsInWorkloadName(t *testing.T) {
 	// Deployment names are DNS subdomains, so a dot is legal and would
 	// otherwise match any character in that position.
-	re := regexp.MustCompile(podsRegexForWorkload("Deployment", "app.v1"))
+	re := regexp.MustCompile(podsRegexForWorkload("Deployment", "app.v1", false))
 	assert.True(t, re.MatchString("app.v1-7d9fkp2xz4-b5tqm"))
 	assert.False(t, re.MatchString("appxv1-7d9fkp2xz4-b5tqm"), "dot must not act as a wildcard")
 }
 
 func TestPodsRegexForWorkload_UnsupportedKindMatchesNothing(t *testing.T) {
-	assert.Empty(t, podsRegexForWorkload("ReplicaSet", "frontend"),
+	assert.Empty(t, podsRegexForWorkload("ReplicaSet", "frontend", false),
 		"an unknown kind must not fall back to a namespace-wide selector")
 }
 
 func TestBuildPromContainerQuery_NotPinnedToCurrentPodNames(t *testing.T) {
-	q := buildPromContainerQuery("default", "Deployment", "frontend", model.StrategyPromP957D, "cpu")
+	q := buildPromContainerQuery("default", "Deployment", "frontend", false, model.StrategyPromP957D, "cpu")
 	assert.Contains(t, q, "[7d:", "7d window in subquery range")
 
 	matcher := regexp.MustCompile("pod=~`([^`]+)`").FindStringSubmatch(q)
@@ -333,6 +353,35 @@ func TestBuildPromContainerQuery_NotPinnedToCurrentPodNames(t *testing.T) {
 	assert.True(t, re.MatchString("frontend-7fkp2xz4d9-m5tqb"), "pod from the revision after the edit")
 }
 
+func TestWorkloadIsIndexed_ReadsCompletionMode(t *testing.T) {
+	indexed := batchv1.IndexedCompletion
+	nonIndexed := batchv1.NonIndexedCompletion
+	cs := fake.NewSimpleClientset(
+		&batchv1.Job{
+			Name: "wide", Namespace: "default",
+			Spec: batchv1.JobSpec{CompletionMode: &indexed},
+		},
+		&batchv1.Job{
+			Name: "plain", Namespace: "default",
+			Spec: batchv1.JobSpec{CompletionMode: &nonIndexed},
+		},
+		&batchv1.CronJob{
+			Name: "fanout", Namespace: "default",
+			Spec: batchv1.CronJobSpec{JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{CompletionMode: &indexed},
+			}},
+		},
+	)
+	c := NewTestClient(cs, nil)
+
+	assert.True(t, c.workloadIsIndexed(t.Context(), "test-ctx", "default", "Job", "wide"))
+	assert.False(t, c.workloadIsIndexed(t.Context(), "test-ctx", "default", "Job", "plain"))
+	assert.True(t, c.workloadIsIndexed(t.Context(), "test-ctx", "default", "CronJob", "fanout"))
+	assert.False(t, c.workloadIsIndexed(t.Context(), "test-ctx", "default", "Job", "missing"),
+		"a lookup failure falls back to the narrower pattern")
+	assert.False(t, c.workloadIsIndexed(t.Context(), "test-ctx", "default", "Deployment", "wide"))
+}
+
 func TestBuildPromContainerQuery_EmptyForUnsupportedKind(t *testing.T) {
-	assert.Empty(t, buildPromContainerQuery("default", "ReplicaSet", "frontend", model.StrategyPromP957D, "cpu"))
+	assert.Empty(t, buildPromContainerQuery("default", "ReplicaSet", "frontend", false, model.StrategyPromP957D, "cpu"))
 }

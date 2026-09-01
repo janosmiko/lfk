@@ -23,8 +23,9 @@ import (
 // gets set to "1d" or "7d" depending on the strategy so the header
 // can show the user what time range backs the recommendation.
 func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, namespace, kind, name string, strategy model.RightsizingStrategy, headroom float64, out *model.Rightsizing) {
-	cpuQuery := buildPromContainerQuery(namespace, kind, name, strategy, "cpu")
-	memQuery := buildPromContainerQuery(namespace, kind, name, strategy, "memory")
+	indexed := c.workloadIsIndexed(ctx, contextName, namespace, kind, name)
+	cpuQuery := buildPromContainerQuery(namespace, kind, name, indexed, strategy, "cpu")
+	memQuery := buildPromContainerQuery(namespace, kind, name, indexed, strategy, "memory")
 	if cpuQuery == "" && memQuery == "" {
 		return
 	}
@@ -80,8 +81,8 @@ func promStrategyWindow(s model.RightsizingStrategy) string {
 //
 // Returns "" for a kind podsRegexForWorkload cannot describe, so the
 // caller skips the query rather than selecting the whole namespace.
-func buildPromContainerQuery(namespace, kind, name string, strategy model.RightsizingStrategy, resourceKind string) string {
-	podRegex := podsRegexForWorkload(kind, name)
+func buildPromContainerQuery(namespace, kind, name string, indexed bool, strategy model.RightsizingStrategy, resourceKind string) string {
+	podRegex := podsRegexForWorkload(kind, name, indexed)
 	if podRegex == "" {
 		return ""
 	}
@@ -133,9 +134,15 @@ const promRawQuote = "`"
 // podsRegexForWorkload also matches pods from revisions that no longer
 // exist, so a 1d or 7d window survives the rollout that applying a
 // recommendation triggers. "" for a kind it cannot describe.
-func podsRegexForWorkload(kind, name string) string {
+func podsRegexForWorkload(kind, name string, indexed bool) string {
 	n := regexp.QuoteMeta(name)
 	gen := k8sGeneratedChars
+	// Only an Indexed Job puts a digit segment here. Always-on, that
+	// group would also swallow a sibling workload named "<name>-3".
+	index := ""
+	if indexed {
+		index = "[0-9]+-"
+	}
 	switch kind {
 	case "Pod":
 		return "^" + n + "$"
@@ -148,12 +155,11 @@ func podsRegexForWorkload(kind, name string) string {
 	case "StatefulSet":
 		return "^" + n + "-[0-9]+$"
 	case "Job":
-		// The optional digit group is an Indexed job's completion index.
-		return "^" + n + "-(?:[0-9]+-)?" + gen + "{5}$"
+		return "^" + n + "-" + index + gen + "{5}$"
 	case "CronJob":
 		// The CronJob controller names each Job after its scheduled time
 		// in minutes since the epoch, then the Job names its own pods.
-		return "^" + n + "-[0-9]+-(?:[0-9]+-)?" + gen + "{5}$"
+		return "^" + n + "-[0-9]+-" + index + gen + "{5}$"
 	}
 	return ""
 }

@@ -4,8 +4,38 @@ import (
 	"context"
 	"fmt"
 
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// workloadIsIndexed reports whether the workload's pods carry a
+// completion-index segment in their names. False on any lookup error,
+// which yields the narrower pod pattern.
+func (c *Client) workloadIsIndexed(ctx context.Context, contextName, namespace, kind, name string) bool {
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return false
+	}
+	switch kind {
+	case "Job":
+		job, err := cs.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+		return isIndexedCompletion(job.Spec.CompletionMode)
+	case "CronJob":
+		cj, err := cs.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+		return isIndexedCompletion(cj.Spec.JobTemplate.Spec.CompletionMode)
+	}
+	return false
+}
+
+func isIndexedCompletion(mode *batchv1.CompletionMode) bool {
+	return mode != nil && *mode == batchv1.IndexedCompletion
+}
 
 // resolvePodsForWorkload returns the names of pods backing the given
 // workload. Strategy varies by kind:
