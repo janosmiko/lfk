@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 // KubeconfigPaths returns the colon-separated kubeconfig paths used by this client.
@@ -246,7 +248,8 @@ func contextDisplayHint(path string) string {
 // implicit defaults. Passing exclusive=false (kubeconfig_exclusive: false /
 // --kubeconfig-exclusive=false / LFK_KUBECONFIG_EXCLUSIVE=false) restores
 // the historical merge-everything behavior.
-func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool) []string {
+func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool, ignore []string) []string {
+	ignore = ResolveKubeconfigIgnore(ignore)
 	var paths []string
 
 	// KUBECONFIG env var (colon-separated on unix). Empty entries (a stray
@@ -279,7 +282,7 @@ func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool) []string {
 		if strings.HasPrefix(dir, "~") && homeErr != nil {
 			continue
 		}
-		paths = append(paths, collectConfigDirPaths(expandTilde(dir, home))...)
+		paths = append(paths, filterParseableKubeconfigs(collectConfigDirPaths(expandTilde(dir, home), ignore))...)
 	}
 
 	// Dedup by canonical path. The same kubeconfig can land in `paths`
@@ -317,6 +320,68 @@ func dedupKubeconfigPaths(paths []string) []string {
 	return out
 }
 
+// DefaultKubeconfigIgnore lists the files that sit beside a kubeconfig but
+// never are one. "._*" catches AppleDouble sidecars, which copy the original's
+// name, so "._prod.yaml" is binary yet passes any check based on the extension.
+var DefaultKubeconfigIgnore = []string{
+	".DS_Store", "._*", "Thumbs.db",
+	"*.swp", "*.swo", "*~", "*.bak", "*.orig", "*.tmp", "*.md",
+}
+
+// matchesKubeconfigIgnore reports whether a discovered file's base name matches
+// an ignore pattern. Matching is case-insensitive because macOS and Windows
+// filesystems are: README.MD and readme.md name the same file.
+func matchesKubeconfigIgnore(name string, patterns []string) bool {
+	lower := strings.ToLower(name)
+	for _, pattern := range patterns {
+		// A bad pattern is dropped here and reported by
+		// ValidateKubeconfigIgnore, so discovery never fails on one.
+		if ok, err := filepath.Match(strings.ToLower(pattern), lower); err == nil && ok {
+			return true
+		}
+	}
+	return false
+}
+
+// ResolveKubeconfigIgnore picks the ignore list. A nil slice means the user
+// configured nothing, so the default applies. A non-nil empty slice is a
+// deliberate "ignore nothing" and is honored.
+func ResolveKubeconfigIgnore(configured []string) []string {
+	if configured == nil {
+		return DefaultKubeconfigIgnore
+	}
+	return configured
+}
+
+// ValidateKubeconfigIgnore returns an error naming the first unusable glob, so
+// a typo in kubeconfig_ignore surfaces at startup instead of silently matching
+// nothing for the rest of the session.
+func ValidateKubeconfigIgnore(patterns []string) error {
+	for _, pattern := range patterns {
+		if _, err := filepath.Match(pattern, "probe"); err != nil {
+			return fmt.Errorf("kubeconfig ignore pattern %q: %w", pattern, err)
+		}
+	}
+	return nil
+}
+
+// filterParseableKubeconfigs drops paths clientcmd cannot parse, for scanned
+// files only: a typo in --kubeconfig must still fail loudly. clientcmd keeps a
+// file it skipped in its aggregate error, which NewClient treats as fatal.
+func filterParseableKubeconfigs(paths []string) []string {
+	var out []string
+	for _, p := range paths {
+		if _, err := clientcmd.LoadFromFile(p); err != nil {
+			// A YAML error can quote the line it choked on, and kubeconfigs hold tokens.
+			logger.Warn("ignoring unparseable file in kubeconfig directory",
+				"path", p, "error", logger.Redact(err.Error()))
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
 // collectConfigDirPaths returns all file paths under dir. If dir is a symlink
 // to a directory, the symlink is followed so WalkDir can descend into the real
 // target. Returns nil when dir is missing, is not a directory, or is a
@@ -327,7 +392,7 @@ func dedupKubeconfigPaths(paths []string) []string {
 // IsDir()=false (Lstat treats symlinks as non-directories), so the callback
 // would add the symlink path as a "file" and clientcmd would later fail with
 // "read ...: is a directory".
-func collectConfigDirPaths(dir string) []string {
+func collectConfigDirPaths(dir string, ignore []string) []string {
 	resolved, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return nil
@@ -338,9 +403,14 @@ func collectConfigDirPaths(dir string) []string {
 	}
 	var out []string
 	_ = filepath.WalkDir(resolved, func(path string, d os.DirEntry, err error) error {
+		// A version-controlled config.d holds hundreds of binary objects
+		// under .git, and none of them is a kubeconfig.
+		if err == nil && d.IsDir() && d.Name() == ".git" {
+			return filepath.SkipDir
+		}
 		// Silently skip entries that can't be read (permission denied, etc.)
 		// so a single unreadable subdir doesn't abort the whole walk.
-		if err == nil && !d.IsDir() {
+		if err == nil && !d.IsDir() && !matchesKubeconfigIgnore(d.Name(), ignore) {
 			out = append(out, path)
 		}
 		return nil
@@ -447,11 +517,11 @@ func ValidateKubeconfigDir(path string) error {
 // resolveKubeconfigPaths returns the kubeconfig file list for NewClient:
 // an explicit --kubeconfig override wins outright. Otherwise discovery
 // runs via buildKubeconfigPaths.
-func resolveKubeconfigPaths(override string, kubeconfigDirs []string, exclusive bool) []string {
+func resolveKubeconfigPaths(override string, kubeconfigDirs []string, exclusive bool, ignore []string) []string {
 	if override != "" {
 		return []string{override}
 	}
-	return buildKubeconfigPaths(kubeconfigDirs, exclusive)
+	return buildKubeconfigPaths(kubeconfigDirs, exclusive, ignore)
 }
 
 // ResolveKubeconfigExclusive resolves whether a set KUBECONFIG suppresses

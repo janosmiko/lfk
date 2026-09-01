@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -791,7 +792,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 			t.Setenv("KUBECONFIG", origKubeconfig)
 		}()
 
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -811,7 +812,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", cfg1+string(os.PathListSeparator)+cfg2)
 
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 
 		assert.Contains(t, paths, cfg1)
 		assert.Contains(t, paths, cfg2)
@@ -828,7 +829,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", defaultPath)
 
-		paths := buildKubeconfigPaths(nil, false)
+		paths := buildKubeconfigPaths(nil, false, nil)
 
 		count := 0
 		for _, p := range paths {
@@ -858,7 +859,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
 		t.Setenv("KUBECONFIG", env)
 
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 
 		assert.Equal(t, []string{env}, paths,
 			"KUBECONFIG must fully determine the file list, excluding ~/.kube/config and config.d")
@@ -881,7 +882,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		dirCfg := filepath.Join(explicitDir, "team-cluster")
 		assert.NoError(t, os.WriteFile(dirCfg, []byte(""), 0o600))
 
-		paths := buildKubeconfigPaths([]string{explicitDir}, true)
+		paths := buildKubeconfigPaths([]string{explicitDir}, true, nil)
 
 		resolvedDirCfg, err := filepath.EvalSymlinks(dirCfg)
 		assert.NoError(t, err)
@@ -906,7 +907,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
 		t.Setenv("KUBECONFIG", env)
 
-		paths := buildKubeconfigPaths(nil, false)
+		paths := buildKubeconfigPaths(nil, false, nil)
 
 		resolvedSeeded, err := filepath.EvalSymlinks(seeded)
 		assert.NoError(t, err)
@@ -926,14 +927,14 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
 
 		t.Setenv("KUBECONFIG", ":")
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 		assert.NotContains(t, paths, "", "no empty path entries")
 		assert.Contains(t, paths, defaultPath, "all-empty KUBECONFIG behaves as unset")
 
 		env := filepath.Join(t.TempDir(), "env-config")
 		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
 		t.Setenv("KUBECONFIG", env+string(os.PathListSeparator))
-		paths = buildKubeconfigPaths(nil, true)
+		paths = buildKubeconfigPaths(nil, true, nil)
 		assert.Equal(t, []string{env}, paths, "trailing separator adds no empty entry")
 	})
 
@@ -945,7 +946,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		override := filepath.Join(t.TempDir(), "override-config")
 		assert.NoError(t, os.WriteFile(override, []byte(""), 0o600))
 
-		paths := resolveKubeconfigPaths(override, []string{t.TempDir()}, true)
+		paths := resolveKubeconfigPaths(override, []string{t.TempDir()}, true, nil)
 		assert.Equal(t, []string{override}, paths,
 			"--kubeconfig short-circuits KUBECONFIG, dirs, and defaults")
 	})
@@ -963,7 +964,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		// and returns at least the default path.
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 
 		assert.NotEmpty(t, paths, "should return at least the default kubeconfig path")
 	})
@@ -976,7 +977,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		via := filepath.Join(tmpDir, ".", "config.yaml")
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+via)
 
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 		count := 0
 		for _, p := range paths {
 			if p == cfg || p == via {
@@ -1000,7 +1001,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.Symlink(cfg, viaSymlink))
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+viaSymlink)
 
-		paths := buildKubeconfigPaths(nil, true)
+		paths := buildKubeconfigPaths(nil, true, nil)
 		// Both entries point at the same underlying file; only one should
 		// remain after dedup. Compare via EvalSymlinks on both sides so
 		// we don't trip over /tmp → /private/tmp on macOS.
@@ -1029,7 +1030,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{customDir}, true)
+		paths := buildKubeconfigPaths([]string{customDir}, true, nil)
 		// collectConfigDirPaths resolves symlinks, so on macOS /tmp may
 		// become /private/tmp — compare via EvalSymlinks to avoid failing.
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
@@ -1049,7 +1050,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{"~/custom-k8s"}, true)
+		paths := buildKubeconfigPaths([]string{"~/custom-k8s"}, true, nil)
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
@@ -1067,7 +1068,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(cfgA, []byte(""), 0o600))
 		assert.NoError(t, os.WriteFile(cfgB, []byte(""), 0o600))
 
-		paths := buildKubeconfigPaths([]string{dirA, dirB}, true)
+		paths := buildKubeconfigPaths([]string{dirA, dirB}, true, nil)
 
 		resA, _ := filepath.EvalSymlinks(cfgA)
 		resB, _ := filepath.EvalSymlinks(cfgB)
@@ -1086,7 +1087,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		extraCfg := filepath.Join(customDir, "extra-cluster")
 		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
 
-		paths := buildKubeconfigPaths([]string{customDir}, true)
+		paths := buildKubeconfigPaths([]string{customDir}, true, nil)
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
@@ -1101,7 +1102,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		t.Setenv("USERPROFILE", "")
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{"~/some/dir"}, true)
+		paths := buildKubeconfigPaths([]string{"~/some/dir"}, true, nil)
 		// Result is whatever KUBECONFIG provides (empty here); the tilde
 		// path is silently skipped because expansion isn't possible.
 		for _, p := range paths {
@@ -1273,7 +1274,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("", nil, true)
+	client, err := NewClient("", nil, true, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1368,7 +1369,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("", nil, true)
+	client, err := NewClient("", nil, true, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1467,7 +1468,7 @@ users:
 	t.Setenv("KUBECONFIG",
 		dev+string(os.PathListSeparator)+itg+string(os.PathListSeparator)+prod)
 
-	client, err := NewClient("", nil, true)
+	client, err := NewClient("", nil, true, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1743,7 +1744,7 @@ users:
 
 			t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
 
-			client, err := NewClient("", nil, true)
+			client, err := NewClient("", nil, true, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, client)
 
@@ -1818,7 +1819,7 @@ func TestCollectConfigDirPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(a, []byte("{}"), 0o600))
 		assert.NoError(t, os.WriteFile(b, []byte("{}"), 0o600))
 
-		paths := collectConfigDirPaths(tmp)
+		paths := collectConfigDirPaths(tmp, DefaultKubeconfigIgnore)
 		assert.Len(t, paths, 2)
 	})
 
@@ -1831,7 +1832,7 @@ func TestCollectConfigDirPaths(t *testing.T) {
 		linkDir := filepath.Join(tmp, "config.d")
 		assert.NoError(t, os.Symlink(realDir, linkDir))
 
-		paths := collectConfigDirPaths(linkDir)
+		paths := collectConfigDirPaths(linkDir, DefaultKubeconfigIgnore)
 		assert.Len(t, paths, 1, "symlink to directory should be followed")
 		// Every returned path must point to a real file, never the directory itself.
 		for _, p := range paths {
@@ -1843,7 +1844,7 @@ func TestCollectConfigDirPaths(t *testing.T) {
 
 	t.Run("non-existent path returns empty", func(t *testing.T) {
 		tmp := t.TempDir()
-		paths := collectConfigDirPaths(filepath.Join(tmp, "nope"))
+		paths := collectConfigDirPaths(filepath.Join(tmp, "nope"), DefaultKubeconfigIgnore)
 		assert.Empty(t, paths)
 	})
 
@@ -1852,7 +1853,7 @@ func TestCollectConfigDirPaths(t *testing.T) {
 		notDir := filepath.Join(tmp, "not-dir")
 		assert.NoError(t, os.WriteFile(notDir, []byte("{}"), 0o600))
 
-		paths := collectConfigDirPaths(notDir)
+		paths := collectConfigDirPaths(notDir, DefaultKubeconfigIgnore)
 		assert.Empty(t, paths, "must not add a non-directory path")
 	})
 
@@ -1861,7 +1862,7 @@ func TestCollectConfigDirPaths(t *testing.T) {
 		dangling := filepath.Join(tmp, "dangling")
 		assert.NoError(t, os.Symlink(filepath.Join(tmp, "missing"), dangling))
 
-		paths := collectConfigDirPaths(dangling)
+		paths := collectConfigDirPaths(dangling, DefaultKubeconfigIgnore)
 		assert.Empty(t, paths)
 	})
 
@@ -1872,8 +1873,265 @@ func TestCollectConfigDirPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(filepath.Join(tmp, "top.yaml"), []byte("{}"), 0o600))
 		assert.NoError(t, os.WriteFile(filepath.Join(sub, "nested.yaml"), []byte("{}"), 0o600))
 
-		paths := collectConfigDirPaths(tmp)
+		paths := collectConfigDirPaths(tmp, DefaultKubeconfigIgnore)
 		assert.Len(t, paths, 2)
+	})
+
+	t.Run("junk file names are skipped, dotfile kubeconfigs are kept", func(t *testing.T) {
+		tmp := t.TempDir()
+		sub := filepath.Join(tmp, "sub")
+		assert.NoError(t, os.MkdirAll(sub, 0o755))
+
+		junk := []string{
+			".DS_Store", "Thumbs.db", "._itg-k8s.yaml", "notes.md",
+			".prod.yaml.swp", ".prod.yaml.swo", "prod.yaml~",
+			"prod.yaml.bak", "prod.yaml.orig", "prod.yaml.tmp",
+			// Uppercase variants that do not collide case-insensitively with
+			// the names above, so each is a distinct file on APFS too.
+			"README.MD", "backup.ORIG", "swapfile.SWP",
+		}
+		for _, name := range junk {
+			assert.NoError(t, os.WriteFile(filepath.Join(tmp, name), []byte{0x00, 0x01}, 0o600))
+		}
+		// Nested junk must be skipped too, not just at the top level.
+		assert.NoError(t, os.WriteFile(filepath.Join(sub, ".DS_Store"), []byte{0x00, 0x01}, 0o600))
+
+		keep := []string{".prod.yaml", "a.yaml", "config", "admin.conf", "ci.kubeconfig"}
+		for _, name := range keep {
+			assert.NoError(t, os.WriteFile(filepath.Join(tmp, name), []byte("{}"), 0o600))
+		}
+
+		paths := collectConfigDirPaths(tmp, DefaultKubeconfigIgnore)
+
+		got := make(map[string]bool, len(paths))
+		for _, p := range paths {
+			got[filepath.Base(p)] = true
+		}
+		for _, name := range junk {
+			assert.False(t, got[name], "junk file must be skipped: %s", name)
+		}
+		for _, name := range keep {
+			assert.True(t, got[name], "kubeconfig must be discovered: %s", name)
+		}
+		assert.Len(t, paths, len(keep))
+	})
+
+	t.Run("git directory is not descended", func(t *testing.T) {
+		tmp := t.TempDir()
+		gitObjects := filepath.Join(tmp, ".git", "objects", "ab")
+		assert.NoError(t, os.MkdirAll(gitObjects, 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(gitObjects, "cdef"), []byte{0x00, 0x01}, 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(tmp, ".git", "config"), []byte("[core]\n"), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(tmp, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(tmp, "real.yaml"), []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(tmp, DefaultKubeconfigIgnore)
+		assert.Len(t, paths, 1, "the walk must not descend into .git")
+		assert.Equal(t, "real.yaml", filepath.Base(paths[0]))
+	})
+}
+
+// --- matchesKubeconfigIgnore ---
+
+// Tested apart from the directory walk because a case-insensitive filesystem
+// cannot hold ".DS_Store" and ".ds_store" at once.
+func TestMatchesKubeconfigIgnoreDefaults(t *testing.T) {
+	junk := []string{
+		".DS_Store", ".ds_store", ".DS_STORE",
+		"Thumbs.db", "thumbs.db", "THUMBS.DB",
+		"._prod.yaml", "._config",
+		"notes.md", "README.MD", "Changelog.Md",
+		"a.swp", "a.SWO", "a~", "a.BAK", "a.orig", "a.TMP",
+	}
+	for _, name := range junk {
+		assert.True(t, matchesKubeconfigIgnore(name, DefaultKubeconfigIgnore), "must be junk: %s", name)
+	}
+
+	keep := []string{
+		"config", "admin.conf", "k3s.yaml", "ci.kubeconfig",
+		".prod.yaml", "prod.yml", "Config", "ADMIN.CONF",
+		// "_prod.yaml" lacks the leading dot of an AppleDouble sidecar.
+		"_prod.yaml",
+		// A name that merely contains a junk suffix must survive.
+		"bak.yaml", "tmp.yaml", "md.yaml",
+	}
+	for _, name := range keep {
+		assert.False(t, matchesKubeconfigIgnore(name, DefaultKubeconfigIgnore), "must be kept: %s", name)
+	}
+}
+
+func TestKubeconfigIgnoreIsConfigurable(t *testing.T) {
+	t.Run("a configured list replaces the defaults", func(t *testing.T) {
+		custom := []string{"*.log", "vault-*"}
+		assert.True(t, matchesKubeconfigIgnore("audit.log", custom))
+		assert.True(t, matchesKubeconfigIgnore("vault-token.yaml", custom))
+		// .DS_Store is in the default list but not in this one.
+		assert.False(t, matchesKubeconfigIgnore(".DS_Store", custom))
+	})
+
+	t.Run("an empty list ignores nothing", func(t *testing.T) {
+		assert.False(t, matchesKubeconfigIgnore(".DS_Store", []string{}))
+	})
+
+	t.Run("nil resolves to the defaults, empty stays empty", func(t *testing.T) {
+		assert.Equal(t, DefaultKubeconfigIgnore, ResolveKubeconfigIgnore(nil))
+		assert.Empty(t, ResolveKubeconfigIgnore([]string{}))
+		assert.NotNil(t, ResolveKubeconfigIgnore([]string{}), "an explicit empty list must not fall back")
+	})
+
+	t.Run("a broken pattern is skipped, not fatal", func(t *testing.T) {
+		// "[" is an unterminated character class, so filepath.Match rejects it.
+		patterns := []string{"[", "*.log"}
+		assert.False(t, matchesKubeconfigIgnore("anything.yaml", patterns))
+		assert.True(t, matchesKubeconfigIgnore("audit.log", patterns), "a later valid pattern must still apply")
+
+		err := ValidateKubeconfigIgnore(patterns)
+		assert.Error(t, err, "the broken pattern must be reported at startup")
+		assert.Contains(t, err.Error(), `"["`)
+		assert.NoError(t, ValidateKubeconfigIgnore([]string{"*.log", ".DS_Store", "._*"}))
+	})
+
+	t.Run("the walk honours a configured list", func(t *testing.T) {
+		tmp := t.TempDir()
+		for _, name := range []string{"keep.yaml", "drop.log", ".DS_Store"} {
+			assert.NoError(t, os.WriteFile(filepath.Join(tmp, name), []byte("{}"), 0o600))
+		}
+
+		paths := collectConfigDirPaths(tmp, []string{"*.log"})
+
+		got := make(map[string]bool, len(paths))
+		for _, p := range paths {
+			got[filepath.Base(p)] = true
+		}
+		assert.True(t, got["keep.yaml"])
+		assert.False(t, got["drop.log"], "the configured pattern must apply")
+		assert.True(t, got[".DS_Store"], "a configured list replaces the defaults, so .DS_Store is no longer skipped here")
+	})
+}
+
+// --- filterParseableKubeconfigs ---
+
+// stubKubeconfig is a minimal kubeconfig declaring one of everything, named
+// after ctx so callers can put two of them in one merge without colliding.
+func stubKubeconfig(ctx string) string {
+	return fmt.Sprintf(`apiVersion: v1
+kind: Config
+current-context: %[1]s
+clusters:
+- name: %[1]s-cluster
+  cluster:
+    server: https://%[1]s.test
+contexts:
+- name: %[1]s
+  context:
+    cluster: %[1]s-cluster
+    user: %[1]s-user
+users:
+- name: %[1]s-user
+  user: {}
+`, ctx)
+}
+
+func TestFilterParseableKubeconfigs(t *testing.T) {
+	t.Run("drops a file clientcmd cannot parse", func(t *testing.T) {
+		tmp := t.TempDir()
+		good := filepath.Join(tmp, "good.yaml")
+		bad := filepath.Join(tmp, ".DS_Store")
+		assert.NoError(t, os.WriteFile(good, []byte(stubKubeconfig("ctx1")), 0o600))
+		assert.NoError(t, os.WriteFile(bad, []byte{0x00, 0x01, 0x02}, 0o600))
+
+		assert.Equal(t, []string{good}, filterParseableKubeconfigs([]string{good, bad}))
+	})
+
+	t.Run("drops plain text that is not a kubeconfig", func(t *testing.T) {
+		tmp := t.TempDir()
+		good := filepath.Join(tmp, "good.yaml")
+		readme := filepath.Join(tmp, "README")
+		assert.NoError(t, os.WriteFile(good, []byte(stubKubeconfig("ctx1")), 0o600))
+		assert.NoError(t, os.WriteFile(readme, []byte("# Clusters\n\nProd lives here.\n"), 0o600))
+
+		assert.Equal(t, []string{good}, filterParseableKubeconfigs([]string{good, readme}))
+	})
+
+	t.Run("keeps a fragment declaring only users", func(t *testing.T) {
+		// Split kubeconfigs are legitimate: clientcmd merges a users-only
+		// file with the contexts that reference it from another file.
+		tmp := t.TempDir()
+		frag := filepath.Join(tmp, "users-only.yaml")
+		assert.NoError(t, os.WriteFile(frag, []byte("apiVersion: v1\nkind: Config\nusers:\n- name: u1\n  user: {}\n"), 0o600))
+
+		assert.Equal(t, []string{frag}, filterParseableKubeconfigs([]string{frag}))
+	})
+
+	t.Run("keeps an empty file", func(t *testing.T) {
+		tmp := t.TempDir()
+		empty := filepath.Join(tmp, "empty.yaml")
+		assert.NoError(t, os.WriteFile(empty, []byte(""), 0o600))
+
+		assert.Equal(t, []string{empty}, filterParseableKubeconfigs([]string{empty}))
+	})
+
+	t.Run("preserves order and returns nil for no input", func(t *testing.T) {
+		tmp := t.TempDir()
+		want := make([]string, 0, 3)
+		for _, name := range []string{"a.yaml", "b.yaml", "c.yaml"} {
+			p := filepath.Join(tmp, name)
+			assert.NoError(t, os.WriteFile(p, []byte(stubKubeconfig("ctx1")), 0o600))
+			want = append(want, p)
+		}
+		assert.Equal(t, want, filterParseableKubeconfigs(want))
+		assert.Nil(t, filterParseableKubeconfigs(nil))
+	})
+}
+
+// --- NewClient: discovered files are best-effort, named files are strict ---
+
+func TestNewClientDiscoveryTolerance(t *testing.T) {
+	t.Run("junk in a discovered directory does not stop startup", func(t *testing.T) {
+		// Regression: Finder wrote .DS_Store into ~/.kube/config.d and lfk
+		// refused to start. clientcmd skips the unparseable file but still
+		// reports it in an aggregate error, which NewClient treated as fatal.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+
+		env := filepath.Join(tmpHome, "env.yaml")
+		assert.NoError(t, os.WriteFile(env, []byte(stubKubeconfig("from-env")), 0o600))
+		t.Setenv("KUBECONFIG", env)
+
+		dir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, "good.yaml"), []byte(stubKubeconfig("from-dir")), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte{0x00, 0x01, 0x02}, 0o600))
+
+		client, err := NewClient("", []string{dir}, true, nil)
+		require.NoError(t, err, "a junk file in a discovered directory must not stop startup")
+		require.NotNil(t, client)
+		assert.NotContains(t, client.KubeconfigPaths(), ".DS_Store")
+		// The good neighbour must survive, not just the junk be dropped.
+		assert.Contains(t, client.contexts, "from-dir")
+	})
+
+	t.Run("an unparseable file named by KUBECONFIG still errors", func(t *testing.T) {
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+
+		bad := filepath.Join(tmpHome, "typo.yaml")
+		assert.NoError(t, os.WriteFile(bad, []byte{0x00, 0x01, 0x02}, 0o600))
+		t.Setenv("KUBECONFIG", bad)
+
+		_, err := NewClient("", nil, true, nil)
+		assert.Error(t, err, "a file the user named must fail loudly")
+	})
+
+	t.Run("an unparseable --kubeconfig override still errors", func(t *testing.T) {
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		t.Setenv("KUBECONFIG", "")
+
+		bad := filepath.Join(tmpHome, "typo.yaml")
+		assert.NoError(t, os.WriteFile(bad, []byte{0x00, 0x01, 0x02}, 0o600))
+
+		_, err := NewClient(bad, nil, true, nil)
+		assert.Error(t, err, "--kubeconfig pointing at an unparseable file must fail loudly")
 	})
 }
 

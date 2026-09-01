@@ -288,6 +288,11 @@ type configFile struct {
 	// --kubeconfig-exclusive CLI flag, then LFK_KUBECONFIG_EXCLUSIVE,
 	// take precedence over this value.
 	KubeconfigExclusive *bool `json:"kubeconfig_exclusive" yaml:"kubeconfig_exclusive"`
+
+	// KubeconfigIgnore replaces the default glob patterns that directory
+	// discovery skips. A pointer so an absent key keeps the defaults while
+	// an explicit [] ignores nothing.
+	KubeconfigIgnore *[]string `json:"kubeconfig_ignore" yaml:"kubeconfig_ignore"`
 	// UnionSets defines named multi-cluster groups for the --union-set CLI
 	// flag. Each set bundles a list of contexts and an optional default
 	// namespace so users don't have to retype long --union-context lists

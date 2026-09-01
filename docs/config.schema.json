@@ -34,6 +34,13 @@
         { "type": "null" }
       ]
     },
+    "kubeconfig_ignore": {
+      "description": "Glob patterns that kubeconfig directory discovery skips, matched against each file's base name, case-insensitively. Replaces the built-in list rather than extending it. An empty list skips nothing. Files that fail to parse are dropped either way, so a custom list cannot break startup.",
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "null" }
+      ]
+    },
     "kubeconfig_exclusive": {
       "type": "boolean",
       "default": true,

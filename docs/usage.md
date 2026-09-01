@@ -198,6 +198,27 @@ Precedence (replacement, not merge): `--kubeconfig-dir` flag > `KUBECONFIG_DIR` 
 
 lfk validates every directory exists at startup and errors out loudly on a typo. The `--kubeconfig` flag bypasses all directory discovery entirely.
 
+lfk skips known non-kubeconfig files in a scanned directory. It then drops any remaining file that fails to parse. A file you name with `--kubeconfig` or `KUBECONFIG` still fails loudly when it is broken.
+
+The skip list holds these glob patterns by default, matched against a file's base name, case-insensitively:
+
+```
+.DS_Store    ._*        Thumbs.db
+*.swp        *.swo      *~
+*.bak        *.orig     *.tmp       *.md
+```
+
+Set `kubeconfig_ignore` in the config file to replace that list. The key replaces the default rather than extending it, so include any built-in pattern you still want. An empty list skips nothing. The parse check runs either way, so a custom list cannot bring back a startup failure.
+
+```yaml
+kubeconfig_ignore:
+  - .DS_Store
+  - "._*"
+  - "*.log"
+```
+
+The walk never descends into a `.git` directory, and that is not configurable.
+
 ## Read-only mode
 
 Read-only mode disables every action that changes cluster state — delete,

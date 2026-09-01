@@ -186,6 +186,11 @@ log_path: /tmp/lfk.log
 #   - /team-a/configs
 #   - /team-b/configs
 
+# Globs discovery skips, matched on the base name. Replaces the built-in list.
+# kubeconfig_ignore:
+#   - .DS_Store
+#   - "*.md"
+
 # When KUBECONFIG is set, lfk loads only the files it lists (kubectl
 # semantics) and skips ~/.kube/config plus the default ~/.kube/config.d
 # scan. Set to false to merge everything like releases before 0.15.

@@ -62,7 +62,7 @@ func newBenchClient(b *testing.B, kubeconfig string) *Client {
 	if err := os.WriteFile(path, []byte(kubeconfig), 0o600); err != nil {
 		b.Fatalf("write kubeconfig: %v", err)
 	}
-	c, err := NewClient(path, nil, true)
+	c, err := NewClient(path, nil, true, nil)
 	if err != nil {
 		b.Fatalf("NewClient: %v", err)
 	}

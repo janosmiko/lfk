@@ -88,6 +88,9 @@ field_manager: lfk-ci
 show_rare_types: true
 kubeconfig_dir: /tmp/lfk-kcfg
 kubeconfig_exclusive: false
+kubeconfig_ignore:
+  - "*.log"
+  - "vault-*"
 abbreviations:
   zz: pod
 keybindings:
@@ -272,6 +275,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigShowRareTypes, "show_rare_types")
 	assert.Equal(t, []string{"/tmp/lfk-kcfg"}, ConfigKubeconfigDirs, "kubeconfig_dir")
 	assert.False(t, ConfigKubeconfigExclusive, "kubeconfig_exclusive")
+	assert.Equal(t, []string{"*.log", "vault-*"}, ConfigKubeconfigIgnore, "kubeconfig_ignore")
 	assert.Equal(t, "traffic-ns", ConfigKubesharkNamespace, "kubeshark")
 
 	// security section.
@@ -365,6 +369,51 @@ func TestLoadConfig_PinnedSummariesEmptyListSetsFlag(t *testing.T) {
 // being absent from the config file (as opposed to an explicit `[]`) leaves
 // ConfigPinnedSummariesSet false, so loadDashboardFor's default-pins gate
 // applies.
+// The nil / empty distinction is the whole contract of kubeconfig_ignore:
+// nil means "not configured" and yields the built-in list, while an explicit
+// [] means "skip nothing". A test that only checked len() would pass on both.
+func TestLoadConfig_KubeconfigIgnoreAbsentKeyStaysNil(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("dashboard: true\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.Nil(t, ConfigKubeconfigIgnore, "an absent key must leave the defaults in charge")
+}
+
+func TestLoadConfig_KubeconfigIgnoreEmptyListSkipsNothing(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("kubeconfig_ignore: []\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.NotNil(t, ConfigKubeconfigIgnore, "an explicit empty list must not read as unset")
+	assert.Empty(t, ConfigKubeconfigIgnore)
+}
+
+func TestLoadConfig_KubeconfigIgnoreDropsBlankEntries(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("kubeconfig_ignore:\n  - \"*.log\"\n  - \"   \"\n  - \"\"\n"), 0o600))
+
+	LoadConfig(path)
+
+	// A blank pattern would match nothing, but a lone "*" typo'd as " * "
+	// trimmed to "*" would hide the directory, so blanks go rather than trim.
+	assert.Equal(t, []string{"*.log"}, ConfigKubeconfigIgnore)
+}
+
 func TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset(t *testing.T) {
 	restore := snapshotAllConfigGlobals(t)
 	defer restore()
@@ -481,6 +530,7 @@ var wiringCoveredFields = map[string]string{
 	"kubeshark":                  "TestLoadConfig_AllSettingsWired",
 	"scheduler":                  "TestLoadConfig_AllSettingsWired",
 	"kubeconfig_dir":             "TestLoadConfig_AllSettingsWired",
+	"kubeconfig_ignore":          "TestLoadConfig_AllSettingsWired + TestLoadConfig_KubeconfigIgnore*",
 	"kubeconfig_exclusive":       "TestLoadConfig_AllSettingsWired",
 	"union_sets":                 "TestLoadConfig_AllSettingsWired",
 	"goto_targets":               "TestLoadConfig_AllSettingsWired + TestLoadConfig_GotoTargets",
@@ -584,6 +634,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origNoColor := ConfigNoColor
 	origKubeconfig := ConfigKubeconfigDirs
 	origKubeconfigExclusive := ConfigKubeconfigExclusive
+	origKubeconfigIgnore := ConfigKubeconfigIgnore
 	origSecretLazy := ConfigSecretLazyLoading
 	origDisableHTTP2 := ConfigDisableHTTP2
 	origKubeshark := ConfigKubesharkNamespace
@@ -686,6 +737,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigNoColor = origNoColor
 		ConfigKubeconfigDirs = origKubeconfig
 		ConfigKubeconfigExclusive = origKubeconfigExclusive
+		ConfigKubeconfigIgnore = origKubeconfigIgnore
 		ConfigSecretLazyLoading = origSecretLazy
 		ConfigDisableHTTP2 = origDisableHTTP2
 		ConfigKubesharkNamespace = origKubeshark
