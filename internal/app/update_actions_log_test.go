@@ -15,7 +15,7 @@ import (
 func newTestModelWithClient(t *testing.T) Model {
 	t.Helper()
 	m := baseModel()
-	c, err := k8s.NewClient("", nil, true)
+	c, err := k8s.NewClient("", nil, true, nil)
 	if err != nil {
 		t.Fatalf("k8s.NewClient() for test setup: %v", err)
 	}

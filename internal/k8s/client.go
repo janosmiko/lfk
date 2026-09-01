@@ -445,8 +445,8 @@ func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespac
 //
 // kubeconfigOverride (--kubeconfig) beats everything: when non-empty it is
 // the only file loaded.
-func NewClient(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExclusive bool) (*Client, error) {
-	kubeconfigPaths := resolveKubeconfigPaths(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive)
+func NewClient(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExclusive bool, kubeconfigIgnore []string) (*Client, error) {
+	kubeconfigPaths := resolveKubeconfigPaths(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive, kubeconfigIgnore)
 
 	loadingRules := &clientcmd.ClientConfigLoadingRules{
 		Precedence: kubeconfigPaths,

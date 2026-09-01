@@ -17,7 +17,7 @@ func newCacheTestClient(t *testing.T) *Client {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config")
 	require.NoError(t, os.WriteFile(path, []byte(benchKubeconfigPlain), 0o600))
-	c, err := NewClient(path, nil, true)
+	c, err := NewClient(path, nil, true, nil)
 	require.NoError(t, err)
 	return c
 }

@@ -41,7 +41,7 @@ users:
 	cfgPath := filepath.Join(dir, "kubeconfig")
 	require.NoError(t, os.WriteFile(cfgPath, []byte(kubecfg), 0o600))
 
-	c, err := NewClient(cfgPath, nil, true)
+	c, err := NewClient(cfgPath, nil, true, nil)
 	require.NoError(t, err)
 
 	assert.Nil(t, c.injectedClientset)

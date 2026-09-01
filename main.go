@@ -164,7 +164,11 @@ func resolveStartupClient(opts app.StartupOptions) (*k8s.Client, error) {
 		os.Getenv("LFK_KUBECONFIG_EXCLUSIVE"), ui.ConfigKubeconfigExclusive,
 	)
 
-	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDirs, kubeconfigExclusive)
+	if err := k8s.ValidateKubeconfigIgnore(ui.ConfigKubeconfigIgnore); err != nil {
+		return nil, err
+	}
+
+	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDirs, kubeconfigExclusive, ui.ConfigKubeconfigIgnore)
 	if err != nil {
 		return nil, fmt.Errorf("initializing Kubernetes client: %w", err)
 	}

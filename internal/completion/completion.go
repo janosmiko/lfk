@@ -100,7 +100,9 @@ func selectedUnionContexts(cmd *cobra.Command) map[string]struct{} {
 }
 
 func completeKubeContexts(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExclusive bool, selected map[string]struct{}, prefix string) ([]string, error) {
-	client, err := k8s.NewClient(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive)
+	// nil ignore list: shell completion runs without the config file loaded,
+	// so it uses the built-in defaults.
+	client, err := k8s.NewClient(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive, nil)
 	if err != nil {
 		return nil, err
 	}
