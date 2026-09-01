@@ -161,7 +161,7 @@ func (c *Client) GetRightsizing(ctx context.Context, contextName, namespace, kin
 	case model.StrategyVPA:
 		c.applyVPAStrategy(ctx, contextName, namespace, kind, name, headroom, out)
 	case model.StrategyPromMax1D, model.StrategyPromAvg1D, model.StrategyPromP957D:
-		c.applyPrometheusStrategy(ctx, contextName, namespace, pods, strategy, headroom, out)
+		c.applyPrometheusStrategy(ctx, contextName, namespace, kind, name, strategy, headroom, out)
 	case model.StrategySnapshot:
 		c.applySnapshotStrategy(ctx, contextName, namespace, pods, headroom, out)
 	}
