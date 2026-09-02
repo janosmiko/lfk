@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.6](https://github.com/janosmiko/lfk/compare/v0.18.5...v0.18.6) (2026-09-02)
+
+
+### Bug Fixes
+
+* honor a configured path_prefix on discovered Prometheus services ([#718](https://github.com/janosmiko/lfk/issues/718)) ([867461a](https://github.com/janosmiko/lfk/commit/867461a7128989d8e0a092b940a6a6bcf931bcd4)), closes [#699](https://github.com/janosmiko/lfk/issues/699)
+* ignore non-kubeconfig files found by directory discovery ([#715](https://github.com/janosmiko/lfk/issues/715)) ([fc957e0](https://github.com/janosmiko/lfk/commit/fc957e047ff883218d0977b50a3278f00a54cf2b))
+* keep the right-sizing window across a workload rollout ([#717](https://github.com/janosmiko/lfk/issues/717)) ([4e8f5c9](https://github.com/janosmiko/lfk/commit/4e8f5c935fe1cbfadcdde0e97c24389dc12c1869))
+
 ## [0.18.5](https://github.com/janosmiko/lfk/compare/v0.18.4...v0.18.5) (2026-08-29)
 
 
