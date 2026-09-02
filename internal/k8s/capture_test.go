@@ -187,7 +187,8 @@ func TestCaptureManager_Start_RefusesPreexistingPath(t *testing.T) {
 	// Sanity: nanosecond timestamps mean a back-to-back Start picks a
 	// different filename. Independently confirm O_EXCL by re-opening the
 	// first path with the same flags — it must fail.
-	if _, err := os.OpenFile(firstPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600); err == nil {
+	if f, err := os.OpenFile(firstPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600); err == nil {
+		f.Close()
 		t.Errorf("OpenFile O_EXCL on existing %s succeeded; should have failed", firstPath)
 	}
 }

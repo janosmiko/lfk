@@ -14,7 +14,14 @@ func OpenBrowser(url string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no browser opener for GOOS=%s; URL: %s", runtime.GOOS, url)
 	}
-	return exec.Command(args[0], args[1:]...).Start()
+	cmd := exec.Command(args[0], args[1:]...)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	// Reap the opener in the background so it doesn't linger as a zombie
+	// for the lifetime of the process.
+	go func() { _ = cmd.Wait() }()
+	return nil
 }
 
 // browserCommand returns the argv for opening a URL on the given GOOS.
