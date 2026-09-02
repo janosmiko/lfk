@@ -74,7 +74,7 @@ Typical flow:
    2. Run `make refresh-vendor-hash` so `vendorHash` matches the new vendored module set.
    3. Push the change to the PR branch.
 
-   (`verify-flake-build` in `release.yml` catches a stale hash if you forget this step.)
+   (`verify-vendor-hash` in `ci.yml` fails any PR that carries a stale hash, and `verify-flake-build` in `release.yml` builds the full flake before publishing.)
 4. Merge the Release PR. release-please tags the merge commit (e.g. `v0.9.33`), and `release.yml` takes over to publish the release.
 
 For emergency manual releases (skipping the bot), `make bump-version VERSION=X.Y.Z` and `make release VERSION=X.Y.Z` remain available. The `verify-flake-version` job in `release.yml` is the safety net that prevents a tag/`flake.nix` mismatch.

@@ -52,9 +52,13 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
+      # pipefail is required: without it the step reports tee's exit code, and
+      # 0.18.6 shipped with a stale vendorHash past a green build (#719).
       - name: Build flake
         id: build
-        run: nix build .#default --no-link 2>&1 | tee build.log
+        run: |
+          set -o pipefail
+          nix build .#default --no-link 2>&1 | tee build.log
 
       - name: Explain stale-hash failure
         if: failure() && steps.build.outcome == 'failure'

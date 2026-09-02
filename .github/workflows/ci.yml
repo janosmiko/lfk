@@ -75,3 +75,21 @@ jobs:
 
       - name: Run govulncheck
         run: govulncheck ./...
+
+  # A dependency bump changes go.sum and invalidates the flake's vendorHash.
+  # Failing the PR here keeps a stale hash out of main and out of every
+  # release tag (#62, #284, #341, #719).
+  verify-vendor-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Verify vendorHash matches go.sum
+        run: make verify-vendor-hash

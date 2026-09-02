@@ -1,4 +1,4 @@
-.PHONY: setup lint lint-fix test e2e coverage fuzz build generate-themes sonar bump-version refresh-vendor-hash release goreleaser-check
+.PHONY: setup lint lint-fix test e2e coverage fuzz build generate-themes sonar bump-version refresh-vendor-hash verify-vendor-hash release goreleaser-check
 
 setup:
 	git config core.hooksPath .githooks
@@ -36,6 +36,20 @@ refresh-vendor-hash: ## Recompute vendorHash in flake.nix from current go.sum (r
 	rm flake.nix.orig; \
 	echo "Updated vendorHash to $$NEW_HASH"
 	@grep -n "vendorHash" flake.nix
+
+# Builds only the vendored-modules derivation, so a stale hash surfaces in
+# about a minute without compiling lfk. CI runs this on every PR (#719).
+verify-vendor-hash: ## Check that vendorHash in flake.nix matches go.sum (requires nix)
+	@command -v nix >/dev/null 2>&1 || { \
+		echo "error: nix is required to verify vendorHash (https://nixos.org/download)"; exit 1; \
+	}
+	@nix build .#default.goModules --no-link --extra-experimental-features 'nix-command flakes' || { \
+		echo ""; \
+		echo "error: nix could not fetch the vendored modules recorded in flake.nix."; \
+		echo "       'hash mismatch' above means vendorHash is stale: run 'make refresh-vendor-hash' and commit flake.nix."; \
+		exit 1; \
+	}
+	@echo "vendorHash matches go.sum"
 
 release: setup ## Bump version, commit, and create tag in one step (usage: make release VERSION=0.9.23)
 	@if [ -z "$(VERSION)" ]; then \
