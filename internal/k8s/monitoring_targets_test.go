@@ -68,7 +68,7 @@ func TestTargetsFromServices(t *testing.T) {
 	t.Run("maps vmselect to the tenant query prefixes", func(t *testing.T) {
 		svcs := []corev1.Service{*monitoringSvc("monitoring", "vmselect-vmks", "vmselect", port("http", 8481))}
 
-		prom, am := targetsFromServices(svcs, nil)
+		prom, am := targetsFromServices(svcs, "", nil)
 
 		assert.Empty(t, am)
 		require.Len(t, prom, 2)
@@ -79,7 +79,7 @@ func TestTargetsFromServices(t *testing.T) {
 	t.Run("maps vmsingle to the root query path", func(t *testing.T) {
 		svcs := []corev1.Service{*monitoringSvc("vm", "vmsingle-vmks", "vmsingle", port("http", 8428))}
 
-		prom, _ := targetsFromServices(svcs, nil)
+		prom, _ := targetsFromServices(svcs, "", nil)
 
 		require.Len(t, prom, 1)
 		assert.Equal(t, monitoringTarget{Namespace: "vm", Service: "vmsingle-vmks", Port: "8428", Prefix: ""}, prom[0])
@@ -89,7 +89,7 @@ func TestTargetsFromServices(t *testing.T) {
 		svcs := []corev1.Service{*monitoringSvc("monitoring", "vmalertmanager-vmks", "vmalertmanager",
 			port("web", 9093), port("tcp-mesh", 9094))}
 
-		prom, am := targetsFromServices(svcs, nil)
+		prom, am := targetsFromServices(svcs, "", nil)
 
 		assert.Empty(t, prom)
 		require.Len(t, am, 1)
@@ -102,7 +102,7 @@ func TestTargetsFromServices(t *testing.T) {
 			*monitoringSvc("monitoring", "kps-alertmanager", "alertmanager", port("http-web", 9093)),
 		}
 
-		prom, am := targetsFromServices(svcs, nil)
+		prom, am := targetsFromServices(svcs, "", nil)
 
 		require.Len(t, prom, 1)
 		require.Len(t, am, 1)
@@ -117,10 +117,42 @@ func TestTargetsFromServices(t *testing.T) {
 			*monitoringSvc("monitoring", "vmselect-broken", "vmselect"),
 		}
 
-		prom, am := targetsFromServices(svcs, nil)
+		prom, am := targetsFromServices(svcs, "", nil)
 
 		assert.Empty(t, prom)
 		assert.Empty(t, am)
+	})
+
+	t.Run("a configured prefix replaces the vmselect tenant guesses", func(t *testing.T) {
+		svcs := []corev1.Service{*monitoringSvc("monitoring", "vmselect-vmks", "vmselect", port("http", 8481))}
+
+		prom, _ := targetsFromServices(svcs, "/vm/select/0/prometheus", nil)
+
+		require.Len(t, prom, 1)
+		assert.Equal(t, monitoringTarget{
+			Namespace: "monitoring", Service: "vmselect-vmks", Port: "8481",
+			Prefix: "/vm/select/0/prometheus", fixedPrefix: true,
+		}, prom[0])
+	})
+
+	t.Run("a configured prefix pins a prometheus service and beats the pod lookup", func(t *testing.T) {
+		svcs := []corev1.Service{*monitoringSvc("monitoring", "kps-prometheus", "prometheus", port("http-web", 9090))}
+		fromPods := func(*corev1.Service) string { return "/from-pods" }
+
+		prom, _ := targetsFromServices(svcs, "/prometheus", fromPods)
+
+		require.Len(t, prom, 1)
+		assert.Equal(t, "/prometheus", prom[0].Prefix)
+		assert.True(t, prom[0].fixedPrefix)
+	})
+
+	t.Run("a configured prefix leaves alertmanager alone", func(t *testing.T) {
+		svcs := []corev1.Service{*monitoringSvc("monitoring", "vmalertmanager-vmks", "vmalertmanager", port("web", 9093))}
+
+		_, am := targetsFromServices(svcs, "/vm/select/0/prometheus", nil)
+
+		require.Len(t, am, 1)
+		assert.Equal(t, "", am[0].Prefix)
 	})
 }
 
@@ -133,7 +165,7 @@ func TestDiscoverMonitoringServices(t *testing.T) {
 			monitoringSvc("default", "web", "nginx", port("http", 80)),
 		)
 
-		prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, nil)
+		prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, "", nil)
 
 		assert.Empty(t, am)
 		require.Len(t, prom, 2)
@@ -149,7 +181,7 @@ func TestDiscoverMonitoringServices(t *testing.T) {
 			return false, nil, nil
 		})
 
-		prom, _ := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, nil)
+		prom, _ := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, "", nil)
 
 		require.Len(t, prom, 1)
 		assert.Equal(t, "vmsingle-vmks", prom[0].Service)
@@ -161,7 +193,7 @@ func TestDiscoverMonitoringServices(t *testing.T) {
 			return true, nil, assert.AnError
 		})
 
-		prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, nil)
+		prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, "", nil)
 
 		assert.Empty(t, prom)
 		assert.Empty(t, am)
@@ -510,7 +542,7 @@ func TestDiscoverKubePrometheusStack(t *testing.T) {
 
 	cs := k8sfake.NewClientset(promOperated, amOperated, chartProm)
 
-	prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, nil)
+	prom, am := discoverMonitoringServices(t.Context(), cs, []string{"monitoring"}, "", nil)
 
 	require.Len(t, prom, 1)
 	assert.Equal(t, "prometheus-operated", prom[0].Service)
@@ -525,7 +557,7 @@ func TestDiscoverMonitoringServicesDedupes(t *testing.T) {
 	svc := monitoringSvc("monitoring", "prometheus-operated", "prometheus", port("web", 9090))
 	svc.Labels["operated-prometheus"] = "true"
 
-	prom, _ := discoverMonitoringServices(t.Context(), k8sfake.NewClientset(svc), []string{"monitoring"}, nil)
+	prom, _ := discoverMonitoringServices(t.Context(), k8sfake.NewClientset(svc), []string{"monitoring"}, "", nil)
 
 	assert.Len(t, prom, 1)
 }
@@ -540,7 +572,7 @@ func TestDiscoveryPrefersWellKnownNamespaces(t *testing.T) {
 		monitoringSvc("monitoring", "vmsingle-real", "vmsingle", port("http", 8428)),
 	)
 
-	prom, _ := discoverMonitoringServices(t.Context(), cs, defaultMonitoringNamespaces, nil)
+	prom, _ := discoverMonitoringServices(t.Context(), cs, defaultMonitoringNamespaces, "", nil)
 
 	require.Len(t, prom, 2)
 	assert.Equal(t, "vmsingle-real", prom[0].Service, "the well-known namespace is probed first")
@@ -697,4 +729,32 @@ func TestDiscoverMonitoringServicesAppliesTheFoundPrefixWhenOptedIn(t *testing.T
 	require.Len(t, prom, 2)
 	assert.Equal(t, vmSelectTenantPrefix, prom[0].Prefix)
 	assert.False(t, prom[0].fixedPrefix)
+}
+
+// Issue #699: a context that sets path_prefix but names no services still
+// runs discovery, and the discovered vmselect must be probed at the configured
+// path only. The bare tenant guesses log a warning on every poll otherwise.
+func TestDiscoveredTargetsUseTheConfiguredPathPrefix(t *testing.T) {
+	resetMonitoringDiscoveryCache()
+	orig := model.ConfigMonitoring
+	t.Cleanup(func() { model.ConfigMonitoring = orig })
+	model.ConfigMonitoring = map[string]model.MonitoringConfig{
+		"_global":    {Prometheus: &model.MonitoringEndpoint{PathPrefix: "/prometheus"}},
+		"vm-cluster": {Prometheus: &model.MonitoringEndpoint{PathPrefix: "/vm/select/0/prometheus"}},
+	}
+	cs := k8sfake.NewClientset(
+		monitoringSvc("monitoring", "vmselect-vmks", "vmselect", port("http", 8481)),
+		monitoringSvc("monitoring", "vmalertmanager-vmks", "vmalertmanager", port("web", 9093)),
+	)
+
+	prom, am := monitoringTargetsFor(t.Context(), cs, "vm-cluster")
+
+	require.NotEmpty(t, prom)
+	assert.Equal(t, "/vm/select/0/prometheus/api/v1/query", prom[0].path("/api/v1/query"))
+	for _, tgt := range prom {
+		assert.Equal(t, "/vm/select/0/prometheus", tgt.Prefix, "every probe carries the configured prefix: %s", tgt)
+		assert.True(t, tgt.fixedPrefix, "%s", tgt)
+	}
+	require.NotEmpty(t, am)
+	assert.Equal(t, "", am[0].Prefix)
 }
