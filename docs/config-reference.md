@@ -345,7 +345,7 @@ When discovery finds nothing, lfk probes these names:
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `kube-prometheus-stack-prometheus`, `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
 
-Each Prometheus target is probed on its bare path first, then under `/prometheus` (kube-prometheus-stack `routePrefix`) and `/vm` (VictoriaMetrics `http.pathPrefix`). A configured `path_prefix` is probed as written. With `discover_path_prefix: true` lfk reads the prefix off the pods behind each discovered Service instead of guessing. If no pod carries a prefix flag, or the pod list is denied, the guesses above still run.
+Each Prometheus target is probed on its bare path first, then under `/prometheus` (kube-prometheus-stack `routePrefix`) and `/vm` (VictoriaMetrics `http.pathPrefix`). A configured `path_prefix` is probed as written, on named and discovered Services alike. With `discover_path_prefix: true` lfk reads the prefix off the pods behind each discovered Service instead of guessing. If no pod carries a prefix flag, or the pod list is denied, the guesses above still run.
 
 ### Metrics source
 
