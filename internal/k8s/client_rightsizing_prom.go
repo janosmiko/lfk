@@ -22,18 +22,19 @@ import (
 // the user still sees Current and Usage columns. The Window field
 // gets set to "1d" or "7d" depending on the strategy so the header
 // can show the user what time range backs the recommendation.
-func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, namespace string, pods []string, strategy model.RightsizingStrategy, headroom float64, out *model.Rightsizing) {
-	if len(pods) == 0 {
+func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, namespace, kind, name string, strategy model.RightsizingStrategy, headroom float64, out *model.Rightsizing) {
+	indexed := c.workloadIsIndexed(ctx, contextName, namespace, kind, name)
+	cpuQuery := buildPromContainerQuery(namespace, kind, name, indexed, strategy, "cpu")
+	memQuery := buildPromContainerQuery(namespace, kind, name, indexed, strategy, "memory")
+	if cpuQuery == "" && memQuery == "" {
 		return
 	}
 	out.Window = promStrategyWindow(strategy)
 
-	cpuQuery := buildPromContainerQuery(namespace, pods, strategy, "cpu")
 	cpuResult, err := c.queryPromContainerMetric(ctx, contextName, cpuQuery)
 	if err != nil {
 		logger.Debug("rightsizing: Prometheus CPU query failed", "err", err)
 	}
-	memQuery := buildPromContainerQuery(namespace, pods, strategy, "memory")
 	memResult, err := c.queryPromContainerMetric(ctx, contextName, memQuery)
 	if err != nil {
 		logger.Debug("rightsizing: Prometheus memory query failed", "err", err)
@@ -72,24 +73,24 @@ func promStrategyWindow(s model.RightsizingStrategy) string {
 }
 
 // buildPromContainerQuery returns the PromQL query for the requested
-// strategy + resource. The query aggregates per container across the
-// pods named in `pods` (escaped into a regex alternation).
+// strategy + resource, aggregated per container.
 //
-// CPU uses container_cpu_usage_seconds_total wrapped in rate(...) over
-// a 5-minute window so the inner sample is cores/sec. The outer
-// aggregation (max_over_time / avg_over_time / quantile_over_time)
-// folds those samples across the strategy's window.
+// CPU wraps container_cpu_usage_seconds_total in rate(...) over 5m so
+// the inner sample is cores/sec. Memory reads
+// container_memory_working_set_bytes directly because it is a gauge.
 //
-// Memory uses container_memory_working_set_bytes directly because it's
-// a gauge (no rate() needed).
-func buildPromContainerQuery(namespace string, pods []string, strategy model.RightsizingStrategy, resourceKind string) string {
-	podRegex := podsRegex(pods)
-	// PromQL string literal uses single-backslash escapes (similar to
-	// JSON / shell double-quoted strings). fmt's %q would Go-escape and
-	// emit `\\.` for a literal `\.` regex — wrong for PromQL. Build the
-	// label selector with a manual quote-wrap instead so the regex
-	// metacharacter survives intact.
-	commonLabels := `namespace="` + namespace + `",pod=~"` + podRegex + `",container!="POD",container!=""`
+// Returns "" for a kind podsRegexForWorkload cannot describe, so the
+// caller skips the query rather than selecting the whole namespace.
+func buildPromContainerQuery(namespace, kind, name string, indexed bool, strategy model.RightsizingStrategy, resourceKind string) string {
+	podRegex := podsRegexForWorkload(kind, name, indexed)
+	if podRegex == "" {
+		return ""
+	}
+	// A raw PromQL literal, so the `\.` QuoteMeta emits for a dotted
+	// workload name survives: a double-quoted literal processes escapes
+	// and rejects `\.` as unknown.
+	podMatcher := fmt.Sprintf("pod=~%s%s%s", promRawQuote, podRegex, promRawQuote)
+	commonLabels := fmt.Sprintf(`namespace=%q,%s,container!="POD",container!=""`, namespace, podMatcher)
 	var inner string
 	switch resourceKind {
 	case "cpu":
@@ -122,20 +123,45 @@ func wrapPromAggregation(s model.RightsizingStrategy, subquery string) string {
 	return subquery
 }
 
-// podsRegex builds a regex alternation from a slice of pod names. The
-// `(p1|p2|p3)` form matches the exact pods backing the workload — no
-// label-prefix wildcards. Pod names with regex metacharacters get
-// escaped so the query is well-formed even when a controller emits
-// names with `.` (rare but valid).
-func podsRegex(pods []string) string {
-	if len(pods) == 0 {
-		return ""
+// k8sGeneratedChars is rand.alphanums. Its lack of vowels is what keeps
+// a Deployment "foo" pattern off the pods of a sibling "foo-api".
+const k8sGeneratedChars = `[bcdfghjklmnpqrstvwxz2456789]`
+
+// promRawQuote opens and closes a PromQL raw string literal. Named
+// because a bare backtick cannot appear inside one.
+const promRawQuote = "`"
+
+// podsRegexForWorkload also matches pods from revisions that no longer
+// exist, so a 1d or 7d window survives the rollout that applying a
+// recommendation triggers. "" for a kind it cannot describe.
+func podsRegexForWorkload(kind, name string, indexed bool) string {
+	n := regexp.QuoteMeta(name)
+	gen := k8sGeneratedChars
+	// Only an Indexed Job puts a digit segment here. Always-on, that
+	// group would also swallow a sibling workload named "<name>-3".
+	index := ""
+	if indexed {
+		index = "[0-9]+-"
 	}
-	escaped := make([]string, len(pods))
-	for i, p := range pods {
-		escaped[i] = regexp.QuoteMeta(p)
+	switch kind {
+	case "Pod":
+		return "^" + n + "$"
+	case "Deployment":
+		// <deployment>-<pod-template-hash>-<suffix>. The hash is a uint32
+		// rendered through the same alphabet, so 1-10 characters.
+		return "^" + n + "-" + gen + "{1,10}-" + gen + "{5}$"
+	case "DaemonSet":
+		return "^" + n + "-" + gen + "{5}$"
+	case "StatefulSet":
+		return "^" + n + "-[0-9]+$"
+	case "Job":
+		return "^" + n + "-" + index + gen + "{5}$"
+	case "CronJob":
+		// The CronJob controller names each Job after its scheduled time
+		// in minutes since the epoch, then the Job names its own pods.
+		return "^" + n + "-[0-9]+-" + index + gen + "{5}$"
 	}
-	return "^(" + strings.Join(escaped, "|") + ")$"
+	return ""
 }
 
 // queryPromContainerMetric runs an instant PromQL query and returns a
