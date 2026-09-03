@@ -258,7 +258,7 @@ events:
 
 Configure Prometheus and Alertmanager endpoints for the monitoring dashboard (`@` key) and alert views. By default, lfk discovers monitoring services by their operator labels, then falls back to common service names in common namespaces. Use this section to override the endpoints per cluster or set a default for all clusters.
 
-Keys are kubeconfig context names. The special key `"_global"` applies to any cluster without an explicit entry.
+Keys are kubeconfig context names. The special key `"_global"` applies to any cluster without an explicit entry. A key that matches no context logs a warning at startup (visible in the app log), because `"_global"` silently applies to that cluster instead.
 
 ```yaml
 monitoring:

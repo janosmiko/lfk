@@ -176,6 +176,7 @@ func resolveStartupClient(opts app.StartupOptions) (*k8s.Client, error) {
 	if opts.Context != "" && !client.ContextExists(opts.Context) {
 		return nil, fmt.Errorf("context %q not found in kubeconfig", opts.Context)
 	}
+	client.WarnUnmatchedMonitoringKeys()
 
 	return client, nil
 }
