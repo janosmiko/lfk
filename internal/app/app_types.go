@@ -312,8 +312,8 @@ type syncWaveState struct {
 //     yet" and the overlay shows a loading state.
 //   - loading is true while a fetch is in flight.
 //   - err surfaces a non-recoverable error from the fetch.
-//   - gen guards against stale-fetch races (overlay closed + reopened
-//     with a different workload before a slow fetch returns).
+//   - gen drops a strategy probe that answers a previous overlay open.
+//     Data fetches are matched by cache key instead.
 //   - scroll is the visible-row offset within the overlay's table when
 //     it overflows the visible height.
 //   - strategy is the currently-selected recommendation algorithm.

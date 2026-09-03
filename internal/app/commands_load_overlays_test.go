@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -26,7 +28,6 @@ func TestLoadRightsizing_CacheHitReturnsSync(t *testing.T) {
 	assert.Equal(t, key, msg.key)
 	assert.Same(t, cached, msg.data, "cache hit returns the same pointer (no copy)")
 	assert.NoError(t, msg.err)
-	assert.Equal(t, 7, msg.generation, "generation captured at dispatch time")
 }
 
 func TestRightsizingCacheKey_IncludesStrategy(t *testing.T) {
@@ -63,54 +64,75 @@ func TestLoadRightsizing_NoActionContext_ReturnsNil(t *testing.T) {
 	assert.Nil(t, cmd, "no actionCtx → no fetch")
 }
 
-func TestUpdateRightsizingLoaded_StaleGenDiscarded(t *testing.T) {
-	m := Model{rightsizingCache: make(map[string]*model.Rightsizing)}
-	m.rightsizing.gen = 5
-	existing := &model.Rightsizing{Source: "VPA", PodCount: 2}
-	m.rightsizing.data = existing
+// The scheduler folds a resubmission into a running task with the same
+// identity, so a shared name would leave a `]` press with no fetch (#705).
+func TestLoadRightsizing_StrategyAndHeadroomChangeTaskIdentity(t *testing.T) {
+	m := newRightsizingTestModel()
+	m.rightsizing.data = nil
+	m.scheduler = scheduler.New(0)
 
-	stale := rightsizingLoadedMsg{
-		key:        "ctx/ns/Pod/p",
-		data:       &model.Rightsizing{Source: "estimated"},
-		generation: 3, // older than current gen
+	require.NotNil(t, m.loadRightsizing())
+	m.rightsizing.strategy = model.StrategySnapshot
+	require.NotNil(t, m.loadRightsizing())
+	m.rightsizing.headroom = 1.5
+	require.NotNil(t, m.loadRightsizing())
+
+	names := map[string]bool{}
+	for _, e := range m.scheduler.QueueSnapshot() {
+		names[e.Name] = true
 	}
-	r := m.updateRightsizingLoaded(stale)
-	assert.Same(t, existing, r.rightsizing.data, "stale msg must NOT replace current data")
-	_, present := r.rightsizingCache["ctx/ns/Pod/p"]
-	assert.False(t, present, "stale msg must NOT populate cache")
+	assert.Len(t, names, 3, "each strategy/headroom pair must be its own scheduler task")
 }
 
-func TestUpdateRightsizingLoaded_FreshSetsDataAndCaches(t *testing.T) {
-	m := Model{rightsizingCache: make(map[string]*model.Rightsizing)}
-	m.rightsizing.gen = 5
+func TestUpdateRightsizingLoaded_OtherKeyOnlyWarmsCache(t *testing.T) {
+	m := newRightsizingTestModel()
+	existing := m.rightsizing.data
 	m.rightsizing.loading = true
 
+	other := rightsizingLoadedMsg{
+		key:  "ctx/ns/Pod/p",
+		data: &model.Rightsizing{Source: "estimated"},
+	}
+	r := m.updateRightsizingLoaded(other)
+	assert.Same(t, existing, r.rightsizing.data, "other-key msg must NOT replace current data")
+	assert.True(t, r.rightsizing.loading, "other-key msg must NOT end the current fetch's loading state")
+	assert.Same(t, other.data, r.rightsizingCache["ctx/ns/Pod/p"], "other-key msg still warms the cache")
+}
+
+// The scheduler may have folded a newer submission into an older fetch,
+// so the gen that dispatched a result must not decide whether it is shown.
+func TestUpdateRightsizingLoaded_MatchingKeyAcceptedAcrossGen(t *testing.T) {
+	m := newRightsizingTestModel()
+	m.rightsizing.data = nil
+	m.rightsizing.loading = true
+	m.rightsizing.gen = 5
+	key := rightsizingCacheKey("c", "ns", "Pod", "pod-a", model.StrategyVPA, model.DefaultRightsizingHeadroom)
+
 	fresh := rightsizingLoadedMsg{
-		key:        "ctx/ns/Pod/p",
-		data:       &model.Rightsizing{Source: "VPA", PodCount: 3},
-		generation: 5, // matches current gen
+		key:  key,
+		data: &model.Rightsizing{Source: "VPA", PodCount: 3},
 	}
 	r := m.updateRightsizingLoaded(fresh)
-	assert.False(t, r.rightsizing.loading, "fresh msg flips loading off")
+	assert.False(t, r.rightsizing.loading, "matching key ends the loading state")
 	assert.Equal(t, "VPA", r.rightsizing.data.Source)
-	cached := r.rightsizingCache["ctx/ns/Pod/p"]
+	cached := r.rightsizingCache[key]
 	assert.NotNil(t, cached)
 	assert.Equal(t, 3, cached.PodCount)
 }
 
 func TestUpdateRightsizingLoaded_ErrorSurfacedNotCached(t *testing.T) {
-	m := Model{rightsizingCache: make(map[string]*model.Rightsizing)}
-	m.rightsizing.gen = 5
+	m := newRightsizingTestModel()
+	m.rightsizing.data = nil
 	m.rightsizing.loading = true
+	key := rightsizingCacheKey("c", "ns", "Pod", "pod-a", model.StrategyVPA, model.DefaultRightsizingHeadroom)
 
 	errMsg := rightsizingLoadedMsg{
-		key:        "ctx/ns/Pod/p",
-		err:        assert.AnError,
-		generation: 5,
+		key: key,
+		err: assert.AnError,
 	}
 	r := m.updateRightsizingLoaded(errMsg)
 	assert.False(t, r.rightsizing.loading)
 	assert.NotNil(t, r.rightsizing.err)
-	_, present := r.rightsizingCache["ctx/ns/Pod/p"]
+	_, present := r.rightsizingCache[key]
 	assert.False(t, present, "error response must NOT pollute the cache")
 }

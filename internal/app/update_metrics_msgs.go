@@ -483,28 +483,29 @@ func ensureNodeMetricsColumnsPlaceholder(item *model.Item) {
 	item.Columns = newCols
 }
 
-// updateRightsizingLoaded handles the rightsizingLoadedMsg. Stale
-// generation discarded (overlay closed + reopened with a different
-// workload before this fetch returned). Otherwise stores the result
-// in m.rightsizing (or m.rightsizing.err) and caches it for re-opens.
-//
-// Errors are NOT cached — the next overlay open will retry instead
-// of replaying the stale failure.
+// updateRightsizingLoaded handles the rightsizingLoadedMsg. The key,
+// not a generation counter, decides whether the result is shown: the
+// scheduler may fold a newer submission into an older fetch of the
+// same key. Errors are NOT cached so the next open retries.
 func (m Model) updateRightsizingLoaded(msg rightsizingLoadedMsg) Model {
-	if msg.generation != m.rightsizing.gen {
-		return m // late response from a previous overlay open — discard
-	}
-	m.rightsizing.loading = false
+	current := rightsizingCacheKey(m.actionCtx.context, m.actionCtx.namespace, m.actionCtx.kind, m.actionCtx.name, m.rightsizing.strategy, m.rightsizing.headroom)
 	if msg.err != nil {
-		m.rightsizing.err = msg.err
+		if msg.key == current {
+			m.rightsizing.loading = false
+			m.rightsizing.err = msg.err
+		}
 		return m
 	}
-	m.rightsizing.err = nil
-	m.rightsizing.data = msg.data
 	if m.rightsizingCache == nil {
 		m.rightsizingCache = make(map[string]*model.Rightsizing)
 	}
 	m.rightsizingCache[msg.key] = msg.data
+	if msg.key != current {
+		return m
+	}
+	m.rightsizing.loading = false
+	m.rightsizing.err = nil
+	m.rightsizing.data = msg.data
 	return m
 }
 
@@ -528,18 +529,15 @@ func (m Model) updateRightsizingStrategiesProbed(msg rightsizingStrategiesProbed
 	m.rightsizing.available = msg.available
 	if slices.Contains(msg.available, m.rightsizing.strategy) {
 		// Sticky strategy survived the probe — no-op reconciliation.
-		// Don't bump gen / fire another load: the data fetch dispatched
-		// alongside the probe is still valid.
+		// Don't fire another load: the data fetch dispatched alongside
+		// the probe is still valid.
 		return m, nil
 	}
 	// Sticky strategy is unavailable on this workload. Re-pick from
-	// the fresh list and reload data for the new strategy. Bumping
-	// gen ensures the original load (which will be for the wrong
-	// strategy) is dropped on arrival. Clearing err prevents a stale
-	// error from the optimistic-strategy load from masking the
-	// re-picked strategy's data.
+	// the fresh list and reload data for the new strategy. Clearing
+	// err prevents a stale error from the optimistic-strategy load
+	// from masking the re-picked strategy's data.
 	m.rightsizing.strategy = pickRightsizingStrategy(m.rightsizing.strategy, msg.available)
-	m.rightsizing.gen++
 	m.rightsizing.scroll = 0
 	m.rightsizing.err = nil
 

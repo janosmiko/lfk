@@ -416,13 +416,12 @@ type secretDataLoadedMsg struct {
 }
 
 // rightsizingLoadedMsg carries the lazily-fetched right-sizing
-// recommendations. Generation token guards against stale-fetch
-// races (see Model.rightsizing.gen).
+// recommendations. The handler shows the result only when key still
+// names the view on screen. A successful result is cached either way.
 type rightsizingLoadedMsg struct {
-	key        string // cache key the fetch was dispatched for
-	data       *model.Rightsizing
-	err        error
-	generation int
+	key  string // cache key the fetch was dispatched for
+	data *model.Rightsizing
+	err  error
 }
 
 // rightsizingStrategiesProbedMsg carries the result of an async probe
