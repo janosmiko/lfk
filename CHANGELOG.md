@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.7](https://github.com/janosmiko/lfk/compare/v0.18.6...v0.18.7) (2026-09-03)
+
+
+### Bug Fixes
+
+* keep the right-sizing overlay loading after a picker press mid-fetch ([#722](https://github.com/janosmiko/lfk/issues/722)) ([47ce657](https://github.com/janosmiko/lfk/commit/47ce6574c878cf663f834f118ec3463a09d5e6bd)), closes [#705](https://github.com/janosmiko/lfk/issues/705)
+* refresh the nix vendorHash and fail CI when it goes stale ([#720](https://github.com/janosmiko/lfk/issues/720)) ([a0e7a77](https://github.com/janosmiko/lfk/commit/a0e7a77a6ab24dee5236214d2ae3081f9a429c6f))
+
 ## [0.18.6](https://github.com/janosmiko/lfk/compare/v0.18.5...v0.18.6) (2026-09-02)
 
 
