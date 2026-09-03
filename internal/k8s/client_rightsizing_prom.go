@@ -9,6 +9,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/tainted"
 )
 
 // applyPrometheusStrategy is the per-container Prometheus query path
@@ -34,16 +35,21 @@ func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, names
 	cpuResult, err := c.queryPromContainerMetric(ctx, contextName, cpuQuery)
 	if err != nil {
 		logger.Debug("rightsizing: Prometheus CPU query failed", "err", err)
+		out.SourceError = tainted.SanitizeTerminalText(err.Error())
 	}
 	memResult, err := c.queryPromContainerMetric(ctx, contextName, memQuery)
 	if err != nil {
 		logger.Debug("rightsizing: Prometheus memory query failed", "err", err)
+		if out.SourceError == "" {
+			out.SourceError = tainted.SanitizeTerminalText(err.Error())
+		}
 	}
 
 	for i := range out.Containers {
 		cr := &out.Containers[i]
-		// CPU value is in cores. Convert to millicores.
-		if cores, ok := cpuResult[cr.Name]; ok && cores > 0 {
+		// CPU value is in cores. Convert to millicores. A rate under 1m
+		// truncates to 0, which is "no suggestion", not a 0 request.
+		if cores, ok := cpuResult[cr.Name]; ok && cores > 0 && int64(cores*1000.0*headroom) > 0 {
 			milli := int64(cores * 1000.0 * headroom)
 			rec := SnapCPUMilliToCanonical(milli)
 			cr.CPU.RecommendedRequest = rec

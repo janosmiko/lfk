@@ -58,6 +58,8 @@ Force a refresh of ExternalSecrets, ClusterExternalSecrets, and PushSecrets.
 | `1d-max`, `1d-avg`, `7d-p95` | Prometheus range queries | Sizing decisions. `7d-p95` is the safest default for requests. |
 | `vpa` | VerticalPodAutoscaler recommender | Sizing decisions when a VPA already targets the workload. |
 
+If the Prometheus query fails, the overlay prints the error above the table and the `SUGGESTION` column stays empty. The `USAGE` column still comes from metrics-server.
+
 The chip shows `snapshot` with no `[N/M]` counter when it is the only strategy available. To unlock the others, point lfk at Prometheus or VictoriaMetrics (see [config-reference.md](config-reference.md#monitoring)) or create a VPA in `Off` mode for the workload. Then cycle with `[` and `]`. Keys and headroom are in [keybindings.md](keybindings.md#right-sizing-advisor).
 
 ## Embedded terminal

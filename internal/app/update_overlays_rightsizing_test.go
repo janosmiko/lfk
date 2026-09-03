@@ -613,3 +613,12 @@ func newRightsizingTestClient(_ *testing.T) *k8s.Client {
 
 // silence unused err helper
 var _ = errors.New
+
+func TestRightsizingVisibleRows_SourceErrorTakesOneRow(t *testing.T) {
+	m := newRightsizingTestModel()
+	m.height = 40
+	base := rightsizingVisibleRows(m)
+	m.rightsizing.data.SourceError = "no prometheus target answered"
+	assert.Equal(t, base-1, rightsizingVisibleRows(m),
+		"the error line above the table must count against the scroll window")
+}

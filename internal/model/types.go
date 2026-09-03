@@ -517,6 +517,7 @@ type Rightsizing struct {
 	Headroom            float64               // headroom multiplier that produced these numbers (e.g. 1.25 = 25% padding above usage)
 	PodCount            int                   // pods aggregated (always 1 for Pod kind)
 	Window              string                // sampling window (e.g. "30s" for metrics-server, "1d"/"7d" for Prometheus). Empty for VPA
+	SourceError         string                // why the SUGGESTION column is empty (e.g. a failed Prometheus query). Empty when the source answered
 	Containers          []ContainerRec
 }
 

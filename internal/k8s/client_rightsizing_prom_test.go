@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -232,6 +233,39 @@ func TestGetRightsizing_PrometheusQueryFailureLeavesSuggestionEmpty(t *testing.T
 	require.Len(t, out.Containers, 1)
 	assert.Empty(t, out.Containers[0].CPU.RecommendedRequest)
 	assert.Empty(t, out.Containers[0].Mem.RecommendedRequest)
+	assert.Contains(t, out.SourceError, assert.AnError.Error(),
+		"the query error must reach the payload so the overlay can show it (#705)")
+}
+
+func TestGetRightsizing_PrometheusSuccessLeavesSourceErrorEmpty(t *testing.T) {
+	dep, pods := makeDepFixture()
+	stub := func(_ context.Context, _ string, _ string) ([]byte, error) {
+		return []byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`), nil
+	}
+	c := newPromTestClient(t, pods, dep, stub)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, 1.2)
+	require.NoError(t, err)
+	assert.Empty(t, out.SourceError, "an empty vector is not an error")
+}
+
+func TestGetRightsizing_PrometheusTinyCPUStaysEmpty(t *testing.T) {
+	// A sidecar idling at 0.0004 cores truncates to 0m. That must render
+	// as "no suggestion", not as a "0" request (#705).
+	dep, pods := makeDepFixture()
+	stub := func(_ context.Context, _ string, query string) ([]byte, error) {
+		if strings.Contains(query, "container_cpu_usage_seconds_total") {
+			return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"container":"app"},"value":[1700000000,"0.0004"]}]}}`), nil
+		}
+		return []byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`), nil
+	}
+	c := newPromTestClient(t, pods, dep, stub)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, 1.1)
+	require.NoError(t, err)
+	require.Len(t, out.Containers, 1)
+	assert.Empty(t, out.Containers[0].CPU.RecommendedRequest)
+	assert.Empty(t, out.Containers[0].CPU.RecommendedLimit)
 }
 
 // --- podsRegexForWorkload ---
@@ -384,4 +418,20 @@ func TestWorkloadIsIndexed_ReadsCompletionMode(t *testing.T) {
 
 func TestBuildPromContainerQuery_EmptyForUnsupportedKind(t *testing.T) {
 	assert.Empty(t, buildPromContainerQuery("default", "ReplicaSet", "frontend", false, model.StrategyPromP957D, "cpu"))
+}
+
+func TestGetRightsizing_PrometheusErrorTextIsTerminalSafe(t *testing.T) {
+	// The proxy error can carry the raw HTTP body of whatever Service
+	// answered, so control characters must not reach the overlay.
+	dep, pods := makeDepFixture()
+	stub := func(_ context.Context, _ string, _ string) ([]byte, error) {
+		return nil, errors.New("bad gateway \x1b[2J\x1b]0;owned\x07 body")
+	}
+	c := newPromTestClient(t, pods, dep, stub)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, 1.2)
+	require.NoError(t, err)
+	assert.NotContains(t, out.SourceError, "\x1b")
+	assert.NotContains(t, out.SourceError, "\x07")
+	assert.Contains(t, out.SourceError, "bad gateway")
 }

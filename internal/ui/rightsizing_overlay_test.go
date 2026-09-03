@@ -419,3 +419,33 @@ func TestRenderRightsizingOverlay_VPAMethodologyAt1RawNote(t *testing.T) {
 type assertErr string
 
 func (a assertErr) Error() string { return string(a) }
+
+func TestRenderRightsizingOverlay_SourceErrorShownWithUsage(t *testing.T) {
+	// Issue #705: a failed Prometheus query used to render as a row of
+	// dashes with no explanation. The error text must be visible and the
+	// metrics-server USAGE column must stay on screen.
+	data := makeFixture("7d-p95", []model.ContainerRec{{
+		Name: "app",
+		CPU:  model.ResourceRec{Usage: "10m", CurrentRequest: "50m"},
+		Mem:  model.ResourceRec{Usage: "33Mi", CurrentRequest: "90Mi"},
+	}})
+	data.Strategy = model.StrategyPromP957D
+	data.SourceError = "no prometheus target answered (tried 1 targets): monitoring/vm:8429: 422 Unprocessable Entity"
+	out := ansi.Strip(RenderRightsizingOverlay(data, false, nil, 0, 160, 30))
+	assert.Contains(t, out, "no prometheus target answered", "query error must be visible")
+	assert.Contains(t, out, "10m", "USAGE column must survive a source error")
+	assert.Contains(t, out, "33Mi", "USAGE column must survive a source error")
+}
+
+func TestRenderRightsizingOverlay_SourceErrorTruncatesToPanel(t *testing.T) {
+	data := makeFixture("7d-p95", []model.ContainerRec{{
+		Name: "app",
+		CPU:  model.ResourceRec{Usage: "10m", CurrentRequest: "50m"},
+	}})
+	data.Strategy = model.StrategyPromP957D
+	data.SourceError = strings.Repeat("x", 500)
+	out := ansi.Strip(RenderRightsizingOverlay(data, false, nil, 0, 100, 30))
+	for line := range strings.SplitSeq(out, "\n") {
+		assert.LessOrEqual(t, ansi.StringWidth(line), 100, "error line must not widen the overlay")
+	}
+}

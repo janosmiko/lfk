@@ -19,6 +19,11 @@ var rightsizingInnerPanelStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color(ColorBorder)).
 	Padding(0, 1)
 
+// rightsizingMinPanelH is the table header plus one data row. At this
+// floor the "Suggestions unavailable" note is dropped, and
+// app.rightsizingVisibleRows mirrors that so scroll math matches.
+const rightsizingMinPanelH = 4
+
 // RenderRightsizingOverlay paints the right-sizing advisor overlay
 // for the given recommendation payload. Loading/empty/error states
 // take precedence over data display so the user always sees a
@@ -43,7 +48,7 @@ func RenderRightsizingOverlay(data *model.Rightsizing, loading bool, err error, 
 	titleH := 2 // title + header strip
 	gapH := 1
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 4)
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, rightsizingMinPanelH)
 	panelContentW := max(boxW-outerPadW-innerPadW, 30)
 	panelW := boxW - outerPadW
 
@@ -72,7 +77,16 @@ func RenderRightsizingOverlay(data *model.Rightsizing, loading bool, err error, 
 		// signals the in-progress fetch with a "Loading…" suffix so
 		// the user sees the strategy switch is still settling
 		// without losing their current view.
-		body = renderRightsizingTable(data, scroll, panelContentW, panelContentH)
+		tableH := panelContentH
+		var note string
+		if data.SourceError != "" && panelContentH > rightsizingMinPanelH {
+			// The USAGE column still has metrics-server data, so keep the
+			// table and say why SUGGESTION is empty instead of showing
+			// only dashes (#705).
+			note = ErrorStyle.Render(Truncate("Suggestions unavailable: "+data.SourceError, panelContentW)) + "\n"
+			tableH--
+		}
+		body = note + renderRightsizingTable(data, scroll, panelContentW, tableH)
 	}
 
 	innerPanel := rightsizingInnerPanelStyle.

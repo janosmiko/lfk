@@ -437,5 +437,11 @@ func rightsizingVisibleRows(m Model) int {
 	boxH := max(m.height*75/100, 12)
 	// Subtract outer padding (4), inner border (2), title (2), gap (1),
 	// grouped table header (2), header underline (1) = 12.
-	return max(boxH-12, 1)
+	rows := boxH - 12
+	// The "Suggestions unavailable" line takes a row, unless the panel
+	// is already at its floor and the renderer drops the note.
+	if m.rightsizing.data != nil && m.rightsizing.data.SourceError != "" && rows > 1 {
+		rows--
+	}
+	return max(rows, 1)
 }
