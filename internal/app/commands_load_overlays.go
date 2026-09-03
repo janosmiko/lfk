@@ -31,9 +31,9 @@ func rightsizingCacheKey(ctx, ns, kind, name string, strategy model.RightsizingS
 // first frame; cache miss runs the GetRightsizing call in a
 // goroutine via a tea.Cmd.
 //
-// The generation token is captured at dispatch and round-tripped
-// through the msg so the handler can drop late responses (overlay
-// closed + reopened with a different workload before this finished).
+// The task name carries strategy and headroom: the scheduler folds a
+// submission into a running task with the same name, so a shared name
+// would leave a picker press during a slow fetch with no fetch at all.
 func (m Model) loadRightsizing() tea.Cmd {
 	ctx := m.actionCtx
 	if ctx.kind == "" || ctx.name == "" {
@@ -42,11 +42,10 @@ func (m Model) loadRightsizing() tea.Cmd {
 	strategy := m.rightsizing.strategy
 	headroom := m.rightsizing.headroom
 	key := rightsizingCacheKey(ctx.context, ctx.namespace, ctx.kind, ctx.name, strategy, headroom)
-	gen := m.rightsizing.gen
 
 	if cached, ok := m.rightsizingCache[key]; ok && cached != nil {
 		return func() tea.Msg {
-			return rightsizingLoadedMsg{key: key, data: cached, generation: gen}
+			return rightsizingLoadedMsg{key: key, data: cached}
 		}
 	}
 
@@ -54,11 +53,11 @@ func (m Model) loadRightsizing() tea.Cmd {
 	return m.scheduleK8sCall(
 		scheduler.PriorityLow,
 		scheduler.KindMetrics,
-		"Rightsizing: "+ctx.name,
+		fmt.Sprintf("Rightsizing: %s (%s, %gx)", ctx.name, strategy.HumanLabel(), headroom),
 		bgtaskTarget(ctx.context, ctx.namespace),
 		func(reqCtx context.Context) tea.Msg {
 			data, err := client.GetRightsizing(reqCtx, ctx.context, ctx.namespace, ctx.kind, ctx.name, strategy, headroom)
-			return rightsizingLoadedMsg{key: key, data: data, err: err, generation: gen}
+			return rightsizingLoadedMsg{key: key, data: data, err: err}
 		},
 	)
 }

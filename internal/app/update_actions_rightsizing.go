@@ -12,8 +12,8 @@ import (
 // current actionCtx. Cache hit pre-fills m.rightsizing.data so the
 // overlay opens with data on the first frame; cache miss flips
 // m.rightsizing.loading=true while loadRightsizing fetches in a
-// goroutine. The generation token is bumped before dispatch so any
-// in-flight fetch from a previous open is dropped on arrival.
+// goroutine. The generation token is bumped before dispatch so a
+// strategy probe from a previous open is dropped on arrival.
 //
 // Strategy availability (VPA reachable, Prometheus configured,
 // snapshot always) is probed ASYNCHRONOUSLY — the underlying
@@ -70,7 +70,7 @@ func (m Model) executeActionRightsizing() (tea.Model, tea.Cmd) {
 
 	// Reset the per-workload transient fields. data is recomputed by
 	// the loader (cache hit short-circuits below); err / scroll start
-	// fresh; gen bumps so a slow fetch from a prior open is ignored.
+	// fresh. gen bumps so a slow probe from a prior open is ignored.
 	m.rightsizing.data = nil
 	m.rightsizing.err = nil
 	m.rightsizing.scroll = 0

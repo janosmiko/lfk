@@ -42,7 +42,6 @@ func (m Model) handleRightsizingOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.
 		m.rightsizing.data = nil
 		m.rightsizing.err = nil
 		m.rightsizing.loading = true
-		m.rightsizing.gen++
 		return m, m.loadRightsizing()
 	case "y":
 		yaml := buildRightsizingYAML(m.rightsizing.data)
@@ -142,11 +141,8 @@ func (m Model) cycleRightsizingHeadroom(direction int) (tea.Model, tea.Cmd) {
 	)
 
 	// Fast path 1: cache hit — swap to the cluster-fresh entry without
-	// flashing through a loading state. Bump gen so any in-flight prior
-	// fetch (e.g. from the previous strategy/headroom open) is dropped
-	// on arrival rather than overwriting the cache hit.
+	// flashing through a loading state.
 	if cached, ok := m.rightsizingCache[cacheKey]; ok && cached != nil {
-		m.rightsizing.gen++
 		m.rightsizing.data = cached
 		m.rightsizing.err = nil
 		m.rightsizing.loading = false
@@ -189,7 +185,6 @@ func (m Model) cycleRightsizingHeadroom(direction int) (tea.Model, tea.Cmd) {
 	m.rightsizing.data = nil
 	m.rightsizing.err = nil
 	m.rightsizing.loading = true
-	m.rightsizing.gen++
 	return m, m.loadRightsizing()
 }
 
@@ -273,12 +268,8 @@ func (m Model) cycleRightsizingStrategy(direction int) (tea.Model, tea.Cmd) {
 	)
 
 	// Fast path: cache hit on the new strategy + same headroom — swap
-	// to the cluster-fresh entry without flashing. Bump gen so any
-	// in-flight prior strategy fetch is dropped on arrival rather
-	// than overwriting the cache hit (the late response would still
-	// match the old generation otherwise and silently win).
+	// to the cluster-fresh entry without flashing.
 	if cached, ok := m.rightsizingCache[cacheKey]; ok && cached != nil {
-		m.rightsizing.gen++
 		m.rightsizing.data = cached
 		m.rightsizing.err = nil
 		m.rightsizing.loading = false
@@ -295,7 +286,6 @@ func (m Model) cycleRightsizingStrategy(direction int) (tea.Model, tea.Cmd) {
 	m.rightsizing.err = nil
 	m.rightsizing.scroll = 0
 	m.rightsizing.loading = true
-	m.rightsizing.gen++
 	return m, m.loadRightsizing()
 }
 
