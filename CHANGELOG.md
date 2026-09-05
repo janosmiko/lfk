@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.8](https://github.com/janosmiko/lfk/compare/v0.18.7...v0.18.8) (2026-09-05)
+
+
+### Features
+
+* **nodes:** show cordon state in the node Status column ([#724](https://github.com/janosmiko/lfk/issues/724)) ([8299501](https://github.com/janosmiko/lfk/commit/8299501c3ecc968f16b89d477dbe4ae13342cae0)), closes [#723](https://github.com/janosmiko/lfk/issues/723)
+
 ## [0.18.7](https://github.com/janosmiko/lfk/compare/v0.18.6...v0.18.7) (2026-09-03)
 
 
