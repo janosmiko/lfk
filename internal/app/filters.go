@@ -179,7 +179,7 @@ func nodeFilterPresets() []FilterPreset {
 	return []FilterPreset{
 		{
 			Name: "Not Ready", Description: "Node status != Ready", Key: "n",
-			MatchFn: func(item model.Item) bool { return strings.ToLower(item.Status) != "ready" },
+			MatchFn: func(item model.Item) bool { return !model.NodeReady(item.Status) },
 		},
 		{
 			Name: "Cordoned", Description: "Unschedulable", Key: "c",

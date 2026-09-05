@@ -29,6 +29,36 @@ func TestNodeReadyStatus(t *testing.T) {
 	assert.Equal(t, "", nodeReadyStatus(nil))
 }
 
+func TestNodeStatusCordoned(t *testing.T) {
+	ready := map[string]any{
+		"conditions": []any{map[string]any{"type": "Ready", "status": "True"}},
+	}
+	notReady := map[string]any{
+		"conditions": []any{map[string]any{"type": "Ready", "status": "False"}},
+	}
+	cordoned := map[string]any{"unschedulable": true}
+
+	assert.Equal(t, "Ready", nodeStatus(ready, nil))
+	assert.Equal(t, "Ready", nodeStatus(ready, map[string]any{"unschedulable": false}))
+	assert.Equal(t, "Ready,SchedulingDisabled", nodeStatus(ready, cordoned))
+	assert.Equal(t, "NotReady,SchedulingDisabled", nodeStatus(notReady, cordoned))
+
+	// No Ready condition: the cordon still shows, on its own.
+	assert.Equal(t, "SchedulingDisabled", nodeStatus(nil, cordoned))
+	assert.Equal(t, "", nodeStatus(nil, nil))
+}
+
+func TestPopulateNodeDetailsCordonedStatus(t *testing.T) {
+	ti := &model.Item{Kind: "Node"}
+	status := map[string]any{
+		"conditions": []any{map[string]any{"type": "Ready", "status": "True"}},
+	}
+	populateNodeDetails(ti, map[string]any{}, status, map[string]any{"unschedulable": true})
+
+	assert.Equal(t, "Ready,SchedulingDisabled", ti.Status)
+	assert.Equal(t, "true", ti.ColumnValue("Unschedulable"))
+}
+
 func TestPopulateNamespaceDetails(t *testing.T) {
 	ti := &model.Item{Kind: "Namespace"}
 	populateNamespaceDetails(ti, map[string]any{"phase": "Active"})

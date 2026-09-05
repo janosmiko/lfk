@@ -44,6 +44,7 @@ func statusSeverity(status string) statusSev {
 		"Waiting", "Init", "NotReady",
 		"Progressing", "Progressing/Synced", "Progressing/OutOfSync",
 		"Missing", "Suspended", "Unknown", "Reconciling",
+		"Ready,SchedulingDisabled", "NotReady,SchedulingDisabled", "SchedulingDisabled",
 		"Healthy/OutOfSync", "Missing/OutOfSync", "Suspended/OutOfSync",
 		"OutOfSync",
 		"Pending-install", "Pending-upgrade", "Pending-rollback", "Uninstalling",

@@ -342,6 +342,14 @@ func (i Item) ColumnValue(key string) string {
 // this single constant.
 const MissingRefStatus = "MissingRef"
 
+// NodeReady reports whether a node Status means Ready. A cordoned node carries
+// a ",SchedulingDisabled" suffix that says nothing about readiness, so callers
+// must not compare the whole string.
+func NodeReady(status string) bool {
+	ready, _, _ := strings.Cut(status, ",")
+	return strings.EqualFold(ready, "Ready")
+}
+
 // ResourceNode represents a node in a resource relationship tree.
 type ResourceNode struct {
 	Name      string

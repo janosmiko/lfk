@@ -244,6 +244,30 @@ func TestNodeCordonedPreset(t *testing.T) {
 	}
 }
 
+func TestNodeNotReadyPresetIgnoresCordonSuffix(t *testing.T) {
+	presets := builtinFilterPresets("Node")
+	notReady := findPreset(presets, "Not Ready")
+	if notReady == nil {
+		t.Fatal("Not Ready preset not found")
+	}
+
+	tests := []struct {
+		name string
+		item model.Item
+		want bool
+	}{
+		{"ready", model.Item{Status: "Ready"}, false},
+		{"ready and cordoned", model.Item{Status: "Ready,SchedulingDisabled"}, false},
+		{"not ready", model.Item{Status: "NotReady"}, true},
+		{"not ready and cordoned", model.Item{Status: "NotReady,SchedulingDisabled"}, true},
+	}
+	for _, tt := range tests {
+		if got := notReady.MatchFn(tt.item); got != tt.want {
+			t.Errorf("NotReady(%s) = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestEventWarningsPreset(t *testing.T) {
 	presets := builtinFilterPresets("Event")
 	warnings := findPreset(presets, "Warnings")

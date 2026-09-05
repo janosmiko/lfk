@@ -137,6 +137,10 @@ var statusAbbreviations = map[string]string{
 	"CreateContainerError":       "CtrErr",
 	"Succeeded":                  "Done",
 	"Completed":                  "Done",
+	// The status column caps at 20, so the kubectl spelling rarely fits.
+	"Ready,SchedulingDisabled":    "Ready,Cordoned",
+	"NotReady,SchedulingDisabled": "NotReady,Cordoned",
+	"SchedulingDisabled":          "Cordoned",
 }
 
 // AbbreviateStatusForWidth returns a status label that fits within w

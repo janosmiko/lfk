@@ -764,3 +764,12 @@ func TestParseResourceValueOK_PlainValuesUnaffected(t *testing.T) {
 	_, ok = ParseResourceValueOK("n/a", true)
 	assert.False(t, ok)
 }
+
+func TestAbbreviateStatusForWidthCordoned(t *testing.T) {
+	// The status column caps at 20 columns, so the kubectl-length string only
+	// fits once a wide layout gives it room.
+	assert.Equal(t, "Ready,Cordoned", AbbreviateStatusForWidth("Ready,SchedulingDisabled", 19))
+	assert.Equal(t, "NotReady,Cordoned", AbbreviateStatusForWidth("NotReady,SchedulingDisabled", 19))
+	assert.Equal(t, "Cordoned", AbbreviateStatusForWidth("SchedulingDisabled", 10))
+	assert.Equal(t, "Ready,SchedulingDisabled", AbbreviateStatusForWidth("Ready,SchedulingDisabled", 30))
+}
