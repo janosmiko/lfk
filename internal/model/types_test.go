@@ -514,3 +514,12 @@ func TestItemColumnValue(t *testing.T) {
 	assert.Equal(t, "", item.ColumnValue("severity"),
 		"match is case-sensitive — callers store keys with stable casing")
 }
+
+func TestNodeReady(t *testing.T) {
+	assert.True(t, NodeReady("Ready"))
+	assert.True(t, NodeReady("Ready,SchedulingDisabled"))
+	assert.False(t, NodeReady("NotReady"))
+	assert.False(t, NodeReady("NotReady,SchedulingDisabled"))
+	assert.False(t, NodeReady("SchedulingDisabled"))
+	assert.False(t, NodeReady(""))
+}

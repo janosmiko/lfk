@@ -198,6 +198,10 @@ func TestStatusSeverity_FreeFormPhrases(t *testing.T) {
 		// Exact matches keep precedence over word scanning.
 		{"Failed", sevFailed},
 		{"Running", sevRunning},
+		// A cordoned node is amber, not the green its "Ready" word would give.
+		{"Ready,SchedulingDisabled", sevProgressing},
+		{"NotReady,SchedulingDisabled", sevProgressing},
+		{"SchedulingDisabled", sevProgressing},
 	}
 	for _, tt := range tests {
 		t.Run(tt.status, func(t *testing.T) {

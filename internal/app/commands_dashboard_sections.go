@@ -144,7 +144,7 @@ func fetchDashboardNodes(ctx context.Context, kctx string, client *k8s.Client) d
 		data.nodeCount = len(nodeItems)
 		data.podCapacity = sumPodCapacity(nodeItems)
 		for _, n := range nodeItems {
-			if n.Status == "Ready" {
+			if model.NodeReady(n.Status) {
 				data.readyNodes++
 			}
 		}
@@ -538,7 +538,7 @@ func dashboardNodesSection(lines []string, data dashboardData, w dashboardWidths
 // nodeStatusDot returns a colored dot indicating whether a node is Ready.
 func nodeStatusDot(nodeItems []model.Item, name string) string {
 	for _, ni := range nodeItems {
-		if ni.Name == name && ni.Status != "Ready" {
+		if ni.Name == name && !model.NodeReady(ni.Status) {
 			return ui.StatusFailed.Render("●")
 		}
 	}
@@ -624,7 +624,7 @@ func dashboardWarningsColumn(data dashboardData) []string {
 func countNotReadyWorkerNodes(nodeItems []model.Item) int {
 	count := 0
 	for _, ni := range nodeItems {
-		if ni.Status != "Ready" {
+		if !model.NodeReady(ni.Status) {
 			isControlPlane := false
 			for _, kv := range ni.Columns {
 				if kv.Key == "Role" && strings.Contains(kv.Value, "control-plane") {

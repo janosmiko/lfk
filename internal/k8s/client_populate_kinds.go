@@ -16,15 +16,31 @@ func populateNodeDetails(ti *model.Item, obj map[string]any, status, spec map[st
 	populateNodeStatus(ti, status)
 	populateNodeUnschedulable(ti, spec)
 	populateNodeTaints(ti, spec)
-	if s := nodeReadyStatus(status); s != "" {
+	if s := nodeStatus(status, spec); s != "" {
 		ti.Status = s
 	}
 }
 
+// schedulingDisabled is the cordon marker kubectl appends to a node's STATUS.
+const schedulingDisabled = "SchedulingDisabled"
+
+// nodeStatus mirrors `kubectl get nodes`, so a cordon is visible without the
+// Unschedulable column. The marker stands alone when the Ready condition is
+// missing, otherwise a cordoned node would report no status at all.
+func nodeStatus(status, spec map[string]any) string {
+	ready := nodeReadyStatus(status)
+	if !nodeUnschedulable(spec) {
+		return ready
+	}
+	if ready == "" {
+		return schedulingDisabled
+	}
+	return ready + "," + schedulingDisabled
+}
+
 // nodeReadyStatus derives a node's at-a-glance status ("Ready"/"NotReady") from
 // its Ready condition. Returns "" when the condition is absent so callers leave
-// Status untouched. Cordon state is surfaced separately via the Unschedulable
-// column, keeping the status (and its rollup) to clean Ready/NotReady buckets.
+// Status untouched.
 func nodeReadyStatus(status map[string]any) string {
 	conds, _ := status["conditions"].([]any)
 	for _, c := range conds {
@@ -106,11 +122,16 @@ func populateNodeStatus(ti *model.Item, status map[string]any) {
 	}
 }
 
-func populateNodeUnschedulable(ti *model.Item, spec map[string]any) {
+func nodeUnschedulable(spec map[string]any) bool {
 	if spec == nil {
-		return
+		return false
 	}
-	if val, ok := spec["unschedulable"].(bool); ok && val {
+	val, _ := spec["unschedulable"].(bool)
+	return val
+}
+
+func populateNodeUnschedulable(ti *model.Item, spec map[string]any) {
+	if nodeUnschedulable(spec) {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Unschedulable", Value: "true"})
 	}
 }
