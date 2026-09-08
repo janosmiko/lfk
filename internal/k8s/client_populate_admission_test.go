@@ -52,6 +52,7 @@ func TestPopulateResourceDetailsExt_MutatingAdmissionPolicy(t *testing.T) {
 			},
 			wantCols: map[string]string{
 				"Match Resources": "/pods",
+				"Mutations":       "0",
 			},
 		},
 		{
@@ -72,6 +73,7 @@ func TestPopulateResourceDetailsExt_MutatingAdmissionPolicy(t *testing.T) {
 			},
 			wantCols: map[string]string{
 				"Match Resources": "apps/deployments,statefulsets; /pods",
+				"Mutations":       "0",
 			},
 		},
 		{
@@ -92,11 +94,10 @@ func TestPopulateResourceDetailsExt_MutatingAdmissionPolicy(t *testing.T) {
 			populateResourceDetailsExt(ti, map[string]any{"spec": tt.spec}, "MutatingAdmissionPolicy", nil, tt.spec)
 
 			colMap := columnsToMap(ti.Columns)
-			for k, v := range tt.wantCols {
-				assert.Equal(t, v, colMap[k], "column %q mismatch", k)
-			}
-			if tt.spec == nil {
-				assert.Empty(t, ti.Columns)
+			if tt.wantCols == nil {
+				assert.Empty(t, colMap)
+			} else {
+				assert.Equal(t, tt.wantCols, colMap)
 			}
 		})
 	}
@@ -163,11 +164,10 @@ func TestPopulateResourceDetailsExt_MutatingAdmissionPolicyBinding(t *testing.T)
 			populateResourceDetailsExt(ti, map[string]any{"spec": tt.spec}, "MutatingAdmissionPolicyBinding", nil, tt.spec)
 
 			colMap := columnsToMap(ti.Columns)
-			for k, v := range tt.wantCols {
-				assert.Equal(t, v, colMap[k], "column %q mismatch", k)
-			}
 			if tt.wantCols == nil {
-				assert.Empty(t, ti.Columns)
+				assert.Empty(t, colMap)
+			} else {
+				assert.Equal(t, tt.wantCols, colMap)
 			}
 		})
 	}
