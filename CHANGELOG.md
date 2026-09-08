@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.9](https://github.com/janosmiko/lfk/compare/v0.18.8...v0.18.9) (2026-09-08)
+
+
+### Miscellaneous Chores
+
+* release 0.18.9 ([#730](https://github.com/janosmiko/lfk/issues/730)) ([17553eb](https://github.com/janosmiko/lfk/commit/17553ebe71da768858b52649037833434b5fea0d))
+
 ## [0.18.8](https://github.com/janosmiko/lfk/compare/v0.18.7...v0.18.8) (2026-09-05)
 
 
