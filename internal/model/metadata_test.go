@@ -239,6 +239,8 @@ var allowListedUnicodeCollisions = map[string]string{
 	"admissionregistration.k8s.io/validatingwebhookconfigurations":   "admission-flow",
 	"admissionregistration.k8s.io/validatingadmissionpolicies":       "admission-flow",
 	"admissionregistration.k8s.io/validatingadmissionpolicybindings": "admission-flow",
+	"admissionregistration.k8s.io/mutatingadmissionpolicies":         "admission-flow",
+	"admissionregistration.k8s.io/mutatingadmissionpolicybindings":   "admission-flow",
 	"flowcontrol.apiserver.k8s.io/flowschemas":                       "admission-flow",
 	"flowcontrol.apiserver.k8s.io/prioritylevelconfigurations":       "admission-flow",
 

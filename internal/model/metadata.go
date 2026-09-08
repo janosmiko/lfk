@@ -155,6 +155,8 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"admissionregistration.k8s.io/validatingwebhookconfigurations":   {Category: "Config", DisplayName: "ValidatingWebhookConfigurations", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
 	"admissionregistration.k8s.io/validatingadmissionpolicies":       {Category: "Config", DisplayName: "ValidatingAdmissionPolicies", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
 	"admissionregistration.k8s.io/validatingadmissionpolicybindings": {Category: "Config", DisplayName: "ValidatingAdmissionPolicyBindings", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
+	"admissionregistration.k8s.io/mutatingadmissionpolicies":         {Category: "Config", DisplayName: "MutatingAdmissionPolicies", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
+	"admissionregistration.k8s.io/mutatingadmissionpolicybindings":   {Category: "Config", DisplayName: "MutatingAdmissionPolicyBindings", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
 	"flowcontrol.apiserver.k8s.io/flowschemas":                       {Category: "Config", DisplayName: "FlowSchemas", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
 	"flowcontrol.apiserver.k8s.io/prioritylevelconfigurations":       {Category: "Config", DisplayName: "PriorityLevelConfigurations", Icon: Icon{Unicode: "⚙", Simple: "[Wh]", Emoji: "🔧", NerdFont: "\U000f0494"}, Rare: true},
 
@@ -402,8 +404,10 @@ var BuiltInOrderRank = map[string]int{
 	"admissionregistration.k8s.io/validatingwebhookconfigurations":   41,
 	"admissionregistration.k8s.io/validatingadmissionpolicies":       42,
 	"admissionregistration.k8s.io/validatingadmissionpolicybindings": 43,
-	"flowcontrol.apiserver.k8s.io/flowschemas":                       44,
-	"flowcontrol.apiserver.k8s.io/prioritylevelconfigurations":       45,
+	"admissionregistration.k8s.io/mutatingadmissionpolicies":         44,
+	"admissionregistration.k8s.io/mutatingadmissionpolicybindings":   45,
+	"flowcontrol.apiserver.k8s.io/flowschemas":                       46,
+	"flowcontrol.apiserver.k8s.io/prioritylevelconfigurations":       47,
 
 	// Networking
 	"/services":                                    50,

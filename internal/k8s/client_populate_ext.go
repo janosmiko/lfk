@@ -72,6 +72,12 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 	case "Workflow":
 		populateArgoWorkflow(ti, status)
 
+	case "MutatingAdmissionPolicy":
+		populateMutatingAdmissionPolicy(ti, spec)
+
+	case "MutatingAdmissionPolicyBinding":
+		populateMutatingAdmissionPolicyBinding(ti, spec)
+
 	default:
 		populateGenericCRDResource(ti, status)
 	}
