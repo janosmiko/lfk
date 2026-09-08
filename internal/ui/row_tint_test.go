@@ -41,6 +41,8 @@ func TestRowTintForStatus_ForegroundMode(t *testing.T) {
 
 	_, ok = RowTintForStatus("Running")
 	assert.False(t, ok, "running rows never tint")
+	_, ok = RowTintForStatus("Available")
+	assert.False(t, ok, "a scaled-to-zero Deployment (Available:True) never tints")
 	_, ok = RowTintForStatus("")
 	assert.False(t, ok, "blank status never tints")
 }

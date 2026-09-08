@@ -35,6 +35,29 @@ func populateHPAReady(ti *model.Item, status, spec map[string]any) {
 		}
 	}
 	ti.Ready = fmt.Sprintf("%d/%d (%d-%d)", currentR, desiredR, minR, maxR)
+	if hpaConditionTrue(status, "ScaledToZero") {
+		ti.Ready += " (scaled to zero)"
+	}
+}
+
+// hpaConditionTrue reports whether status.conditions contains condType with status "True".
+func hpaConditionTrue(status map[string]any, condType string) bool {
+	conditions, ok := status["conditions"].([]any)
+	if !ok {
+		return false
+	}
+	for _, c := range conditions {
+		cMap, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		cType, _ := cMap["type"].(string)
+		cStatus, _ := cMap["status"].(string)
+		if cType == condType && cStatus == "True" {
+			return true
+		}
+	}
+	return false
 }
 
 func populateHPASpecColumns(ti *model.Item, spec map[string]any) {

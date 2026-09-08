@@ -193,6 +193,20 @@ func TestHPAAtMaxAndFixed(t *testing.T) {
 		"a pinned HPA is hpa_fixed, not hpa_at_max")
 }
 
+// TestHPAScaleToZero: minReplicas: 0 with maxReplicas > 0 can still scale, so
+// it must not be flagged hpa_fixed. It can still be flagged hpa_at_max once
+// desired reaches the ceiling.
+func TestHPAScaleToZero(t *testing.T) {
+	got := fetchChecks(t,
+		hpaScaled("prod", "idle", "a", 0, 5, 0),
+		hpaScaled("prod", "capped-from-zero", "b", 0, 5, 5),
+	)
+	assert.False(t, got["prod/HorizontalPodAutoscaler/idle"]["hpa_fixed"],
+		"minReplicas 0 and maxReplicas 5 can still scale")
+	assert.False(t, got["prod/HorizontalPodAutoscaler/idle"]["hpa_at_max"])
+	assert.True(t, got["prod/HorizontalPodAutoscaler/capped-from-zero"]["hpa_at_max"])
+}
+
 func TestOrphanPDB(t *testing.T) {
 	web := map[string]string{"app": "web"}
 	ds := map[string]string{"app": "node-agent"}

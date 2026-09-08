@@ -79,6 +79,20 @@ func TestPDBVsHPAMin(t *testing.T) {
 	assert.True(t, checks["prod/PodDisruptionBudget/pdb-e"]["pdb_vs_hpa_min"])
 }
 
+// TestPDBVsHPAMinScaleToZero: an HPA with an explicit minReplicas: 0 (scale to
+// zero) must compare against 0, not the nil-default of 1, so any positive
+// integer minAvailable fires the finding.
+func TestPDBVsHPAMinScaleToZero(t *testing.T) {
+	one := intstr.FromInt32(1)
+	checks := fetchChecks(t,
+		deployment("prod", "z", 0, map[string]string{"app": "z"}, hardened("web")),
+		pdb("pdb-z", map[string]string{"app": "z"}, &one, nil),
+		hpaScaled("prod", "hpa-z", "z", 0, 10, 0),
+	)
+	assert.True(t, checks["prod/PodDisruptionBudget/pdb-z"]["pdb_vs_hpa_min"],
+		"minAvailable 1 > minReplicas 0 must fire")
+}
+
 func withReplicasOwner(dep *appsv1.Deployment, manager, fields string) *appsv1.Deployment {
 	dep.ManagedFields = []metav1.ManagedFieldsEntry{{
 		Manager:    manager,
