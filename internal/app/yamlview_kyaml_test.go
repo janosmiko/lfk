@@ -342,6 +342,34 @@ func TestUpdateYAMLKYAMLRendered_ReplyFromAnotherTabIsDropped(t *testing.T) {
 	assert.Equal(t, bDoc, got.yamlView.source, "nor swap the source it would toggle back to")
 }
 
+// A cloned tab is a new document view. Inheriting the source tab's accepted id
+// would let the conversion started on the original repaint the clone.
+func TestCloneCurrentTab_DoesNotInheritAnInFlightKYAMLRequest(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeYAML
+	m.yamlView = yamlViewState{content: kyamlTestSource, source: kyamlTestSource, collapsed: map[string]bool{}}
+
+	mdl, cmd := m.toggleYAMLKYAML()
+	require.NotNil(t, cmd)
+	onA := mdl.(Model)
+	replyForA := cmd().(yamlKYAMLRenderedMsg)
+
+	clone := onA.cloneCurrentTab()
+	assert.NotEqual(t, replyForA.req, clone.yamlKYAMLReq,
+		"the clone must not accept the reply the original is waiting for")
+
+	onA.tabs = []TabState{onA.cloneCurrentTab(), clone}
+	onA.activeTab = 0
+	onA.saveCurrentTab()
+	_ = onA.loadTab(1) // switch to the clone
+
+	out, _ := onA.updateYAMLKYAMLRendered(replyForA)
+	got := out.(Model)
+
+	assert.Equal(t, kyamlTestSource, got.yamlView.content, "the clone keeps its own block YAML")
+	assert.False(t, got.yamlView.kyaml, "and is not flipped into KYAML by the original's reply")
+}
+
 // Switching back must not let a later request collide with the stored one.
 func TestTabState_KYAMLRequestIDsAreUniqueAcrossTabs(t *testing.T) {
 	m := basePush80Model()
@@ -350,7 +378,6 @@ func TestTabState_KYAMLRequestIDsAreUniqueAcrossTabs(t *testing.T) {
 	mdlA, cmdA := m.toggleYAMLKYAML()
 	reqA := cmdA().(yamlKYAMLRenderedMsg).req
 	onA := mdlA.(Model)
-	savedA := onA.cloneCurrentTab()
 
 	other := basePush80Model()
 	other.yamlView = yamlViewState{content: "kind: Service\n", source: "kind: Service\n", collapsed: map[string]bool{}}
@@ -358,7 +385,12 @@ func TestTabState_KYAMLRequestIDsAreUniqueAcrossTabs(t *testing.T) {
 	reqB := cmdB().(yamlKYAMLRenderedMsg).req
 
 	assert.NotEqual(t, reqA, reqB, "two tabs must never share a request id")
-	assert.Equal(t, reqA, savedA.yamlKYAMLReq, "the snapshot keeps the tab's accepted request")
+
+	// Leaving a tab keeps its pending id, so the reply still lands on return.
+	// Cloning is the opposite case: a new tab must not inherit it.
+	onA.saveCurrentTab()
+	assert.Equal(t, reqA, onA.tabs[onA.activeTab].yamlKYAMLReq,
+		"a tab switch keeps the tab's accepted request")
 }
 
 func TestToggleYAMLKYAML_MultiDocumentSourceStaysWhole(t *testing.T) {

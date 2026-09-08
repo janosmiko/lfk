@@ -124,7 +124,7 @@ func styleKYAMLFlow(v string) string {
 				inSingle = !inSingle
 			}
 		case '"':
-			if !inSingle {
+			if !inSingle && (!inDouble || !isEscapedQuote(v, i)) {
 				inDouble = !inDouble
 			}
 		case '{', '}', '[', ']', ',':
@@ -142,6 +142,16 @@ func styleKYAMLFlow(v string) string {
 		b.WriteString(styleKYAMLFlowSegment(v[start:]))
 	}
 	return b.String()
+}
+
+// isEscapedQuote reports whether the double quote at i is escaped. An even run
+// of backslashes is literal, so the quote after it still closes the string.
+func isEscapedQuote(s string, i int) bool {
+	backslashes := 0
+	for j := i - 1; j >= 0 && s[j] == '\\'; j-- {
+		backslashes++
+	}
+	return backslashes%2 == 1
 }
 
 // styleKYAMLFlowSegment styles one run between two pieces of flow punctuation.

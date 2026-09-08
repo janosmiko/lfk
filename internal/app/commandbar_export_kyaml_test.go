@@ -120,7 +120,8 @@ func TestCommandBarCompletions_ExportOffersKYAML(t *testing.T) {
 	assert.Contains(t, got, "json")
 }
 
-func TestKubectlOutputFormats_IncludeKYAML(t *testing.T) {
-	assert.Contains(t, outputFormatsComplete(), "kyaml",
-		"kubectl 1.34 and later accept -o kyaml")
+// `-o kyaml` needs kubectl 1.34+ with KUBECTL_KYAML=true, and lfk runs whatever
+// kubectl is on PATH, so completing it would suggest a flag that often fails.
+func TestKubectlOutputFormats_OmitKYAML(t *testing.T) {
+	assert.NotContains(t, outputFormatsComplete(), "kyaml")
 }

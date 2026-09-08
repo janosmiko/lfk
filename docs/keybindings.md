@@ -295,7 +295,7 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 | `Ctrl+Y` | Copy a single field |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
 
-`Y`'s YAML, JSON, and KYAML formats support multi-selection: multi-doc YAML or KYAML joined with `---`, or a JSON array. Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest.
+`Y`'s YAML, JSON, and KYAML formats support multi-selection: multi-doc YAML or KYAML joined with `---`, or a JSON array. Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML, JSON, and KYAML extract the container spec block from the Pod manifest.
 
 `Ctrl+Y` opens instantly on the visible table columns (Name, Status, extras). `Enter` copies the cell value. `Tab` switches to the full manifest field list, where array elements are labeled semantically (`status.addresses[ExternalIP].address` for a node's external IP), so filtering `ExternalIP` finds the address row. With multi-selection the chosen column/field is extracted from every selected item, one value per line. Labeled array elements resolve per manifest, not by index, and items missing the field are skipped. `Ctrl+Y` remembers the last-copied entry per resource kind for the session and preselects it next time.
 

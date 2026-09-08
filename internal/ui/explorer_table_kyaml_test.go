@@ -75,6 +75,34 @@ func TestHighlightYAMLLine_KYAMLCommaInsideQuotesIsNotPunctuation(t *testing.T) 
 		"the quoted value stays one string despite the comma inside it")
 }
 
+// KYAML double-quotes every string, so escaped quotes are common. A naive
+// quote-parity walk would treat \" as the end of the string and style the comma
+// inside it as flow punctuation.
+func TestHighlightYAMLLine_KYAMLEscapedQuoteInsideValue(t *testing.T) {
+	got := HighlightYAMLLine(`  msg: "say \"hi\", ok",`)
+	assert.Equal(t, `  msg: "say \"hi\", ok",`, stripANSI(got))
+	assert.Contains(t, got, YamlStringStyle.Render(`"say \"hi\", ok"`),
+		"the whole scalar is one string; the comma inside it is data")
+}
+
+// A backslash can itself be escaped, so parity of the run decides.
+func TestHighlightYAMLLine_KYAMLEscapedBackslashEndsString(t *testing.T) {
+	got := HighlightYAMLLine(`  path: "C:\\",`)
+	assert.Equal(t, `  path: "C:\\",`, stripANSI(got))
+	assert.Contains(t, got, YamlStringStyle.Render(`"C:\\"`),
+		`\\ is a literal backslash, so the quote after it does close the string`)
+	punctStyled(t, got, ",")
+}
+
+func TestHighlightYAMLLine_KYAMLEscapedQuoteInFlowSequence(t *testing.T) {
+	got := HighlightYAMLLine(`  args: ["a,b", "c\"d"],`)
+	assert.Equal(t, `  args: ["a,b", "c\"d"],`, stripANSI(got))
+	assert.Contains(t, got, YamlStringStyle.Render(`"a,b"`), "the comma inside quotes is data")
+	assert.Contains(t, got, YamlStringStyle.Render(`"c\"d"`))
+	punctStyled(t, got, "[")
+	punctStyled(t, got, "]")
+}
+
 // Block YAML must render exactly as it did before KYAML support landed.
 func TestHighlightYAMLLine_BlockYAMLUnchangedByKYAMLSupport(t *testing.T) {
 	for _, line := range []string{
