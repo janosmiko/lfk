@@ -121,6 +121,15 @@ func (m Model) applyCopyFormatPicker() (tea.Model, tea.Cmd) {
 			m.setStatusMessage(fmt.Sprintf("Fetching %d manifests...", len(scope)), false)
 		}
 		return m, wrapYAMLCmdAsJSON(cmd)
+	case CopyFormatKYAML:
+		cmd := m.copyYAMLForScope(scope)
+		if cmd == nil {
+			return m, nil
+		}
+		if len(scope) > 1 {
+			m.setStatusMessage(fmt.Sprintf("Fetching %d manifests...", len(scope)), false)
+		}
+		return m, wrapYAMLCmdAsKYAML(cmd)
 	}
 	return m, nil
 }

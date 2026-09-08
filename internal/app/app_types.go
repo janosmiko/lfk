@@ -98,7 +98,7 @@ const (
 	overlaySyncWave           // per-Application sync wave timeline (action menu key W)
 	overlayLocalClusters      // local-cluster manager (Ctrl+N at LevelClusters)
 	overlayTrafficCapture     // per-pod live packet capture (action menu key c)
-	overlayCopyFormat         // Y-key copy-as picker (YAML / JSON / Table)
+	overlayCopyFormat         // Y-key copy-as picker (YAML / JSON / KYAML / Table)
 	overlayCopyField          // ctrl+y single-field copy picker
 	overlayShuttingDown       // non-interactive "graceful shutdown in progress" notice
 	overlayObjectExplorerFind // recursive key search over the object (r key)
@@ -477,6 +477,9 @@ type TabState struct {
 	cacheFingerprints          map[string]string
 	previewContentFingerprints map[string]string
 	yamlContent                string
+	yamlSource                 string // block YAML behind yamlContent, which differs from it under KYAML
+	yamlKYAML                  bool   // this tab renders its manifest as KYAML
+	yamlKYAMLReq               uint64 // the only KYAML re-render this tab still accepts
 	yamlScroll                 int
 	yamlCursor                 int // cursor position in visible lines (relative to scroll)
 	yamlScrollOption           int // sticky vim 'scroll' option for [count]<C-d>/<C-u>. 0 = default (half viewport)

@@ -23,14 +23,14 @@ func findFormatIndex(formats []CopyFormat, f CopyFormat) int {
 	return -1
 }
 
-func TestOpenCopyFormatPicker_AtResources_HasThreeRows(t *testing.T) {
+func TestOpenCopyFormatPicker_AtResources_HasFourRows(t *testing.T) {
 	m := Model{}
 	m.nav.Level = model.LevelResources
 	m.middleItems = []model.Item{{Name: "a"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
 	assert.True(t, m.copyFormatPicker.active)
-	assert.Equal(t, []CopyFormat{CopyFormatYAML, CopyFormatJSON, CopyFormatTable}, m.copyFormatPicker.formats)
+	assert.Equal(t, []CopyFormat{CopyFormatYAML, CopyFormatJSON, CopyFormatKYAML, CopyFormatTable}, m.copyFormatPicker.formats)
 	assert.Equal(t, 0, m.copyFormatPicker.cursor)
 	assert.Len(t, m.copyFormatPicker.scope, 1)
 	assert.Equal(t, "a", m.copyFormatPicker.scope[0].Name)
@@ -57,9 +57,11 @@ func TestCopyFormatPicker_CycleCursor(t *testing.T) {
 	m.copyFormatPickerStep(1)
 	assert.Equal(t, 2, m.copyFormatPicker.cursor)
 	m.copyFormatPickerStep(1)
+	assert.Equal(t, 3, m.copyFormatPicker.cursor)
+	m.copyFormatPickerStep(1)
 	assert.Equal(t, 0, m.copyFormatPicker.cursor, "wraps")
 	m.copyFormatPickerStep(-1)
-	assert.Equal(t, 2, m.copyFormatPicker.cursor, "wraps backward")
+	assert.Equal(t, 3, m.copyFormatPicker.cursor, "wraps backward")
 }
 
 func TestCopyFormatPickerCancel(t *testing.T) {
@@ -81,11 +83,11 @@ func TestCopyFormatPickerStep_LargeNegativeDelta(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "a"}}
 	m.setCursor(0)
 	m.openCopyFormatPicker()
-	// 3 formats: cursor at 0. delta -4 ≡ -1 mod 3 → cursor 2.
-	m.copyFormatPickerStep(-4)
-	assert.Equal(t, 2, m.copyFormatPicker.cursor, "large negative delta wraps correctly")
-	// delta +7 ≡ +1 mod 3 → cursor 0.
-	m.copyFormatPickerStep(7)
+	// 4 formats: cursor at 0. delta -5 ≡ -1 mod 4 → cursor 3.
+	m.copyFormatPickerStep(-5)
+	assert.Equal(t, 3, m.copyFormatPicker.cursor, "large negative delta wraps correctly")
+	// delta +9 ≡ +1 mod 4 → cursor 0.
+	m.copyFormatPickerStep(9)
 	assert.Equal(t, 0, m.copyFormatPicker.cursor, "large positive delta wraps correctly")
 }
 
@@ -175,6 +177,34 @@ func TestApplyCopyFormatPicker_JSONWrapsExistingDispatcher(t *testing.T) {
 	_, cmd := m.applyCopyFormatPicker()
 	// Cmd should exist when there's a valid item to copy.
 	assert.NotNil(t, cmd, "JSON dispatch must return a tea.Cmd")
+}
+
+func TestApplyCopyFormatPicker_KYAMLWrapsExistingDispatcher(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "a", Kind: "Pod"}}
+	m.setCursor(0)
+	m.openCopyFormatPicker()
+	kyamlIdx := findFormatIndex(m.copyFormatPicker.formats, CopyFormatKYAML)
+	require.NotEqual(t, -1, kyamlIdx)
+	m.copyFormatPicker.cursor = kyamlIdx
+	mdl, cmd := m.applyCopyFormatPicker()
+	assert.NotNil(t, cmd, "KYAML dispatch must return a tea.Cmd")
+	assert.False(t, mdl.(Model).copyFormatPicker.active, "picker closes after apply")
+}
+
+func TestCopyFormatPicker_ShiftKAppliesKYAMLDirectly(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "a", Kind: "Pod"}}
+	m.setCursor(0)
+	m.openCopyFormatPicker()
+
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyPressMsg{Code: 'K', Text: "K"})
+	rm := mdl.(Model)
+
+	assert.False(t, rm.copyFormatPicker.active, "a shortcut key applies without a second keystroke")
+	assert.NotNil(t, cmd)
 }
 
 func TestAnyNonEmpty(t *testing.T) {

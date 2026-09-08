@@ -423,6 +423,9 @@ func (m Model) openSelectedResourceYAML() (tea.Model, tea.Cmd) {
 	m.yamlPendingPath = m.selectedNodePath() // sync the YAML cursor to this node on load
 	m.yamlView.scroll = 0
 	m.yamlView.content = "Loading..."
+	m.yamlView.source = ""
+	m.yamlView.kyaml = ui.ConfigYAMLViewerKYAML
+	m.nextKYAMLReq() // a conversion for the previous resource must not land here
 	m.yamlView.sections = nil
 	m.yamlView.visualCurCol = yamlFoldPrefixLen
 	m.yamlView.resetBlame()

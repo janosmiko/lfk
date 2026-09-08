@@ -226,6 +226,7 @@ log_path: /tmp/lfk.log
 # every viewer; toggle_line_numbers (#) and toggle_unified (u) for the diff viewer.
 # yaml_viewer:
 #   wrap: false
+#   kyaml: false  # KYAML instead of block YAML (toggle: K)
 # diff_viewer:
 #   wrap: false
 #   line_numbers: true

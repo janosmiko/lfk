@@ -239,7 +239,7 @@ func kubectlFlagsForSubcommand(subcommand string) []string {
 // outputFormatsComplete returns kubectl output format values.
 func outputFormatsComplete() []string {
 	return []string{
-		"json", "yaml", "wide", "name",
+		"json", "yaml", "kyaml", "wide", "name",
 		"jsonpath=", "custom-columns=",
 	}
 }

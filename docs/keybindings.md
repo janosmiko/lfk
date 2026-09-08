@@ -291,11 +291,11 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 | Key | Action |
 |---|---|
 | `y` | Copy resource name to clipboard (with multi-selection: newline-joined names of all selected items) |
-| `Y` | Open copy-as picker (YAML / JSON / Table) |
+| `Y` | Open copy-as picker (YAML / JSON / KYAML / Table) |
 | `Ctrl+Y` | Copy a single field |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
 
-`Y`'s YAML and JSON formats support multi-selection: multi-doc YAML joined with `---`, or a JSON array. Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest.
+`Y`'s YAML, JSON, and KYAML formats support multi-selection: multi-doc YAML or KYAML joined with `---`, or a JSON array. Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest.
 
 `Ctrl+Y` opens instantly on the visible table columns (Name, Status, extras). `Enter` copies the cell value. `Tab` switches to the full manifest field list, where array elements are labeled semantically (`status.addresses[ExternalIP].address` for a node's external IP), so filtering `ExternalIP` finds the address row. With multi-selection the chosen column/field is extracted from every selected item, one value per line. Labeled array elements resolve per manifest, not by index, and items missing the field are skipped. `Ctrl+Y` remembers the last-copied entry per resource kind for the session and preselects it next time.
 
@@ -456,6 +456,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse / expand all) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
+| `K` | Toggle KYAML rendering (blame and `O` are unavailable while on) |
 | `m` | Toggle inline field-manager blame on the cursor line |
 | `R` | Re-fetch the resource and refresh the view, keeping cursor/scroll (configurable via `refresh`) |
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
@@ -1429,7 +1430,7 @@ keybindings:
   secret_editor: "e"     # Secret/configmap editor
   create_template: "a"   # Create from template
   copy_name: "y"         # Copy name
-  copy_yaml: "Y"         # Open copy-as picker (YAML/JSON/Table)
+  copy_yaml: "Y"         # Open copy-as picker (YAML/JSON/KYAML/Table)
   copy_field: "ctrl+y"   # Copy a single manifest field (filterable picker)
   paste_apply: "ctrl+p"  # Apply from clipboard
   open_browser: "ctrl+o" # Open in browser

@@ -213,6 +213,7 @@ Startup defaults for the fullscreen YAML / diff / describe viewers, so display t
 ```yaml
 yaml_viewer:
   wrap: false
+  kyaml: false
 diff_viewer:
   wrap: false
   line_numbers: true
@@ -229,6 +230,7 @@ api_explorer:
 | Field | Type | Default | Runtime toggle | Description |
 |-------|------|---------|----------------|-------------|
 | `yaml_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the YAML viewer. |
+| `yaml_viewer.kyaml` | bool | `false` | `K` | KYAML rendering in the YAML viewer. |
 | `diff_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the diff viewer. |
 | `diff_viewer.line_numbers` | bool | `true` | `toggle_line_numbers` (`#`) | Gutter line numbers in the diff viewer. |
 | `diff_viewer.unified` | bool | `false` | `toggle_unified` (`u`) | Unified (vs side-by-side) diff layout. |

@@ -217,14 +217,14 @@ helm uninstall kubeshark --namespace kubeshark 2>/dev/null || true
 
 ## Copy-as picker (`Y`)
 
-The `Y` key opens an overlay picker offering YAML / JSON / Table output. Lowercase `y` still copies the resource name (unchanged).
+The `Y` key opens an overlay picker offering YAML / JSON / KYAML / Table output. Lowercase `y` still copies the resource name (unchanged).
 
 ### Test matrix
 
 | # | Setup | Action | Expected |
 |---|---|---|---|
 | 1 | LevelClusters, cursor on a context row | Press `Y` → Enter | Clipboard contains an aligned-table view of the cluster row. Status: `Table copied to clipboard`. |
-| 2 | LevelResourceTypes, cursor on a kind row | Press `Y` → `t` | Same as #1, but Table-only picker (no YAML/JSON rows shown). |
+| 2 | LevelResourceTypes, cursor on a kind row | Press `Y` → `t` | Same as #1, but Table-only picker (no YAML/JSON/KYAML rows shown). |
 | 3 | LevelResources (Pods), 3 pods selected via Space | Press `Y` → `j` (cursor down) → Enter | Clipboard contains a JSON array of 3 Pod manifests. Status: `Copied 3 manifests as JSON`. |
 | 4 | LevelResources, no selection, cursor on a Deployment row | Press `Y` → `y` | Clipboard contains the single Deployment YAML. Status: `YAML copied to clipboard`. |
 | 5 | LevelResources, 51 items selected | Press `Y` | Picker does NOT open. Status: `Max 50 exceeded for bulk YAML/JSON copy`. |
@@ -233,6 +233,7 @@ The `Y` key opens an overlay picker offering YAML / JSON / Table output. Lowerca
 | 8 | LevelContainers, cursor on a container row, no selection | Press `Y` → Enter | Clipboard has just that container's spec block. |
 | 9 | Picker open (any level) | Press `Esc` | Picker closes. Clipboard unchanged. No status message. |
 | 10 | Picker open at LevelResources | Press `t` | Picker applies Table immediately (single keystroke). |
+| 11 | Picker open at LevelResources | Press `K` | Clipboard contains the manifest as KYAML. Status: `KYAML copied to clipboard`. |
 
 ### Notes
 

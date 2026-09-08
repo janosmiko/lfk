@@ -73,7 +73,7 @@ func wkYAMLOnLine(c *wkYAMLCtx) bool {
 // from, or calls openObjectExplorer (objectexplorer.go:98-107), which toasts
 // and refuses above LevelResources or without a row carrying its Raw payload.
 func wkYAMLObjectExplorerAvailable(c *wkYAMLCtx) bool {
-	if c.visual {
+	if c.visual || c.m.yamlView.kyaml {
 		return false
 	}
 	if c.m.yamlReturnMode == modeObjectExplorer && c.m.objectExplorerView.root != nil {
@@ -152,7 +152,10 @@ var whichKeyYAMLActionList = []wkAction[*wkYAMLCtx]{
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleFold }, Label: "Fold section at cursor", Group: wkViews, Avail: func(c *wkYAMLCtx) bool { return !c.visual && c.foldSection != "" }},
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleFoldAll }, Label: "Fold / unfold all", Group: wkViews, Avail: func(c *wkYAMLCtx) bool { return !c.visual && c.foldable }},
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleWrap }, Label: "Toggle line wrapping", Group: wkSettings, Avail: wkYAMLNormal},
-	{Key: wkLiteralKey("m"), Label: "Toggle field-manager blame", Group: wkSettings, Avail: wkYAMLNormal},
+	{Key: wkLiteralKey("K"), Label: "Toggle KYAML rendering", Group: wkSettings, Avail: wkYAMLNormal},
+	{Key: wkLiteralKey("m"), Label: "Toggle field-manager blame", Group: wkSettings, Avail: func(c *wkYAMLCtx) bool {
+		return wkYAMLNormal(c) && !c.m.yamlView.kyaml
+	}},
 
 	// update_yaml.go:187-188 / 183-184 — search, then the two things q does.
 	{Key: func(kb ui.Keybindings) string { return kb.Search }, Label: "Search in content", Group: wkFilter, Avail: wkYAMLNormal},

@@ -475,6 +475,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 - In the YAML Viewer, press `O` on a line to open the Object Explorer at that attribute, or `I` to see its schema
 - `Ctrl+K` opens a side pane with the schema description of the field under the cursor, and keeps it in step as you move
 - Fold YAML sections with `z` (`Z` folds all), edit the resource in your `$EDITOR` with `Ctrl+E`
+- Render the manifest as KYAML with `K`, the explicit brace-and-quote form kubectl 1.34 emits for `-o kyaml`
 - Replay a resource's event history as a timeline with `V`
 - Every viewer speaks vim: counts (`100j`, `42G`, `5n`), visual selections (`v` / `V` / `Ctrl+V`), and text objects (`viw`)
 
@@ -482,7 +483,7 @@ All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A mu
 
 - Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete, scale, or restart via `x`
 - Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
-- Copy the resource name with `y`, press `Y` to copy as YAML, JSON, or Table
+- Copy the resource name with `y`, press `Y` to copy as YAML, JSON, KYAML, or Table
 - Apply a manifest straight from your clipboard with `Ctrl+P`
 - Save the selected resource manifest to a file with `W`
 - Resource stuck in Terminating? `Ctrl+G` searches its finalizers and removes them

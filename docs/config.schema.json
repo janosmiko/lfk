@@ -854,6 +854,11 @@
           "type": "boolean",
           "description": "Startup default for line wrapping (runtime toggle: z).",
           "default": false
+        },
+        "kyaml": {
+          "type": "boolean",
+          "description": "Startup default for KYAML rendering (runtime toggle: K).",
+          "default": false
         }
       }
     },

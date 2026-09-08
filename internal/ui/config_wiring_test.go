@@ -45,6 +45,7 @@ log_viewer:
   wrap: true
 yaml_viewer:
   wrap: true
+  kyaml: true
 diff_viewer:
   wrap: true
   line_numbers: false
@@ -235,6 +236,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigLogPreviewLive, "log_viewer.preview_live")
 	assert.True(t, ConfigLogWrap, "log_viewer.wrap")
 	assert.True(t, ConfigYAMLViewerWrap, "yaml_viewer.wrap")
+	assert.True(t, ConfigYAMLViewerKYAML, "yaml_viewer.kyaml")
 	assert.True(t, ConfigDiffViewerWrap, "diff_viewer.wrap")
 	assert.False(t, ConfigDiffViewerLineNumbers, "diff_viewer.line_numbers")
 	assert.True(t, ConfigDiffViewerUnified, "diff_viewer.unified")
@@ -609,6 +611,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origLogMaxLines := ConfigLogMaxLines
 	origLogPreviewLive := ConfigLogPreviewLive
 	origYAMLWrap := ConfigYAMLViewerWrap
+	origYAMLKYAML := ConfigYAMLViewerKYAML
 	origDiffWrap := ConfigDiffViewerWrap
 	origDiffLineNums := ConfigDiffViewerLineNumbers
 	origDiffUnified := ConfigDiffViewerUnified
@@ -712,6 +715,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigLogMaxLines = origLogMaxLines
 		ConfigLogPreviewLive = origLogPreviewLive
 		ConfigYAMLViewerWrap = origYAMLWrap
+		ConfigYAMLViewerKYAML = origYAMLKYAML
 		ConfigDiffViewerWrap = origDiffWrap
 		ConfigDiffViewerLineNumbers = origDiffLineNums
 		ConfigDiffViewerUnified = origDiffUnified

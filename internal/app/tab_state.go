@@ -84,6 +84,9 @@ func (m *Model) saveCurrentTab() {
 	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
 	t.previewContentFingerprints = copyMapStringString(m.previewContentFingerprints)
 	t.yamlContent = m.yamlView.content
+	t.yamlSource = m.yamlView.source
+	t.yamlKYAML = m.yamlView.kyaml
+	t.yamlKYAMLReq = m.yamlView.kyamlReq
 	t.yamlScroll = m.yamlView.scroll
 	t.yamlCursor = m.yamlView.cursor
 	t.yamlScrollOption = m.yamlView.scrollOption
@@ -228,6 +231,9 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
 	m.previewContentFingerprints = copyMapStringString(t.previewContentFingerprints)
 	m.yamlView.content = t.yamlContent
+	m.yamlView.source = t.yamlSource
+	m.yamlView.kyaml = t.yamlKYAML
+	m.yamlView.kyamlReq = t.yamlKYAMLReq
 	m.yamlView.scroll = t.yamlScroll
 	m.yamlView.cursor = t.yamlCursor
 	m.yamlView.scrollOption = t.yamlScrollOption
@@ -482,6 +488,9 @@ func (m *Model) cloneCurrentTab() TabState {
 		cacheFingerprints:          copyMapStringString(m.cacheFingerprints),
 		previewContentFingerprints: copyMapStringString(m.previewContentFingerprints),
 		yamlContent:                m.yamlView.content,
+		yamlSource:                 m.yamlView.source,
+		yamlKYAML:                  m.yamlView.kyaml,
+		yamlKYAMLReq:               m.yamlView.kyamlReq,
 		yamlCollapsed:              copyMapStringBool(m.yamlView.collapsed),
 		splitPreview:               m.splitPreview,
 		fullYAMLPreview:            m.fullYAMLPreview,

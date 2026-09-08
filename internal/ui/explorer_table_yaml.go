@@ -58,6 +58,10 @@ func styleYAMLValue(val string) string {
 
 	lead := val[:len(val)-len(strings.TrimLeft(val, " "))]
 
+	if isKYAMLFlowValue(v) {
+		return lead + styleKYAMLFlow(v)
+	}
+
 	switch {
 	case yamlNullValues[v]:
 		return lead + YamlNullStyle.Render(v)
@@ -76,6 +80,75 @@ func styleYAMLValue(val string) string {
 	}
 
 	return lead + YamlStringStyle.Render(v)
+}
+
+func isKYAMLPunctuationByte(c byte) bool {
+	return c == '{' || c == '}' || c == '[' || c == ']' || c == ','
+}
+
+// isKYAMLPunctuationOnly matches the closing and opening lines KYAML emits on
+// their own, such as "}," and "[{".
+func isKYAMLPunctuationOnly(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := range len(s) {
+		if !isKYAMLPunctuationByte(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// isKYAMLFlowValue reports whether a value carries KYAML flow syntax. Only a
+// leading or trailing bracket or comma qualifies, so an ordinary block-YAML
+// scalar containing commas ("a, b, c") is left to the scalar classifier.
+func isKYAMLFlowValue(v string) bool {
+	if v == "" {
+		return false
+	}
+	return isKYAMLPunctuationByte(v[0]) || isKYAMLPunctuationByte(v[len(v)-1])
+}
+
+// styleKYAMLFlow renders brackets and commas as punctuation and hands the runs
+// between them back to the scalar classifier. Punctuation inside quotes is
+// data, so the quote state is tracked the way findYAMLColon tracks it.
+func styleKYAMLFlow(v string) string {
+	var b strings.Builder
+	inSingle, inDouble := false, false
+	start := 0
+	for i := range len(v) {
+		switch v[i] {
+		case '\'':
+			if !inDouble {
+				inSingle = !inSingle
+			}
+		case '"':
+			if !inSingle {
+				inDouble = !inDouble
+			}
+		case '{', '}', '[', ']', ',':
+			if inSingle || inDouble {
+				continue
+			}
+			if i > start {
+				b.WriteString(styleKYAMLFlowSegment(v[start:i]))
+			}
+			b.WriteString(YamlPunctuationStyle.Render(string(v[i])))
+			start = i + 1
+		}
+	}
+	if start < len(v) {
+		b.WriteString(styleKYAMLFlowSegment(v[start:]))
+	}
+	return b.String()
+}
+
+// styleKYAMLFlowSegment styles one run between two pieces of flow punctuation.
+// styleYAMLValue drops trailing spaces, so they are re-attached here.
+func styleKYAMLFlowSegment(seg string) string {
+	body := strings.TrimRight(seg, " ")
+	return styleYAMLValue(body) + seg[len(body):]
 }
 
 // isYAMLQuotedString returns true if v is a single- or double-quoted string.
@@ -149,6 +222,10 @@ func highlightYAMLContent(line string) string {
 
 	if strings.HasPrefix(trimmed, "#") {
 		return YamlCommentStyle.Render(line)
+	}
+
+	if isKYAMLPunctuationOnly(trimmed) {
+		return indent + styleKYAMLFlow(trimmed)
 	}
 
 	if strings.HasPrefix(trimmed, "- ") {

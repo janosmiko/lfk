@@ -361,6 +361,7 @@ func applyLogMaxLines(src *int) {
 func applyViewerDefaults(cfg configFile) {
 	if yv := cfg.YAMLViewer; yv != nil {
 		applyBoolPtr(yv.Wrap, &ConfigYAMLViewerWrap)
+		applyBoolPtr(yv.KYAML, &ConfigYAMLViewerKYAML)
 	}
 	if dv := cfg.DiffViewer; dv != nil {
 		applyBoolPtr(dv.Wrap, &ConfigDiffViewerWrap)

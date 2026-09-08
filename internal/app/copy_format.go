@@ -12,10 +12,11 @@ type CopyFormat int
 const (
 	CopyFormatYAML CopyFormat = iota
 	CopyFormatJSON
+	CopyFormatKYAML
 	CopyFormatTable
 )
 
-// Label returns the title-case display string ("YAML", "JSON",
+// Label returns the title-case display string ("YAML", "JSON", "KYAML",
 // "Table"). Used by the picker UI and the clipboard status text.
 func (f CopyFormat) Label() string {
 	switch f {
@@ -23,6 +24,8 @@ func (f CopyFormat) Label() string {
 		return "YAML"
 	case CopyFormatJSON:
 		return "JSON"
+	case CopyFormatKYAML:
+		return "KYAML"
 	case CopyFormatTable:
 		return "Table"
 	}
@@ -30,8 +33,8 @@ func (f CopyFormat) Label() string {
 }
 
 // ShortcutKey returns the single-letter shortcut that selects this
-// format directly from the picker. JSON uses uppercase "J" because
-// lowercase "j" is reserved for cursor-down navigation in the picker
+// format directly from the picker. JSON and KYAML use uppercase because
+// lowercase "j" and "k" are reserved for cursor navigation in the picker
 // (and globally); the chip-in-picker behaviour stays consistent with
 // YAML and Table so every row advertises a shortcut.
 func (f CopyFormat) ShortcutKey() string {
@@ -40,6 +43,8 @@ func (f CopyFormat) ShortcutKey() string {
 		return "y"
 	case CopyFormatJSON:
 		return "J"
+	case CopyFormatKYAML:
+		return "K"
 	case CopyFormatTable:
 		return "t"
 	}
@@ -49,12 +54,12 @@ func (f CopyFormat) ShortcutKey() string {
 // availableCopyFormats returns the picker rows applicable at the
 // given navigation level. Clusters and ResourceTypes only support
 // Table (there is no manifest behind those rows). All other levels
-// offer the full YAML / JSON / Table set.
+// offer the full YAML / JSON / KYAML / Table set.
 func availableCopyFormats(level model.Level) []CopyFormat {
 	switch level {
 	case model.LevelClusters, model.LevelResourceTypes:
 		return []CopyFormat{CopyFormatTable}
 	default:
-		return []CopyFormat{CopyFormatYAML, CopyFormatJSON, CopyFormatTable}
+		return []CopyFormat{CopyFormatYAML, CopyFormatJSON, CopyFormatKYAML, CopyFormatTable}
 	}
 }

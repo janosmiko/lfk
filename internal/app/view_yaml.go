@@ -180,6 +180,7 @@ func (m Model) yamlHintBar(fullWidth int) string {
 			{Key: "y", Desc: "copy"},
 			{Key: ui.ActiveKeybindings.ToggleFold, Desc: "fold"},
 			{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+			{Key: "K", Desc: "kyaml"},
 			{Key: "m", Desc: "blame"},
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "O", Desc: "object explorer"},

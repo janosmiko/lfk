@@ -424,6 +424,8 @@ type LogViewerConfig struct {
 type YAMLViewerConfig struct {
 	// Wrap: startup default for line wrapping (toggle: z). Default false.
 	Wrap *bool `json:"wrap" yaml:"wrap"`
+	// KYAML: startup default for KYAML rendering (toggle: K). Default false.
+	KYAML *bool `json:"kyaml" yaml:"kyaml"`
 }
 
 // DiffViewerConfig is the on-disk schema for the diff_viewer section.

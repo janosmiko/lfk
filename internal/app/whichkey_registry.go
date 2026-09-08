@@ -93,7 +93,7 @@ func newWKCtx(m *Model) *wkCtx {
 // identically at every level from LevelClusters through LevelContainers —
 // see availableCopyFormats (copy_format.go), which explicitly documents
 // "Clusters and ResourceTypes only support Table ... All other levels offer
-// the full YAML / JSON / Table set" rather than refusing those levels.
+// the full YAML / JSON / KYAML / Table set" rather than refusing those levels.
 func wkRowSelected(c *wkCtx) bool {
 	return c.sel != nil
 }

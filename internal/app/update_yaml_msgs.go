@@ -32,8 +32,9 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 	// the main event loop stays responsive on very large CRD manifests.
 	m.yamlView.content = msg.content
 	m.yamlView.sections = msg.sections
+	cmd := m.applyYAMLKYAMLRender()
 	m.applyYAMLPendingCursor() // sync cursor when arriving from the Object Explorer
-	return m, nil
+	return m, cmd
 }
 
 // updateYamlBlameLoaded stores the per-line blame entries. Any failure turns
@@ -131,12 +132,14 @@ func (m Model) updateYamlClipboard(msg yamlClipboardMsg) (tea.Model, tea.Cmd) {
 
 // copyFormatStatusParts returns the (label, plural-unit) pair used in the
 // clipboard status message. label is title-case for the status line ("YAML",
-// "JSON", "Table"); unit is the plural noun for bulk copies. Empty format
+// "JSON", "KYAML", "Table"); unit is the plural noun for bulk copies. Empty format
 // defaults to YAML so legacy callers stay correct.
 func copyFormatStatusParts(format string) (label, unit string) {
 	switch format {
 	case "json":
 		return "JSON", "manifests"
+	case "kyaml":
+		return "KYAML", "manifests"
 	case "table":
 		return "Table", "rows"
 	default:

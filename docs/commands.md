@@ -17,7 +17,7 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:context <ctx>` &nbsp;·&nbsp; `:ctx <ctx>` | Switch kube context |
 | `:sort <column>` | Sort the current list by column name |
 | `:set <option>` | Toggle log viewer option (see below) |
-| `:export [yaml\|json]` | Copy selected resource(s) to clipboard |
+| `:export [yaml\|json\|kyaml]` | Copy selected resource(s) to clipboard |
 | `:scheduler` | Open scheduler / task queue overlay |
 | `:bookmarks` | Open bookmarks overlay |
 | `:reload` &nbsp;·&nbsp; `:refresh` | Force refresh of the current list |
@@ -46,6 +46,7 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `timestamps` / `notimestamps` | Timestamps |
 | `follow` / `nofollow` | Auto-scroll to tail |
 | `ansi` / `noansi` | Render ANSI SGR colors from log output |
+| `kyaml` / `nokyaml` | KYAML rendering in the YAML viewer |
 
 `noansi` replaces ESC bytes with U+FFFD (see `log_viewer.render_ansi` in [config-reference.md](config-reference.md)).
 

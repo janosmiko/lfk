@@ -769,6 +769,9 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	m.yamlReturnMode = modeExplorer
 	m.yamlView.scroll = 0
 	m.yamlView.content = "Loading..."
+	m.yamlView.source = ""
+	m.yamlView.kyaml = ui.ConfigYAMLViewerKYAML
+	m.nextKYAMLReq() // a conversion for the previous resource must not land here
 	m.yamlView.sections = nil
 	m.yamlView.visualCurCol = yamlFoldPrefixLen
 	m.yamlView.resetBlame()

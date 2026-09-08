@@ -137,7 +137,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		perms:                      newPermissionState(),
 		selectedItems:              make(map[string]bool),
 		selectionAnchor:            -1,
-		yamlView:                   yamlViewState{collapsed: make(map[string]bool), wrap: vp[prefYAMLViewerWrap]},
+		yamlView:                   yamlViewState{collapsed: make(map[string]bool), wrap: vp[prefYAMLViewerWrap], kyaml: ui.ConfigYAMLViewerKYAML},
 		describeView:               describeViewState{wrap: vp[prefDescribeViewerWrap]},
 		dashboardAcc:               make(map[string]*dashboardAccumulator),
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),

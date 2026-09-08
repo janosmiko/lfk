@@ -33,8 +33,8 @@ func (m Model) copyFormatPickerHints() []ui.HintEntry {
 // picker. j/k/down/up cycle the cursor (j/k stays consistent with
 // the global navigation aliases); enter applies the cursor row;
 // esc/q cancel; letter shortcuts apply the matching format directly.
-// JSON's shortcut is uppercase "J" so it doesn't collide with the
-// lowercase "j" cursor-down alias.
+// JSON and KYAML use uppercase "J" and "K" so they don't collide with
+// the lowercase j/k cursor aliases.
 func (m Model) handleCopyFormatPickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":

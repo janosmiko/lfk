@@ -243,7 +243,7 @@ type monitoringDashboardMsg struct {
 }
 
 // yamlClipboardMsg carries serialized content to be copied to the clipboard.
-// format is one of "yaml" (default), "json", "table". Empty format is treated
+// format is one of "yaml" (default), "json", "kyaml", "table". Empty format is treated
 // as "yaml" for back-compat with existing call sites that haven't been
 // updated. count is the number of items joined into content (1 = single).
 type yamlClipboardMsg struct {

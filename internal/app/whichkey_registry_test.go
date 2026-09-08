@@ -366,7 +366,7 @@ func TestAvailableWhichKeyActions_ShowsLabelEditorAtLevelOwned(t *testing.T) {
 // the two named findings): CopyName never checked level at all, and
 // availableCopyFormats (copy_format.go) explicitly documents that
 // CopyYAML/CopyField also work at every level — "Clusters and ResourceTypes
-// only support Table ... All other levels offer the full YAML / JSON / Table
+// only support Table ... All other levels offer the full YAML / JSON / KYAML / Table
 // set" — yet all three predicates inherited wkOnRow's ">= LevelResources"
 // and were hidden at LevelClusters/LevelResourceTypes where the key still
 // works.

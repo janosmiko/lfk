@@ -204,10 +204,12 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case kb.Help, "f1":
 		return m.handleYAMLKeyQuestion()
+	case "K":
+		return m.toggleYAMLKYAML()
 	case "m":
-		return m.handleYAMLToggleBlame()
+		return m.handleYAMLBlameKey()
 	case "O":
-		return m.handleYAMLKeyObjectExplorer()
+		return m.handleYAMLObjectExplorerKey()
 	case "I":
 		return m.openExplainAtObjectPath(m.yamlCursorPath(), modeYAML)
 	case kb.FieldDoc:

@@ -211,7 +211,7 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 	case "sort":
 		return filterSuggestionsFuzzy(ui.ActiveSortableColumns, prefix, "column")
 	case "export":
-		return filterSuggestionsFuzzy([]string{"yaml", "json"}, prefix, "format")
+		return filterSuggestionsFuzzy([]string{"yaml", "json", "kyaml"}, prefix, "format")
 	case "orphans":
 		return filterSuggestionsFuzzy(orphanKindCompletions(), prefix, "kind")
 	case "session":
@@ -330,6 +330,7 @@ func setOptions() []string {
 		"timestamps", "notimestamps",
 		"follow", "nofollow",
 		"ansi", "noansi",
+		"kyaml", "nokyaml",
 	}
 }
 

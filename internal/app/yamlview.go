@@ -11,7 +11,10 @@ package app
 // TabState (see tabs.go); the remaining fields are transient and reset on
 // view entry.
 type yamlViewState struct {
-	content      string    // rendered YAML body shown in the viewer
+	content      string    // rendered body shown in the viewer (block YAML, or KYAML when kyaml is on)
+	source       string    // block YAML as loaded; the input every KYAML re-render converts from
+	kyaml        bool      // render the document as KYAML instead of block YAML
+	kyamlReq     uint64    // numbers each conversion so a superseded reply is dropped
 	scroll       int       // top visible line
 	cursor       int       // cursor line in visible-line space
 	scrollOption int       // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)

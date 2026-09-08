@@ -32,6 +32,10 @@ var ConfigLogWrap = false
 // (runtime toggle: z). Default false.
 var ConfigYAMLViewerWrap = false
 
+// ConfigYAMLViewerKYAML is the startup default for rendering the YAML viewer
+// as KYAML (runtime toggle: K). Default false.
+var ConfigYAMLViewerKYAML = false
+
 // ConfigDiffViewerWrap is the startup default for diff viewer line wrapping
 // (runtime toggle: Ctrl+W / >). Default false.
 var ConfigDiffViewerWrap = false
