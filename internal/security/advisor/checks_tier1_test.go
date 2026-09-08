@@ -169,13 +169,27 @@ func TestQuotaNearLimit(t *testing.T) {
 }
 
 func hpaScaled(ns, name, target string, minReplicas, maxReplicas, desired int32) *autoscalingv2.HorizontalPodAutoscaler {
+	spec := autoscalingv2.HorizontalPodAutoscalerSpec{
+		ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: target},
+		MinReplicas:    &minReplicas,
+		MaxReplicas:    maxReplicas,
+	}
+	if minReplicas == 0 {
+		// The Kubernetes API only admits minReplicas: 0 when the HPA has an Object or External metric.
+		spec.Metrics = []autoscalingv2.MetricSpec{{
+			Type: autoscalingv2.ExternalMetricSourceType,
+			External: &autoscalingv2.ExternalMetricSource{
+				Metric: autoscalingv2.MetricIdentifier{Name: "queue_length"},
+				Target: autoscalingv2.MetricTarget{
+					Type:         autoscalingv2.AverageValueMetricType,
+					AverageValue: resource.NewQuantity(10, resource.DecimalSI),
+				},
+			},
+		}}
+	}
 	return &autoscalingv2.HorizontalPodAutoscaler{
 		Namespace: ns, Name: name,
-		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Kind: "Deployment", Name: target},
-			MinReplicas:    &minReplicas,
-			MaxReplicas:    maxReplicas,
-		},
+		Spec:   spec,
 		Status: autoscalingv2.HorizontalPodAutoscalerStatus{DesiredReplicas: desired},
 	}
 }
