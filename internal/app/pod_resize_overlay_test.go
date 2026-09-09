@@ -22,6 +22,19 @@ func TestPodResizeOverlay_RendersPrefilledRows(t *testing.T) {
 	assert.Contains(t, view, "200m")
 }
 
+// Names from the API object are untrusted terminal text and must not reach
+// the screen with their escape sequences intact.
+func TestPodResizeOverlay_SanitizesNamesFromTheObject(t *testing.T) {
+	m := podResizeOverlayModel()
+	m.podResize.name = "pod\x1b]0;evil\x07"
+	m.podResize.containers[0].name = "web\x1b[31m"
+	m.podResize.restartWarn = []string{"web\x1b[31m"}
+
+	view := m.View().Content
+	assert.NotContains(t, view, "\x1b]0;evil")
+	assert.NotContains(t, view, "web\x1b[31m")
+}
+
 func TestPodResizeOverlay_ShowsRestartWarning(t *testing.T) {
 	m := podResizeOverlayModel()
 	require.Equal(t, []string{"web"}, m.podResize.restartWarn)

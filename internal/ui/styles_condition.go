@@ -40,7 +40,7 @@ var conditionPolarities = map[string]condPolarity{
 	"reconciling": condInfo,
 	"stalled":     condError,
 	"healthy":     condReady,
-	// In-place pod resize (Kubernetes 1.33+).
+	// In-place pod resize (GA in Kubernetes 1.35).
 	"podresizepending":    condWarning,
 	"podresizeinprogress": condInfo,
 }

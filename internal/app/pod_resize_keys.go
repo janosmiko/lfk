@@ -117,9 +117,9 @@ func (m Model) applyPodResizeOverlay() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// Belt-and-suspenders read-only gate: the dispatcher blocks "Resize"
-	// upstream for PVCs, but Pod resize is only gated here since the
-	// action label is shared between the two kinds (D4).
+	// This is the only read-only gate for the resize action: "Resize" is
+	// not in mutatingActions, so the dispatcher lets the form open and the
+	// check has to happen at submit, as the PVC path does.
 	if m.actionTargetBlockedByReadOnly() {
 		m.overlay = overlayNone
 		m.podResize = podResizeState{}

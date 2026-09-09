@@ -13,11 +13,14 @@ import (
 func podResizeFieldLabels(st podResizeState) []string {
 	labels := make([]string, 0, st.totalFields())
 	for _, c := range st.containers {
+		// Container names come from the API object, so they are untrusted
+		// terminal text. The patch body still uses the raw name.
+		name := ui.SanitizeTerminalText(c.name)
 		labels = append(labels,
-			c.name+" CPU Req:",
-			c.name+" CPU Lim:",
-			c.name+" Mem Req:",
-			c.name+" Mem Lim:",
+			name+" CPU Req:",
+			name+" CPU Lim:",
+			name+" Mem Req:",
+			name+" Mem Lim:",
 		)
 	}
 	return labels
@@ -76,14 +79,14 @@ func renderPodResizeOverlay(m Model) (string, int, int) {
 	if len(st.restartWarn) > 0 {
 		notes = append(notes, ui.ConfirmNote{
 			Label: "Restart",
-			Text:  strings.Join(st.restartWarn, ", ") + " will restart to apply",
+			Text:  ui.SanitizeTerminalText(strings.Join(st.restartWarn, ", ")) + " will restart to apply",
 			Warn:  true,
 		})
 	}
 
 	content := ui.RenderOverlayInput(ui.OverlayInputConfig{
 		Title:    "Resize Pod",
-		Subtitle: st.name,
+		Subtitle: ui.SanitizeTerminalText(st.name),
 		Width:    innerW,
 		Rows:     rows,
 		Notes:    notes,
