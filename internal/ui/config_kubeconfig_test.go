@@ -32,8 +32,8 @@ func TestApplyKubeconfigDirsSetting_InvalidValueNotLogged(t *testing.T) {
 		},
 		{
 			name:    "number",
-			raw:     "42",
-			secret:  "42",
+			raw:     "9876543210",
+			secret:  "9876543210",
 			wantLog: "number",
 		},
 	}
