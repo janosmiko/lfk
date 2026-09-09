@@ -44,16 +44,18 @@ func TestPodResizeOverlay_CapsFieldLength(t *testing.T) {
 	assert.LessOrEqual(t, len(m.podResize.active().Value), podResizeMaxLen)
 }
 
-func TestPodResizeOverlay_AcceptsKiSuffix(t *testing.T) {
-	m := podResizeOverlayModel()
-	m.podResize.active().Clear()
+func TestPodResizeOverlay_AcceptsQuantityForms(t *testing.T) {
+	for _, want := range []string{"1Ki", "1e-3", "1E+3"} {
+		m := podResizeOverlayModel()
+		m.podResize.active().Clear()
 
-	for _, r := range "1Ki" {
-		ret, _ := m.handlePodResizeOverlayKey(runeKey(r))
-		m = ret.(Model)
+		for _, r := range want {
+			ret, _ := m.handlePodResizeOverlayKey(runeKey(r))
+			m = ret.(Model)
+		}
+
+		assert.Equal(t, want, m.podResize.active().Value)
 	}
-
-	assert.Equal(t, "1Ki", m.podResize.active().Value)
 }
 
 func TestPodResizeOverlay_ShowsRestartWarning(t *testing.T) {

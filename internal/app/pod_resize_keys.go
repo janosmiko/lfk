@@ -7,9 +7,9 @@ import (
 )
 
 // podResizeCharset covers every letter used in a Kubernetes quantity
-// suffix (Ki/Mi/.../Ei, k/M/.../E, e/E, m/u/n); resource.ParseQuantity is
-// still the final validator at submit.
-const podResizeCharset = "0123456789.eEinumkKMGTPE"
+// suffix (Ki/Mi/.../Ei, k/M/.../E, e/E, m/u/n) and the exponent signs;
+// resource.ParseQuantity is still the final validator at submit.
+const podResizeCharset = "0123456789.+-eEinumkKMGTPE"
 
 // podResizeMaxLen bounds a quantity field. The longest sensible value
 // ("1234567.5Mi") is far shorter, and a cap keeps a held key from growing
