@@ -691,3 +691,55 @@ func TestExtractStatus_ConditionsWithInvalidEntry(t *testing.T) {
 	// Non-map entry should be skipped; last valid condition is "Ready".
 	assert.Equal(t, "Ready", extractStatus(obj))
 }
+
+func TestBuildContainerItemChangedAt(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	c := corev1.Container{Name: "app", Image: "myapp:v1"}
+
+	t.Run("running container changed when it started", func(t *testing.T) {
+		statuses := []corev1.ContainerStatus{{
+			Name: "app", Ready: true,
+			State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(now.Add(-10 * time.Minute))}},
+		}}
+		item := buildContainerItem(c, statuses, false, false, false)
+
+		assert.Equal(t, now.Add(-10*time.Minute), item.ChangedAt)
+		assert.True(t, item.LastRestartAt.IsZero(), "a plain start is not a restart")
+	})
+
+	t.Run("restarted container changed when the last run finished", func(t *testing.T) {
+		statuses := []corev1.ContainerStatus{{
+			Name: "app", Ready: true, RestartCount: 1,
+			State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(now.Add(-2 * time.Minute))}},
+			LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+				Reason: "Error", ExitCode: 1, FinishedAt: metav1.NewTime(now.Add(-3 * time.Minute)),
+			}},
+		}}
+		item := buildContainerItem(c, statuses, false, false, false)
+
+		assert.Equal(t, now.Add(-2*time.Minute), item.ChangedAt, "the newest timestamp wins")
+		assert.Equal(t, now.Add(-3*time.Minute), item.LastRestartAt)
+	})
+
+	t.Run("terminated container changed when it finished", func(t *testing.T) {
+		statuses := []corev1.ContainerStatus{{
+			Name: "app",
+			State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+				Reason: "Completed", StartedAt: metav1.NewTime(now.Add(-time.Hour)), FinishedAt: metav1.NewTime(now.Add(-30 * time.Minute)),
+			}},
+		}}
+		item := buildContainerItem(c, statuses, false, false, false)
+
+		assert.Equal(t, now.Add(-30*time.Minute), item.ChangedAt)
+	})
+
+	t.Run("waiting container without history has no change time", func(t *testing.T) {
+		statuses := []corev1.ContainerStatus{{
+			Name:  "app",
+			State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "ContainerCreating"}},
+		}}
+		item := buildContainerItem(c, statuses, false, false, false)
+
+		assert.True(t, item.ChangedAt.IsZero())
+	})
+}

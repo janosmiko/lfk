@@ -116,6 +116,34 @@ func TestChangedAgeReportsNothingWithoutAnySource(t *testing.T) {
 	}
 }
 
+func TestChangedAgeUsesChangedAtForContainers(t *testing.T) {
+	now := time.Now()
+	// A container: no conditions, no raw object, only the status timestamp.
+	it := model.Item{Name: "app", Kind: "Container", ChangedAt: now.Add(-45 * time.Second)}
+
+	age, ok := changeAge(it, now)
+	if !ok {
+		t.Fatal("a container with a status timestamp must report a change time")
+	}
+	if age != 45*time.Second {
+		t.Fatalf("want the status timestamp, got %v", age)
+	}
+}
+
+func TestChangedAgePrefersTheNewestOfChangedAtAndRestart(t *testing.T) {
+	now := time.Now()
+	it := model.Item{
+		Name: "app", Kind: "Container",
+		ChangedAt:     now.Add(-time.Hour),
+		LastRestartAt: now.Add(-20 * time.Second),
+	}
+
+	age, _ := changeAge(it, now)
+	if age != 20*time.Second {
+		t.Fatalf("the newest of the two must win, got %v", age)
+	}
+}
+
 func TestChangedAgeSurvivesMalformedRaw(t *testing.T) {
 	now := time.Now()
 	cases := []map[string]any{

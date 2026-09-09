@@ -255,6 +255,7 @@ type Item struct {
 	Ready         string    // Ready count (e.g., "2/3" for pods or deployments)
 	Restarts      string    // Restart count (for pods)
 	LastRestartAt time.Time // Most recent container restart time
+	ChangedAt     time.Time // Newest status timestamp for kinds with no conditions (containers)
 	CreatedAt     time.Time // Creation timestamp for sorting (Events: first observed timestamp in the series)
 	LastSeen      time.Time // Most recent observation (Events only — drives the "Last Seen" column)
 	// BootedAt is when a node last booted (Nodes only, from Prometheus

@@ -18,6 +18,9 @@ const ChangedColumnKey = ui.ChangedColumnName
 // that someone wrote, so it serves kinds with no conditions and no restarts.
 func changeAt(it model.Item) (time.Time, bool) {
 	last := it.LastRestartAt
+	if it.ChangedAt.After(last) {
+		last = it.ChangedAt
+	}
 	for _, c := range it.Conditions {
 		if c.LastTransitionTime.After(last) {
 			last = c.LastTransitionTime

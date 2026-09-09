@@ -161,6 +161,10 @@ func buildContainerItem(c corev1.Container, statuses []corev1.ContainerStatus, i
 			item.CreatedAt = cs.State.Running.StartedAt.Time
 			item.Age = formatAge(time.Since(cs.State.Running.StartedAt.Time))
 		}
+		item.ChangedAt = containerChangedAt(cs)
+		if lt := cs.LastTerminationState.Terminated; lt != nil {
+			item.LastRestartAt = lt.FinishedAt.Time
+		}
 
 		// Add reason to columns if not ready.
 		if !cs.Ready {
@@ -225,6 +229,22 @@ func buildContainerItem(c corev1.Container, statuses []corev1.ContainerStatus, i
 	}
 
 	return item
+}
+
+// containerChangedAt returns the newest timestamp in the container status.
+// A waiting container with no history has none.
+func containerChangedAt(cs corev1.ContainerStatus) time.Time {
+	var last time.Time
+	if r := cs.State.Running; r != nil && r.StartedAt.After(last) {
+		last = r.StartedAt.Time
+	}
+	if t := cs.State.Terminated; t != nil && t.FinishedAt.After(last) {
+		last = t.FinishedAt.Time
+	}
+	if lt := cs.LastTerminationState.Terminated; lt != nil && lt.FinishedAt.After(last) {
+		last = lt.FinishedAt.Time
+	}
+	return last
 }
 
 func containerStateString(ready bool, waiting *corev1.ContainerStateWaiting, running *corev1.ContainerStateRunning, terminated *corev1.ContainerStateTerminated) string {
