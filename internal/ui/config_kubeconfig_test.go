@@ -21,16 +21,19 @@ func TestApplyKubeconfigDirsSetting_InvalidValueNotLogged(t *testing.T) {
 	tests := []struct {
 		name    string
 		raw     string
+		secret  string
 		wantLog string
 	}{
 		{
 			name:    "map with secret token",
 			raw:     `{"token":"super-secret-value-12345"}`,
+			secret:  "super-secret-value-12345",
 			wantLog: "map",
 		},
 		{
 			name:    "number",
 			raw:     "42",
+			secret:  "42",
 			wantLog: "number",
 		},
 	}
@@ -44,6 +47,7 @@ func TestApplyKubeconfigDirsSetting_InvalidValueNotLogged(t *testing.T) {
 
 			out := buf.String()
 			assert.NotContains(t, out, tc.raw, "raw config value must not be logged")
+			assert.NotContains(t, out, tc.secret, "secret value must not be logged")
 			assert.Contains(t, out, tc.wantLog, "log must describe the unrecognised shape")
 		})
 	}
