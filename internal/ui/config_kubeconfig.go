@@ -64,12 +64,39 @@ func applyKubeconfigDirsSetting(s *kubeconfigDirsSetting) {
 	}
 	if s.invalid {
 		logger.Warn("unrecognised kubeconfig_dir value in config; ignored",
-			"value", s.raw,
+			"value_shape", kubeconfigDirsValueShape(s.raw),
 			"valid", "string or list of strings")
 		return
 	}
 	if len(s.paths) > 0 {
 		ConfigKubeconfigDirs = s.paths
+	}
+}
+
+// kubeconfigDirsValueShape describes the JSON shape of an unrecognised
+// kubeconfig_dir value without echoing the value itself, so a pasted secret
+// never lands in the log file (CWE-532).
+func kubeconfigDirsValueShape(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "empty"
+	}
+	switch trimmed[0] {
+	case '{':
+		return "map"
+	case '[':
+		return "list"
+	case '"':
+		return "string"
+	case 't', 'f':
+		return "bool"
+	case 'n':
+		return "null"
+	default:
+		if trimmed[0] == '-' || (trimmed[0] >= '0' && trimmed[0] <= '9') {
+			return "number"
+		}
+		return "unknown"
 	}
 }
 
