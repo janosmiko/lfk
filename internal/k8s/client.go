@@ -446,10 +446,10 @@ func (c *Client) ApplyManifest(ctx context.Context, contextName, defaultNamespac
 // kubeconfigOverride (--kubeconfig) beats everything: when non-empty it is
 // the only file loaded.
 func NewClient(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExclusive bool, kubeconfigIgnore []string) (*Client, error) {
-	kubeconfigPaths := resolveKubeconfigPaths(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive, kubeconfigIgnore)
+	kubeconfigSources := resolveKubeconfigSources(kubeconfigOverride, kubeconfigDirs, kubeconfigExclusive, kubeconfigIgnore)
 
 	loadingRules := &clientcmd.ClientConfigLoadingRules{
-		Precedence: kubeconfigPaths,
+		Precedence: sourcePaths(kubeconfigSources),
 	}
 
 	configOverrides := &clientcmd.ConfigOverrides{}
@@ -460,7 +460,7 @@ func NewClient(kubeconfigOverride string, kubeconfigDirs []string, kubeconfigExc
 		return nil, fmt.Errorf("loading kubeconfig: %w", err)
 	}
 
-	contexts, order, current := collectContexts(kubeconfigPaths, rawConfig.CurrentContext)
+	contexts, order, current := collectContexts(kubeconfigSources, rawConfig.CurrentContext)
 
 	return &Client{
 		rawConfig:      rawConfig,
@@ -496,7 +496,7 @@ func (c *Client) ReloadKubeconfig() error {
 		// just restart lfk.
 		return nil
 	}
-	contexts, order, current := collectContexts(c.loadingRules.Precedence, rawConfig.CurrentContext)
+	contexts, order, current := collectContexts(sourcesFromPaths(c.loadingRules.Precedence), rawConfig.CurrentContext)
 	c.configMu.Lock()
 	c.rawConfig = rawConfig
 	c.contexts = contexts

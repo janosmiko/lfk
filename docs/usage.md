@@ -198,7 +198,7 @@ Precedence (replacement, not merge): `--kubeconfig-dir` flag > `KUBECONFIG_DIR` 
 
 lfk validates every directory exists at startup and errors out loudly on a typo. The `--kubeconfig` flag bypasses all directory discovery entirely.
 
-lfk skips known non-kubeconfig files in a scanned directory. It then drops any remaining file that fails to parse. A file you name with `--kubeconfig` or `KUBECONFIG` still fails loudly when it is broken.
+lfk skips known non-kubeconfig files in a scanned directory. It then drops any remaining file that fails to parse, and any file that declares no clusters, no users, no contexts and no current-context, such as a credential cache. A split kubeconfig fragment declares at least one of the four, so it survives. A file you name with `--kubeconfig` or `KUBECONFIG` still fails loudly when it is broken.
 
 The skip list holds these glob patterns by default, matched against a file's base name, case-insensitively:
 
