@@ -78,6 +78,18 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 	case "MutatingAdmissionPolicyBinding":
 		populateMutatingAdmissionPolicyBinding(ti, spec)
 
+	case "ResourceClaim":
+		populateResourceClaim(ti, status)
+
+	case "ResourceClaimTemplate":
+		populateResourceClaimTemplate(ti, spec)
+
+	case "ResourceSlice":
+		populateResourceSlice(ti, spec)
+
+	case "DeviceClass":
+		populateDeviceClass(ti, spec)
+
 	default:
 		populateGenericCRDResource(ti, status)
 	}

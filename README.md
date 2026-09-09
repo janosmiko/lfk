@@ -160,7 +160,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 ### Resource type list
 
-- Groups: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
+- Groups: Dashboards, Workloads, Networking, Config, Storage, Hardware, ArgoCD, Helm, Access Control, Cluster, Custom Resources
 - Discovered CRDs grouped by API group, for example `argoproj.io`, `longhorn.io`
 - Pin a type with `p`: [keybindings.md](docs/keybindings.md#navigation)
 - Pin a type's dashboard summary with `x`: [config-reference.md](docs/config-reference.md#top-level-fields)

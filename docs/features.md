@@ -48,6 +48,10 @@ Pause and unpause ScaledObjects and ScaledJobs.
 
 Force a refresh of ExternalSecrets, ClusterExternalSecrets, and PushSecrets.
 
+## Dynamic Resource Allocation
+
+The Hardware category lists ResourceClaims, ResourceClaimTemplates, ResourceSlices, and DeviceClasses. A pod's detail pane shows the resource claims it uses.
+
 ## Right-sizing advisor
 
 `x` -> `z` suggests CPU and memory requests and limits per container. The suggestion is only as good as the strategy behind it, shown in the `Strategy:` chip.

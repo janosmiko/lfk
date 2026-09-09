@@ -121,6 +121,52 @@ func populatePodExtraColumns(ti *model.Item, _ map[string]any, status, spec map[
 	if nodeName, ok := spec["nodeName"].(string); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Node", Value: nodeName})
 	}
+	populatePodResourceClaims(ti, status, spec)
+}
+
+// A template-backed claim has no name until the controller generates one,
+// so it is resolved through status.resourceClaimStatuses.
+func populatePodResourceClaims(ti *model.Item, status, spec map[string]any) {
+	claims, ok := spec["resourceClaims"].([]any)
+	if !ok || len(claims) == 0 {
+		return
+	}
+	statuses, _ := status["resourceClaimStatuses"].([]any)
+	var names []string
+	for _, c := range claims {
+		claim, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		if name := resolvePodResourceClaimName(claim, statuses); name != "" {
+			names = append(names, name)
+		}
+	}
+	if len(names) > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Resource Claims", Value: strings.Join(names, ", ")})
+	}
+}
+
+func resolvePodResourceClaimName(claim map[string]any, statuses []any) string {
+	if direct, ok := claim["resourceClaimName"].(string); ok && direct != "" {
+		return direct
+	}
+	claimName, _ := claim["name"].(string)
+	for _, s := range statuses {
+		st, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, _ := st["name"].(string); name != claimName {
+			continue
+		}
+		if resolved, ok := st["resourceClaimName"].(string); ok && resolved != "" {
+			return resolved
+		}
+		break
+	}
+	tmpl, _ := claim["resourceClaimTemplateName"].(string)
+	return tmpl
 }
 
 func populateDeploymentDetails(ti *model.Item, obj, status, spec map[string]any) {

@@ -86,6 +86,26 @@ func TestBuiltInMetadata_CoversGatewayAPI(t *testing.T) {
 	}
 }
 
+// TestBuiltInMetadata_CoversHardware asserts the DRA kinds
+// (resource.k8s.io/*) carry the Hardware category and a sort rank.
+func TestBuiltInMetadata_CoversHardware(t *testing.T) {
+	required := []string{
+		"resource.k8s.io/resourceclaims",
+		"resource.k8s.io/resourceclaimtemplates",
+		"resource.k8s.io/resourceslices",
+		"resource.k8s.io/deviceclasses",
+	}
+	for _, key := range required {
+		meta, ok := BuiltInMetadata[key]
+		if assert.True(t, ok, "BuiltInMetadata must contain %s", key) {
+			assert.Equal(t, "Hardware", meta.Category,
+				"%s must be in the Hardware category", key)
+		}
+		_, ranked := BuiltInOrderRank[key]
+		assert.True(t, ranked, "BuiltInOrderRank must contain %s", key)
+	}
+}
+
 // TestBuiltInMetadataCatalogIntegrity enforces that every entry in
 // BuiltInMetadata has all four curated Icon variants populated: the
 // canonical Unicode glyph, the ASCII Simple label, the Emoji glyph,

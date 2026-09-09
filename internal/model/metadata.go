@@ -12,6 +12,7 @@ var CoreCategories = []string{
 	"Config",
 	"Networking",
 	"Storage",
+	"Hardware",
 	"Access Control",
 	"Helm",
 	"API and CRDs",
@@ -185,6 +186,12 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"storage.k8s.io/csinodes":             {Category: "Storage", DisplayName: "CSINodes", Icon: Icon{Unicode: "▤", Simple: "[Cs]", Emoji: "🧩", NerdFont: "\U000f0431"}, Rare: true},
 	"storage.k8s.io/csistoragecapacities": {Category: "Storage", DisplayName: "CSIStorageCapacities", Icon: Icon{Unicode: "▤", Simple: "[Cs]", Emoji: "🧩", NerdFont: "\U000f0431"}, Rare: true},
 	"storage.k8s.io/volumeattachments":    {Category: "Storage", DisplayName: "VolumeAttachments", Icon: Icon{Unicode: "▤", Simple: "[Cs]", Emoji: "🧩", NerdFont: "\U000f0431"}, Rare: true},
+
+	// ---- Hardware ----
+	"resource.k8s.io/resourceclaims":         {Category: "Hardware", DisplayName: "ResourceClaims", Icon: Icon{Unicode: "⎔", Simple: "[Cl]", Emoji: "🎫", NerdFont: "\U000f035b"}},
+	"resource.k8s.io/resourceclaimtemplates": {Category: "Hardware", DisplayName: "ResourceClaimTemplates", Icon: Icon{Unicode: "⌸", Simple: "[Ct]", Emoji: "📇", NerdFont: "\U000f0ede"}},
+	"resource.k8s.io/resourceslices":         {Category: "Hardware", DisplayName: "ResourceSlices", Icon: Icon{Unicode: "▰", Simple: "[Sl]", Emoji: "🔲", NerdFont: "\U000f0ee0"}},
+	"resource.k8s.io/deviceclasses":          {Category: "Hardware", DisplayName: "DeviceClasses", Icon: Icon{Unicode: "⌲", Simple: "[Dc]", Emoji: "🎛️", NerdFont: "\U000f0464"}},
 
 	// ---- Access Control ----
 	"/serviceaccounts":                              {Category: "Access Control", DisplayName: "ServiceAccounts", Icon: Icon{Unicode: "⚇", Simple: "[SA]", Emoji: "👤", NerdFont: "\U000f0004"}},
@@ -459,6 +466,13 @@ var BuiltInOrderRank = map[string]int{
 	"_security/findings-advisor":   110,
 	"_security/findings-heuristic": 111,
 	"_security/findings-rbac":      112,
+
+	// Hardware. Rank orders within a category only, so the block takes the
+	// next free decade instead of squeezing between Storage and Access Control.
+	"resource.k8s.io/resourceclaims":         120,
+	"resource.k8s.io/resourceclaimtemplates": 121,
+	"resource.k8s.io/resourceslices":         122,
+	"resource.k8s.io/deviceclasses":          123,
 }
 
 // PseudoResources returns the LFK-only resource types that are not served
