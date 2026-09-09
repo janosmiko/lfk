@@ -493,6 +493,7 @@ func isHiddenColumnPrefix(key string) bool {
 	return strings.HasPrefix(key, "__") ||
 		strings.HasPrefix(key, "secret:") ||
 		strings.HasPrefix(key, "owner:") ||
+		strings.HasPrefix(key, "claim:") ||
 		strings.HasPrefix(key, "data:") ||
 		strings.HasPrefix(key, "condition:") ||
 		strings.HasPrefix(key, "step:")

@@ -64,6 +64,8 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, b
 		return m.handleExplorerActionKeyPreviewUp()
 	case kb.JumpOwner:
 		return m.handleExplorerActionKeyJumpOwner()
+	case kb.JumpClaim:
+		return m.handleExplorerActionKeyJumpClaim()
 	case kb.SortNext:
 		return m.handleExplorerActionKeySortNext()
 	case kb.SortPrev:

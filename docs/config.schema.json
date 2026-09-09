@@ -454,6 +454,7 @@
         "preview_down": { "type": "string" },
         "preview_up": { "type": "string" },
         "jump_owner": { "type": "string" },
+        "jump_claim": { "type": "string" },
         "jump_back": { "type": "string" },
         "help": { "type": "string" },
         "filter": { "type": "string" },

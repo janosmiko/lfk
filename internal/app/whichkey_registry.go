@@ -616,7 +616,7 @@ func whichKeyExcludedBindings() map[string]string {
 		"PageDown": "navigation", "PageUp": "navigation", "PageForward": "navigation", "PageBack": "navigation",
 		"LevelCluster": "navigation", "LevelTypes": "navigation", "LevelResources": "navigation",
 		"PreviewDown": "navigation", "PreviewUp": "navigation",
-		"JumpOwner": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
+		"JumpOwner": "navigation", "JumpClaim": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
 		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
 
 		// The leader itself: pressing it opens the panel rather than running a

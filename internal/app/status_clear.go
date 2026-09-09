@@ -38,7 +38,7 @@ func (m Model) clearStatusOnNavigationKey(msg tea.KeyPressMsg) Model {
 		kb.PageDown, kb.PageUp, kb.PageForward, kb.PageBack, "pgdown", "pgup", "shift+down", "shift+up",
 		kb.PreviewDown, kb.PreviewUp,
 		kb.LevelCluster, kb.LevelTypes, kb.LevelResources,
-		kb.JumpBack, kb.JumpOwner,
+		kb.JumpBack, kb.JumpOwner, kb.JumpClaim,
 		kb.NextMatch, kb.PrevMatch,
 		kb.NextTab, kb.PrevTab, kb.NewTab, kb.MoveTabLeft, kb.MoveTabRight:
 		m.clearTransientStatus()

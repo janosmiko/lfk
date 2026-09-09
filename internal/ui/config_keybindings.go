@@ -29,7 +29,10 @@ type Keybindings struct {
 	PreviewDown    string `json:"preview_down" yaml:"preview_down"`
 	PreviewUp      string `json:"preview_up" yaml:"preview_up"`
 	JumpOwner      string `json:"jump_owner" yaml:"jump_owner"`
-	JumpBack       string `json:"jump_back" yaml:"jump_back"`
+	// JumpClaim jumps from a pod row to its ResourceClaim. Repeated presses
+	// on the same pod cycle through the pod's remaining claims.
+	JumpClaim string `json:"jump_claim" yaml:"jump_claim"`
+	JumpBack  string `json:"jump_back" yaml:"jump_back"`
 
 	// Views and Modes
 	Help          string `json:"help" yaml:"help"`
@@ -223,7 +226,8 @@ func DefaultKeybindings() Keybindings {
 		PageForward: "ctrl+f", PageBack: "ctrl+b",
 		LevelCluster: "0", LevelTypes: "1", LevelResources: "2",
 		PreviewDown: "J", PreviewUp: "K", JumpOwner: "o",
-		JumpBack: "backspace",
+		JumpClaim: "c",
+		JumpBack:  "backspace",
 
 		// Views
 		Help: "?", Filter: "f", Search: "/",

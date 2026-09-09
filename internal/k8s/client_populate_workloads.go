@@ -139,6 +139,9 @@ func populatePodResourceClaims(ti *model.Item, status, spec map[string]any) {
 			continue
 		}
 		if name := resolvePodResourceClaimName(claim, statuses); name != "" {
+			// "claim:N" is read by handleExplorerActionKeyJumpClaim to jump
+			// from a pod row to its ResourceClaim, cycling on repeated presses.
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: fmt.Sprintf("claim:%d", len(names)), Value: name})
 			names = append(names, name)
 		}
 	}

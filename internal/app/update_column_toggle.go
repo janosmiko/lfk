@@ -253,7 +253,8 @@ func (m *Model) collectExtraToggleEntries(items []model.Item) []columnToggleEntr
 	for _, item := range items {
 		for _, kv := range item.Columns {
 			if strings.HasPrefix(kv.Key, "__") || strings.HasPrefix(kv.Key, "secret:") ||
-				strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "data:") ||
+				strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "claim:") ||
+				strings.HasPrefix(kv.Key, "data:") ||
 				strings.HasPrefix(kv.Key, "condition:") || strings.HasPrefix(kv.Key, "step:") ||
 				strings.HasPrefix(kv.Key, "cond:") {
 				continue

@@ -64,7 +64,7 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 	// the metrics pair swap position depending on which ran last. Order on the
 	// key, as the list table does, or these rows jump every few seconds.
 	for _, kv := range stableDetailColumns(item.Columns) {
-		if strings.HasPrefix(kv.Key, "__") || strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "secret:") || strings.HasPrefix(kv.Key, "data:") {
+		if strings.HasPrefix(kv.Key, "__") || strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "claim:") || strings.HasPrefix(kv.Key, "secret:") || strings.HasPrefix(kv.Key, "data:") {
 			continue
 		}
 		rows = append(rows, row{SanitizeTerminalText(kv.Key), SanitizeTerminalText(kv.Value), valueStyle})

@@ -254,6 +254,7 @@ func isInternalColumnKey(key string) bool {
 		strings.HasPrefix(key, "secret:") ||
 		strings.HasPrefix(key, "data:") ||
 		strings.HasPrefix(key, "owner:") ||
+		strings.HasPrefix(key, "claim:") ||
 		strings.HasPrefix(key, "condition:") ||
 		strings.HasPrefix(key, "step:") ||
 		strings.HasPrefix(key, "cond:")

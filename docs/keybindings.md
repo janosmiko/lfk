@@ -20,6 +20,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `0` / `1` / `2` | Jump to clusters / types / resources level, per cluster and both ways |
 | `J` / `K` | Scroll preview pane down / up |
 | `o` / `O` | Jump to owner/controller / open Object Explorer |
+| `c` | Jump to a pod's resource claim, cycling through multiple claims on repeated presses |
 | `Backspace` | Jump back through teleport history |
 
 In the Events list, `z` toggles event grouping instead of expand/collapse.
@@ -1384,6 +1385,7 @@ keybindings:
   preview_down: "J"      # Scroll preview down
   preview_up: "K"        # Scroll preview up
   jump_owner: "o"        # Jump to owner
+  jump_claim: "c"        # Jump to resource claim (cycles on repeated presses)
   jump_back: "backspace"     # Jump back through teleport history
   toggle_rare: "H"       # Toggle rarely used resource types in the sidebar
 

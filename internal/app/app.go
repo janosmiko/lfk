@@ -240,13 +240,10 @@ type Model struct {
 	objectExplorerTree                          bool             // session tree-view pref (T)
 	viewerPrefs                                 viewerPrefValues // live viewer toggles; see viewer_prefs.go
 
-	// Read-only mode: blocks all mutating actions for the active tab. Mirrors
-	// the active TabState.readOnly. Re-evaluated on context switch and tab
-	// switch.
-	readOnly bool
-	// cliReadOnly is the value of --read-only at startup. Sticky for the life
-	// of the process so context switches can't drop it.
-	cliReadOnly bool
+	// readOnly blocks mutating actions for the active tab (mirrors the active
+	// TabState.readOnly, re-evaluated on context/tab switch). cliReadOnly is
+	// the --read-only startup value, sticky so context switches can't drop it.
+	readOnly, cliReadOnly bool
 	// contextROOverrides holds session-scoped per-context read-only state set
 	// by the user via Ctrl+R on a row in the cluster picker. A present entry
 	// wins over per-context and global config when entering that context;
@@ -742,6 +739,7 @@ type Model struct {
 
 	// Jump history: back stack for "teleport" jumps. jump_back pops it. Capped at jumpHistoryCap.
 	jumpBackStack []navSnapshot
+	claimJump     claimJumpState // last pod+claim jumped to, so repeated presses cycle (update_keys_jump_claim.go)
 	// Level memory: the view each cluster was left at, so the 1 and 2 keys walk back down (level_memory.go).
 	levelMem levelMemory
 
