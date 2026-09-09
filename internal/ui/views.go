@@ -166,16 +166,18 @@ func BuildView(cv *configView) (*View, error) {
 		return nil, nil
 	}
 	v := &View{SortAsc: true}
-	for _, raw := range cv.Columns {
+	// Errors name the column by position, never by content: the warning
+	// they feed lands in the log file, and a config value can hold a secret.
+	for i, raw := range cv.Columns {
 		spec, ok := ParseColumnSpec(raw)
 		if !ok {
-			return nil, fmt.Errorf("invalid column spec %q", raw)
+			return nil, fmt.Errorf("column %d: invalid column spec", i+1)
 		}
 		rc := ResolvedColumn{ColumnSpec: spec}
 		if spec.IsCustom() {
 			jp, err := CompileJSONPath(spec.JSONPath)
 			if err != nil {
-				return nil, fmt.Errorf("compile %q: %w", spec.Name, err)
+				return nil, fmt.Errorf("column %d: invalid JSONPath", i+1)
 			}
 			rc.Compiled = jp
 		}

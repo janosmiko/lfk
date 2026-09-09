@@ -115,7 +115,6 @@ func applyConfigOptions(cfg configFile) {
 		}
 		if clamped != v {
 			logger.Warn("scrollback_lines out of range; clamped",
-				"value", v,
 				"min", ScrollbackLinesMin,
 				"max", ScrollbackLinesMax,
 				"applied", clamped)
@@ -348,7 +347,6 @@ func applyLogMaxLines(src *int) {
 	}
 	if clamped != v {
 		logger.Warn("log_viewer.max_lines out of range; clamped",
-			"value", v,
 			"min", LogMaxLinesMin,
 			"max", LogMaxLinesMax,
 			"applied", clamped)
@@ -580,7 +578,6 @@ func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
 			model.ConfigDefaultRightsizingStrategy = s
 		} else {
 			logger.Warn("unknown rightsizing_defaults.strategy in config; ignored",
-				"value", cfg.Strategy,
 				"valid", rightsizingStrategyLiterals())
 		}
 	}
@@ -590,7 +587,6 @@ func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
 			model.ConfigDefaultRightsizingHeadroom = h
 		} else {
 			logger.Warn("invalid rightsizing_defaults.headroom in config; ignored",
-				"value", cfg.Headroom,
 				"valid", model.RightsizingHeadrooms)
 		}
 	}
@@ -739,11 +735,11 @@ func schedulerKindByName(name string) (scheduler.Kind, bool) {
 func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
 	out := make([]UnionSetConfig, 0, len(in))
 	seen := make(map[string]int, len(in))
-	for _, s := range in {
+	for i, s := range in {
 		s.Name = strings.TrimSpace(s.Name)
 		s.Namespace = strings.TrimSpace(s.Namespace)
 		if s.Name == "" {
-			logger.Warn("union_sets entry has no name; skipping", "contexts", s.Contexts)
+			logger.Warn("union_sets entry has no name; skipping", "index", i)
 			continue
 		}
 		// Drop nameless cluster entries, drop invalid color names, dedupe
@@ -768,7 +764,7 @@ func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
 			seenCtx[c.Context] = struct{}{}
 			if c.Color != "" && !IsValidClusterColor(c.Color) {
 				logger.Warn("union_sets entry has unknown color; leaving cluster untinted",
-					"set", s.Name, "context", c.Context, "color", c.Color,
+					"set", s.Name, "context", c.Context,
 					"valid", ClusterColorNames)
 				c.Color = ""
 			}
