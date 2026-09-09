@@ -62,6 +62,18 @@ func TestConfigWarnings_NeverEchoUserValue(t *testing.T) {
 			want:  "no name",
 		},
 		{
+			name:  "union_sets duplicate context",
+			yaml:  "union_sets:\n  - name: " + secret + "\n    contexts:\n      - context: " + secret + "\n      - context: " + secret + "\n",
+			leaks: []string{secret},
+			want:  "repeats a context",
+		},
+		{
+			name:  "union_sets duplicate set name",
+			yaml:  "union_sets:\n  - name: " + secret + "\n    contexts:\n      - context: a\n  - name: " + secret + "\n    contexts:\n      - context: b\n",
+			leaks: []string{secret},
+			want:  "duplicate union_sets name",
+		},
+		{
 			name:  "views invalid column spec",
 			yaml:  "views:\n  pods:\n    columns:\n      - \"" + secret + "|Z\"\n",
 			leaks: []string{secret},

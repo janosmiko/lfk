@@ -735,6 +735,8 @@ func schedulerKindByName(name string) (scheduler.Kind, bool) {
 func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
 	out := make([]UnionSetConfig, 0, len(in))
 	seen := make(map[string]int, len(in))
+	// Warnings cite entries by position: a name or context string is user
+	// input, and the log file must not carry what the user typed.
 	for i, s := range in {
 		s.Name = strings.TrimSpace(s.Name)
 		s.Namespace = strings.TrimSpace(s.Namespace)
@@ -748,35 +750,35 @@ func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
 		// are either empty (untinted) or a valid ClusterColorNames value.
 		cleanCtxs := make([]UnionSetContextConfig, 0, len(s.Contexts))
 		seenCtx := make(map[string]struct{}, len(s.Contexts))
-		for _, c := range s.Contexts {
+		for j, c := range s.Contexts {
 			c.Context = strings.TrimSpace(c.Context)
 			c.Color = strings.TrimSpace(c.Color)
 			c.Namespace = strings.TrimSpace(c.Namespace)
 			if c.Context == "" {
-				logger.Warn("union_sets entry has nameless context; skipping that entry", "set", s.Name)
+				logger.Warn("union_sets entry has nameless context; skipping that entry", "set", i)
 				continue
 			}
 			if _, dup := seenCtx[c.Context]; dup {
 				logger.Warn("union_sets entry repeats a context; keeping first occurrence",
-					"set", s.Name, "context", c.Context)
+					"set", i, "context", j)
 				continue
 			}
 			seenCtx[c.Context] = struct{}{}
 			if c.Color != "" && !IsValidClusterColor(c.Color) {
 				logger.Warn("union_sets entry has unknown color; leaving cluster untinted",
-					"set", s.Name, "context", c.Context,
+					"set", i, "context", j,
 					"valid", ClusterColorNames)
 				c.Color = ""
 			}
 			cleanCtxs = append(cleanCtxs, c)
 		}
 		if len(cleanCtxs) == 0 {
-			logger.Warn("union_sets entry has no usable contexts; skipping", "name", s.Name)
+			logger.Warn("union_sets entry has no usable contexts; skipping", "set", i)
 			continue
 		}
 		s.Contexts = cleanCtxs
 		if idx, dup := seen[s.Name]; dup {
-			logger.Warn("duplicate union_sets name; later definition wins", "name", s.Name)
+			logger.Warn("duplicate union_sets name; later definition wins", "set", i)
 			out[idx] = s
 			continue
 		}
