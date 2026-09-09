@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -28,6 +29,10 @@ type navSnapshot struct {
 	leftScroll       int // ui.ActiveLeftScroll
 	expandedGroup    string
 	filterText       string
+	// Namespace scope the teleport departed from, restored on jump-back.
+	allNamespaces      bool
+	namespace          string
+	selectedNamespaces map[string]bool
 	// securityActiveGroup preserves the security finding group whose
 	// affected-resources view the snapshot was taken in, so a jump-back
 	// reloads affected resources instead of owned children.
@@ -57,6 +62,9 @@ func (m *Model) captureNavSnapshot() navSnapshot {
 		leftScroll:             ui.ActiveLeftScroll,
 		expandedGroup:          m.expandedGroup,
 		filterText:             m.filterText,
+		allNamespaces:          m.allNamespaces,
+		namespace:              m.namespace,
+		selectedNamespaces:     maps.Clone(m.selectedNamespaces),
 		securityActiveGroup:    m.securityActiveGroup,
 		securityActiveSource:   m.securityActiveSource,
 		securityResourceFilter: append([]security.ResourceRef(nil), m.securityResourceFilter...),
@@ -80,6 +88,7 @@ func (s navSnapshot) clone() navSnapshot {
 	out := s
 	out.leftItems = append([]model.Item(nil), s.leftItems...)
 	out.middleItems = append([]model.Item(nil), s.middleItems...)
+	out.selectedNamespaces = maps.Clone(s.selectedNamespaces)
 	out.securityResourceFilter = append([]security.ResourceRef(nil), s.securityResourceFilter...)
 	out.ownedParentStack = append([]ownedParentState(nil), s.ownedParentStack...)
 	out.leftItemsHistory = make([][]model.Item, len(s.leftItemsHistory))
@@ -114,16 +123,49 @@ func (m *Model) pushJumpHistory() {
 	}
 }
 
+// resolveOwnerResourceTypeEntry lets a caller resolve and fail before
+// pushJumpHistory, so a bad kind never leaves a partial mutation behind.
+func (m Model) resolveOwnerResourceTypeEntry(kind, apiVersion string) (model.ResourceTypeEntry, bool) {
+	crds := m.discoveredResources[m.discoveryContext()]
+	return resolveOwnerResourceType(kind, apiVersion, crds)
+}
+
+// teleportToResourceType performs the climb-to-sidebar-then-descend dance
+// shared by navigateToOwner and its callers. The caller must have already
+// called pushJumpHistory.
+func (m Model) teleportToResourceType(rt model.ResourceTypeEntry, name string) (tea.Model, tea.Cmd) {
+	// Navigate back to resource types level.
+	for m.nav.Level > model.LevelResourceTypes {
+		ret, _ := m.navigateParent()
+		m = ret.(Model)
+	}
+
+	// Find and select the target resource type in middle items.
+	for i, item := range m.middleItems {
+		if item.Extra == rt.ResourceRef() {
+			m.setCursor(i)
+			break
+		}
+	}
+
+	// Set pending target to auto-select the owner resource after load.
+	m.pendingTarget = name
+
+	// Navigate into the resource type.
+	return m.navigateChild()
+}
+
 // restoreNavSnapshot applies a snapshot back onto the Model and returns a
 // command that reloads data for the restored level. Restore is graceful: if the
 // snapshot targets a level deeper than LevelClusters but its context is no
 // longer known, it falls back to the nearest valid level and surfaces a status
 // message instead of crashing.
 func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
-	// Graceful fallback: a snapshot below the cluster picker needs a context
-	// that still exists. If discovery no longer knows it, drop to the cluster
-	// picker rather than restoring into a dead context.
-	if snap.nav.Level > model.LevelClusters && snap.nav.Context != "" {
+	// Graceful fallback: drop to the cluster picker if the snapshot's context
+	// no longer exists. The sentinel is exempt only while union mode is still
+	// on. jumpBackStack isn't cleared when union mode ends.
+	if snap.nav.Level > model.LevelClusters && snap.nav.Context != "" &&
+		(!m.unionMode || snap.nav.Context != UnionContextSentinel) {
 		if !m.contextStillValid(snap.nav.Context) {
 			// A jump-back is a navigation transition: cancel in-flight work and
 			// bump requestGen so async responses from the pre-fallback view
@@ -176,6 +218,9 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 	}
 	m.cursors = snap.cursors
 	m.expandedGroup = snap.expandedGroup
+	m.allNamespaces = snap.allNamespaces
+	m.namespace = snap.namespace
+	m.selectedNamespaces = maps.Clone(snap.selectedNamespaces)
 	m.securityActiveGroup = snap.securityActiveGroup
 	m.securityActiveSource = snap.securityActiveSource
 	m.securityResourceFilter = append([]security.ResourceRef(nil), snap.securityResourceFilter...)

@@ -242,8 +242,7 @@ func resolveOwnerResourceType(kind, apiVersion string, discovered []model.Resour
 // for callers that only know a built-in Kind ("Pod", "Node"). See
 // resolveOwnerResourceType.
 func (m Model) navigateToOwner(kind, name, apiVersion string) (tea.Model, tea.Cmd) {
-	crds := m.discoveredResources[m.discoveryContext()]
-	rt, ok := resolveOwnerResourceType(kind, apiVersion, crds)
+	rt, ok := m.resolveOwnerResourceTypeEntry(kind, apiVersion)
 	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Unknown resource type: %s", kind), true)
 		return m, scheduleStatusClear()
@@ -252,25 +251,7 @@ func (m Model) navigateToOwner(kind, name, apiVersion string) (tea.Model, tea.Cm
 	// Record the origin so jump_back can return here after this teleport.
 	m.pushJumpHistory()
 
-	// Navigate back to resource types level.
-	for m.nav.Level > model.LevelResourceTypes {
-		ret, _ := m.navigateParent()
-		m = ret.(Model)
-	}
-
-	// Find and select the target resource type in middle items.
-	for i, item := range m.middleItems {
-		if item.Extra == rt.ResourceRef() {
-			m.setCursor(i)
-			break
-		}
-	}
-
-	// Set pending target to auto-select the owner resource after load.
-	m.pendingTarget = name
-
-	// Navigate into the resource type.
-	return m.navigateChild()
+	return m.teleportToResourceType(rt, name)
 }
 
 func (m Model) navigateChild() (tea.Model, tea.Cmd) {
@@ -579,13 +560,21 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		if podName == "" || sel.Namespace == "" {
 			return m, nil
 		}
-		// The namespace switch lands before navigateToOwner pushes the
-		// jump history. navSnapshot does not record namespace fields, so
-		// jump_back cannot restore them either way.
+		rt, ok := m.resolveOwnerResourceTypeEntry("Pod", "v1")
+		if !ok {
+			m.setStatusMessage("Unknown resource type: Pod", true)
+			return m, scheduleStatusClear()
+		}
+		// Push history before switching scope, so jump-back restores the
+		// origin namespace/cluster scope rather than the Pod's.
+		m.pushJumpHistory()
+		if m.unionMode && sel.ClusterName != "" {
+			m.nav.Context = sel.ClusterName
+		}
 		m.allNamespaces = false
 		m.namespace = sel.Namespace
 		m.selectedNamespaces = map[string]bool{sel.Namespace: true}
-		return m.navigateToOwner("Pod", podName, "v1")
+		return m.teleportToResourceType(rt, podName)
 	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil

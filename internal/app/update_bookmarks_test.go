@@ -2312,3 +2312,32 @@ func TestNavigateToBookmark_FailedJumpRecordsNoHistory(t *testing.T) {
 	assert.Empty(t, rm.jumpBackStack,
 		"a failed bookmark jump must not record a jump-history entry")
 }
+
+// TestNavigateToBookmark_JumpBackRestoresOriginNamespace verifies jump-back
+// after a bookmark jump returns to the pre-bookmark namespace scope.
+func TestNavigateToBookmark_JumpBackRestoresOriginNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "namespace-a"
+	m.allNamespaces = true
+	m.selectedNamespaces = map[string]bool{"namespace-a": true}
+	m.bookmarkLoadNamespace = true
+
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "namespace-b",
+	}
+
+	result, _ := m.navigateToBookmark(bm)
+	rm := result.(Model)
+	require.Equal(t, "namespace-b", rm.namespace, "precondition: bookmark jump applies the saved namespace")
+	require.False(t, rm.allNamespaces, "precondition: the bookmark scoped to a single namespace")
+
+	back, _ := rm.jumpBack()
+	bm2 := back.(Model)
+
+	assert.Equal(t, "namespace-a", bm2.namespace, "jump-back must return to the pre-bookmark namespace")
+	assert.True(t, bm2.allNamespaces, "jump-back must restore the pre-bookmark all-namespaces flag")
+}

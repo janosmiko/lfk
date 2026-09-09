@@ -902,3 +902,124 @@ func TestNavigateChildResource_PodCertificateRequestNoPodColumnNoOp(t *testing.T
 	assert.Equal(t, model.LevelResources, rm.nav.Level, "must not navigate without a Pod column")
 	assert.Nil(t, cmd)
 }
+
+// Round trip: a PodCertificateRequest jump scopes to the request's own
+// namespace, and jumping back must restore the origin all-namespaces scope
+// rather than stranding the user in the Pod's single namespace.
+func TestNavigateChildResource_PodCertificateRequestJumpBackRestoresNamespaceScope(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "PodCertificateRequest", APIGroup: "certificates.k8s.io", APIVersion: "v1",
+		Resource: "podcertificaterequests", Namespaced: true,
+	}
+	m.allNamespaces = true
+	m.namespace = ""
+	m.selectedNamespaces = map[string]bool{"team-a": true, "team-b": true}
+	m.leftItemsHistory = [][]model.Item{{{Name: "test-ctx"}}}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
+
+	sel := &model.Item{
+		Name: "pcr-1", Namespace: "ns-a", Kind: "PodCertificateRequest",
+		Columns: []model.KeyValue{{Key: "Pod", Value: "target-pod"}},
+	}
+	result, _ := m.navigateChildResource(sel)
+	rm := result.(Model)
+	require.False(t, rm.allNamespaces, "the teleport must scope to the request's own namespace")
+	require.Equal(t, "ns-a", rm.namespace)
+
+	back, _ := rm.jumpBack()
+	bm := back.(Model)
+
+	assert.True(t, bm.allNamespaces, "jump-back must restore the origin all-namespaces scope")
+	assert.Empty(t, bm.namespace)
+	assert.Equal(t, map[string]bool{"team-a": true, "team-b": true}, bm.selectedNamespaces)
+}
+
+// The row carries its source cluster in ClusterName. The pod load must
+// target that cluster rather than fanning out via the union sentinel.
+func TestNavigateChildResource_PodCertificateRequestUnionRoutesToSourceCluster(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "PodCertificateRequest", APIGroup: "certificates.k8s.io", APIVersion: "v1",
+		Resource: "podcertificaterequests", Namespaced: true,
+	}
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.unionContexts = []string{"blue", "green"}
+	m.leftItemsHistory = [][]model.Item{{{Name: "union"}}}
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
+
+	sel := &model.Item{
+		Name: "pcr-1", Namespace: "ns-a", Kind: "PodCertificateRequest", ClusterName: "green",
+		Columns: []model.KeyValue{{Key: "Pod", Value: "target-pod"}},
+	}
+	result, _ := m.navigateChildResource(sel)
+	rm := result.(Model)
+
+	assert.Equal(t, "green", rm.nav.Context,
+		"must route the pod load to the row's source cluster, not the union sentinel")
+}
+
+// A union-mode PodCertificateRequest jump must be reversible: jump-back
+// restores the union sentinel view, not the source cluster it teleported to.
+func TestNavigateChildResource_PodCertificateRequestUnionJumpBackRestoresUnionContext(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "PodCertificateRequest", APIGroup: "certificates.k8s.io", APIVersion: "v1",
+		Resource: "podcertificaterequests", Namespaced: true,
+	}
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.unionContexts = []string{"blue", "green"}
+	m.leftItemsHistory = [][]model.Item{{{Name: "union"}}}
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
+
+	sel := &model.Item{
+		Name: "pcr-1", Namespace: "ns-a", Kind: "PodCertificateRequest", ClusterName: "green",
+		Columns: []model.KeyValue{{Key: "Pod", Value: "target-pod"}},
+	}
+	result, _ := m.navigateChildResource(sel)
+	rm := result.(Model)
+	require.Equal(t, "green", rm.nav.Context)
+
+	back, _ := rm.jumpBack()
+	bm := back.(Model)
+
+	assert.Equal(t, UnionContextSentinel, bm.nav.Context,
+		"jump-back must restore the union view, not strand the user in the source cluster")
+}
+
+// jumpBackStack isn't cleared when union mode ends (navigateParentFromPickerUnion),
+// so a stale union-mode snapshot restored after leaving union mode must be
+// rejected like any other unknown context, not exempted via the sentinel alone.
+func TestJumpBackUnionSnapshotAfterUnionModeOffFallsBackLikeUnknownContext(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.unionContexts = []string{"blue", "green"}
+	m.leftItemsHistory = [][]model.Item{{{Name: "union"}}}
+
+	m.pushJumpHistory()
+
+	m.unionMode = false
+	m.nav.Context = "blue"
+
+	result, _ := m.jumpBack()
+	rm := result.(Model)
+
+	assert.NotEqual(t, UnionContextSentinel, rm.nav.Context,
+		"jump-back must not leave the sentinel in nav.Context once union mode is off")
+	assert.Equal(t, model.LevelClusters, rm.nav.Level,
+		"a stale union snapshot outside union mode falls back to the cluster picker like any unknown context")
+	assert.True(t, rm.hasStatusMessage(), "fallback must surface a status message")
+}
