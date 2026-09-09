@@ -9,9 +9,40 @@ import (
 	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/logger"
 )
+
+// kubeconfigSource is a kubeconfig path plus the Config discovery already
+// parsed from it. cfg is nil for files nothing read yet (KUBECONFIG entries,
+// ~/.kube/config, and every path on a reload).
+type kubeconfigSource struct {
+	path string
+	cfg  *clientcmdapi.Config
+}
+
+func sourcePaths(sources []kubeconfigSource) []string {
+	if len(sources) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(sources))
+	for _, s := range sources {
+		out = append(out, s.path)
+	}
+	return out
+}
+
+func sourcesFromPaths(paths []string) []kubeconfigSource {
+	if len(paths) == 0 {
+		return nil
+	}
+	out := make([]kubeconfigSource, 0, len(paths))
+	for _, p := range paths {
+		out = append(out, kubeconfigSource{path: p})
+	}
+	return out
+}
 
 // KubeconfigPaths returns the colon-separated kubeconfig paths used by this client.
 func (c *Client) KubeconfigPaths() string {
@@ -104,7 +135,7 @@ func (c *Client) HostForContext(displayName string) string {
 // already resolved (first-writer-wins). collectContexts uses it to decide
 // which display name should be marked "current" when multiple files declare
 // the same name. If no file sets a current-context, it returns "".
-func collectContexts(paths []string, fallbackCurrent string) (map[string]contextInfo, []string, string) {
+func collectContexts(sources []kubeconfigSource, fallbackCurrent string) (map[string]contextInfo, []string, string) {
 	type fileContext struct {
 		sourcePath string
 		original   string
@@ -119,10 +150,15 @@ func collectContexts(paths []string, fallbackCurrent string) (map[string]context
 	entriesByName := make(map[string][]fileContext)
 	var orderedNames []string
 
-	for _, path := range paths {
-		cfg, err := clientcmd.LoadFromFile(path)
-		if err != nil {
-			continue
+	for _, src := range sources {
+		path := src.path
+		cfg := src.cfg
+		if cfg == nil {
+			loaded, err := clientcmd.LoadFromFile(path)
+			if err != nil {
+				continue
+			}
+			cfg = loaded
 		}
 		names := make([]string, 0, len(cfg.Contexts))
 		for name := range cfg.Contexts {
@@ -199,9 +235,9 @@ func collectContexts(paths []string, fallbackCurrent string) (map[string]context
 			current = info.display
 		} else {
 			// Disambiguated: walk paths in order, pick first match.
-			for _, path := range paths {
+			for _, src := range sources {
 				for _, info := range contexts {
-					if info.original == fallbackCurrent && info.sourcePath == path {
+					if info.original == fallbackCurrent && info.sourcePath == src.path {
 						current = info.display
 						break
 					}
@@ -230,7 +266,7 @@ func contextDisplayHint(path string) string {
 	return base
 }
 
-// buildKubeconfigPaths assembles the list of kubeconfig file paths to load.
+// buildKubeconfigSources assembles the list of kubeconfig files to load.
 //
 // Resolution order:
 //  1. KUBECONFIG env var (colon-separated).
@@ -248,23 +284,23 @@ func contextDisplayHint(path string) string {
 // implicit defaults. Passing exclusive=false (kubeconfig_exclusive: false /
 // --kubeconfig-exclusive=false / LFK_KUBECONFIG_EXCLUSIVE=false) restores
 // the historical merge-everything behavior.
-func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool, ignore []string) []string {
+func buildKubeconfigSources(kubeconfigDirs []string, exclusive bool, ignore []string) []kubeconfigSource {
 	ignore = ResolveKubeconfigIgnore(ignore)
-	var paths []string
+	var sources []kubeconfigSource
 
 	// KUBECONFIG env var (colon-separated on unix). Empty entries (a stray
 	// "KUBECONFIG=:" or a trailing colon) are dropped. When nothing
 	// non-empty remains the variable counts as unset, so the default
 	// discovery still applies instead of silently loading zero clusters.
 	envPaths := trimNonEmpty(filepath.SplitList(os.Getenv("KUBECONFIG")))
-	paths = append(paths, envPaths...)
+	sources = append(sources, sourcesFromPaths(envPaths)...)
 	kubeconfigExclusive := exclusive && len(envPaths) > 0
 
 	home, homeErr := os.UserHomeDir()
 	if homeErr == nil && !kubeconfigExclusive {
 		// Default kubeconfig. The dedup pass below collapses it when
 		// KUBECONFIG already lists the same file.
-		paths = append(paths, filepath.Join(home, ".kube", "config"))
+		sources = append(sources, kubeconfigSource{path: filepath.Join(home, ".kube", "config")})
 		// Fall back to the default discovery directory when no override.
 		if len(kubeconfigDirs) == 0 {
 			kubeconfigDirs = []string{filepath.Join(home, ".kube", "config.d")}
@@ -282,7 +318,7 @@ func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool, ignore []stri
 		if strings.HasPrefix(dir, "~") && homeErr != nil {
 			continue
 		}
-		paths = append(paths, filterParseableKubeconfigs(collectConfigDirPaths(expandTilde(dir, home), ignore))...)
+		sources = append(sources, filterParseableKubeconfigs(collectConfigDirPaths(expandTilde(dir, home), ignore))...)
 	}
 
 	// Dedup by canonical path. The same kubeconfig can land in `paths`
@@ -292,10 +328,10 @@ func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool, ignore []stri
 	// two --kubeconfig-dir entries point at overlapping trees. Without
 	// this pass collectContexts loads the same file twice and emits each
 	// context as two "disambiguated" rows in the cluster list.
-	return dedupKubeconfigPaths(paths)
+	return dedupKubeconfigSources(sources)
 }
 
-// dedupKubeconfigPaths removes paths that resolve to the same underlying
+// dedupKubeconfigSources removes paths that resolve to the same underlying
 // file, preserving the first occurrence's order. Comparison uses
 // filepath.EvalSymlinks (canonical absolute path) so cosmetic differences
 // like trailing slashes, "./" prefixes, or symlink redirection collapse to
@@ -303,19 +339,19 @@ func buildKubeconfigPaths(kubeconfigDirs []string, exclusive bool, ignore []stri
 // keep their original spelling — clientcmd will still try to load them and
 // log an error if the file isn't readable, which is more informative than
 // silently dropping them here.
-func dedupKubeconfigPaths(paths []string) []string {
-	seen := make(map[string]struct{}, len(paths))
-	out := make([]string, 0, len(paths))
-	for _, p := range paths {
-		key := p
-		if resolved, err := filepath.EvalSymlinks(p); err == nil {
+func dedupKubeconfigSources(sources []kubeconfigSource) []kubeconfigSource {
+	seen := make(map[string]struct{}, len(sources))
+	out := make([]kubeconfigSource, 0, len(sources))
+	for _, s := range sources {
+		key := s.path
+		if resolved, err := filepath.EvalSymlinks(s.path); err == nil {
 			key = resolved
 		}
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		seen[key] = struct{}{}
-		out = append(out, p)
+		out = append(out, s)
 	}
 	return out
 }
@@ -365,19 +401,27 @@ func ValidateKubeconfigIgnore(patterns []string) error {
 	return nil
 }
 
-// filterParseableKubeconfigs drops paths clientcmd cannot parse, for scanned
-// files only: a typo in --kubeconfig must still fail loudly. clientcmd keeps a
-// file it skipped in its aggregate error, which NewClient treats as fatal.
-func filterParseableKubeconfigs(paths []string) []string {
-	var out []string
+// filterParseableKubeconfigs keeps scanned files that parse and declare at least one
+// cluster, user or context, and carries each one's Config on so nothing re-reads it.
+// Scanned files only: clientcmd reports a file it skipped in the aggregate error
+// NewClient treats as fatal, while a typo in --kubeconfig must still fail loudly.
+func filterParseableKubeconfigs(paths []string) []kubeconfigSource {
+	var out []kubeconfigSource
 	for _, p := range paths {
-		if _, err := clientcmd.LoadFromFile(p); err != nil {
+		cfg, err := clientcmd.LoadFromFile(p)
+		if err != nil {
 			// A YAML error can quote the line it choked on, and kubeconfigs hold tokens.
 			logger.Warn("ignoring unparseable file in kubeconfig directory",
 				"path", p, "error", logger.Redact(err.Error()))
 			continue
 		}
-		out = append(out, p)
+		// The codec ignores unrecognised fields, so a flat JSON credential cache
+		// decodes into an empty Config and would reach a subprocess KUBECONFIG.
+		if len(cfg.Clusters) == 0 && len(cfg.AuthInfos) == 0 && len(cfg.Contexts) == 0 {
+			logger.Debug("ignoring file with no kubeconfig entries", "path", p)
+			continue
+		}
+		out = append(out, kubeconfigSource{path: p, cfg: cfg})
 	}
 	return out
 }
@@ -514,14 +558,14 @@ func ValidateKubeconfigDir(path string) error {
 	return nil
 }
 
-// resolveKubeconfigPaths returns the kubeconfig file list for NewClient:
+// resolveKubeconfigSources returns the kubeconfig file list for NewClient:
 // an explicit --kubeconfig override wins outright. Otherwise discovery
-// runs via buildKubeconfigPaths.
-func resolveKubeconfigPaths(override string, kubeconfigDirs []string, exclusive bool, ignore []string) []string {
+// runs via buildKubeconfigSources.
+func resolveKubeconfigSources(override string, kubeconfigDirs []string, exclusive bool, ignore []string) []kubeconfigSource {
 	if override != "" {
-		return []string{override}
+		return []kubeconfigSource{{path: override}}
 	}
-	return buildKubeconfigPaths(kubeconfigDirs, exclusive, ignore)
+	return buildKubeconfigSources(kubeconfigDirs, exclusive, ignore)
 }
 
 // ResolveKubeconfigExclusive resolves whether a set KUBECONFIG suppresses

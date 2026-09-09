@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -781,7 +782,13 @@ func TestExtractGenericConditions(t *testing.T) {
 	})
 }
 
-// --- buildKubeconfigPaths ---
+// --- buildKubeconfigSources ---
+
+// buildKubeconfigPathList keeps these path-level assertions readable: they
+// care about which files discovery returns, not the configs it parsed.
+func buildKubeconfigPathList(kubeconfigDirs []string, exclusive bool) []string {
+	return sourcePaths(buildKubeconfigSources(kubeconfigDirs, exclusive, nil))
+}
 
 func TestBuildKubeconfigPaths(t *testing.T) {
 	t.Run("includes default kubeconfig path", func(t *testing.T) {
@@ -792,7 +799,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 			t.Setenv("KUBECONFIG", origKubeconfig)
 		}()
 
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -812,7 +819,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", cfg1+string(os.PathListSeparator)+cfg2)
 
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 
 		assert.Contains(t, paths, cfg1)
 		assert.Contains(t, paths, cfg2)
@@ -829,7 +836,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", defaultPath)
 
-		paths := buildKubeconfigPaths(nil, false, nil)
+		paths := buildKubeconfigPathList(nil, false)
 
 		count := 0
 		for _, p := range paths {
@@ -852,14 +859,14 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.MkdirAll(configD, 0o755))
 		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
 		configDCfg := filepath.Join(configD, "seeded-cluster")
-		assert.NoError(t, os.WriteFile(configDCfg, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(configDCfg, []byte(stubKubeconfig("seeded")), 0o600))
 
 		tmpDir := t.TempDir()
 		env := filepath.Join(tmpDir, "env-config")
 		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
 		t.Setenv("KUBECONFIG", env)
 
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 
 		assert.Equal(t, []string{env}, paths,
 			"KUBECONFIG must fully determine the file list, excluding ~/.kube/config and config.d")
@@ -880,9 +887,9 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		explicitDir := t.TempDir()
 		dirCfg := filepath.Join(explicitDir, "team-cluster")
-		assert.NoError(t, os.WriteFile(dirCfg, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(dirCfg, []byte(stubKubeconfig("team")), 0o600))
 
-		paths := buildKubeconfigPaths([]string{explicitDir}, true, nil)
+		paths := buildKubeconfigPathList([]string{explicitDir}, true)
 
 		resolvedDirCfg, err := filepath.EvalSymlinks(dirCfg)
 		assert.NoError(t, err)
@@ -901,13 +908,13 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.MkdirAll(configD, 0o755))
 		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
 		seeded := filepath.Join(configD, "seeded-cluster")
-		assert.NoError(t, os.WriteFile(seeded, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(seeded, []byte(stubKubeconfig("seeded")), 0o600))
 
 		env := filepath.Join(t.TempDir(), "env-config")
 		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
 		t.Setenv("KUBECONFIG", env)
 
-		paths := buildKubeconfigPaths(nil, false, nil)
+		paths := buildKubeconfigPathList(nil, false)
 
 		resolvedSeeded, err := filepath.EvalSymlinks(seeded)
 		assert.NoError(t, err)
@@ -927,14 +934,14 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.WriteFile(defaultPath, []byte(""), 0o600))
 
 		t.Setenv("KUBECONFIG", ":")
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 		assert.NotContains(t, paths, "", "no empty path entries")
 		assert.Contains(t, paths, defaultPath, "all-empty KUBECONFIG behaves as unset")
 
 		env := filepath.Join(t.TempDir(), "env-config")
 		assert.NoError(t, os.WriteFile(env, []byte(""), 0o600))
 		t.Setenv("KUBECONFIG", env+string(os.PathListSeparator))
-		paths = buildKubeconfigPaths(nil, true, nil)
+		paths = buildKubeconfigPathList(nil, true)
 		assert.Equal(t, []string{env}, paths, "trailing separator adds no empty entry")
 	})
 
@@ -946,7 +953,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		override := filepath.Join(t.TempDir(), "override-config")
 		assert.NoError(t, os.WriteFile(override, []byte(""), 0o600))
 
-		paths := resolveKubeconfigPaths(override, []string{t.TempDir()}, true, nil)
+		paths := sourcePaths(resolveKubeconfigSources(override, []string{t.TempDir()}, true, nil))
 		assert.Equal(t, []string{override}, paths,
 			"--kubeconfig short-circuits KUBECONFIG, dirs, and defaults")
 	})
@@ -957,14 +964,14 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		configD := filepath.Join(tmpHome, ".kube", "config.d")
 		assert.NoError(t, os.MkdirAll(configD, 0o755))
 		extraCfg := filepath.Join(configD, "extra-cluster")
-		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(stubKubeconfig("extra")), 0o600))
 
 		// This test verifies the WalkDir mechanism by checking the real home dir.
 		// Since we cannot override UserHomeDir, we test that the function runs without error
 		// and returns at least the default path.
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 
 		assert.NotEmpty(t, paths, "should return at least the default kubeconfig path")
 	})
@@ -977,7 +984,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		via := filepath.Join(tmpDir, ".", "config.yaml")
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+via)
 
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 		count := 0
 		for _, p := range paths {
 			if p == cfg || p == via {
@@ -1001,7 +1008,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.Symlink(cfg, viaSymlink))
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+viaSymlink)
 
-		paths := buildKubeconfigPaths(nil, true, nil)
+		paths := buildKubeconfigPathList(nil, true)
 		// Both entries point at the same underlying file; only one should
 		// remain after dedup. Compare via EvalSymlinks on both sides so
 		// we don't trip over /tmp → /private/tmp on macOS.
@@ -1026,11 +1033,11 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		customDir := filepath.Join(tmpDir, "custom-config.d")
 		assert.NoError(t, os.MkdirAll(customDir, 0o755))
 		extraCfg := filepath.Join(customDir, "extra-cluster")
-		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(stubKubeconfig("extra")), 0o600))
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{customDir}, true, nil)
+		paths := buildKubeconfigPathList([]string{customDir}, true)
 		// collectConfigDirPaths resolves symlinks, so on macOS /tmp may
 		// become /private/tmp — compare via EvalSymlinks to avoid failing.
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
@@ -1046,11 +1053,11 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		customDir := filepath.Join(tmpHome, "custom-k8s")
 		assert.NoError(t, os.MkdirAll(customDir, 0o755))
 		extraCfg := filepath.Join(customDir, "extra-cluster")
-		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(stubKubeconfig("extra")), 0o600))
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{"~/custom-k8s"}, true, nil)
+		paths := buildKubeconfigPathList([]string{"~/custom-k8s"}, true)
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
@@ -1065,10 +1072,10 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		dirA, dirB := t.TempDir(), t.TempDir()
 		cfgA := filepath.Join(dirA, "team-a")
 		cfgB := filepath.Join(dirB, "team-b")
-		assert.NoError(t, os.WriteFile(cfgA, []byte(""), 0o600))
-		assert.NoError(t, os.WriteFile(cfgB, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(cfgA, []byte(stubKubeconfig("team-a")), 0o600))
+		assert.NoError(t, os.WriteFile(cfgB, []byte(stubKubeconfig("team-b")), 0o600))
 
-		paths := buildKubeconfigPaths([]string{dirA, dirB}, true, nil)
+		paths := buildKubeconfigPathList([]string{dirA, dirB}, true)
 
 		resA, _ := filepath.EvalSymlinks(cfgA)
 		resB, _ := filepath.EvalSymlinks(cfgB)
@@ -1085,9 +1092,9 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		customDir := t.TempDir()
 		extraCfg := filepath.Join(customDir, "extra-cluster")
-		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(stubKubeconfig("extra")), 0o600))
 
-		paths := buildKubeconfigPaths([]string{customDir}, true, nil)
+		paths := buildKubeconfigPathList([]string{customDir}, true)
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
@@ -1102,7 +1109,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		t.Setenv("USERPROFILE", "")
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths([]string{"~/some/dir"}, true, nil)
+		paths := buildKubeconfigPathList([]string{"~/some/dir"}, true)
 		// Result is whatever KUBECONFIG provides (empty here); the tilde
 		// path is silently skipped because expansion isn't possible.
 		for _, p := range paths {
@@ -1112,22 +1119,22 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 	})
 }
 
-func TestDedupKubeconfigPaths(t *testing.T) {
+func TestDedupKubeconfigSources(t *testing.T) {
 	t.Run("preserves order, drops later duplicates", func(t *testing.T) {
 		tmp := t.TempDir()
 		a := filepath.Join(tmp, "a.yaml")
 		b := filepath.Join(tmp, "b.yaml")
 		assert.NoError(t, os.WriteFile(a, []byte(""), 0o600))
 		assert.NoError(t, os.WriteFile(b, []byte(""), 0o600))
-		got := dedupKubeconfigPaths([]string{a, b, a, b})
-		assert.Equal(t, []string{a, b}, got)
+		got := dedupKubeconfigSources(sourcesFromPaths([]string{a, b, a, b}))
+		assert.Equal(t, []string{a, b}, sourcePaths(got))
 	})
 
 	t.Run("keeps unresolvable paths as-is", func(t *testing.T) {
 		// Missing/dangling paths should still pass through (clientcmd will
 		// surface a clear error later) — they shouldn't crash the dedup.
-		got := dedupKubeconfigPaths([]string{"/no/such/file", "/no/such/file", "/another"})
-		assert.Equal(t, []string{"/no/such/file", "/another"}, got)
+		got := dedupKubeconfigSources(sourcesFromPaths([]string{"/no/such/file", "/no/such/file", "/another"}))
+		assert.Equal(t, []string{"/no/such/file", "/another"}, sourcePaths(got))
 	})
 }
 
@@ -2011,8 +2018,8 @@ func TestKubeconfigIgnoreIsConfigurable(t *testing.T) {
 
 // --- filterParseableKubeconfigs ---
 
-// stubKubeconfig is a minimal kubeconfig declaring one of everything, named
-// after ctx so callers can put two of them in one merge without colliding.
+// stubKubeconfig names everything after ctx so two of them can share one merge.
+// Discovery drops a file declaring no clusters, users and contexts, so scanned-directory fixtures need this content.
 func stubKubeconfig(ctx string) string {
 	return fmt.Sprintf(`apiVersion: v1
 kind: Config
@@ -2040,7 +2047,7 @@ func TestFilterParseableKubeconfigs(t *testing.T) {
 		assert.NoError(t, os.WriteFile(good, []byte(stubKubeconfig("ctx1")), 0o600))
 		assert.NoError(t, os.WriteFile(bad, []byte{0x00, 0x01, 0x02}, 0o600))
 
-		assert.Equal(t, []string{good}, filterParseableKubeconfigs([]string{good, bad}))
+		assert.Equal(t, []string{good}, sourcePaths(filterParseableKubeconfigs([]string{good, bad})))
 	})
 
 	t.Run("drops plain text that is not a kubeconfig", func(t *testing.T) {
@@ -2050,7 +2057,7 @@ func TestFilterParseableKubeconfigs(t *testing.T) {
 		assert.NoError(t, os.WriteFile(good, []byte(stubKubeconfig("ctx1")), 0o600))
 		assert.NoError(t, os.WriteFile(readme, []byte("# Clusters\n\nProd lives here.\n"), 0o600))
 
-		assert.Equal(t, []string{good}, filterParseableKubeconfigs([]string{good, readme}))
+		assert.Equal(t, []string{good}, sourcePaths(filterParseableKubeconfigs([]string{good, readme})))
 	})
 
 	t.Run("keeps a fragment declaring only users", func(t *testing.T) {
@@ -2060,15 +2067,49 @@ func TestFilterParseableKubeconfigs(t *testing.T) {
 		frag := filepath.Join(tmp, "users-only.yaml")
 		assert.NoError(t, os.WriteFile(frag, []byte("apiVersion: v1\nkind: Config\nusers:\n- name: u1\n  user: {}\n"), 0o600))
 
-		assert.Equal(t, []string{frag}, filterParseableKubeconfigs([]string{frag}))
+		assert.Equal(t, []string{frag}, sourcePaths(filterParseableKubeconfigs([]string{frag})))
 	})
 
-	t.Run("keeps an empty file", func(t *testing.T) {
+	t.Run("keeps a fragment declaring only clusters", func(t *testing.T) {
+		tmp := t.TempDir()
+		frag := filepath.Join(tmp, "clusters-only.yaml")
+		body := "apiVersion: v1\nkind: Config\nclusters:\n- name: c1\n  cluster:\n    server: https://c1.test\n"
+		assert.NoError(t, os.WriteFile(frag, []byte(body), 0o600))
+
+		assert.Equal(t, []string{frag}, sourcePaths(filterParseableKubeconfigs([]string{frag})))
+	})
+
+	t.Run("drops a credential cache that parses into an empty config", func(t *testing.T) {
+		// A gcloud auth plugin token cache is flat JSON. The k8s codec
+		// ignores every unknown field, so it decodes without error into a
+		// Config that would hand a subprocess a KUBECONFIG with no clusters.
+		tmp := t.TempDir()
+		good := filepath.Join(tmp, "good.yaml")
+		cache := filepath.Join(tmp, "gke_token_cache")
+		assert.NoError(t, os.WriteFile(good, []byte(stubKubeconfig("ctx1")), 0o600))
+		assert.NoError(t, os.WriteFile(cache,
+			[]byte(`{"access_token":"redacted","token_expiry":"2026-01-01T00:00:00Z"}`), 0o600))
+
+		assert.Equal(t, []string{good}, sourcePaths(filterParseableKubeconfigs([]string{good, cache})))
+	})
+
+	t.Run("drops an empty file", func(t *testing.T) {
 		tmp := t.TempDir()
 		empty := filepath.Join(tmp, "empty.yaml")
 		assert.NoError(t, os.WriteFile(empty, []byte(""), 0o600))
 
-		assert.Equal(t, []string{empty}, filterParseableKubeconfigs([]string{empty}))
+		assert.Nil(t, filterParseableKubeconfigs([]string{empty}))
+	})
+
+	t.Run("returns the config it parsed for every kept file", func(t *testing.T) {
+		tmp := t.TempDir()
+		p := filepath.Join(tmp, "one.yaml")
+		assert.NoError(t, os.WriteFile(p, []byte(stubKubeconfig("ctx1")), 0o600))
+
+		got := filterParseableKubeconfigs([]string{p})
+		require.Len(t, got, 1)
+		require.NotNil(t, got[0].cfg, "discovery must hand its parsed config on so nothing re-reads the file")
+		assert.Contains(t, got[0].cfg.Contexts, "ctx1")
 	})
 
 	t.Run("preserves order and returns nil for no input", func(t *testing.T) {
@@ -2079,8 +2120,38 @@ func TestFilterParseableKubeconfigs(t *testing.T) {
 			assert.NoError(t, os.WriteFile(p, []byte(stubKubeconfig("ctx1")), 0o600))
 			want = append(want, p)
 		}
-		assert.Equal(t, want, filterParseableKubeconfigs(want))
+		assert.Equal(t, want, sourcePaths(filterParseableKubeconfigs(want)))
 		assert.Nil(t, filterParseableKubeconfigs(nil))
+	})
+}
+
+func TestCollectContextsReusesDiscoveredConfig(t *testing.T) {
+	t.Run("reads nothing when discovery already parsed the file", func(t *testing.T) {
+		// The path is never written, so a context can only reach the result
+		// through the config discovery handed over.
+		cfg := clientcmdapi.NewConfig()
+		cfg.Contexts["preparsed"] = &clientcmdapi.Context{Cluster: "c1", AuthInfo: "u1", Namespace: "team"}
+		cfg.CurrentContext = "preparsed"
+		missing := filepath.Join(t.TempDir(), "never-written.yaml")
+
+		contexts, order, current := collectContexts([]kubeconfigSource{{path: missing, cfg: cfg}}, "preparsed")
+
+		assert.Equal(t, []string{"preparsed"}, order)
+		assert.Equal(t, "preparsed", current)
+		assert.Equal(t, "team", contexts["preparsed"].namespace)
+		assert.Equal(t, missing, contexts["preparsed"].sourcePath)
+	})
+
+	t.Run("loads from disk when no config is attached", func(t *testing.T) {
+		// ReloadKubeconfig has no preparsed configs: it must see disk state.
+		p := filepath.Join(t.TempDir(), "reloaded.yaml")
+		assert.NoError(t, os.WriteFile(p, []byte(stubKubeconfig("ctx1")), 0o600))
+
+		contexts, order, current := collectContexts(sourcesFromPaths([]string{p}), "ctx1")
+
+		assert.Equal(t, []string{"ctx1"}, order)
+		assert.Equal(t, "ctx1", current)
+		assert.Equal(t, p, contexts["ctx1"].sourcePath)
 	})
 }
 
