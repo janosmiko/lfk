@@ -847,6 +847,7 @@ func TestCovExecuteActionScale(t *testing.T) {
 
 func TestCovExecuteActionResize(t *testing.T) {
 	m := testModelExec()
+	m.actionCtx.kind = "PersistentVolumeClaim"
 	m.actionCtx.columns = []model.KeyValue{{Key: "Capacity", Value: "5Gi"}}
 	result, cmd := m.executeAction("Resize")
 	rm := result.(Model)
@@ -857,6 +858,7 @@ func TestCovExecuteActionResize(t *testing.T) {
 
 func TestCovExecuteActionResizeNoCap(t *testing.T) {
 	m := testModelExec()
+	m.actionCtx.kind = "PersistentVolumeClaim"
 	result, cmd := m.executeAction("Resize")
 	rm := result.(Model)
 	assert.Nil(t, cmd)
@@ -1709,6 +1711,7 @@ func TestFinalExecuteActionScale(t *testing.T) {
 
 func TestFinalExecuteActionResize(t *testing.T) {
 	m := baseFinalModel()
+	m.actionCtx.kind = "PersistentVolumeClaim"
 	m.actionCtx.columns = []model.KeyValue{{Key: "Capacity", Value: "10Gi"}}
 	result, cmd := m.executeAction("Resize")
 	assert.Nil(t, cmd)
@@ -1719,6 +1722,7 @@ func TestFinalExecuteActionResize(t *testing.T) {
 
 func TestFinalExecuteActionResizeCapacity(t *testing.T) {
 	m := baseFinalModel()
+	m.actionCtx.kind = "PersistentVolumeClaim"
 	m.actionCtx.columns = []model.KeyValue{{Key: "CAPACITY", Value: "5Gi"}}
 	result, _ := m.executeAction("Resize")
 	rm := result.(Model)
@@ -1727,6 +1731,7 @@ func TestFinalExecuteActionResizeCapacity(t *testing.T) {
 
 func TestFinalExecuteActionResizeNoCapacity(t *testing.T) {
 	m := baseFinalModel()
+	m.actionCtx.kind = "PersistentVolumeClaim"
 	m.actionCtx.columns = []model.KeyValue{{Key: "Other", Value: "5Gi"}}
 	result, _ := m.executeAction("Resize")
 	rm := result.(Model)

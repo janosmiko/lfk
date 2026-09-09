@@ -121,6 +121,7 @@ func populatePodExtraColumns(ti *model.Item, _ map[string]any, status, spec map[
 	if nodeName, ok := spec["nodeName"].(string); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Node", Value: nodeName})
 	}
+	addPodLevelResourceColumns(ti, spec)
 	populatePodResourceClaims(ti, status, spec)
 }
 

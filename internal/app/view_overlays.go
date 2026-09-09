@@ -198,6 +198,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 			Hint:  hint,
 			Rows:  []ui.OverlayInputRow{{Label: "New size: ", Input: m.scaleInput.Value, Placeholder: "e.g. 10Gi"}},
 		}), min(45, m.width-10), min(10, m.height-6), true
+	case overlayPodResize:
+		content, w, h := renderPodResizeOverlay(m)
+		return content, w, h, true
 	case overlayPortForward:
 		content := renderPortForwardOverlay(m)
 		return content, min(55, m.width-10), min(5+len(m.pfAvailablePorts)+4, m.height-6), true

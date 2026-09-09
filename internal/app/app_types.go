@@ -109,6 +109,7 @@ const (
 	overlayTaintPresets       // common-taint picker over the taint editor (p key)
 	overlayExportTemplate     // destination picker for Export Template (clipboard / file / template list)
 	overlayExportStrip        // field-category picker over the Export Template destinations (s key)
+	overlayPodResize          // in-place Pod CPU/memory resize (action menu key r on a Pod)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

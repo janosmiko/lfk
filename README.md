@@ -190,7 +190,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 ### Resource actions
 
-- Action menu `x`: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize: [keybindings.md](docs/keybindings.md#action-menu-items)
+- Action menu `x`: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize, Pod resize: [keybindings.md](docs/keybindings.md#action-menu-items)
 - Multi-select with `Space`, range with `Ctrl+Space`, then bulk delete, scale, or restart: [keybindings.md](docs/keybindings.md#multi-selection)
 - Custom shell actions per resource type: [config-reference.md](docs/config-reference.md#custom-actions)
 - Port forwarding, with active forwards listed under the Networking group: [keybindings.md](docs/keybindings.md#action-menu-items)

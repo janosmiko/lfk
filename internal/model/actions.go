@@ -129,6 +129,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Right-sizing", Description: "Per-container CPU/Mem recommendations", Key: "z"},
+			{Label: "Resize", Description: "Resize container CPU/memory in place", Key: "r"},
 			{Label: "Security Findings", Description: "List security findings for this resource", Key: "y"},
 			{Label: "Delete", Description: "Delete this pod", Key: "D"},
 			{Label: "Force Delete", Description: "Force delete this pod", Key: "X"},

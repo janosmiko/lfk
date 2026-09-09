@@ -125,6 +125,11 @@ func TestConditionStyle(t *testing.T) {
 		// Warning suffix wins regardless of status.
 		{"DeprecationWarning", "True", amber, "warning suffix"},
 
+		// In-place pod resize (curated, since the keyword heuristic alone
+		// would leave Pending as neutral info instead of a warning).
+		{"PodResizePending", "True", amber, "resize blocked, needs attention"},
+		{"PodResizeInProgress", "True", blue, "resize actively applying"},
+
 		// Unknown status is always neutral.
 		{"Ready", "Unknown", dim, "unknown is neutral"},
 		{"ComparisonError", "Unknown", dim, "unknown is neutral"},

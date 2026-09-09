@@ -57,6 +57,13 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "Enter", Desc: "resize"},
 			{Key: "esc", Desc: "cancel"},
 		})
+	case overlayPodResize:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "field"},
+			{Key: "Tab", Desc: "next"},
+			{Key: "Enter", Desc: "apply"},
+			{Key: "esc", Desc: "cancel"},
+		})
 	case overlayBatchLabel:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "Tab", Desc: "toggle add/remove"},

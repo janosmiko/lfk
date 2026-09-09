@@ -1244,7 +1244,9 @@ Locked rows offer no choice — keeping them yields a manifest that will not app
 The template picker (`a`): `Enter` create, `/` filter, `d` delete the highlighted saved template after a confirmation, `Esc`/`q` close. `d` works on your own templates only — the built-ins have no file behind them.
 
 ### Pod actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `r` Resize (in-place CPU/memory), `D` Delete, `X` Force Delete, `V` Events
+
+The Resize overlay (`r`) edits each container's CPU/memory requests and limits in place, via the `pods/resize` subresource (Kubernetes 1.33+). Pod-level `spec.resources` shows read-only. `j`/`k` or `Tab` move between fields; `Enter` applies. A container whose `resizePolicy` requires `RestartContainer` is flagged before you confirm.
 
 ### Deployment actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events

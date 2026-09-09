@@ -12,6 +12,7 @@ import (
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -157,6 +158,20 @@ func (m Model) resizePVC(newSize string) tea.Cmd {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Resize requested for %s to %s", name, newSize)}
+	})
+}
+
+func (m Model) resizePodResources(specs []model.ContainerResources) tea.Cmd {
+	kctx := m.actionCtx.context
+	ns := m.actionNamespace()
+	name := m.actionCtx.name
+	logger.Info("Resizing pod resources", "name", name, "namespace", ns, "context", kctx)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resize Pod: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		err := m.client.ResizePodResources(ctx, kctx, ns, name, specs)
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		return actionResultMsg{message: "Resize requested for " + name}
 	})
 }
 

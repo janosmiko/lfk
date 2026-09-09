@@ -238,8 +238,15 @@ func (m Model) executeActionCancelEviction() (tea.Model, tea.Cmd) { //nolint:unp
 	return m, nil
 }
 
-// executeActionResize handles the "Resize" action.
+// executeActionResize handles the "Resize" action, shared by PersistentVolumeClaim
+// (storage size) and Pod (in-place CPU/memory).
 func (m Model) executeActionResize() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	if m.actionCtx.kind == "Pod" {
+		m.podResize = buildPodResizeState(m.actionCtx.raw)
+		m.overlay = overlayPodResize
+		return m, nil
+	}
+
 	// Extract current PVC size from columns for display in the overlay.
 	m.pvcCurrentSize = ""
 	for _, kv := range m.actionCtx.columns {

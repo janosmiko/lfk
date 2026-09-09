@@ -115,6 +115,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayLabelEditor`     | `i` on a resource              | Add / remove labels and annotations.                |
 | `overlayBatchLabel`      | `i` with multi-selection       | Apply labels and annotations to selected items.     |
 | `overlayPVCResize`       | resize on PVC (action menu)    | New PVC size input.                                 |
+| `overlayPodResize`       | `r` on Pod (action menu)       | Per-container CPU/memory resize.                    |
 
 ### Action menus
 

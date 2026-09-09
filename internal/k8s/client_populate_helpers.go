@@ -301,6 +301,36 @@ func extractTemplateResources(spec map[string]any) (cpuReq, cpuLim, memReq, memL
 	return extractContainerResources(containers)
 }
 
+// addPodLevelResourceColumns reads spec.resources, distinct from the
+// per-container sums addResourceColumns appends.
+func addPodLevelResourceColumns(ti *model.Item, spec map[string]any) {
+	resources, ok := spec["resources"].(map[string]any)
+	if !ok {
+		return
+	}
+	var cpuReq, cpuLim, memReq, memLim string
+	if requests, ok := resources["requests"].(map[string]any); ok {
+		cpuReq, _ = requests["cpu"].(string)
+		memReq, _ = requests["memory"].(string)
+	}
+	if limits, ok := resources["limits"].(map[string]any); ok {
+		cpuLim, _ = limits["cpu"].(string)
+		memLim, _ = limits["memory"].(string)
+	}
+	if cpuReq != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pod CPU Req", Value: cpuReq})
+	}
+	if cpuLim != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pod CPU Lim", Value: cpuLim})
+	}
+	if memReq != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pod Mem Req", Value: memReq})
+	}
+	if memLim != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pod Mem Lim", Value: memLim})
+	}
+}
+
 // addResourceColumns appends CPU/memory request/limit columns to an item if they are non-empty.
 func addResourceColumns(ti *model.Item, cpuReq, cpuLim, memReq, memLim string) {
 	if cpuReq != "" {

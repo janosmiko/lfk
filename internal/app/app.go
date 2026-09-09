@@ -154,11 +154,11 @@ type Model struct {
 	// Action context: which resource/kind the action targets.
 	actionCtx actionContext
 
-	// Scale input state.
-	scaleInput TextInput
-	hpaScale   hpaScaleState // HPA scale overlay: min/max bounds + target replicas
-	// PVC resize: current size displayed in the overlay.
-	pvcCurrentSize string
+	// Scale / resize overlay inputs.
+	scaleInput     TextInput
+	hpaScale       hpaScaleState // HPA scale overlay: min/max bounds + target replicas
+	pvcCurrentSize string        // current size displayed in the PVC resize overlay
+	podResize      podResizeState
 
 	// Port forward input state.
 	portForwardInput TextInput

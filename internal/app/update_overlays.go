@@ -139,6 +139,9 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd,
 	case overlayPVCResize:
 		mdl, cmd := m.handlePVCResizeOverlayKey(msg)
 		return mdl, cmd, true
+	case overlayPodResize:
+		mdl, cmd := m.handlePodResizeOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayPortForward:
 		mdl, cmd := m.handlePortForwardOverlayKey(msg)
 		return mdl, cmd, true
