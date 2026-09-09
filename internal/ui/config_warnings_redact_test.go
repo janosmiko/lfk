@@ -97,11 +97,17 @@ func TestConfigWarnings_NeverEchoUserValue(t *testing.T) {
 	prevHeadroom := model.ConfigDefaultRightsizingHeadroom
 	prevViews := ConfigViews
 	prevSets := ConfigUnionSets
+	prevScrollback := ConfigScrollbackLines
+	prevLogMax := ConfigLogMaxLines
+	prevResourceColumns := ConfigResourceColumns
 	t.Cleanup(func() {
 		model.ConfigDefaultRightsizingStrategy = prevStrategy
 		model.ConfigDefaultRightsizingHeadroom = prevHeadroom
 		ConfigViews = prevViews
 		ConfigUnionSets = prevSets
+		ConfigScrollbackLines = prevScrollback
+		ConfigLogMaxLines = prevLogMax
+		ConfigResourceColumns = prevResourceColumns
 	})
 
 	for _, tc := range tests {
