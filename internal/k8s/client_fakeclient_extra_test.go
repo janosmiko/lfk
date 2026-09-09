@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"maps"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1607,6 +1608,136 @@ func TestGetResourceTree_Node(t *testing.T) {
 	root, err := c.GetResourceTree(t.Context(), "", "", "Node", "node-1")
 	require.NoError(t, err)
 	assert.Equal(t, "node-1", root.Name)
+}
+
+// helmTreeManifest mixes a workload that owns a ReplicaSet/Pod subtree, two
+// namespaced leaves (one outside the release namespace) and a cluster-scoped
+// leaf that must keep an empty namespace.
+const helmTreeManifest = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+  namespace: default
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: web-data
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: web-reader
+`
+
+func findTreeChild(root *model.ResourceNode, kind, name string) *model.ResourceNode {
+	for _, ch := range root.Children {
+		if ch.Kind == kind && ch.Name == name {
+			return ch
+		}
+	}
+	return nil
+}
+
+func TestGetResourceTree_HelmRelease(t *testing.T) {
+	rs := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "apps/v1",
+			"kind":       "ReplicaSet",
+			"metadata": map[string]any{
+				"name": "web-abc", "namespace": "default",
+				"ownerReferences": []any{
+					map[string]any{"kind": "Deployment", "name": "web"},
+				},
+			},
+		},
+	}
+	pod := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]any{
+				"name": "web-abc-1", "namespace": "default",
+				"ownerReferences": []any{
+					map[string]any{"kind": "ReplicaSet", "name": "web-abc"},
+				},
+			},
+		},
+	}
+
+	blob := makeHelmBlobWithManifest(
+		"web-release", "web", "1.0.0", "1.0.0",
+		"deployed", "Install complete", helmTreeManifest, 1,
+	)
+	secret := newFakeHelmReleaseSecret(
+		t, "sh.helm.release.v1.web-release.v1", "web-release", "deployed", "1", blob, time.Now(),
+	)
+	cs := k8sfake.NewClientset(secret)
+	dc := newFakeDynClient(rs, pod)
+	c := newFakeClient(cs, dc)
+
+	root, err := c.GetResourceTree(t.Context(), "", "default", "HelmRelease", "web-release")
+	require.NoError(t, err)
+	require.NotEmpty(t, root.Children, "helm release tree must list the resources the release owns")
+
+	depNode := findTreeChild(root, "Deployment", "web")
+	require.NotNil(t, depNode, "manifest Deployment missing from tree")
+	rsNode := findTreeChild(depNode, "ReplicaSet", "web-abc")
+	require.NotNil(t, rsNode, "Deployment child must recurse into its ReplicaSet")
+	require.NotNil(t, findTreeChild(rsNode, "Pod", "web-abc-1"), "ReplicaSet child must recurse into its Pod")
+
+	svcNode := findTreeChild(root, "Service", "web-svc")
+	require.NotNil(t, svcNode, "manifest Service missing from tree")
+	assert.Equal(t, "default", svcNode.Namespace)
+	assert.Empty(t, svcNode.Children)
+
+	cmNode := findTreeChild(root, "ConfigMap", "web-config")
+	require.NotNil(t, cmNode, "manifest ConfigMap missing from tree")
+	assert.Equal(t, "web-data", cmNode.Namespace, "child keeps its own namespace, not the release namespace")
+	assert.Empty(t, cmNode.Children)
+
+	crNode := findTreeChild(root, "ClusterRole", "web-reader")
+	require.NotNil(t, crNode, "cluster-scoped ClusterRole missing from tree")
+	assert.Empty(t, crNode.Namespace, "cluster-scoped kinds keep an empty namespace")
+}
+
+// TestGetResourceTree_HelmReleaseLabelFallback covers the release whose blob
+// cannot be decoded: discovery falls back to instance labels and the tree must
+// still list what it finds.
+func TestGetResourceTree_HelmReleaseLabelFallback(t *testing.T) {
+	secret := &corev1.Secret{
+		Name: "sh.helm.release.v1.legacy.v1", Namespace: "default",
+		Labels: map[string]string{
+			"owner": "helm", "name": "legacy", "status": "deployed", "version": "1",
+		},
+		Data: map[string][]byte{"release": []byte("not-a-helm-blob")},
+		Type: "helm.sh/release.v1",
+	}
+	dep := &appsv1.Deployment{
+		Name: "legacy-web", Namespace: "default",
+		Labels: map[string]string{"app.kubernetes.io/instance": "legacy"},
+		Spec:   appsv1.DeploymentSpec{Replicas: new(int32(1))},
+		Status: appsv1.DeploymentStatus{AvailableReplicas: 1, ReadyReplicas: 1},
+	}
+	cs := k8sfake.NewClientset(secret, dep)
+	dc := newFakeDynClient()
+	c := newFakeClient(cs, dc)
+
+	root, err := c.GetResourceTree(t.Context(), "", "default", "HelmRelease", "legacy")
+	require.NoError(t, err)
+	require.NotEmpty(t, root.Children, "label fallback must still produce tree nodes")
+
+	depNode := findTreeChild(root, "Deployment", "legacy-web")
+	require.NotNil(t, depNode, "label-discovered Deployment missing from tree")
+	assert.Equal(t, "default", depNode.Namespace, "label-discovered items inherit the release namespace")
 }
 
 func TestGetResourceTree_Pod(t *testing.T) {

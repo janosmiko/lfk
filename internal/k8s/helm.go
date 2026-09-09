@@ -309,6 +309,13 @@ func (c *Client) collectHelmResourcesByLabels(ctx context.Context, cs kubernetes
 		collectHelmSimpleResources(&items, seen, cs, ctx, namespace, opts)
 	}
 
+	// The collectHelm* helpers list from a single namespace and leave
+	// Item.Namespace unset, so callers cannot tell these apart from the
+	// cluster-scoped entries the manifest path reports with no namespace.
+	for i := range items {
+		items[i].Namespace = namespace
+	}
+
 	if len(items) == 0 {
 		logger.Info("Helm: no managed resources found for release", "release", releaseName, "namespace", namespace)
 	}

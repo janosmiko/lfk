@@ -76,6 +76,8 @@ func (c *Client) GetResourceTree(ctx context.Context, contextName, namespace, ki
 		err = c.buildServiceTree(ctx, contextName, namespace, name, root)
 	case "Node":
 		err = c.buildNodeTree(ctx, dynClient, name, root)
+	case "HelmRelease":
+		err = c.buildHelmReleaseTree(ctx, dynClient, contextName, namespace, name, root)
 	case "Pod":
 		err = c.buildPodTree(ctx, contextName, namespace, name, root)
 	default:
