@@ -35,6 +35,15 @@ func TestPodResizeOverlay_SanitizesNamesFromTheObject(t *testing.T) {
 	assert.NotContains(t, view, "web\x1b[31m")
 }
 
+func TestPodResizeOverlay_CapsFieldLength(t *testing.T) {
+	m := podResizeOverlayModel()
+	for range podResizeMaxLen + 5 {
+		ret, _ := m.handlePodResizeOverlayKey(runeKey('1'))
+		m = ret.(Model)
+	}
+	assert.LessOrEqual(t, len(m.podResize.active().Value), podResizeMaxLen)
+}
+
 func TestPodResizeOverlay_ShowsRestartWarning(t *testing.T) {
 	m := podResizeOverlayModel()
 	require.Equal(t, []string{"web"}, m.podResize.restartWarn)

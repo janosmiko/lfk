@@ -11,6 +11,11 @@ import (
 // this overlay supports (m, k, M, G, i).
 const podResizeCharset = "0123456789.mkMGi"
 
+// podResizeMaxLen bounds a quantity field. The longest sensible value
+// ("1234567.5Mi") is far shorter, and a cap keeps a held key from growing
+// the row past the overlay width.
+const podResizeMaxLen = 20
+
 // podResizeFieldCount is the number of editable rows per container (cpu
 // req, cpu lim, mem req, mem lim), matching podResizeRow's field order.
 const podResizeFieldCount = 4
@@ -83,8 +88,9 @@ func (m Model) handlePodResizeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		return m, nil
 	default:
 		key := msg.String()
-		if len(key) == 1 && strings.ContainsRune(podResizeCharset, rune(key[0])) {
-			m.podResize.active().Insert(key)
+		in := m.podResize.active()
+		if len(key) == 1 && strings.ContainsRune(podResizeCharset, rune(key[0])) && len(in.Value) < podResizeMaxLen {
+			in.Insert(key)
 		}
 		return m, nil
 	}
