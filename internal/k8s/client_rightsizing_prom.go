@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -31,14 +32,28 @@ func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, names
 	}
 	out.Window = promStrategyWindow(strategy)
 
-	cpuResult, err := c.queryPromContainerMetric(ctx, contextName, cpuQuery)
-	if err != nil {
-		logger.Debug("rightsizing: Prometheus CPU query failed", "err", err)
-	}
-	memResult, err := c.queryPromContainerMetric(ctx, contextName, memQuery)
-	if err != nil {
-		logger.Debug("rightsizing: Prometheus memory query failed", "err", err)
-	}
+	// Each proxy round trip carries its own 10s timeout, so in series a
+	// slow Prometheus would hold the overlay blank for three of them.
+	var (
+		cpuResult, memResult map[string]float64
+		span                 string
+		wg                   sync.WaitGroup
+	)
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		cpuResult = c.promContainerValues(ctx, contextName, cpuQuery, "cpu")
+	}()
+	go func() {
+		defer wg.Done()
+		memResult = c.promContainerValues(ctx, contextName, memQuery, "memory")
+	}()
+	go func() {
+		defer wg.Done()
+		span = c.promDataSpan(ctx, contextName, namespace, kind, name, indexed, strategy)
+	}()
+	wg.Wait()
+	out.DataSpan = span
 
 	for i := range out.Containers {
 		cr := &out.Containers[i]
@@ -57,6 +72,16 @@ func (c *Client) applyPrometheusStrategy(ctx context.Context, contextName, names
 			cr.Mem.RecommendedLimit = scaleLimitFromRatio(cr.Mem.CurrentRequest, cr.Mem.CurrentLimit, rec)
 		}
 	}
+}
+
+// promContainerValues swallows the query error after logging it: the
+// SUGGESTION cells go empty rather than the whole overlay failing.
+func (c *Client) promContainerValues(ctx context.Context, contextName, query, resourceKind string) map[string]float64 {
+	result, err := c.queryPromContainerMetric(ctx, contextName, query)
+	if err != nil {
+		logger.Debug("rightsizing: Prometheus query failed", "resource", resourceKind, "err", err)
+	}
+	return result
 }
 
 // promStrategyWindow returns the human-readable window label for the
@@ -86,11 +111,7 @@ func buildPromContainerQuery(namespace, kind, name string, indexed bool, strateg
 	if podRegex == "" {
 		return ""
 	}
-	// A raw PromQL literal, so the `\.` QuoteMeta emits for a dotted
-	// workload name survives: a double-quoted literal processes escapes
-	// and rejects `\.` as unknown.
-	podMatcher := fmt.Sprintf("pod=~%s%s%s", promRawQuote, podRegex, promRawQuote)
-	commonLabels := fmt.Sprintf(`namespace=%q,%s,container!="POD",container!=""`, namespace, podMatcher)
+	commonLabels := promWorkloadSelector(namespace, podRegex)
 	var inner string
 	switch resourceKind {
 	case "cpu":
@@ -104,6 +125,13 @@ func buildPromContainerQuery(namespace, kind, name string, indexed bool, strateg
 	subquery := fmt.Sprintf(`%s[%s:5m]`, inner, window)
 	aggregated := wrapPromAggregation(strategy, subquery)
 	return fmt.Sprintf(`max by (container) (%s)`, aggregated)
+}
+
+// promWorkloadSelector puts the pod matcher in a raw PromQL literal: a
+// double-quoted one rejects the `\.` QuoteMeta emits for a dotted name.
+func promWorkloadSelector(namespace, podRegex string) string {
+	podMatcher := fmt.Sprintf("pod=~%s%s%s", promRawQuote, podRegex, promRawQuote)
+	return fmt.Sprintf(`namespace=%q,%s,container!="POD",container!=""`, namespace, podMatcher)
 }
 
 // wrapPromAggregation wraps the inner subquery expression with the

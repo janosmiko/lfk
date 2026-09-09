@@ -526,6 +526,7 @@ type Rightsizing struct {
 	Headroom            float64               // headroom multiplier that produced these numbers (e.g. 1.25 = 25% padding above usage)
 	PodCount            int                   // pods aggregated (always 1 for Pod kind)
 	Window              string                // sampling window (e.g. "30s" for metrics-server, "1d"/"7d" for Prometheus). Empty for VPA
+	DataSpan            string                // how far back the samples reach, set only when that is meaningfully shorter than Window
 	Containers          []ContainerRec
 }
 

@@ -221,6 +221,9 @@ func rightsizingMethodologyHint(data *model.Rightsizing) string {
 		if data.Strategy == model.StrategySnapshot && data.Window != "" {
 			hint += " (window: " + data.Window + ")"
 		}
+		if data.DataSpan != "" {
+			hint += " (data: " + data.DataSpan + ")"
+		}
 		hint += headroomMethodologySuffix(data.Strategy, data.Headroom)
 		return hint
 	}
