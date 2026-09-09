@@ -2079,6 +2079,17 @@ func TestFilterParseableKubeconfigs(t *testing.T) {
 		assert.Equal(t, []string{frag}, sourcePaths(filterParseableKubeconfigs([]string{frag})))
 	})
 
+	t.Run("keeps a fragment declaring only current-context", func(t *testing.T) {
+		// A split kubeconfig may hold nothing but the selection of a
+		// context another file declares.
+		tmp := t.TempDir()
+		frag := filepath.Join(tmp, "current-only.yaml")
+		body := "apiVersion: v1\nkind: Config\ncurrent-context: ctx1\n"
+		assert.NoError(t, os.WriteFile(frag, []byte(body), 0o600))
+
+		assert.Equal(t, []string{frag}, sourcePaths(filterParseableKubeconfigs([]string{frag})))
+	})
+
 	t.Run("drops a credential cache that parses into an empty config", func(t *testing.T) {
 		// A gcloud auth plugin token cache is flat JSON. The k8s codec
 		// ignores every unknown field, so it decodes without error into a
@@ -2179,6 +2190,42 @@ func TestNewClientDiscoveryTolerance(t *testing.T) {
 		assert.NotContains(t, client.KubeconfigPaths(), ".DS_Store")
 		// The good neighbour must survive, not just the junk be dropped.
 		assert.Contains(t, client.contexts, "from-dir")
+	})
+
+	t.Run("a discovered fragment setting only current-context still selects", func(t *testing.T) {
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		t.Setenv("KUBECONFIG", "")
+
+		dir := t.TempDir()
+		// The walk is lexical, so the fragment leads the precedence list
+		// and its current-context wins the clientcmd merge.
+		frag := filepath.Join(dir, "00-current.yaml")
+		assert.NoError(t, os.WriteFile(frag,
+			[]byte("apiVersion: v1\nkind: Config\ncurrent-context: from-dir\n"), 0o600))
+		declaring := filepath.Join(dir, "10-team.yaml")
+		assert.NoError(t, os.WriteFile(declaring, []byte(`apiVersion: v1
+kind: Config
+clusters:
+- name: from-dir-cluster
+  cluster:
+    server: https://from-dir.test
+contexts:
+- name: from-dir
+  context:
+    cluster: from-dir-cluster
+    user: from-dir-user
+users:
+- name: from-dir-user
+  user: {}
+`), 0o600))
+
+		client, err := NewClient("", []string{dir}, true, nil)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		assert.Contains(t, client.KubeconfigPaths(), frag,
+			"a fragment that only selects a context must stay in the precedence list")
+		assert.Equal(t, "from-dir", client.CurrentContext())
 	})
 
 	t.Run("an unparseable file named by KUBECONFIG still errors", func(t *testing.T) {

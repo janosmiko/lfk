@@ -402,7 +402,8 @@ func ValidateKubeconfigIgnore(patterns []string) error {
 }
 
 // filterParseableKubeconfigs keeps scanned files that parse and declare at least one
-// cluster, user or context, and carries each one's Config on so nothing re-reads it.
+// cluster, user or context, or a current-context, and carries each one's Config on so
+// nothing re-reads it.
 // Scanned files only: clientcmd reports a file it skipped in the aggregate error
 // NewClient treats as fatal, while a typo in --kubeconfig must still fail loudly.
 func filterParseableKubeconfigs(paths []string) []kubeconfigSource {
@@ -417,7 +418,10 @@ func filterParseableKubeconfigs(paths []string) []kubeconfigSource {
 		}
 		// The codec ignores unrecognised fields, so a flat JSON credential cache
 		// decodes into an empty Config and would reach a subprocess KUBECONFIG.
-		if len(cfg.Clusters) == 0 && len(cfg.AuthInfos) == 0 && len(cfg.Contexts) == 0 {
+		// CurrentContext counts: a split kubeconfig may hold only the selection
+		// of a context another file declares, and dropping it loses that choice.
+		if len(cfg.Clusters) == 0 && len(cfg.AuthInfos) == 0 && len(cfg.Contexts) == 0 &&
+			cfg.CurrentContext == "" {
 			logger.Debug("ignoring file with no kubeconfig entries", "path", p)
 			continue
 		}
