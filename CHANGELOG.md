@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.18.10](https://github.com/janosmiko/lfk/compare/v0.18.9...v0.18.10) (2026-09-09)
+
+
+### Features
+
+* add KYAML output to copy, export, and the YAML viewer ([#732](https://github.com/janosmiko/lfk/issues/732)) ([3f204ac](https://github.com/janosmiko/lfk/commit/3f204ac727fe1a10be131750c40b4fa8ca017d4a))
+* browse Dynamic Resource Allocation objects ([#737](https://github.com/janosmiko/lfk/issues/737)) ([1424a37](https://github.com/janosmiko/lfk/commit/1424a37a600f21bb1e3a2ec1687fb4852a273e52))
+* browse MutatingAdmissionPolicy and binding objects ([#734](https://github.com/janosmiko/lfk/issues/734)) ([78e075c](https://github.com/janosmiko/lfk/commit/78e075c37bd622a46abb647e18a8d5f6f3e1c42e))
+* browse PodCertificateRequest and ClusterTrustBundle objects ([#738](https://github.com/janosmiko/lfk/issues/738)) ([f02f204](https://github.com/janosmiko/lfk/commit/f02f204164eabfc3ab593aeb31bc6c8c310dc05c))
+* jump from a pod to its ResourceClaim with c ([#746](https://github.com/janosmiko/lfk/issues/746)) ([97ece1e](https://github.com/janosmiko/lfk/commit/97ece1ee6c9edf987d310ab909b1864f8bda254c))
+* resize pod container resources in place ([#747](https://github.com/janosmiko/lfk/issues/747)) ([72575dd](https://github.com/janosmiko/lfk/commit/72575dd6c8669ee770f05cee20c0a66f90e10015))
+* show the right-sizing data span when it is shorter than the window ([#740](https://github.com/janosmiko/lfk/issues/740)) ([cef699d](https://github.com/janosmiko/lfk/commit/cef699d17398f5a2bcb246a456b55252cb6c3aaf))
+
+
+### Bug Fixes
+
+* drop kubeconfig files that declare no clusters, users or contexts ([#741](https://github.com/janosmiko/lfk/issues/741)) ([ba3eacf](https://github.com/janosmiko/lfk/commit/ba3eacfb76a6ec1f232171e4aaaf8e0852645211))
+* drop kubeconfig files whose only cluster has no server ([#745](https://github.com/janosmiko/lfk/issues/745)) ([73c5117](https://github.com/janosmiko/lfk/commit/73c5117e622f3e9345abe59eb00a33fb75e657da))
+* keep user-supplied values out of config warnings ([#744](https://github.com/janosmiko/lfk/issues/744)) ([a38904c](https://github.com/janosmiko/lfk/commit/a38904c412ddb025a32e2cf0fee493304217fff0))
+* log the kubeconfig_dir shape instead of its raw value ([#739](https://github.com/janosmiko/lfk/issues/739)) ([c9106b4](https://github.com/janosmiko/lfk/commit/c9106b4cc711d0530be7e1b3ddf8dd1b290bc88a))
+* show a real Changed age on container rows ([#736](https://github.com/janosmiko/lfk/issues/736)) ([eaf73e1](https://github.com/janosmiko/lfk/commit/eaf73e17160a6a39bb85f311d820c99c323ae529))
+* show the resources a Helm release manages in its resource map ([#743](https://github.com/janosmiko/lfk/issues/743)) ([b275a9e](https://github.com/janosmiko/lfk/commit/b275a9e8ba2c3cab4a02917e0a2b2ae44fd6d32f)), closes [#742](https://github.com/janosmiko/lfk/issues/742)
+* treat HPA minReplicas 0 as scaled to zero ([#735](https://github.com/janosmiko/lfk/issues/735)) ([38e10d7](https://github.com/janosmiko/lfk/commit/38e10d70a297db973f2405f5cda6569a1093f505))
+
 ## [0.18.9](https://github.com/janosmiko/lfk/compare/v0.18.8...v0.18.9) (2026-09-08)
 
 
