@@ -133,26 +133,35 @@ func populatePodResourceClaims(ti *model.Item, status, spec map[string]any) {
 	}
 	statuses, _ := status["resourceClaimStatuses"].([]any)
 	var names []string
+	var claimNames []string
 	for _, c := range claims {
 		claim, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
-		if name := resolvePodResourceClaimName(claim, statuses); name != "" {
-			// "claim:N" is read by handleExplorerActionKeyJumpClaim to jump
-			// from a pod row to its ResourceClaim, cycling on repeated presses.
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: fmt.Sprintf("claim:%d", len(names)), Value: name})
-			names = append(names, name)
+		name, resolved := resolvePodResourceClaimName(claim, statuses)
+		if name == "" {
+			continue
 		}
+		if resolved {
+			// "claim:N" is read by handleExplorerActionKeyJumpClaim.
+			// A template name is not a real object to navigate to.
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: fmt.Sprintf("claim:%d", len(claimNames)), Value: name})
+			claimNames = append(claimNames, name)
+		}
+		names = append(names, name)
 	}
 	if len(names) > 0 {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Resource Claims", Value: strings.Join(names, ", ")})
 	}
 }
 
-func resolvePodResourceClaimName(claim map[string]any, statuses []any) string {
+// resolvePodResourceClaimName returns the display name for a pod's claim
+// entry and whether that name is a resolved ResourceClaim object (as
+// opposed to a template name the controller has not realized yet).
+func resolvePodResourceClaimName(claim map[string]any, statuses []any) (string, bool) {
 	if direct, ok := claim["resourceClaimName"].(string); ok && direct != "" {
-		return direct
+		return direct, true
 	}
 	claimName, _ := claim["name"].(string)
 	for _, s := range statuses {
@@ -164,12 +173,12 @@ func resolvePodResourceClaimName(claim map[string]any, statuses []any) string {
 			continue
 		}
 		if resolved, ok := st["resourceClaimName"].(string); ok && resolved != "" {
-			return resolved
+			return resolved, true
 		}
 		break
 	}
 	tmpl, _ := claim["resourceClaimTemplateName"].(string)
-	return tmpl
+	return tmpl, false
 }
 
 func populateDeploymentDetails(ti *model.Item, obj, status, spec map[string]any) {

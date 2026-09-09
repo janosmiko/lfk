@@ -134,6 +134,15 @@ func TestPopulatePodResourceClaims_HiddenClaimColumns(t *testing.T) {
 			spec:       map[string]any{},
 			wantClaims: map[string]string{},
 		},
+		{
+			name: "template-backed claim produces no hidden column when unresolved",
+			spec: map[string]any{
+				"resourceClaims": []any{
+					map[string]any{"name": "gpu", "resourceClaimTemplateName": "gpu-template"},
+				},
+			},
+			wantClaims: map[string]string{},
+		},
 	}
 
 	for _, tt := range tests {

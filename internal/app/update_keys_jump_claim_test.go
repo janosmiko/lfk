@@ -50,6 +50,22 @@ func TestActionKeyJumpClaimNoClaimsOnPod(t *testing.T) {
 	assert.Equal(t, "No resource claims on this pod", rm.statusMessage)
 }
 
+func TestActionKeyJumpClaimUnresolvedClaimsOnPod(t *testing.T) {
+	m := claimJumpTestModel()
+	m.middleItems = append(m.middleItems, model.Item{
+		Name: "pod-3", Namespace: "default", Kind: "Pod", Status: "Running",
+		Columns: []model.KeyValue{{Key: "Resource Claims", Value: "gpu-template"}},
+	})
+	m.setCursor(2) // pod-3 has claims pending but none resolved to a claim: column
+
+	ret, cmd, handled := m.handleExplorerActionKeyJumpClaim()
+	assert.True(t, handled)
+	require.NotNil(t, cmd)
+	rm := ret.(Model)
+	assert.True(t, rm.statusMessageErr)
+	assert.Equal(t, "Resource claim not created yet", rm.statusMessage)
+}
+
 func TestActionKeyJumpClaimTeleportsToFirstClaim(t *testing.T) {
 	m := claimJumpTestModel()
 	m.setCursor(0)

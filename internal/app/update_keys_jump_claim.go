@@ -23,13 +23,21 @@ func (m Model) handleExplorerActionKeyJumpClaim() (tea.Model, tea.Cmd, bool) {
 	}
 
 	var claims []string
+	hasUnresolvedClaims := false
 	for _, kv := range sel.Columns {
 		if strings.HasPrefix(kv.Key, "claim:") {
 			claims = append(claims, kv.Value)
 		}
+		if kv.Key == "Resource Claims" {
+			hasUnresolvedClaims = true
+		}
 	}
 	if len(claims) == 0 {
-		m.setStatusMessage("No resource claims on this pod", true)
+		if hasUnresolvedClaims {
+			m.setStatusMessage("Resource claim not created yet", true)
+		} else {
+			m.setStatusMessage("No resource claims on this pod", true)
+		}
 		return m, scheduleStatusClear(), true
 	}
 
