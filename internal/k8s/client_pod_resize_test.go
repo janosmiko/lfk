@@ -38,7 +38,7 @@ func TestResizePodResources_PatchBody(t *testing.T) {
 	specs := []model.ContainerResources{
 		{Name: "web", CPURequest: "200m", CPULimit: "1", MemRequest: "256Mi"},
 	}
-	err := c.ResizePodResources(t.Context(), "", "default", "my-pod", specs)
+	err := c.ResizePodResources(t.Context(), "", "default", "my-pod", specs, "42")
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
@@ -48,6 +48,9 @@ func TestResizePodResources_PatchBody(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(captured.GetPatch(), &body))
 	expected := map[string]any{
+		"metadata": map[string]any{
+			"resourceVersion": "42",
+		},
 		"spec": map[string]any{
 			"containers": []any{
 				map[string]any{
@@ -91,7 +94,7 @@ func TestResizePodResources_OmitsEmptyFields(t *testing.T) {
 	specs := []model.ContainerResources{
 		{Name: "web", CPURequest: "200m"},
 	}
-	err := c.ResizePodResources(t.Context(), "", "default", "my-pod", specs)
+	err := c.ResizePodResources(t.Context(), "", "default", "my-pod", specs, "")
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
@@ -112,4 +115,5 @@ func TestResizePodResources_OmitsEmptyFields(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expected, body)
+	assert.NotContains(t, body, "metadata")
 }

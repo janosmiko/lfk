@@ -161,13 +161,13 @@ func (m Model) resizePVC(newSize string) tea.Cmd {
 	})
 }
 
-func (m Model) resizePodResources(specs []model.ContainerResources) tea.Cmd {
+func (m Model) resizePodResources(specs []model.ContainerResources, resourceVersion string) tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logger.Info("Resizing pod resources", "name", name, "namespace", ns, "context", kctx)
 	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resize Pod: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
-		err := m.client.ResizePodResources(ctx, kctx, ns, name, specs)
+		err := m.client.ResizePodResources(ctx, kctx, ns, name, specs, resourceVersion)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}

@@ -14,7 +14,12 @@ import (
 )
 
 type podResizePatch struct {
-	Spec podResizePatchSpec `json:"spec"`
+	Metadata *podResizePatchMetadata `json:"metadata,omitempty"`
+	Spec     podResizePatchSpec      `json:"spec"`
+}
+
+type podResizePatchMetadata struct {
+	ResourceVersion string `json:"resourceVersion"`
 }
 
 type podResizePatchSpec struct {
@@ -32,15 +37,16 @@ type podResizePatchLimits struct {
 }
 
 // ResizePodResources uses the pods/resize subresource, since a running
-// Pod's spec.containers[].resources is otherwise immutable.
-func (c *Client) ResizePodResources(ctx context.Context, contextName, namespace, name string, specs []model.ContainerResources) error {
+// Pod's spec.containers[].resources is otherwise immutable. resourceVersion,
+// when set, makes the API server reject a stale patch with a 409.
+func (c *Client) ResizePodResources(ctx context.Context, contextName, namespace, name string, specs []model.ContainerResources, resourceVersion string) error {
 	logger.Info("Resizing pod resources", "context", contextName, "namespace", namespace, "name", name)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
 	}
 
-	body, err := json.Marshal(buildPodResizePatch(specs))
+	body, err := json.Marshal(buildPodResizePatch(specs, resourceVersion))
 	if err != nil {
 		return fmt.Errorf("building resize patch for pod %s: %w", name, err)
 	}
@@ -55,7 +61,7 @@ func (c *Client) ResizePodResources(ctx context.Context, contextName, namespace,
 	return nil
 }
 
-func buildPodResizePatch(specs []model.ContainerResources) podResizePatch {
+func buildPodResizePatch(specs []model.ContainerResources, resourceVersion string) podResizePatch {
 	containers := make([]podResizePatchContainer, 0, len(specs))
 	for _, spec := range specs {
 		requests := map[string]string{}
@@ -83,5 +89,9 @@ func buildPodResizePatch(specs []model.ContainerResources) podResizePatch {
 			Resources: podResizePatchLimits{Requests: requests, Limits: limits},
 		})
 	}
-	return podResizePatch{Spec: podResizePatchSpec{Containers: containers}}
+	patch := podResizePatch{Spec: podResizePatchSpec{Containers: containers}}
+	if resourceVersion != "" {
+		patch.Metadata = &podResizePatchMetadata{ResourceVersion: resourceVersion}
+	}
+	return patch
 }

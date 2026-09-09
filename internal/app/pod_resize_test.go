@@ -10,7 +10,8 @@ import (
 func podResizeRawFixture() map[string]any {
 	return map[string]any{
 		"metadata": map[string]any{
-			"name": "my-pod",
+			"name":            "my-pod",
+			"resourceVersion": "999",
 		},
 		"spec": map[string]any{
 			"resources": map[string]any{
@@ -43,6 +44,7 @@ func TestBuildPodResizeState_PrefillsFromRaw(t *testing.T) {
 	st := buildPodResizeState(podResizeRawFixture())
 
 	assert.Equal(t, "my-pod", st.name)
+	assert.Equal(t, "999", st.resourceVersion)
 	require.Len(t, st.containers, 2)
 
 	web := st.containers[0]
@@ -94,6 +96,29 @@ func TestParsePodResizeForm_OnlyChangedContainers(t *testing.T) {
 	assert.Equal(t, "500m", specs[0].CPURequest)
 	assert.Equal(t, "1", specs[0].CPULimit)
 	assert.Equal(t, "256Mi", specs[0].MemRequest)
+	assert.Equal(t, "", specs[0].MemLimit)
+}
+
+func TestParsePodResizeForm_RejectsClearingASetField(t *testing.T) {
+	st := buildPodResizeState(podResizeRawFixture())
+	st.containers[0].cpuReq.Set("")
+
+	_, err := parsePodResizeForm(st)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "web")
+	assert.Contains(t, err.Error(), "cpu request")
+	assert.Contains(t, err.Error(), "cannot be cleared")
+}
+
+func TestParsePodResizeForm_AllowsAnEmptyFieldToStayEmpty(t *testing.T) {
+	st := buildPodResizeState(podResizeRawFixture())
+	// web.memLim starts empty (see fixture); changing cpuReq keeps memLim
+	// in the diff without ever setting it.
+	st.containers[0].cpuReq.Set("500m")
+
+	specs, err := parsePodResizeForm(st)
+	require.NoError(t, err)
+	require.Len(t, specs, 1)
 	assert.Equal(t, "", specs[0].MemLimit)
 }
 

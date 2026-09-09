@@ -6,10 +6,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// podResizeCharset is the set of characters a quantity field accepts:
-// digits, the decimal point, and the Kubernetes quantity suffix letters
-// this overlay supports (m, k, M, G, i).
-const podResizeCharset = "0123456789.mkMGi"
+// podResizeCharset covers every letter used in a Kubernetes quantity
+// suffix (Ki/Mi/.../Ei, k/M/.../E, e/E, m/u/n); resource.ParseQuantity is
+// still the final validator at submit.
+const podResizeCharset = "0123456789.eEinumkKMGTPE"
 
 // podResizeMaxLen bounds a quantity field. The longest sensible value
 // ("1234567.5Mi") is far shorter, and a cap keeps a held key from growing
@@ -133,8 +133,9 @@ func (m Model) applyPodResizeOverlay() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	resourceVersion := m.podResize.resourceVersion
 	m.overlay = overlayNone
 	m.loading = true
 	m.podResize = podResizeState{}
-	return m, m.resizePodResources(specs)
+	return m, m.resizePodResources(specs, resourceVersion)
 }

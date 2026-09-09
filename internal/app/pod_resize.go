@@ -23,12 +23,13 @@ type podResizeRow struct {
 // podResizeState is the Resize Pod overlay: one podResizeRow per container,
 // plus the pod-level spec.resources shown read-only.
 type podResizeState struct {
-	name        string
-	containers  []podResizeRow
-	podLevel    []model.KeyValue
-	field       int
-	scroll      int
-	restartWarn []string // container names whose resizePolicy requires a restart
+	name            string
+	resourceVersion string
+	containers      []podResizeRow
+	podLevel        []model.KeyValue
+	field           int
+	scroll          int
+	restartWarn     []string // container names whose resizePolicy requires a restart
 }
 
 // buildPodResizeState reads a Pod's raw object into the overlay's prefill
@@ -39,6 +40,7 @@ func buildPodResizeState(raw map[string]any) podResizeState {
 		return st
 	}
 	st.name, _, _ = unstructured.NestedString(raw, "metadata", "name")
+	st.resourceVersion, _, _ = unstructured.NestedString(raw, "metadata", "resourceVersion")
 
 	spec, _ := raw["spec"].(map[string]any)
 	if spec == nil {
@@ -134,16 +136,16 @@ func parsePodResizeForm(st podResizeState) ([]model.ContainerResources, error) {
 
 		spec := model.ContainerResources{Name: row.name}
 		var err error
-		if spec.CPURequest, err = parseQuantityField(row.name, "cpu request", cur[0]); err != nil {
+		if spec.CPURequest, err = parseQuantityField(row.name, "cpu request", row.orig[0], cur[0]); err != nil {
 			return nil, err
 		}
-		if spec.CPULimit, err = parseQuantityField(row.name, "cpu limit", cur[1]); err != nil {
+		if spec.CPULimit, err = parseQuantityField(row.name, "cpu limit", row.orig[1], cur[1]); err != nil {
 			return nil, err
 		}
-		if spec.MemRequest, err = parseQuantityField(row.name, "memory request", cur[2]); err != nil {
+		if spec.MemRequest, err = parseQuantityField(row.name, "memory request", row.orig[2], cur[2]); err != nil {
 			return nil, err
 		}
-		if spec.MemLimit, err = parseQuantityField(row.name, "memory limit", cur[3]); err != nil {
+		if spec.MemLimit, err = parseQuantityField(row.name, "memory limit", row.orig[3], cur[3]); err != nil {
 			return nil, err
 		}
 		specs = append(specs, spec)
@@ -151,11 +153,14 @@ func parsePodResizeForm(st podResizeState) ([]model.ContainerResources, error) {
 	return specs, nil
 }
 
-// parseQuantityField validates a non-empty field with resource.ParseQuantity
-// and returns it unchanged (the API wants the original string form, not a
-// re-rendered quantity). An empty field is left out of the patch.
-func parseQuantityField(containerName, field, value string) (string, error) {
+// parseQuantityField returns value unchanged (the API wants the original
+// string form). The resize subresource can't remove a request/limit that
+// was already set, so clearing a previously non-empty field is rejected.
+func parseQuantityField(containerName, field, orig, value string) (string, error) {
 	if value == "" {
+		if orig != "" {
+			return "", fmt.Errorf("%s %s: cannot be cleared, set a value", containerName, field)
+		}
 		return "", nil
 	}
 	if _, err := resource.ParseQuantity(value); err != nil {
