@@ -57,6 +57,25 @@ func TestBuiltInMetadata_CoversCoreK8sResources(t *testing.T) {
 	}
 }
 
+// TestBuiltInMetadata_CoversPodCertificates asserts that the certificates.k8s.io
+// rare kinds (PodCertificateRequest, ClusterTrustBundle) are registered under
+// Access Control, next to the other rare RBAC/identity kinds.
+func TestBuiltInMetadata_CoversPodCertificates(t *testing.T) {
+	for _, tc := range []struct {
+		key         string
+		displayName string
+	}{
+		{"certificates.k8s.io/podcertificaterequests", "PodCertificateRequests"},
+		{"certificates.k8s.io/clustertrustbundles", "ClusterTrustBundles"},
+	} {
+		meta, ok := BuiltInMetadata[tc.key]
+		require.True(t, ok, "BuiltInMetadata must contain %s", tc.key)
+		assert.Equal(t, "Access Control", meta.Category)
+		assert.Equal(t, tc.displayName, meta.DisplayName)
+		assert.True(t, meta.Rare, "%s should be a rare resource", tc.key)
+	}
+}
+
 // TestBuiltInMetadata_CoversGatewayAPI asserts that the full set of
 // Gateway API resources (gateway.networking.k8s.io/*) surfaced by LFK
 // are present in BuiltInMetadata and carry the Networking category, so

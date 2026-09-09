@@ -574,6 +574,19 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		}
 		return m, m.loadPreview()
 	}
+	if sel.Kind == "PodCertificateRequest" {
+		podName := sel.ColumnValue("Pod")
+		if podName == "" || sel.Namespace == "" {
+			return m, nil
+		}
+		// The namespace switch lands before navigateToOwner pushes the
+		// jump history. navSnapshot does not record namespace fields, so
+		// jump_back cannot restore them either way.
+		m.allNamespaces = false
+		m.namespace = sel.Namespace
+		m.selectedNamespaces = map[string]bool{sel.Namespace: true}
+		return m.navigateToOwner("Pod", podName, "v1")
+	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil
 	}

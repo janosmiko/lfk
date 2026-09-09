@@ -857,3 +857,48 @@ func TestPgUpKeyScrollsFullPageUp(t *testing.T) {
 	assert.Less(t, rm.cursor(), 30, "PgUp must move the cursor backwards")
 	assert.GreaterOrEqual(t, rm.cursor(), 0)
 }
+
+// Must scope the namespace to the item's own, not the current all-namespaces view.
+func TestNavigateChildResource_PodCertificateRequestJumpsToPod(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "PodCertificateRequest", APIGroup: "certificates.k8s.io", APIVersion: "v1",
+		Resource: "podcertificaterequests", Namespaced: true,
+	}
+	m.namespace = "default"
+	m.allNamespaces = true
+	m.leftItemsHistory = [][]model.Item{{{Name: "test-ctx"}}}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
+
+	sel := &model.Item{
+		Name: "pcr-1", Namespace: "ns-a", Kind: "PodCertificateRequest",
+		Columns: []model.KeyValue{{Key: "Pod", Value: "target-pod"}},
+	}
+	result, _ := m.navigateChildResource(sel)
+	rm := result.(Model)
+
+	assert.False(t, rm.allNamespaces, "must switch off all-namespaces so the Pod list loads scoped")
+	assert.Equal(t, "ns-a", rm.namespace, "must use the request's own namespace, not the current view")
+	assert.True(t, rm.selectedNamespaces["ns-a"])
+	assert.Equal(t, "target-pod", rm.pendingTarget)
+}
+
+func TestNavigateChildResource_PodCertificateRequestNoPodColumnNoOp(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "PodCertificateRequest", APIGroup: "certificates.k8s.io", APIVersion: "v1",
+		Resource: "podcertificaterequests", Namespaced: true,
+	}
+	m.namespace = "default"
+
+	sel := &model.Item{Name: "pcr-1", Namespace: "ns-a", Kind: "PodCertificateRequest"}
+	result, cmd := m.navigateChildResource(sel)
+	rm := result.(Model)
+
+	assert.Equal(t, model.LevelResources, rm.nav.Level, "must not navigate without a Pod column")
+	assert.Nil(t, cmd)
+}

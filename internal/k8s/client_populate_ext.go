@@ -90,6 +90,12 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 	case "DeviceClass":
 		populateDeviceClass(ti, spec)
 
+	case "PodCertificateRequest":
+		populatePodCertificateRequest(ti, spec, status)
+
+	case "ClusterTrustBundle":
+		populateClusterTrustBundle(ti, spec)
+
 	default:
 		populateGenericCRDResource(ti, status)
 	}

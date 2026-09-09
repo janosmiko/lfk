@@ -199,6 +199,8 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"rbac.authorization.k8s.io/rolebindings":        {Category: "Access Control", DisplayName: "RoleBindings", Icon: Icon{Unicode: "⊷", Simple: "[Rb]", Emoji: "🔗", NerdFont: "\U000f0339"}},
 	"rbac.authorization.k8s.io/clusterroles":        {Category: "Access Control", DisplayName: "ClusterRoles", Icon: Icon{Unicode: "⚿", Simple: "[Ro]", Emoji: "🔑", NerdFont: "\U000f0be4"}},
 	"rbac.authorization.k8s.io/clusterrolebindings": {Category: "Access Control", DisplayName: "ClusterRoleBindings", Icon: Icon{Unicode: "⊷", Simple: "[Rb]", Emoji: "🔗", NerdFont: "\U000f0339"}},
+	"certificates.k8s.io/podcertificaterequests":    {Category: "Access Control", DisplayName: "PodCertificateRequests", Icon: Icon{Unicode: "⌖", Simple: "[Pc]", Emoji: "📜", NerdFont: "\U000f0a36"}, Rare: true},
+	"certificates.k8s.io/clustertrustbundles":       {Category: "Access Control", DisplayName: "ClusterTrustBundles", Icon: Icon{Unicode: "▩", Simple: "[Tb]", Emoji: "🔏", NerdFont: "\U000f0bfa"}, Rare: true},
 
 	// ---- API and CRDs ----
 	"apiregistration.k8s.io/apiservices":             {Category: "API and CRDs", DisplayName: "API Services", Icon: Icon{Unicode: "⟐", Simple: "[AS]", Emoji: "🔌", NerdFont: "\U000f109b"}, Rare: true},
@@ -453,6 +455,8 @@ var BuiltInOrderRank = map[string]int{
 	"rbac.authorization.k8s.io/rolebindings":        82,
 	"rbac.authorization.k8s.io/clusterroles":        83,
 	"rbac.authorization.k8s.io/clusterrolebindings": 84,
+	"certificates.k8s.io/podcertificaterequests":    85,
+	"certificates.k8s.io/clustertrustbundles":       86,
 
 	// Helm
 	"_helm/releases": 90,
