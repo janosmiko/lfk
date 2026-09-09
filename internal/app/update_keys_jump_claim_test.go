@@ -102,7 +102,7 @@ func TestActionKeyJumpClaimCyclesOnRepeatedPress(t *testing.T) {
 
 func TestActionKeyJumpClaimResetsIndexForDifferentPod(t *testing.T) {
 	m := claimJumpTestModel()
-	m.claimJump = claimJumpState{podKey: "default/pod-1", index: 1}
+	m.claimJump = claimJumpState{podKey: claimJumpPodKey("", "default", "pod-1"), index: 1}
 	m.middleItems = append(m.middleItems, model.Item{
 		Name: "pod-3", Namespace: "default", Kind: "Pod", Status: "Running",
 		Columns: []model.KeyValue{{Key: "claim:0", Value: "other-claim"}},
@@ -112,6 +112,19 @@ func TestActionKeyJumpClaimResetsIndexForDifferentPod(t *testing.T) {
 	ret, _, _ := m.handleExplorerActionKeyJumpClaim()
 	rm := ret.(Model)
 	assert.Equal(t, "other-claim", rm.pendingTarget, "a different pod always starts at its first claim")
+}
+
+// In union mode two clusters can hold a pod with the same namespace and
+// name. A jump from one must not advance the claim index on the other.
+func TestActionKeyJumpClaimKeysBySameNamedPodInAnotherCluster(t *testing.T) {
+	m := claimJumpTestModel()
+	m.middleItems[0].ClusterName = "cluster-a"
+	m.claimJump = claimJumpState{podKey: claimJumpPodKey("cluster-b", "default", "pod-1"), index: 1}
+	m.setCursor(0)
+
+	ret, _, _ := m.handleExplorerActionKeyJumpClaim()
+	rm := ret.(Model)
+	assert.Equal(t, "gpu-claim", rm.pendingTarget, "a same-named pod in another cluster starts at its first claim")
 }
 
 func TestActionKeyCJumpsToClaim(t *testing.T) {

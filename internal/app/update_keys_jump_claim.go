@@ -10,7 +10,7 @@ import (
 // last jumped to, so a repeated press on the same pod advances through its
 // remaining claims instead of always landing on the first one.
 type claimJumpState struct {
-	podKey string // "namespace/name" of the pod the last jump started from
+	podKey string // cluster, namespace and name of the pod the last jump started from
 	index  int    // claim index to use on the next press for that pod
 }
 
@@ -41,7 +41,9 @@ func (m Model) handleExplorerActionKeyJumpClaim() (tea.Model, tea.Cmd, bool) {
 		return m, scheduleStatusClear(), true
 	}
 
-	podKey := sel.Namespace + "/" + sel.Name
+	// The cluster is part of the key: in union mode two clusters can hold a
+	// pod with the same namespace and name.
+	podKey := claimJumpPodKey(sel.ClusterName, sel.Namespace, sel.Name)
 	idx := 0
 	if m.claimJump.podKey == podKey && m.claimJump.index < len(claims) {
 		idx = m.claimJump.index
@@ -54,4 +56,8 @@ func (m Model) handleExplorerActionKeyJumpClaim() (tea.Model, tea.Cmd, bool) {
 
 	ret, cmd := m.navigateToOwner("ResourceClaim", claims[idx], "resource.k8s.io/v1")
 	return ret, cmd, true
+}
+
+func claimJumpPodKey(cluster, namespace, name string) string {
+	return cluster + "\x00" + namespace + "\x00" + name
 }
