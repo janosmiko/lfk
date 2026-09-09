@@ -2,9 +2,13 @@ package k8s
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,9 +148,12 @@ func makeDepFixture() (*appsv1.Deployment, []*corev1.Pod) {
 
 func TestGetRightsizing_PrometheusMax1D(t *testing.T) {
 	dep, pods := makeDepFixture()
-	calls := 0
+	var calls atomic.Int32
 	stub := func(_ context.Context, _ string, query string) ([]byte, error) {
-		calls++
+		calls.Add(1)
+		if isPromSpanProbe(query) {
+			return promSpanResponse("86400"), nil
+		}
 		// CPU returns 0.08 cores (= 80m); Memory returns ~200Mi worth of bytes.
 		if strings.Contains(query, "container_cpu_usage_seconds_total") {
 			return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"container":"app"},"value":[1700000000,"0.08"]}]}}`), nil
@@ -170,12 +177,16 @@ func TestGetRightsizing_PrometheusMax1D(t *testing.T) {
 	assert.Equal(t, "100m", rec.CPU.RecommendedRequest)
 	// 200Mi * 1.2 = 240Mi
 	assert.Equal(t, "240Mi", rec.Mem.RecommendedRequest)
-	assert.Equal(t, 2, calls, "expects one CPU + one memory PromQL call")
+	assert.EqualValues(t, 3, calls.Load(), "expects one CPU + one memory + one data-span PromQL call")
+	assert.Empty(t, out.DataSpan, "a full 1d of samples leaves the header unchanged")
 }
 
 func TestGetRightsizing_PrometheusAvg1D(t *testing.T) {
 	dep, pods := makeDepFixture()
 	stub := func(_ context.Context, _ string, query string) ([]byte, error) {
+		if isPromSpanProbe(query) {
+			return promSpanResponse("86400"), nil
+		}
 		assert.Contains(t, query, "avg_over_time", "avg strategy must use avg_over_time")
 		assert.Contains(t, query, "[1d:")
 		if strings.Contains(query, "container_cpu_usage_seconds_total") {
@@ -198,6 +209,9 @@ func TestGetRightsizing_PrometheusAvg1D(t *testing.T) {
 func TestGetRightsizing_PrometheusP957D(t *testing.T) {
 	dep, pods := makeDepFixture()
 	stub := func(_ context.Context, _ string, query string) ([]byte, error) {
+		if isPromSpanProbe(query) {
+			return promSpanResponse("604800"), nil
+		}
 		assert.Contains(t, query, "quantile_over_time(0.95")
 		assert.Contains(t, query, "[7d:")
 		if strings.Contains(query, "container_cpu_usage_seconds_total") {
@@ -232,6 +246,157 @@ func TestGetRightsizing_PrometheusQueryFailureLeavesSuggestionEmpty(t *testing.T
 	require.Len(t, out.Containers, 1)
 	assert.Empty(t, out.Containers[0].CPU.RecommendedRequest)
 	assert.Empty(t, out.Containers[0].Mem.RecommendedRequest)
+}
+
+// --- data span probe ---
+
+// isPromSpanProbe separates the data-span probe from the two usage
+// queries: only the probe wraps the metric in timestamp().
+func isPromSpanProbe(query string) bool { return strings.Contains(query, "timestamp(") }
+
+func promSpanResponse(seconds string) []byte {
+	return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{},"value":[1700000000,"` + seconds + `"]}]}}`)
+}
+
+// newSpanProbeClient answers the p95/7d usage queries with fixed values
+// and the data-span probe with the caller's body or error.
+func newSpanProbeClient(t *testing.T, spanBody []byte, spanErr error) *Client {
+	t.Helper()
+	dep, pods := makeDepFixture()
+	stub := func(_ context.Context, _ string, query string) ([]byte, error) {
+		if isPromSpanProbe(query) {
+			return spanBody, spanErr
+		}
+		if strings.Contains(query, "container_cpu_usage_seconds_total") {
+			return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"container":"app"},"value":[1700000000,"0.05"]}]}}`), nil
+		}
+		return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"container":"app"},"value":[1700000000,"268435456"]}]}}`), nil
+	}
+	return newPromTestClient(t, pods, dep, stub)
+}
+
+func TestBuildPromDataSpanQuery_ProbesEarliestSampleInWindow(t *testing.T) {
+	q := buildPromDataSpanQuery("default", "Deployment", "frontend", false, model.StrategyPromP957D)
+	assert.Contains(t, q, "timestamp(", "the probe reads sample timestamps, not values")
+	assert.Contains(t, q, "min_over_time", "earliest sample in the window")
+	assert.Contains(t, q, "container_memory_working_set_bytes", "a gauge needs no rate() wrapper")
+	assert.Contains(t, q, "[7d:", "probe covers the strategy's window")
+	assert.Contains(t, q, "time() -", "Prometheus subtracts, so clock skew cannot shorten the span")
+	assert.Contains(t, q, `namespace="default"`)
+	assert.Contains(t, q, "pod=~`", "the matcher uses a raw PromQL literal")
+
+	oneDay := buildPromDataSpanQuery("default", "Deployment", "frontend", false, model.StrategyPromMax1D)
+	assert.Contains(t, oneDay, "[1d:")
+}
+
+func TestBuildPromDataSpanQuery_EmptyForUnsupportedKind(t *testing.T) {
+	assert.Empty(t, buildPromDataSpanQuery("default", "ReplicaSet", "frontend", false, model.StrategyPromP957D))
+	assert.Empty(t, buildPromDataSpanQuery("default", "Deployment", "frontend", false, model.StrategySnapshot))
+}
+
+func TestGetRightsizing_PrometheusShortHistoryReportsDataSpan(t *testing.T) {
+	// A workload Prometheus has only watched for 5h must not look like
+	// it carries a full 7d of history behind its recommendation.
+	c := newSpanProbeClient(t, promSpanResponse("18000"), nil)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
+	require.NoError(t, err)
+	assert.Equal(t, "7d", out.Window)
+	assert.Equal(t, "5h", out.DataSpan, "measured span reported when it falls short of the window")
+}
+
+func TestGetRightsizing_PrometheusFullWindowLeavesDataSpanEmpty(t *testing.T) {
+	c := newSpanProbeClient(t, promSpanResponse("604800"), nil)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
+	require.NoError(t, err)
+	assert.Equal(t, "7d", out.Window)
+	assert.Empty(t, out.DataSpan, "a covered window leaves the header unchanged")
+}
+
+func TestGetRightsizing_PrometheusSpanProbeFailureLeavesDataSpanEmpty(t *testing.T) {
+	c := newSpanProbeClient(t, nil, assert.AnError)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
+	require.NoError(t, err, "a failed probe must not fail the recommendation")
+	assert.Empty(t, out.DataSpan)
+	assert.Equal(t, "60m", out.Containers[0].CPU.RecommendedRequest, "usage queries still land")
+}
+
+func TestGetRightsizing_PrometheusEmptySpanProbeLeavesDataSpanEmpty(t *testing.T) {
+	c := newSpanProbeClient(t, []byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`), nil)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
+	require.NoError(t, err)
+	assert.Empty(t, out.DataSpan)
+}
+
+// promQueryBarrier holds every caller until `want` of them have arrived,
+// so a serial caller can never get past its first query.
+type promQueryBarrier struct {
+	mu      sync.Mutex
+	arrived int
+	want    int
+	all     chan struct{}
+}
+
+func newPromQueryBarrier(want int) *promQueryBarrier {
+	return &promQueryBarrier{want: want, all: make(chan struct{})}
+}
+
+// wait reports whether every caller arrived before the timeout.
+func (b *promQueryBarrier) wait(timeout time.Duration) bool {
+	b.mu.Lock()
+	b.arrived++
+	if b.arrived == b.want {
+		close(b.all)
+	}
+	b.mu.Unlock()
+	select {
+	case <-b.all:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+func TestGetRightsizing_PrometheusQueriesRunConcurrently(t *testing.T) {
+	// Each proxy round trip carries its own 10s timeout, so running the
+	// cpu, memory and span queries in series would triple the worst-case
+	// wait before the overlay paints.
+	dep, pods := makeDepFixture()
+	barrier := newPromQueryBarrier(3)
+	stub := func(_ context.Context, _ string, query string) ([]byte, error) {
+		if !barrier.wait(3 * time.Second) {
+			return nil, fmt.Errorf("query ran alone, the other two never arrived")
+		}
+		if isPromSpanProbe(query) {
+			return promSpanResponse("18000"), nil
+		}
+		if strings.Contains(query, "container_cpu_usage_seconds_total") {
+			return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"container":"app"},"value":[1700000000,"0.05"]}]}}`), nil
+		}
+		return []byte(`{"status":"success","data":{"resultType":"vector","result":[{"metric":{"container":"app"},"value":[1700000000,"268435456"]}]}}`), nil
+	}
+	c := newPromTestClient(t, pods, dep, stub)
+
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
+	require.NoError(t, err)
+	assert.Equal(t, "5h", out.DataSpan, "span probe answered, so it overlapped the usage queries")
+	assert.Equal(t, "60m", out.Containers[0].CPU.RecommendedRequest)
+	assert.Equal(t, "308Mi", out.Containers[0].Mem.RecommendedRequest)
+}
+
+func TestShortDataSpanLabel_ReportsOnlyAMeaningfulGap(t *testing.T) {
+	week := 7 * 24 * time.Hour
+	assert.Equal(t, "5h", shortDataSpanLabel(5*time.Hour, week))
+	assert.Equal(t, "3d", shortDataSpanLabel(3*24*time.Hour, week))
+	// The subquery step makes a covered window read slightly short, so a
+	// near-full span stays quiet.
+	assert.Empty(t, shortDataSpanLabel(week-2*time.Hour, week))
+	assert.Empty(t, shortDataSpanLabel(week, week))
+	assert.Empty(t, shortDataSpanLabel(0, week))
+	assert.Empty(t, shortDataSpanLabel(time.Hour, 0))
 }
 
 // --- podsRegexForWorkload ---

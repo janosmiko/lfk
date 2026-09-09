@@ -399,6 +399,38 @@ func TestRenderRightsizingOverlay_HeaderHeadroomChipAlwaysShown(t *testing.T) {
 	assert.Contains(t, out, "[6/6]", "2.0 is the last preset → 6/6")
 }
 
+// --- Data span in header ---
+
+func promHeaderFixture(dataSpan string) *model.Rightsizing {
+	return &model.Rightsizing{
+		Source:              "7d-p95",
+		Strategy:            model.StrategyPromP957D,
+		AvailableStrategies: []model.RightsizingStrategy{model.StrategyPromP957D, model.StrategySnapshot},
+		Headroom:            1.25,
+		PodCount:            2,
+		Window:              "7d",
+		DataSpan:            dataSpan,
+		Containers: []model.ContainerRec{{
+			Name: "app",
+			CPU:  model.ResourceRec{CurrentRequest: "100m", RecommendedRequest: "60m"},
+		}},
+	}
+}
+
+func TestRenderRightsizingOverlay_HeaderShowsShortDataSpan(t *testing.T) {
+	// Prometheus only holds 5h for this workload, so the header must not
+	// let a 7d label imply a week of evidence.
+	out := stripANSI(RenderRightsizingOverlay(promHeaderFixture("5h"), false, nil, 0, 200, 40))
+	assert.Contains(t, out, "over last 7d (data: 5h)", "header reports the real span next to the window")
+	assert.Contains(t, out, "x 1.25 headroom", "headroom suffix still trails the methodology hint")
+}
+
+func TestRenderRightsizingOverlay_HeaderOmitsDataSpanOnFullWindow(t *testing.T) {
+	out := stripANSI(RenderRightsizingOverlay(promHeaderFixture(""), false, nil, 0, 200, 40))
+	assert.Contains(t, out, "over last 7d")
+	assert.NotContains(t, out, "data:", "a covered window leaves the header unchanged")
+}
+
 func TestRenderRightsizingOverlay_VPAMethodologyAt1RawNote(t *testing.T) {
 	// When VPA is the active strategy AND headroom == 1.0, the
 	// methodology hint should signal "raw" so the user understands the
