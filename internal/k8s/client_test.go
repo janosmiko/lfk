@@ -2104,6 +2104,38 @@ func TestFilterParseableKubeconfigs(t *testing.T) {
 		assert.Equal(t, []string{good}, sourcePaths(filterParseableKubeconfigs([]string{good, cache})))
 	})
 
+	t.Run("drops a file whose only cluster has no server", func(t *testing.T) {
+		// A credential cache that also declares one placeholder cluster
+		// would otherwise pass. clientcmd rejects a cluster without a
+		// server at validation time, so no real fragment is lost.
+		tmp := t.TempDir()
+		good := filepath.Join(tmp, "good.yaml")
+		stub := filepath.Join(tmp, "stub.yaml")
+		body := "apiVersion: v1\nkind: Config\nclusters:\n- name: placeholder\n  cluster: {}\n"
+		assert.NoError(t, os.WriteFile(good, []byte(stubKubeconfig("ctx1")), 0o600))
+		assert.NoError(t, os.WriteFile(stub, []byte(body), 0o600))
+
+		assert.Equal(t, []string{good}, sourcePaths(filterParseableKubeconfigs([]string{good, stub})))
+	})
+
+	t.Run("keeps a serverless cluster when the file also declares a user", func(t *testing.T) {
+		tmp := t.TempDir()
+		frag := filepath.Join(tmp, "mixed.yaml")
+		body := "apiVersion: v1\nkind: Config\nclusters:\n- name: c1\n  cluster: {}\nusers:\n- name: u1\n  user: {}\n"
+		assert.NoError(t, os.WriteFile(frag, []byte(body), 0o600))
+
+		assert.Equal(t, []string{frag}, sourcePaths(filterParseableKubeconfigs([]string{frag})))
+	})
+
+	t.Run("keeps a file when one of several clusters has a server", func(t *testing.T) {
+		tmp := t.TempDir()
+		frag := filepath.Join(tmp, "two-clusters.yaml")
+		body := "apiVersion: v1\nkind: Config\nclusters:\n- name: c1\n  cluster: {}\n- name: c2\n  cluster:\n    server: https://c2.test\n"
+		assert.NoError(t, os.WriteFile(frag, []byte(body), 0o600))
+
+		assert.Equal(t, []string{frag}, sourcePaths(filterParseableKubeconfigs([]string{frag})))
+	})
+
 	t.Run("drops an empty file", func(t *testing.T) {
 		tmp := t.TempDir()
 		empty := filepath.Join(tmp, "empty.yaml")

@@ -402,8 +402,8 @@ func ValidateKubeconfigIgnore(patterns []string) error {
 }
 
 // filterParseableKubeconfigs keeps scanned files that parse and declare at least one
-// cluster, user or context, or a current-context, and carries each one's Config on so
-// nothing re-reads it.
+// user, context, current-context, or cluster with a server, and carries each one's
+// Config on so nothing re-reads it.
 // Scanned files only: clientcmd reports a file it skipped in the aggregate error
 // NewClient treats as fatal, while a typo in --kubeconfig must still fail loudly.
 func filterParseableKubeconfigs(paths []string) []kubeconfigSource {
@@ -416,18 +416,32 @@ func filterParseableKubeconfigs(paths []string) []kubeconfigSource {
 				"path", p, "error", logger.Redact(err.Error()))
 			continue
 		}
-		// The codec ignores unrecognised fields, so a flat JSON credential cache
-		// decodes into an empty Config and would reach a subprocess KUBECONFIG.
-		// CurrentContext counts: a split kubeconfig may hold only the selection
-		// of a context another file declares, and dropping it loses that choice.
-		if len(cfg.Clusters) == 0 && len(cfg.AuthInfos) == 0 && len(cfg.Contexts) == 0 &&
-			cfg.CurrentContext == "" {
+		if !declaresKubeconfigEntries(cfg) {
 			logger.Debug("ignoring file with no kubeconfig entries", "path", p)
 			continue
 		}
 		out = append(out, kubeconfigSource{path: p, cfg: cfg})
 	}
 	return out
+}
+
+// declaresKubeconfigEntries reports whether a parsed file carries anything a
+// merged kubeconfig can use. The codec ignores unrecognised fields, so a flat
+// JSON credential cache decodes into an empty Config and would reach a
+// subprocess KUBECONFIG. CurrentContext counts: a split kubeconfig may hold
+// only the selection of a context another file declares. A cluster counts only
+// with a server URL: clientcmd rejects one without at validation time, so a
+// file whose sole content is a placeholder cluster is a cache, not a fragment.
+func declaresKubeconfigEntries(cfg *clientcmdapi.Config) bool {
+	if len(cfg.AuthInfos) > 0 || len(cfg.Contexts) > 0 || cfg.CurrentContext != "" {
+		return true
+	}
+	for _, c := range cfg.Clusters {
+		if c != nil && c.Server != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // collectConfigDirPaths returns all file paths under dir. If dir is a symlink
