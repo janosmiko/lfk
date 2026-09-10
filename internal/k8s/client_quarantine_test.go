@@ -1,7 +1,9 @@
 package k8s
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -93,4 +96,58 @@ func TestRestorePod_NoAnnotation_ReturnsErrNotQuarantined(t *testing.T) {
 
 	_, err := c.RestorePod(t.Context(), "", "default", "my-pod")
 	assert.True(t, errors.Is(err, ErrNotQuarantined))
+}
+
+func quarantineTestPodWithAnnotation(rawAnnotation string) *unstructured.Unstructured {
+	pod := quarantineTestPod()
+	pod.Object["metadata"].(map[string]any)["annotations"] = map[string]any{
+		QuarantinedLabelsAnnotation: rawAnnotation,
+	}
+	return pod
+}
+
+func hasPatchAction(dc *dynamicfake.FakeDynamicClient) bool {
+	for _, action := range dc.Actions() {
+		if action.GetVerb() == "patch" {
+			return true
+		}
+	}
+	return false
+}
+
+func TestRestorePod_RefusesInvalidLabelKey(t *testing.T) {
+	dc := newFakeDynClient(quarantineTestPodWithAnnotation(`{"bad key!":"value"}`))
+	c := newFakeClient(nil, dc)
+
+	_, err := c.RestorePod(t.Context(), "", "default", "my-pod")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrTamperedAnnotation))
+	assert.False(t, hasPatchAction(dc), "an invalid key must not reach a patch call")
+}
+
+func TestRestorePod_RefusesInvalidLabelValue(t *testing.T) {
+	dc := newFakeDynClient(quarantineTestPodWithAnnotation(`{"app":"has spaces"}`))
+	c := newFakeClient(nil, dc)
+
+	_, err := c.RestorePod(t.Context(), "", "default", "my-pod")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrTamperedAnnotation))
+	assert.False(t, hasPatchAction(dc), "an invalid value must not reach a patch call")
+}
+
+func TestRestorePod_RefusesOversizedAnnotation(t *testing.T) {
+	pairs := make(map[string]string, maxRestoredLabelEntries+1)
+	for i := range maxRestoredLabelEntries + 1 {
+		pairs[fmt.Sprintf("key-%d", i)] = "value"
+	}
+	raw, err := json.Marshal(pairs)
+	require.NoError(t, err)
+
+	dc := newFakeDynClient(quarantineTestPodWithAnnotation(string(raw)))
+	c := newFakeClient(nil, dc)
+
+	_, err = c.RestorePod(t.Context(), "", "default", "my-pod")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrTamperedAnnotation))
+	assert.False(t, hasPatchAction(dc), "an oversized annotation must not reach a patch call")
 }

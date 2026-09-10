@@ -13,10 +13,6 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// quarantineServiceListMax mirrors dependentSummaryKinds: past this many, a
-// confirm box states a count instead of a half-listed set of names.
-const quarantineServiceListMax = 3
-
 // quarantineState is what the open Quarantine/Restore confirm dialog knows:
 // the Services and label keys a quarantine would touch, or the label pairs
 // a restore would put back.
@@ -125,13 +121,12 @@ func quarantineRestoreNotes(restored map[string]string) []ui.ConfirmNote {
 	return []ui.ConfirmNote{{Label: "Scope", Text: quarantineLabelScope(keys)}}
 }
 
-// quarantineServiceScope names the Services a quarantine stops routing to,
-// falling back to a count past quarantineServiceListMax.
+// quarantineServiceScope names every Service a quarantine stops routing to,
+// so the confirm box never hides a Service behind a count.
 func quarantineServiceScope(services []string) string {
-	if len(services) > quarantineServiceListMax {
-		return fmt.Sprintf("%d Services", len(services))
-	}
-	return ui.SanitizeTerminalText(strings.Join(services, ", "))
+	sorted := append([]string(nil), services...)
+	sort.Strings(sorted)
+	return ui.SanitizeTerminalText(strings.Join(sorted, ", "))
 }
 
 // quarantineLabelScope states how many label keys move, and which ones.

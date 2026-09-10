@@ -36,12 +36,8 @@ func TestQuarantineConfirmNotes_NamesEveryServiceAndTheReplacement(t *testing.T)
 				}
 			}
 
-			if len(tc.services) <= 3 {
-				for _, svc := range tc.services {
-					assert.Contains(t, scope, svc)
-				}
-			} else {
-				assert.Contains(t, scope, "5 Services")
+			for _, svc := range tc.services {
+				assert.Contains(t, scope, svc)
 			}
 			assert.Equal(t, tc.wantRisk, risk)
 		})

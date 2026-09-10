@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/janosmiko/lfk/internal/logger"
 )
@@ -21,6 +22,15 @@ const QuarantinedLabelsAnnotation = "lfk.janosmiko.dev/quarantined-labels"
 // ErrNotQuarantined means the pod carries no quarantine annotation, or its
 // value does not parse — RestorePod has nothing to put back.
 var ErrNotQuarantined = errors.New("pod is not quarantined")
+
+// ErrTamperedAnnotation means the annotation holds a pair that is not a
+// valid label, or more pairs than a quarantine ever removes — anyone who
+// can edit the pod can edit this annotation too.
+var ErrTamperedAnnotation = errors.New("quarantine annotation is not a valid label set")
+
+// maxRestoredLabelEntries: past this many, an oversized annotation is a
+// tampering signal, not a legitimate restore.
+const maxRestoredLabelEntries = 64
 
 // QuarantineTargets finds the Services that route to a pod by its labels,
 // and which label keys their selectors use. A selector-less Service is
@@ -129,6 +139,9 @@ func (c *Client) RestorePod(ctx context.Context, contextName, namespace, name st
 	if unmarshalErr := json.Unmarshal([]byte(raw), &restored); unmarshalErr != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNotQuarantined, unmarshalErr)
 	}
+	if err := validateRestoredLabels(restored); err != nil {
+		return nil, fmt.Errorf("restoring pod %s: %w", name, err)
+	}
 
 	labelPatch := make(map[string]any, len(restored))
 	for k, v := range restored {
@@ -153,4 +166,27 @@ func (c *Client) RestorePod(ctx context.Context, contextName, namespace, name st
 		return nil, fmt.Errorf("restoring pod %s: %w", name, err)
 	}
 	return restored, nil
+}
+
+// validateRestoredLabels runs before the patch: the annotation is editable
+// by anyone who can edit the pod, so it cannot be trusted unchecked.
+func validateRestoredLabels(restored map[string]string) error {
+	if len(restored) > maxRestoredLabelEntries {
+		return fmt.Errorf("%w: %d entries, more than a quarantine ever removes",
+			ErrTamperedAnnotation, len(restored))
+	}
+	var invalidKeys, invalidValues int
+	for k, v := range restored {
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			invalidKeys++
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			invalidValues++
+		}
+	}
+	if invalidKeys > 0 || invalidValues > 0 {
+		return fmt.Errorf("%w: %d invalid key(s), %d invalid value(s)",
+			ErrTamperedAnnotation, invalidKeys, invalidValues)
+	}
+	return nil
 }
