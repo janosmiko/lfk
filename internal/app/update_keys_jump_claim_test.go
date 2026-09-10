@@ -15,6 +15,7 @@ func claimJumpTestModel() Model {
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
 		{Kind: "ResourceClaim", APIGroup: "resource.k8s.io", APIVersion: "v1", Resource: "resourceclaims", Namespaced: true},
 	}
+	m.leftItems = model.BuildSidebarItems(m.discoveredResources["test-ctx"])
 	m.middleItems = []model.Item{
 		{
 			Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running",

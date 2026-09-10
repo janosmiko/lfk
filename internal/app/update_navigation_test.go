@@ -872,6 +872,7 @@ func TestNavigateChildResource_PodCertificateRequestJumpsToPod(t *testing.T) {
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
 		{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
 	}
+	m.leftItems = model.BuildSidebarItems(m.discoveredResources["test-ctx"])
 
 	sel := &model.Item{
 		Name: "pcr-1", Namespace: "ns-a", Kind: "PodCertificateRequest",

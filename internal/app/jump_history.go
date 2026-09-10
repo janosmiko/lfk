@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"maps"
 	"strings"
 
@@ -140,8 +141,28 @@ func (m Model) teleportToResourceType(rt model.ResourceTypeEntry, name string) (
 		m = ret.(Model)
 	}
 
-	// Find and select the target resource type in middle items.
-	for i, item := range m.middleItems {
+	// Reveal the target's accordion group: cursor positions are read
+	// against the collapsed visibleMiddleItems(), not this full slice
+	// (issue #748).
+	found := false
+	for _, item := range m.middleItems {
+		if item.Extra == rt.ResourceRef() {
+			found = true
+			if !m.allGroupsExpanded && item.Category != "" && item.Category != m.expandedGroup {
+				m.expandedGroup = item.Category
+			}
+			break
+		}
+	}
+	if !found {
+		m.setStatusMessage(
+			fmt.Sprintf("Cannot jump: %s not in sidebar (toggle rare resources with H?)", model.DisplayNameFor(rt)),
+			true)
+		return m, scheduleStatusClear()
+	}
+
+	// Find and select the target resource type in the now-visible middle items.
+	for i, item := range m.visibleMiddleItems() {
 		if item.Extra == rt.ResourceRef() {
 			m.setCursor(i)
 			break
