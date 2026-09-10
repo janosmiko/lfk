@@ -43,6 +43,7 @@ func (c *Client) priorityConstraintRows(ctx context.Context, kubeCtx string, tar
 	var lookupErrs []error
 
 	pod, err := cs.CoreV1().Pods(target.Namespace).Get(ctx, target.PodName, metav1.GetOptions{})
+	podFound := err == nil
 	switch {
 	case err != nil:
 		lookupErrs = append(lookupErrs, fmt.Errorf("getting pod %s: %w", target.PodName, err))
@@ -57,8 +58,14 @@ func (c *Client) priorityConstraintRows(ctx context.Context, kubeCtx string, tar
 		})
 	}
 
+	// A pod's UID is unique across the reused name, so pinning it excludes
+	// Preempted events left over from an earlier pod with the same name.
+	selector := fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod,reason=Preempted", target.PodName)
+	if podFound {
+		selector += fmt.Sprintf(",involvedObject.uid=%s", pod.UID)
+	}
 	events, err := cs.CoreV1().Events(target.Namespace).List(ctx, metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod,reason=Preempted", target.PodName),
+		FieldSelector: selector,
 		Limit:         constraintsEventsLimit,
 	})
 	if err != nil {

@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -32,8 +33,8 @@ func (c *Client) quotaConstraintRows(ctx context.Context, kubeCtx string, target
 	if err != nil {
 		return nil, err
 	}
-	requests := totalContainerRequests(target.Containers)
-	limits := totalContainerLimits(target.Containers)
+	requests := effectivePodResources(target.Containers, target.InitContainers, func(c ContainerRequest) map[string]string { return c.Requests })
+	limits := effectivePodResources(target.Containers, target.InitContainers, func(c ContainerRequest) map[string]string { return c.Limits })
 	if (len(requests) == 0 && len(limits) == 0) || len(quotas) == 0 {
 		return nil, nil
 	}
@@ -193,13 +194,17 @@ func (c *Client) limitRangeConstraintRows(ctx context.Context, kubeCtx string, t
 	if err != nil {
 		return nil, err
 	}
+	containers := make([]ContainerRequest, 0, len(target.Containers)+len(target.InitContainers))
+	containers = append(containers, target.Containers...)
+	containers = append(containers, target.InitContainers...)
+
 	var rows []ConstraintRow
 	for _, lr := range limitRanges {
 		for _, item := range lr.Spec.Limits {
 			if item.Type != corev1.LimitTypeContainer {
 				continue
 			}
-			rows = append(rows, limitRangeItemRows(lr, item, target.Containers)...)
+			rows = append(rows, limitRangeItemRows(lr, item, containers)...)
 		}
 	}
 	return rows, nil
@@ -209,12 +214,13 @@ func limitRangeItemRows(lr corev1.LimitRange, item corev1.LimitRangeItem, contai
 	var rows []ConstraintRow
 	for _, c := range containers {
 		for resName, minQty := range item.Min {
-			if row, ok := limitRangeBoundRow(lr, resName.String(), "min", minQty, c, true); ok {
-				rows = append(rows, row)
-			}
+			rows = append(rows, limitRangeBoundRows(lr, resName.String(), "min", minQty, c, true)...)
 		}
 		for resName, maxQty := range item.Max {
-			if row, ok := limitRangeBoundRow(lr, resName.String(), "max", maxQty, c, false); ok {
+			rows = append(rows, limitRangeBoundRows(lr, resName.String(), "max", maxQty, c, false)...)
+		}
+		for resName, ratioQty := range item.MaxLimitRequestRatio {
+			if row, ok := limitRequestRatioRow(lr, resName.String(), ratioQty, c); ok {
 				rows = append(rows, row)
 			}
 		}
@@ -222,19 +228,32 @@ func limitRangeItemRows(lr corev1.LimitRange, item corev1.LimitRangeItem, contai
 	return rows
 }
 
-// limitRangeBoundRow reports a container's request against one Min or Max
-// bound. belowIsViolation selects the comparison direction: Min is
-// violated by a smaller request, Max by a larger one.
-func limitRangeBoundRow(lr corev1.LimitRange, resName, bound string, boundQty resource.Quantity, c ContainerRequest, belowIsViolation bool) (ConstraintRow, bool) {
-	reqStr, ok := c.Requests[resName]
+// limitRangeBoundRows checks a container's requests and limits against one
+// Min or Max bound — the admission plugin applies both to each bound.
+func limitRangeBoundRows(lr corev1.LimitRange, resName, bound string, boundQty resource.Quantity, c ContainerRequest, belowIsViolation bool) []ConstraintRow {
+	var rows []ConstraintRow
+	if row, ok := limitRangeBoundRow(lr, resName, bound, boundQty, c, "requests", c.Requests, belowIsViolation); ok {
+		rows = append(rows, row)
+	}
+	if row, ok := limitRangeBoundRow(lr, resName, bound, boundQty, c, "limits", c.Limits, belowIsViolation); ok {
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+// limitRangeBoundRow reports one field (requests or limits) of a container
+// against one Min or Max bound. belowIsViolation selects the comparison
+// direction: Min is violated by a smaller value, Max by a larger one.
+func limitRangeBoundRow(lr corev1.LimitRange, resName, bound string, boundQty resource.Quantity, c ContainerRequest, field string, values map[string]string, belowIsViolation bool) (ConstraintRow, bool) {
+	valStr, ok := values[resName]
 	if !ok {
 		return ConstraintRow{}, false
 	}
-	reqQty, err := resource.ParseQuantity(reqStr)
+	valQty, err := resource.ParseQuantity(valStr)
 	if err != nil {
 		return ConstraintRow{}, false
 	}
-	cmp := reqQty.Cmp(boundQty)
+	cmp := valQty.Cmp(boundQty)
 	violated := (belowIsViolation && cmp < 0) || (!belowIsViolation && cmp > 0)
 	if !violated {
 		return ConstraintRow{}, false
@@ -244,22 +263,105 @@ func limitRangeBoundRow(lr corev1.LimitRange, resName, bound string, boundQty re
 		Kind:      "LimitRange",
 		Namespace: lr.Namespace,
 		Name:      lr.Name,
-		Detail: fmt.Sprintf("container %s requests %s %s, %s is %s",
-			c.Name, reqStr, resName, bound, boundQty.String()),
+		Detail: fmt.Sprintf("container %s %s %s %s, %s is %s",
+			c.Name, field, valStr, resName, bound, boundQty.String()),
 		Headroom: boundQty.String(),
 		Blocking: true,
 	}, true
 }
 
-// totalContainerRequests sums each container's requested amount per
-// resource name, so a multi-container pod's ask is compared to quota as a
-// whole rather than one container at a time.
-func totalContainerRequests(containers []ContainerRequest) map[string]string {
-	return totalContainerResources(containers, func(c ContainerRequest) map[string]string { return c.Requests })
+// limitRequestRatioRow reports a container's limit/request ratio against a
+// MaxLimitRequestRatio bound. The check only applies when both are set, as
+// the admission plugin skips it otherwise.
+func limitRequestRatioRow(lr corev1.LimitRange, resName string, ratioQty resource.Quantity, c ContainerRequest) (ConstraintRow, bool) {
+	reqStr, hasReq := c.Requests[resName]
+	limStr, hasLim := c.Limits[resName]
+	if !hasReq || !hasLim {
+		return ConstraintRow{}, false
+	}
+	reqQty, err := resource.ParseQuantity(reqStr)
+	if err != nil {
+		return ConstraintRow{}, false
+	}
+	limQty, err := resource.ParseQuantity(limStr)
+	if err != nil {
+		return ConstraintRow{}, false
+	}
+	reqFloat := reqQty.AsApproximateFloat64()
+	if reqFloat <= 0 || limQty.AsApproximateFloat64()/reqFloat <= ratioQty.AsApproximateFloat64() {
+		return ConstraintRow{}, false
+	}
+	return ConstraintRow{
+		Source:    "LimitRange",
+		Kind:      "LimitRange",
+		Namespace: lr.Namespace,
+		Name:      lr.Name,
+		Detail: fmt.Sprintf("container %s limit %s / request %s %s exceeds maxLimitRequestRatio %s",
+			c.Name, limStr, reqStr, resName, ratioQty.String()),
+		Headroom: ratioQty.String(),
+		Blocking: true,
+	}, true
 }
 
-func totalContainerLimits(containers []ContainerRequest) map[string]string {
-	return totalContainerResources(containers, func(c ContainerRequest) map[string]string { return c.Limits })
+// effectivePodResources is max(sum of regular containers, largest single
+// init container), matching the scheduler and quota admission: sequential
+// init containers never run alongside the pod's regular ones.
+func effectivePodResources(containers, initContainers []ContainerRequest, pick func(ContainerRequest) map[string]string) map[string]string {
+	return mergeResourceMapsByMax(
+		totalContainerResources(containers, pick),
+		maxContainerResources(initContainers, pick),
+	)
+}
+
+func maxContainerResources(containers []ContainerRequest, pick func(ContainerRequest) map[string]string) map[string]string {
+	maxes := map[string]resource.Quantity{}
+	for _, c := range containers {
+		for name, qtyStr := range pick(c) {
+			qty, err := resource.ParseQuantity(qtyStr)
+			if err != nil {
+				continue
+			}
+			cur, ok := maxes[name]
+			if !ok || qty.Cmp(cur) > 0 {
+				maxes[name] = qty
+			}
+		}
+	}
+	if len(maxes) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(maxes))
+	for name, qty := range maxes {
+		out[name] = qty.String()
+	}
+	return out
+}
+
+// mergeResourceMapsByMax keeps, per resource name, whichever of the two
+// maps' values is larger. A resource name is dropped only if it parses in
+// neither map.
+func mergeResourceMapsByMax(a, b map[string]string) map[string]string {
+	if len(a) == 0 {
+		return b
+	}
+	if len(b) == 0 {
+		return a
+	}
+	out := make(map[string]string, len(a)+len(b))
+	maps.Copy(out, a)
+	for name, bStr := range b {
+		aStr, ok := out[name]
+		if !ok {
+			out[name] = bStr
+			continue
+		}
+		aQty, errA := resource.ParseQuantity(aStr)
+		bQty, errB := resource.ParseQuantity(bStr)
+		if errA != nil || (errB == nil && bQty.Cmp(aQty) > 0) {
+			out[name] = bStr
+		}
+	}
+	return out
 }
 
 func totalContainerResources(containers []ContainerRequest, pick func(ContainerRequest) map[string]string) map[string]string {

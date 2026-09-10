@@ -36,7 +36,9 @@ func TestRulesMatchTarget_Scope(t *testing.T) {
 		{"unset scope places no restriction", rule(nil, "deployments"), clusterScope, true, false},
 		{"explicit all scopes", rule(&allScopes, "deployments"), clusterScope, true, false},
 		{"*/* matches every resource", rule(nil, "*/*"), namespacedScope, true, true},
-		{"resource/* matches the bare resource", rule(nil, "deployments/*"), namespacedScope, true, false},
+		{"* matches the bare resource", rule(nil, "*"), namespacedScope, true, true},
+		{"resource/* does not match the bare resource", rule(nil, "deployments/*"), namespacedScope, false, false},
+		{"exact resource matches", rule(nil, "deployments"), namespacedScope, true, false},
 		{"other resource does not match", rule(nil, "statefulsets"), namespacedScope, false, false},
 	}
 	for _, tt := range tests {

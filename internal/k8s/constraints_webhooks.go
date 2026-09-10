@@ -203,14 +203,14 @@ func valueOrWildcard(values []string, want string) bool {
 }
 
 // webhookResourceMatches accepts the "resource/subresource" forms a rule
-// may use. "*/*" covers every resource and subresource, "<want>/*" the
-// target resource and its own subresources.
+// may use. want is always a bare resource, so "<want>/*" — a subresource
+// wildcard — never matches it: only an exact resource, "*", or "*/*" do.
 func webhookResourceMatches(resources []string, want string) (matched, wildcard bool) {
 	for _, r := range resources {
 		if r == "*" || r == "*/*" {
 			return true, true
 		}
-		if r == want || r == want+"/*" {
+		if r == want {
 			return true, false
 		}
 	}

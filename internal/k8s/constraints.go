@@ -64,6 +64,7 @@ type ConstraintTarget struct {
 	Affinity          []NodeSelectorTerm
 	Tolerations       []corev1.Toleration
 	Containers        []ContainerRequest
+	InitContainers    []ContainerRequest
 	PriorityClassName string
 	GVR               schema.GroupVersionResource
 	Kind              string
@@ -98,6 +99,7 @@ func targetFromRaw(raw map[string]any) ConstraintTarget {
 		Affinity:          nodeAffinityTermsFromRaw(podSpec["affinity"]),
 		Tolerations:       tolerationsFromRaw(podSpec["tolerations"]),
 		Containers:        containerRequestsFromRaw(podSpec["containers"]),
+		InitContainers:    containerRequestsFromRaw(podSpec["initContainers"]),
 		PriorityClassName: stringField(podSpec, "priorityClassName"),
 	}
 }

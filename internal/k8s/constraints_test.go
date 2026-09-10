@@ -102,3 +102,33 @@ func TestTargetFromRaw_PodUsesOwnSpec(t *testing.T) {
 		assert.Equal(t, "1", target.Containers[0].Requests["memory"])
 	}
 }
+
+func TestTargetFromRaw_ReadsInitContainersSeparately(t *testing.T) {
+	raw := map[string]any{
+		"kind": "Pod",
+		"spec": map[string]any{
+			"initContainers": []any{
+				map[string]any{
+					"name":      "init",
+					"resources": map[string]any{"requests": map[string]any{"cpu": "2"}},
+				},
+			},
+			"containers": []any{
+				map[string]any{
+					"name":      "app",
+					"resources": map[string]any{"requests": map[string]any{"cpu": "500m"}},
+				},
+			},
+		},
+	}
+
+	target := targetFromRaw(raw)
+
+	if assert.Len(t, target.InitContainers, 1) {
+		assert.Equal(t, "init", target.InitContainers[0].Name)
+		assert.Equal(t, "2", target.InitContainers[0].Requests["cpu"])
+	}
+	if assert.Len(t, target.Containers, 1) {
+		assert.Equal(t, "app", target.Containers[0].Name)
+	}
+}

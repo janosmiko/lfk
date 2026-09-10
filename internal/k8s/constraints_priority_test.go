@@ -10,6 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -111,6 +112,53 @@ func TestPriorityRows_NoPriorityClassNameYieldsNoRows(t *testing.T) {
 	}
 	if rows != nil {
 		t.Errorf("expected no rows, got %+v", rows)
+	}
+}
+
+func TestPriorityRows_EventsFieldSelectorIncludesPodUID(t *testing.T) {
+	tests := []struct {
+		name       string
+		podUID     string
+		podGetFail bool
+		wantUID    string
+		wantNoUID  bool
+	}{
+		{name: "pod found sets involvedObject.uid", podUID: "pod-uid-123", wantUID: "pod-uid-123"},
+		{name: "pod lookup failure omits involvedObject.uid", podGetFail: true, wantNoUID: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pc := &schedulingv1.PriorityClass{Name: "high", Value: 100}
+			pod := &corev1.Pod{Name: "web-1", Namespace: "default", UID: types.UID(tt.podUID)}
+			cs := k8sfake.NewClientset(pc, pod)
+			if tt.podGetFail {
+				cs.PrependReactor("get", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, "web-1", nil)
+				})
+			}
+
+			var gotSelector string
+			cs.PrependReactor("list", "events", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				listAction, ok := action.(k8stesting.ListActionImpl)
+				if ok {
+					gotSelector = listAction.GetListOptions().FieldSelector
+				}
+				return false, nil, nil
+			})
+			client := newFakeClient(cs, nil)
+
+			target := ConstraintTarget{Namespace: "default", PodName: "web-1", PriorityClassName: "high"}
+			if _, err := client.priorityConstraintRows(t.Context(), "", target); err != nil && !tt.podGetFail {
+				t.Fatalf("priorityConstraintRows: %v", err)
+			}
+
+			if tt.wantUID != "" && !strings.Contains(gotSelector, "involvedObject.uid="+tt.wantUID) {
+				t.Errorf("FieldSelector = %q, want to contain involvedObject.uid=%s", gotSelector, tt.wantUID)
+			}
+			if tt.wantNoUID && strings.Contains(gotSelector, "involvedObject.uid=") {
+				t.Errorf("FieldSelector = %q, want no involvedObject.uid", gotSelector)
+			}
+		})
 	}
 }
 
