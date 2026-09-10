@@ -121,6 +121,22 @@ func TestAllowMetricsFetch_NamespaceSwitchIsNotThrottled(t *testing.T) {
 		"switching back inside the interval keeps the first namespace's stamp")
 }
 
+// Two multi-namespace selections both have no single effective namespace,
+// yet they list different pods, so they must not share a stamp.
+func TestAllowMetricsFetch_MultiNamespaceSelectionsKeepOwnStamps(t *testing.T) {
+	setMetricsInterval(t, time.Hour)
+	m := newMetricsThrottleModel("Pod")
+	m.suppressBgtasks = true
+	m.selectedNamespaces = map[string]bool{"a": true, "b": true}
+	require.True(t, m.allowMetricsFetch("Pod"))
+	m.selectedNamespaces = map[string]bool{"c": true, "d": true}
+	assert.True(t, m.allowMetricsFetch("Pod"),
+		"a different multi-namespace selection must fetch its own metrics")
+	m.allNamespaces = true
+	assert.True(t, m.allowMetricsFetch("Pod"),
+		"all namespaces is yet another list")
+}
+
 func TestAllowMetricsFetch_ContainerKeyedByOwner(t *testing.T) {
 	setMetricsInterval(t, time.Hour)
 	m := newMetricsThrottleModel("Container")

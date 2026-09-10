@@ -60,13 +60,15 @@ func (m *Model) allowMetricsFetch(kind string) bool {
 // sparklineScope returns the part of the throttle key that identifies which
 // series the range query asks for. Without it a namespace switch, or opening a
 // second pod's containers, reuses the previous stamp and the new view sits
-// without history until the interval expires.
+// without history until the interval expires. The full selection fingerprint
+// is used rather than the effective namespace, which is empty for every
+// multi-namespace selection and would make them share one stamp.
 func sparklineScope(m *Model, kind string) string {
 	switch kind {
 	case "Pod":
-		return "/" + m.effectiveNamespace()
+		return "/" + m.fetchFingerprint()
 	case "Container":
-		return "/" + m.effectiveNamespace() + "/" + m.nav.OwnedName
+		return "/" + m.fetchFingerprint() + "/" + m.nav.OwnedName
 	default:
 		// Node and Cluster queries are not namespaced, so the context already
 		// identifies them.
