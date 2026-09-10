@@ -103,10 +103,13 @@ func TestQuotaRows_EffectiveRequestIsMaxOfContainerSumAndInitContainerMax(t *tes
 		wantAsked      string
 	}{
 		{
-			name:           "container sum exceeds any single init container",
-			containers:     []ContainerRequest{{Name: "app", Requests: map[string]string{"cpu": "500m"}}},
-			initContainers: []ContainerRequest{{Name: "init", Requests: map[string]string{"cpu": "200m"}}},
-			wantAsked:      "500m",
+			name: "container sum exceeds any single init container",
+			containers: []ContainerRequest{
+				{Name: "app", Requests: map[string]string{"cpu": "300m"}},
+				{Name: "sidecar", Requests: map[string]string{"cpu": "300m"}},
+			},
+			initContainers: []ContainerRequest{{Name: "init", Requests: map[string]string{"cpu": "500m"}}},
+			wantAsked:      "600m",
 		},
 		{
 			name:           "a single init container exceeds the container sum",
