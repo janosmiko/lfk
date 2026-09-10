@@ -26,7 +26,7 @@ func (m Model) viewConstraints() string {
 	} else if m.constraints.err != nil {
 		body = append(body, ui.ErrorStyle.Render("  "+ui.SanitizeTerminalText(m.constraints.err.Error())))
 	} else {
-		body = append(body, constraintsBanner(m.constraints.report.Skipped))
+		body = append(body, constraintsBanner(m.constraints.report.Skipped, m.constraints.report.Failed))
 		body = append(body, m.renderConstraintsRows()...)
 	}
 
@@ -40,17 +40,29 @@ func (m Model) viewConstraints() string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, content, m.constraintsHintBar())
 }
 
-// constraintsBanner names the sources RBAC (or another failure) kept the
-// scan from reading — one line, never a per-source row implying "absent".
-func constraintsBanner(skipped []string) string {
-	if len(skipped) == 0 {
+// constraintsBanner names the sources the scan couldn't read — one line,
+// never a per-source row implying "absent". Denied and failed sources are
+// named separately so an RBAC gap doesn't read as a bug, or vice versa.
+func constraintsBanner(skipped, failed []string) string {
+	if len(skipped) == 0 && len(failed) == 0 {
 		return ""
 	}
-	names := make([]string, len(skipped))
-	for i, s := range skipped {
-		names[i] = ui.SanitizeTerminalText(s)
+	var parts []string
+	if len(skipped) > 0 {
+		parts = append(parts, "denied: "+strings.Join(sanitizedConstraintNames(skipped), ", "))
 	}
-	return ui.StatusWarning.Render("  skipped (denied or unreachable): " + strings.Join(names, ", "))
+	if len(failed) > 0 {
+		parts = append(parts, "failed: "+strings.Join(sanitizedConstraintNames(failed), ", "))
+	}
+	return ui.StatusWarning.Render("  skipped (" + strings.Join(parts, "; ") + ")")
+}
+
+func sanitizedConstraintNames(names []string) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = ui.SanitizeTerminalText(n)
+	}
+	return out
 }
 
 func (m Model) renderConstraintsRows() []string {

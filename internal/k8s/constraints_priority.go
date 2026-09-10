@@ -7,6 +7,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// constraintsEventsLimit caps the Preempted events fetched for one pod,
+// bounding both the API response size and the rows rendered from it.
+const constraintsEventsLimit = 500
+
 // priorityConstraintRows reports the target's PriorityClass value and, for
 // a bare Pod, whether it is already mid-preemption: a set
 // status.nominatedNodeName or a recent Preempted event against it.
@@ -47,9 +51,14 @@ func (c *Client) priorityConstraintRows(ctx context.Context, kubeCtx string, tar
 
 	events, err := cs.CoreV1().Events(target.Namespace).List(ctx, metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod,reason=Preempted", target.PodName),
+		Limit:         constraintsEventsLimit,
 	})
 	if err == nil {
-		for _, ev := range events.Items {
+		items := events.Items
+		if len(items) > constraintsEventsLimit {
+			items = items[:constraintsEventsLimit]
+		}
+		for _, ev := range items {
 			rows = append(rows, ConstraintRow{
 				Source:    "PriorityClass",
 				Kind:      "Event",

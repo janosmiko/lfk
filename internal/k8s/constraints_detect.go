@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"golang.org/x/sync/errgroup"
 )
 
@@ -19,8 +21,8 @@ type constraintSource struct {
 }
 
 // DetectConstraints runs every constraint source in parallel and merges
-// the rows. A source that errors contributes zero rows and one Skipped
-// entry, never a false "nothing found". Mirrors DetectOrphans.
+// the rows. The returned error is set only when every source failed, so
+// a partial failure shortens the view instead of blanking it.
 func (c *Client) DetectConstraints(ctx context.Context, kubeCtx string, t ConstraintTarget) (ConstraintReport, error) {
 	sources := []constraintSource{
 		{"resourcequotas", func(ctx context.Context) ([]ConstraintRow, error) { return c.quotaConstraintRows(ctx, kubeCtx, t) }},
@@ -47,12 +49,20 @@ func (c *Client) DetectConstraints(ctx context.Context, kubeCtx string, t Constr
 	var report ConstraintReport
 	var errs []error
 	for i, src := range sources {
-		if err := errsBySource[i]; err != nil {
-			report.Skipped = append(report.Skipped, src.name)
-			errs = append(errs, err)
+		err := errsBySource[i]
+		if err == nil {
+			report.Rows = append(report.Rows, rowsBySource[i]...)
 			continue
 		}
-		report.Rows = append(report.Rows, rowsBySource[i]...)
+		errs = append(errs, err)
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			report.Skipped = append(report.Skipped, src.name)
+		} else {
+			report.Failed = append(report.Failed, src.name)
+		}
 	}
-	return report, errors.Join(errs...)
+	if len(errs) == len(sources) {
+		return report, errors.Join(errs...)
+	}
+	return report, nil
 }

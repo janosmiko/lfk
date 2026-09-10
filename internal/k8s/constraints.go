@@ -21,10 +21,12 @@ type ConstraintRow struct {
 }
 
 // ConstraintReport is the aggregated result of DetectConstraints.
-// Skipped names the sources a failed list omitted — see DetectConstraints.
+// Skipped names sources the caller's RBAC denied. Failed names sources
+// omitted for any other reason. See DetectConstraints.
 type ConstraintReport struct {
 	Rows    []ConstraintRow
 	Skipped []string
+	Failed  []string
 }
 
 // ContainerRequest holds one container's resource requests/limits as raw
