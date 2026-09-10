@@ -5,13 +5,14 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 )
 
 func TestConstraintsBanner_DistinguishesDeniedFromFailed(t *testing.T) {
-	out := stripANSI(constraintsBanner([]string{"poddisruptionbudgets"}, []string{"nodes"}))
+	out := stripANSI(constraintsBanner([]string{"poddisruptionbudgets"}, []string{"nodes"}, 120))
 
 	if !strings.Contains(out, "denied") || !strings.Contains(out, "poddisruptionbudgets") {
 		t.Errorf("expected the denied group to name poddisruptionbudgets, got %q", out)
@@ -203,8 +204,57 @@ func TestViewConstraints_At80Columns_RowsFitWithinWidth(t *testing.T) {
 	}
 }
 
+func TestConstraintsBanner_TruncatesToOneLineSoDataRowsAreNotClipped(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeConstraints
+	m.width = 60
+	m.height = 20
+	rows := make([]k8s.ConstraintRow, 30)
+	for i := range rows {
+		// Short, so the row survives column truncation at 60 columns — the
+		// assertion below is about the row being scrolled into view, not
+		// about its cell width (that's covered by the column-width tests).
+		rows[i] = k8s.ConstraintRow{Source: "Quota", Kind: "RQ", Name: fmt.Sprintf("q%02d", i)}
+	}
+	m.constraints.report = k8s.ConstraintReport{
+		Rows: rows,
+		Skipped: []string{
+			"a-very-long-denied-resource-name-one",
+			"a-very-long-denied-resource-name-two",
+			"a-very-long-denied-resource-name-three",
+		},
+		Failed: []string{
+			"a-very-long-failed-resource-name-one",
+			"a-very-long-failed-resource-name-two",
+			"a-very-long-failed-resource-name-three",
+		},
+	}
+
+	result, _ := m.handleConstraintsKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	updated, ok := result.(Model)
+	if !ok {
+		t.Fatalf("expected Model, got %T", result)
+	}
+
+	content := stripANSI(updated.viewConstraints())
+	bannerLines := 0
+	for line := range strings.SplitSeq(content, "\n") {
+		if strings.Contains(line, "skipped (") {
+			bannerLines++
+		}
+	}
+	if bannerLines != 1 {
+		t.Errorf("banner rendered as %d lines, want exactly 1: %q", bannerLines, content)
+	}
+
+	lastRow := rows[len(rows)-1]
+	if !strings.Contains(content, lastRow.Name) {
+		t.Errorf("expected the cursor row %q to still render, got:\n%s", lastRow.Name, content)
+	}
+}
+
 func TestConstraintsBanner_EmptyWhenNothingSkippedOrFailed(t *testing.T) {
-	if out := constraintsBanner(nil, nil); out != "" {
+	if out := constraintsBanner(nil, nil, 120); out != "" {
 		t.Errorf("expected an empty banner, got %q", out)
 	}
 }

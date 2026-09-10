@@ -22,6 +22,13 @@ func (m Model) constraintsDataHeight() int {
 	return max(m.constraintsViewportHeight()-2, 1)
 }
 
+// constraintsContentWidth is the interior width content lines wrap to,
+// shared by the banner and the row/column sizing so both truncate to the
+// same box.
+func (m Model) constraintsContentWidth() int {
+	return max(m.width-4, 20)
+}
+
 func (m Model) viewConstraints() string {
 	title := ui.ViewTitle(m.width, m.constraints.title+" — what constrains this object")
 
@@ -31,7 +38,7 @@ func (m Model) viewConstraints() string {
 	} else if m.constraints.err != nil {
 		body = append(body, ui.ErrorStyle.Render("  "+ui.SanitizeTerminalText(m.constraints.err.Error())))
 	} else {
-		body = append(body, constraintsBanner(m.constraints.report.Skipped, m.constraints.report.Failed))
+		body = append(body, constraintsBanner(m.constraints.report.Skipped, m.constraints.report.Failed, m.constraintsContentWidth()))
 		body = append(body, m.renderConstraintsRows()...)
 	}
 
@@ -45,10 +52,10 @@ func (m Model) viewConstraints() string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, content, m.constraintsHintBar())
 }
 
-// constraintsBanner names the sources the scan couldn't read — one line,
-// never a per-source row implying "absent". Denied and failed sources are
-// named separately so an RBAC gap doesn't read as a bug, or vice versa.
-func constraintsBanner(skipped, failed []string) string {
+// constraintsBanner names the sources the scan couldn't read, denied and
+// failed separately so an RBAC gap doesn't read as a bug, or vice versa.
+// Truncated to width: constraintsDataHeight reserves it exactly one line.
+func constraintsBanner(skipped, failed []string, width int) string {
 	if len(skipped) == 0 && len(failed) == 0 {
 		return ""
 	}
@@ -59,7 +66,8 @@ func constraintsBanner(skipped, failed []string) string {
 	if len(failed) > 0 {
 		parts = append(parts, "failed: "+strings.Join(sanitizedConstraintNames(failed), ", "))
 	}
-	return ui.StatusWarning.Render("  skipped (" + strings.Join(parts, "; ") + ")")
+	line := "  skipped (" + strings.Join(parts, "; ") + ")"
+	return ui.StatusWarning.Render(ui.Truncate(line, width))
 }
 
 func sanitizedConstraintNames(names []string) []string {
@@ -75,8 +83,7 @@ func sanitizedConstraintNames(names []string) []string {
 // which visibleRows and the cursor index without it.
 func (m Model) renderConstraintsRows() []string {
 	rows := m.constraints.visibleRows()
-	width := max(m.width-4, 20)
-	cols := constraintsColumns(width, rows)
+	cols := constraintsColumns(m.constraintsContentWidth(), rows)
 	header := constraintsHeaderLine(cols)
 
 	if len(rows) == 0 {
