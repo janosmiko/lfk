@@ -37,6 +37,8 @@ func TestIsMutatingAction(t *testing.T) {
 		"Reconcile",
 		// Helm.
 		"Edit Values", "Upgrade",
+		// Pod service quarantine.
+		"Quarantine", "Restore",
 	}
 	for _, label := range mutating {
 		assert.True(t, isMutatingAction(label), "%q should be classified mutating", label)
@@ -108,6 +110,26 @@ func TestExecuteAction_ReadOnly_BlocksMutating(t *testing.T) {
 			// state (e.g., overlayConfirm for Delete).
 			assert.NotEqual(t, overlayConfirm, result.overlay)
 			assert.NotEqual(t, overlayScaleInput, result.overlay)
+		})
+	}
+}
+
+func TestExecuteAction_ReadOnly_BlocksQuarantine(t *testing.T) {
+	for _, label := range []string{"Quarantine", "Restore"} {
+		t.Run(label, func(t *testing.T) {
+			m := baseModelWithFakeClient()
+			m.readOnly = true
+			m.actionCtx = actionContext{kind: "Pod", name: "pod-1", namespace: "default", context: "test-ctx"}
+
+			ret, cmd := m.executeAction(label)
+			result := ret.(Model)
+
+			assert.Equal(t, readOnlyBlockedMessage(label), result.statusMessage)
+			assert.True(t, result.statusMessageErr)
+			assert.Equal(t, overlayNone, result.overlay)
+			require.NotNil(t, cmd, "a status-clear cmd is still returned")
+			assert.Zero(t, result.scheduler.QueueLen(result.nav.Context),
+				"a blocked action must not submit any k8s call")
 		})
 	}
 }

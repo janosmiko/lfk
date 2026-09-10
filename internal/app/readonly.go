@@ -86,6 +86,10 @@ var mutatingActions = map[string]bool{
 	// Helm release mutations.
 	"Edit Values": true,
 	"Upgrade":     true,
+
+	// Pod service quarantine.
+	"Quarantine": true,
+	"Restore":    true,
 }
 
 // isUnionAllowedActionForKind reports whether an action is allowed at the

@@ -95,6 +95,11 @@ func TestIsUnionAllowedActionForKind_ClosureOverMutatingActions(t *testing.T) {
 		"Activate":             nil,
 		"Edit Values":          nil,
 		"Upgrade":              nil,
+
+		// Quarantine/Restore rewrite Service-selected labels on a single
+		// Pod, like Labels / Annotations above — hard-blocked in union.
+		"Quarantine": nil,
+		"Restore":    nil,
 	}
 
 	probeKinds := []string{"Pod", "Deployment", "StatefulSet", "DaemonSet", "Service", "ConfigMap"}

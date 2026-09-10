@@ -107,6 +107,8 @@ func (m Model) openResourceActionMenu() Model {
 		}
 	}
 
+	rewriteQuarantineMenuItem(items, sel.Raw)
+
 	sortActionMenuItems(items)
 	m.overlay = overlayAction
 	m.overlayItems = items
@@ -598,6 +600,12 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 		return mdl, cmd, true
 	case "Vuln Scan":
 		mdl, cmd := m.executeActionVulnScan()
+		return mdl, cmd, true
+	case model.ActionLabelQuarantine:
+		mdl, cmd := m.executeActionQuarantine()
+		return mdl, cmd, true
+	case model.ActionLabelRestore:
+		mdl, cmd := m.executeActionRestore()
 		return mdl, cmd, true
 	}
 	return m, nil, false

@@ -66,6 +66,10 @@ When Prometheus holds less history than the window, the header adds the real spa
 
 The chip shows `snapshot` with no `[N/M]` counter when it is the only strategy available. To unlock the others, point lfk at Prometheus or VictoriaMetrics (see [config-reference.md](config-reference.md#monitoring)) or create a VPA in `Off` mode for the workload. Then cycle with `[` and `]`. Keys and headroom are in [keybindings.md](keybindings.md#right-sizing-advisor).
 
+## Pod quarantine
+
+`x` -> `Q` strips the label keys a pod's Services select on, so they stop routing traffic to it without deleting the pod, then records what it removed in the `lfk.janosmiko.dev/quarantined-labels` annotation. `Q` then reads Restore and puts the labels back. Keys are in [keybindings.md](keybindings.md#pod-actions).
+
 ## Embedded terminal
 
 Exec and shell sessions run in an embedded PTY by default. A session keeps running in the background when you switch tabs, so you can leave it and come back. `Ctrl+T` cycles the mode, see [config-reference.md](config-reference.md#terminal-mode).

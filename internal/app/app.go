@@ -159,6 +159,7 @@ type Model struct {
 	hpaScale       hpaScaleState // HPA scale overlay: min/max bounds + target replicas
 	pvcCurrentSize string        // current size displayed in the PVC resize overlay
 	podResize      podResizeState
+	quarantine     quarantineState
 
 	// Port forward input state.
 	portForwardInput TextInput

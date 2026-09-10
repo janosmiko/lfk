@@ -63,6 +63,14 @@ func ActionsForKind(kind string) []ActionMenuItem {
 // applies elsewhere. Exported so the app-layer dispatcher can switch on it.
 const ActionLabelExportTemplate = "Export Template"
 
+// ActionLabelQuarantine and ActionLabelRestore are exported so the app-layer
+// dispatcher and the menu-item rewrite (Quarantine <-> Restore) can switch
+// on them without repeating the label strings.
+const (
+	ActionLabelQuarantine = "Quarantine"
+	ActionLabelRestore    = "Restore"
+)
+
 // exportTemplateAction is appended to every kind's menu: any object can be
 // turned into a template, and the export writes nothing to the cluster, so it
 // is not gated by read-only mode.
@@ -130,6 +138,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Right-sizing", Description: "Per-container CPU/Mem recommendations", Key: "z"},
 			{Label: "Resize", Description: "Resize container CPU/memory in place", Key: "r"},
+			{Label: ActionLabelQuarantine, Description: "Remove the labels that put this pod behind its Services", Key: "Q"},
 			{Label: "Security Findings", Description: "List security findings for this resource", Key: "y"},
 			{Label: "Delete", Description: "Delete this pod", Key: "D"},
 			{Label: "Force Delete", Description: "Force delete this pod", Key: "X"},

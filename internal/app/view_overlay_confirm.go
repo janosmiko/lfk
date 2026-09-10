@@ -27,7 +27,13 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 	// it costs two extra rows when present. Width is settled before anything
 	// is fitted to it.
 	showsPolicy := m.deleteConfirmShowsPolicy()
-	notes := confirmCostNotes(m.buildConfirmCost(showsPolicy, m.pendingAction == "Drain"))
+	var notes []ui.ConfirmNote
+	switch m.pendingAction {
+	case model.ActionLabelQuarantine, model.ActionLabelRestore:
+		notes = quarantineConfirmNotes(m.quarantine, podHasController(m.actionCtx.raw))
+	default:
+		notes = confirmCostNotes(m.buildConfirmCost(showsPolicy, m.pendingAction == "Drain"))
+	}
 	if len(notes) > 0 {
 		// The risk row carries a resource name, which does not fit the
 		// 50-column box a plain y/n question needs.
