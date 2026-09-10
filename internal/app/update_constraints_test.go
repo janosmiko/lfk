@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -93,6 +95,28 @@ func TestConstraintsView_HiddenTargetLeavesNavigationUntouched(t *testing.T) {
 	assert.Equal(t, modeConstraints, updated.mode, "a failed jump must keep the view open")
 	assert.Equal(t, "default", updated.namespace, "a failed jump must not switch namespace")
 	assert.Empty(t, updated.jumpBackStack, "a failed jump must not record history")
+}
+
+func TestHandleConstraintsKey_CursorStaysVisibleWithBannerAndHeader(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeConstraints
+	m.width = 120
+	m.height = 20
+	rows := make([]k8s.ConstraintRow, 30)
+	for i := range rows {
+		rows[i] = k8s.ConstraintRow{
+			Source: "Quota", Kind: "ResourceQuota", Namespace: "default", Name: fmt.Sprintf("quota-%02d", i),
+		}
+	}
+	m.constraints.report = k8s.ConstraintReport{Rows: rows, Skipped: []string{"poddisruptionbudgets"}}
+
+	result, _ := m.handleConstraintsKey(tea.KeyPressMsg{Code: 'G', Text: "G"})
+	updated, ok := result.(Model)
+	require.True(t, ok)
+
+	out := strings.Join(updated.renderConstraintsRows(), "\n")
+	lastRow := rows[len(rows)-1]
+	assert.Contains(t, out, lastRow.Name, "the cursor row must render after jumping to the bottom")
 }
 
 func TestConstraintsView_QuitClearsPendingG(t *testing.T) {

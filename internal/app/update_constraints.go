@@ -17,7 +17,9 @@ const constraintsScrollOff = 3
 // constraintsWorkloadKinds are the kinds that carry, or generate, a pod
 // template — the shapes podSpecAndMetaFromRaw (internal/k8s) knows how to
 // read. Shared with the which-key Avail gate so the two lists never drift.
-var constraintsWorkloadKinds = []string{"Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob"}
+var constraintsWorkloadKinds = []string{
+	"Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob", "ReplicationController",
+}
 
 // openConstraintsView opens the "what constrains this object" fullscreen
 // view for the currently selected middle-column row.
@@ -62,7 +64,7 @@ func (m Model) handleConstraintsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	kb := ui.ActiveKeybindings
 	rows := m.constraints.visibleRows()
 	maxIdx := len(rows) - 1
-	half := max(m.constraintsViewportHeight()/2, 1)
+	half := max(m.constraintsDataHeight()/2, 1)
 
 	// Cleared up front so no exit path leaves a half-typed gg armed for the
 	// explorer to complete after the view closes.
@@ -100,7 +102,7 @@ func (m Model) handleConstraintsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.constraints.scroll = ui.VimScrollOff(
 		m.constraints.scroll, m.constraints.cursor, len(rows),
-		m.constraintsViewportHeight(), constraintsScrollOff,
+		m.constraintsDataHeight(), constraintsScrollOff,
 		func(from, to int) int { return to - from },
 	)
 	return m, nil

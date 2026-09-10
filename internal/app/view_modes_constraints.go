@@ -10,11 +10,16 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// constraintsViewportHeight is the number of table rows visible at once —
-// shared by the key handler (scroll math) and the renderer (page size) so
-// they agree on what "one page" means.
+// constraintsViewportHeight is the number of lines inside the fullscreen
+// box. constraintsDataHeight derives the actual row budget from it.
 func (m Model) constraintsViewportHeight() int {
 	return max(m.height-4, 3)
+}
+
+// constraintsDataHeight is the viewport minus the banner and header lines,
+// shared by the key handler and the renderer so both agree on one page.
+func (m Model) constraintsDataHeight() int {
+	return max(m.constraintsViewportHeight()-2, 1)
 }
 
 func (m Model) viewConstraints() string {
@@ -77,7 +82,7 @@ func (m Model) renderConstraintsRows() []string {
 	if len(rows) == 0 {
 		return []string{header, ui.DimStyle.Render("  no constraints found")}
 	}
-	height := m.constraintsViewportHeight() - 2 // banner + header lines
+	height := m.constraintsDataHeight()
 	scroll := min(max(m.constraints.scroll, 0), max(len(rows)-1, 0))
 	end := min(scroll+height, len(rows))
 
