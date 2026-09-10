@@ -10,10 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func TestQuarantineTargets_MatchesOnlySelectorServices(t *testing.T) {
@@ -71,6 +75,67 @@ func TestQuarantinePod_StripsKeysAndRecordsAnnotation(t *testing.T) {
 	assert.NotContains(t, obj.GetLabels(), "app")
 	assert.Equal(t, "backend", obj.GetLabels()["tier"])
 	assert.Equal(t, `{"app":"web"}`, obj.GetAnnotations()[QuarantinedLabelsAnnotation])
+}
+
+func TestQuarantinePod_PatchCarriesResourceVersion(t *testing.T) {
+	pod := quarantineTestPod()
+	pod.SetResourceVersion("42")
+	dc := newFakeDynClient(pod)
+
+	var captured k8stesting.PatchAction
+	dc.PrependReactor("patch", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		captured = action.(k8stesting.PatchAction)
+		return true, pod, nil
+	})
+	c := newFakeClient(nil, dc)
+
+	_, err := c.QuarantinePod(t.Context(), "", "default", "my-pod", []string{"app"})
+	require.NoError(t, err)
+	require.NotNil(t, captured)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(captured.GetPatch(), &body))
+	metadata, ok := body["metadata"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "42", metadata["resourceVersion"])
+}
+
+func TestQuarantinePod_ConflictSurfacesError(t *testing.T) {
+	dc := newFakeDynClient(quarantineTestPod())
+	patchCount := 0
+	dc.PrependReactor("patch", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		patchCount++
+		return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "pods"}, "my-pod", errors.New("stale resourceVersion"))
+	})
+	c := newFakeClient(nil, dc)
+
+	_, err := c.QuarantinePod(t.Context(), "", "default", "my-pod", []string{"app"})
+	require.Error(t, err)
+	assert.True(t, apierrors.IsConflict(err))
+	assert.Equal(t, 1, patchCount, "a conflict must not be retried with a second patch")
+}
+
+func TestRestorePod_PatchCarriesResourceVersion(t *testing.T) {
+	pod := quarantineTestPodWithAnnotation(`{"app":"web"}`)
+	pod.SetResourceVersion("99")
+	dc := newFakeDynClient(pod)
+
+	var captured k8stesting.PatchAction
+	dc.PrependReactor("patch", "pods", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		captured = action.(k8stesting.PatchAction)
+		return true, pod, nil
+	})
+	c := newFakeClient(nil, dc)
+
+	_, err := c.RestorePod(t.Context(), "", "default", "my-pod")
+	require.NoError(t, err)
+	require.NotNil(t, captured)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(captured.GetPatch(), &body))
+	metadata, ok := body["metadata"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "99", metadata["resourceVersion"])
 }
 
 func TestRestorePod_RestoresExactPairsAndClearsAnnotation(t *testing.T) {

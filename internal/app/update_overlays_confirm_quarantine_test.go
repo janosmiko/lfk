@@ -1,15 +1,21 @@
 package app
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	tea "charm.land/bubbletea/v2"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynfake "k8s.io/client-go/dynamic/fake"
+	fake "k8s.io/client-go/kubernetes/fake"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -74,11 +80,33 @@ func quarantineFakePod() *unstructured.Unstructured {
 	}}
 }
 
-func TestQuarantinePodCmd_EndToEnd(t *testing.T) {
-	m := baseModelWithFakeDynamic(map[schema.GroupVersionResource]string{
+// quarantineModelWithService wires a Model whose dynamic client serves
+// quarantineFakePod and whose clientset serves the given Services, so the
+// pre-patch QuarantineTargets re-check has real data to compare against.
+func quarantineModelWithService(services ...runtime.Object) Model {
+	cs := fake.NewClientset(services...)
+	scheme := newFakeScheme()
+	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
 		{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 	}, quarantineFakePod())
-	m.actionCtx = actionContext{context: "test-ctx", kind: "Pod", name: "pod-1", namespace: "default"}
+
+	m := baseModelCov()
+	m.client = k8s.NewTestClient(cs, dyn)
+	m.nav.Context = "test-ctx"
+	m.namespace = "default"
+	m.reqCtx = context.Background()
+	m.actionCtx = actionContext{
+		context: "test-ctx", kind: "Pod", name: "pod-1", namespace: "default",
+		raw: quarantineFakePod().Object,
+	}
+	return m
+}
+
+func TestQuarantinePodCmd_EndToEnd(t *testing.T) {
+	m := quarantineModelWithService(&corev1.Service{
+		Name: "svc-web", Namespace: "default",
+		Spec: corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
+	})
 
 	cmd := m.quarantinePodCmd([]string{"app"})
 
@@ -86,6 +114,27 @@ func TestQuarantinePodCmd_EndToEnd(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, msg.err)
 	assert.Contains(t, msg.message, "Quarantined pod-1")
+}
+
+// The confirm box showed keys ["app"], but by commit time the only
+// matching Service selects on "tier" instead.
+func TestQuarantineCommit_AbortsWhenTargetsChanged(t *testing.T) {
+	m := quarantineModelWithService(&corev1.Service{
+		Name: "svc-tier", Namespace: "default",
+		Spec: corev1.ServiceSpec{Selector: map[string]string{"tier": "backend"}},
+	})
+
+	cmd := m.quarantinePodCmd([]string{"app"})
+
+	msg := execScheduled(t, m, cmd)
+	_, changed := msg.(quarantineTargetsChangedMsg)
+	assert.True(t, changed, "expected quarantineTargetsChangedMsg, got %T", msg)
+
+	mdl, _ := m.updateQuarantineTargetsChanged()
+	out := mdl.(Model)
+	assert.True(t, out.statusMessageErr)
+	assert.Contains(t, out.statusMessage, "run Quarantine again")
+	assert.Nil(t, out.quarantine.keys)
 }
 
 func TestRestorePodCmd_EndToEnd(t *testing.T) {

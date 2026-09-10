@@ -98,7 +98,8 @@ func (c *Client) QuarantinePod(ctx context.Context, contextName, namespace, name
 	}
 	patchData, err := json.Marshal(map[string]any{
 		"metadata": map[string]any{
-			"labels": labelPatch,
+			"resourceVersion": obj.GetResourceVersion(),
+			"labels":          labelPatch,
 			"annotations": map[string]any{
 				QuarantinedLabelsAnnotation: string(removedJSON),
 			},
@@ -149,7 +150,8 @@ func (c *Client) RestorePod(ctx context.Context, contextName, namespace, name st
 	}
 	patchData, err := json.Marshal(map[string]any{
 		"metadata": map[string]any{
-			"labels": labelPatch,
+			"resourceVersion": obj.GetResourceVersion(),
+			"labels":          labelPatch,
 			"annotations": map[string]any{
 				QuarantinedLabelsAnnotation: nil,
 			},

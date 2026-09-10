@@ -44,7 +44,9 @@ func TestUpdateQuarantineTargets_NoServices_ReportsAndOpensNoOverlay(t *testing.
 	m.actionCtx = quarantineTestActionCtx()
 	m.quarantine.reset()
 
-	mdl, cmd := m.updateQuarantineTargets(quarantineTargetsMsg{req: m.quarantine.req})
+	mdl, cmd := m.updateQuarantineTargets(quarantineTargetsMsg{
+		req: m.quarantine.req, context: m.actionCtx.context, namespace: m.actionCtx.namespace, name: m.actionCtx.name,
+	})
 	out := mdl.(Model)
 
 	assert.Equal(t, overlayNone, out.overlay)
@@ -69,5 +71,34 @@ func TestUpdateQuarantineTargets_StaleReqIgnored(t *testing.T) {
 
 	assert.Equal(t, overlayNone, out.overlay)
 	assert.Nil(t, out.quarantine.services)
+	assert.Nil(t, cmd)
+}
+
+// A single fetch means req alone cannot catch pod-a's reply landing on
+// pod-b's confirm box. context/namespace/name must also match.
+func TestUpdateQuarantineTargets_StaleActionCtxIgnored(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.actionCtx = quarantineTestActionCtx() // pod-a
+	m.quarantine.reset()
+	reqForA := m.quarantine.req
+	ctxForA := m.actionCtx.context
+	nsForA := m.actionCtx.namespace
+	nameForA := m.actionCtx.name
+
+	m.actionCtx.name = "pod-b" // action menu reopened on a different pod
+
+	mdl, cmd := m.updateQuarantineTargets(quarantineTargetsMsg{
+		req:       reqForA,
+		context:   ctxForA,
+		namespace: nsForA,
+		name:      nameForA,
+		services:  []string{"svc-web"},
+		keys:      []string{"app"},
+	})
+	out := mdl.(Model)
+
+	assert.Equal(t, overlayNone, out.overlay, "pod-a's result must not open a confirm meant for pod-b")
+	assert.Nil(t, out.quarantine.services)
+	assert.Nil(t, out.quarantine.keys)
 	assert.Nil(t, cmd)
 }

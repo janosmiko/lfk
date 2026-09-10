@@ -164,6 +164,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case quarantineTargetsMsg:
 		mdl, cmd := m.updateQuarantineTargets(msg)
 		return mdl, cmd, true
+	case quarantineTargetsChangedMsg:
+		mdl, cmd := m.updateQuarantineTargetsChanged()
+		return mdl, cmd, true
 	case dependentsLoadedMsg:
 		mdl, cmd := m.updateDependentsLoaded(msg)
 		return mdl, cmd, true

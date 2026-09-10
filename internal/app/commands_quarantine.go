@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -19,13 +20,16 @@ import (
 var errNoQuarantineTarget = errors.New("quarantine targets are not available for this action")
 
 // quarantineTargetsMsg carries the Services and label keys a Quarantine
-// would touch. req numbers the fetch so a stale reply cannot land on a
-// dialog the user already closed and reopened.
+// would touch. req, context, namespace and name together identify the
+// fetch a reply belongs to, so a stale or mismatched pod reply is dropped.
 type quarantineTargetsMsg struct {
-	req      uint64
-	services []string
-	keys     []string
-	err      error
+	req       uint64
+	context   string
+	namespace string
+	name      string
+	services  []string
+	keys      []string
+	err       error
 }
 
 // loadQuarantineTargets fetches which Services route to the target pod.
@@ -39,7 +43,9 @@ func (m Model) loadQuarantineTargets() tea.Cmd {
 	name := m.actionCtx.name
 	podLabels, _, _ := unstructured.NestedStringMap(m.actionCtx.raw, "metadata", "labels")
 	if client == nil {
-		return func() tea.Msg { return quarantineTargetsMsg{req: req, err: errNoQuarantineTarget} }
+		return func() tea.Msg {
+			return quarantineTargetsMsg{req: req, context: ctxName, namespace: namespace, name: name, err: errNoQuarantineTarget}
+		}
 	}
 	return m.scheduleK8sCall(
 		scheduler.PriorityHigh,
@@ -48,7 +54,10 @@ func (m Model) loadQuarantineTargets() tea.Cmd {
 		bgtaskTarget(ctxName, namespace),
 		func(ctx context.Context) tea.Msg {
 			services, keys, err := client.QuarantineTargets(ctx, ctxName, namespace, podLabels)
-			return quarantineTargetsMsg{req: req, services: services, keys: keys, err: err}
+			return quarantineTargetsMsg{
+				req: req, context: ctxName, namespace: namespace, name: name,
+				services: services, keys: keys, err: err,
+			}
 		},
 	)
 }
@@ -88,6 +97,9 @@ func (m Model) updateQuarantineTargets(msg quarantineTargetsMsg) (tea.Model, tea
 	if msg.req != m.quarantine.req {
 		return m, nil // an older fetch answering late
 	}
+	if msg.context != m.actionCtx.context || msg.namespace != m.actionCtx.namespace || msg.name != m.actionCtx.name {
+		return m, nil // a reply for a pod the menu no longer targets
+	}
 	if msg.err != nil {
 		m.setErrorFromErr("Quarantine: ", msg.err)
 		return m, scheduleStatusClear()
@@ -109,13 +121,29 @@ func (m Model) updateQuarantineTargets(msg quarantineTargetsMsg) (tea.Model, tea
 	return m, nil
 }
 
+// quarantineTargetsChangedMsg means the Services routing to the pod (or
+// their selector keys) changed between the confirm box opening and Enter,
+// so the confirmed keys no longer match what a quarantine would touch.
+type quarantineTargetsChangedMsg struct{}
+
+// updateQuarantineTargetsChanged aborts a stale Quarantine commit: nothing
+// was patched, so only the loading/confirm state needs unwinding.
+func (m Model) updateQuarantineTargetsChanged() (tea.Model, tea.Cmd) {
+	m.loading = false
+	m.quarantine.reset()
+	m.setStatusMessage("Services changed since the confirm box, run Quarantine again", true)
+	return m, scheduleStatusClear()
+}
+
 // quarantinePodCmd commits the Quarantine confirm. keys is passed
-// explicitly: the caller resets m.quarantine before this cmd's closure runs.
+// explicitly: the caller resets m.quarantine before this cmd's closure
+// runs. It re-runs QuarantineTargets first, refusing to patch on drift.
 func (m Model) quarantinePodCmd(keys []string) tea.Cmd {
 	client := m.client
 	ctxName := m.actionCtx.context
 	namespace := m.actionCtx.namespace
 	name := m.actionCtx.name
+	podLabels, _, _ := unstructured.NestedStringMap(m.actionCtx.raw, "metadata", "labels")
 	safeName := ui.SanitizeTerminalText(name)
 	return m.scheduleK8sCall(
 		scheduler.PriorityCritical,
@@ -123,6 +151,13 @@ func (m Model) quarantinePodCmd(keys []string) tea.Cmd {
 		"Quarantine: "+name,
 		bgtaskTarget(ctxName, namespace),
 		func(ctx context.Context) tea.Msg {
+			_, freshKeys, err := client.QuarantineTargets(ctx, ctxName, namespace, podLabels)
+			if err != nil {
+				return actionResultMsg{err: err}
+			}
+			if !slices.Equal(freshKeys, keys) {
+				return quarantineTargetsChangedMsg{}
+			}
 			if _, err := client.QuarantinePod(ctx, ctxName, namespace, name, keys); err != nil {
 				return actionResultMsg{err: err}
 			}
