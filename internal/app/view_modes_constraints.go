@@ -65,18 +65,24 @@ func sanitizedConstraintNames(names []string) []string {
 	return out
 }
 
+// renderConstraintsRows renders the header line plus one line per visible
+// row. The header always leads and is never part of the scrolled range,
+// which visibleRows and the cursor index without it.
 func (m Model) renderConstraintsRows() []string {
 	rows := m.constraints.visibleRows()
-	if len(rows) == 0 {
-		return []string{ui.DimStyle.Render("  no constraints found")}
-	}
 	width := max(m.width-4, 20)
-	height := m.constraintsViewportHeight() - 1 // banner line
+	cols := constraintsColumns(width, rows)
+	header := constraintsHeaderLine(cols)
+
+	if len(rows) == 0 {
+		return []string{header, ui.DimStyle.Render("  no constraints found")}
+	}
+	height := m.constraintsViewportHeight() - 2 // banner + header lines
 	scroll := min(max(m.constraints.scroll, 0), max(len(rows)-1, 0))
 	end := min(scroll+height, len(rows))
 
-	cols := constraintsColumns(width)
-	out := make([]string, 0, max(end-scroll, 0))
+	out := make([]string, 0, max(end-scroll, 0)+1)
+	out = append(out, header)
 	for i := scroll; i < end; i++ {
 		out = append(out, formatConstraintRow(rows[i], i == m.constraints.cursor, cols))
 	}
@@ -89,14 +95,59 @@ type constraintColumns struct {
 	source, kind, name, headroom, detail, line int
 }
 
-// constraintsColumns hands cells back to the detail column, widest first,
-// until the row fits. Gaps between the five columns cost 5 cells.
-func constraintsColumns(width int) constraintColumns {
+const (
+	constraintHeaderSource   = "SOURCE"
+	constraintHeaderKind     = "KIND"
+	constraintHeaderName     = "NAME"
+	constraintHeaderHeadroom = "HEADROOM"
+	constraintHeaderDetail   = "DETAIL"
+)
+
+// constraintCells is one row's plain, sanitized cell text, shared between
+// column-width measurement and row rendering so they never disagree.
+type constraintCells struct {
+	source, kind, name, headroom, detail string
+}
+
+func constraintRowCells(row k8s.ConstraintRow) constraintCells {
+	nsName := ui.SanitizeTerminalText(row.Namespace)
+	if row.Name != "" {
+		if nsName != "" {
+			nsName += "/"
+		}
+		nsName += ui.SanitizeTerminalText(row.Name)
+	}
+	return constraintCells{
+		source:   row.Source,
+		kind:     ui.SanitizeTerminalText(row.Kind),
+		name:     nsName,
+		headroom: row.Headroom,
+		detail:   ui.SanitizeTerminalText(row.Detail),
+	}
+}
+
+// constraintsColumns sizes Source/Kind/Name/Headroom to their widest cell,
+// shrinks them toward their floors widest-first until Detail keeps at
+// least detailFloor cells, then hands Detail whatever remains.
+func constraintsColumns(width int, rows []k8s.ConstraintRow) constraintColumns {
 	const (
 		gaps        = 5
 		detailFloor = 10
 	)
-	cols := constraintColumns{source: 9, kind: 26, name: 28, headroom: 10, line: width - 1}
+	cols := constraintColumns{
+		source:   lipgloss.Width(constraintHeaderSource),
+		kind:     lipgloss.Width(constraintHeaderKind),
+		name:     lipgloss.Width(constraintHeaderName),
+		headroom: lipgloss.Width(constraintHeaderHeadroom),
+		line:     width - 1,
+	}
+	for _, row := range rows {
+		c := constraintRowCells(row)
+		cols.source = max(cols.source, lipgloss.Width(c.source))
+		cols.kind = max(cols.kind, lipgloss.Width(c.kind))
+		cols.name = max(cols.name, lipgloss.Width(c.name))
+		cols.headroom = max(cols.headroom, lipgloss.Width(c.headroom))
+	}
 
 	shrinkable := []*int{&cols.name, &cols.kind, &cols.headroom, &cols.source}
 	floors := []int{6, 6, 4, 4}
@@ -111,24 +162,30 @@ func constraintsColumns(width int) constraintColumns {
 	return cols
 }
 
+func constraintsHeaderLine(cols constraintColumns) string {
+	line := fmt.Sprintf("%-*s %-*s %-*s %-*s  %s",
+		cols.source, ui.Truncate(constraintHeaderSource, cols.source),
+		cols.kind, ui.Truncate(constraintHeaderKind, cols.kind),
+		cols.name, ui.Truncate(constraintHeaderName, cols.name),
+		cols.headroom, ui.Truncate(constraintHeaderHeadroom, cols.headroom),
+		ui.Truncate(constraintHeaderDetail, cols.detail),
+	)
+	line = ui.Truncate(line, cols.line)
+	return " " + ui.DimStyle.Bold(true).Render(line)
+}
+
 func formatConstraintRow(row k8s.ConstraintRow, isCursor bool, cols constraintColumns) string {
 	gutter := " "
 	if isCursor {
 		gutter = ui.YamlCursorIndicatorStyle.Render("▎")
 	}
-	nsName := ui.SanitizeTerminalText(row.Namespace)
-	if row.Name != "" {
-		if nsName != "" {
-			nsName += "/"
-		}
-		nsName += ui.SanitizeTerminalText(row.Name)
-	}
+	c := constraintRowCells(row)
 	line := fmt.Sprintf("%-*s %-*s %-*s %-*s  %s",
-		cols.source, ui.Truncate(row.Source, cols.source),
-		cols.kind, ui.Truncate(ui.SanitizeTerminalText(row.Kind), cols.kind),
-		cols.name, ui.Truncate(nsName, cols.name),
-		cols.headroom, ui.Truncate(row.Headroom, cols.headroom),
-		ui.Truncate(ui.SanitizeTerminalText(row.Detail), cols.detail),
+		cols.source, ui.Truncate(c.source, cols.source),
+		cols.kind, ui.Truncate(c.kind, cols.kind),
+		cols.name, ui.Truncate(c.name, cols.name),
+		cols.headroom, ui.Truncate(c.headroom, cols.headroom),
+		ui.Truncate(c.detail, cols.detail),
 	)
 	// The floors can still overrun a very narrow terminal, and a row wider
 	// than the box wraps into the border.

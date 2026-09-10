@@ -84,6 +84,24 @@ func TestAvailableWhichKeyActions_SecretEditorOnlyForSecretAndConfigMap(t *testi
 	}
 }
 
+func TestAvailableWhichKeyActions_ConstraintsOnlyForWorkloadKinds(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel() // Pod
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "ConfigMap", APIVersion: "v1", Resource: "configmaps", Namespaced: true}
+	m.setMiddleItems([]model.Item{{Name: "cfg", Kind: "ConfigMap", Namespace: "default", Raw: map[string]any{}}})
+	m.setCursor(0)
+	if containsKey(whichKeyKeys(m), ui.ActiveKeybindings.Constraints) {
+		t.Fatal("constraints view must not be offered for a ConfigMap")
+	}
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Namespace: "default", Raw: map[string]any{}}})
+	m.setCursor(0)
+	if !containsKey(whichKeyKeys(m), ui.ActiveKeybindings.Constraints) {
+		t.Fatal("constraints view must be offered for a Pod")
+	}
+}
+
 func TestAvailableWhichKeyActions_RespectsRebind(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	kb := ui.DefaultKeybindings()
@@ -637,7 +655,9 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Live log preview", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
 		{"Resource map", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Object Explorer", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"What constrains this object", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		// LevelContainers is excluded: a container row's Kind is always
+		// "Container", never a workload kind (finding 1).
+		{"What constrains this object", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
 		{"API Explorer", "Pod", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"RBAC browser", "", "", allLevels},
 		{"Orphan overview", "", "", allLevels},

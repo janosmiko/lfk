@@ -11,6 +11,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOpenConstraintsView_RefusesKindWithoutPodTemplate(t *testing.T) {
+	m := basePush80Model()
+	m.setMiddleItems([]model.Item{{
+		Name: "cfg", Namespace: "default", Kind: "ConfigMap", Raw: map[string]any{"kind": "ConfigMap"},
+	}})
+	m.setCursor(0)
+
+	result, cmd := m.openConstraintsView()
+	updated, ok := result.(Model)
+	require.True(t, ok)
+
+	assert.Equal(t, modeExplorer, updated.mode, "must not open the constraints view for a kind with no pod template")
+	assert.True(t, updated.hasStatusMessage())
+	assert.Contains(t, updated.statusMessage, "Constraints apply to workloads only")
+	require.NotNil(t, cmd)
+}
+
+func TestOpenConstraintsView_OpensForEveryWorkloadKind(t *testing.T) {
+	for _, kind := range constraintsWorkloadKinds {
+		t.Run(kind, func(t *testing.T) {
+			m := basePush80Model()
+			m.setMiddleItems([]model.Item{{
+				Name: "obj", Namespace: "default", Kind: kind, Raw: map[string]any{"kind": kind},
+			}})
+			m.setCursor(0)
+
+			result, _ := m.openConstraintsView()
+			updated, ok := result.(Model)
+			require.True(t, ok)
+			assert.Equal(t, modeConstraints, updated.mode, "must open the constraints view for %s", kind)
+		})
+	}
+}
+
 func TestConstraintsView_EnterJumpsToRowObject(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeConstraints

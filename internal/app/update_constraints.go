@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -13,6 +14,11 @@ import (
 
 const constraintsScrollOff = 3
 
+// constraintsWorkloadKinds are the kinds that carry, or generate, a pod
+// template — the shapes podSpecAndMetaFromRaw (internal/k8s) knows how to
+// read. Shared with the which-key Avail gate so the two lists never drift.
+var constraintsWorkloadKinds = []string{"Pod", "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob"}
+
 // openConstraintsView opens the "what constrains this object" fullscreen
 // view for the currently selected middle-column row.
 func (m Model) openConstraintsView() (tea.Model, tea.Cmd) {
@@ -23,6 +29,10 @@ func (m Model) openConstraintsView() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
 	if sel == nil || sel.Raw == nil {
 		m.setStatusMessage("No resource data available", true)
+		return m, scheduleStatusClear()
+	}
+	if !slices.Contains(constraintsWorkloadKinds, sel.Kind) {
+		m.setStatusMessage("Constraints apply to workloads only", true)
 		return m, scheduleStatusClear()
 	}
 

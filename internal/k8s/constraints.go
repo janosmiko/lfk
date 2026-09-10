@@ -104,8 +104,9 @@ func targetFromRaw(raw map[string]any) ConstraintTarget {
 	}
 }
 
-// podSpecAndMetaFromRaw picks the Pod spec/metadata for a bare Pod, or the
-// pod template's for anything else.
+// podSpecAndMetaFromRaw picks the Pod spec/metadata for a bare Pod, the
+// job template's pod template for a CronJob (spec.jobTemplate.spec.template),
+// or the pod template's for anything else (spec.template).
 func podSpecAndMetaFromRaw(raw map[string]any) (spec, meta map[string]any) {
 	kind, _ := raw["kind"].(string)
 	if kind == "Pod" {
@@ -114,7 +115,12 @@ func podSpecAndMetaFromRaw(raw map[string]any) (spec, meta map[string]any) {
 		return spec, meta
 	}
 	topSpec, _ := raw["spec"].(map[string]any)
-	tmpl, _ := topSpec["template"].(map[string]any)
+	tmplParent := topSpec
+	if kind == "CronJob" {
+		jobTemplate, _ := topSpec["jobTemplate"].(map[string]any)
+		tmplParent, _ = jobTemplate["spec"].(map[string]any)
+	}
+	tmpl, _ := tmplParent["template"].(map[string]any)
 	spec, _ = tmpl["spec"].(map[string]any)
 	meta, _ = tmpl["metadata"].(map[string]any)
 	return spec, meta

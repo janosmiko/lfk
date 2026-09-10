@@ -35,6 +35,46 @@ func TestTargetFromRaw_DeploymentUsesPodTemplate(t *testing.T) {
 	assert.Equal(t, map[string]string{"disk": "nvme"}, target.NodeSelector)
 }
 
+func TestTargetFromRaw_CronJobUsesJobTemplatePodTemplate(t *testing.T) {
+	raw := map[string]any{
+		"kind": "CronJob",
+		"metadata": map[string]any{
+			"namespace": "default",
+		},
+		"spec": map[string]any{
+			"jobTemplate": map[string]any{
+				"spec": map[string]any{
+					"template": map[string]any{
+						"metadata": map[string]any{
+							"labels": map[string]any{"app": "nightly"},
+						},
+						"spec": map[string]any{
+							"priorityClassName": "batch",
+							"nodeSelector":      map[string]any{"disk": "hdd"},
+							"containers": []any{
+								map[string]any{
+									"name":      "job",
+									"resources": map[string]any{"requests": map[string]any{"cpu": "1"}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	target := targetFromRaw(raw)
+
+	assert.Equal(t, "default", target.Namespace)
+	assert.Equal(t, map[string]string{"app": "nightly"}, target.PodLabels)
+	assert.Equal(t, "batch", target.PriorityClassName)
+	assert.Equal(t, map[string]string{"disk": "hdd"}, target.NodeSelector)
+	if assert.Len(t, target.Containers, 1) {
+		assert.Equal(t, "job", target.Containers[0].Name)
+	}
+}
+
 func TestTargetFromRaw_KeepsRequiredAffinityMatchFields(t *testing.T) {
 	raw := map[string]any{
 		"kind": "Pod",
