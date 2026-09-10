@@ -54,26 +54,29 @@ func (m Model) handleConstraintsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	maxIdx := len(rows) - 1
 	half := max(m.constraintsViewportHeight()/2, 1)
 
+	// Cleared up front so no exit path leaves a half-typed gg armed for the
+	// explorer to complete after the view closes.
+	pendingG := m.pendingG
+	m.pendingG = false
+
 	switch msg.String() {
 	case kb.Down, "j", "down":
 		m.constraints.cursor = clampOverlayCursor(m.constraints.cursor, 1, maxIdx)
 	case kb.Up, "k", "up":
 		m.constraints.cursor = clampOverlayCursor(m.constraints.cursor, -1, maxIdx)
 	case kb.JumpTop, "g":
-		if m.pendingG {
-			m.pendingG = false
-			m.constraints.cursor = 0
-		} else {
+		if !pendingG {
 			m.pendingG = true
 			return m, nil
 		}
+		m.constraints.cursor = 0
 	case kb.JumpBottom, "G":
 		m.constraints.cursor = maxIdx
 	case kb.PageDown, "ctrl+d":
 		m.constraints.cursor = clampOverlayCursor(m.constraints.cursor, half, maxIdx)
 	case kb.PageUp, "ctrl+u":
 		m.constraints.cursor = clampOverlayCursor(m.constraints.cursor, -half, maxIdx)
-	case "enter":
+	case kb.Enter, "enter":
 		return m.jumpFromConstraintsRow()
 	case kb.Refresh:
 		m.constraints.loading = true
@@ -85,7 +88,6 @@ func (m Model) handleConstraintsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
-	m.pendingG = false
 	m.constraints.scroll = ui.VimScrollOff(
 		m.constraints.scroll, m.constraints.cursor, len(rows),
 		m.constraintsViewportHeight(), constraintsScrollOff,
@@ -116,29 +118,33 @@ func (m Model) jumpFromConstraintsRow() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	m.pushJumpHistory()
-	m.mode = m.constraints.returnMode
+	// Every navigation change lands on a candidate copy, so a jump that
+	// cannot resolve its target leaves the view, namespace and jump
+	// history as the user left them.
+	cand := m
+	cand.pushJumpHistory()
+	cand.mode = m.constraints.returnMode
 
 	if row.Namespace != "" {
-		m.allNamespaces = false
-		m.namespace = row.Namespace
-		m.selectedNamespaces = map[string]bool{row.Namespace: true}
+		cand.allNamespaces = false
+		cand.namespace = row.Namespace
+		cand.selectedNamespaces = map[string]bool{row.Namespace: true}
 	}
 
-	for m.nav.Level > model.LevelResourceTypes {
-		ret, _ := m.navigateParent()
-		m = ret.(Model)
+	for cand.nav.Level > model.LevelResourceTypes {
+		ret, _ := cand.navigateParent()
+		cand = ret.(Model)
 	}
-	if m.nav.Level < model.LevelResourceTypes {
+	if cand.nav.Level < model.LevelResourceTypes {
 		m.setStatusMessage("Cannot jump: enter a context first", true)
 		return m, scheduleStatusClear()
 	}
 
-	for i, item := range m.middleItems {
+	for i, item := range cand.middleItems {
 		if item.Extra == rt.ResourceRef() {
-			m.setCursor(i)
-			m.pendingTarget = row.Name
-			ret, cmd := m.navigateChild()
+			cand.setCursor(i)
+			cand.pendingTarget = row.Name
+			ret, cmd := cand.navigateChild()
 			next, ok := ret.(Model)
 			if !ok {
 				return m, cmd

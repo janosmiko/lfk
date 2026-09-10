@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,8 +38,15 @@ func (c *Client) priorityConstraintRows(ctx context.Context, kubeCtx string, tar
 	if target.PodName == "" {
 		return rows, nil
 	}
+	// The PriorityClass row above survives a preemption lookup failure:
+	// DetectConstraints keeps a source's rows and still banners its error.
+	var lookupErrs []error
+
 	pod, err := cs.CoreV1().Pods(target.Namespace).Get(ctx, target.PodName, metav1.GetOptions{})
-	if err == nil && pod.Status.NominatedNodeName != "" {
+	switch {
+	case err != nil:
+		lookupErrs = append(lookupErrs, fmt.Errorf("getting pod %s: %w", target.PodName, err))
+	case pod.Status.NominatedNodeName != "":
 		rows = append(rows, ConstraintRow{
 			Source:    "PriorityClass",
 			Kind:      "Pod",
@@ -53,7 +61,9 @@ func (c *Client) priorityConstraintRows(ctx context.Context, kubeCtx string, tar
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s,involvedObject.kind=Pod,reason=Preempted", target.PodName),
 		Limit:         constraintsEventsLimit,
 	})
-	if err == nil {
+	if err != nil {
+		lookupErrs = append(lookupErrs, fmt.Errorf("listing preemption events for %s: %w", target.PodName, err))
+	} else {
 		items := events.Items
 		if len(items) > constraintsEventsLimit {
 			items = items[:constraintsEventsLimit]
@@ -69,5 +79,5 @@ func (c *Client) priorityConstraintRows(ctx context.Context, kubeCtx string, tar
 			})
 		}
 	}
-	return rows, nil
+	return rows, errors.Join(lookupErrs...)
 }

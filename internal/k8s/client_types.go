@@ -21,6 +21,18 @@ type QuotaInfo struct {
 	Name      string
 	Namespace string
 	Resources []QuotaResource
+	// Scopes and ScopeSelector narrow which objects the quota counts. Both
+	// must match before the quota applies — see quotaAppliesTo.
+	Scopes        []string
+	ScopeSelector []QuotaScopeRequirement
+}
+
+// QuotaScopeRequirement mirrors corev1.ScopedResourceSelectorRequirement,
+// read off a ResourceQuota's raw spec.scopeSelector.
+type QuotaScopeRequirement struct {
+	ScopeName string
+	Operator  string // In, NotIn, Exists, DoesNotExist
+	Values    []string
 }
 
 // QuotaResource holds usage data for a single resource within a quota.

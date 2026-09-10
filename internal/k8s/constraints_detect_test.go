@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -127,6 +128,54 @@ func TestDetectConstraints_AllSourcesFailReturnsJoinedError(t *testing.T) {
 	}
 	if len(report.Rows) != 0 {
 		t.Errorf("expected no rows when every source fails, got %+v", report.Rows)
+	}
+}
+
+func TestDetectConstraints_MutatingFailureKeepsValidatingRows(t *testing.T) {
+	sideEffects := admissionregistrationv1.SideEffectClassNone
+	cfg := &admissionregistrationv1.ValidatingWebhookConfiguration{
+		Name: "guard",
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{{
+			Name:        "guard.example.com",
+			SideEffects: &sideEffects,
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+				APIGroups:  []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"},
+			}},
+		}},
+	}
+	ns := &corev1.Namespace{Name: "default"}
+	cs := k8sfake.NewClientset(ns, cfg)
+	cs.PrependReactor("list", "mutatingwebhookconfigurations", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(
+			schema.GroupResource{Group: "admissionregistration.k8s.io", Resource: "mutatingwebhookconfigurations"}, "", nil)
+	})
+	client := newFakeClient(cs, newFakeDynClient())
+
+	target := ConstraintTarget{
+		Namespace: "default",
+		GVR:       schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+	}
+
+	report, err := client.DetectConstraints(t.Context(), "", target)
+	if err != nil {
+		t.Fatalf("expected a partial failure to return a nil top-level error, got %v", err)
+	}
+
+	sawWebhook := false
+	for _, row := range report.Rows {
+		if row.Source == "Webhook" && row.Name == "guard" {
+			sawWebhook = true
+		}
+	}
+	if !sawWebhook {
+		t.Errorf("expected the validating webhook row to survive, got %+v", report.Rows)
+	}
+	if !slices.Contains(report.Skipped, "mutatingwebhookconfigurations") {
+		t.Errorf("expected the denied mutating source in Skipped, got %v", report.Skipped)
+	}
+	if slices.Contains(report.Skipped, "validatingwebhookconfigurations") {
+		t.Errorf("the validating source read fine and must not be reported denied, got %v", report.Skipped)
 	}
 }
 

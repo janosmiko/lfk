@@ -7,7 +7,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -64,6 +66,40 @@ func TestPriorityRows_ReportPreemptionFromEventAndNominatedNode(t *testing.T) {
 	}
 	if !sawEvent {
 		t.Error("expected a row from the Preempted event")
+	}
+}
+
+func TestPriorityRows_PreemptionLookupFailureKeepsRowAndReportsError(t *testing.T) {
+	failErr := apierrors.NewForbidden(schema.GroupResource{Resource: "pods"}, "web-1", nil)
+
+	tests := []struct {
+		name     string
+		verb     string
+		resource string
+	}{
+		{"pod get denied", "get", "pods"},
+		{"event list denied", "list", "events"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pc := &schedulingv1.PriorityClass{Name: "high", Value: 100}
+			pod := &corev1.Pod{Name: "web-1", Namespace: "default"}
+			cs := k8sfake.NewClientset(pc, pod)
+			cs.PrependReactor(tt.verb, tt.resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, failErr
+			})
+			client := newFakeClient(cs, nil)
+
+			target := ConstraintTarget{Namespace: "default", PodName: "web-1", PriorityClassName: "high"}
+			rows, err := client.priorityConstraintRows(t.Context(), "", target)
+
+			if err == nil {
+				t.Error("expected the failed lookup to surface an error")
+			}
+			if len(rows) != 1 || rows[0].Kind != "PriorityClass" {
+				t.Errorf("expected the PriorityClass row to survive, got %+v", rows)
+			}
+		})
 	}
 }
 

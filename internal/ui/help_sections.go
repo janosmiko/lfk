@@ -442,10 +442,10 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 			title: "Constraints View", context: "Constraints View",
 			bindings: []helpEntry{
 				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
-				{"j/k", "Navigate rows"},
+				{kb.Down + "/" + kb.Up, "Navigate rows"},
 				{kb.JumpTop + "/" + kb.JumpBottom, "Jump to top / bottom"},
-				{"ctrl+d/ctrl+u", "Half page down / up"},
-				{"enter", "Jump to the row's object"},
+				{kb.PageDown + "/" + kb.PageUp, "Half page down / up"},
+				{kb.Enter, "Jump to the row's object"},
 				{kb.Refresh, "Re-run the scan"},
 				{"q/esc", "Close constraints view"},
 			},

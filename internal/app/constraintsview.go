@@ -32,3 +32,10 @@ func (s *constraintsViewState) clampCursor() {
 		s.cursor = 0
 	}
 }
+
+// clampScroll keeps the window inside a report that shrank under it. A
+// scroll past the last row makes the renderer's row count negative.
+func (s *constraintsViewState) clampScroll(viewportHeight int) {
+	maxScroll := max(len(s.visibleRows())-max(viewportHeight, 1), 0)
+	s.scroll = min(max(s.scroll, 0), maxScroll)
+}

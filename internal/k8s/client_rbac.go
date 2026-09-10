@@ -356,6 +356,9 @@ func (c *Client) GetNamespaceQuotas(ctx context.Context, kubeCtx, namespace stri
 		spec, _ := item.Object["spec"].(map[string]any)
 		status, _ := item.Object["status"].(map[string]any)
 
+		qi.Scopes = quotaScopesFromRaw(spec["scopes"])
+		qi.ScopeSelector = quotaScopeSelectorFromRaw(spec["scopeSelector"])
+
 		hardMap, _ := spec["hard"].(map[string]any)
 		usedMap := map[string]any{}
 		if status != nil {

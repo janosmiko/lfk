@@ -22,56 +22,75 @@ type webhookRuleset struct {
 	objectSelector    *metav1.LabelSelector
 }
 
-// webhookConstraintRows reports webhooks that would intercept an UPDATE
-// or DELETE on the target (D3): GVR/operation match a rule, and any
-// namespaceSelector/objectSelector match too.
-func (c *Client) webhookConstraintRows(ctx context.Context, kubeCtx string, target ConstraintTarget) ([]ConstraintRow, error) {
+// validatingWebhookConstraintRows reports configurations that intercept an
+// UPDATE or DELETE on the target (D3). Mutating ones are a separate source,
+// so a denial of one still leaves the other's rows visible.
+func (c *Client) validatingWebhookConstraintRows(ctx context.Context, kubeCtx string, target ConstraintTarget) ([]ConstraintRow, error) {
 	cs, err := c.clientsetForContext(kubeCtx)
 	if err != nil {
 		return nil, err
 	}
-	validating, err := cs.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(ctx, metav1.ListOptions{})
+	list, err := cs.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("listing validatingwebhookconfigurations: %w", err)
 	}
-	mutating, err := cs.AdmissionregistrationV1().MutatingWebhookConfigurations().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("listing mutatingwebhookconfigurations: %w", err)
+	var rulesets []webhookRuleset
+	for _, wh := range list.Items {
+		rulesets = append(rulesets, validatingRulesets(wh)...)
 	}
-	nsLabels, err := namespaceLabelsForWebhookMatch(ctx, cs, target.Namespace)
+	return webhookRows(ctx, cs, rulesets, target)
+}
+
+// mutatingWebhookConstraintRows is validatingWebhookConstraintRows for
+// MutatingWebhookConfigurations.
+func (c *Client) mutatingWebhookConstraintRows(ctx context.Context, kubeCtx string, target ConstraintTarget) ([]ConstraintRow, error) {
+	cs, err := c.clientsetForContext(kubeCtx)
 	if err != nil {
 		return nil, err
 	}
-
-	rulesets := make([]webhookRuleset, 0, len(validating.Items)+len(mutating.Items))
-	for _, wh := range validating.Items {
-		rulesets = append(rulesets, validatingRulesets(wh)...)
+	list, err := cs.AdmissionregistrationV1().MutatingWebhookConfigurations().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing mutatingwebhookconfigurations: %w", err)
 	}
-	for _, wh := range mutating.Items {
+	var rulesets []webhookRuleset
+	for _, wh := range list.Items {
 		rulesets = append(rulesets, mutatingRulesets(wh)...)
 	}
+	return webhookRows(ctx, cs, rulesets, target)
+}
 
+func webhookRows(ctx context.Context, cs kubernetes.Interface, rulesets []webhookRuleset, target ConstraintTarget) ([]ConstraintRow, error) {
+	if len(rulesets) == 0 {
+		return nil, nil
+	}
+	nsLabels, nsSelectorApplies, err := namespaceLabelsForWebhookMatch(ctx, cs, target)
+	if err != nil {
+		return nil, err
+	}
 	var rows []ConstraintRow
 	for _, rs := range rulesets {
-		if row, matched := webhookRow(rs, target, nsLabels); matched {
+		if row, matched := webhookRow(rs, target, nsLabels, nsSelectorApplies); matched {
 			rows = append(rows, row)
 		}
 	}
 	return rows, nil
 }
 
-// namespaceLabelsForWebhookMatch fetches the target namespace's labels for
-// namespaceSelector matching. Cluster-scoped targets (namespace == "")
-// skip the call — there is no namespace to match against.
-func namespaceLabelsForWebhookMatch(ctx context.Context, cs kubernetes.Interface, namespace string) (map[string]string, error) {
-	if namespace == "" {
-		return nil, nil
+// namespaceLabelsForWebhookMatch resolves what a namespaceSelector matches
+// against: a namespaced target's namespace, a Namespace object itself, and
+// for any other cluster-scoped kind nothing, so the selector cannot apply.
+func namespaceLabelsForWebhookMatch(ctx context.Context, cs kubernetes.Interface, target ConstraintTarget) (nsLabels map[string]string, applies bool, err error) {
+	if target.Namespace == "" {
+		if target.Kind == "Namespace" {
+			return target.Labels, true, nil
+		}
+		return nil, false, nil
 	}
-	ns, err := cs.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+	ns, err := cs.CoreV1().Namespaces().Get(ctx, target.Namespace, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("getting namespace %s: %w", namespace, err)
+		return nil, false, fmt.Errorf("getting namespace %s: %w", target.Namespace, err)
 	}
-	return ns.Labels, nil
+	return ns.Labels, true, nil
 }
 
 func validatingRulesets(wh admissionregistrationv1.ValidatingWebhookConfiguration) []webhookRuleset {
@@ -104,12 +123,12 @@ func mutatingRulesets(wh admissionregistrationv1.MutatingWebhookConfiguration) [
 	return out
 }
 
-func webhookRow(rs webhookRuleset, target ConstraintTarget, nsLabels map[string]string) (ConstraintRow, bool) {
-	matched, allResources := rulesMatchTarget(rs.rules, target.GVR)
+func webhookRow(rs webhookRuleset, target ConstraintTarget, nsLabels map[string]string, nsSelectorApplies bool) (ConstraintRow, bool) {
+	matched, allResources := rulesMatchTarget(rs.rules, target.GVR, targetRuleScope(target))
 	if !matched {
 		return ConstraintRow{}, false
 	}
-	if !selectorMatches(rs.namespaceSelector, nsLabels) {
+	if nsSelectorApplies && !selectorMatches(rs.namespaceSelector, nsLabels) {
 		return ConstraintRow{}, false
 	}
 	if !selectorMatches(rs.objectSelector, target.Labels) {
@@ -128,9 +147,29 @@ func webhookRow(rs webhookRuleset, target ConstraintTarget, nsLabels map[string]
 	}, true
 }
 
-func rulesMatchTarget(rules []admissionregistrationv1.RuleWithOperations, gvr schema.GroupVersionResource) (matched, allResources bool) {
+// targetRuleScope maps the target to the scope a rule selects on. A
+// Namespace object counts as cluster-scoped here, as it does in the API.
+func targetRuleScope(target ConstraintTarget) admissionregistrationv1.ScopeType {
+	if target.Namespace == "" {
+		return admissionregistrationv1.ClusterScope
+	}
+	return admissionregistrationv1.NamespacedScope
+}
+
+// ruleScopeMatches treats an unset rule scope as the API's "*" default.
+func ruleScopeMatches(ruleScope *admissionregistrationv1.ScopeType, target admissionregistrationv1.ScopeType) bool {
+	if ruleScope == nil || *ruleScope == admissionregistrationv1.AllScopes {
+		return true
+	}
+	return *ruleScope == target
+}
+
+func rulesMatchTarget(rules []admissionregistrationv1.RuleWithOperations, gvr schema.GroupVersionResource, scope admissionregistrationv1.ScopeType) (matched, allResources bool) {
 	for _, rule := range rules {
 		if !operationsInclude(rule.Operations) {
+			continue
+		}
+		if !ruleScopeMatches(rule.Scope, scope) {
 			continue
 		}
 		if !valueOrWildcard(rule.APIGroups, gvr.Group) || !valueOrWildcard(rule.APIVersions, gvr.Version) {
@@ -163,12 +202,15 @@ func valueOrWildcard(values []string, want string) bool {
 	return false
 }
 
+// webhookResourceMatches accepts the "resource/subresource" forms a rule
+// may use. "*/*" covers every resource and subresource, "<want>/*" the
+// target resource and its own subresources.
 func webhookResourceMatches(resources []string, want string) (matched, wildcard bool) {
 	for _, r := range resources {
-		if r == "*" {
+		if r == "*" || r == "*/*" {
 			return true, true
 		}
-		if r == want {
+		if r == want || r == want+"/*" {
 			return true, false
 		}
 	}

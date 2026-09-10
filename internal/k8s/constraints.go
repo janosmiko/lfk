@@ -20,9 +20,9 @@ type ConstraintRow struct {
 	Blocking  bool
 }
 
-// ConstraintReport is the aggregated result of DetectConstraints.
-// Skipped names sources the caller's RBAC denied. Failed names sources
-// omitted for any other reason. See DetectConstraints.
+// ConstraintReport is the aggregated result of DetectConstraints. Skipped
+// names sources the caller's RBAC denied, Failed the ones that broke for
+// any other reason — either may still have contributed rows.
 type ConstraintReport struct {
 	Rows    []ConstraintRow
 	Skipped []string
@@ -47,10 +47,11 @@ type NodeSelectorRequirement struct {
 }
 
 // NodeSelectorTerm is one OR-branch of a required node affinity match.
-// Every MatchExpressions entry must match (AND). Preferred terms are
-// dropped upstream — they never block scheduling.
+// Every MatchExpressions and MatchFields entry must match (AND). Preferred
+// terms are dropped upstream — they never block scheduling.
 type NodeSelectorTerm struct {
 	MatchExpressions []NodeSelectorRequirement
+	MatchFields      []NodeSelectorRequirement
 }
 
 // ConstraintTarget is the pod-shaped part of an object (or its pod
@@ -163,22 +164,32 @@ func nodeAffinityTermsFromRaw(v any) []NodeSelectorTerm {
 	out := make([]NodeSelectorTerm, 0, len(rawTerms))
 	for _, rt := range rawTerms {
 		termMap := rawMap(rt)
-		exprs := rawSlice(termMap["matchExpressions"])
-		term := NodeSelectorTerm{MatchExpressions: make([]NodeSelectorRequirement, 0, len(exprs))}
-		for _, e := range exprs {
-			em := rawMap(e)
-			req := NodeSelectorRequirement{
-				Key:      stringField(em, "key"),
-				Operator: stringField(em, "operator"),
-			}
-			for _, val := range rawSlice(em["values"]) {
-				if s, ok := val.(string); ok {
-					req.Values = append(req.Values, s)
-				}
-			}
-			term.MatchExpressions = append(term.MatchExpressions, req)
+		out = append(out, NodeSelectorTerm{
+			MatchExpressions: nodeSelectorRequirementsFromRaw(termMap["matchExpressions"]),
+			MatchFields:      nodeSelectorRequirementsFromRaw(termMap["matchFields"]),
+		})
+	}
+	return out
+}
+
+func nodeSelectorRequirementsFromRaw(v any) []NodeSelectorRequirement {
+	rawReqs := rawSlice(v)
+	if len(rawReqs) == 0 {
+		return nil
+	}
+	out := make([]NodeSelectorRequirement, 0, len(rawReqs))
+	for _, e := range rawReqs {
+		em := rawMap(e)
+		req := NodeSelectorRequirement{
+			Key:      stringField(em, "key"),
+			Operator: stringField(em, "operator"),
 		}
-		out = append(out, term)
+		for _, val := range rawSlice(em["values"]) {
+			if s, ok := val.(string); ok {
+				req.Values = append(req.Values, s)
+			}
+		}
+		out = append(out, req)
 	}
 	return out
 }

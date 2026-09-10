@@ -531,7 +531,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 
 ## Constraints View
 
-Press `b` on a resource to see what constrains it: ResourceQuotas and LimitRanges against its container requests, PodDisruptionBudgets, its PriorityClass and any preemption events, node selector / affinity / taint mismatches, and admission webhooks that would intercept it. A row that names no single object (a node selector or affinity mismatch) can't be jumped to; a row for a real object (quota, PDB, PriorityClass, node, webhook config) can. Sources denied by RBAC are named in a banner instead of being silently omitted.
+Press `b` on a resource to see what constrains it: ResourceQuotas and LimitRanges against its container requests, PodDisruptionBudgets, its PriorityClass and any preemption events, node selector / affinity / taint mismatches, and admission webhooks that would intercept it. A row that names no single object (a node selector or affinity mismatch) can't be jumped to; a row for a real object (quota, PDB, PriorityClass, node, webhook config) can. Sources denied by RBAC are named in a `skipped (denied: ...)` banner instead of being silently omitted. A source that broke for any other reason is named as `failed: ...` in the same banner, and the rows other sources found stay visible, so a short list means unread sources, not absent constraints.
 
 | Key | Action |
 |---|---|

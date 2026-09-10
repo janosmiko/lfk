@@ -35,6 +35,38 @@ func TestTargetFromRaw_DeploymentUsesPodTemplate(t *testing.T) {
 	assert.Equal(t, map[string]string{"disk": "nvme"}, target.NodeSelector)
 }
 
+func TestTargetFromRaw_KeepsRequiredAffinityMatchFields(t *testing.T) {
+	raw := map[string]any{
+		"kind": "Pod",
+		"spec": map[string]any{
+			"affinity": map[string]any{
+				"nodeAffinity": map[string]any{
+					"requiredDuringSchedulingIgnoredDuringExecution": map[string]any{
+						"nodeSelectorTerms": []any{
+							map[string]any{
+								"matchFields": []any{
+									map[string]any{
+										"key": "metadata.name", "operator": "In", "values": []any{"node-1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	target := targetFromRaw(raw)
+
+	if assert.Len(t, target.Affinity, 1) {
+		assert.Empty(t, target.Affinity[0].MatchExpressions)
+		assert.Equal(t, []NodeSelectorRequirement{
+			{Key: "metadata.name", Operator: "In", Values: []string{"node-1"}},
+		}, target.Affinity[0].MatchFields)
+	}
+}
+
 func TestTargetFromRaw_PodUsesOwnSpec(t *testing.T) {
 	raw := map[string]any{
 		"kind": "Pod",

@@ -30,7 +30,12 @@ func (c *Client) DetectConstraints(ctx context.Context, kubeCtx string, t Constr
 		{"poddisruptionbudgets", func(ctx context.Context) ([]ConstraintRow, error) { return c.pdbConstraintRows(ctx, kubeCtx, t) }},
 		{"priorityclasses", func(ctx context.Context) ([]ConstraintRow, error) { return c.priorityConstraintRows(ctx, kubeCtx, t) }},
 		{"nodes", func(ctx context.Context) ([]ConstraintRow, error) { return c.nodeConstraintRows(ctx, kubeCtx, t) }},
-		{"webhookconfigurations", func(ctx context.Context) ([]ConstraintRow, error) { return c.webhookConstraintRows(ctx, kubeCtx, t) }},
+		{"validatingwebhookconfigurations", func(ctx context.Context) ([]ConstraintRow, error) {
+			return c.validatingWebhookConstraintRows(ctx, kubeCtx, t)
+		}},
+		{"mutatingwebhookconfigurations", func(ctx context.Context) ([]ConstraintRow, error) {
+			return c.mutatingWebhookConstraintRows(ctx, kubeCtx, t)
+		}},
 	}
 
 	rowsBySource := make([][]ConstraintRow, len(sources))
@@ -49,9 +54,11 @@ func (c *Client) DetectConstraints(ctx context.Context, kubeCtx string, t Constr
 	var report ConstraintReport
 	var errs []error
 	for i, src := range sources {
+		// Rows a source gathered before it failed are kept: a source that
+		// reports both (preemption lookups) would otherwise lose them.
+		report.Rows = append(report.Rows, rowsBySource[i]...)
 		err := errsBySource[i]
 		if err == nil {
-			report.Rows = append(report.Rows, rowsBySource[i]...)
 			continue
 		}
 		errs = append(errs, err)

@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // nodeConstraintRows lists every node once and reports the scheduling
@@ -26,10 +27,50 @@ func (c *Client) nodeConstraintRows(ctx context.Context, kubeCtx string, target 
 	nodes := list.Items
 
 	return slices.Concat(
-		nodeSelectorRows(nodes, target.NodeSelector),
-		nodeAffinityRows(nodes, target.Affinity),
+		schedulingRows(nodes, target),
 		taintRows(nodes, target.Tolerations),
 	), nil
+}
+
+// schedulingRows suppresses a row only when one node satisfies the
+// nodeSelector and the required affinity at once: node A matching the
+// selector and node B the affinity still leaves the target unschedulable.
+func schedulingRows(nodes []corev1.Node, target ConstraintTarget) []ConstraintRow {
+	if len(target.NodeSelector) == 0 && len(target.Affinity) == 0 {
+		return nil
+	}
+	selector := labels.SelectorFromSet(labels.Set(target.NodeSelector))
+	for _, n := range nodes {
+		if selector.Matches(labels.Set(n.Labels)) && nodeMatchesAffinity(n, target.Affinity) {
+			return nil
+		}
+	}
+
+	rows := slices.Concat(
+		nodeSelectorRows(nodes, target.NodeSelector),
+		nodeAffinityRows(nodes, target.Affinity),
+	)
+	if len(rows) > 0 {
+		return rows
+	}
+	return []ConstraintRow{{
+		Source:   "Node",
+		Detail:   "nodeSelector and nodeAffinity: no single node satisfies both",
+		Headroom: "0 nodes",
+		Blocking: true,
+	}}
+}
+
+func nodeMatchesAffinity(n corev1.Node, terms []NodeSelectorTerm) bool {
+	if len(terms) == 0 {
+		return true
+	}
+	for _, term := range terms {
+		if nodeSelectorTermMatches(term, n) {
+			return true
+		}
+	}
+	return false
 }
 
 func nodeSelectorRows(nodes []corev1.Node, sel map[string]string) []ConstraintRow {
@@ -49,8 +90,11 @@ func nodeSelectorRows(nodes []corev1.Node, sel map[string]string) []ConstraintRo
 }
 
 func anyNodeHasLabel(nodes []corev1.Node, key, value string) bool {
+	// SelectorFromSet requires the key to be present, so a node missing it
+	// no longer matches an empty selector value.
+	sel := labels.SelectorFromSet(labels.Set{key: value})
 	for _, n := range nodes {
-		if n.Labels[key] == value {
+		if sel.Matches(labels.Set(n.Labels)) {
 			return true
 		}
 	}
@@ -62,10 +106,8 @@ func nodeAffinityRows(nodes []corev1.Node, terms []NodeSelectorTerm) []Constrain
 		return nil
 	}
 	for _, n := range nodes {
-		for _, term := range terms {
-			if nodeSelectorTermMatches(term, n.Labels) {
-				return nil
-			}
+		if nodeMatchesAffinity(n, terms) {
+			return nil
 		}
 	}
 	rows := make([]ConstraintRow, 0, len(terms))
@@ -80,13 +122,32 @@ func nodeAffinityRows(nodes []corev1.Node, terms []NodeSelectorTerm) []Constrain
 	return rows
 }
 
-func nodeSelectorTermMatches(term NodeSelectorTerm, labels map[string]string) bool {
+func nodeSelectorTermMatches(term NodeSelectorTerm, n corev1.Node) bool {
+	// Kubernetes treats a term with neither expressions nor fields as
+	// matching no node at all.
+	if len(term.MatchExpressions) == 0 && len(term.MatchFields) == 0 {
+		return false
+	}
 	for _, req := range term.MatchExpressions {
-		if !nodeSelectorRequirementMatches(req, labels) {
+		if !nodeSelectorRequirementMatches(req, n.Labels) {
 			return false
 		}
 	}
+	if len(term.MatchFields) > 0 {
+		fields := nodeFieldSet(n)
+		for _, req := range term.MatchFields {
+			if !nodeSelectorRequirementMatches(req, fields) {
+				return false
+			}
+		}
+	}
 	return true
+}
+
+// nodeFieldSet is what matchFields selects on. Kubernetes accepts only
+// metadata.name there for a node.
+func nodeFieldSet(n corev1.Node) map[string]string {
+	return map[string]string{"metadata.name": n.Name}
 }
 
 func nodeSelectorRequirementMatches(req NodeSelectorRequirement, labels map[string]string) bool {
@@ -117,8 +178,8 @@ func numericLess(a, b string) bool {
 
 func describeNodeSelectorTerm(term NodeSelectorTerm) string {
 	var out strings.Builder
-	for i, req := range term.MatchExpressions {
-		if i > 0 {
+	for _, req := range slices.Concat(term.MatchExpressions, term.MatchFields) {
+		if out.Len() > 0 {
 			out.WriteString(", ")
 		}
 		fmt.Fprintf(&out, "%s %s %v", req.Key, req.Operator, req.Values)

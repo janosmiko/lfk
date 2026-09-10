@@ -71,18 +71,47 @@ func (m Model) renderConstraintsRows() []string {
 		return []string{ui.DimStyle.Render("  no constraints found")}
 	}
 	width := max(m.width-4, 20)
-	scroll := m.constraints.scroll
 	height := m.constraintsViewportHeight() - 1 // banner line
+	scroll := min(max(m.constraints.scroll, 0), max(len(rows)-1, 0))
 	end := min(scroll+height, len(rows))
 
-	out := make([]string, 0, end-scroll)
+	cols := constraintsColumns(width)
+	out := make([]string, 0, max(end-scroll, 0))
 	for i := scroll; i < end; i++ {
-		out = append(out, formatConstraintRow(rows[i], i == m.constraints.cursor, width))
+		out = append(out, formatConstraintRow(rows[i], i == m.constraints.cursor, cols))
 	}
 	return out
 }
 
-func formatConstraintRow(row k8s.ConstraintRow, isCursor bool, width int) string {
+// constraintColumns holds the per-row column widths, recomputed for the
+// terminal width so a narrow window still renders one row per line.
+type constraintColumns struct {
+	source, kind, name, headroom, detail, line int
+}
+
+// constraintsColumns hands cells back to the detail column, widest first,
+// until the row fits. Gaps between the five columns cost 5 cells.
+func constraintsColumns(width int) constraintColumns {
+	const (
+		gaps        = 5
+		detailFloor = 10
+	)
+	cols := constraintColumns{source: 9, kind: 26, name: 28, headroom: 10, line: width - 1}
+
+	shrinkable := []*int{&cols.name, &cols.kind, &cols.headroom, &cols.source}
+	floors := []int{6, 6, 4, 4}
+	for i, col := range shrinkable {
+		over := cols.source + cols.kind + cols.name + cols.headroom + gaps + detailFloor - cols.line
+		if over <= 0 {
+			break
+		}
+		*col -= min(*col-floors[i], over)
+	}
+	cols.detail = max(cols.line-(cols.source+cols.kind+cols.name+cols.headroom+gaps), 1)
+	return cols
+}
+
+func formatConstraintRow(row k8s.ConstraintRow, isCursor bool, cols constraintColumns) string {
 	gutter := " "
 	if isCursor {
 		gutter = ui.YamlCursorIndicatorStyle.Render("▎")
@@ -94,13 +123,16 @@ func formatConstraintRow(row k8s.ConstraintRow, isCursor bool, width int) string
 		}
 		nsName += ui.SanitizeTerminalText(row.Name)
 	}
-	line := fmt.Sprintf("%-9s %-26s %-28s %-10s  %s",
-		ui.Truncate(row.Source, 9),
-		ui.Truncate(ui.SanitizeTerminalText(row.Kind), 26),
-		ui.Truncate(nsName, 28),
-		ui.Truncate(row.Headroom, 10),
-		ui.Truncate(ui.SanitizeTerminalText(row.Detail), max(width-80, 10)),
+	line := fmt.Sprintf("%-*s %-*s %-*s %-*s  %s",
+		cols.source, ui.Truncate(row.Source, cols.source),
+		cols.kind, ui.Truncate(ui.SanitizeTerminalText(row.Kind), cols.kind),
+		cols.name, ui.Truncate(nsName, cols.name),
+		cols.headroom, ui.Truncate(row.Headroom, cols.headroom),
+		ui.Truncate(ui.SanitizeTerminalText(row.Detail), cols.detail),
 	)
+	// The floors can still overrun a very narrow terminal, and a row wider
+	// than the box wraps into the border.
+	line = ui.Truncate(line, cols.line)
 	if row.Blocking {
 		line = ui.StatusFailed.Render(line)
 	}

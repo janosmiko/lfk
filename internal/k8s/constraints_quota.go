@@ -3,6 +3,8 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,54 +25,162 @@ func (c *Client) listLimitRanges(ctx context.Context, contextName, namespace str
 }
 
 // quotaConstraintRows reports ResourceQuota objects covering a resource
-// the target requests (trimQuotaResourcePrefix matches "requests.cpu"
+// the target asks for (trimQuotaResourcePrefix matches "requests.cpu"
 // against a container's bare "cpu" key).
 func (c *Client) quotaConstraintRows(ctx context.Context, kubeCtx string, target ConstraintTarget) ([]ConstraintRow, error) {
 	quotas, err := c.GetNamespaceQuotas(ctx, kubeCtx, target.Namespace)
 	if err != nil {
 		return nil, err
 	}
-	totals := totalContainerRequests(target.Containers)
-	if len(totals) == 0 || len(quotas) == 0 {
+	requests := totalContainerRequests(target.Containers)
+	limits := totalContainerLimits(target.Containers)
+	if (len(requests) == 0 && len(limits) == 0) || len(quotas) == 0 {
 		return nil, nil
 	}
 
 	var rows []ConstraintRow
 	for _, quota := range quotas {
+		if !quotaAppliesTo(quota, target) {
+			continue
+		}
 		for _, res := range quota.Resources {
-			resName := trimQuotaResourcePrefix(res.Name)
-			requested, ok := totals[resName]
+			resName, countsLimits := trimQuotaResourcePrefix(res.Name)
+			totals, verb := requests, "requests"
+			if countsLimits {
+				totals, verb = limits, "limits"
+			}
+			asked, ok := totals[resName]
 			if !ok {
 				continue
 			}
-			rows = append(rows, quotaRow(quota, res, requested))
+			rows = append(rows, quotaRow(quota, res, asked, verb))
 		}
 	}
 	return rows, nil
 }
 
-// trimQuotaResourcePrefix strips the "requests."/"limits." prefix
-// ResourceQuota uses for compute resources, so "requests.cpu" and "cpu"
-// both compare equal to a container's raw request key.
-func trimQuotaResourcePrefix(name string) string {
-	for _, prefix := range []string{"requests.", "limits."} {
-		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
-			return name[len(prefix):]
-		}
+// trimQuotaResourcePrefix reports which half of the container spec the
+// quota counts: Kubernetes charges "limits.*" against container limits,
+// "requests.*" and bare "cpu"/"memory" against requests.
+func trimQuotaResourcePrefix(name string) (resourceName string, countsLimits bool) {
+	if trimmed, ok := strings.CutPrefix(name, "limits."); ok && trimmed != "" {
+		return trimmed, true
 	}
-	return name
+	if trimmed, ok := strings.CutPrefix(name, "requests."); ok && trimmed != "" {
+		return trimmed, false
+	}
+	return name, false
 }
 
-func quotaRow(quota QuotaInfo, res QuotaResource, requested string) ConstraintRow {
+// quotaAppliesTo ANDs spec.scopes with spec.scopeSelector. A scope needing
+// pod state this view lacks (Terminating, CrossNamespacePodAffinity) leaves
+// the quota applicable rather than hiding one that may well bind.
+func quotaAppliesTo(quota QuotaInfo, target ConstraintTarget) bool {
+	for _, scope := range quota.Scopes {
+		if !quotaScopeMatches(QuotaScopeRequirement{ScopeName: scope, Operator: string(corev1.ScopeSelectorOpExists)}, target) {
+			return false
+		}
+	}
+	for _, req := range quota.ScopeSelector {
+		if !quotaScopeMatches(req, target) {
+			return false
+		}
+	}
+	return true
+}
+
+func quotaScopeMatches(req QuotaScopeRequirement, target ConstraintTarget) bool {
+	switch corev1.ResourceQuotaScope(req.ScopeName) {
+	case corev1.ResourceQuotaScopePriorityClass:
+		return priorityClassScopeMatches(req, target.PriorityClassName)
+	case corev1.ResourceQuotaScopeBestEffort:
+		return scopePresenceMatches(req.Operator, targetIsBestEffort(target))
+	case corev1.ResourceQuotaScopeNotBestEffort:
+		return scopePresenceMatches(req.Operator, !targetIsBestEffort(target))
+	default:
+		return true
+	}
+}
+
+func priorityClassScopeMatches(req QuotaScopeRequirement, className string) bool {
+	switch corev1.ScopeSelectorOperator(req.Operator) {
+	case corev1.ScopeSelectorOpIn:
+		return slices.Contains(req.Values, className)
+	case corev1.ScopeSelectorOpNotIn:
+		return !slices.Contains(req.Values, className)
+	case corev1.ScopeSelectorOpDoesNotExist:
+		return className == ""
+	default:
+		return className != ""
+	}
+}
+
+func scopePresenceMatches(operator string, has bool) bool {
+	if corev1.ScopeSelectorOperator(operator) == corev1.ScopeSelectorOpDoesNotExist {
+		return !has
+	}
+	return has
+}
+
+// targetIsBestEffort mirrors the BestEffort QoS rule: no container sets
+// any CPU or memory request or limit.
+func targetIsBestEffort(target ConstraintTarget) bool {
+	for _, c := range target.Containers {
+		for _, name := range []string{"cpu", "memory"} {
+			if c.Requests[name] != "" || c.Limits[name] != "" {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func quotaScopesFromRaw(v any) []string {
+	rawScopes := rawSlice(v)
+	if len(rawScopes) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(rawScopes))
+	for _, s := range rawScopes {
+		if str, ok := s.(string); ok {
+			out = append(out, str)
+		}
+	}
+	return out
+}
+
+func quotaScopeSelectorFromRaw(v any) []QuotaScopeRequirement {
+	rawReqs := rawSlice(rawMap(v)["matchExpressions"])
+	if len(rawReqs) == 0 {
+		return nil
+	}
+	out := make([]QuotaScopeRequirement, 0, len(rawReqs))
+	for _, e := range rawReqs {
+		em := rawMap(e)
+		req := QuotaScopeRequirement{
+			ScopeName: stringField(em, "scopeName"),
+			Operator:  stringField(em, "operator"),
+		}
+		for _, val := range rawSlice(em["values"]) {
+			if s, ok := val.(string); ok {
+				req.Values = append(req.Values, s)
+			}
+		}
+		out = append(out, req)
+	}
+	return out
+}
+
+func quotaRow(quota QuotaInfo, res QuotaResource, asked, verb string) ConstraintRow {
 	headroom := quantityHeadroom(res.Hard, res.Used)
-	requestedQty, errR := resource.ParseQuantity(requested)
-	blocking := errR == nil && headroom.qty != nil && requestedQty.Cmp(*headroom.qty) > 0
+	askedQty, errR := resource.ParseQuantity(asked)
+	blocking := errR == nil && headroom.qty != nil && askedQty.Cmp(*headroom.qty) > 0
 	return ConstraintRow{
 		Source:    "Quota",
 		Kind:      "ResourceQuota",
 		Namespace: quota.Namespace,
 		Name:      quota.Name,
-		Detail:    fmt.Sprintf("requests %s %s (hard %s, used %s)", requested, res.Name, res.Hard, res.Used),
+		Detail:    fmt.Sprintf("%s %s %s (hard %s, used %s)", verb, asked, res.Name, res.Hard, res.Used),
 		Headroom:  headroom.text,
 		Blocking:  blocking,
 	}
@@ -145,9 +255,17 @@ func limitRangeBoundRow(lr corev1.LimitRange, resName, bound string, boundQty re
 // resource name, so a multi-container pod's ask is compared to quota as a
 // whole rather than one container at a time.
 func totalContainerRequests(containers []ContainerRequest) map[string]string {
+	return totalContainerResources(containers, func(c ContainerRequest) map[string]string { return c.Requests })
+}
+
+func totalContainerLimits(containers []ContainerRequest) map[string]string {
+	return totalContainerResources(containers, func(c ContainerRequest) map[string]string { return c.Limits })
+}
+
+func totalContainerResources(containers []ContainerRequest, pick func(ContainerRequest) map[string]string) map[string]string {
 	sums := map[string]resource.Quantity{}
 	for _, c := range containers {
-		for name, qtyStr := range c.Requests {
+		for name, qtyStr := range pick(c) {
 			qty, err := resource.ParseQuantity(qtyStr)
 			if err != nil {
 				continue
