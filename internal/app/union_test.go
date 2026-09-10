@@ -1634,6 +1634,7 @@ func TestUnionSentinelContextWideFeatures(t *testing.T) {
 func TestUnionSetPinGroupTogglesUnionSetPins(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", tmpDir)
+	defer func(orig []string) { model.PinnedTypes = orig }(model.PinnedTypes)
 
 	m := baseModelWithFakeClient()
 	m.unionMode = true

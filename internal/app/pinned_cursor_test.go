@@ -26,6 +26,7 @@ func cursorIndexOfItem(m *Model, name string) int {
 func TestPinCursorFollowsToNextItem(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	defer func(orig []string) { model.PinnedTypes = orig }(model.PinnedTypes)
+	model.PinnedTypes = nil
 
 	m := baseModelWithFakeClient()
 	m.nav.Context = "prod"
@@ -63,6 +64,7 @@ func TestPinCursorFollowsToNextItem(t *testing.T) {
 func TestPinCursorFallsBackToPreviousWhenLast(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	defer func(orig []string) { model.PinnedTypes = orig }(model.PinnedTypes)
+	model.PinnedTypes = nil
 
 	m := baseModelWithFakeClient()
 	m.nav.Context = "prod"
