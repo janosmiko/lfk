@@ -31,19 +31,25 @@ func TestCovBoost2LoadPreviewClusters(t *testing.T) {
 }
 
 func TestCovBoost2LoadPreviewRTOverview(t *testing.T) {
+	orig := ui.ConfigDashboard
+	ui.ConfigDashboard = true
+	t.Cleanup(func() { ui.ConfigDashboard = orig })
+
 	m := baseModelBoost2()
 	m.nav.Level = model.LevelResourceTypes
 	m.middleItems = []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}}
-	ui.ConfigDashboard = true
 	cmd := m.loadPreview()
 	assert.NotNil(t, cmd)
 }
 
 func TestCovBoost2LoadPreviewRTOverviewDisabled(t *testing.T) {
+	orig := ui.ConfigDashboard
+	ui.ConfigDashboard = false
+	t.Cleanup(func() { ui.ConfigDashboard = orig })
+
 	m := baseModelBoost2()
 	m.nav.Level = model.LevelResourceTypes
 	m.middleItems = []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}}
-	ui.ConfigDashboard = false
 	cmd := m.loadPreview()
 	assert.Nil(t, cmd)
 }
@@ -201,10 +207,13 @@ func TestCovLoadPreviewClusters(t *testing.T) {
 }
 
 func TestCovLoadPreviewResourceTypesOverview(t *testing.T) {
+	orig := ui.ConfigDashboard
+	ui.ConfigDashboard = true
+	t.Cleanup(func() { ui.ConfigDashboard = orig })
+
 	m := baseModelWithFakeClient()
 	m.nav.Level = model.LevelResourceTypes
 	m = withMiddleItem(m, model.Item{Extra: "__overview__"})
-	ui.ConfigDashboard = true
 	cmd := m.loadPreview()
 	assert.NotNil(t, cmd)
 }

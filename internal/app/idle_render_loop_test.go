@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // A previewLoading flag that clearRight() arms and no handler clears leaves the
@@ -143,6 +144,13 @@ func TestUserRefreshArmsPreviewLoading(t *testing.T) {
 // the cluster dashboard, the page issue #646 reports.
 func runResourceTypesRefresh(t *testing.T, silent bool) (Model, tea.Cmd) {
 	t.Helper()
+	// The cluster-dashboard overview row only dispatches a preview load when
+	// this is on (commands_load_preview.go). Pinned explicitly so this test
+	// is hermetic under -shuffle regardless of what other tests leave behind.
+	orig := ui.ConfigDashboard
+	ui.ConfigDashboard = true
+	t.Cleanup(func() { ui.ConfigDashboard = orig })
+
 	m := newTestModelWithScheduler()
 	m.nav.Level = model.LevelResourceTypes
 	m.nav.Context = "test-ctx"
