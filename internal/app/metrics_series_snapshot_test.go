@@ -14,7 +14,8 @@ import (
 func TestMetricsSeriesCacheIsNotSnapshottedPerTab(t *testing.T) {
 	cacheType := reflect.TypeFor[metricsSeriesCache]()
 	for f := range reflect.TypeFor[TabState]().Fields() {
-		assert.NotEqual(t, cacheType, f.Type,
+		held := f.Type == cacheType || f.Type == reflect.PointerTo(cacheType)
+		assert.False(t, held,
 			"TabState.%s snapshots the series cache; make its maps copy on write before keeping this", f.Name)
 	}
 }
