@@ -105,6 +105,44 @@ func TestAllowMetricsFetch_KeyedByContextAndKind(t *testing.T) {
 		"another cluster's metrics keep their own stamp")
 }
 
+// A namespace switch inside the interval asks for a different pod list, so it
+// must not reuse the previous namespace's stamp.
+func TestAllowMetricsFetch_NamespaceSwitchIsNotThrottled(t *testing.T) {
+	setMetricsInterval(t, time.Hour)
+	m := newMetricsThrottleModel("Pod")
+	m.suppressBgtasks = true
+	m.namespace = "team-a"
+	require.True(t, m.allowMetricsFetch("Pod"))
+	m.namespace = "team-b"
+	assert.True(t, m.allowMetricsFetch("Pod"),
+		"a namespace switch inside the interval must fetch the new list's metrics")
+	m.namespace = "team-a"
+	assert.False(t, m.allowMetricsFetch("Pod"),
+		"switching back inside the interval keeps the first namespace's stamp")
+}
+
+func TestAllowMetricsFetch_ContainerKeyedByOwner(t *testing.T) {
+	setMetricsInterval(t, time.Hour)
+	m := newMetricsThrottleModel("Container")
+	m.suppressBgtasks = true
+	m.nav.OwnedName = "pod-1"
+	require.True(t, m.allowMetricsFetch("Container"))
+	m.nav.OwnedName = "pod-2"
+	assert.True(t, m.allowMetricsFetch("Container"),
+		"another pod's containers keep their own stamp")
+}
+
+func TestAllowMetricsFetch_NodeIgnoresNamespace(t *testing.T) {
+	setMetricsInterval(t, time.Hour)
+	m := newMetricsThrottleModel("Node")
+	m.suppressBgtasks = true
+	m.namespace = "team-a"
+	require.True(t, m.allowMetricsFetch("Node"))
+	m.namespace = "team-b"
+	assert.False(t, m.allowMetricsFetch("Node"),
+		"node metrics are cluster-wide, a namespace switch must not refetch them")
+}
+
 // secondTickQueue runs two list loads on a fresh model and returns the names of
 // the cluster calls the second load submitted. Reading the queue beats counting
 // the returned cmds: tea.Batch collapses a single-cmd batch into that cmd, and

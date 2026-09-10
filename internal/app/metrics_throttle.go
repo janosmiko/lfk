@@ -41,8 +41,10 @@ func (m *Model) listMetricsCmds(kind string) []tea.Cmd {
 // run now, and stamps it when it does. metrics-server recomputes roughly every
 // 15s, so most 2s watch ticks refetch identical numbers. Only suppressed
 // refreshes are throttled, so a first load and a manual refresh always fetch.
+// The key carries the namespace scope, otherwise a namespace switch inside
+// the interval keeps showing the previous list's numbers.
 func (m *Model) allowMetricsFetch(kind string) bool {
-	key := m.nav.Context + "/" + kind
+	key := m.nav.Context + "/" + kind + sparklineScope(m, kind)
 	if interval := ui.ConfigMetricsInterval; interval > 0 && m.suppressBgtasks {
 		if last, ok := m.metricsLastFetch[key]; ok && time.Since(last) < interval {
 			return false
