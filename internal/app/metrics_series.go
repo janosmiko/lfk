@@ -24,6 +24,12 @@ const sparklineColumnCap = 20
 // metricsSeriesCache holds the CPU and memory history the current sparkline
 // mode draws from, keyed the same way the instant metrics maps are:
 // "namespace/pod" for pods, node name for nodes.
+//
+// The maps are updated in place on purpose. The cache is model-wide, not part
+// of TabState, and no goroutine or rendered frame keeps an earlier Model, so
+// no snapshot can observe a later write. Copy on write would allocate on
+// every metrics tick, times the member count of a union dashboard.
+// TestMetricsSeriesCacheIsNotSnapshottedPerTab guards the premise.
 type metricsSeriesCache struct {
 	// cpu and mem hold either pod or node series depending on which list is
 	// active, never both: a "namespace/pod" key always contains a slash and a
