@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.11](https://github.com/janosmiko/lfk/compare/v0.18.10...v0.18.11) (2026-09-10)
+
+
+### Features
+
+* quarantine a pod out of its Service selectors ([#751](https://github.com/janosmiko/lfk/issues/751)) ([24bfdb1](https://github.com/janosmiko/lfk/commit/24bfdb1a2eba52a500a666dfb6e36cd3df80aa6e))
+* show what constrains the selected object ([#755](https://github.com/janosmiko/lfk/issues/755)) ([b985970](https://github.com/janosmiko/lfk/commit/b985970c23dca6039b622091ae79c9ef1ec085dd))
+
+
+### Bug Fixes
+
+* land owner jumps on the visible sidebar row ([#759](https://github.com/janosmiko/lfk/issues/759)) ([623d313](https://github.com/janosmiko/lfk/commit/623d313b687eda5e6a6c4489cbbfa12a14ec442a)), closes [#748](https://github.com/janosmiko/lfk/issues/748)
+* open the constraints view for workloads only and size its columns ([#758](https://github.com/janosmiko/lfk/issues/758)) ([cd1cdcc](https://github.com/janosmiko/lfk/commit/cd1cdcc9cec76d5030341e1e123f17be45e0fc94))
+* scope the instant metrics throttle by namespace ([#749](https://github.com/janosmiko/lfk/issues/749)) ([eb50b95](https://github.com/janosmiko/lfk/commit/eb50b95d2a2e31335cf6f5fd1b8a223c756c08a7))
+
 ## [0.18.10](https://github.com/janosmiko/lfk/compare/v0.18.9...v0.18.10) (2026-09-09)
 
 
