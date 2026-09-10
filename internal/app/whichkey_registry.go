@@ -526,6 +526,7 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.TogglePreviewLogs }, Label: "Live log preview", Group: wkViews, Avail: wkTogglePreviewLogsAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.ResourceMap }, Label: "Resource map", Group: wkViews, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.ObjectExplorer }, Label: "Object Explorer", Group: wkViews, Avail: func(c *wkCtx) bool { return wkOnRow(c) && c.sel.Raw != nil }},
+	{Key: func(kb ui.Keybindings) string { return kb.Constraints }, Label: "What constrains this object", Group: wkViews, Avail: func(c *wkCtx) bool { return wkOnRow(c) && c.sel.Raw != nil }},
 	{Key: func(kb ui.Keybindings) string { return kb.APIExplorer }, Label: "API Explorer", Group: wkViews, Avail: wkAPIExplorerAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.RBACBrowser }, Label: "RBAC browser", Group: wkViews},
 	{Key: func(kb ui.Keybindings) string { return kb.OrphanOverlay }, Label: "Orphan overview", Group: wkViews, Avail: func(c *wkCtx) bool { return !c.unionSentinel }},

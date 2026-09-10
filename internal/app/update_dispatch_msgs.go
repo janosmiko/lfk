@@ -79,13 +79,13 @@ func (m Model) updateBulkActionResult(msg bulkActionResultMsg) (tea.Model, tea.C
 }
 
 func (m Model) updateFinalizerSearchResult(msg finalizerSearchResultMsg) (tea.Model, tea.Cmd) {
-	m.finalizerSearchLoading = false
+	m.finalizerSearch.loading = false
 	if msg.err != nil {
 		m.setErrorFromErr("Finalizer search: ", msg.err)
 		m.overlay = overlayNone
 		return m, scheduleStatusClear()
 	}
-	m.finalizerSearchResults = msg.results
+	m.finalizerSearch.results = msg.results
 	if len(msg.results) == 0 {
 		m.setStatusMessage("No resources found with matching finalizer", false)
 		m.overlay = overlayNone
@@ -101,8 +101,8 @@ func (m Model) updateFinalizerRemoveResult(msg finalizerRemoveResultMsg) (tea.Mo
 	} else {
 		m.setStatusMessage(fmt.Sprintf("Removed finalizer from %d resources", msg.succeeded), false)
 	}
-	m.finalizerSearchResults = nil
-	m.finalizerSearchSelected = nil
+	m.finalizerSearch.results = nil
+	m.finalizerSearch.selected = nil
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
 

@@ -11,11 +11,11 @@ import (
 
 func TestCovBulkRemoveFinalizer(t *testing.T) {
 	m := baseModelWithFakeClient()
-	m.finalizerSearchResults = []k8s.FinalizerMatch{
+	m.finalizerSearch.results = []k8s.FinalizerMatch{
 		{Namespace: "default", Kind: "Pod", Name: "pod-1", Matched: "test/finalizer"},
 		{Namespace: "default", Kind: "Pod", Name: "pod-2", Matched: "test/finalizer"},
 	}
-	m.finalizerSearchSelected = map[string]bool{
+	m.finalizerSearch.selected = map[string]bool{
 		"default/Pod/pod-1": true,
 	}
 	cmd := m.bulkRemoveFinalizer()
@@ -29,10 +29,10 @@ func TestCovBulkRemoveFinalizer(t *testing.T) {
 
 func TestCovBulkRemoveFinalizerNoneSelected(t *testing.T) {
 	m := baseModelWithFakeClient()
-	m.finalizerSearchResults = []k8s.FinalizerMatch{
+	m.finalizerSearch.results = []k8s.FinalizerMatch{
 		{Namespace: "default", Kind: "Pod", Name: "pod-1", Matched: "test/finalizer"},
 	}
-	m.finalizerSearchSelected = map[string]bool{}
+	m.finalizerSearch.selected = map[string]bool{}
 	cmd := m.bulkRemoveFinalizer()
 	msg := execCmd(t, cmd)
 	result, ok := msg.(finalizerRemoveResultMsg)

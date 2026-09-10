@@ -2166,8 +2166,8 @@ func TestCovOverlayKeyDispatchQuitConfirm(t *testing.T) {
 func TestCovOverlayKeyDispatchFinalizerSearch(t *testing.T) {
 	m := baseModelOverlay()
 	m.overlay = overlayFinalizerSearch
-	m.finalizerSearchResults = nil
-	m.finalizerSearchSelected = make(map[string]bool)
+	m.finalizerSearch.results = nil
+	m.finalizerSearch.selected = make(map[string]bool)
 	result, _ := m.handleOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)

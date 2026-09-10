@@ -439,6 +439,18 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 			},
 		},
 		{
+			title: "Constraints View", context: "Constraints View",
+			bindings: []helpEntry{
+				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{"j/k", "Navigate rows"},
+				{kb.JumpTop + "/" + kb.JumpBottom, "Jump to top / bottom"},
+				{"ctrl+d/ctrl+u", "Half page down / up"},
+				{"enter", "Jump to the row's object"},
+				{kb.Refresh, "Re-run the scan"},
+				{"q/esc", "Close constraints view"},
+			},
+		},
+		{
 			// Grouping and warnings-only used to be listed here. They are keys of
 			// the explorer's Events list (handleKeyExpandCollapse,
 			// handleExplorerActionKeySaveResource), not of the timeline, and are

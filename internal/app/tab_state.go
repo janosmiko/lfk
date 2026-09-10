@@ -174,6 +174,7 @@ func (m *Model) saveCurrentTab() {
 	t.diffRightName = m.diffView.rightName
 	t.diffScroll = m.diffView.scroll
 	t.diffUnified = m.diffView.unified
+	t.constraints = m.constraints
 	t.execPTY = m.execPTY
 	t.execTerm = m.execTerm
 	t.execTitle = m.execTitle
@@ -332,6 +333,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.diffView.rightName = t.diffRightName
 	m.diffView.scroll = t.diffScroll
 	m.diffView.unified = t.diffUnified
+	m.constraints = t.constraints
 	m.execPTY = t.execPTY
 	m.execTerm = t.execTerm
 	m.execTitle = t.execTitle

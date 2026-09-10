@@ -53,7 +53,7 @@ func replaceLastLine(view, line string) string {
 // (with its own title/tab/hint bars) rather than the three-pane explorer.
 func isFullscreenRenderMode(mode viewMode) bool {
 	switch mode {
-	case modeYAML, modeLogs, modeDescribe, modeDiff, modeExec, modeExplain, modeEventViewer, modeObjectExplorer, modeLogTop:
+	case modeYAML, modeLogs, modeDescribe, modeDiff, modeExec, modeExplain, modeEventViewer, modeObjectExplorer, modeLogTop, modeConstraints:
 		return true
 	default:
 		return false
@@ -140,6 +140,8 @@ func (m Model) renderView() string {
 			content = m.viewObjectExplorer()
 		case modeLogTop:
 			content = m.viewLogTop()
+		case modeConstraints:
+			content = m.viewConstraints()
 		}
 
 		var parts []string

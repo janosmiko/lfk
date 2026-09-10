@@ -7,7 +7,7 @@ import tea "charm.land/bubbletea/v2"
 // tracked background task in the scheduler indicator.
 func (m Model) spinnerNeeded() bool {
 	if m.loading || m.previewLoading || m.metricsLoading ||
-		m.helmRevisionsLoading || m.finalizerSearchLoading ||
+		m.helmRevisionsLoading || m.finalizerSearch.loading ||
 		m.commandBarNameLoading != "" {
 		return true
 	}

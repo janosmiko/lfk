@@ -50,12 +50,12 @@ func (m Model) searchFinalizers(pattern string) tea.Cmd {
 func (m Model) bulkRemoveFinalizer() tea.Cmd {
 	client := m.client
 	kctx := m.nav.Context
-	selected := make(map[string]bool, len(m.finalizerSearchSelected))
-	maps.Copy(selected, m.finalizerSearchSelected)
+	selected := make(map[string]bool, len(m.finalizerSearch.selected))
+	maps.Copy(selected, m.finalizerSearch.selected)
 
 	// Collect the matching results for selected items.
 	var targets []finalizerTarget
-	for _, result := range m.finalizerSearchResults {
+	for _, result := range m.finalizerSearch.results {
 		key := finalizerMatchKey(result)
 		if selected[key] {
 			targets = append(targets, finalizerTarget{match: result})

@@ -637,6 +637,7 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Live log preview", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
 		{"Resource map", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Object Explorer", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"What constrains this object", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"API Explorer", "Pod", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"RBAC browser", "", "", allLevels},
 		{"Orphan overview", "", "", allLevels},

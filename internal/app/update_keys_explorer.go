@@ -433,6 +433,9 @@ func (m Model) handleExplorerUIKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, boo
 	case kb.OrphanOverlay:
 		mdl, cmd := m.openOrphansOverlay()
 		return mdl, cmd, true
+	case kb.Constraints:
+		mdl, cmd := m.openConstraintsView()
+		return mdl, cmd, true
 	case kb.SessionManager:
 		mdl, cmd := m.openSessionsOverlay()
 		return mdl, cmd, true

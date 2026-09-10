@@ -217,6 +217,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 - Object Explorer with `O` for the live object: [keybindings.md](docs/keybindings.md#object-explorer)
 - API Explorer with `I` for the resource schema: [keybindings.md](docs/keybindings.md#api-explorer)
 - Describe with `v`, relationship map with `M`, events with `V` plus warnings-only and grouping toggles: [keybindings.md](docs/keybindings.md#actions)
+- Constraints view with `b`: quotas, PDBs, priority, node placement, and webhooks that would block or admit the resource: [keybindings.md](docs/keybindings.md#constraints-view)
 
 ### Logs and shells
 

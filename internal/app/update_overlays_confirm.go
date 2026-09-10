@@ -242,8 +242,8 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.
 			case "Finalizer Remove":
 				m.loading = false
 				m.overlay = overlayFinalizerSearch
-				selectedCount := len(m.finalizerSearchSelected)
-				m.addLogEntry("DBG", fmt.Sprintf("Removing finalizer %q from %d resources", m.finalizerSearchPattern, selectedCount))
+				selectedCount := len(m.finalizerSearch.selected)
+				m.addLogEntry("DBG", fmt.Sprintf("Removing finalizer %q from %d resources", m.finalizerSearch.pattern, selectedCount))
 				return m, m.bulkRemoveFinalizer()
 			case "Disrupt":
 				// Karpenter NodeClaim disrupt: kubectl delete nodeclaim.

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logagg"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -114,6 +115,13 @@ func whichKeyViewerModel(mode viewMode) Model {
 	m.logTop.colOrder = []string{logagg.FieldPath}
 	m.eventTimelineLines = []string{"10m  Normal  Scheduled  pod/p1", "9m  Warning  BackOff  pod/p1"}
 	m.eventTimelineCursor = 0
+	m.constraints.report = k8s.ConstraintReport{
+		Rows: []k8s.ConstraintRow{
+			{Source: "Quota", Kind: "ResourceQuota", Namespace: "default", Name: "compute-quota", Detail: "requests 500m cpu", Headroom: "1"},
+		},
+	}
+	m.constraints.cursor = 0
+	m.constraints.name = "p1"
 	return m
 }
 
@@ -303,6 +311,17 @@ func wkViewerScenarios(t *testing.T, mode viewMode) []struct {
 			{"cursor off content", func() Model { m := base(); m.eventTimelineCursor = 999; return m }},
 			{"no lines", func() Model { m := base(); m.eventTimelineLines = nil; return m }},
 		}
+	case modeConstraints:
+		return []scenario{
+			{"normal", base},
+			{"cursor off content", func() Model { m := base(); m.constraints.cursor = 999; return m }},
+			{"no rows", func() Model { m := base(); m.constraints.report.Rows = nil; return m }},
+			{"skipped sources", func() Model {
+				m := base()
+				m.constraints.report.Skipped = []string{"poddisruptionbudgets"}
+				return m
+			}},
+		}
 	}
 	t.Fatalf("catalogued mode %q has no scenario set; add one covering every branch its "+
 		"predicates take, or the sweeps that drive off this will pass on nothing",
@@ -369,6 +388,7 @@ func wkTextViewerModes(t *testing.T) map[viewMode]bool {
 		modeExplain:        false,
 		modeObjectExplorer: false,
 		modeLogTop:         false,
+		modeConstraints:    false,
 	}
 	for _, mc := range whichKeyViewerCatalogs() {
 		if _, ok := out[mc.mode]; !ok {
@@ -587,6 +607,7 @@ func wkViewerHelpContexts(t *testing.T) map[viewMode]string {
 		modeLogTop:         "Log Top",
 		modeObjectExplorer: "Object Explorer",
 		modeEventViewer:    "Event Timeline",
+		modeConstraints:    "Constraints View",
 	}
 	for _, mc := range whichKeyViewerCatalogs() {
 		if out[mc.mode] == "" {

@@ -501,6 +501,7 @@
         "toggle_rare": { "type": "string" },
         "orphan_overlay": { "type": "string" },
         "session_manager": { "type": "string" },
+        "constraints": { "type": "string" },
         "namespace_selector": { "type": "string" },
         "all_namespaces": { "type": "string" },
         "action_menu": { "type": "string" },

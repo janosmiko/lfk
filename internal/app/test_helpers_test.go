@@ -269,12 +269,12 @@ func baseModelFinalizer() Model {
 		execMu:              &sync.Mutex{},
 	}
 	m.overlay = overlayFinalizerSearch
-	m.finalizerSearchResults = []k8s.FinalizerMatch{
+	m.finalizerSearch.results = []k8s.FinalizerMatch{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Matched: "kubernetes.io/pv-protection"},
 		{Name: "pod-2", Namespace: "default", Kind: "Pod", Matched: "kubernetes.io/pv-protection"},
 		{Name: "pod-3", Namespace: "kube-system", Kind: "Pod", Matched: "finalizer.example.com"},
 	}
-	m.finalizerSearchSelected = make(map[string]bool)
+	m.finalizerSearch.selected = make(map[string]bool)
 	return m
 }
 

@@ -148,9 +148,9 @@ func (m Model) renderOverlayFinalizerSearch() (string, int, int) {
 	}
 	h := min(m.height-4, m.height*70/100)
 	return ui.RenderFinalizerSearchOverlay(
-		entries, m.finalizerSearchCursor, m.finalizerSearchSelected,
-		m.finalizerSearchPattern, m.finalizerSearchFilter, m.finalizerSearchFilterActive,
-		m.finalizerSearchLoading, w, h,
+		entries, m.finalizerSearch.cursor, m.finalizerSearch.selected,
+		m.finalizerSearch.pattern, m.finalizerSearch.filter, m.finalizerSearch.filterActive,
+		m.finalizerSearch.loading, w, h,
 	), w, h
 }
 

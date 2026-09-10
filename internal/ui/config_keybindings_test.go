@@ -131,6 +131,31 @@ func TestEmittedNameForCtrlChord_FiresOnKnownDeadSpellings(t *testing.T) {
 	}
 }
 
+// TestConstraintsKeybindingDefaultIsFree checks the "b" default for Constraints
+// against every other keybinding default, so adding it did not silently shadow
+// an existing explorer-scope shortcut.
+func TestConstraintsKeybindingDefaultIsFree(t *testing.T) {
+	kb := DefaultKeybindings()
+	if kb.Constraints != "b" {
+		t.Fatalf("Constraints default = %q, want %q", kb.Constraints, "b")
+	}
+
+	v := reflect.ValueOf(kb)
+	for i := range v.NumField() {
+		name := v.Type().Field(i).Name
+		if name == "Constraints" {
+			continue
+		}
+		f := v.Field(i)
+		if f.Kind() != reflect.String {
+			continue
+		}
+		if f.String() == kb.Constraints {
+			t.Errorf("%s also defaults to %q, colliding with Constraints", name, kb.Constraints)
+		}
+	}
+}
+
 // TestLogKeybindingSwap verifies the log key layout: the details-pane live-log
 // toggle claims shift+l ("L") and the fullscreen log viewer uses ctrl+l
 // (reachable on macOS without Option-as-Meta, unlike an alt+letter binding).

@@ -84,6 +84,10 @@ type Keybindings struct {
 	ToggleRare        string `json:"toggle_rare" yaml:"toggle_rare"`
 	OrphanOverlay     string `json:"orphan_overlay" yaml:"orphan_overlay"`
 	SessionManager    string `json:"session_manager" yaml:"session_manager"`
+	// Constraints opens the "what constrains this object" fullscreen view
+	// for the selected resource: quotas, limit ranges, PDBs, priority
+	// preemption, node scheduling terms, and admission webhooks.
+	Constraints string `json:"constraints" yaml:"constraints"`
 
 	// Actions
 	NamespaceSelector string `json:"namespace_selector" yaml:"namespace_selector"`
@@ -254,6 +258,7 @@ func DefaultKeybindings() Keybindings {
 		MetricsSparkCycle: "~",
 		OrphanOverlay:     "Z",
 		SessionManager:    "C",
+		Constraints:       "b",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",

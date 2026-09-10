@@ -229,6 +229,7 @@ var whichKeyCatalogList = []whichKeyModeCatalog{
 	{modeObjectExplorer, "Object Explorer", whichKeyObjectExplorerCatalog},
 	{modeLogTop, "Log Top", whichKeyLogTopCatalog},
 	{modeEventViewer, "event viewer", whichKeyEventViewerCatalog},
+	{modeConstraints, "constraints view", whichKeyConstraintsCatalog},
 }
 
 // whichKeyCatalogs indexes whichKeyCatalogList for the render and dispatch

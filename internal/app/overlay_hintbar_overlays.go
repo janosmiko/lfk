@@ -279,7 +279,7 @@ func (m Model) overlayHintBarOverlayLabelEditor() string {
 }
 
 func (m Model) overlayHintBarOverlayFinalizerSearch() string {
-	if m.finalizerSearchFilterActive {
+	if m.finalizerSearch.filterActive {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type", Desc: "filter"},
 			{Key: "enter", Desc: "apply"},

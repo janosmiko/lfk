@@ -263,6 +263,9 @@ func (m Model) handleModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	case modeLogTop:
 		mdl, cmd := m.handleLogTopKey(msg)
 		return mdl, cmd, true
+	case modeConstraints:
+		mdl, cmd := m.handleConstraintsKey(msg)
+		return mdl, cmd, true
 	case modeCredits:
 		// Any key exits the credits screen.
 		m.mode = modeExplorer

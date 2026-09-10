@@ -32,6 +32,7 @@ const (
 	modeCredits
 	modeObjectExplorer
 	modeLogTop
+	modeConstraints
 )
 
 // wheelBurst tracks a single mouse/trackpad wheel burst. Trackpad momentum
@@ -360,6 +361,19 @@ const (
 	bookmarkModeConfirmDeleteAll
 )
 
+// finalizerSearchState groups the finalizer-search overlay's fields so
+// they live together on Model without bloating the main struct over the
+// file-length cap. Mirrors kvEditorSearchState.
+type finalizerSearchState struct {
+	pattern      string
+	results      []k8s.FinalizerMatch
+	cursor       int
+	selected     map[string]bool // "ns/kind/name" keys
+	loading      bool
+	filter       string
+	filterActive bool
+}
+
 // kvEditorSearchState backs the / search + multi-row selection +
 // Shift+Y format-picker for the K/V editor overlays (secret,
 // configmap, label). All state lives here because only one editor
@@ -641,6 +655,9 @@ type TabState struct {
 	logTopFilterQuery string
 	logTopColOrder    []string
 	logTopColHidden   []string // serialized (sorted key) form of the runtime colHidden map[string]bool
+
+	// Full-screen constraints view state (per-tab). See constraintsview.go.
+	constraints constraintsViewState
 
 	// Security feature state — per-tab so two tabs pointing at different
 	// clusters keep their own source manager and availability map.

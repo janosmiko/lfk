@@ -2576,7 +2576,7 @@ func TestCovUpdateFinalizerSearch(t *testing.T) {
 		results: []k8s.FinalizerMatch{{Namespace: "default", Kind: "Pod", Name: "stuck-pod"}},
 	})
 	rm := result.(Model)
-	assert.Len(t, rm.finalizerSearchResults, 1)
+	assert.Len(t, rm.finalizerSearch.results, 1)
 }
 
 func TestCovUpdateEventTimeline(t *testing.T) {
