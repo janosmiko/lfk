@@ -588,8 +588,23 @@ func TestHandleHeaderClickNameColumn(t *testing.T) {
 	m := baseExplorerModel()
 	m.sortColumnName = "Age"
 	m.sortAscending = true
+
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	oldLayout := ui.ActiveMiddleColumnLayout
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+		ui.ActiveMiddleColumnLayout = oldLayout
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Age"}
 	ui.ActiveSortableColumnCount = 2
+	// handleHeaderClick resolves relX against this layout (populated by a real
+	// RenderTable call outside this test), so it must be set explicitly here.
+	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
+		{Key: "Name", StartX: 0, EndX: 10},
+		{Key: "Age", StartX: 10, EndX: 20},
+	}
 
 	ret, _ := m.handleHeaderClick(5)
 	result := ret.(Model)
@@ -842,6 +857,8 @@ func TestCovHandleHeaderClickNoItems(t *testing.T) {
 func TestCovHandleHeaderClickNoColumns(t *testing.T) {
 	m := baseModelActions()
 	m.middleItems = []model.Item{{Name: "pod-1"}}
+	oldCols := ui.ActiveSortableColumns
+	t.Cleanup(func() { ui.ActiveSortableColumns = oldCols })
 	ui.ActiveSortableColumns = nil
 	result, cmd := m.handleHeaderClick(5)
 	_ = result.(Model)
@@ -881,7 +898,20 @@ func TestCovHandleHeaderClickToggleDirection(t *testing.T) {
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default"},
 	}
+
+	oldCols := ui.ActiveSortableColumns
+	oldLayout := ui.ActiveMiddleColumnLayout
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveMiddleColumnLayout = oldLayout
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Namespace"}
+	// handleHeaderClick resolves relX against this layout (populated by a real
+	// RenderTable call outside this test), so it must be set explicitly here.
+	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
+		{Key: "Namespace", StartX: 0, EndX: 10},
+		{Key: "Name", StartX: 10, EndX: 20},
+	}
 	m.sortColumnName = "Namespace"
 	m.sortAscending = true
 	// Click within the namespace column region (at the start)
