@@ -49,8 +49,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		m.overlay = overlayNone
 		m.loading = true
 		// The figures belong to the action being committed here. A later
-		// confirm must not open showing them. quarantineKeys is captured
-		// before the reset, since the Quarantine branch below still needs it.
+		// confirm must not open showing them. quarantineServices/Keys are
+		// captured before the reset, since the Quarantine branch below still needs them.
+		quarantineServices := m.quarantine.services
 		quarantineKeys := m.quarantine.keys
 		m.blast.reset()
 		m.deps.reset()
@@ -117,7 +118,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		case model.ActionLabelQuarantine:
 			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch pod %s --type merge -p '{\"metadata\":{\"labels\":{%s},\"annotations\":{%q:...}}}'%s --context %s",
 				name, quarantineNullLabelsJSON(quarantineKeys), k8s.QuarantinedLabelsAnnotation, nsArg, ctx))
-			return m, m.quarantinePodCmd(quarantineKeys)
+			return m, m.quarantinePodCmd(quarantineServices, quarantineKeys)
 		case model.ActionLabelRestore:
 			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch pod %s --type merge -p '{\"metadata\":{\"labels\":{...}},\"annotations\":{%q:null}}}'%s --context %s",
 				name, k8s.QuarantinedLabelsAnnotation, nsArg, ctx))

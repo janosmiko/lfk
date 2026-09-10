@@ -28,6 +28,16 @@ var ErrNotQuarantined = errors.New("pod is not quarantined")
 // can edit the pod can edit this annotation too.
 var ErrTamperedAnnotation = errors.New("quarantine annotation is not a valid label set")
 
+// ErrTooManyLabels means the keys passed to QuarantinePod would remove more
+// entries than RestorePod's cap allows it to store, so a later restore of
+// this pod would be refused.
+var ErrTooManyLabels = errors.New("quarantine would remove more labels than can be restored")
+
+// ErrAlreadyQuarantined means the pod already carries a quarantine
+// annotation. Patching over it would discard the first set of removed
+// labels, so QuarantinePod refuses instead.
+var ErrAlreadyQuarantined = errors.New("pod is already quarantined")
+
 // maxRestoredLabelEntries: past this many, an oversized annotation is a
 // tampering signal, not a legitimate restore.
 const maxRestoredLabelEntries = 64
@@ -81,6 +91,9 @@ func (c *Client) QuarantinePod(ctx context.Context, contextName, namespace, name
 	if err != nil {
 		return nil, fmt.Errorf("getting pod %s: %w", name, err)
 	}
+	if existing := obj.GetAnnotations()[QuarantinedLabelsAnnotation]; existing != "" {
+		return nil, fmt.Errorf("quarantining pod %s: %w", name, ErrAlreadyQuarantined)
+	}
 
 	podLabels := obj.GetLabels()
 	removed = make(map[string]string, len(keys))
@@ -90,6 +103,10 @@ func (c *Client) QuarantinePod(ctx context.Context, contextName, namespace, name
 			removed[k] = v
 		}
 		labelPatch[k] = nil
+	}
+	if len(removed) > maxRestoredLabelEntries {
+		return nil, fmt.Errorf("quarantining pod %s: %w: %d labels, more than a restore can accept",
+			name, ErrTooManyLabels, len(removed))
 	}
 
 	removedJSON, err := json.Marshal(removed)

@@ -135,10 +135,10 @@ func (m Model) updateQuarantineTargetsChanged() (tea.Model, tea.Cmd) {
 	return m, scheduleStatusClear()
 }
 
-// quarantinePodCmd commits the Quarantine confirm. keys is passed
-// explicitly: the caller resets m.quarantine before this cmd's closure
-// runs. It re-runs QuarantineTargets first, refusing to patch on drift.
-func (m Model) quarantinePodCmd(keys []string) tea.Cmd {
+// quarantinePodCmd commits the Quarantine confirm. Both services and keys
+// must still match at commit time: same keys behind a renamed Service is
+// still a mismatch the confirm box never named.
+func (m Model) quarantinePodCmd(services, keys []string) tea.Cmd {
 	client := m.client
 	ctxName := m.actionCtx.context
 	namespace := m.actionCtx.namespace
@@ -151,11 +151,11 @@ func (m Model) quarantinePodCmd(keys []string) tea.Cmd {
 		"Quarantine: "+name,
 		bgtaskTarget(ctxName, namespace),
 		func(ctx context.Context) tea.Msg {
-			_, freshKeys, err := client.QuarantineTargets(ctx, ctxName, namespace, podLabels)
+			freshServices, freshKeys, err := client.QuarantineTargets(ctx, ctxName, namespace, podLabels)
 			if err != nil {
 				return actionResultMsg{err: err}
 			}
-			if !slices.Equal(freshKeys, keys) {
+			if !sortedStringsEqual(freshServices, services) || !sortedStringsEqual(freshKeys, keys) {
 				return quarantineTargetsChangedMsg{}
 			}
 			if _, err := client.QuarantinePod(ctx, ctxName, namespace, name, keys); err != nil {
@@ -164,6 +164,19 @@ func (m Model) quarantinePodCmd(keys []string) tea.Cmd {
 			return actionResultMsg{message: "Quarantined " + safeName}
 		},
 	)
+}
+
+// sortedStringsEqual compares ignoring order: QuarantineTargets sorts its
+// results, but a caller's confirmed figures are not guaranteed to be.
+func sortedStringsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	sa := slices.Clone(a)
+	sb := slices.Clone(b)
+	slices.Sort(sa)
+	slices.Sort(sb)
+	return slices.Equal(sa, sb)
 }
 
 // restorePodCmd commits the Restore confirm: puts back the label pairs

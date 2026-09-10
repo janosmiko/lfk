@@ -108,7 +108,7 @@ func TestQuarantinePodCmd_EndToEnd(t *testing.T) {
 		Spec: corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
 	})
 
-	cmd := m.quarantinePodCmd([]string{"app"})
+	cmd := m.quarantinePodCmd([]string{"svc-web"}, []string{"app"})
 
 	msg, ok := execScheduled(t, m, cmd).(actionResultMsg)
 	require.True(t, ok)
@@ -124,7 +124,7 @@ func TestQuarantineCommit_AbortsWhenTargetsChanged(t *testing.T) {
 		Spec: corev1.ServiceSpec{Selector: map[string]string{"tier": "backend"}},
 	})
 
-	cmd := m.quarantinePodCmd([]string{"app"})
+	cmd := m.quarantinePodCmd([]string{"svc-web"}, []string{"app"})
 
 	msg := execScheduled(t, m, cmd)
 	_, changed := msg.(quarantineTargetsChangedMsg)
@@ -135,6 +135,22 @@ func TestQuarantineCommit_AbortsWhenTargetsChanged(t *testing.T) {
 	assert.True(t, out.statusMessageErr)
 	assert.Contains(t, out.statusMessage, "run Quarantine again")
 	assert.Nil(t, out.quarantine.keys)
+}
+
+// svc-a is confirmed by name, but by commit time the matching Service is
+// svc-b — same selector keys, different Service. The confirm box never
+// listed svc-b, so the patch must be refused rather than silently retargeted.
+func TestQuarantineCommit_AbortsWhenServiceNameChanged(t *testing.T) {
+	m := quarantineModelWithService(&corev1.Service{
+		Name: "svc-b", Namespace: "default",
+		Spec: corev1.ServiceSpec{Selector: map[string]string{"app": "web"}},
+	})
+
+	cmd := m.quarantinePodCmd([]string{"svc-a"}, []string{"app"})
+
+	msg := execScheduled(t, m, cmd)
+	_, changed := msg.(quarantineTargetsChangedMsg)
+	assert.True(t, changed, "expected quarantineTargetsChangedMsg, got %T", msg)
 }
 
 func TestRestorePodCmd_EndToEnd(t *testing.T) {

@@ -200,6 +200,50 @@ func TestRestorePod_RefusesInvalidLabelValue(t *testing.T) {
 	assert.False(t, hasPatchAction(dc), "an invalid value must not reach a patch call")
 }
 
+func quarantineTestPodWithLabels(count int) (*unstructured.Unstructured, []string) {
+	pod := quarantineTestPod()
+	labels := pod.Object["metadata"].(map[string]any)["labels"].(map[string]any)
+	keys := make([]string, 0, count)
+	for i := range count {
+		k := fmt.Sprintf("extra-%d", i)
+		labels[k] = "value"
+		keys = append(keys, k)
+	}
+	return pod, keys
+}
+
+func TestQuarantinePod_AcceptsMaxLabelEntries(t *testing.T) {
+	pod, keys := quarantineTestPodWithLabels(maxRestoredLabelEntries)
+	dc := newFakeDynClient(pod)
+	c := newFakeClient(nil, dc)
+
+	removed, err := c.QuarantinePod(t.Context(), "", "default", "my-pod", keys)
+	require.NoError(t, err)
+	assert.Len(t, removed, maxRestoredLabelEntries)
+	assert.True(t, hasPatchAction(dc))
+}
+
+func TestQuarantinePod_RefusesTooManyLabelEntries(t *testing.T) {
+	pod, keys := quarantineTestPodWithLabels(maxRestoredLabelEntries + 1)
+	dc := newFakeDynClient(pod)
+	c := newFakeClient(nil, dc)
+
+	_, err := c.QuarantinePod(t.Context(), "", "default", "my-pod", keys)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrTooManyLabels))
+	assert.False(t, hasPatchAction(dc), "an oversized label set must not reach a patch call")
+}
+
+func TestQuarantinePod_RefusesAlreadyQuarantinedPod(t *testing.T) {
+	dc := newFakeDynClient(quarantineTestPodWithAnnotation(`{"tier":"backend"}`))
+	c := newFakeClient(nil, dc)
+
+	_, err := c.QuarantinePod(t.Context(), "", "default", "my-pod", []string{"app"})
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrAlreadyQuarantined))
+	assert.False(t, hasPatchAction(dc), "an already-quarantined pod must not be patched again")
+}
+
 func TestRestorePod_RefusesOversizedAnnotation(t *testing.T) {
 	pairs := make(map[string]string, maxRestoredLabelEntries+1)
 	for i := range maxRestoredLabelEntries + 1 {
