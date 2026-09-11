@@ -188,7 +188,9 @@ func TestCaptureManager_Start_RefusesPreexistingPath(t *testing.T) {
 	// different filename. Independently confirm O_EXCL by re-opening the
 	// first path with the same flags — it must fail.
 	if f, err := os.OpenFile(firstPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600); err == nil {
-		f.Close()
+		if closeErr := f.Close(); closeErr != nil {
+			t.Errorf("close unexpectedly opened capture file: %v", closeErr)
+		}
 		t.Errorf("OpenFile O_EXCL on existing %s succeeded; should have failed", firstPath)
 	}
 }
