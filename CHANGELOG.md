@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.12](https://github.com/janosmiko/lfk/compare/v0.18.11...v0.18.12) (2026-09-11)
+
+
+### Features
+
+* **ui:** add default layout setting ([#757](https://github.com/janosmiko/lfk/issues/757)) ([7d0f0da](https://github.com/janosmiko/lfk/commit/7d0f0da3c01fe5877558f34e7a4d42345400ac37))
+
+
+### Bug Fixes
+
+* reap browser opener process and close probe handle ([#761](https://github.com/janosmiko/lfk/issues/761)) ([ae84899](https://github.com/janosmiko/lfk/commit/ae84899aac48137d643593b5382d3db502187fd8))
+* reset the explorer layout to normal on config reload ([#764](https://github.com/janosmiko/lfk/issues/764)) ([7368824](https://github.com/janosmiko/lfk/commit/736882402e6225db7f7acb75b7092eec075791ea))
+
 ## [0.18.11](https://github.com/janosmiko/lfk/compare/v0.18.10...v0.18.11) (2026-09-10)
 
 
