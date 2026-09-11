@@ -144,6 +144,43 @@ func TestExplorerLayout_InvalidFallsBack(t *testing.T) {
 	assert.Equal(t, LayoutNormal, ConfigExplorerLayout, "invalid layout falls back to default")
 }
 
+// TestExplorerLayout_ResetsOnReload verifies a reload that no longer sets
+// appearance.layout returns to the compiled default instead of keeping the
+// previous load's value.
+func TestExplorerLayout_ResetsOnReload(t *testing.T) {
+	snapshotAppearanceGlobals(t)
+
+	path := writeConfigFile(t, "appearance:\n  layout: fullscreen\n")
+	LoadConfig(path)
+	assert.Equal(t, LayoutFullscreen, ConfigExplorerLayout, "first load applies fullscreen")
+
+	path = writeConfigFile(t, "appearance:\n  no_color: true\n")
+	LoadConfig(path)
+	assert.Equal(t, LayoutNormal, ConfigExplorerLayout, "reload without layout resets to default")
+}
+
+// TestExplorerLayout_ResetsOnReloadWithInvalidValue verifies a reload with an
+// invalid appearance.layout resets to the compiled default (rather than
+// keeping a previous load's value) and still warns.
+func TestExplorerLayout_ResetsOnReloadWithInvalidValue(t *testing.T) {
+	snapshotAppearanceGlobals(t)
+
+	path := writeConfigFile(t, "appearance:\n  layout: fullscreen\n")
+	LoadConfig(path)
+	assert.Equal(t, LayoutFullscreen, ConfigExplorerLayout, "first load applies fullscreen")
+
+	origLogger := logger.Logger
+	var buf bytes.Buffer
+	logger.Logger = slog.New(slog.NewTextHandler(&buf, nil))
+	t.Cleanup(func() { logger.Logger = origLogger })
+
+	path = writeConfigFile(t, "appearance:\n  layout: \"banana\"\n")
+	LoadConfig(path)
+
+	assert.Equal(t, LayoutNormal, ConfigExplorerLayout, "reload with invalid layout resets to default")
+	assert.Contains(t, buf.String(), "appearance.layout", "warning must name the offending key")
+}
+
 // TestExplorerLayout_FlatAlias applies the deprecated flat layout key.
 func TestExplorerLayout_FlatAlias(t *testing.T) {
 	snapshotAppearanceGlobals(t)
