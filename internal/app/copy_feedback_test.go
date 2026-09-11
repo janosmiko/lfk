@@ -1,11 +1,13 @@
 package app
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Each fullscreen viewer's footer must surface a fresh status message in
@@ -332,29 +334,52 @@ func TestNormalizeClipboardLineEndings(t *testing.T) {
 	}
 }
 
+// stubClipboardWriteAll swaps clipboardWriteAll for fn and restores the
+// original on cleanup, so tests never touch the real system clipboard.
+func stubClipboardWriteAll(t *testing.T, fn func(string) error) *string {
+	t.Helper()
+	var got string
+	original := clipboardWriteAll
+	clipboardWriteAll = func(text string) error {
+		got = text
+		return fn(text)
+	}
+	t.Cleanup(func() { clipboardWriteAll = original })
+	return &got
+}
+
 // Regression guard: copyToSystemClipboard must not return a generic
 // "Copied to clipboard" message — every caller has already set a
 // context-specific status. Returning the generic one races back via
 // updateActionResult and overwrites the more useful caller message
 // (visible to the user as "Copied 1 line" → "Copied to clipboard").
 func TestCopyToSystemClipboardSuccessIsSilent(t *testing.T) {
+	got := stubClipboardWriteAll(t, func(string) error { return nil })
+
 	cmd := copyToSystemClipboard("anything")
 	if cmd == nil {
 		t.Fatal("copyToSystemClipboard returned nil cmd")
 	}
 	msg := cmd()
-	// On hosts where atotto/clipboard can't reach a clipboard (Linux CI
-	// without xsel/xclip/wl-copy installed, headless containers, etc.) an
-	// error is expected — only assert success-path silence when the write
-	// actually succeeded.
-	if msg == nil {
-		return
+
+	assert.Equal(t, "anything", *got, "clipboardWriteAll must receive the copied text")
+	assert.Nil(t, msg, "success must return nil so the caller's status message survives")
+}
+
+func TestCopyToSystemClipboardErrorReturnsActionResult(t *testing.T) {
+	writeErr := errors.New("write failed")
+	got := stubClipboardWriteAll(t, func(string) error { return writeErr })
+
+	cmd := copyToSystemClipboard("anything")
+	if cmd == nil {
+		t.Fatal("copyToSystemClipboard returned nil cmd")
 	}
+	msg := cmd()
+
+	assert.Equal(t, "anything", *got, "clipboardWriteAll must receive the copied text")
 	res, ok := msg.(actionResultMsg)
-	if !ok {
-		t.Fatalf("unexpected message type: %T", msg)
-	}
-	assert.NotEmpty(t, res.err, "non-nil success message would race and overwrite caller status")
+	require.True(t, ok, "unexpected message type: %T", msg)
+	assert.ErrorIs(t, res.err, writeErr)
 }
 
 // Regression guard: the status message must not be muted when a search

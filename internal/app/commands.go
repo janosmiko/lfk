@@ -149,6 +149,10 @@ func openInBrowser(url string) tea.Cmd {
 	}
 }
 
+// clipboardWriteAll is a seam over clipboard.WriteAll so tests can inject a
+// fake instead of hitting the real system clipboard.
+var clipboardWriteAll = clipboard.WriteAll
+
 // copyToSystemClipboard copies text to the system clipboard.
 //
 // Backed by atotto/clipboard so macOS (pbcopy), Linux X11 (xsel/xclip),
@@ -162,7 +166,7 @@ func openInBrowser(url string) tea.Cmd {
 // useful caller message — visible to the user as a flicker.
 func copyToSystemClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
-		if err := clipboard.WriteAll(normalizeClipboardLineEndings(text, runtime.GOOS)); err != nil {
+		if err := clipboardWriteAll(normalizeClipboardLineEndings(text, runtime.GOOS)); err != nil {
 			return actionResultMsg{err: fmt.Errorf("clipboard: %w", err)}
 		}
 		return nil
