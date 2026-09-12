@@ -1,6 +1,11 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
+
+	"sigs.k8s.io/yaml"
+
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 )
@@ -36,11 +41,24 @@ func loadExportStripPrefs() k8s.TemplateStripSet {
 // preference is never worth failing a keypress over. Called from the single
 // Bubble Tea Update goroutine.
 func saveExportStripPrefs(set k8s.TemplateStripSet) {
+	path := exportStripPrefsFilePath()
+	if path == "" {
+		return
+	}
 	categories := make(map[string]bool, len(k8s.TemplateCategories))
 	for _, cat := range k8s.TemplateCategories {
 		categories[string(cat)] = set[cat]
 	}
-	if err := saveStateFile(exportStripPrefsFileName, ExportStripPrefsState{Categories: categories}); err != nil {
-		logger.Error("Failed to persist export strip prefs", "error", err)
+	data, err := yaml.Marshal(ExportStripPrefsState{Categories: categories})
+	if err != nil {
+		logger.Error("Failed to encode export strip prefs", "error", err)
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		logger.Error("Failed to create export strip prefs directory", "error", err, "path", path)
+		return
+	}
+	if err := writeFileDurable(path, data); err != nil {
+		logger.Error("Failed to persist export strip prefs", "error", err, "path", path)
 	}
 }

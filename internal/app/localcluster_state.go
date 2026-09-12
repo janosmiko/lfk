@@ -9,7 +9,9 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"sigs.k8s.io/yaml"
@@ -78,16 +80,33 @@ func loadLocalClusterState() map[string]localClusterCacheEntry {
 	return out
 }
 
-// saveLocalClusterState writes the cache durably (fsynced tmp + rename).
-// Failures are logged at the storage layer so a silent disk problem still
-// leaves a trace even if the caller discards the error.
+// saveLocalClusterState wraps each error with %w + a stage so callers see
+// "mkdir state dir: permission denied" rather than a bare "permission denied".
 func saveLocalClusterState(entries []localClusterCacheEntry) error {
-	err := saveStateFile(localClusterStateFileName, localClusterStateFile{
+	path := localClusterStateFilePath()
+	if path == "" {
+		err := errors.New("no state path: cannot resolve lfk state directory")
+		logger.Warn("local cluster state save failed", "error", err)
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		wrapped := fmt.Errorf("mkdir local-cluster state dir: %w", err)
+		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
+		return wrapped
+	}
+	data, err := yaml.Marshal(localClusterStateFile{
 		SchemaVersion: localClusterStateSchemaVersion,
 		Clusters:      entries,
 	})
 	if err != nil {
-		logger.Warn("local cluster state save failed", "error", err)
+		wrapped := fmt.Errorf("marshal local-cluster state: %w", err)
+		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
+		return wrapped
 	}
-	return err
+	if err := writeFileDurable(path, data); err != nil {
+		wrapped := fmt.Errorf("write local-cluster state: %w", err)
+		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
+		return wrapped
+	}
+	return nil
 }

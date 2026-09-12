@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"sigs.k8s.io/yaml"
 
@@ -77,11 +78,19 @@ func saveClusterColors(colors map[string]string) error {
 			return fmt.Errorf("cluster colors: unknown color %q for context %q", color, ctx)
 		}
 	}
-	if clusterColorsFilePath() == "" {
+	path := clusterColorsFilePath()
+	if path == "" {
 		return errors.New("cluster colors: cannot resolve state file path")
 	}
-	return saveStateFile(clusterColorsFileName, clusterColorsState{
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(clusterColorsState{
 		SchemaVersion: clusterColorsSchemaVersion,
 		Contexts:      colors,
 	})
+	if err != nil {
+		return err
+	}
+	return writeFileDurable(path, data)
 }

@@ -1,10 +1,13 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -45,7 +48,18 @@ func loadSecurityIgnores() *SecurityIgnoreState {
 // (fsynced tmp file, then rename) to prevent data loss if the process is
 // interrupted mid-write.
 func saveSecurityIgnores(state *SecurityIgnoreState) error {
-	return saveStateFile(securityIgnoresFileName, state)
+	path := stateFilePath(securityIgnoresFileName)
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(state)
+	if err != nil {
+		return err
+	}
+	return writeFileDurable(path, data)
 }
 
 // saveSecurityIgnoresCmd wraps saveSecurityIgnores in a tea.Cmd so the

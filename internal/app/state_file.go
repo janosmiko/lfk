@@ -43,8 +43,9 @@ func loadStateFile[T any](name string) T {
 	return v
 }
 
-// saveStateFile is a no-op (nil error) when the state dir can't be resolved,
-// matching the existing best-effort contract of the per-site save funcs.
+// saveStateFile writes plainly, no fsync: several callers run inline on
+// every keypress, and File.Sync costs tens of ms on macOS (F_FULLFSYNC). A
+// caller that needs durability calls writeFileDurable(stateFilePath(name), data).
 func saveStateFile[T any](name string, v T) error {
 	path := stateFilePath(name)
 	if path == "" {
@@ -57,5 +58,5 @@ func saveStateFile[T any](name string, v T) error {
 	if err != nil {
 		return err
 	}
-	return writeFileDurable(path, data)
+	return os.WriteFile(path, data, 0o600)
 }

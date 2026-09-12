@@ -1,6 +1,11 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
+
+	"sigs.k8s.io/yaml"
+
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -74,8 +79,21 @@ func loadWhichKeyGrouping() wkGrouping {
 // preference is never worth failing a keypress over, so every error is logged
 // and swallowed. Called from the single Bubble Tea Update goroutine.
 func saveWhichKeyGrouping(grouped bool) {
+	path := whichKeyPrefsFilePath()
+	if path == "" {
+		return
+	}
 	cfg := ui.ConfigWhichKeyGrouped
-	if err := saveStateFile(whichKeyPrefsFileName, WhichKeyPrefsState{Grouped: &grouped, ConfigDefault: &cfg}); err != nil {
-		logger.Error("Failed to persist which-key prefs", "error", err)
+	data, err := yaml.Marshal(WhichKeyPrefsState{Grouped: &grouped, ConfigDefault: &cfg})
+	if err != nil {
+		logger.Error("Failed to encode which-key prefs", "error", err)
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		logger.Error("Failed to create which-key prefs directory", "error", err, "path", path)
+		return
+	}
+	if err := writeFileDurable(path, data); err != nil {
+		logger.Error("Failed to persist which-key prefs", "error", err, "path", path)
 	}
 }
