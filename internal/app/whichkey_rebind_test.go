@@ -13,24 +13,6 @@ import (
 // habit) meets the Object Explorer's literal "r" and one of the two rows
 // becomes a lie. The sweeps below rebind on purpose.
 
-// entries lists what a catalog advertises, resolving no context. Only the
-// guards below ask what COULD be offered. The render path always resolves a
-// context first, so this stays out of the whichKeyCatalog interface itself.
-func (c wkCatalog[C]) entries() []whichKeyEntry {
-	out := make([]whichKeyEntry, 0, len(c.actions))
-	for _, a := range c.actions {
-		out = append(out, a.entry())
-	}
-	return out
-}
-
-// catalogEntries reaches entries() on a whichKeyCatalog value. entries() is
-// not part of that interface, so this asserts to the narrower one the
-// concrete catalog types satisfy.
-func catalogEntries(cat whichKeyCatalog) []whichKeyEntry {
-	return cat.(interface{ entries() []whichKeyEntry }).entries()
-}
-
 // wkCatalogFields returns the ui.Keybindings field names a catalog actually
 // reads, discovered by mutating one field at a time and watching for an entry
 // whose key moves. Derived rather than listed so a new entry is swept the day
@@ -38,7 +20,7 @@ func catalogEntries(cat whichKeyCatalog) []whichKeyEntry {
 func wkCatalogFields(cat whichKeyCatalog) []string {
 	base := ui.DefaultKeybindings()
 	rt := reflect.TypeFor[ui.Keybindings]()
-	entries := catalogEntries(cat)
+	entries := cat.entries()
 	out := make([]string, 0, rt.NumField())
 	for i := range rt.NumField() {
 		if rt.Field(i).Type.Kind() != reflect.String {
@@ -69,7 +51,7 @@ func wkCatalogLiterals(cat whichKeyCatalog) []string {
 	}
 	seen := map[string]bool{}
 	var out []string
-	for _, e := range catalogEntries(cat) {
+	for _, e := range cat.entries() {
 		k := e.Key(base)
 		if k != "" && k == e.Key(alt) && !seen[k] {
 			seen[k] = true

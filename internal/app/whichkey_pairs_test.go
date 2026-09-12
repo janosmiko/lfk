@@ -57,7 +57,7 @@ func TestWhichKeyCatalogs_PairDeclarationsAreWellFormed(t *testing.T) {
 	for _, mc := range whichKeyCatalogList {
 		t.Run(mc.name, func(t *testing.T) {
 			counts := map[string]int{}
-			for _, e := range catalogEntries(mc.catalog) {
+			for _, e := range mc.catalog.entries() {
 				if e.Pair != "" {
 					counts[e.Pair]++
 				}
@@ -82,7 +82,7 @@ func TestWhichKeyCatalogs_BidirectionalPairsAppearTogether(t *testing.T) {
 
 	for _, mc := range whichKeyCatalogList {
 		declared := map[string]int{}
-		for _, e := range catalogEntries(mc.catalog) {
+		for _, e := range mc.catalog.entries() {
 			if e.Pair != "" {
 				declared[e.Pair]++
 			}

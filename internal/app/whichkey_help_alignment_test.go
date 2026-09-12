@@ -244,7 +244,7 @@ func whichKeyRegistryGroupsByField(t *testing.T) map[string]whichKeyGroup {
 	// explorer and another in a viewer.
 	out := map[string]whichKeyGroup{}
 	for _, mc := range whichKeyCatalogList {
-		for _, e := range catalogEntries(mc.catalog) {
+		for _, e := range mc.catalog.entries() {
 			field, ok := fieldForSentinel[e.Key(kb)]
 			if !ok {
 				continue // literal key (wkLiteralKey) — no source field

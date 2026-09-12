@@ -432,7 +432,7 @@ func TestWhichKeyCatalogs_NeverAdvertiseEscOrMotions(t *testing.T) {
 					banned = append(banned, listNavigation...)
 				}
 			}
-			for _, e := range catalogEntries(mc.catalog) {
+			for _, e := range mc.catalog.entries() {
 				key := e.Key(kb)
 				if slices.Contains(banned, key) {
 					t.Errorf("entry %q is keyed to %q, which the panel must not advertise", e.Label, key)
@@ -536,7 +536,7 @@ func TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode(t *testing.T) {
 	declares := make(map[viewMode]map[string]bool, len(whichKeyCatalogList))
 	for _, mc := range whichKeyCatalogList {
 		labels := make(map[string]bool)
-		for _, e := range catalogEntries(mc.catalog) {
+		for _, e := range mc.catalog.entries() {
 			labels[e.Label] = true
 		}
 		declares[mc.mode] = labels
@@ -549,7 +549,7 @@ func TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode(t *testing.T) {
 				if other.mode == mc.mode {
 					continue
 				}
-				for _, e := range catalogEntries(other.catalog) {
+				for _, e := range other.catalog.entries() {
 					if declares[mc.mode][e.Label] {
 						continue
 					}
@@ -659,7 +659,7 @@ func TestWhichKeyCatalogs_EveryEntryIsDocumentedInItsViewHelp(t *testing.T) {
 			if len(documented) == 0 {
 				t.Fatalf("no help rows carry context %q", helpCtx)
 			}
-			for _, e := range catalogEntries(mc.catalog) {
+			for _, e := range mc.catalog.entries() {
 				key := e.Key(kb)
 				if documented[key] {
 					continue

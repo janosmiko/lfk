@@ -105,6 +105,9 @@ func wkLiteralHelpKey(kb ui.Keybindings) string {
 // Adding a viewer is a new wkCatalog value plus one row in
 // whichKeyCatalogList — no dispatch, render, sort, or guard code changes.
 type whichKeyCatalog interface {
+	// entries lists what the catalog advertises, resolving no context. Used
+	// by the drift and group guards, which ask what COULD be offered.
+	entries() []whichKeyEntry
 	// available filters the catalog against m, resolving its context once.
 	available(m *Model) []whichKeyEntry
 	// inputFocused reports whether a text input owns the keyboard right now,
@@ -124,6 +127,14 @@ type wkCatalog[C any] struct {
 	// reaches the leader dispatch.
 	input   func(m *Model) bool
 	actions []wkAction[C]
+}
+
+func (c wkCatalog[C]) entries() []whichKeyEntry {
+	out := make([]whichKeyEntry, 0, len(c.actions))
+	for _, a := range c.actions {
+		out = append(out, a.entry())
+	}
+	return out
 }
 
 func (c wkCatalog[C]) available(m *Model) []whichKeyEntry {
