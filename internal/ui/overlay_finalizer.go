@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // FinalizerMatchEntry is the UI-facing representation of a finalizer match.
@@ -120,10 +122,10 @@ func RenderFinalizerSearchOverlay(
 			prefix = "\u2713 "
 		}
 
-		ns := truncateStr(r.Namespace, nsWidth)
-		kind := truncateStr(r.Kind, kindWidth)
-		name := truncateStr(r.Name, nameWidth)
-		fin := truncateStr(r.Matched, finalizerW)
+		ns := ansi.Truncate(r.Namespace, nsWidth, "...")
+		kind := ansi.Truncate(r.Kind, kindWidth, "...")
+		name := ansi.Truncate(r.Name, nameWidth, "...")
+		fin := ansi.Truncate(r.Matched, finalizerW, "...")
 
 		lineContent := fmt.Sprintf(
 			"%s%-*s %-*s %-*s  %-*s %s",

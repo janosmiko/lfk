@@ -973,17 +973,17 @@ func TestComputeDiff(t *testing.T) {
 
 func TestTruncateToWidth(t *testing.T) {
 	t.Run("short string unchanged", func(t *testing.T) {
-		assert.Equal(t, "hello", truncateToWidth("hello", 10))
+		assert.Equal(t, "hello", Truncate("hello", 10))
 	})
 
 	t.Run("long string truncated", func(t *testing.T) {
-		result := truncateToWidth("hello world this is long", 10)
+		result := Truncate("hello world this is long", 10)
 		assert.LessOrEqual(t, len(result), 10)
 		assert.True(t, strings.HasSuffix(result, "~"))
 	})
 
 	t.Run("empty string", func(t *testing.T) {
-		assert.Equal(t, "", truncateToWidth("", 10))
+		assert.Equal(t, "", Truncate("", 10))
 	})
 }
 

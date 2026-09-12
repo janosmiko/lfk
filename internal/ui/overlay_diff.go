@@ -134,8 +134,8 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 
 	// Build header.
 	gutterPad := strings.Repeat(" ", gutterWidth)
-	leftHeader := headerNameStyle.Render(truncateToWidth(leftName, colWidth))
-	rightHeader := headerNameStyle.Render(truncateToWidth(rightName, colWidth))
+	leftHeader := headerNameStyle.Render(Truncate(leftName, colWidth))
+	rightHeader := headerNameStyle.Render(Truncate(rightName, colWidth))
 	header := gutterPad + padToWidth(leftHeader, colWidth) + separatorStyle.Render(" | ") + gutterPad + padToWidth(rightHeader, colWidth)
 
 	// Reserve lines for title, hint bar, border (top+bottom), header, and separator.
@@ -306,7 +306,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 
 		// Truncate to the content width so the border never re-wraps the line.
 		prefix, text, style := unifiedLineParts(dl, uStyles)
-		plain := truncateToWidth(prefix+text, contentWidth)
+		plain := Truncate(prefix+text, contentWidth)
 		var content string
 		switch {
 		case isSelected:
@@ -545,10 +545,10 @@ func DiffLineTextIn(rawDiffLines []diffLine, visLines []VisibleDiffLine, visible
 func applyDiffVisualSelection(leftPlain, rightPlain string, vp DiffVisualParams, visIdx, selStart, selEnd, colWidth int) (string, string) {
 	if vp.CursorSide == 0 {
 		leftResult := applyDiffVisualSide(leftPlain, vp, visIdx, selStart, selEnd)
-		rightResult := truncateToWidth(rightPlain, colWidth)
+		rightResult := Truncate(rightPlain, colWidth)
 		return leftResult, rightResult
 	}
-	leftResult := truncateToWidth(leftPlain, colWidth)
+	leftResult := Truncate(leftPlain, colWidth)
 	rightResult := applyDiffVisualSide(rightPlain, vp, visIdx, selStart, selEnd)
 	return leftResult, rightResult
 }
@@ -558,22 +558,6 @@ func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart
 	colStart := min(vp.VisualCol, vp.CursorCol)
 	colEnd := max(vp.VisualCol, vp.CursorCol)
 	return RenderVisualSelection(plainText, vp.VisualType, visIdx, selStart, selEnd, vp.VisualStart, vp.VisualCol, vp.CursorCol, colStart, colEnd)
-}
-
-// truncateToWidth truncates a string to fit within the given visual width.
-func truncateToWidth(s string, maxWidth int) string {
-	if lipgloss.Width(s) <= maxWidth {
-		return s
-	}
-	// Progressively truncate until it fits.
-	runes := []rune(s)
-	for len(runes) > 0 {
-		runes = runes[:len(runes)-1]
-		if lipgloss.Width(string(runes)) <= maxWidth-1 {
-			return string(runes) + "~"
-		}
-	}
-	return ""
 }
 
 // padToWidth pads a styled string with spaces to reach the desired visual width.

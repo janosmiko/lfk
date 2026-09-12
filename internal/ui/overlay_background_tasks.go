@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 )
@@ -145,10 +146,10 @@ func RenderBackgroundTasksOverlayWithSubtitle(rows []BackgroundTaskRow, mode Bac
 		statusText, statusStyle := bgtStatusCell(r, statusW, mode, dimStyle)
 		lastCol := bgtLastColCell(r, mode, now)
 		body := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s",
-			prioW, truncateBGT(priorityLabel(r.Priority), prioW),
-			kindW, truncateBGT(r.Kind, kindW),
-			nameW, truncateBGT(r.Name, nameW),
-			targetW, truncateBGT(r.Target, targetW),
+			prioW, ansi.Truncate(priorityLabel(r.Priority), prioW, "…"),
+			kindW, ansi.Truncate(r.Kind, kindW, "…"),
+			nameW, ansi.Truncate(r.Name, nameW, "…"),
+			targetW, ansi.Truncate(r.Target, targetW, "…"),
 			lastColW, lastCol)
 		// Queued and finished rows render dimmer than running rows so
 		// the user's eye lands on what's actively executing.
@@ -230,7 +231,7 @@ func bgtStatusCell(r BackgroundTaskRow, statusW int, mode BackgroundTaskOverlayM
 	switch r.Status {
 	case TaskStatusQueued:
 		txt := fmt.Sprintf("Queued #%d", r.Position)
-		return fmt.Sprintf("%-*s", statusW, truncateBGT(txt, statusW)), dim
+		return fmt.Sprintf("%-*s", statusW, ansi.Truncate(txt, statusW, "…")), dim
 	case TaskStatusFinished:
 		return fmt.Sprintf("%-*s", statusW, "Finished"), dim
 	default:
@@ -388,18 +389,4 @@ func formatElapsedBGT(d time.Duration) string {
 		s := int(d.Seconds()) - m*60
 		return fmt.Sprintf("%dm %ds", m, s)
 	}
-}
-
-// truncateBGT shortens a string to max runes using a UTF-8-safe slice and
-// an ellipsis. Matches the rune-based truncation pattern used in other
-// lfk renderers.
-func truncateBGT(s string, max int) string {
-	runes := []rune(s)
-	if len(runes) <= max {
-		return s
-	}
-	if max <= 1 {
-		return string(runes[:max])
-	}
-	return string(runes[:max-1]) + "\u2026"
 }

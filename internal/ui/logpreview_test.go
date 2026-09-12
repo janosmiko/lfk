@@ -328,33 +328,6 @@ func TestRenderLogPreviewPane_FooterHasNoLegend(t *testing.T) {
 	}
 }
 
-func TestTruncateKeyForPreview(t *testing.T) {
-	cases := []struct {
-		name      string
-		in        string
-		width     int
-		wantKey   string
-		wantWidth int
-	}{
-		{"short ascii fits", "level", 10, "level", 5},
-		{"exact fit", "abcde", 5, "abcde", 5},
-		{"truncates with ellipsis", "extremely_long_key_name", 18, "extremely_long_ke…", 18},
-		{"single-cell width degrades to ellipsis only", "abc", 1, "…", 1},
-		{"multibyte counted in runes", "αβγδε", 4, "αβγ…", 4},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			gotKey, gotWidth := truncateKeyForPreview(tc.in, tc.width)
-			if gotKey != tc.wantKey {
-				t.Fatalf("key = %q, want %q", gotKey, tc.wantKey)
-			}
-			if gotWidth != tc.wantWidth {
-				t.Fatalf("width = %d, want %d", gotWidth, tc.wantWidth)
-			}
-		})
-	}
-}
-
 func TestRenderLogPreviewPane_TruncatedKeyShowsEllipsis(t *testing.T) {
 	out := RenderLogPreviewPane(`{"extremely_long_key_name":"v","b":"c"}`, 40, 10, 0, false)
 	if !strings.Contains(out, "…") {

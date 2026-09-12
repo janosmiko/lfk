@@ -50,35 +50,27 @@ func TestCellPad(t *testing.T) {
 
 func TestCellTruncate(t *testing.T) {
 	cases := []struct {
-		name    string
-		s       string
-		w       int
-		want    string
-		oldSame bool
+		name string
+		s    string
+		w    int
+		want string
 	}{
-		{"plain", "hello world", 5, "hell…", true},
-		{"ansi styled", "\x1b[31mhello\x1b[m", 3, "\x1b[31mhe…\x1b[m", false},
-		{"wide", "中文字", 4, "中…", false},
-		{"fits", "hi", 5, "hi", true},
-		{"exact width", "hello", 5, "hello", true},
-		{"one cell", "hello", 1, "…", false},
-		{"zero width", "hello", 0, "", false},
-		{"negative width", "hello", -1, "", false},
-		{"empty", "", 3, "", true},
-		{"tab", "a\tbcdef", 4, "a\tbc…", false},
-		{"multibyte runes", "αβγδε", 4, "αβγ…", true},
+		{"plain", "hello world", 5, "hell…"},
+		{"ansi styled", "\x1b[31mhello\x1b[m", 3, "\x1b[31mhe…\x1b[m"},
+		{"wide", "中文字", 4, "中…"},
+		{"fits", "hi", 5, "hi"},
+		{"exact width", "hello", 5, "hello"},
+		{"one cell", "hello", 1, "…"},
+		{"zero width", "hello", 0, ""},
+		{"negative width", "hello", -1, ""},
+		{"empty", "", 3, ""},
+		{"tab", "a\tbcdef", 4, "a\tbc…"},
+		{"multibyte runes", "αβγδε", 4, "αβγ…"},
+		{"long key", "extremely_long_key_name", 18, "extremely_long_ke…"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, ansi.Truncate(tc.s, tc.w, "…"))
-			if tc.oldSame {
-				assert.Equal(t, tc.want, truncate(tc.s, tc.w))
-				assert.Equal(t, tc.want, whoCanTruncate(tc.s, tc.w))
-				assert.Equal(t, tc.want, rsTruncate(tc.s, tc.w))
-				assert.Equal(t, tc.want, truncateBGT(tc.s, tc.w))
-				key, _ := truncateKeyForPreview(tc.s, tc.w)
-				assert.Equal(t, tc.want, key)
-			}
 		})
 	}
 }
@@ -97,7 +89,6 @@ func TestCellTruncateDots(t *testing.T) {
 	}
 	for _, tc := range cases {
 		assert.Equal(t, tc.want, ansi.Truncate(tc.s, tc.w, "..."))
-		assert.Equal(t, tc.want, truncateStr(tc.s, tc.w))
 	}
 }
 

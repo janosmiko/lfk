@@ -268,10 +268,10 @@ func renderWhoCanSubjects(rows []WhoCanRow, scroll int, loading bool, resource s
 	// Truncate header labels too — at narrow widths "NAMESPACE" alone
 	// overflows nsW and pushes the row past the column's inner area.
 	colHeader := fmt.Sprintf("  %-*s  %-*s  %-*s  %-*s",
-		nameW, whoCanTruncate("SUBJECT", nameW),
-		kindW, whoCanTruncate("KIND", kindW),
-		nsW, whoCanTruncate("NAMESPACE", nsW),
-		viaW, whoCanTruncate("VIA", viaW))
+		nameW, ansi.Truncate("SUBJECT", nameW, "…"),
+		kindW, ansi.Truncate("KIND", kindW, "…"),
+		nsW, ansi.Truncate("NAMESPACE", nsW, "…"),
+		viaW, ansi.Truncate("VIA", viaW, "…"))
 	colHeaderLine := BarDimStyle.Bold(true).Render(colHeader)
 
 	bodyHeight := max(height-1, 1) // -1 for column header
@@ -305,10 +305,10 @@ func renderWhoCanRow(r WhoCanRow, nameW, kindW, nsW, viaW int) string {
 		Foreground(lipgloss.Color(ColorPrimary)).
 		Background(BaseBg).
 		Bold(true)
-	nameCell := whoCanPadCellStyled(whoCanTruncate(r.Name, nameW), nameW, nameStyle)
-	kindCell := whoCanPadCellStyled(whoCanTruncate(r.Kind, kindW), kindW, BarNormalStyle)
-	nsCell := whoCanPadCellStyled(whoCanTruncate(ns, nsW), nsW, BarNormalStyle)
-	viaCell := whoCanPadCellStyled(whoCanTruncate(r.Via, viaW), viaW, BarNormalStyle)
+	nameCell := whoCanPadCellStyled(ansi.Truncate(r.Name, nameW, "…"), nameW, nameStyle)
+	kindCell := whoCanPadCellStyled(ansi.Truncate(r.Kind, kindW, "…"), kindW, BarNormalStyle)
+	nsCell := whoCanPadCellStyled(ansi.Truncate(ns, nsW, "…"), nsW, BarNormalStyle)
+	viaCell := whoCanPadCellStyled(ansi.Truncate(r.Via, viaW, "…"), viaW, BarNormalStyle)
 	return sep + nameCell + sep + kindCell + sep + nsCell + sep + viaCell
 }
 
@@ -339,22 +339,4 @@ func whoCanFitPlaceholder(s string, width int) string {
 		return s
 	}
 	return ansi.Truncate(s, width, "")
-}
-
-// whoCanTruncate trims a plain (non-ANSI) string to maxW columns,
-// appending "…" when cut. Kept private to this file under a unique
-// name so it doesn't collide with the existing padRight in
-// explorer_format.go (which is ANSI-aware in different ways).
-func whoCanTruncate(s string, maxW int) string {
-	if maxW <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) <= maxW {
-		return s
-	}
-	if maxW <= 1 {
-		return "…"
-	}
-	return string(runes[:maxW-1]) + "…"
 }
