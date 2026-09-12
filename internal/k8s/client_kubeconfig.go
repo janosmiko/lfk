@@ -52,9 +52,9 @@ func sourcesFromPaths(paths []string) []kubeconfigSource {
 // names) still get a sensible KUBECONFIG.
 //
 // Subprocess invocations (kubectl, helm, etc.) must use this single source
-// file rather than KubeconfigPaths because clientcmd's merge collapses
-// clusters and users that share names across files — see issue #23 and
-// restConfigForContext for the in-process equivalent.
+// file because clientcmd's merge collapses clusters and users that share
+// names across files — see issue #23 and restConfigForContext for the
+// in-process equivalent.
 func (c *Client) KubeconfigPathForContext(displayName string) string {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
