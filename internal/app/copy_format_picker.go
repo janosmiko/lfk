@@ -98,7 +98,7 @@ func (m Model) applyCopyFormatPicker() (tea.Model, tea.Cmd) {
 	// (handleExplorerActionKeyCopyYAML).
 	switch format {
 	case CopyFormatTable:
-		columns := copyTableColumnsForLevel(m.nav.Level, scope)
+		columns := copyTableColumnsForLevel(scope)
 		content := BuildCopyTable(scope, columns)
 		return m, func() tea.Msg {
 			return yamlClipboardMsg{content: content, count: len(scope), format: "table"}
@@ -135,16 +135,10 @@ func (m Model) applyCopyFormatPicker() (tea.Model, tea.Cmd) {
 }
 
 // copyTableColumnsForLevel decides which columns the Table format
-// should emit for the current level. Mirrors what the explorer's
-// middle column shows: Name first, then the built-ins present in
-// items minus any the user hid, then the extras the user has visible
-// (per ui.ActiveSessionColumns) — finally reordered to match
-// ui.ActiveColumnOrder if the user reordered columns. The ui.Active*
-// globals are set on every render via applySessionColumnsForKind, so
-// reading them here returns the same column set the user just saw.
-func copyTableColumnsForLevel(level model.Level, items []model.Item) []string {
-	_ = level // reserved: a future per-level table column override (e.g., LevelClusters showing ClusterColor) would key off this param
-
+// emits: Name, then present built-ins minus hidden ones, then visible
+// extras (ui.ActiveSessionColumns), reordered per ui.ActiveColumnOrder.
+// Mirrors the explorer's middle column so the copy matches the screen.
+func copyTableColumnsForLevel(items []model.Item) []string {
 	hiddenBuiltin := ui.ActiveHiddenBuiltinColumns
 	cols := []string{"Name"}
 	addBuiltinIfPresent := func(key string, accessor func(model.Item) string) {
