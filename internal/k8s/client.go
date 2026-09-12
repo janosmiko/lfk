@@ -260,13 +260,6 @@ func (c *Client) SetSecurityManager(m *security.Manager) {
 	c.securityManager.Store(m)
 }
 
-// SecurityManager returns the wired security manager, or nil if SetSecurityManager
-// was never called. Callers that need to fetch findings for the dashboard should
-// go through this accessor rather than the unexported field.
-func (c *Client) SecurityManager() *security.Manager {
-	return c.securityManager.Load()
-}
-
 // SetIgnoreChecker installs the ignore-list filter consulted when converting
 // findings into Items. Pass nil to disable filtering.
 func (c *Client) SetIgnoreChecker(checker IgnoreChecker) {

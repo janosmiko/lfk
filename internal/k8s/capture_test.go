@@ -12,6 +12,34 @@ import (
 	"time"
 )
 
+// ActiveCount returns the number of entries in Starting or Running state.
+func (m *CaptureManager) ActiveCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, e := range m.entries {
+		if e.Status == CaptureRunning || e.Status == CaptureStarting {
+			n++
+		}
+	}
+	return n
+}
+
+// FindByPod returns the ID of the most-recent active capture matching the pod, if any.
+func (m *CaptureManager) FindByPod(kubectx, ns, pod string) (int, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, e := range m.entries {
+		if e.Status != CaptureRunning && e.Status != CaptureStarting {
+			continue
+		}
+		if e.Request.Context == kubectx && e.Request.Namespace == ns && e.Request.PodName == pod {
+			return e.ID, true
+		}
+	}
+	return 0, false
+}
+
 func TestNewCaptureManager_EmptyAtStart(t *testing.T) {
 	m := NewCaptureManager()
 	if m == nil {

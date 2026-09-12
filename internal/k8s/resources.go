@@ -3,8 +3,6 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,67 +76,4 @@ func (c *Client) GetContainers(ctx context.Context, contextName, namespace, podN
 	}
 
 	return items, nil
-}
-
-func (c *Client) GetPodSelector(ctx context.Context, contextName, namespace, kind, name string) (string, error) {
-	cs, err := c.clientsetForContext(contextName)
-	if err != nil {
-		return "", err
-	}
-
-	var labels map[string]string
-
-	switch kind {
-	case "Deployment":
-		obj, err := cs.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("getting deployment %s: %w", name, err)
-		}
-		if obj.Spec.Selector != nil {
-			labels = obj.Spec.Selector.MatchLabels
-		}
-	case "StatefulSet":
-		obj, err := cs.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("getting statefulset %s: %w", name, err)
-		}
-		if obj.Spec.Selector != nil {
-			labels = obj.Spec.Selector.MatchLabels
-		}
-	case "DaemonSet":
-		obj, err := cs.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("getting daemonset %s: %w", name, err)
-		}
-		if obj.Spec.Selector != nil {
-			labels = obj.Spec.Selector.MatchLabels
-		}
-	case "Job":
-		obj, err := cs.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("getting job %s: %w", name, err)
-		}
-		if obj.Spec.Selector != nil {
-			labels = obj.Spec.Selector.MatchLabels
-		}
-	case "Service":
-		obj, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return "", fmt.Errorf("getting service %s: %w", name, err)
-		}
-		labels = obj.Spec.Selector
-	default:
-		return "", nil
-	}
-
-	if len(labels) == 0 {
-		return "", nil
-	}
-
-	parts := make([]string, 0, len(labels))
-	for k, v := range labels {
-		parts = append(parts, k+"="+v)
-	}
-	sort.Strings(parts)
-	return strings.Join(parts, ","), nil
 }
