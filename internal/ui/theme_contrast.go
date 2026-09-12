@@ -54,8 +54,10 @@ func blendHex(base, tint string, amount float64) string {
 }
 
 // derivedParentHighlightBg blends Border toward Base until bold Text over it
-// clears the WCAG AA large-text floor (3.0:1), for a near-white "bright
-// black" theme that would otherwise collapse the two to invisibility.
+// clears the WCAG AA large-text floor (3.0:1). Border skips fg-readability
+// enforcement because it also has a decorative role on column outlines, so
+// a near-white "bright black" theme could collapse Text-on-Border to
+// invisibility.
 func derivedParentHighlightBg(t Theme) string {
 	const target = 3.0
 
@@ -90,9 +92,10 @@ func derivedParentHighlightBg(t Theme) string {
 
 // EnforceMinContrast nudges fg's HSL lightness (hue and saturation kept) to
 // meet a WCAG contrast ratio against bg. value is the normalized knob in
-// [0, 1]: 0 is off, 0.175 is the AA threshold (4.5:1), 1.0 targets 21:1 via
-// wcagTarget = 1.0 + clamp(value, 0, 1) * 20.0. An unparsable fg or bg
-// returns fg unchanged.
+// [0, 1]: 0 is off, 0.175 is the AA threshold (4.5:1), 0.3 is the AAA
+// threshold (7.0:1), 1.0 targets 21:1 via wcagTarget = 1.0 + clamp(value, 0,
+// 1) * 20.0. At value=1.0 hue collapses to achromatic black or white, an
+// accepted tradeoff. An unparsable fg or bg returns fg unchanged.
 func EnforceMinContrast(fg, bg string, value float64) string {
 	if value <= 0 {
 		return fg
