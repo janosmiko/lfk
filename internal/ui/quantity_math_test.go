@@ -1,10 +1,36 @@
 package ui
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// SnapCPU rounds CPU millicores UP to the nearest 10m and returns the
+// canonical k8s string. Inputs >= 1000m are formatted as whole-core
+// ("1", "2"); anything below uses the millicore suffix ("80m", "1240m").
+func SnapCPU(milli int64) string {
+	if milli <= 0 {
+		return "0"
+	}
+	snapped := ((milli + 9) / 10) * 10
+	if snapped >= 1000 && snapped%1000 == 0 {
+		return fmt.Sprintf("%d", snapped/1000)
+	}
+	return fmt.Sprintf("%dm", snapped)
+}
+
+// SnapMem rounds memory bytes UP to the nearest Mi and returns the
+// canonical k8s string ("Mi" suffix). Anything below 1Mi snaps up to "1Mi".
+func SnapMem(bytes int64) string {
+	if bytes <= 0 {
+		return "0"
+	}
+	const mi = 1024 * 1024
+	mibs := (bytes + mi - 1) / mi
+	return fmt.Sprintf("%dMi", mibs)
+}
 
 func TestSnapCPU(t *testing.T) {
 	cases := []struct {
