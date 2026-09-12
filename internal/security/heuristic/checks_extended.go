@@ -185,13 +185,6 @@ var secretEnvExempt = []string{
 // trigger rolling restarts.
 var secretEnvExemptPrefixes = []string{"STAKATER_"}
 
-// checkSecretEnv is the default-configured, test-only variant. Fetch
-// dispatches checkSecretEnvWith with the source's configured patterns
-// instead of going through allChecks.
-func checkSecretEnv(pod *corev1.Pod, c corev1.Container) []security.Finding {
-	return checkSecretEnvWith(pod, c, nil, nil)
-}
-
 // checkSecretEnvWith flags env vars whose name looks like a credential but
 // whose value is a literal in the pod spec instead of a secretKeyRef. The
 // summary lists names only — never the values. Include/exclude are
