@@ -372,9 +372,9 @@ func buildThemeStyles(t Theme) {
 		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
 		wkOrange = EnforceMinContrast(wkOrange, t.Base, ConfigMinContrastRatio)
 	}
-	// No Background here: the panel paints its own
-	// background per render from BaseBg, which also tracks the transparency
-	// setting, so baking one in would double-set it.
+	// No Background here: the panel paints its own background per render from
+	// BaseBg, which also tracks the transparency setting, so baking one in
+	// would double-set it.
 	WhichKeyKeyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
 	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
 	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))

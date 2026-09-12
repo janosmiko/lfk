@@ -1,9 +1,5 @@
 package ui
 
-import (
-	"charm.land/lipgloss/v2"
-)
-
 // applyNoColorTheme rebuilds the styles from an empty Theme. An empty color
 // string is NoColor{} in lipgloss, so no style can keep a color by being missed.
 func applyNoColorTheme() {
@@ -24,12 +20,6 @@ func applyNoColorTheme() {
 	ColorSurface = ""
 
 	buildThemeStyles(Theme{})
-
-	// FillLinesBg skips the fill only for the NoColor type itself.
-	none := lipgloss.NoColor{}
-	BaseBg = none
-	BarBg = none
-	SurfaceBg = none
 
 	ActiveColumnStyle = ActiveColumnStyle.Bold(true)
 	SelectedStyle = SelectedStyle.Reverse(true)
