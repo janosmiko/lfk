@@ -7,10 +7,7 @@ import (
 )
 
 // innerPanelStyle is used for the content panel inside the help overlay.
-var innerPanelStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color(ColorBorder)).
-	Padding(0, 1)
+var innerPanelStyle lipgloss.Style
 
 // helpEntry holds a single keybinding entry.
 type helpEntry struct {
