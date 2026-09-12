@@ -9,19 +9,19 @@ func AllKinds() []ProfileKind {
 func ParserFor(kind ProfileKind) Parser {
 	switch kind {
 	case ProfileTraefikJSON:
-		return NewTraefikJSONParser()
+		return traefikParser{}
 	case ProfileIngressNginx:
-		return NewIngressNginxParser()
+		return ingressNginxParser{}
 	case ProfileNginx:
-		return NewNginxParser()
+		return nginxParser{}
 	case ProfileEnvoy:
-		return NewEnvoyParser()
+		return envoyParser{}
 	case ProfileLogfmt:
-		return NewLogfmtParser()
+		return logfmtParser{}
 	case ProfileJSON:
-		return NewJSONParser()
+		return jsonParser{}
 	default:
-		return NewJSONParser()
+		return jsonParser{}
 	}
 }
 
