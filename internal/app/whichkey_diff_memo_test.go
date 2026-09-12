@@ -10,7 +10,7 @@ import (
 
 // wkDiffBenchModel is a diff viewer holding two manifests of a size the app
 // really opens (a ~400-line rendered Deployment against its live copy), with
-// enough unchanged runs to make folds real. computeDiff is O(nxm), so the cost
+// enough unchanged runs to make folds real. ComputeDiffLines is O(nxm), so the cost
 // this measures grows quadratically with the document — a 40-line fixture
 // would hide the whole finding.
 func wkDiffBenchModel() Model {
