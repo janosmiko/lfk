@@ -3,56 +3,9 @@ package ui
 import (
 	"fmt"
 	"math"
-	"strconv"
+
+	"github.com/lucasb-eyer/go-colorful"
 )
-
-// parseHexColor parses a CSS hex color string ("#rrggbb" or "#rgb") and
-// returns the RGB components in [0, 1]. Returns ok=false for any unrecognised
-// input (named colors, malformed strings, wrong length) so callers can decide
-// to leave the original color unchanged rather than crash.
-func parseHexColor(s string) (r, g, b float64, ok bool) {
-	if len(s) == 0 || s[0] != '#' {
-		return 0, 0, 0, false
-	}
-	hex := s[1:]
-	switch len(hex) {
-	case 3:
-		// Expand #rgb -> #rrggbb
-		hex = string([]byte{hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]})
-	case 6:
-		// Already the right length.
-	default:
-		return 0, 0, 0, false
-	}
-	ri, err := strconv.ParseInt(hex[0:2], 16, 32)
-	if err != nil {
-		return 0, 0, 0, false
-	}
-	gi, err := strconv.ParseInt(hex[2:4], 16, 32)
-	if err != nil {
-		return 0, 0, 0, false
-	}
-	bi, err := strconv.ParseInt(hex[4:6], 16, 32)
-	if err != nil {
-		return 0, 0, 0, false
-	}
-	return float64(ri) / 255.0, float64(gi) / 255.0, float64(bi) / 255.0, true
-}
-
-// formatHexColor converts RGB components in [0, 1] to a lowercase "#rrggbb"
-// CSS hex string. Values outside [0, 1] are clamped.
-func formatHexColor(r, g, b float64) string {
-	clamp := func(v float64) int {
-		if v < 0 {
-			return 0
-		}
-		if v > 1 {
-			return 255
-		}
-		return int(math.Round(v * 255))
-	}
-	return fmt.Sprintf("#%02x%02x%02x", clamp(r), clamp(g), clamp(b))
-}
 
 // linearize converts a single sRGB channel value in [0, 1] to linear light
 // using the WCAG-specified sRGB piecewise function.
@@ -78,129 +31,43 @@ func contrastRatio(l1, l2 float64) float64 {
 	return (lighter + 0.05) / (darker + 0.05)
 }
 
-// rgbToHSL converts an sRGB color (components in [0, 1]) to HSL where:
-//   - h is in [0, 1] representing degrees [0, 360)
-//   - s is in [0, 1]
-//   - l is in [0, 1]
-func rgbToHSL(r, g, b float64) (h, s, l float64) {
-	max := math.Max(r, math.Max(g, b))
-	min := math.Min(r, math.Min(g, b))
-	l = (max + min) / 2.0
-	if max == min {
-		// Achromatic.
-		return 0, 0, l
-	}
-	d := max - min
-	if l > 0.5 {
-		s = d / (2.0 - max - min)
-	} else {
-		s = d / (max + min)
-	}
-	switch max {
-	case r:
-		h = (g - b) / d
-		if g < b {
-			h += 6
-		}
-	case g:
-		h = (b-r)/d + 2
-	default: // b
-		h = (r-g)/d + 4
-	}
-	h /= 6
-	return h, s, l
-}
-
-// hslToRGB converts an HSL color (h in [0,1], s in [0,1], l in [0,1]) to sRGB.
-func hslToRGB(h, s, l float64) (r, g, b float64) {
-	if s == 0 {
-		// Achromatic.
-		return l, l, l
-	}
-	hue2rgb := func(p, q, t float64) float64 {
-		if t < 0 {
-			t += 1
-		}
-		if t > 1 {
-			t -= 1
-		}
-		switch {
-		case t < 1.0/6.0:
-			return p + (q-p)*6*t
-		case t < 1.0/2.0:
-			return q
-		case t < 2.0/3.0:
-			return p + (q-p)*(2.0/3.0-t)*6
-		default:
-			return p
-		}
-	}
-	var q float64
-	if l < 0.5 {
-		q = l * (1 + s)
-	} else {
-		q = l + s - l*s
-	}
-	p := 2*l - q
-	r = hue2rgb(p, q, h+1.0/3.0)
-	g = hue2rgb(p, q, h)
-	b = hue2rgb(p, q, h-1.0/3.0)
-	return r, g, b
-}
-
 // rowTintBgBlend is how far a row-tint background moves from the theme base
 // toward the severity color: strong enough to read as a tint, muted enough
 // that the selection highlight stays clearly distinct (issue #540).
 const rowTintBgBlend = 0.22
 
-// rowTintCursorBlend is how far the cursor row's background moves from the
-// status-tint background toward the selection background, so a selected tinted
-// row reads as both "failed" (status hue) and "cursor" (selection hue) instead
-// of losing the cursor highlight (issue #540 UAT).
+// rowTintCursorBlend keeps a selected tinted row reading as both "failed"
+// and "cursor" instead of losing the cursor highlight (issue #540 UAT).
 const rowTintCursorBlend = 0.5
 
-// blendHexToward linearly blends base toward tint by amount (0 = base,
-// 1 = tint), returning a hex color. Unparsable inputs return tint unchanged.
-func blendHexToward(base, tint string, amount float64) string {
-	br, bg, bb, okB := parseHexColor(base)
-	tr, tg, tb, okT := parseHexColor(tint)
-	if !okB || !okT {
+// blendHex blends base toward tint by amount (0 = base, 1 = tint).
+// Unparsable inputs return tint unchanged.
+func blendHex(base, tint string, amount float64) string {
+	baseCol, errBase := colorful.Hex(base)
+	tintCol, errTint := colorful.Hex(tint)
+	if errBase != nil || errTint != nil {
 		return tint
 	}
-	lerp := func(a, b float64) float64 { return a*(1-amount) + b*amount }
-	return fmt.Sprintf("#%02x%02x%02x", int(lerp(br, tr)*255), int(lerp(bg, tg)*255), int(lerp(bb, tb)*255))
+	c := baseCol.BlendRgb(tintCol, amount)
+	// Truncates rather than rounds so existing theme colors stay byte-identical.
+	return fmt.Sprintf("#%02x%02x%02x", uint8(c.R*255), uint8(c.G*255), uint8(c.B*255))
 }
 
-// derivedParentHighlightBg returns the background color to use for
-// ParentHighlightStyle (the LEFT pane's selected-row highlight, which
-// renders bold Text on top of the returned color).
-//
-// In most themes Border is a subtle mid-luminance color (terminal
-// "bright black"), giving Text-on-Border enough contrast to read. A
-// few themes (e.g. synthwave-everything) set their bright-black
-// palette entry to a near-white color, which collapses Text-on-Border
-// into invisibility. Border itself is intentionally not subject to
-// fg-readability enforcement because it has a decorative role on
-// column outlines — pushing it toward the foreground spectrum makes
-// other things unreadable. Instead we pick a substitute bg here:
-// blend Border toward Base via binary search until Text-on-bg meets
-// the WCAG AA large-text contrast floor (3.0:1).
-//
-// When Text-on-Border already clears the floor, Border is returned
-// unchanged so themes that work today keep their designer-chosen
-// highlight color.
+// derivedParentHighlightBg blends Border toward Base until bold Text over it
+// clears the WCAG AA large-text floor (3.0:1), for a near-white "bright
+// black" theme that would otherwise collapse the two to invisibility.
 func derivedParentHighlightBg(t Theme) string {
 	const target = 3.0
 
-	tr, tg, tb, okT := parseHexColor(t.Text)
-	br, bg, bb, okB := parseHexColor(t.Border)
-	baseR, baseG, baseB, okBase := parseHexColor(t.Base)
-	if !okT || !okB || !okBase {
+	textCol, errText := colorful.Hex(t.Text)
+	borderCol, errBorder := colorful.Hex(t.Border)
+	baseCol, errBase := colorful.Hex(t.Base)
+	if errText != nil || errBorder != nil || errBase != nil {
 		return t.Border
 	}
 
-	lText := relativeLuminance(tr, tg, tb)
-	if contrastRatio(lText, relativeLuminance(br, bg, bb)) >= target {
+	lText := relativeLuminance(textCol.R, textCol.G, textCol.B)
+	if contrastRatio(lText, relativeLuminance(borderCol.R, borderCol.G, borderCol.B)) >= target {
 		return t.Border
 	}
 
@@ -208,54 +75,35 @@ func derivedParentHighlightBg(t Theme) string {
 	// 30 iterations converges to far below 1/255 in each channel, more
 	// precision than hex-truncation can represent.
 	const iterations = 30
-	lerp := func(a, b, t float64) float64 { return a*(1-t) + b*t }
 	lo, hi := 0.0, 1.0
 	for range iterations {
 		mid := (lo + hi) / 2.0
-		r := lerp(br, baseR, mid)
-		g := lerp(bg, baseG, mid)
-		b := lerp(bb, baseB, mid)
-		if contrastRatio(lText, relativeLuminance(r, g, b)) >= target {
+		blended := borderCol.BlendRgb(baseCol, mid)
+		if contrastRatio(lText, relativeLuminance(blended.R, blended.G, blended.B)) >= target {
 			hi = mid
 		} else {
 			lo = mid
 		}
 	}
-	r := lerp(br, baseR, hi)
-	g := lerp(bg, baseG, hi)
-	b := lerp(bb, baseB, hi)
-	return formatHexColor(r, g, b)
+	return borderCol.BlendRgb(baseCol, hi).Hex()
 }
 
-// EnforceMinContrast nudges the fg hex color's HSL lightness so it meets a
-// minimum WCAG contrast ratio against the bg hex color. The value parameter is
-// the user-facing normalized knob in [0, 1]:
-//
-//   - 0.0  = off (no-op, returns fg unchanged)
-//   - 0.175 approx = WCAG AA threshold (4.5:1) for normal text
-//   - 0.3   approx = WCAG AAA threshold (7.0:1)
-//   - 1.0   = maximum (targets 21:1, forces fg toward pure black or white)
-//
-// The mapping is: wcagTarget = 1.0 + clamp(value, 0, 1) * 20.0
-//
-// Only the HSL lightness channel is adjusted. Hue and saturation are
-// preserved, so chromatic colors keep their identity at moderate values.
-// At value=1.0 the extremes (L=0 or L=1) are achromatic by definition —
-// hue collapse at max value is an acceptable and documented trade-off.
-//
-// If fg or bg fails parseHexColor (named color, malformed, empty) the
-// original fg is returned unchanged, never panicking.
+// EnforceMinContrast nudges fg's HSL lightness (hue and saturation kept) to
+// meet a WCAG contrast ratio against bg. value is the normalized knob in
+// [0, 1]: 0 is off, 0.175 is the AA threshold (4.5:1), 1.0 targets 21:1 via
+// wcagTarget = 1.0 + clamp(value, 0, 1) * 20.0. An unparsable fg or bg
+// returns fg unchanged.
 func EnforceMinContrast(fg, bg string, value float64) string {
 	if value <= 0 {
 		return fg
 	}
 
-	fgR, fgG, fgB, ok := parseHexColor(fg)
-	if !ok {
+	fgCol, err := colorful.Hex(fg)
+	if err != nil {
 		return fg
 	}
-	bgR, bgG, bgB, ok := parseHexColor(bg)
-	if !ok {
+	bgCol, err := colorful.Hex(bg)
+	if err != nil {
 		return fg
 	}
 
@@ -271,8 +119,8 @@ func EnforceMinContrast(fg, bg string, value float64) string {
 
 	target := 1.0 + clamp01(value)*20.0
 
-	lFg := relativeLuminance(fgR, fgG, fgB)
-	lBg := relativeLuminance(bgR, bgG, bgB)
+	lFg := relativeLuminance(fgCol.R, fgCol.G, fgCol.B)
+	lBg := relativeLuminance(bgCol.R, bgCol.G, bgCol.B)
 
 	if contrastRatio(lFg, lBg) >= target {
 		return fg
@@ -293,7 +141,7 @@ func EnforceMinContrast(fg, bg string, value float64) string {
 		goLighter = lBg < 0.179
 	}
 
-	h, s, l := rgbToHSL(fgR, fgG, fgB)
+	h, s, l := fgCol.Hsl()
 
 	// Binary search over lightness in [0, 1] for 40 iterations. This is more
 	// than enough for convergence to well under 0.001 precision in L.
@@ -305,11 +153,10 @@ func EnforceMinContrast(fg, bg string, value float64) string {
 		lo, hi = 0.0, l
 	}
 
-	for i := range iterations {
-		_ = i
+	for range iterations {
 		mid := (lo + hi) / 2.0
-		cr, cg, cb := hslToRGB(h, s, mid)
-		lMid := relativeLuminance(cr, cg, cb)
+		midCol := colorful.Hsl(h, s, mid)
+		lMid := relativeLuminance(midCol.R, midCol.G, midCol.B)
 		if contrastRatio(lMid, lBg) >= target {
 			if goLighter {
 				hi = mid // can go darker while still meeting target
@@ -335,6 +182,5 @@ func EnforceMinContrast(fg, bg string, value float64) string {
 		finalL = lo
 	}
 
-	nr, ng, nb := hslToRGB(h, s, finalL)
-	return formatHexColor(nr, ng, nb)
+	return colorful.Hsl(h, s, finalL).Hex()
 }
