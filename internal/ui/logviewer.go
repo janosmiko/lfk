@@ -349,7 +349,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 				// In visual mode, don't overlay block cursor on visual selection styling.
 				line = YamlCursorIndicatorStyle.Render("\u258e") + line
 			} else {
-				cursorLine := RenderCursorAtCol(line, lines[i], visualCurCol)
+				cursorLine := RenderCursorAtCol(line, visualCurCol)
 				if lineNumbers {
 					numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
 					cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
@@ -449,7 +449,7 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 				if isSelected {
 					wl = YamlCursorIndicatorStyle.Render("\u258e") + wl
 				} else {
-					cursorLine := RenderCursorAtCol(wl, lines[i], visualCurCol)
+					cursorLine := RenderCursorAtCol(wl, visualCurCol)
 					if lineNumbers {
 						numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
 						cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine

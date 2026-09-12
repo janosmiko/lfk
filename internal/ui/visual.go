@@ -8,22 +8,15 @@ import (
 // CursorBlockStyle is the reverse-video style used to render a block cursor at a column position.
 var CursorBlockStyle = lipgloss.NewStyle().Reverse(true)
 
-// RenderCursorAtCol renders a block cursor at the given visual column within a
-// line. If the column is at or beyond the line's visual width, the cursor is
-// shown as a highlighted space appended to the line. styledLine is the source
-// of truth for both visual width and the rendered body — it carries the
-// already-applied YAML syntax highlighting / diff coloring / log producer
-// ANSI codes that we need to preserve around the cursor. plainLine is kept
-// as a parameter for legacy call sites. The function no longer reads it
-// because slicing plainLine destroyed any styling around the cursor row
-// (matched lines lost their YAML colors the moment the cursor sat on them).
-// When the cursor is at a negative column the styled line is returned as-is.
+// RenderCursorAtCol renders a block cursor at the given visual column of
+// styledLine, which carries any already-applied ANSI styling (YAML/diff/log
+// colors) that must survive around the cursor. Negative col returns the
+// line as-is; col past the visual width appends a highlighted space.
 //
 // The split is ANSI-aware: rune-indexing across an SGR sequence would land
 // the cursor on the ESC byte or a payload digit, and lipgloss strips bare
-// ESC bytes when wrapping content with reverse-video codes. The remaining
-// "[NNm" payload then leaks as literal text in front of the line.
-func RenderCursorAtCol(styledLine, _ string, col int) string {
+// ESC bytes when wrapping content with reverse-video codes.
+func RenderCursorAtCol(styledLine string, col int) string {
 	if col < 0 {
 		return styledLine
 	}

@@ -254,9 +254,9 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			// Block cursor on cursor line (non-visual mode).
 			if isCursorLine && !vp.VisualMode {
 				if vp.CursorSide == 0 {
-					leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
+					leftText = RenderCursorAtCol(leftText, vp.CursorCol)
 				} else {
-					rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
+					rightText = RenderCursorAtCol(rightText, vp.CursorCol)
 				}
 			}
 			leftCol = leftText
@@ -277,7 +277,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 				leftText = removedStyle.Render(truncateToWidth(dl.left, colWidth))
 			}
 			if isCursorLine && !vp.VisualMode && vp.CursorSide == 0 {
-				leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
+				leftText = RenderCursorAtCol(leftText, vp.CursorCol)
 			}
 			leftCol = leftText
 			rightCol = ""
@@ -296,7 +296,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 				rightText = addedStyle.Render(truncateToWidth(dl.right, colWidth))
 			}
 			if isCursorLine && !vp.VisualMode && vp.CursorSide == 1 {
-				rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
+				rightText = RenderCursorAtCol(rightText, vp.CursorCol)
 			}
 			leftCol = ""
 			rightCol = rightText
