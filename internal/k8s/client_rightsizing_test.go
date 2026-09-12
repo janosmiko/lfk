@@ -634,3 +634,24 @@ func TestAvailableRightsizingStrategies_DiscoveredPrometheus(t *testing.T) {
 		assert.Equal(t, []model.RightsizingStrategy{model.StrategySnapshot}, got)
 	})
 }
+
+func TestScaleQuantityByHeadroom(t *testing.T) {
+	cases := []struct {
+		name     string
+		q        string
+		headroom float64
+		want     string
+	}{
+		{name: "empty quantity returns empty", q: "", headroom: 2.0, want: ""},
+		{name: "headroom 1 returns input unchanged", q: "100m", headroom: 1, want: "100m"},
+		{name: "unparseable quantity returns input unchanged", q: "not-a-quantity", headroom: 2.0, want: "not-a-quantity"},
+		{name: "CPU quantity scales and snaps to milli suffix", q: "100m", headroom: 2.0, want: "200m"},
+		{name: "memory quantity scales and snaps to Mi suffix", q: "100Mi", headroom: 2.0, want: "200Mi"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, scaleQuantityByHeadroom(tc.q, tc.headroom))
+		})
+	}
+}
