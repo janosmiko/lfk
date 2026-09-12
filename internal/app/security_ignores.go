@@ -1,17 +1,15 @@
 package app
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"sigs.k8s.io/yaml"
 
-	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+const securityIgnoresFileName = "security_ignores.yaml"
 
 // SecurityIgnoreRule represents a single ignore entry. Scope is determined by
 // which of Namespace / Resource are set, in order of increasing specificity:
@@ -33,107 +31,21 @@ type SecurityIgnoreState struct {
 	Contexts map[string][]SecurityIgnoreRule `json:"contexts" yaml:"contexts"`
 }
 
-// securityIgnoresFilePath returns the path to the security ignores file.
-// Uses $XDG_STATE_HOME/lfk/ (defaults to ~/.local/state/lfk/) per XDG specification.
-func securityIgnoresFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
-	}
-	return filepath.Join(stateDir, "lfk", "security_ignores.yaml")
-}
-
 // loadSecurityIgnores reads ignore rules from the YAML file on disk.
 // Returns an empty state (never nil) if the file is missing or corrupt.
 func loadSecurityIgnores() *SecurityIgnoreState {
-	path := securityIgnoresFilePath()
-	if path == "" {
-		return &SecurityIgnoreState{Contexts: make(map[string][]SecurityIgnoreRule)}
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil || len(data) == 0 {
-		return &SecurityIgnoreState{Contexts: make(map[string][]SecurityIgnoreRule)}
-	}
-
-	var state SecurityIgnoreState
-	if err := yaml.Unmarshal(data, &state); err != nil {
-		logger.Info("Failed to parse security ignores file", "path", path, "error", err)
-		return &SecurityIgnoreState{Contexts: make(map[string][]SecurityIgnoreRule)}
-	}
-
+	state := loadStateFile[SecurityIgnoreState](securityIgnoresFileName)
 	if state.Contexts == nil {
 		state.Contexts = make(map[string][]SecurityIgnoreRule)
 	}
-
 	return &state
 }
 
-// saveSecurityIgnores writes ignore rules to the YAML file on disk using an
-// atomic write (write to temp file, fsync, then rename) to prevent data loss
-// if the process is interrupted mid-write.
+// saveSecurityIgnores writes ignore rules to the YAML file on disk durably
+// (fsynced tmp file, then rename) to prevent data loss if the process is
+// interrupted mid-write.
 func saveSecurityIgnores(state *SecurityIgnoreState) error {
-	path := securityIgnoresFilePath()
-	if path == "" {
-		return nil
-	}
-
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-
-	data, err := yaml.Marshal(state)
-	if err != nil {
-		return err
-	}
-
-	// Atomic write: write to a temp file in the same directory, fsync, then rename.
-	tmp, err := os.CreateTemp(dir, ".security_ignores-*.yaml.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	// Fsync to ensure data is flushed to stable storage before rename.
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	// Fsync the parent directory so the rename itself is durable; without
-	// this, a crash immediately after rename can lose the new directory
-	// entry even though the file contents are already on stable storage.
-	dirFd, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	syncErr := dirFd.Sync()
-	closeErr := dirFd.Close()
-	if syncErr != nil {
-		return syncErr
-	}
-	return closeErr
+	return saveStateFile(securityIgnoresFileName, state)
 }
 
 // saveSecurityIgnoresCmd wraps saveSecurityIgnores in a tea.Cmd so the

@@ -1,15 +1,11 @@
 package app
 
 import (
-	"os"
-	"path/filepath"
-
-	"sigs.k8s.io/yaml"
-
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+const whichKeyPrefsFileName = "whichkey_prefs.yaml"
 
 // WhichKeyPrefsState is the on-disk schema for the which-key panel's entry
 // order, written to the state directory rather than to config.yaml: config is
@@ -29,11 +25,7 @@ type WhichKeyPrefsState struct {
 
 // whichKeyPrefsFilePath returns the path to the which-key prefs state file.
 func whichKeyPrefsFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "whichkey_prefs.yaml")
+	return stateFilePath(whichKeyPrefsFileName)
 }
 
 // loadWhichKeyPrefs reads the state file, returning a zero value (every field
@@ -41,23 +33,7 @@ func whichKeyPrefsFilePath() string {
 // user-visible on-disk schema has to survive being edited by hand, so nothing
 // here is ever fatal.
 func loadWhichKeyPrefs() WhichKeyPrefsState {
-	path := whichKeyPrefsFilePath()
-	if path == "" {
-		return WhichKeyPrefsState{}
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read which-key prefs state", "error", err, "path", path)
-		}
-		return WhichKeyPrefsState{}
-	}
-	var s WhichKeyPrefsState
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Which-key prefs file is corrupt; ignoring", "error", err, "path", path)
-		return WhichKeyPrefsState{}
-	}
-	return s
+	return loadStateFile[WhichKeyPrefsState](whichKeyPrefsFileName)
 }
 
 // loadWhichKeyGrouping resolves the startup entry order.
@@ -98,21 +74,8 @@ func loadWhichKeyGrouping() wkGrouping {
 // preference is never worth failing a keypress over, so every error is logged
 // and swallowed. Called from the single Bubble Tea Update goroutine.
 func saveWhichKeyGrouping(grouped bool) {
-	path := whichKeyPrefsFilePath()
-	if path == "" {
-		return
-	}
 	cfg := ui.ConfigWhichKeyGrouped
-	data, err := yaml.Marshal(WhichKeyPrefsState{Grouped: &grouped, ConfigDefault: &cfg})
-	if err != nil {
-		logger.Error("Failed to encode which-key prefs", "error", err)
-		return
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		logger.Error("Failed to create which-key prefs directory", "error", err, "path", path)
-		return
-	}
-	if err := writeFileDurable(path, data); err != nil {
-		logger.Error("Failed to persist which-key prefs", "error", err, "path", path)
+	if err := saveStateFile(whichKeyPrefsFileName, WhichKeyPrefsState{Grouped: &grouped, ConfigDefault: &cfg}); err != nil {
+		logger.Error("Failed to persist which-key prefs", "error", err)
 	}
 }

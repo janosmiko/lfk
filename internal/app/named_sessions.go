@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // NamedSession is a whole-workspace snapshot saved under a user name. State is
@@ -50,11 +49,7 @@ func sanitizeSessionName(name string) string {
 }
 
 func namedSessionsDir() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "sessions")
+	return stateFilePath("sessions")
 }
 
 func namedSessionPath(name string) string {

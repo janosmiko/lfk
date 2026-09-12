@@ -1,15 +1,12 @@
 package app
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
+
+const sortMemoryFileName = "sort_memory.yaml"
 
 // persistedSortPref is the on-disk form of sortPref. sortPref's fields are
 // unexported (so they never leak across packages); this mirror exposes them for
@@ -30,11 +27,7 @@ type SortMemoryState struct {
 
 // sortMemoryFilePath returns the path to the sort-memory state file.
 func sortMemoryFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "sort_memory.yaml")
+	return stateFilePath(sortMemoryFileName)
 }
 
 // sortMemoryToState converts the in-memory "context\x00gvr" keyed map into the
@@ -69,39 +62,12 @@ func sortMemoryFromState(s SortMemoryState) map[string]sortPref {
 // loadSortMemory reads remembered sort preferences from disk, returning an empty
 // (never nil) map when the file is missing or corrupt.
 func loadSortMemory() map[string]sortPref {
-	path := sortMemoryFilePath()
-	if path == "" {
-		return make(map[string]sortPref)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read sort-memory state", "error", err, "path", path)
-		}
-		return make(map[string]sortPref)
-	}
-	var s SortMemoryState
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Sort-memory file is corrupt; starting fresh", "error", err, "path", path)
-		return make(map[string]sortPref)
-	}
-	return sortMemoryFromState(s)
+	return sortMemoryFromState(loadStateFile[SortMemoryState](sortMemoryFileName))
 }
 
 // saveSortMemory writes remembered sort preferences to disk.
 func saveSortMemory(mem map[string]sortPref) error {
-	path := sortMemoryFilePath()
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(sortMemoryToState(mem))
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+	return saveStateFile(sortMemoryFileName, sortMemoryToState(mem))
 }
 
 // persistRememberedSort writes a single remembered sort pref to disk, merging it
