@@ -989,13 +989,13 @@ func TestTruncateToWidth(t *testing.T) {
 
 func TestPadToWidth(t *testing.T) {
 	t.Run("short string padded", func(t *testing.T) {
-		result := padToWidth("hi", 10)
+		result := padRight("hi", 10)
 		assert.Equal(t, 10, len(result))
 		assert.True(t, strings.HasPrefix(result, "hi"))
 	})
 
 	t.Run("exact width unchanged", func(t *testing.T) {
-		result := padToWidth("1234567890", 10)
+		result := padRight("1234567890", 10)
 		assert.Equal(t, "1234567890", result)
 	})
 }

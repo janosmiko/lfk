@@ -15,35 +15,26 @@ const styledDot = "\x1b[31m●\x1b[m"
 
 func TestCellPad(t *testing.T) {
 	cases := []struct {
-		name       string
-		s          string
-		w          int
-		wantRight  string
-		wantLeft   string
-		oldDiffers bool
+		name      string
+		s         string
+		w         int
+		wantRight string
+		wantLeft  string
 	}{
-		{"plain", "ab", 5, "ab   ", "   ab", false},
-		{"ansi styled", styledDot, 3, styledDot + "  ", "  " + styledDot, false},
-		{"wide", "中", 4, "中  ", "  中", false},
-		{"too long", "hello world", 5, "hello world", "hello world", false},
-		{"exact width", "hello", 5, "hello", "hello", false},
-		{"zero width", "ab", 0, "ab", "ab", false},
-		{"negative width", "ab", -1, "ab", "ab", false},
-		{"empty", "", 3, "   ", "   ", false},
-		{"tab", "a\tb", 6, "a    b", "a    b", true},
+		{"plain", "ab", 5, "ab   ", "   ab"},
+		{"ansi styled", styledDot, 3, styledDot + "  ", "  " + styledDot},
+		{"wide", "中", 4, "中  ", "  中"},
+		{"too long", "hello world", 5, "hello world", "hello world"},
+		{"exact width", "hello", 5, "hello", "hello"},
+		{"zero width", "ab", 0, "ab", "ab"},
+		{"negative width", "ab", -1, "ab", "ab"},
+		{"empty", "", 3, "   ", "   "},
+		{"tab", "a\tb", 6, "a\tb    ", "    a\tb"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			right := lipgloss.NewStyle().Inline(true).Width(tc.w).Render(tc.s)
-			left := lipgloss.NewStyle().Inline(true).Width(tc.w).Align(lipgloss.Right).Render(tc.s)
-			assert.Equal(t, tc.wantRight, right)
-			assert.Equal(t, tc.wantLeft, left)
-			if !tc.oldDiffers {
-				assert.Equal(t, tc.wantRight, padRight(tc.s, tc.w))
-				assert.Equal(t, tc.wantRight, padToWidth(tc.s, tc.w))
-				assert.Equal(t, tc.wantLeft, padLeft(tc.s, tc.w))
-				assert.Equal(t, tc.wantLeft, padKeyLeft(tc.s, tc.w))
-			}
+			assert.Equal(t, tc.wantRight, padRight(tc.s, tc.w))
+			assert.Equal(t, tc.wantLeft, padLeft(tc.s, tc.w))
 		})
 	}
 }

@@ -136,7 +136,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	gutterPad := strings.Repeat(" ", gutterWidth)
 	leftHeader := headerNameStyle.Render(Truncate(leftName, colWidth))
 	rightHeader := headerNameStyle.Render(Truncate(rightName, colWidth))
-	header := gutterPad + padToWidth(leftHeader, colWidth) + separatorStyle.Render(" | ") + gutterPad + padToWidth(rightHeader, colWidth)
+	header := gutterPad + padRight(leftHeader, colWidth) + separatorStyle.Render(" | ") + gutterPad + padRight(rightHeader, colWidth)
 
 	// Reserve lines for title, hint bar, border (top+bottom), header, and separator.
 	maxLines := max(height-6, 3)
@@ -558,15 +558,6 @@ func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart
 	colStart := min(vp.VisualCol, vp.CursorCol)
 	colEnd := max(vp.VisualCol, vp.CursorCol)
 	return RenderVisualSelection(plainText, vp.VisualType, visIdx, selStart, selEnd, vp.VisualStart, vp.VisualCol, vp.CursorCol, colStart, colEnd)
-}
-
-// padToWidth pads a styled string with spaces to reach the desired visual width.
-func padToWidth(s string, targetWidth int) string {
-	w := lipgloss.Width(s)
-	if w >= targetWidth {
-		return s
-	}
-	return s + strings.Repeat(" ", targetWidth-w)
 }
 
 // PlaceOverlayBottom anchors an overlay near the bottom edge of the background,

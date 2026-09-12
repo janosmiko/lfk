@@ -912,7 +912,7 @@ func TestStyleHelpKeyCell_BareSlashSearchKeyIsNotDimmed(t *testing.T) {
 	// key resolved to its drawn form, then right-aligned in the column.
 	drawn := helpKeySymbols("/")
 	assert.Equal(t, "/", drawn, "the Search binding must stay an unspaced slash")
-	cell := padKeyLeft(drawn, helpKeyColumnMinWidth)
+	cell := padLeft(drawn, helpKeyColumnMinWidth)
 
 	rendered := styleHelpKeyCell(cell, "", SearchHighlightStyle, keyStyle)
 	assert.NotContains(t, rendered, styleOpenCodes(OverlayDimStyle),

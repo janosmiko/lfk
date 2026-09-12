@@ -129,7 +129,7 @@ func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLine
 		}
 
 		if vl.IsFoldPlaceholder {
-			ph := padToWidth(DiffFoldPlaceholderText(vl.HiddenCount), colWidth)
+			ph := padRight(DiffFoldPlaceholderText(vl.HiddenCount), colWidth)
 			rows = append(rows, leftInd+emptyGutter+ph+sep+rightInd+emptyGutter+ph)
 			continue
 		}
@@ -155,8 +155,8 @@ func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLine
 					}
 				}
 			}
-			lcell := padToWidth(styleDiffSub(subAt(leftSubs, r), leftStyle, searchQuery, isCurrent), colWidth)
-			rcell := padToWidth(styleDiffSub(subAt(rightSubs, r), rightStyle, searchQuery, isCurrent), colWidth)
+			lcell := padRight(styleDiffSub(subAt(leftSubs, r), leftStyle, searchQuery, isCurrent), colWidth)
+			rcell := padRight(styleDiffSub(subAt(rightSubs, r), rightStyle, searchQuery, isCurrent), colWidth)
 			rows = append(rows, li+lg+lcell+sep+ri+rg+rcell)
 		}
 
@@ -224,8 +224,8 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 		if vl.IsFoldPlaceholder {
 			placeholder := DiffFoldPlaceholderText(vl.HiddenCount)
 			gutterPadL := strings.Repeat(" ", gutterWidth)
-			leftPlaceholder := padToWidth(placeholder, colWidth)
-			rightPlaceholder := padToWidth(placeholder, colWidth)
+			leftPlaceholder := padRight(placeholder, colWidth)
+			rightPlaceholder := padRight(placeholder, colWidth)
 			row := leftCursorInd + gutterPadL + leftPlaceholder + separatorStyle.Render(" | ") + rightCursorInd + gutterPadL + rightPlaceholder
 			rows = append(rows, row)
 			continue
@@ -306,7 +306,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			}
 			rightNum++
 		}
-		row := leftCursorInd + leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightCursorInd + rightGutter + padToWidth(rightCol, colWidth)
+		row := leftCursorInd + leftGutter + padRight(leftCol, colWidth) + separatorStyle.Render(" | ") + rightCursorInd + rightGutter + padRight(rightCol, colWidth)
 		rows = append(rows, row)
 	}
 	return rows
