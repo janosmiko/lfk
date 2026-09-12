@@ -98,6 +98,20 @@ func TestClientCacheConcurrentAccess(t *testing.T) {
 	wg.Wait()
 }
 
+// invalidateClientsForContext drops the cached clients for a single context
+// (both the foreground and throttled variants), leaving other contexts intact.
+// The generation bump applies process-wide (not per-context), a coarse but
+// safe choice: at worst an unrelated context's racing build rebuilds once.
+//
+//nolint:unparam // per-context invalidation API; contextName is constant only because current callers are tests
+func (c *Client) invalidateClientsForContext(contextName string) {
+	c.clientMu.Lock()
+	defer c.clientMu.Unlock()
+	delete(c.clientCache, clientCacheKey(contextName, false))
+	delete(c.clientCache, clientCacheKey(contextName, true))
+	c.clientCacheGen++
+}
+
 // TestInvalidateClientsForContext verifies the targeted single-context cache
 // drop (used when one context's credentials/endpoint may have changed without
 // a full kubeconfig reload).
