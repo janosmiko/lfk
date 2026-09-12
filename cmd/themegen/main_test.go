@@ -455,7 +455,7 @@ func TestRun(t *testing.T) {
 	t.Run("processes valid theme directory", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		// Create two valid theme files.
 		writeThemeFixture(t, inputDir, "dracula", "#282a36", "#f8f8f2")
@@ -464,17 +464,15 @@ func TestRun(t *testing.T) {
 		err := run(inputDir, outPath, "")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		content := string(data)
-		assert.Contains(t, content, `"dracula"`)
-		assert.Contains(t, content, `"gruvbox"`)
+		rows := readTSVRows(t, outPath)
+		assert.Contains(t, rows, "dracula")
+		assert.Contains(t, rows, "gruvbox")
 	})
 
 	t.Run("skips themes in skip list", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		writeThemeFixture(t, inputDir, "dracula", "#282a36", "#f8f8f2")
 		writeThemeFixture(t, inputDir, "gruvbox", "#282828", "#ebdbb2")
@@ -482,17 +480,15 @@ func TestRun(t *testing.T) {
 		err := run(inputDir, outPath, "dracula")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		content := string(data)
-		assert.NotContains(t, content, `"dracula"`)
-		assert.Contains(t, content, `"gruvbox"`)
+		rows := readTSVRows(t, outPath)
+		assert.NotContains(t, rows, "dracula")
+		assert.Contains(t, rows, "gruvbox")
 	})
 
 	t.Run("skips subdirectories", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		writeThemeFixture(t, inputDir, "valid-theme", "#000000", "#ffffff")
 		require.NoError(t, os.Mkdir(filepath.Join(inputDir, "subdir"), 0o755))
@@ -500,15 +496,14 @@ func TestRun(t *testing.T) {
 		err := run(inputDir, outPath, "")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		assert.Contains(t, string(data), `"valid-theme"`)
+		rows := readTSVRows(t, outPath)
+		assert.Contains(t, rows, "valid-theme")
 	})
 
 	t.Run("handles invalid theme files gracefully", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		// One valid, one invalid (missing palette).
 		writeThemeFixture(t, inputDir, "good-theme", "#000000", "#ffffff")
@@ -521,17 +516,15 @@ func TestRun(t *testing.T) {
 		err := run(inputDir, outPath, "")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		content := string(data)
-		assert.Contains(t, content, `"good-theme"`)
-		assert.NotContains(t, content, `"bad-theme"`)
+		rows := readTSVRows(t, outPath)
+		assert.Contains(t, rows, "good-theme")
+		assert.NotContains(t, rows, "bad-theme")
 	})
 
 	t.Run("deduplicates names", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		// Two files that normalize to the same name.
 		writeThemeFixture(t, inputDir, "My_Theme", "#000000", "#ffffff")
@@ -540,10 +533,8 @@ func TestRun(t *testing.T) {
 		err := run(inputDir, outPath, "")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		// Should only appear once.
-		assert.Equal(t, 1, strings.Count(string(data), `"my-theme"`))
+		rows := readTSVRows(t, outPath)
+		assert.Equal(t, 1, len(rows["my-theme"]))
 	})
 
 	t.Run("error on nonexistent input dir", func(t *testing.T) {
@@ -555,22 +546,22 @@ func TestRun(t *testing.T) {
 	t.Run("light theme detection", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		writeThemeFixture(t, inputDir, "light-theme", "#f5f5f5", "#333333")
 
 		err := run(inputDir, outPath, "")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		assert.Contains(t, string(data), `"light-theme": true`)
+		rows := readTSVRows(t, outPath)
+		require.Contains(t, rows, "light-theme")
+		assert.Equal(t, "true", rows["light-theme"][0][1])
 	})
 
 	t.Run("multiple skip entries with spaces", func(t *testing.T) {
 		inputDir := t.TempDir()
 		outputDir := t.TempDir()
-		outPath := filepath.Join(outputDir, "schemes.go")
+		outPath := filepath.Join(outputDir, "schemes.tsv")
 
 		writeThemeFixture(t, inputDir, "alpha", "#000000", "#ffffff")
 		writeThemeFixture(t, inputDir, "beta", "#111111", "#eeeeee")
@@ -579,13 +570,29 @@ func TestRun(t *testing.T) {
 		err := run(inputDir, outPath, "alpha, beta")
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		content := string(data)
-		assert.NotContains(t, content, `"alpha"`)
-		assert.NotContains(t, content, `"beta"`)
-		assert.Contains(t, content, `"gamma"`)
+		rows := readTSVRows(t, outPath)
+		assert.NotContains(t, rows, "alpha")
+		assert.NotContains(t, rows, "beta")
+		assert.Contains(t, rows, "gamma")
 	})
+}
+
+// readTSVRows parses a themegen TSV file into name -> matching rows' columns.
+func readTSVRows(t *testing.T, path string) map[string][][]string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	rows := make(map[string][][]string)
+	for line := range strings.SplitSeq(strings.TrimRight(string(data), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		cols := strings.Split(line, "\t")
+		require.Len(t, cols, 15, "row %q", line)
+		rows[cols[0]] = append(rows[cols[0]], cols)
+	}
+	return rows
 }
 
 // writeThemeFixture creates a valid ghostty theme file in the given directory.
@@ -598,9 +605,9 @@ func writeThemeFixture(t *testing.T, dir, name, bg, fg string) {
 // --- writeOutput ---
 
 func TestWriteOutput(t *testing.T) {
-	t.Run("generates valid go file", func(t *testing.T) {
+	t.Run("generates valid tsv file", func(t *testing.T) {
 		dir := t.TempDir()
-		outPath := filepath.Join(dir, "out.go")
+		outPath := filepath.Join(dir, "out.tsv")
 
 		pal := buildPaletteArray(fullPalette())
 		themes := []themeEntry{
@@ -619,34 +626,27 @@ func TestWriteOutput(t *testing.T) {
 		err := writeOutput(outPath, themes, 2, 1)
 		require.NoError(t, err)
 
-		data, err := os.ReadFile(outPath)
-		require.NoError(t, err)
-		content := string(data)
-
-		assert.Contains(t, content, "DO NOT EDIT")
-		assert.Contains(t, content, "package ui")
-		assert.Contains(t, content, "generatedSchemes")
-		assert.Contains(t, content, `"test-dark"`)
-		assert.Contains(t, content, `"test-light"`)
-		assert.Contains(t, content, "generatedLightSchemes")
-		// Only the light theme should appear in light schemes.
-		assert.Contains(t, content, `"test-light": true`)
+		rows := readTSVRows(t, outPath)
+		require.Contains(t, rows, "test-dark")
+		require.Contains(t, rows, "test-light")
+		assert.Equal(t, "false", rows["test-dark"][0][1])
+		assert.Equal(t, "true", rows["test-light"][0][1])
 	})
 
 	t.Run("empty themes list", func(t *testing.T) {
 		dir := t.TempDir()
-		outPath := filepath.Join(dir, "empty.go")
+		outPath := filepath.Join(dir, "empty.tsv")
 
 		err := writeOutput(outPath, nil, 0, 0)
 		require.NoError(t, err)
 
 		data, err := os.ReadFile(outPath)
 		require.NoError(t, err)
-		assert.Contains(t, string(data), "package ui")
+		assert.Empty(t, string(data))
 	})
 
 	t.Run("error on invalid path", func(t *testing.T) {
-		err := writeOutput("/nonexistent/dir/file.go", nil, 0, 0)
+		err := writeOutput("/nonexistent/dir/file.tsv", nil, 0, 0)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "creating output file")
 	})
