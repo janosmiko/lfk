@@ -39,7 +39,7 @@ func TestWhichKeyRegistry_CoversEveryBinding(t *testing.T) {
 
 	registered := map[string]bool{}
 	for _, mc := range whichKeyCatalogList {
-		for _, e := range mc.catalog.entries() {
+		for _, e := range catalogEntries(mc.catalog) {
 			if name, ok := fieldForValue[e.Key(kb)]; ok {
 				registered[name] = true
 			}
@@ -86,7 +86,7 @@ func TestWhichKeyRegistry_EveryEntryHasADeclaredGroup(t *testing.T) {
 	// Every entry in EVERY catalog must carry a declared group; the panel is
 	// one shared renderer and the legend explains one shared color mapping.
 	for _, mc := range whichKeyCatalogList {
-		for _, e := range mc.catalog.entries() {
+		for _, e := range catalogEntries(mc.catalog) {
 			if !declared[e.Group] {
 				t.Errorf("%s catalog entry %q carries group %q, which whichKeyGroupOrder does not declare", mc.name, e.Label, e.Group)
 			}
