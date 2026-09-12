@@ -155,12 +155,12 @@ func buildCachedClient[T comparable](
 		}
 
 		c.clientMu.Lock()
-		// If an invalidate (ReloadKubeconfig / invalidateClientsForContext)
-		// bumped the generation while we built, our client is against stale
-		// config: hand it to this flight's callers (all of whom snapshotted the
-		// same pre-invalidate gen, so their request predates the change) but do
-		// NOT cache it — the next caller snapshots the newer gen, takes a fresh
-		// flight, and rebuilds against the fresh config.
+		// If ReloadKubeconfig bumped the generation while we built, our
+		// client is against stale config: hand it to this flight's callers
+		// (all of whom snapshotted the same pre-invalidate gen, so their
+		// request predates the change) but do NOT cache it — the next
+		// caller snapshots the newer gen, takes a fresh flight, and rebuilds
+		// against the fresh config.
 		if c.clientCacheGen == gen {
 			set(c.cachedClientsLocked(key), built)
 		}

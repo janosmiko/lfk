@@ -157,8 +157,7 @@ type Client struct {
 	// HTTP request, NOT during build, so it is never part of this critical
 	// section.) clientCache memoizes clients per cache key (see clientCacheKey:
 	// context, plus a "throttled" variant for the lower-rate security clients).
-	// Invalidated on ReloadKubeconfig (the only mid-session config mutation)
-	// and per-context via invalidateClientsForContext.
+	// Invalidated on ReloadKubeconfig, the only mid-session config mutation.
 	//
 	// The actual construction runs OUTSIDE clientMu via clientGroup (see
 	// buildCachedClient): a slow build must never block other callers — in
