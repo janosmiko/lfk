@@ -98,6 +98,29 @@ func probeAlerts(ctx context.Context, cs kubernetes.Interface, kubeCtx string,
 	return nil, fmt.Errorf("no Prometheus/Alertmanager service found in configured/default monitoring namespaces")
 }
 
+// resolveGrafanaURL tries common Grafana/dashboard URL annotation names.
+func resolveGrafanaURL(annotations map[string]string) string {
+	for _, key := range []string{"grafana_url", "dashboard_url", "runbook_url"} {
+		if url := annotations[key]; url != "" {
+			return url
+		}
+	}
+	return ""
+}
+
+func alertInfoFromPrometheus(a prometheusAlert) AlertInfo {
+	return AlertInfo{
+		Name:        a.Labels["alertname"],
+		State:       a.State,
+		Severity:    a.Labels["severity"],
+		Summary:     a.Annotations["summary"],
+		Description: a.Annotations["description"],
+		Since:       a.ActiveAt,
+		Labels:      a.Labels,
+		GrafanaURL:  resolveGrafanaURL(a.Annotations),
+	}
+}
+
 // parseAndFilterAlerts unmarshals the Prometheus alerts API response and filters
 // alerts relevant to the specified resource.
 func parseAndFilterAlerts(data []byte, resourceNs, resourceName, resourceKind string) ([]AlertInfo, error) {
@@ -116,23 +139,7 @@ func parseAndFilterAlerts(data []byte, resourceNs, resourceName, resourceKind st
 		if !alertMatchesResource(a.Labels, resourceNs, resourceName, kindLower) {
 			continue
 		}
-		info := AlertInfo{
-			Name:        a.Labels["alertname"],
-			State:       a.State,
-			Severity:    a.Labels["severity"],
-			Summary:     a.Annotations["summary"],
-			Description: a.Annotations["description"],
-			Since:       a.ActiveAt,
-			Labels:      a.Labels,
-		}
-		// Try common Grafana/dashboard URL annotation names.
-		for _, key := range []string{"grafana_url", "dashboard_url", "runbook_url"} {
-			if url := a.Annotations[key]; url != "" {
-				info.GrafanaURL = url
-				break
-			}
-		}
-		alerts = append(alerts, info)
+		alerts = append(alerts, alertInfoFromPrometheus(a))
 	}
 
 	return alerts, nil
@@ -173,22 +180,7 @@ func parseAllAlerts(data []byte, namespace string) ([]AlertInfo, error) {
 		if namespace != "" && a.Labels["namespace"] != "" && a.Labels["namespace"] != namespace {
 			continue
 		}
-		info := AlertInfo{
-			Name:        a.Labels["alertname"],
-			State:       a.State,
-			Severity:    a.Labels["severity"],
-			Summary:     a.Annotations["summary"],
-			Description: a.Annotations["description"],
-			Since:       a.ActiveAt,
-			Labels:      a.Labels,
-		}
-		for _, key := range []string{"grafana_url", "dashboard_url", "runbook_url"} {
-			if url := a.Annotations[key]; url != "" {
-				info.GrafanaURL = url
-				break
-			}
-		}
-		alerts = append(alerts, info)
+		alerts = append(alerts, alertInfoFromPrometheus(a))
 	}
 
 	return alerts, nil
@@ -202,6 +194,26 @@ type alertmanagerAlert struct {
 		State string `json:"state"` // "active", "suppressed", "unprocessed"
 	} `json:"status"`
 	StartsAt time.Time `json:"startsAt"`
+}
+
+func alertmanagerState(status string) string {
+	if status == "unprocessed" {
+		return "pending"
+	}
+	return "firing"
+}
+
+func alertInfoFromAlertmanager(a alertmanagerAlert) AlertInfo {
+	return AlertInfo{
+		Name:        a.Labels["alertname"],
+		State:       alertmanagerState(a.Status.State),
+		Severity:    a.Labels["severity"],
+		Summary:     a.Annotations["summary"],
+		Description: a.Annotations["description"],
+		Since:       a.StartsAt,
+		Labels:      a.Labels,
+		GrafanaURL:  resolveGrafanaURL(a.Annotations),
+	}
 }
 
 // parseAlertmanagerAlerts parses the Alertmanager v2 API response and returns alerts,
@@ -222,26 +234,7 @@ func parseAlertmanagerAlerts(data []byte, namespace string) ([]AlertInfo, error)
 		if namespace != "" && a.Labels["namespace"] != "" && a.Labels["namespace"] != namespace {
 			continue
 		}
-		state := "firing"
-		if a.Status.State == "unprocessed" {
-			state = "pending"
-		}
-		info := AlertInfo{
-			Name:        a.Labels["alertname"],
-			State:       state,
-			Severity:    a.Labels["severity"],
-			Summary:     a.Annotations["summary"],
-			Description: a.Annotations["description"],
-			Since:       a.StartsAt,
-			Labels:      a.Labels,
-		}
-		for _, key := range []string{"grafana_url", "dashboard_url", "runbook_url"} {
-			if url := a.Annotations[key]; url != "" {
-				info.GrafanaURL = url
-				break
-			}
-		}
-		alerts = append(alerts, info)
+		alerts = append(alerts, alertInfoFromAlertmanager(a))
 	}
 
 	return alerts, nil
@@ -263,26 +256,7 @@ func parseAndFilterAlertmanagerAlerts(data []byte, resourceNs, resourceName, res
 		if !alertMatchesResource(a.Labels, resourceNs, resourceName, kindLower) {
 			continue
 		}
-		state := "firing"
-		if a.Status.State == "unprocessed" {
-			state = "pending"
-		}
-		info := AlertInfo{
-			Name:        a.Labels["alertname"],
-			State:       state,
-			Severity:    a.Labels["severity"],
-			Summary:     a.Annotations["summary"],
-			Description: a.Annotations["description"],
-			Since:       a.StartsAt,
-			Labels:      a.Labels,
-		}
-		for _, key := range []string{"grafana_url", "dashboard_url", "runbook_url"} {
-			if url := a.Annotations[key]; url != "" {
-				info.GrafanaURL = url
-				break
-			}
-		}
-		alerts = append(alerts, info)
+		alerts = append(alerts, alertInfoFromAlertmanager(a))
 	}
 
 	return alerts, nil
