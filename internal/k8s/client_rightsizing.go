@@ -505,21 +505,27 @@ func layerVPAResource(rec *model.ResourceRec, rm map[string]any, resKey string, 
 // fails to parse (defensive — the VPA payload always parses, but
 // silent passthrough beats panicking on a future schema change).
 func scaleQuantityByHeadroom(q string, headroom float64) string {
-	if q == "" || headroom == 1 {
+	return scaleQuantityByFactor(q, headroom, isMemoryQuantity(q))
+}
+
+// scaleQuantityByFactor scales a Kubernetes quantity string by factor and
+// snaps it back to a canonical CPU or memory unit.
+func scaleQuantityByFactor(q string, factor float64, isMemory bool) string {
+	if q == "" || factor == 1 {
 		return q
 	}
 	parsed, err := resource.ParseQuantity(q)
 	if err != nil {
 		return q
 	}
-	if isMemoryQuantity(q) {
+	if isMemory {
 		// MilliValue() for memory returns bytes×1000. Convert back to
 		// bytes before scaling so SnapMemBytesToCanonical sees the right
 		// unit.
 		bytes := parsed.MilliValue() / 1000
-		return SnapMemBytesToCanonical(int64(float64(bytes) * headroom))
+		return SnapMemBytesToCanonical(int64(float64(bytes) * factor))
 	}
-	return SnapCPUMilliToCanonical(int64(float64(parsed.MilliValue()) * headroom))
+	return SnapCPUMilliToCanonical(int64(float64(parsed.MilliValue()) * factor))
 }
 
 // scaleLimitFromRatio returns the recommended limit that preserves
