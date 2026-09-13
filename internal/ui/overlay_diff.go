@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -565,6 +566,64 @@ func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart
 	return RenderVisualSelection(plainText, vp.VisualType, visIdx, selStart, selEnd, vp.VisualStart, vp.VisualCol, vp.CursorCol, colStart, colEnd)
 }
 
+// trailingSGRRun matches a run of SGR sequences at the end of a string,
+// leadingSGRRun matches one at the start. ":" is included as a valid SGR
+// sub-parameter separator, e.g. colon-form truecolor \x1b[38:2::r:g:bm.
+var (
+	trailingSGRRun = regexp.MustCompile(`(?:\x1b\[[0-9;:]*m)+$`)
+	leadingSGRRun  = regexp.MustCompile(`^(?:\x1b\[[0-9;:]*m)+`)
+)
+
+// padWithinTrailingSGR inserts pad spaces before line's trailing SGR run
+// so the pad keeps that style instead of landing after the reset. pad<=0
+// is a no-op so an escape the matcher misses can't go negative here.
+func padWithinTrailingSGR(s string, pad int) string {
+	if pad <= 0 {
+		return s
+	}
+	at := len(s)
+	if loc := trailingSGRRun.FindStringIndex(s); loc != nil {
+		at = loc[0]
+	}
+	return s[:at] + strings.Repeat(" ", pad) + s[at:]
+}
+
+// padWithinLeadingSGR inserts pad spaces after line's leading SGR run, the
+// style ansi.TruncateLeft carries over from before the cut. Same pad<=0
+// guard as padWithinTrailingSGR.
+func padWithinLeadingSGR(s string, pad int) string {
+	if pad <= 0 {
+		return s
+	}
+	at := len(leadingSGRRun.FindString(s))
+	return s[:at] + strings.Repeat(" ", pad) + s[at:]
+}
+
+// truncateBgLeft truncates line to col cells, padding with a space when the
+// cut lands inside a wide rune (ansi.Truncate drops it whole) so the overlay
+// after it still starts exactly at col.
+func truncateBgLeft(line string, col int) string {
+	s := ansi.Truncate(line, col, "")
+	if w := lipgloss.Width(s); w < col {
+		s = padWithinTrailingSGR(s, col-w)
+	}
+	return s
+}
+
+// truncateBgRight truncates line to the cells from col onward. A wide rune
+// straddling col comes back whole (ansi.TruncateLeft never splits one), so
+// it is dropped and replaced with a space to keep the row at its full width.
+func truncateBgRight(line string, col int) string {
+	s := ansi.TruncateLeft(line, col, "")
+	want := max(lipgloss.Width(line)-col, 0)
+	if w := lipgloss.Width(s); w > want {
+		at := len(leadingSGRRun.FindString(s))
+		cluster, clusterWidth := ansi.FirstGraphemeCluster(s[at:], ansi.GraphemeWidth)
+		s = padWithinLeadingSGR(s[:at]+s[at+len(cluster):], want-(w-clusterWidth))
+	}
+	return s
+}
+
 // PlaceOverlayBottom anchors an overlay near the bottom edge of the background,
 // horizontally centered, leaving marginBottom rows below it. Used for the
 // which-key panel, which rises from the bottom of the screen like neovim's
@@ -601,8 +660,8 @@ func PlaceOverlayBottom(width, height, marginBottom int, overlay, background str
 			continue
 		}
 		ovVisualWidth := lipgloss.Width(ovLine)
-		leftBg := ansi.Truncate(result[row], startCol, "")
-		rightBg := ansi.TruncateLeft(result[row], startCol+ovVisualWidth, "")
+		leftBg := truncateBgLeft(result[row], startCol)
+		rightBg := truncateBgRight(result[row], startCol+ovVisualWidth)
 		result[row] = leftBg + ovLine + rightBg
 	}
 	return strings.Join(result, "\n")
@@ -662,8 +721,8 @@ func PlaceOverlay(width, height int, overlay, background string) string {
 		}
 		bgLine := result[row]
 		ovVisualWidth := lipgloss.Width(ovLine)
-		leftBg := ansi.Truncate(bgLine, startCol, "")
-		rightBg := ansi.TruncateLeft(bgLine, startCol+ovVisualWidth, "")
+		leftBg := truncateBgLeft(bgLine, startCol)
+		rightBg := truncateBgRight(bgLine, startCol+ovVisualWidth)
 		result[row] = leftBg + ovLine + rightBg
 	}
 
