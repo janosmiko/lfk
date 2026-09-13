@@ -167,7 +167,7 @@ func renderWhoCanResourcePicker(resources []string, cursor, scroll, width, heigh
 	}
 
 	bodyHeight := max(height-1, 1) // -1 for header
-	scroll = whoCanClampScroll(scroll, len(resources), bodyHeight)
+	scroll = ClampScroll(scroll, len(resources), bodyHeight)
 	end := min(scroll+bodyHeight, len(resources))
 
 	lines := make([]string, 0, end-scroll)
@@ -195,20 +195,6 @@ func renderWhoCanResourceHeader(count, width int) string {
 		BarDimStyle.Bold(true).Render(fmt.Sprintf("  Resources (%d)", count)),
 		width,
 	)
-}
-
-// whoCanClampScroll snaps the requested scroll offset to a valid range
-// for the given list size and viewport. Doesn't try to keep the cursor
-// in view — handlers do that — only protects against stale offsets
-// that would otherwise show blank space past the end of the list.
-func whoCanClampScroll(scroll, total, bodyHeight int) int {
-	if total <= bodyHeight {
-		return 0
-	}
-	maxScroll := total - bodyHeight
-	scroll = max(scroll, 0)
-	scroll = min(scroll, maxScroll)
-	return scroll
 }
 
 // WhoCanScrollForCursor returns the new scroll offset that keeps
