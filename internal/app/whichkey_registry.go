@@ -1,7 +1,6 @@
 package app
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -595,63 +594,4 @@ var whichKeyExplorerCatalog = wkCatalog[*wkCtx]{
 // reaches help, and advertising "?" there would be a lie.
 func whichKeyHelpKey(kb ui.Keybindings) string {
 	return kb.HelpScreenKey()
-}
-
-// whichKeyExplorerActions returns a copy of the shared explorer catalog, so a
-// caller cannot reorder or overwrite the package slice through it. Only tests
-// call this. The render path reads whichKeyExplorerActionList directly, so the
-// clone costs nothing per frame.
-func whichKeyExplorerActions() []whichKeyAction {
-	return slices.Clone(whichKeyExplorerActionList)
-}
-
-// whichKeyExcludedBindings lists the ui.Keybindings fields that deliberately do
-// not appear in ANY mode's leader panel, keyed by Go field name. Navigation is
-// excluded because the panel is a discovery aid for actions, not a full keymap;
-// the remaining viewer-local keys belong to viewers that have no catalog yet.
-// TestWhichKeyRegistry_CoversEveryBinding fails when a new binding is neither
-// registered in some catalog nor listed here.
-func whichKeyExcludedBindings() map[string]string {
-	return map[string]string{
-		// Navigation — excluded by design.
-		"Left": "navigation", "Right": "navigation", "Down": "navigation", "Up": "navigation",
-		"Enter": "navigation", "JumpTop": "navigation", "JumpBottom": "navigation",
-		"PageDown": "navigation", "PageUp": "navigation", "PageForward": "navigation", "PageBack": "navigation",
-		"LevelCluster": "navigation", "LevelTypes": "navigation", "LevelResources": "navigation",
-		"PreviewDown": "navigation", "PreviewUp": "navigation",
-		"JumpOwner": "navigation", "JumpClaim": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
-		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
-
-		// The leader itself: pressing it opens the panel rather than running a
-		// listed action, so listing it would advertise the panel from inside
-		// the panel.
-		"WhichKeyLeader": "the leader key itself",
-		// SetMark ("m") arms m.pendingMark and waits for the bookmark-slot
-		// key (update_keys_explorer.go:26-33,330-332). Unlike the g-prefix
-		// (armWhichKey/renderWhichKey), nothing renders while pendingMark is
-		// true — there is no popup, just a silent wait for the next key.
-		"SetMark": "chord prefix, no rendered continuation",
-
-		// Tabs: muscle-memory keys that would crowd out the actions.
-		"NewTab": "tab management", "NextTab": "tab management", "PrevTab": "tab management",
-		"MoveTabLeft": "tab management", "MoveTabRight": "tab management",
-
-		// Goto chords (whichkey.go): each is a full "g<x>" chord dispatched by
-		// handleGotoChord while the g prefix is armed, and already has its own
-		// which-key-style popup (renderWhichKey) distinct from the leader
-		// panel this registry drives.
-		"GotoPods": "goto chord, has its own popup", "GotoDeployments": "goto chord, has its own popup",
-		"GotoServices": "goto chord, has its own popup", "GotoNodes": "goto chord, has its own popup",
-		"GotoNamespaces": "goto chord, has its own popup", "GotoIngresses": "goto chord, has its own popup",
-		"GotoJobs": "goto chord, has its own popup", "GotoCronJobs": "goto chord, has its own popup",
-		"GotoReplicaSets": "goto chord, has its own popup", "GotoDaemonSets": "goto chord, has its own popup",
-		"GotoStatefulSets": "goto chord, has its own popup", "GotoConfigMaps": "goto chord, has its own popup",
-		"GotoSecrets": "goto chord, has its own popup", "GotoHPAs": "goto chord, has its own popup",
-		"GotoPVCs": "goto chord, has its own popup", "GotoPVs": "goto chord, has its own popup",
-		"GotoPDBs": "goto chord, has its own popup",
-		// PreviousNamespace ("g\\") is dispatched by the same handleGotoChord
-		// and listed in the same goto popup (whichKeyCells), even though it
-		// swaps namespace scope rather than switching resource type.
-		"PreviousNamespace": "goto chord, has its own popup",
-	}
 }

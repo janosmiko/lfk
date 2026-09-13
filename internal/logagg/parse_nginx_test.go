@@ -38,7 +38,7 @@ func TestNginxParser_Parse(t *testing.T) {
 			wantOK: false,
 		},
 	}
-	p := NewNginxParser()
+	p := nginxParser{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := p.Parse(tt.line)
@@ -69,7 +69,7 @@ func TestNginxParser_Parse(t *testing.T) {
 
 // TestNginxParser_RouterExtraction tests Traefik router name extraction.
 func TestNginxParser_RouterExtraction(t *testing.T) {
-	p := NewNginxParser()
+	p := nginxParser{}
 
 	// Traefik CLF line with router name.
 	traefikLine := `10.42.2.19 - - [18/Jun/2026:15:18:46 +0000] "GET /api/health HTTP/1.1" 200 0 "-" "-" 100 "websecure-gitlab@kubernetes" "http://10.42.1.1:8080" 3ms`
@@ -95,7 +95,7 @@ func TestNginxParser_RouterExtraction(t *testing.T) {
 // TestNginxParser_AtInUserAgent verifies that an "@"-sign in the user-agent field
 // of a plain combined log line does NOT trigger router extraction.
 func TestNginxParser_AtInUserAgent(t *testing.T) {
-	p := NewNginxParser()
+	p := nginxParser{}
 
 	// Plain combined log line whose UA contains "@" — must NOT set router.
 	uaLine := `192.0.2.1 - - [10/Oct/2000:13:55:36 -0700] "GET /index.html HTTP/1.0" 200 2326 "-" "bot@example.com"`

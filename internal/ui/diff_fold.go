@@ -34,12 +34,12 @@ type VisibleDiffLine struct {
 // unchanged ('=') lines longer than 6 lines. Each such run is a foldable
 // region with 3 lines of context kept at each end.
 func ComputeDiffFoldRegions(left, right string) []DiffFoldRegion {
-	diffLines := computeDiff(left, right)
+	diffLines := ComputeDiffLines(left, right)
 	return ComputeDiffFoldRegionsFromLines(diffLines)
 }
 
 // ComputeDiffFoldRegionsFromLines is ComputeDiffFoldRegions for a caller that
-// already holds the diff. computeDiff builds an O(nxm) LCS table, so a caller
+// already holds the diff. ComputeDiffLines builds an O(nxm) LCS table, so a caller
 // needing both the regions and the raw lines must not pay for it twice.
 func ComputeDiffFoldRegionsFromLines(diffLines []diffLine) []DiffFoldRegion {
 	var regions []DiffFoldRegion

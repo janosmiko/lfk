@@ -217,7 +217,7 @@ func helpEntrySpecs(rows []helpKeyRow, keyWidth int, blankKey string, descBudget
 		for ci, chunk := range chunks {
 			spec := helpLineSpec{kind: helpLineEntry, key: blankKey, desc: chunk}
 			if ci == 0 {
-				spec.key = padKeyLeft(r.key, keyWidth)
+				spec.key = padLeft(r.key, keyWidth)
 				spec.keyText = r.keyText
 			}
 			out = append(out, spec)
@@ -414,7 +414,7 @@ func helpSpecSearchText(s helpLineSpec) string {
 	if s.kind != helpLineEntry || s.keyText == "" {
 		return helpSpecPlain(s)
 	}
-	return "    " + padKeyLeft(s.keyText, lipgloss.Width(s.key)) + "  " + s.desc
+	return "    " + padLeft(s.keyText, lipgloss.Width(s.key)) + "  " + s.desc
 }
 
 // helpKeyMatchesSearch reports whether the search query hits a row's key
@@ -491,7 +491,7 @@ func helpSpecStyled(s helpLineSpec, search string, isCurrent bool) string {
 			// Query matched "Ctrl+D" but the cell draws "⌃D" — highlight
 			// the whole chord (separator included) so the hit is visible
 			// where the user looks.
-			keyInner = padKeyLeft(hl.Render(strings.TrimLeft(s.key, " ")), lipgloss.Width(s.key))
+			keyInner = padLeft(hl.Render(strings.TrimLeft(s.key, " ")), lipgloss.Width(s.key))
 		}
 		descInner := HighlightMatchStyledOver(s.desc, search, hl, descStyle)
 		return "    " + RenderOverPrestyled(keyInner, keyStyle) + "  " + RenderOverPrestyled(descInner, descStyle)

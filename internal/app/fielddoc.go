@@ -71,13 +71,6 @@ func (c *fieldDocCache) put(k fieldDocKey, e fieldDocEntry) {
 	}
 }
 
-func (c *fieldDocCache) len() int {
-	if c == nil {
-		return 0
-	}
-	return len(c.entries)
-}
-
 // fieldDocState is the footnote pane: whether it is open, what it shows, and
 // which fetch it is waiting for. req numbers each fetch so a reply that arrives
 // after the cursor moved on is dropped instead of overwriting the new field.

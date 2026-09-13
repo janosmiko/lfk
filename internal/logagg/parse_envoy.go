@@ -13,13 +13,9 @@ var envoyRe = regexp.MustCompile(`^\[[^\]]*\] "([A-Z]+) (\S+)[^"]*" (\d{3}) \S+ 
 // envoyQuotedRe captures all double-quoted tokens from a line.
 var envoyQuotedRe = regexp.MustCompile(`"([^"]*)"`)
 
-type envoyParser struct{}
-
-// NewEnvoyParser parses Envoy's default access log text format as used by
+// envoyParser parses Envoy's default access log text format as used by
 // Istio, Contour, Emissary, Gloo, and Gateway API.
-func NewEnvoyParser() Parser { return envoyParser{} }
-
-func (envoyParser) Kind() ProfileKind { return ProfileEnvoy }
+type envoyParser struct{}
 
 func (envoyParser) Parse(line string) (Fields, bool) {
 	m := envoyRe.FindStringSubmatch(line)

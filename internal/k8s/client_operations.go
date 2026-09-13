@@ -457,10 +457,8 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	if err != nil {
 		return nil, fmt.Errorf("building rest config for context %q: %w", displayName, err)
 	}
-	if RateLimitOverridesEnabled {
-		qps, burst := foregroundRate(displayName)
-		applyRateLimit(cfg, qps, burst)
-	}
+	qps, burst := foregroundRate(displayName)
+	applyRateLimit(cfg, qps, burst)
 	// Name the tool, its version and the person to the apiserver, which
 	// records the agent in the audit log.
 	cfg.UserAgent = UserAgent()
@@ -487,9 +485,7 @@ func (c *Client) restConfigForContextThrottled(displayName string) (*rest.Config
 	if err != nil {
 		return nil, err
 	}
-	if RateLimitOverridesEnabled {
-		applyRateLimit(cfg, SecurityClientQPS, SecurityClientBurst)
-	}
+	applyRateLimit(cfg, SecurityClientQPS, SecurityClientBurst)
 	return cfg, nil
 }
 
@@ -516,28 +512,6 @@ func (c *Client) dynamicForContext(contextName string) (dynamic.Interface, error
 	return c.cachedDynamic(contextName, false, func() (*rest.Config, error) {
 		return c.restConfigForContext(contextName)
 	})
-}
-
-// RawClientset returns the kubernetes clientset for the currently selected
-// context, or nil if none is available. Used by security sources that need
-// a raw kubernetes.Interface (e.g., the heuristic source walking Pod specs).
-func (c *Client) RawClientset() kubernetes.Interface {
-	cs, err := c.clientsetForContext(c.CurrentContext())
-	if err != nil || cs == nil {
-		return nil
-	}
-	return cs
-}
-
-// RawDynamic returns the dynamic client for the currently selected context,
-// or nil if none is available. Used by security sources that read CRDs
-// (e.g., the trivy-operator source reading VulnerabilityReport CRs).
-func (c *Client) RawDynamic() dynamic.Interface {
-	dc, err := c.dynamicForContext(c.CurrentContext())
-	if err != nil || dc == nil {
-		return nil
-	}
-	return dc
 }
 
 // RawClientsetForContext returns the kubernetes clientset for the given

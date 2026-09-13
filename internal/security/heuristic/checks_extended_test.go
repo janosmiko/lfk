@@ -350,6 +350,13 @@ func TestCheckShareProcessNamespace(t *testing.T) {
 	})
 }
 
+// checkSecretEnv is the default-configured variant checkSecretEnvWith backs.
+// Fetch dispatches checkSecretEnvWith with the source's configured patterns
+// instead of going through allChecks.
+func checkSecretEnv(pod *corev1.Pod, c corev1.Container) []security.Finding {
+	return checkSecretEnvWith(pod, c, nil, nil)
+}
+
 func TestCheckSecretEnv(t *testing.T) {
 	pod := &corev1.Pod{Namespace: "prod", Name: "p"}
 	fromSecret := &corev1.EnvVarSource{

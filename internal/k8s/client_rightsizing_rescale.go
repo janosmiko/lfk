@@ -1,8 +1,6 @@
 package k8s
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -93,19 +91,5 @@ func rescaleResourceRec(r model.ResourceRec, ratio float64, isMemory bool) model
 // caller already computed a new/old ratio and shouldn't have to fake
 // up a "headroom" parameter to reuse the existing helper.
 func scaleQuantityByRatio(q string, ratio float64, isMemory bool) string {
-	if q == "" || ratio == 1 {
-		return q
-	}
-	parsed, err := resource.ParseQuantity(q)
-	if err != nil {
-		return q
-	}
-	if isMemory {
-		// MilliValue() for memory returns bytes×1000. Convert back to
-		// bytes before scaling so SnapMemBytesToCanonical sees the right
-		// unit.
-		bytes := parsed.MilliValue() / 1000
-		return SnapMemBytesToCanonical(int64(float64(bytes) * ratio))
-	}
-	return SnapCPUMilliToCanonical(int64(float64(parsed.MilliValue()) * ratio))
+	return scaleQuantityByFactor(q, ratio, isMemory)
 }

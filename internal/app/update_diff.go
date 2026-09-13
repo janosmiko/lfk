@@ -584,7 +584,7 @@ func (m *Model) diffScrollToMatch(foldRegions []ui.DiffFoldRegion, viewportLines
 
 	// Move cursor column to the match position on the active side.
 	lineText := m.diffCurrentLineText(foldRegions)
-	col := ui.DiffSearchColumnInLine(lineText, m.diffView.searchQuery)
+	col := ui.FindColumnInLine(lineText, m.diffView.searchQuery)
 	if col >= 0 {
 		m.diffView.visualCurCol = col
 	}

@@ -7,10 +7,39 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
+
+// ActiveCount returns the number of entries in Starting or Running state.
+func (m *CaptureManager) ActiveCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, e := range m.entries {
+		if e.Status == CaptureRunning || e.Status == CaptureStarting {
+			n++
+		}
+	}
+	return n
+}
+
+// FindByPod returns the ID of the most-recent active capture matching the pod, if any.
+func (m *CaptureManager) FindByPod(kubectx, ns, pod string) (int, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, e := range slices.Backward(m.entries) {
+		if e.Status != CaptureRunning && e.Status != CaptureStarting {
+			continue
+		}
+		if e.Request.Context == kubectx && e.Request.Namespace == ns && e.Request.PodName == pod {
+			return e.ID, true
+		}
+	}
+	return 0, false
+}
 
 func TestNewCaptureManager_EmptyAtStart(t *testing.T) {
 	m := NewCaptureManager()
@@ -148,6 +177,24 @@ func TestCaptureManager_FindByPod(t *testing.T) {
 
 	if _, ok := m.FindByPod("ctx", "ns", "other"); ok {
 		t.Error("FindByPod returned ok for unrelated pod")
+	}
+}
+
+func TestCaptureManager_FindByPod_ReturnsNewestMatch(t *testing.T) {
+	m := NewCaptureManager()
+	req := CaptureRequest{Context: "ctx", Namespace: "ns", PodName: "pod1"}
+	m.entries = []*CaptureEntry{
+		{ID: 1, Status: CaptureStopped, Request: req},
+		{ID: 2, Status: CaptureRunning, Request: req},
+		{ID: 3, Status: CaptureRunning, Request: req},
+	}
+
+	gotID, ok := m.FindByPod("ctx", "ns", "pod1")
+	if !ok {
+		t.Fatal("FindByPod returned !ok for active capture")
+	}
+	if gotID != 3 {
+		t.Errorf("FindByPod ID = %d, want %d (newest)", gotID, 3)
 	}
 }
 

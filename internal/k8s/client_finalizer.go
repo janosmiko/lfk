@@ -25,7 +25,6 @@ type FinalizerMatch struct {
 	APIVersion string
 	Resource   string // plural
 	Namespaced bool
-	Finalizers []string
 	Matched    string // the specific finalizer that matched
 	Age        string
 }
@@ -100,7 +99,6 @@ func (c *Client) FindResourcesWithFinalizer(
 						APIVersion: rt.APIVersion,
 						Resource:   rt.Resource,
 						Namespaced: rt.Namespaced,
-						Finalizers: finalizers,
 						Matched:    f,
 						Age:        age,
 					})
