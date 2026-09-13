@@ -182,9 +182,16 @@ func TestRenderSyncWave_FocusedPhaseMarker(t *testing.T) {
 			{Name: "PreSync"},
 			{Name: "Sync"},
 		},
+		SidebarCursor: 1,
+		ActivePane:    SyncWavePaneSidebar,
 	}
-	got := RenderSyncWaveTimeline(entry, 100, 30)
-	assert.Contains(t, got, "Sync")
+	focused := RenderSyncWaveTimeline(entry, 100, 30)
+	assert.Contains(t, focused, "Sync")
+
+	entry.ActivePane = SyncWavePaneBody
+	unfocused := RenderSyncWaveTimeline(entry, 100, 30)
+	assert.NotEqual(t, focused, unfocused,
+		"the sidebar cursor row must render differently when its pane is active vs inactive")
 }
 
 // buildLongPhase produces a single-phase entry with `n` resource rows in

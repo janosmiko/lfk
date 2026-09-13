@@ -22,7 +22,7 @@ func TestCheckDeprecation(t *testing.T) {
 	t.Run("deprecated RBAC v1beta1 roles", func(t *testing.T) {
 		info, found := CheckDeprecation("rbac.authorization.k8s.io", "v1beta1", "roles")
 		assert.True(t, found)
-		assert.Contains(t, info.Message, "v1")
+		assert.Contains(t, info.Message, "use v1")
 	})
 
 	t.Run("deprecated autoscaling/v2beta2 HPA", func(t *testing.T) {
@@ -49,6 +49,6 @@ func TestCheckDeprecation(t *testing.T) {
 	t.Run("deprecated flowcontrol v1beta2", func(t *testing.T) {
 		info, found := CheckDeprecation("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas")
 		assert.True(t, found)
-		assert.Contains(t, info.Message, "v1")
+		assert.Contains(t, info.Message, "use v1")
 	})
 }
