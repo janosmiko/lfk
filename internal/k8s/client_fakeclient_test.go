@@ -1547,7 +1547,7 @@ func TestGetResources_EventsSortedByLastSeen(t *testing.T) {
 
 	items, err := c.GetResources(t.Context(), "", "default", model.ResourceTypeEntry{
 		Kind: "Event", APIGroup: "", APIVersion: "v1", Resource: "events", Namespaced: true,
-	})
+	}, false)
 	require.NoError(t, err)
 	require.Len(t, items, 3)
 

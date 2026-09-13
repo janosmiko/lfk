@@ -32,7 +32,7 @@ func TestGetResources_PreferCache_DefersInformerStartUntilTheListReturns(t *test
 		return false, nil, nil // fall through to the tracker
 	})
 
-	items, err := c.GetResources(t.Context(), "", "team-a", podRT, PreferCache())
+	items, err := c.GetResources(t.Context(), "", "team-a", podRT, true)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
