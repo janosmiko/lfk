@@ -800,3 +800,14 @@ func TestTask_Elapsed_FreezesAfterFinish(t *testing.T) {
 	assert.Equal(t, 1*time.Second, t2.Elapsed(now.Add(time.Hour)),
 		"finished tasks must not keep ticking past Finish()")
 }
+
+// SetLingerDurationForTest overrides DefaultLingerDuration on this registry,
+// so linger-window assertions run without real-time waits.
+func (r *Registry) SetLingerDurationForTest(d time.Duration) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.lingerDuration = d
+}

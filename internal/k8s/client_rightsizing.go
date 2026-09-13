@@ -565,11 +565,9 @@ func isMemoryQuantity(s string) bool {
 	return false
 }
 
-// SnapCPUMilliToCanonical / SnapMemBytesToCanonical duplicate the
-// snapping logic from internal/ui/quantity_math.go. The k8s package
-// can't import internal/ui (would invert the architecture's data ->
-// presentation direction), so the helpers live in both places. Keep
-// in sync. They're only ~15 lines each.
+// SnapCPUMilliToCanonical rounds and formats a quantity independently of
+// internal/ui, since k8s can't import ui (would invert the architecture's
+// data -> presentation direction).
 func SnapCPUMilliToCanonical(milli int64) string {
 	if milli <= 0 {
 		return "0"

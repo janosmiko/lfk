@@ -144,6 +144,15 @@ func TestFieldOwners_EmptyIsSafeToQuery(t *testing.T) {
 	assert.True(t, owners.Empty())
 }
 
+// Managers returns the distinct field managers, sorted. The order is stable
+// so a color assigned to a manager does not move between renders.
+func (f *FieldOwners) Managers() []string {
+	if f == nil {
+		return nil
+	}
+	return f.managers
+}
+
 func TestFieldOwners_Managers(t *testing.T) {
 	now := time.Now()
 	owners := NewFieldOwners([]metav1.ManagedFieldsEntry{

@@ -225,3 +225,10 @@ func TestFieldDocCacheRepeatedPutKeepsOneOrderRecord(t *testing.T) {
 func pathForIndex(i int) string {
 	return "spec.field" + strconv.Itoa(i)
 }
+
+func (c *fieldDocCache) len() int {
+	if c == nil {
+		return 0
+	}
+	return len(c.entries)
+}
