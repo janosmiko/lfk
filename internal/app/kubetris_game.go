@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // tPieceIndex is the index of the T-shaped piece in the tetrominoes table.
@@ -245,11 +244,7 @@ func (g *kubetrisGame) isGhost(x, y, ghostY int) bool {
 }
 
 func highScoreFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "kubetris-highscore")
+	return stateFilePath("kubetris-highscore")
 }
 
 func (g *kubetrisGame) loadHighScore() {

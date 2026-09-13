@@ -1,14 +1,6 @@
 package app
 
-import (
-	"os"
-	"path/filepath"
-
-	"sigs.k8s.io/yaml"
-
-	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
-)
+const pinnedFileName = "pinned.yaml"
 
 // PinnedState stores pinned resource-type keys ("group/resource",
 // version-agnostic) scoped either to a kube context or to a named union set.
@@ -22,34 +14,17 @@ type PinnedState struct {
 
 // pinnedFilePath returns the path to the pinned groups state file.
 func pinnedFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "pinned.yaml")
+	return stateFilePath(pinnedFileName)
 }
 
 // loadPinnedState reads pinned groups from disk.
-func loadPinnedState() *PinnedState { return loadPinStateFile(pinnedFilePath()) }
+func loadPinnedState() *PinnedState { return loadPinStateFile(pinnedFileName) }
 
 // loadPinStateFile reads any PinnedState-shaped scope file (sidebar pins,
-// pinned dashboard summaries). Missing or corrupt files start fresh.
-func loadPinStateFile(path string) *PinnedState {
-	if path == "" {
-		return newPinnedState()
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read pinned-scope state", "error", err, "path", path)
-		}
-		return newPinnedState()
-	}
-	var s PinnedState
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Pinned-scope file is corrupt; starting fresh", "error", err, "path", path)
-		return newPinnedState()
-	}
+// pinned dashboard summaries) by its state-dir-relative name. Missing or
+// corrupt files start fresh.
+func loadPinStateFile(name string) *PinnedState {
+	s := loadStateFile[PinnedState](name)
 	if s.Contexts == nil {
 		s.Contexts = make(map[string][]string)
 	}
@@ -67,20 +42,10 @@ func newPinnedState() *PinnedState {
 }
 
 // savePinnedState writes pinned groups to disk.
-func savePinnedState(s *PinnedState) error { return savePinStateFile(pinnedFilePath(), s) }
+func savePinnedState(s *PinnedState) error { return savePinStateFile(pinnedFileName, s) }
 
-func savePinStateFile(path string, s *PinnedState) error {
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(s)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+func savePinStateFile(name string, s *PinnedState) error {
+	return saveStateFile(name, s)
 }
 
 // togglePinnedType adds or removes a resource-type key from the per-context

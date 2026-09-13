@@ -10,7 +10,6 @@ import (
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // SessionTab represents the persisted navigation state for a single tab.
@@ -53,13 +52,8 @@ type SessionState struct {
 }
 
 // sessionFilePath returns the path to the session state file.
-// Resolves the lfk state directory via internal/paths.
 func sessionFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "session.yaml")
+	return stateFilePath("session.yaml")
 }
 
 // migrateStateFile checks if a state file exists at the legacy ~/.config/lfk/ location

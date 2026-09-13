@@ -9,9 +9,10 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+const clusterColorsFileName = "cluster-colors.yaml"
 
 // clusterColorsSchemaVersion bumps whenever the on-disk shape changes.
 // loadClusterColors rejects unknown versions so older binaries don't trip on
@@ -27,13 +28,8 @@ type clusterColorsState struct {
 }
 
 // clusterColorsFilePath returns the path to the cluster-colors state file.
-// Resolves the lfk state directory via internal/paths.
 func clusterColorsFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "cluster-colors.yaml")
+	return stateFilePath(clusterColorsFileName)
 }
 
 // loadClusterColors reads the cluster-colours map from disk. Returns an
@@ -74,10 +70,8 @@ func loadClusterColors() map[string]string {
 	return out
 }
 
-// saveClusterColors writes the cluster-colours map to disk atomically
-// (sibling .tmp + rename) so a crash mid-write can't leave a half-written
-// file that loadClusterColors would discard. Rejects unknown colour names
-// at the boundary so the on-disk file is always valid.
+// saveClusterColors writes the cluster-colours map to disk. Rejects unknown
+// colour names at the boundary so the on-disk file is always valid.
 func saveClusterColors(colors map[string]string) error {
 	for ctx, color := range colors {
 		if !ui.IsValidClusterColor(color) {
@@ -91,44 +85,12 @@ func saveClusterColors(colors map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	state := clusterColorsState{
+	data, err := yaml.Marshal(clusterColorsState{
 		SchemaVersion: clusterColorsSchemaVersion,
 		Contexts:      colors,
-	}
-	data, err := yaml.Marshal(state)
+	})
 	if err != nil {
 		return err
 	}
-	// Use os.CreateTemp with a unique suffix instead of a fixed ".tmp"
-	// sibling so two concurrent saves can't collide on the temp filename
-	// — a fixed suffix would race in the (admittedly unusual) case of
-	// two lfk instances saving to the same XDG state dir at the same
-	// moment, leaving one with a half-written file or a botched rename.
-	tmpFile, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp.*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmpFile.Name()
-	// Best-effort cleanup if anything below fails: the temp file is
-	// orphaned and will not be retried on next save.
-	cleanup := func() { _ = os.Remove(tmpPath) }
-	if _, err := tmpFile.Write(data); err != nil {
-		_ = tmpFile.Close()
-		cleanup()
-		return err
-	}
-	if err := tmpFile.Sync(); err != nil {
-		_ = tmpFile.Close()
-		cleanup()
-		return err
-	}
-	if err := tmpFile.Close(); err != nil {
-		cleanup()
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		cleanup()
-		return err
-	}
-	return nil
+	return writeFileDurable(path, data)
 }
