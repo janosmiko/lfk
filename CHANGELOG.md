@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.13](https://github.com/janosmiko/lfk/compare/v0.18.12...v0.18.13) (2026-09-13)
+
+
+### Bug Fixes
+
+* honor show_priority_in_tasks_overlay in the tasks overlay ([#782](https://github.com/janosmiko/lfk/issues/782)) ([54f6dbc](https://github.com/janosmiko/lfk/commit/54f6dbcfc8efda35f60243594eb958ea276a147e))
+* offer prometheus rightsizing strategies when prometheus is discovered ([#776](https://github.com/janosmiko/lfk/issues/776)) ([98beeea](https://github.com/janosmiko/lfk/commit/98beeea44bae22929cbbab14d03aa0a8b82ec6ee))
+
 ## [0.18.12](https://github.com/janosmiko/lfk/compare/v0.18.11...v0.18.12) (2026-09-11)
 
 
