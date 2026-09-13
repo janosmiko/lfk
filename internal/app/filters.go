@@ -416,40 +416,92 @@ func appendConfigPresets(presets []FilterPreset, kind string) []FilterPreset {
 	return presets
 }
 
+// orphanKindInfo is one row of orphanKindTable: everything the orphan
+// filter/detector feature needs for a given resource Kind.
+type orphanKindInfo struct {
+	pool        func(*k8s.OrphanReport) []k8s.OrphanItem
+	presetName  string
+	description string
+}
+
+// orphanKindTable drives orphanPoolForKind, orphanPresetsForKind,
+// needsOrphanCache and orphanPresetNameForKind (commandbar_orphans.go).
+var orphanKindTable = map[string]orphanKindInfo{
+	"Pod": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.Pods },
+		presetName:  "Orphans",
+		description: "No owner reference",
+	},
+	"Secret": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.Secrets },
+		presetName:  "Unmounted",
+		description: "No Pod / template / Ingress / SA refers to it",
+	},
+	"ConfigMap": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.ConfigMaps },
+		presetName:  "Unmounted",
+		description: "No Pod or workload template refers to it",
+	},
+	"Service": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.Services },
+		presetName:  "No Endpoints",
+		description: "Zero ready+notReady endpoints",
+	},
+	"PersistentVolumeClaim": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.PVCs },
+		presetName:  "Unused",
+		description: "Not mounted by any Pod or template",
+	},
+	"HorizontalPodAutoscaler": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.HPAs },
+		presetName:  "Dangling",
+		description: "scaleTargetRef points to a missing workload",
+	},
+	"PodDisruptionBudget": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.PDBs },
+		presetName:  "Dangling",
+		description: "Selector matches no live / templated pods",
+	},
+	"NetworkPolicy": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.NetworkPolicies },
+		presetName:  "Dangling",
+		description: "podSelector matches no live / templated pods",
+	},
+	"Role": {
+		// ClusterRoleBinding can only reference ClusterRoles, so a Role is
+		// "unbound" iff no RoleBinding refers to it.
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.Roles },
+		presetName:  "Unbound",
+		description: "No RoleBinding refers to it",
+	},
+	"ClusterRole": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.ClusterRoles },
+		presetName:  "Unbound",
+		description: "No RoleBinding / ClusterRoleBinding refers to it",
+	},
+	"RoleBinding": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.RoleBindings },
+		presetName:  "Dangling",
+		description: "Missing role or empty subjects",
+	},
+	"ClusterRoleBinding": {
+		pool:        func(r *k8s.OrphanReport) []k8s.OrphanItem { return r.ClusterRoleBindings },
+		presetName:  "Dangling",
+		description: "Missing role or empty subjects",
+	},
+}
+
 // orphanPoolForKind returns the OrphanItem slice on `report` matching
 // `kind`, or nil if the kind doesn't have a per-list orphan preset.
-// Centralised so orphanMatcher and any future caller stay in sync.
 func orphanPoolForKind(report *k8s.OrphanReport, kind string) []k8s.OrphanItem {
 	if report == nil {
 		return nil
 	}
-	switch kind {
-	case "Pod":
-		return report.Pods
-	case "Secret":
-		return report.Secrets
-	case "ConfigMap":
-		return report.ConfigMaps
-	case "Service":
-		return report.Services
-	case "PersistentVolumeClaim":
-		return report.PVCs
-	case "HorizontalPodAutoscaler":
-		return report.HPAs
-	case "PodDisruptionBudget":
-		return report.PDBs
-	case "NetworkPolicy":
-		return report.NetworkPolicies
-	case "Role":
-		return report.Roles
-	case "ClusterRole":
-		return report.ClusterRoles
-	case "RoleBinding":
-		return report.RoleBindings
-	case "ClusterRoleBinding":
-		return report.ClusterRoleBindings
+	info, ok := orphanKindTable[kind]
+	if !ok {
+		return nil
 	}
-	return nil
+	return info.pool(report)
 }
 
 // orphanLookupKey joins namespace and name with a NUL separator so a
@@ -499,93 +551,24 @@ func orphanMatcher(cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKe
 // user has one mnemonic to remember across the whole feature surface;
 // the per-kind preset Name still distinguishes the underlying check
 // (Orphans / Unmounted / Unused / No Endpoints / Dangling / Unbound).
-//
-// Descriptions are kept short (≈ ≤50 chars) so they fit within the
-// quick-filter overlay's 72-col content area without wrapping.
 func orphanPresetsForKind(kind string, cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey) []FilterPreset {
-	const orphanKey = "O"
-	switch kind {
-	case "Pod":
-		return []FilterPreset{{
-			Name: "Orphans", Description: "No owner reference", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "Pod"),
-		}}
-	case "Secret":
-		return []FilterPreset{{
-			Name: "Unmounted", Description: "No Pod / template / Ingress / SA refers to it", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "Secret"),
-		}}
-	case "ConfigMap":
-		return []FilterPreset{{
-			Name: "Unmounted", Description: "No Pod or workload template refers to it", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "ConfigMap"),
-		}}
-	case "Service":
-		return []FilterPreset{{
-			Name: "No Endpoints", Description: "Zero ready+notReady endpoints", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "Service"),
-		}}
-	case "PersistentVolumeClaim":
-		return []FilterPreset{{
-			Name: "Unused", Description: "Not mounted by any Pod or template", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "PersistentVolumeClaim"),
-		}}
-	case "HorizontalPodAutoscaler":
-		return []FilterPreset{{
-			Name: "Dangling", Description: "scaleTargetRef points to a missing workload", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "HorizontalPodAutoscaler"),
-		}}
-	case "PodDisruptionBudget":
-		return []FilterPreset{{
-			Name: "Dangling", Description: "Selector matches no live / templated pods", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "PodDisruptionBudget"),
-		}}
-	case "NetworkPolicy":
-		return []FilterPreset{{
-			Name: "Dangling", Description: "podSelector matches no live / templated pods", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "NetworkPolicy"),
-		}}
-	case "Role":
-		return []FilterPreset{{
-			// ClusterRoleBinding can only reference ClusterRoles, so a
-			// Role is "unbound" iff no RoleBinding refers to it.
-			Name: "Unbound", Description: "No RoleBinding refers to it", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "Role"),
-		}}
-	case "ClusterRole":
-		return []FilterPreset{{
-			Name: "Unbound", Description: "No RoleBinding / ClusterRoleBinding refers to it", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "ClusterRole"),
-		}}
-	case "RoleBinding":
-		return []FilterPreset{{
-			Name: "Dangling", Description: "Missing role or empty subjects", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "RoleBinding"),
-		}}
-	case "ClusterRoleBinding":
-		return []FilterPreset{{
-			Name: "Dangling", Description: "Missing role or empty subjects", Key: orphanKey,
-			MatchFn: orphanMatcher(cache, key, "ClusterRoleBinding"),
-		}}
+	info, ok := orphanKindTable[kind]
+	if !ok {
+		return nil
 	}
-	return nil
+	return []FilterPreset{{
+		Name:        info.presetName,
+		Description: info.description,
+		Key:         "O",
+		MatchFn:     orphanMatcher(cache, key, kind),
+	}}
 }
 
 // needsOrphanCache reports whether opening the filter-preset overlay for this
-// kind should kick off a DetectOrphans scan. Every kind that has a preset in
-// orphanPresetsForKind also needs the cache; keep the two in sync.
+// kind should kick off a DetectOrphans scan.
 func needsOrphanCache(kind string) bool {
-	switch kind {
-	case "Pod", "Secret", "ConfigMap", "Service",
-		"PersistentVolumeClaim",
-		"HorizontalPodAutoscaler",
-		"PodDisruptionBudget",
-		"NetworkPolicy",
-		"Role", "ClusterRole",
-		"RoleBinding", "ClusterRoleBinding":
-		return true
-	}
-	return false
+	_, ok := orphanKindTable[kind]
+	return ok
 }
 
 // buildConfigMatchFn converts a ConfigFilterMatch into a MatchFn closure.
