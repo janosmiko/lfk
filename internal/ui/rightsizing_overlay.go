@@ -327,7 +327,7 @@ func rightsizingDataRow(
 	layout rsLayout,
 ) []string {
 	cells := []string{
-		renderRSCell(truncateName(name, layout.widths[0]), layout.widths[0], layout.aligns[0], BarNormalStyle),
+		renderRSCell(name, layout.widths[0], layout.aligns[0], BarNormalStyle),
 		renderRSCell(resKey, layout.widths[1], layout.aligns[1], BarNormalStyle),
 		valueCellOrDash(r.Usage, layout.widths[2], layout.aligns[2]),
 		currentCell(r.CurrentRequest, layout.widths[3], layout.aligns[3]),
@@ -347,13 +347,7 @@ func rightsizingDataRow(
 }
 
 // valueCellOrDash renders a value cell — `BarNormalStyle` when set, dim
-// em-dash placeholder when empty. Coordinating the placeholder with the
-// cell's base style HERE (rather than passing pre-styled `orDash`
-// content into `renderRSCell`) keeps the content plain so `rsTruncate`
-// inside the cell renderer can do rune-based truncation safely. The old
-// `orDash` returned an ANSI-styled string whose escape bytes counted as
-// runes, so any cell wider than the escape sequence got cut mid-escape
-// and the `—` never reached the screen.
+// em-dash placeholder when empty.
 func valueCellOrDash(v string, width int, align lipgloss.Position) string {
 	if v == "" {
 		return renderRSCell("—", width, align, BarDimStyle)
@@ -401,24 +395,6 @@ func deltaCell(current, recommended string, width int, align lipgloss.Position) 
 		return renderRSCell("—", width, align, BarDimStyle)
 	}
 	return renderRSCellPrestyled(formatPct(pct), width, align, deltaForegroundFor(pct))
-}
-
-// truncateName clips an over-long container name to the assigned
-// column content width so it doesn't overflow into the next cell.
-// Padding(0,1) gives the cell 2 chars of internal padding, so the
-// effective text room is `nameW - 2`. Adds a trailing ellipsis when
-// truncation occurs so the user knows the value is partial. Guards
-// against pathologically narrow widths so we never panic.
-func truncateName(name string, nameW int) string {
-	usable := nameW
-	if usable <= 1 {
-		return name
-	}
-	if len([]rune(name)) <= usable {
-		return name
-	}
-	runes := []rune(name)
-	return string(runes[:usable-1]) + "…"
 }
 
 // deltaForegroundFor maps a percent change to a foreground colour.

@@ -321,7 +321,7 @@ func buildCrashSummaryLines(entry CrashInvestigatorEntry) []string {
 			formatTimeAgo(active.LastFinished),
 		)))
 		if msg := strings.TrimSpace(sanitizeCrashMessage(active.LastMessage)); msg != "" {
-			lines = append(lines, OverlayDimStyle.Render("    Message: "+truncateCrash(msg, 200)))
+			lines = append(lines, OverlayDimStyle.Render("    Message: "+ansi.Truncate(msg, 200, "…")))
 		}
 	}
 
@@ -383,11 +383,11 @@ func renderCrashContainerTableLines(containers []CrashContainerEntry, active str
 			reason = fallbackCrashStr(SanitizeTerminalText(c.LastReason))
 		}
 		row := marker + crashJoinRow(
-			crashCell(truncateCrash(SanitizeTerminalText(c.Name), crashColContainer), crashColContainer),
-			crashCell(truncateCrash(state, crashColState), crashColState),
+			crashCell(ansi.Truncate(SanitizeTerminalText(c.Name), crashColContainer, "…"), crashColContainer),
+			crashCell(ansi.Truncate(state, crashColState, "…"), crashColState),
 			crashCell(fmt.Sprintf("%d", c.RestartCount), crashColRestarts),
 			crashCell(exit, crashColLastExit),
-			crashCell(truncateCrash(reason, crashColLastReason), crashColLastReason),
+			crashCell(ansi.Truncate(reason, crashColLastReason, "…"), crashColLastReason),
 		)
 		if c.Name == active {
 			lines = append(lines, OverlaySelectedStyle.Render(row))
@@ -425,19 +425,6 @@ func findCrashContainer(entry CrashInvestigatorEntry, name string) *CrashContain
 		}
 	}
 	return nil
-}
-
-// truncateCrash returns s shortened to at most n runes (counting bytes for
-// simplicity — container names and state strings are ASCII in practice).
-// Adds an ellipsis when truncated.
-func truncateCrash(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	if n <= 1 {
-		return s[:n]
-	}
-	return s[:n-1] + "…"
 }
 
 // wrapCrashText word-wraps s to at most width visual columns per line.
@@ -563,9 +550,9 @@ func renderCrashEventsTab(entry CrashInvestigatorEntry, scroll, width, height in
 	for _, ev := range entry.Events {
 		msgLines := wrapCrashText(sanitizeCrashMessage(ev.Message), msgW)
 		first := strings.Repeat(" ", indent) + crashJoinRow(
-			crashCell(truncateCrash(SanitizeTerminalText(ev.Type), typeW), typeW),
-			crashCell(truncateCrash(SanitizeTerminalText(ev.Reason), reasonW), reasonW),
-			crashCell(truncateCrash(ev.Age, ageW), ageW),
+			crashCell(ansi.Truncate(SanitizeTerminalText(ev.Type), typeW, "…"), typeW),
+			crashCell(ansi.Truncate(SanitizeTerminalText(ev.Reason), reasonW, "…"), reasonW),
+			crashCell(ansi.Truncate(ev.Age, ageW, "…"), ageW),
 			msgLines[0],
 		)
 		style := OverlayNormalStyle

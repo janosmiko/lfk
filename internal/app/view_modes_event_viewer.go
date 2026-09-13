@@ -137,7 +137,7 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 			if lowerQuery != "" {
 				displayLine = highlightDescribeSearchLine(displayLine, lowerQuery)
 			}
-			visible = append(visible, ui.YamlCursorIndicatorStyle.Render("▎")+ui.RenderCursorAtCol(displayLine, truncLine, m.eventTimelineCursorCol))
+			visible = append(visible, ui.YamlCursorIndicatorStyle.Render("▎")+ui.RenderCursorAtCol(displayLine, m.eventTimelineCursorCol))
 		} else {
 			displayLine := truncLine
 			if lowerQuery != "" {

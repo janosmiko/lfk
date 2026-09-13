@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // LogPreviewKind identifies how the previewed log line was parsed.
@@ -726,8 +727,8 @@ func renderPreviewFields(fields []LogPreviewField, width int) []string {
 
 	out := make([]string, 0, len(fields))
 	for _, f := range fields {
-		key, keyDisplayLen := truncateKeyForPreview(f.Key, keyWidth)
-		prefix := keyStyle.Render(key) + strings.Repeat(" ", keyWidth-keyDisplayLen) + sepStyle.Render(" : ")
+		key := ansi.Truncate(f.Key, keyWidth, "…")
+		prefix := keyStyle.Render(key) + strings.Repeat(" ", keyWidth-lipgloss.Width(key)) + sepStyle.Render(" : ")
 		first := true
 		for line := range strings.SplitSeq(f.Value, "\n") {
 			chunks := wrapLine(sanitizeLogLine(line, ConfigLogRenderAnsi), availForValue)
@@ -745,18 +746,4 @@ func renderPreviewFields(fields []LogPreviewField, width int) []string {
 		}
 	}
 	return out
-}
-
-// truncateKeyForPreview clamps a key to at most keyWidth runes, appending an
-// ellipsis when truncation occurs so the user can tell the displayed key has
-// been shortened. Returns the rendered key and its rune count for padding.
-func truncateKeyForPreview(key string, keyWidth int) (string, int) {
-	runes := []rune(key)
-	if len(runes) <= keyWidth {
-		return key, len(runes)
-	}
-	if keyWidth <= 1 {
-		return "…", 1
-	}
-	return string(runes[:keyWidth-1]) + "…", keyWidth
 }

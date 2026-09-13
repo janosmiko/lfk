@@ -86,6 +86,23 @@ func TestRenderDiffView_NoWrapDoesNotBleed(t *testing.T) {
 	}
 }
 
+// A tab advances the terminal to the next tab stop, not zero columns.
+// Same bleed-detection technique as TestRenderDiffView_NoWrapDoesNotBleed.
+func TestRenderDiffView_TabDoesNotBleed(t *testing.T) {
+	left := "a: 1\nlongkey:\t" + strings.Repeat("Q", 300) + "\nz: 9\n"
+	right := "a: 1\nlongkey:\t" + strings.Repeat("Z", 300) + "\nz: 9\n"
+	for _, lineNumbers := range []bool{true, false} {
+		for w := 60; w <= 200; w += 5 {
+			out := stripANSI(RenderDiffView(left, right, "left", "right", 0, w, 24, lineNumbers, false, "", nil, nil, false, "", 0, -1, DiffVisualParams{}, ""))
+			for line := range strings.SplitSeq(out, "\n") {
+				if strings.ContainsAny(line, "QZ") && !strings.Contains(line, "|") {
+					t.Fatalf("w=%d lineNumbers=%v: tab-bearing diff content bled past its column: %q", w, lineNumbers, line)
+				}
+			}
+		}
+	}
+}
+
 // --- unified ---
 
 func TestRenderUnifiedDiffView_WrapShowsFullLine(t *testing.T) {

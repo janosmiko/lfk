@@ -172,7 +172,7 @@ func (m Model) viewDescribe() string {
 			if lowerQuery != "" {
 				displayLine = highlightDescribeSearchLine(plainLine, lowerQuery)
 			}
-			cursorLine := ui.RenderCursorAtCol(displayLine, plainLine, m.describeView.cursorCol)
+			cursorLine := ui.RenderCursorAtCol(displayLine, m.describeView.cursorCol)
 			renderedLines = append(renderedLines, ui.YamlCursorIndicatorStyle.Render("\u258e")+cursorLine)
 		} else {
 			displayLine := plainLine

@@ -457,10 +457,8 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	if err != nil {
 		return nil, fmt.Errorf("building rest config for context %q: %w", displayName, err)
 	}
-	if RateLimitOverridesEnabled {
-		qps, burst := foregroundRate(displayName)
-		applyRateLimit(cfg, qps, burst)
-	}
+	qps, burst := foregroundRate(displayName)
+	applyRateLimit(cfg, qps, burst)
 	// Name the tool, its version and the person to the apiserver, which
 	// records the agent in the audit log.
 	cfg.UserAgent = UserAgent()
@@ -487,9 +485,7 @@ func (c *Client) restConfigForContextThrottled(displayName string) (*rest.Config
 	if err != nil {
 		return nil, err
 	}
-	if RateLimitOverridesEnabled {
-		applyRateLimit(cfg, SecurityClientQPS, SecurityClientBurst)
-	}
+	applyRateLimit(cfg, SecurityClientQPS, SecurityClientBurst)
 	return cfg, nil
 }
 
