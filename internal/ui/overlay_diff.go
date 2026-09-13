@@ -565,6 +565,29 @@ func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart
 	return RenderVisualSelection(plainText, vp.VisualType, visIdx, selStart, selEnd, vp.VisualStart, vp.VisualCol, vp.CursorCol, colStart, colEnd)
 }
 
+// truncateBgLeft truncates line to col cells, padding with a space when the
+// cut lands inside a wide rune (ansi.Truncate drops it whole) so the overlay
+// after it still starts exactly at col.
+func truncateBgLeft(line string, col int) string {
+	s := ansi.Truncate(line, col, "")
+	if w := lipgloss.Width(s); w < col {
+		s += strings.Repeat(" ", col-w)
+	}
+	return s
+}
+
+// truncateBgRight truncates line to the cells from col onward, padding with
+// a space when the cut lands inside a wide rune (ansi.TruncateLeft drops it
+// whole) so the row after the overlay still reaches the line's full width.
+func truncateBgRight(line string, col int) string {
+	s := ansi.TruncateLeft(line, col, "")
+	want := max(lipgloss.Width(line)-col, 0)
+	if w := lipgloss.Width(s); w < want {
+		s = strings.Repeat(" ", want-w) + s
+	}
+	return s
+}
+
 // PlaceOverlayBottom anchors an overlay near the bottom edge of the background,
 // horizontally centered, leaving marginBottom rows below it. Used for the
 // which-key panel, which rises from the bottom of the screen like neovim's
@@ -601,8 +624,8 @@ func PlaceOverlayBottom(width, height, marginBottom int, overlay, background str
 			continue
 		}
 		ovVisualWidth := lipgloss.Width(ovLine)
-		leftBg := ansi.Truncate(result[row], startCol, "")
-		rightBg := ansi.TruncateLeft(result[row], startCol+ovVisualWidth, "")
+		leftBg := truncateBgLeft(result[row], startCol)
+		rightBg := truncateBgRight(result[row], startCol+ovVisualWidth)
 		result[row] = leftBg + ovLine + rightBg
 	}
 	return strings.Join(result, "\n")
@@ -662,8 +685,8 @@ func PlaceOverlay(width, height int, overlay, background string) string {
 		}
 		bgLine := result[row]
 		ovVisualWidth := lipgloss.Width(ovLine)
-		leftBg := ansi.Truncate(bgLine, startCol, "")
-		rightBg := ansi.TruncateLeft(bgLine, startCol+ovVisualWidth, "")
+		leftBg := truncateBgLeft(bgLine, startCol)
+		rightBg := truncateBgRight(bgLine, startCol+ovVisualWidth)
 		result[row] = leftBg + ovLine + rightBg
 	}
 
