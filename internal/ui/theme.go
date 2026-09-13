@@ -190,13 +190,13 @@ func ApplyTheme(t Theme) {
 	RowTintFailedFg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error)).Background(baseBg)
 	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Background(baseBg)
 	RowTintFailedBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
-		Background(lipgloss.Color(blendHexToward(t.Base, t.Error, rowTintBgBlend)))
+		Background(lipgloss.Color(blendHex(t.Base, t.Error, rowTintBgBlend)))
 	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
-		Background(lipgloss.Color(blendHexToward(t.Base, t.Primary, rowTintBgBlend)))
+		Background(lipgloss.Color(blendHex(t.Base, t.Primary, rowTintBgBlend)))
 	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
-		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Error, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+		Background(lipgloss.Color(blendHex(blendHex(t.Base, t.Error, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
 	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
-		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+		Background(lipgloss.Color(blendHex(blendHex(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
 
 	var barBg color.Color = lipgloss.NoColor{}
 	if !ConfigTransparentBg {

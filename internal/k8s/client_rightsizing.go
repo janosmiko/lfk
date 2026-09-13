@@ -32,8 +32,8 @@ func effectiveHeadroom(h float64) float64 {
 // metrics-server fallback path that produced any number is the safety
 // net). VPA appears iff a VerticalPodAutoscaler with a matching
 // targetRef exists in the namespace. Prometheus strategies appear iff
-// model.ConfigMonitoring carries a Prometheus endpoint for this
-// context (or the "_global" fallback). The returned slice preserves
+// prometheusAvailable finds a usable endpoint for this context, from
+// config or label discovery. The returned slice preserves
 // the priority order from model.AllRightsizingStrategies so the caller
 // can pick the head as the default and walk the slice on </>.
 func (c *Client) AvailableRightsizingStrategies(ctx context.Context, contextName, namespace, kind, name string) []model.RightsizingStrategy {
@@ -44,7 +44,7 @@ func (c *Client) AvailableRightsizingStrategies(ctx context.Context, contextName
 		available[model.StrategyVPA] = true
 	}
 
-	if hasPrometheusConfigured(contextName) {
+	if c.prometheusAvailable(ctx, contextName) {
 		available[model.StrategyPromMax1D] = true
 		available[model.StrategyPromAvg1D] = true
 		available[model.StrategyPromP957D] = true
@@ -57,25 +57,6 @@ func (c *Client) AvailableRightsizingStrategies(ctx context.Context, contextName
 		}
 	}
 	return out
-}
-
-// hasPrometheusConfigured reports whether ConfigMonitoring carries a
-// usable Prometheus endpoint for the given context (or the "_global"
-// fallback). Centralised so the right-sizing strategy picker and the
-// Prometheus query path agree on what "configured" means.
-func hasPrometheusConfigured(contextName string) bool {
-	cfg := model.ConfigMonitoring
-	if cfg == nil {
-		return false
-	}
-	mc, ok := cfg[contextName]
-	if !ok {
-		mc, ok = cfg["_global"]
-	}
-	if !ok {
-		return false
-	}
-	return mc.Prometheus != nil
 }
 
 // GetRightsizing builds a per-container recommendation payload for
@@ -584,11 +565,9 @@ func isMemoryQuantity(s string) bool {
 	return false
 }
 
-// SnapCPUMilliToCanonical / SnapMemBytesToCanonical duplicate the
-// snapping logic from internal/ui/quantity_math.go. The k8s package
-// can't import internal/ui (would invert the architecture's data ->
-// presentation direction), so the helpers live in both places. Keep
-// in sync. They're only ~15 lines each.
+// SnapCPUMilliToCanonical rounds and formats a quantity independently of
+// internal/ui, since k8s can't import ui (would invert the architecture's
+// data -> presentation direction).
 func SnapCPUMilliToCanonical(milli int64) string {
 	if milli <= 0 {
 		return "0"

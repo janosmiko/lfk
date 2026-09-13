@@ -1,10 +1,41 @@
 package ui
 
 import (
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// SnapCPU rounds CPU millicores UP to the nearest 10m and returns the
+// canonical k8s string. Inputs >= 1000m are formatted as whole-core
+// ("1", "2"); anything below uses the millicore suffix ("80m", "1240m").
+func SnapCPU(milli int64) string {
+	if milli <= 0 {
+		return "0"
+	}
+	tens := milli / 10
+	if milli%10 != 0 {
+		tens++
+	}
+	// tens*10 is formatted, never computed, so it can't overflow near MaxInt64.
+	if tens >= 100 && tens%100 == 0 {
+		return fmt.Sprintf("%d", tens/100)
+	}
+	return fmt.Sprintf("%d0m", tens)
+}
+
+// SnapMem rounds memory bytes UP to the nearest Mi and returns the
+// canonical k8s string ("Mi" suffix). Anything below 1Mi snaps up to "1Mi".
+func SnapMem(bytes int64) string {
+	if bytes <= 0 {
+		return "0"
+	}
+	const mi = 1024 * 1024
+	mibs := (bytes-1)/mi + 1
+	return fmt.Sprintf("%dMi", mibs)
+}
 
 func TestSnapCPU(t *testing.T) {
 	cases := []struct {
@@ -28,6 +59,11 @@ func TestSnapCPU(t *testing.T) {
 	}
 }
 
+func TestSnapCPU_NearMaxInt64DoesNotOverflow(t *testing.T) {
+	got := SnapCPU(math.MaxInt64)
+	assert.NotContains(t, got, "-", "SnapCPU near MaxInt64 wrapped negative: %s", got)
+}
+
 func TestSnapMem(t *testing.T) {
 	cases := []struct {
 		name string
@@ -44,6 +80,11 @@ func TestSnapMem(t *testing.T) {
 			assert.Equal(t, tc.want, SnapMem(tc.in))
 		})
 	}
+}
+
+func TestSnapMem_NearMaxInt64DoesNotOverflow(t *testing.T) {
+	got := SnapMem(math.MaxInt64)
+	assert.NotContains(t, got, "-", "SnapMem near MaxInt64 wrapped negative: %s", got)
 }
 
 func TestDeltaPercent(t *testing.T) {

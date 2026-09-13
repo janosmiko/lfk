@@ -76,50 +76,6 @@ func (r *Registry) StopWorkers() {
 	r.workersWG.Wait()
 }
 
-// SetWorkersForTest overrides the configured worker count for a Registry
-// before any pool is spawned. Tests use this to make dispatch
-// deterministic. Production code MUST NOT call this.
-func (r *Registry) SetWorkersForTest(workers, criticalReserved int) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.cfg.WorkersPerContext = ClampWorkers(workers)
-	r.cfg.CriticalReserved = ClampCriticalReserved(criticalReserved, r.cfg.WorkersPerContext)
-	// Re-clamp the existing low reservation against the new totals so an
-	// earlier SetLowReservedForTest stays valid (and the default doesn't
-	// exceed a small test pool). Tests that want a specific value call
-	// SetLowReservedForTest after this.
-	r.cfg.LowReserved = ClampLowReserved(r.cfg.LowReserved, r.cfg.WorkersPerContext, r.cfg.CriticalReserved)
-}
-
-// SetLowReservedForTest overrides the low-reserved worker count before any
-// pool is spawned. Clamped against the current worker/critical totals.
-// Production code MUST NOT call this. Use the ConfigLowReserved global.
-func (r *Registry) SetLowReservedForTest(n int) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.cfg.LowReserved = ClampLowReserved(n, r.cfg.WorkersPerContext, r.cfg.CriticalReserved)
-}
-
-// SetAgingThresholdForTest overrides the anti-starvation aging threshold on a
-// Registry before any per-context queue is created (queues capture it lazily on
-// first Submit). The value is used verbatim — including 0 to disable aging — so
-// tests can exercise both small thresholds and the strict-priority kill switch.
-// Production code MUST NOT call this. Use the ConfigAgingThreshold global.
-func (r *Registry) SetAgingThresholdForTest(n int) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.cfg.AgingThreshold = n
-}
-
 // ensurePoolFor spawns the per-context worker pool the first time a
 // kctx receives a Submit. Caller must hold r.mu.
 func (r *Registry) ensurePoolFor(_ string, q *ctxQueue) {

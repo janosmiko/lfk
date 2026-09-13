@@ -155,12 +155,12 @@ func buildCachedClient[T comparable](
 		}
 
 		c.clientMu.Lock()
-		// If an invalidate (ReloadKubeconfig / invalidateClientsForContext)
-		// bumped the generation while we built, our client is against stale
-		// config: hand it to this flight's callers (all of whom snapshotted the
-		// same pre-invalidate gen, so their request predates the change) but do
-		// NOT cache it — the next caller snapshots the newer gen, takes a fresh
-		// flight, and rebuilds against the fresh config.
+		// If ReloadKubeconfig bumped the generation while we built, our
+		// client is against stale config: hand it to this flight's callers
+		// (all of whom snapshotted the same pre-invalidate gen, so their
+		// request predates the change) but do NOT cache it — the next
+		// caller snapshots the newer gen, takes a fresh flight, and rebuilds
+		// against the fresh config.
 		if c.clientCacheGen == gen {
 			set(c.cachedClientsLocked(key), built)
 		}
@@ -232,19 +232,5 @@ func (c *Client) invalidateClientCache() {
 	c.clientMu.Lock()
 	defer c.clientMu.Unlock()
 	c.clientCache = nil
-	c.clientCacheGen++
-}
-
-// invalidateClientsForContext drops the cached clients for a single context
-// (both the foreground and throttled variants), leaving other contexts intact.
-// The generation bump applies process-wide (not per-context) — a coarse but
-// safe choice: at worst an unrelated context's racing build rebuilds once.
-//
-//nolint:unparam // per-context invalidation API; contextName is constant only because current callers are tests
-func (c *Client) invalidateClientsForContext(contextName string) {
-	c.clientMu.Lock()
-	defer c.clientMu.Unlock()
-	delete(c.clientCache, clientCacheKey(contextName, false))
-	delete(c.clientCache, clientCacheKey(contextName, true))
 	c.clientCacheGen++
 }

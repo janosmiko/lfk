@@ -514,28 +514,6 @@ func (c *Client) dynamicForContext(contextName string) (dynamic.Interface, error
 	})
 }
 
-// RawClientset returns the kubernetes clientset for the currently selected
-// context, or nil if none is available. Used by security sources that need
-// a raw kubernetes.Interface (e.g., the heuristic source walking Pod specs).
-func (c *Client) RawClientset() kubernetes.Interface {
-	cs, err := c.clientsetForContext(c.CurrentContext())
-	if err != nil || cs == nil {
-		return nil
-	}
-	return cs
-}
-
-// RawDynamic returns the dynamic client for the currently selected context,
-// or nil if none is available. Used by security sources that read CRDs
-// (e.g., the trivy-operator source reading VulnerabilityReport CRs).
-func (c *Client) RawDynamic() dynamic.Interface {
-	dc, err := c.dynamicForContext(c.CurrentContext())
-	if err != nil || dc == nil {
-		return nil
-	}
-	return dc
-}
-
 // RawClientsetForContext returns the kubernetes clientset for the given
 // context, or nil if it cannot be built. Exposed for callers that need to
 // construct per-context sources (e.g., security source re-registration on

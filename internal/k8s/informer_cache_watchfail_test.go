@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	clienttesting "k8s.io/client-go/testing"
 
@@ -155,4 +156,12 @@ func TestInformerCache_WatchFailureLogsOnce(t *testing.T) {
 			return
 		}
 	}
+}
+
+// hasEntry reports whether a live informer exists for (contextName, gvr).
+func (ic *informerCache) hasEntry(contextName string, gvr schema.GroupVersionResource) bool {
+	ic.mu.Lock()
+	defer ic.mu.Unlock()
+	_, ok := ic.entries[contextName][gvr]
+	return ok
 }

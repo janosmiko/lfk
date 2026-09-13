@@ -2,7 +2,7 @@ package ui
 
 import "sort"
 
-//go:generate go run ../../cmd/themegen --input-dir=../../themes/ghostty --output=colorschemes_gen.go
+//go:generate go run ../../cmd/themegen --input-dir=../../themes/ghostty --output=colorschemes.tsv
 
 // BuiltinSchemes returns all built-in color schemes keyed by display name.
 // All schemes are auto-generated from ghostty terminal themes.

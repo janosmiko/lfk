@@ -454,3 +454,41 @@ func TestRunTask_SilentTrackAppearsInHistoryButNotIndicator(t *testing.T) {
 		return false
 	}, time.Second, 5*time.Millisecond, "silent task must appear in SnapshotCompleted so the user can see watch-tick history")
 }
+
+// SetWorkersForTest overrides the configured worker count for a Registry
+// before any pool is spawned, to make dispatch deterministic.
+func (r *Registry) SetWorkersForTest(workers, criticalReserved int) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cfg.WorkersPerContext = ClampWorkers(workers)
+	r.cfg.CriticalReserved = ClampCriticalReserved(criticalReserved, r.cfg.WorkersPerContext)
+	// Re-clamp against the new totals so an earlier SetLowReservedForTest
+	// value stays valid.
+	r.cfg.LowReserved = ClampLowReserved(r.cfg.LowReserved, r.cfg.WorkersPerContext, r.cfg.CriticalReserved)
+}
+
+// SetLowReservedForTest overrides the low-reserved worker count before any
+// pool is spawned. Clamped against the current worker/critical totals.
+func (r *Registry) SetLowReservedForTest(n int) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cfg.LowReserved = ClampLowReserved(n, r.cfg.WorkersPerContext, r.cfg.CriticalReserved)
+}
+
+// SetAgingThresholdForTest overrides the anti-starvation aging threshold on a
+// Registry before any per-context queue is created. Applied verbatim,
+// including 0 to disable aging.
+func (r *Registry) SetAgingThresholdForTest(n int) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cfg.AgingThreshold = n
+}

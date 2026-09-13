@@ -1,14 +1,6 @@
 package app
 
-import (
-	"os"
-	"path/filepath"
-
-	"sigs.k8s.io/yaml"
-
-	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
-)
+const hiddenTypesFileName = "hidden_types.yaml"
 
 // HiddenTypesState stores the resource-type keys ("group/resource",
 // version-agnostic — e.g. "networking.k8s.io/ingresses" or "/limitranges")
@@ -23,32 +15,13 @@ type HiddenTypesState struct {
 
 // hiddenTypesFilePath returns the path to the hidden-types state file.
 func hiddenTypesFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "hidden_types.yaml")
+	return stateFilePath(hiddenTypesFileName)
 }
 
 // loadHiddenTypesState reads hidden types from disk, returning an empty state
 // (never nil) when the file is missing or corrupt.
 func loadHiddenTypesState() *HiddenTypesState {
-	path := hiddenTypesFilePath()
-	if path == "" {
-		return newHiddenTypesState()
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read hidden-types state", "error", err, "path", path)
-		}
-		return newHiddenTypesState()
-	}
-	var s HiddenTypesState
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Hidden-types file is corrupt; starting fresh", "error", err, "path", path)
-		return newHiddenTypesState()
-	}
+	s := loadStateFile[HiddenTypesState](hiddenTypesFileName)
 	if s.Contexts == nil {
 		s.Contexts = make(map[string][]string)
 	}
@@ -67,18 +40,7 @@ func newHiddenTypesState() *HiddenTypesState {
 
 // saveHiddenTypesState writes hidden types to disk.
 func saveHiddenTypesState(s *HiddenTypesState) error {
-	path := hiddenTypesFilePath()
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(s)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+	return saveStateFile(hiddenTypesFileName, s)
 }
 
 // toggleHiddenType adds or removes a resource-type key from the per-context
