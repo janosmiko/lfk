@@ -123,15 +123,15 @@ var (
 	RowTintFailedFg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
 	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
 	RowTintFailedBg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
-				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend)))
+				Background(lipgloss.Color(blendHex(defaultColorBase, defaultColorError, rowTintBgBlend)))
 	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
-				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend)))
+				Background(lipgloss.Color(blendHex(defaultColorBase, defaultColorPrimary, rowTintBgBlend)))
 	// Cursor row in background mode: the status background blended toward the
 	// selection color so the cursor stays visible on a tinted row (#540 UAT).
 	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true).
-				Background(lipgloss.Color(blendHexToward(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
+				Background(lipgloss.Color(blendHex(blendHex(defaultColorBase, defaultColorError, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
 	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true).
-					Background(lipgloss.Color(blendHexToward(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
+					Background(lipgloss.Color(blendHex(blendHex(defaultColorBase, defaultColorPrimary, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
 
 	// Title bar (full-width background).
 	TitleBarStyle = lipgloss.NewStyle().

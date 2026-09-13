@@ -6,73 +6,19 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/lucasb-eyer/go-colorful"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// ---- parseHexColor tests ----
-
-func TestParseHexColor(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  string
-		wantR  float64
-		wantG  float64
-		wantB  float64
-		wantOK bool
-	}{
-		{"black 6-digit", "#000000", 0, 0, 0, true},
-		{"white 6-digit", "#ffffff", 1, 1, 1, true},
-		{"white uppercase", "#FFFFFF", 1, 1, 1, true},
-		{"mixed case", "#FF0080", 1, 0, float64(0x80) / 255.0, true},
-		{"3-digit black", "#000", 0, 0, 0, true},
-		{"3-digit white", "#fff", 1, 1, 1, true},
-		{"3-digit mixed", "#f08", 1, 0, float64(0x88) / 255.0, true},
-		{"tokyonight primary", "#7aa2f7", float64(0x7a) / 255.0, float64(0xa2) / 255.0, float64(0xf7) / 255.0, true},
-		{"empty string", "", 0, 0, 0, false},
-		{"no hash", "ff0000", 0, 0, 0, false},
-		{"named color", "red", 0, 0, 0, false},
-		{"too short", "#ff00", 0, 0, 0, false},
-		{"too long", "#ff000000", 0, 0, 0, false},
-		{"invalid hex", "#gggggg", 0, 0, 0, false},
+// hexOK parses a hex color for test assertions, mirroring the (r, g, b, ok)
+// shape the deleted parseHexColor helper used.
+func hexOK(s string) (r, g, b float64, ok bool) {
+	c, err := colorful.Hex(s)
+	if err != nil {
+		return 0, 0, 0, false
 	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			r, g, b, ok := parseHexColor(tc.input)
-			assert.Equal(t, tc.wantOK, ok)
-			if tc.wantOK {
-				assert.InDelta(t, tc.wantR, r, 1e-10)
-				assert.InDelta(t, tc.wantG, g, 1e-10)
-				assert.InDelta(t, tc.wantB, b, 1e-10)
-			}
-		})
-	}
-}
-
-// ---- formatHexColor tests ----
-
-func TestFormatHexColor(t *testing.T) {
-	tests := []struct {
-		name    string
-		r, g, b float64
-		want    string
-	}{
-		{"black", 0, 0, 0, "#000000"},
-		{"white", 1, 1, 1, "#ffffff"},
-		{"red", 1, 0, 0, "#ff0000"},
-		{"green", 0, 1, 0, "#00ff00"},
-		{"blue", 0, 0, 1, "#0000ff"},
-		{"clamps below 0", -1, 0, 0, "#000000"},
-		{"clamps above 1", 2, 0, 0, "#ff0000"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := formatHexColor(tc.r, tc.g, tc.b)
-			assert.Equal(t, tc.want, got)
-		})
-	}
+	return c.R, c.G, c.B, true
 }
 
 // ---- relativeLuminance tests ----
@@ -122,9 +68,9 @@ func TestContrastRatio(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fgR, fgG, fgB, ok := parseHexColor(tc.fg)
+			fgR, fgG, fgB, ok := hexOK(tc.fg)
 			require.True(t, ok)
-			bgR, bgG, bgB, ok := parseHexColor(tc.bg)
+			bgR, bgG, bgB, ok := hexOK(tc.bg)
 			require.True(t, ok)
 			l1 := relativeLuminance(fgR, fgG, fgB)
 			l2 := relativeLuminance(bgR, bgG, bgB)
@@ -133,26 +79,6 @@ func TestContrastRatio(t *testing.T) {
 			// ratio must always be >= 1
 			assert.GreaterOrEqual(t, got, 1.0)
 		})
-	}
-}
-
-// ---- RGB/HSL roundtrip tests ----
-
-func TestRGBHSLRoundtrip(t *testing.T) {
-	// For chromatic colors the round-trip should be lossless.
-	testColors := []struct{ r, g, b float64 }{
-		{1, 0, 0},
-		{0, 1, 0},
-		{0, 0, 1},
-		{float64(0x7a) / 255.0, float64(0xa2) / 255.0, float64(0xf7) / 255.0}, // #7aa2f7
-		{float64(0xbb) / 255.0, float64(0x9a) / 255.0, float64(0xf7) / 255.0}, // #bb9af7
-	}
-	for _, c := range testColors {
-		h, s, l := rgbToHSL(c.r, c.g, c.b)
-		r2, g2, b2 := hslToRGB(h, s, l)
-		assert.InDelta(t, c.r, r2, 1e-9, "R roundtrip for (%g,%g,%g)", c.r, c.g, c.b)
-		assert.InDelta(t, c.g, g2, 1e-9, "G roundtrip for (%g,%g,%g)", c.r, c.g, c.b)
-		assert.InDelta(t, c.b, b2, 1e-9, "B roundtrip for (%g,%g,%g)", c.r, c.g, c.b)
 	}
 }
 
@@ -190,10 +116,10 @@ func TestEnforceMinContrastLightensAgainstDark(t *testing.T) {
 
 	require.NotEmpty(t, result)
 	// The result must be parseable.
-	rR, rG, rB, ok := parseHexColor(result)
+	rR, rG, rB, ok := hexOK(result)
 	require.True(t, ok, "result must be a valid hex color, got %q", result)
 
-	bgR, bgG, bgB, ok2 := parseHexColor(bg)
+	bgR, bgG, bgB, ok2 := hexOK(bg)
 	require.True(t, ok2)
 
 	lFg := relativeLuminance(rR, rG, rB)
@@ -203,7 +129,7 @@ func TestEnforceMinContrastLightensAgainstDark(t *testing.T) {
 	assert.GreaterOrEqual(t, ratio, target-0.1, "result contrast ratio %g should meet target %g", ratio, target)
 
 	// Verify fg moved lighter (higher luminance) compared to original.
-	origR, origG, origB, _ := parseHexColor(fg)
+	origR, origG, origB, _ := hexOK(fg)
 	origL := relativeLuminance(origR, origG, origB)
 	assert.GreaterOrEqual(t, lFg, origL, "fg should move to higher luminance (lighter) against dark bg")
 }
@@ -216,10 +142,10 @@ func TestEnforceMinContrastDarkensAgainstLight(t *testing.T) {
 	result := EnforceMinContrast(fg, bg, 0.175) // target ~4.5
 
 	require.NotEmpty(t, result)
-	rR, rG, rB, ok := parseHexColor(result)
+	rR, rG, rB, ok := hexOK(result)
 	require.True(t, ok, "result must be a valid hex color, got %q", result)
 
-	bgR, bgG, bgB, _ := parseHexColor(bg)
+	bgR, bgG, bgB, _ := hexOK(bg)
 	lFg := relativeLuminance(rR, rG, rB)
 	lBg := relativeLuminance(bgR, bgG, bgB)
 	ratio := contrastRatio(lFg, lBg)
@@ -227,7 +153,7 @@ func TestEnforceMinContrastDarkensAgainstLight(t *testing.T) {
 	assert.GreaterOrEqual(t, ratio, target-0.1, "result contrast ratio %g should meet target %g", ratio, target)
 
 	// Verify fg moved darker (lower luminance) compared to original.
-	origR, origG, origB, _ := parseHexColor(fg)
+	origR, origG, origB, _ := hexOK(fg)
 	origL := relativeLuminance(origR, origG, origB)
 	assert.LessOrEqual(t, lFg, origL, "fg should move to lower luminance (darker) against light bg")
 }
@@ -239,10 +165,10 @@ func TestEnforceMinContrastMaxValue(t *testing.T) {
 	result := EnforceMinContrast(fg, bg, 1.0)
 
 	require.NotEmpty(t, result)
-	rR, rG, rB, ok := parseHexColor(result)
+	rR, rG, rB, ok := hexOK(result)
 	require.True(t, ok, "result must be a valid hex color, got %q", result)
 
-	bgR, bgG, bgB, _ := parseHexColor(bg)
+	bgR, bgG, bgB, _ := hexOK(bg)
 	lFg := relativeLuminance(rR, rG, rB)
 	lBg := relativeLuminance(bgR, bgG, bgB)
 	ratio := contrastRatio(lFg, lBg)
@@ -261,8 +187,8 @@ func TestEnforceMinContrastPreservesHuePartial(t *testing.T) {
 	fg := "#2e3147" // very dark blue-ish, low contrast against dark base
 	bg := "#24283b" // dark base
 
-	origR, origG, origB, _ := parseHexColor(fg)
-	origH, _, _ := rgbToHSL(origR, origG, origB)
+	origCol, _ := colorful.Hex(fg)
+	origH, _, _ := origCol.Hsl()
 
 	result := EnforceMinContrast(fg, bg, 0.175) // AA nudge
 
@@ -270,12 +196,11 @@ func TestEnforceMinContrastPreservesHuePartial(t *testing.T) {
 		t.Skip("already meets target, hue preservation trivially holds")
 	}
 
-	rR, rG, rB, ok := parseHexColor(result)
-	require.True(t, ok)
-	newH, _, _ := rgbToHSL(rR, rG, rB)
+	resultCol, err := colorful.Hex(result)
+	require.NoError(t, err)
+	newH, _, _ := resultCol.Hsl()
 
-	// Compute angular difference in degrees (hue is in [0,1] mapped to [0,360]).
-	diff := math.Abs(origH-newH) * 360
+	diff := math.Abs(origH - newH)
 	if diff > 180 {
 		diff = 360 - diff
 	}
@@ -320,8 +245,8 @@ func TestApplyThemePreservesParentHighlightReadability(t *testing.T) {
 	ConfigMinContrastRatio = 0.5
 	ApplyTheme(DefaultTheme())
 
-	tr, tg, tb, okT := parseHexColor(ActiveTheme.Text)
-	br, bgG, bb, okB := parseHexColor(ActiveTheme.Border)
+	tr, tg, tb, okT := hexOK(ActiveTheme.Text)
+	br, bgG, bb, okB := hexOK(ActiveTheme.Border)
 	require.True(t, okT, "Text must remain a valid hex after enforcement")
 	require.True(t, okB, "Border must remain a valid hex after enforcement")
 
@@ -361,8 +286,8 @@ func TestDerivedParentHighlightBg_DimsWhenBorderTooCloseToText(t *testing.T) {
 
 	bg := derivedParentHighlightBg(theme)
 
-	tr, tg, tb, okT := parseHexColor(theme.Text)
-	br, bgG, bb, okB := parseHexColor(bg)
+	tr, tg, tb, okT := hexOK(theme.Text)
+	br, bgG, bb, okB := hexOK(bg)
 	require.True(t, okT, "Text must be a valid hex")
 	require.True(t, okB, "derived parent-highlight bg must be a valid hex (got %q)", bg)
 
@@ -405,15 +330,15 @@ func TestEnforceMinContrastPreservesFgBgRelationship(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fr, fg, fb, _ := parseHexColor(tc.fg)
-			br, bgGreen, bb, _ := parseHexColor(tc.bg)
+			fr, fg, fb, _ := hexOK(tc.fg)
+			br, bgGreen, bb, _ := hexOK(tc.bg)
 			lFgBefore := relativeLuminance(fr, fg, fb)
 			lBg := relativeLuminance(br, bgGreen, bb)
 			fgStartedDarker := lFgBefore < lBg
 
 			got := EnforceMinContrast(tc.fg, tc.bg, tc.value)
 
-			gr, gg, gb, ok := parseHexColor(got)
+			gr, gg, gb, ok := hexOK(got)
 			require.True(t, ok, "mutator must return a valid hex color")
 			lFgAfter := relativeLuminance(gr, gg, gb)
 
@@ -559,9 +484,9 @@ func TestApplyThemeHonoursContrastKnob(t *testing.T) {
 	assert.NotEqual(t, textWithoutKnob, textWithKnob, "text color should shift when contrast knob is active")
 
 	// Verify the new color actually meets the target ratio against Base.
-	tR, tG, tB, ok := parseHexColor(textWithKnob)
+	tR, tG, tB, ok := hexOK(textWithKnob)
 	require.True(t, ok, "shifted text color must be a valid hex")
-	bR, bG, bB, ok2 := parseHexColor(lowContrastTheme.Base)
+	bR, bG, bB, ok2 := hexOK(lowContrastTheme.Base)
 	require.True(t, ok2)
 
 	lFg := relativeLuminance(tR, tG, tB)
