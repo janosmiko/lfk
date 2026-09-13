@@ -1,10 +1,18 @@
 package ui
 
 import (
+	"hash/fnv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// FieldManagerColorIndex returns which palette slot a manager lands in.
+func FieldManagerColorIndex(manager string) int {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(manager))
+	return int(h.Sum32()) % len(fieldManagerPalette())
+}
 
 func TestFieldManagerColorIndex_IsStableAndInRange(t *testing.T) {
 	for _, name := range []string{"kubectl", "argocd-controller", "helm", ""} {

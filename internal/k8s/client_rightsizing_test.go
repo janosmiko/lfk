@@ -590,3 +590,47 @@ func TestAvailableRightsizingStrategies(t *testing.T) {
 		})
 	}
 }
+
+// Covers #705: label-discovered Prometheus (no monitoring: config) must
+// also unlock the strategies, matching prometheusAvailable's rule.
+func TestAvailableRightsizingStrategies_DiscoveredPrometheus(t *testing.T) {
+	prevCfg := model.ConfigMonitoring
+	model.ConfigMonitoring = nil
+	t.Cleanup(func() { model.ConfigMonitoring = prevCfg })
+
+	pod := &corev1.Pod{
+		Name: "frontend-aaa", Namespace: "default",
+		Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+	}
+
+	t.Run("discovered service, no config -> prom strategies present", func(t *testing.T) {
+		resetMonitoringDiscoveryCache()
+		cs := fake.NewSimpleClientset(pod, monitoringSvc("monitoring", "vmsingle-vmks", "vmsingle", port("http", 8428)))
+		dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			vpaGVRForTest(): "VerticalPodAutoscalerList",
+			{Group: "autoscaling.k8s.io", Version: "v1beta2", Resource: "verticalpodautoscalers"}: "VerticalPodAutoscalerList",
+		})
+		c := NewTestClient(cs, dyn)
+
+		got := c.AvailableRightsizingStrategies(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa")
+		assert.Equal(t, []model.RightsizingStrategy{
+			model.StrategyPromMax1D,
+			model.StrategyPromAvg1D,
+			model.StrategyPromP957D,
+			model.StrategySnapshot,
+		}, got)
+	})
+
+	t.Run("no config, no service -> no prom strategies", func(t *testing.T) {
+		resetMonitoringDiscoveryCache()
+		cs := fake.NewSimpleClientset(pod)
+		dyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			vpaGVRForTest(): "VerticalPodAutoscalerList",
+			{Group: "autoscaling.k8s.io", Version: "v1beta2", Resource: "verticalpodautoscalers"}: "VerticalPodAutoscalerList",
+		})
+		c := NewTestClient(cs, dyn)
+
+		got := c.AvailableRightsizingStrategies(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa")
+		assert.Equal(t, []model.RightsizingStrategy{model.StrategySnapshot}, got)
+	})
+}

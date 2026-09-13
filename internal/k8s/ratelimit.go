@@ -35,14 +35,6 @@ const (
 // mutex guards it. Tests that reassign it run sequentially (no t.Parallel).
 var RateLimitForContext func(context string) (qps float32, burst int)
 
-// RateLimitOverridesEnabled gates whether lfk applies ANY client-side
-// QPS/Burst override (the raised foreground default and the lower security
-// budget). When false, every client uses client-go's stock default (QPS 5 /
-// Burst 10) — the pre-feature baseline. Enabled now that the scheduler
-// lost-wakeup jam is fixed; set to false to fall back to stock client-go
-// limits while diagnosing any throttling regression.
-var RateLimitOverridesEnabled = true
-
 // foregroundRate resolves the foreground rate limit for a context, applying
 // the config hook when present and falling back to the compiled defaults.
 func foregroundRate(context string) (float32, int) {

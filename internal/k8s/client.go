@@ -157,8 +157,7 @@ type Client struct {
 	// HTTP request, NOT during build, so it is never part of this critical
 	// section.) clientCache memoizes clients per cache key (see clientCacheKey:
 	// context, plus a "throttled" variant for the lower-rate security clients).
-	// Invalidated on ReloadKubeconfig (the only mid-session config mutation)
-	// and per-context via invalidateClientsForContext.
+	// Invalidated on ReloadKubeconfig, the only mid-session config mutation.
 	//
 	// The actual construction runs OUTSIDE clientMu via clientGroup (see
 	// buildCachedClient): a slow build must never block other callers — in
@@ -258,13 +257,6 @@ func (c *Client) SetKubesharkNamespace(ns string) {
 // disable the security category. Called once at startup by the app layer.
 func (c *Client) SetSecurityManager(m *security.Manager) {
 	c.securityManager.Store(m)
-}
-
-// SecurityManager returns the wired security manager, or nil if SetSecurityManager
-// was never called. Callers that need to fetch findings for the dashboard should
-// go through this accessor rather than the unexported field.
-func (c *Client) SecurityManager() *security.Manager {
-	return c.securityManager.Load()
 }
 
 // SetIgnoreChecker installs the ignore-list filter consulted when converting

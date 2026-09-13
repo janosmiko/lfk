@@ -17,10 +17,12 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
-const localClusterStateSchemaVersion = 1
+const (
+	localClusterStateFileName      = "local-clusters.yaml"
+	localClusterStateSchemaVersion = 1
+)
 
 // localClusterCacheEntry is one row in local-clusters.yaml.
 type localClusterCacheEntry struct {
@@ -40,11 +42,7 @@ type localClusterStateFile struct {
 }
 
 func localClusterStateFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "local-clusters.yaml")
+	return stateFilePath(localClusterStateFileName)
 }
 
 // loadLocalClusterState reads the cache from disk. Returns an empty
@@ -82,13 +80,8 @@ func loadLocalClusterState() map[string]localClusterCacheEntry {
 	return out
 }
 
-// saveLocalClusterState writes the cache atomically (tmp + rename).
-// Each error path is wrapped with %w + a short context so callers
-// surfacing the error see "mkdir state dir: permission denied" rather
-// than a bare "permission denied" with no provenance. Failures are
-// also logged at the storage layer (mirroring loadLocalClusterState's
-// pattern) so a silent disk problem still leaves a trace even if the
-// caller discards the error.
+// saveLocalClusterState wraps each error with %w + a stage so callers see
+// "mkdir state dir: permission denied" rather than a bare "permission denied".
 func saveLocalClusterState(entries []localClusterCacheEntry) error {
 	path := localClusterStateFilePath()
 	if path == "" {
@@ -101,7 +94,7 @@ func saveLocalClusterState(entries []localClusterCacheEntry) error {
 		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
 		return wrapped
 	}
-	body, err := yaml.Marshal(localClusterStateFile{
+	data, err := yaml.Marshal(localClusterStateFile{
 		SchemaVersion: localClusterStateSchemaVersion,
 		Clusters:      entries,
 	})
@@ -110,15 +103,8 @@ func saveLocalClusterState(entries []localClusterCacheEntry) error {
 		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
 		return wrapped
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, body, 0o600); err != nil {
-		wrapped := fmt.Errorf("write local-cluster state tmp: %w", err)
-		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
-		return wrapped
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		wrapped := fmt.Errorf("rename local-cluster state into place: %w", err)
+	if err := writeFileDurable(path, data); err != nil {
+		wrapped := fmt.Errorf("write local-cluster state: %w", err)
 		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
 		return wrapped
 	}

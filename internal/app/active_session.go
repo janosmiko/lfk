@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // The "active session" is the named session that auto-save writes to and that
@@ -18,11 +17,7 @@ import (
 // activeSessionFilePath returns the path to the file recording the active
 // session name. Empty string when the state dir cannot be resolved.
 func activeSessionFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "active_session")
+	return stateFilePath("active_session")
 }
 
 // loadActiveSessionName reads the persisted active session name. Returns "" for

@@ -121,10 +121,10 @@ build: setup
 GHOSTTY_THEMES_URL := https://deps.files.ghostty.org/ghostty-themes-release-20260216-151611-fc73ce3.tgz
 GHOSTTY_THEMES_DIR := themes/ghostty
 
-generate-themes: ## Download ghostty themes and regenerate colorschemes_gen.go
+generate-themes: ## Download ghostty themes and regenerate colorschemes.tsv
 	@echo "Downloading ghostty themes..."
 	@mkdir -p themes
 	@curl -sL $(GHOSTTY_THEMES_URL) | tar xz -C themes/
 	@echo "Generating colorschemes..."
-	go run ./cmd/themegen --input-dir=$(GHOSTTY_THEMES_DIR) --output=internal/ui/colorschemes_gen.go
+	go run ./cmd/themegen --input-dir=$(GHOSTTY_THEMES_DIR) --output=internal/ui/colorschemes.tsv
 	@echo "Done. Run 'go test ./internal/ui/' to verify."

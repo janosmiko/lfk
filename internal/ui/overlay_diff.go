@@ -334,7 +334,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 			content = style.Render(plain)
 		}
 		if isCursorLine && !vp.VisualMode {
-			content = RenderCursorAtCol(content, plain, vp.CursorCol)
+			content = RenderCursorAtCol(content, vp.CursorCol)
 		}
 		lines = append(lines, unifiedLine{text: gutter + content, plain: plain, visIdx: vi})
 	}

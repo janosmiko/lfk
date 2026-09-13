@@ -343,7 +343,7 @@ func renderErrorLogEntry(entry ErrorLogEntry, contentW int, vp ErrorLogVisualPar
 			// left over from a vertical move onto a shorter line lands on the
 			// text rather than parking in the padding past end-of-line.
 			col := min(vp.CursorCol, max(ansi.StringWidth(lines[0])-1, 0))
-			lines[0] = RenderCursorAtCol(lines[0], "", col)
+			lines[0] = RenderCursorAtCol(lines[0], col)
 		}
 	}
 
