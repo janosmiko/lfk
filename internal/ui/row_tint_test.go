@@ -463,12 +463,12 @@ func TestRenderTable_MultiSelectedTintedRowKeepsBg(t *testing.T) {
 	}
 }
 
-// TestBlendHexToward pins the blend helper: 0 returns the base, 1 returns the
+// TestBlendHex pins the blend helper: 0 returns the base, 1 returns the
 // tint, and midpoints move each channel linearly.
-func TestBlendHexToward(t *testing.T) {
-	assert.Equal(t, "#000000", blendHexToward("#000000", "#ffffff", 0))
-	assert.Equal(t, "#ffffff", blendHexToward("#000000", "#ffffff", 1))
-	assert.Equal(t, "#7f7f7f", blendHexToward("#000000", "#ffffff", 0.5))
+func TestBlendHex(t *testing.T) {
+	assert.Equal(t, "#000000", blendHex("#000000", "#ffffff", 0))
+	assert.Equal(t, "#ffffff", blendHex("#000000", "#ffffff", 1))
+	assert.Equal(t, "#7f7f7f", blendHex("#000000", "#ffffff", 0.5))
 	// Unparsable inputs fall back to the tint color unchanged.
-	assert.Equal(t, "#ff0000", blendHexToward("not-a-color", "#ff0000", 0.2))
+	assert.Equal(t, "#ff0000", blendHex("not-a-color", "#ff0000", 0.2))
 }
