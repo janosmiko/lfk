@@ -81,7 +81,7 @@ func TestGetResources_ResourceClaim(t *testing.T) {
 	rt := model.ResourceTypeEntry{
 		APIGroup: "resource.k8s.io", APIVersion: "v1", Resource: "resourceclaims", Kind: "ResourceClaim", Namespaced: true,
 	}
-	items, err := c.GetResources(t.Context(), "", "default", rt)
+	items, err := c.GetResources(t.Context(), "", "default", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -98,7 +98,7 @@ func TestGetResources_ResourceClaimTemplate(t *testing.T) {
 	rt := model.ResourceTypeEntry{
 		APIGroup: "resource.k8s.io", APIVersion: "v1", Resource: "resourceclaimtemplates", Kind: "ResourceClaimTemplate", Namespaced: true,
 	}
-	items, err := c.GetResources(t.Context(), "", "default", rt)
+	items, err := c.GetResources(t.Context(), "", "default", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -113,7 +113,7 @@ func TestGetResources_ResourceSlice(t *testing.T) {
 	rt := model.ResourceTypeEntry{
 		APIGroup: "resource.k8s.io", APIVersion: "v1", Resource: "resourceslices", Kind: "ResourceSlice", Namespaced: false,
 	}
-	items, err := c.GetResources(t.Context(), "", "", rt)
+	items, err := c.GetResources(t.Context(), "", "", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -130,7 +130,7 @@ func TestGetResources_DeviceClass(t *testing.T) {
 	rt := model.ResourceTypeEntry{
 		APIGroup: "resource.k8s.io", APIVersion: "v1", Resource: "deviceclasses", Kind: "DeviceClass", Namespaced: false,
 	}
-	items, err := c.GetResources(t.Context(), "", "", rt)
+	items, err := c.GetResources(t.Context(), "", "", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -158,7 +158,7 @@ func TestGetResources_Pod_ResourceClaimsColumn(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	rt := model.ResourceTypeEntry{APIGroup: "", APIVersion: "v1", Resource: "pods", Kind: "Pod", Namespaced: true}
-	items, err := c.GetResources(t.Context(), "", "default", rt)
+	items, err := c.GetResources(t.Context(), "", "default", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
