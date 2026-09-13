@@ -35,36 +35,18 @@ func fuzzyScoreLower(text, qLower string) int {
 	}
 
 	if strings.HasPrefix(t, qLower) {
-		return 5000 + lengthBonus(len(t))
+		return 5000 + max(100-len(t), 0)
 	}
 
 	if idx := strings.Index(t, qLower); idx >= 0 {
-		return 2000 + positionBonus(idx) + lengthBonus(len(t))
+		return 2000 + max(100-idx, 0) + max(100-len(t), 0)
 	}
 
 	if span, ok := subsequenceSpan(t, qLower); ok {
-		return 500 + positionBonus(span)
+		return 500 + max(100-span, 0)
 	}
 
 	return 0
-}
-
-// lengthBonus prefers shorter candidates. Capped so it never crosses tiers.
-func lengthBonus(n int) int {
-	if n >= 100 {
-		return 0
-	}
-
-	return 100 - n
-}
-
-// positionBonus prefers smaller values (earlier position, tighter span).
-func positionBonus(n int) int {
-	if n >= 100 {
-		return 0
-	}
-
-	return 100 - n
 }
 
 // subsequenceSpan reports whether all query runes appear in text in order
