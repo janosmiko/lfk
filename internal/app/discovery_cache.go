@@ -60,48 +60,15 @@ const discoveryCacheSchemaVersion = 2
 // files so the two formats can coexist in the same directory.
 const discoveryCacheFilename = "lfk-enriched.yaml"
 
-// DiscoveryCacheEntry is the serialized form of a single ResourceTypeEntry.
-// It mirrors model.ResourceTypeEntry but carries explicit JSON tags so the
-// YAML shape stays stable across renames in the domain type.
-type DiscoveryCacheEntry struct {
-	DisplayName    string              `json:"display_name,omitempty"`
-	Kind           string              `json:"kind"`
-	APIGroup       string              `json:"api_group"`
-	APIVersion     string              `json:"api_version"`
-	Resource       string              `json:"resource"`
-	Namespaced     bool                `json:"namespaced,omitempty"`
-	RequiresCRD    bool                `json:"requires_crd,omitempty"`
-	Deprecated     bool                `json:"deprecated,omitempty"`
-	DeprecationMsg string              `json:"deprecation_msg,omitempty"`
-	Verbs          []string            `json:"verbs,omitempty"`
-	PrinterColumns []DiscoveryCacheCol `json:"printer_columns,omitempty"`
-	Icon           DiscoveryCacheIcon  `json:"icon,omitzero"`
-}
-
-// DiscoveryCacheCol mirrors model.PrinterColumn with explicit JSON tags.
-type DiscoveryCacheCol struct {
-	Name     string `json:"name"`
-	Type     string `json:"type,omitempty"`
-	JSONPath string `json:"json_path,omitempty"`
-}
-
-// DiscoveryCacheIcon mirrors model.Icon with explicit JSON tags.
-type DiscoveryCacheIcon struct {
-	Unicode  string `json:"unicode,omitempty"`
-	Simple   string `json:"simple,omitempty"`
-	Emoji    string `json:"emoji,omitempty"`
-	NerdFont string `json:"nerd_font,omitempty"`
-}
-
 // DiscoveryCacheHostState is the on-disk shape: one file per cluster API
 // host. Multiple kubeconfig contexts pointing at the same host share one
 // file because cluster-level discovery output is host-keyed, not
 // context-keyed.
 type DiscoveryCacheHostState struct {
-	SchemaVersion int                   `json:"schema_version"`
-	Host          string                `json:"host"`
-	UpdatedAt     time.Time             `json:"updated_at"`
-	Entries       []DiscoveryCacheEntry `json:"entries"`
+	SchemaVersion int                       `json:"schema_version"`
+	Host          string                    `json:"host"`
+	UpdatedAt     time.Time                 `json:"updated_at"`
+	Entries       []model.ResourceTypeEntry `json:"entries"`
 }
 
 // discoveryCacheFilePathForHost returns the per-host cache file path:
@@ -162,7 +129,7 @@ func saveDiscoveryCacheForHost(host string, entries []model.ResourceTypeEntry) e
 		SchemaVersion: discoveryCacheSchemaVersion,
 		Host:          host,
 		UpdatedAt:     time.Now().UTC(),
-		Entries:       discoveryCacheEntriesFromModel(entries),
+		Entries:       entries,
 	}
 	data, err := yaml.Marshal(state)
 	if err != nil {
@@ -212,7 +179,7 @@ func loadAllDiscoveryCaches(reqCtx context.Context, client *k8s.Client) map[stri
 		if snap == nil {
 			continue
 		}
-		out[ctx.Name] = modelEntriesFromDiscoveryCache(snap.Entries)
+		out[ctx.Name] = snap.Entries
 	}
 	return out
 }
@@ -253,7 +220,7 @@ func loadDiscoveryCacheForContext(client *k8s.Client, contextName string) []mode
 	if snap == nil || len(snap.Entries) == 0 {
 		return nil
 	}
-	return append(model.PseudoResources(), modelEntriesFromDiscoveryCache(snap.Entries)...)
+	return append(model.PseudoResources(), snap.Entries...)
 }
 
 // updateDiscoveryCacheForContext is the single mutator used by the discovery
@@ -269,87 +236,6 @@ func updateDiscoveryCacheForContext(client *k8s.Client, contextName string, entr
 		return nil
 	}
 	return saveDiscoveryCacheForHost(host, entries)
-}
-
-// discoveryCacheEntriesFromModel converts the model's domain types to the
-// cache's serialization types. The cache deliberately does not store
-// pseudo-resources (helm releases, port forwards) — those are prepended at
-// runtime by updateAPIResourceDiscovery and may evolve independently of
-// disk format.
-func discoveryCacheEntriesFromModel(entries []model.ResourceTypeEntry) []DiscoveryCacheEntry {
-	out := make([]DiscoveryCacheEntry, 0, len(entries))
-	for _, e := range entries {
-		out = append(out, DiscoveryCacheEntry{
-			DisplayName:    e.DisplayName,
-			Kind:           e.Kind,
-			APIGroup:       e.APIGroup,
-			APIVersion:     e.APIVersion,
-			Resource:       e.Resource,
-			Namespaced:     e.Namespaced,
-			RequiresCRD:    e.RequiresCRD,
-			Deprecated:     e.Deprecated,
-			DeprecationMsg: e.DeprecationMsg,
-			Verbs:          append([]string(nil), e.Verbs...),
-			PrinterColumns: discoveryCacheColsFromModel(e.PrinterColumns),
-			Icon: DiscoveryCacheIcon{
-				Unicode:  e.Icon.Unicode,
-				Simple:   e.Icon.Simple,
-				Emoji:    e.Icon.Emoji,
-				NerdFont: e.Icon.NerdFont,
-			},
-		})
-	}
-	return out
-}
-
-func discoveryCacheColsFromModel(cols []model.PrinterColumn) []DiscoveryCacheCol {
-	if len(cols) == 0 {
-		return nil
-	}
-	out := make([]DiscoveryCacheCol, 0, len(cols))
-	for _, c := range cols {
-		out = append(out, DiscoveryCacheCol{Name: c.Name, Type: c.Type, JSONPath: c.JSONPath})
-	}
-	return out
-}
-
-// modelEntriesFromDiscoveryCache is the inverse: turn a cached snapshot back
-// into model types ready to plug into m.discoveredResources.
-func modelEntriesFromDiscoveryCache(entries []DiscoveryCacheEntry) []model.ResourceTypeEntry {
-	out := make([]model.ResourceTypeEntry, 0, len(entries))
-	for _, e := range entries {
-		out = append(out, model.ResourceTypeEntry{
-			DisplayName:    e.DisplayName,
-			Kind:           e.Kind,
-			APIGroup:       e.APIGroup,
-			APIVersion:     e.APIVersion,
-			Resource:       e.Resource,
-			Namespaced:     e.Namespaced,
-			RequiresCRD:    e.RequiresCRD,
-			Deprecated:     e.Deprecated,
-			DeprecationMsg: e.DeprecationMsg,
-			Verbs:          append([]string(nil), e.Verbs...),
-			PrinterColumns: modelColsFromDiscoveryCache(e.PrinterColumns),
-			Icon: model.Icon{
-				Unicode:  e.Icon.Unicode,
-				Simple:   e.Icon.Simple,
-				Emoji:    e.Icon.Emoji,
-				NerdFont: e.Icon.NerdFont,
-			},
-		})
-	}
-	return out
-}
-
-func modelColsFromDiscoveryCache(cols []DiscoveryCacheCol) []model.PrinterColumn {
-	if len(cols) == 0 {
-		return nil
-	}
-	out := make([]model.PrinterColumn, 0, len(cols))
-	for _, c := range cols {
-		out = append(out, model.PrinterColumn{Name: c.Name, Type: c.Type, JSONPath: c.JSONPath})
-	}
-	return out
 }
 
 // shouldFireDiscoveryFor reports whether a fresh discovery call should be

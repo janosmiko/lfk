@@ -25,13 +25,9 @@ var nginxDurRe = regexp.MustCompile(`(\d+)ms\s*$`)
 // by the expected downstream-url and duration fields.
 var nginxRouterRe = regexp.MustCompile(`\d+ "([^"]*@[^"]*)" "[^"]*"(?:\s+\d+ms)?\s*$`)
 
-type nginxParser struct{}
-
-// NewNginxParser parses NCSA Common/Combined Log Format access logs (nginx,
+// nginxParser parses NCSA Common/Combined Log Format access logs (nginx,
 // Apache, and Traefik's "common" access-log format).
-func NewNginxParser() Parser { return nginxParser{} }
-
-func (nginxParser) Kind() ProfileKind { return ProfileNginx }
+type nginxParser struct{}
 
 func (nginxParser) Parse(line string) (Fields, bool) {
 	m := nginxRe.FindStringSubmatch(line)

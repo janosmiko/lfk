@@ -157,8 +157,7 @@ type Client struct {
 	// HTTP request, NOT during build, so it is never part of this critical
 	// section.) clientCache memoizes clients per cache key (see clientCacheKey:
 	// context, plus a "throttled" variant for the lower-rate security clients).
-	// Invalidated on ReloadKubeconfig (the only mid-session config mutation)
-	// and per-context via invalidateClientsForContext.
+	// Invalidated on ReloadKubeconfig, the only mid-session config mutation.
 	//
 	// The actual construction runs OUTSIDE clientMu via clientGroup (see
 	// buildCachedClient): a slow build must never block other callers — in
@@ -258,13 +257,6 @@ func (c *Client) SetKubesharkNamespace(ns string) {
 // disable the security category. Called once at startup by the app layer.
 func (c *Client) SetSecurityManager(m *security.Manager) {
 	c.securityManager.Store(m)
-}
-
-// SecurityManager returns the wired security manager, or nil if SetSecurityManager
-// was never called. Callers that need to fetch findings for the dashboard should
-// go through this accessor rather than the unexported field.
-func (c *Client) SecurityManager() *security.Manager {
-	return c.securityManager.Load()
 }
 
 // SetIgnoreChecker installs the ignore-list filter consulted when converting
@@ -625,7 +617,7 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 // Partial results are returned alongside an errors.Join of every per-context
 // failure, so the status bar can surface "2 of 8 contexts failed: …" instead
 // of silently truncating to the first error.
-func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry, opts ...ListOption) ([]model.Item, error) {
+func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry, preferCache bool) ([]model.Item, error) {
 	type result struct {
 		items []model.Item
 		err   error
@@ -637,7 +629,7 @@ func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, names
 	for i, kctx := range contexts {
 		go func(idx int, contextName string) {
 			defer wg.Done()
-			items, err := c.GetResources(ctx, contextName, namespace, rt, opts...)
+			items, err := c.GetResources(ctx, contextName, namespace, rt, preferCache)
 			if err != nil {
 				results[idx] = result{ctx: contextName, err: err}
 				return

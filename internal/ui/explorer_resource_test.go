@@ -311,12 +311,9 @@ func TestRenderPreviewEvents(t *testing.T) {
 		}
 	})
 
-	// Regression (TASK-874 CodeRabbit review): the reason-column width was
-	// measured with len(), which counts bytes. A CJK Reason has 3 bytes but
-	// 2 display cells per rune, so the byte count wildly overstates the
-	// column's visual width. That fed both the %-*s pad (rune-counted) and
-	// the byte-slicing truncateStr helper, which cut the string mid-rune
-	// and produced invalid UTF-8.
+	// A CJK Reason has 3 bytes but 2 display cells per rune. The reason
+	// column must measure display cells, and truncation must never cut a
+	// rune apart and produce invalid UTF-8.
 	t.Run("multibyte reason column stays within width with valid UTF-8", func(t *testing.T) {
 		events := []EventTimelineEntry{{
 			Timestamp: time.Now().Add(-2 * time.Hour),

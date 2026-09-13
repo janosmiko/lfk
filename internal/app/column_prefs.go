@@ -1,15 +1,12 @@
 package app
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
+
+const columnPrefsFileName = "column_prefs.yaml"
 
 // persistedColumnPrefs is the on-disk form of a single kind's committed column
 // layout: display order, visible extra columns, and hidden built-in columns.
@@ -31,33 +28,13 @@ type ColumnPrefsState struct {
 
 // columnPrefsFilePath returns the path to the column-prefs state file.
 func columnPrefsFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "column_prefs.yaml")
+	return stateFilePath(columnPrefsFileName)
 }
 
 // loadColumnPrefsState reads the raw nested state from disk, returning an empty
 // (never nil Contexts) value when the file is missing or corrupt.
 func loadColumnPrefsState() ColumnPrefsState {
-	empty := ColumnPrefsState{Contexts: map[string]map[string]persistedColumnPrefs{}}
-	path := columnPrefsFilePath()
-	if path == "" {
-		return empty
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read column-prefs state", "error", err, "path", path)
-		}
-		return empty
-	}
-	var s ColumnPrefsState
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Column-prefs file is corrupt; starting fresh", "error", err, "path", path)
-		return empty
-	}
+	s := loadStateFile[ColumnPrefsState](columnPrefsFileName)
 	if s.Contexts == nil {
 		s.Contexts = map[string]map[string]persistedColumnPrefs{}
 	}
@@ -66,18 +43,7 @@ func loadColumnPrefsState() ColumnPrefsState {
 
 // saveColumnPrefsState writes the nested state to disk.
 func saveColumnPrefsState(s ColumnPrefsState) error {
-	path := columnPrefsFilePath()
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(s)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+	return saveStateFile(columnPrefsFileName, s)
 }
 
 // columnPrefMaps bundles the three in-memory column maps for seeding the model.

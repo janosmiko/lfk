@@ -18,7 +18,6 @@ func TestFinalizerMatch_StructFields(t *testing.T) {
 			APIVersion: "v1",
 			Resource:   "configmaps",
 			Namespaced: true,
-			Finalizers: []string{"finalizer.example.com/cleanup", "kubernetes.io/pvc-protection"},
 			Matched:    "finalizer.example.com/cleanup",
 			Age:        "5d",
 		}
@@ -30,7 +29,6 @@ func TestFinalizerMatch_StructFields(t *testing.T) {
 		assert.Equal(t, "v1", fm.APIVersion)
 		assert.Equal(t, "configmaps", fm.Resource)
 		assert.True(t, fm.Namespaced)
-		assert.Len(t, fm.Finalizers, 2)
 		assert.Equal(t, "finalizer.example.com/cleanup", fm.Matched)
 		assert.Equal(t, "5d", fm.Age)
 	})
@@ -44,7 +42,6 @@ func TestFinalizerMatch_StructFields(t *testing.T) {
 			APIVersion: "v1",
 			Resource:   "namespaces",
 			Namespaced: false,
-			Finalizers: []string{"kubernetes"},
 			Matched:    "kubernetes",
 			Age:        "30d",
 		}
@@ -65,7 +62,6 @@ func TestFinalizerMatch_StructFields(t *testing.T) {
 		assert.Empty(t, fm.APIVersion)
 		assert.Empty(t, fm.Resource)
 		assert.False(t, fm.Namespaced)
-		assert.Nil(t, fm.Finalizers)
 		assert.Empty(t, fm.Matched)
 		assert.Empty(t, fm.Age)
 	})
@@ -79,19 +75,11 @@ func TestFinalizerMatch_StructFields(t *testing.T) {
 			APIVersion: "v1",
 			Resource:   "clusters",
 			Namespaced: true,
-			Finalizers: []string{
-				"cnpg.io/finalizer",
-				"foregroundDeletion",
-				"custom.io/block",
-			},
-			Matched: "cnpg.io/finalizer",
-			Age:     "1h",
+			Matched:    "cnpg.io/finalizer",
+			Age:        "1h",
 		}
 
 		assert.Equal(t, "cnpg.io", fm.APIGroup)
-		assert.Len(t, fm.Finalizers, 3)
-		assert.Contains(t, fm.Finalizers, "cnpg.io/finalizer")
-		assert.Contains(t, fm.Finalizers, "foregroundDeletion")
-		assert.Contains(t, fm.Finalizers, "custom.io/block")
+		assert.Equal(t, "cnpg.io/finalizer", fm.Matched)
 	})
 }

@@ -1,0 +1,67 @@
+package app
+
+import (
+	"os"
+	"path/filepath"
+
+	"sigs.k8s.io/yaml"
+
+	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
+)
+
+// stateFilePath returns "" when the state dir can't be resolved, so callers
+// degrade to a best-effort no-op instead of failing.
+func stateFilePath(name string) string {
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, name)
+}
+
+// loadStateFile returns the zero value on any failure: a hand-edited or
+// absent state file must never stop the app from starting.
+func loadStateFile[T any](name string) T {
+	var zero T
+	path := stateFilePath(name)
+	if path == "" {
+		return zero
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warn("Failed to read state file", "error", err, "path", path)
+		}
+		return zero
+	}
+	var v T
+	if err := yaml.Unmarshal(data, &v); err != nil {
+		logger.Warn("State file is corrupt; ignoring", "error", err, "path", path)
+		return zero
+	}
+	return v
+}
+
+// saveStateFile writes plainly, no fsync: several callers run inline on
+// every keypress, and File.Sync costs tens of ms on macOS (F_FULLFSYNC). A
+// caller that needs durability calls writeFileDurable(stateFilePath(name), data).
+func saveStateFile[T any](name string, v T) error {
+	path := stateFilePath(name)
+	if path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(v)
+	if err != nil {
+		return err
+	}
+	// os.WriteFile only applies the mode on create. Tighten an existing file
+	// from an older version or a manual copy before writing over it.
+	if err := os.Chmod(path, 0o600); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}

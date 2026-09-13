@@ -91,7 +91,6 @@ type SyncWaveLastOperation struct {
 type SyncWavePhaseEntry struct {
 	Name      string
 	Collapsed bool
-	Focused   bool
 	Waves     []SyncWaveBucketEntry
 }
 

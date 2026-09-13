@@ -49,28 +49,30 @@ const (
 	LevelContainers                 // Containers within a pod
 )
 
-// ResourceTypeEntry represents a single navigable resource type.
+// ResourceTypeEntry represents a single navigable resource type. JSON tags
+// pin the discovery cache's on-disk shape (internal/app/discovery_cache.go);
+// FieldSelector is runtime-only and never persisted.
 type ResourceTypeEntry struct {
-	DisplayName    string // e.g., "Deployments"
-	Kind           string // e.g., "Deployment"
-	APIGroup       string // e.g., "apps"
-	APIVersion     string // e.g., "v1"
-	Resource       string // e.g., "deployments" (plural lowercase for API calls)
-	FieldSelector  string // optional server-side field selector, e.g. "type=Warning"
-	Icon           Icon   // Icon variants for display (see icon.go)
-	Namespaced     bool   // true for namespace-scoped resources, false for cluster-scoped
-	RequiresCRD    bool   // true if this resource type depends on a CRD being installed
-	Deprecated     bool   // true if this API version is deprecated
-	DeprecationMsg string // human-readable deprecation message
+	DisplayName    string `json:"display_name,omitempty"`    // e.g., "Deployments"
+	Kind           string `json:"kind"`                      // e.g., "Deployment"
+	APIGroup       string `json:"api_group"`                 // e.g., "apps"
+	APIVersion     string `json:"api_version"`               // e.g., "v1"
+	Resource       string `json:"resource"`                  // e.g., "deployments" (plural lowercase for API calls)
+	FieldSelector  string `json:"-"`                         // optional server-side field selector, e.g. "type=Warning"
+	Icon           Icon   `json:"icon,omitzero"`             // Icon variants for display (see icon.go)
+	Namespaced     bool   `json:"namespaced,omitempty"`      // true for namespace-scoped resources, false for cluster-scoped
+	RequiresCRD    bool   `json:"requires_crd,omitempty"`    // true if this resource type depends on a CRD being installed
+	Deprecated     bool   `json:"deprecated,omitempty"`      // true if this API version is deprecated
+	DeprecationMsg string `json:"deprecation_msg,omitempty"` // human-readable deprecation message
 
 	// Verbs is the set of verbs the API server reports for this resource
 	// (e.g. "get", "list", "watch", "create"). Populated from the discovery
 	// API. Empty for LFK pseudo-resources and entries constructed without
 	// discovery data — the sidebar treats empty Verbs as listable so those
 	// stay visible.
-	Verbs []string
+	Verbs []string `json:"verbs,omitempty"`
 
-	PrinterColumns []PrinterColumn // additionalPrinterColumns from CRD spec
+	PrinterColumns []PrinterColumn `json:"printer_columns,omitempty"` // additionalPrinterColumns from CRD spec
 }
 
 // CanList reports whether the API server supports LIST for this
@@ -88,13 +90,13 @@ func (e ResourceTypeEntry) CanList() bool {
 
 // PrinterColumn represents an additionalPrinterColumn from a CRD spec.
 type PrinterColumn struct {
-	Name     string
-	Type     string // string, integer, number, boolean, date
-	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
+	Name     string `json:"name"`
+	Type     string `json:"type,omitempty"`      // string, integer, number, boolean, date
+	JSONPath string `json:"json_path,omitempty"` // e.g. ".status.phase", ".spec.source.repoURL"
 	// Priority mirrors the column's additionalPrinterColumns priority.
 	// kubectl shows priority 0 columns in standard output and hides
 	// priority > 0 columns unless `-o wide`. LFK applies the same default.
-	Priority int
+	Priority int `json:"-"`
 }
 
 // CanIVerbState is the display state for one RBAC verb in the Can-I view.

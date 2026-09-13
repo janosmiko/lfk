@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // rsLayout describes the per-row column geometry for the right-sizing
@@ -359,7 +360,7 @@ func renderRSCell(content string, width int, align lipgloss.Position, base lipgl
 		Background(BaseBg).
 		Width(width + rsCellPadding).
 		Align(align).
-		Render(rsTruncate(content, width))
+		Render(ansi.Truncate(content, width, "…"))
 }
 
 // renderRSCellPrestyled is the variant for cells whose content is a
@@ -377,26 +378,7 @@ func renderRSCellPrestyled(content string, width int, align lipgloss.Position, f
 	} else {
 		style = style.Foreground(lipgloss.Color(fg))
 	}
-	return style.Render(rsTruncate(content, width))
-}
-
-// rsTruncate cuts `s` to at most `width` runes. When `s` exceeds the
-// budget the last char becomes `…` so the truncation is visible. When
-// `width <= 0` returns the empty string. Plain runes only — assumes
-// content has no embedded ANSI sequences (data values are unstyled
-// strings. The styling lives on the surrounding `renderRSCell` style).
-func rsTruncate(s string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) <= width {
-		return s
-	}
-	if width == 1 {
-		return "…"
-	}
-	return string(runes[:width-1]) + "…"
+	return style.Render(ansi.Truncate(content, width, "…"))
 }
 
 // rsSpanContaining returns the span that contains sub-column index

@@ -51,7 +51,7 @@ func TestGetResources_SecretsNeverInformerCached_AlwaysMode(t *testing.T) {
 	t.Cleanup(c.Shutdown)
 
 	for range 3 {
-		items, err := c.GetResources(t.Context(), "", "default", secretRT, PreferCache())
+		items, err := c.GetResources(t.Context(), "", "default", secretRT, true)
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 	}
@@ -75,12 +75,12 @@ func TestGetResources_SecretsNeverAutoPromoted(t *testing.T) {
 	c.SetInformerCacheMode(InformerCacheAuto)
 	t.Cleanup(c.Shutdown)
 
-	items, err := c.GetResources(t.Context(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT, false)
 	require.NoError(t, err)
 	require.Len(t, items, autoPromoteAt+200)
 	assert.False(t, c.informers.isPromoted("", secretGVR), "a large secret list must never auto-promote")
 
-	items2, err := c.GetResources(t.Context(), "", "default", secretRT)
+	items2, err := c.GetResources(t.Context(), "", "default", secretRT, false)
 	require.NoError(t, err)
 	require.Len(t, items2, autoPromoteAt+200)
 	assert.Equal(t, 2, listSecretActionCount(dc.Actions()), "second call must still hit a direct list")

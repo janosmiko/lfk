@@ -721,6 +721,34 @@ func TestRestartsCells_SanitizeValue(t *testing.T) {
 	assert.Contains(t, stripANSI(styledRestartsCell(model.Item{Restarts: "3"}, 20, false)), "3")
 }
 
+func TestContextCell_SanitizesClusterName(t *testing.T) {
+	prev := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = prev })
+
+	order := []string{"Context"}
+	for name, payload := range formatHostilePayloads {
+		t.Run("plain/"+name, func(t *testing.T) {
+			item := model.Item{ClusterName: "ab" + payload + "cd"}
+			out := formatTableRowOrdered("", "", "", "", "", "", 0, 20, 0, 0, 0, 0, 0, order, nil, &item)
+			assert.NotContains(t, out, string(rune(0x202e)))
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+			assert.Contains(t, out, "ab")
+			assert.Contains(t, out, "cd")
+		})
+		t.Run("styled/"+name, func(t *testing.T) {
+			item := model.Item{ClusterName: "ab" + payload + "cd"}
+			out := formatTableRowStyledOrdered(item, 0, 20, 0, 0, 0, 0, 0, order, nil, false, nil)
+			assert.NotContains(t, out, string(rune(0x202e)))
+			assert.NotContains(t, out, "\x1b[2J")
+			assert.NotContains(t, out, "\x1b]52")
+			assert.Contains(t, stripANSI(out), "ab")
+			assert.Contains(t, stripANSI(out), "cd")
+		})
+	}
+}
+
 // A sparkline sits in the same prefix position as the trend arrow. Without
 // stripping it, every CPU and MEM sort in sparkline mode compares glyphs
 // instead of numbers.

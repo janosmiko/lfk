@@ -505,21 +505,26 @@ func layerVPAResource(rec *model.ResourceRec, rm map[string]any, resKey string, 
 // fails to parse (defensive — the VPA payload always parses, but
 // silent passthrough beats panicking on a future schema change).
 func scaleQuantityByHeadroom(q string, headroom float64) string {
-	if q == "" || headroom == 1 {
+	return scaleQuantityByFactor(q, headroom, isMemoryQuantity(q))
+}
+
+// scaleQuantityByFactor scales a Kubernetes quantity string by factor and
+// snaps it back to a canonical CPU or memory unit.
+func scaleQuantityByFactor(q string, factor float64, isMemory bool) string {
+	if q == "" || factor == 1 {
 		return q
 	}
 	parsed, err := resource.ParseQuantity(q)
 	if err != nil {
 		return q
 	}
-	if isMemoryQuantity(q) {
-		// MilliValue() for memory returns bytes×1000. Convert back to
-		// bytes before scaling so SnapMemBytesToCanonical sees the right
-		// unit.
-		bytes := parsed.MilliValue() / 1000
-		return SnapMemBytesToCanonical(int64(float64(bytes) * headroom))
+	if isMemory {
+		// Scale the milli value before dividing by 1000, or a sub-byte
+		// quantity truncates to 0 before factor is ever applied.
+		bytes := int64(float64(parsed.MilliValue()) * factor / 1000)
+		return SnapMemBytesToCanonical(bytes)
 	}
-	return SnapCPUMilliToCanonical(int64(float64(parsed.MilliValue()) * headroom))
+	return SnapCPUMilliToCanonical(int64(float64(parsed.MilliValue()) * factor))
 }
 
 // scaleLimitFromRatio returns the recommended limit that preserves
@@ -565,11 +570,9 @@ func isMemoryQuantity(s string) bool {
 	return false
 }
 
-// SnapCPUMilliToCanonical / SnapMemBytesToCanonical duplicate the
-// snapping logic from internal/ui/quantity_math.go. The k8s package
-// can't import internal/ui (would invert the architecture's data ->
-// presentation direction), so the helpers live in both places. Keep
-// in sync. They're only ~15 lines each.
+// SnapCPUMilliToCanonical rounds and formats a quantity independently of
+// internal/ui, since k8s can't import ui (would invert the architecture's
+// data -> presentation direction).
 func SnapCPUMilliToCanonical(milli int64) string {
 	if milli <= 0 {
 		return "0"

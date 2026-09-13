@@ -30,6 +30,5 @@ const (
 
 // Parser turns a single log line into normalized Fields.
 type Parser interface {
-	Kind() ProfileKind
 	Parse(line string) (Fields, bool)
 }

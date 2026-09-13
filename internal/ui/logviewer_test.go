@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// --- wrapLine ---
+// --- WrapLine ---
 
 func TestWrapLine(t *testing.T) {
 	tests := []struct {
@@ -74,13 +74,13 @@ func TestWrapLine(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, wrapLine(tt.line, tt.width))
+			assert.Equal(t, tt.expected, WrapLine(tt.line, tt.width))
 		})
 	}
 }
 
 // Regression: producer-colored kyverno-style log rows in wrap mode lost
-// text mid-line. wrapLine rune-sliced the input, but ANSI escape sequences
+// text mid-line. WrapLine rune-sliced the input, but ANSI escape sequences
 // occupy several rune slots while contributing zero visual width. A wrap
 // at `width` runes regularly cut mid-SGR (e.g. between `\x1b[` and `90m`)
 // or chopped real text early because the rune budget was eaten by the
@@ -93,7 +93,7 @@ func TestWrapLine_PreservesANSIAndSplitsByVisualWidth(t *testing.T) {
 	// SGR runs around each field. ANSI bytes are zero-width and must not
 	// consume the wrap budget.
 	line := "\x1b[90mtimestamp\x1b[0m \x1b[34mlevel\x1b[0m message1"
-	parts := wrapLine(line, 16)
+	parts := WrapLine(line, 16)
 
 	// Stripped concatenation of the wrap parts must equal the stripped
 	// original (no characters lost mid-line).

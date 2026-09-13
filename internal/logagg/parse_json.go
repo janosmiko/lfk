@@ -47,13 +47,9 @@ var jsonKeyAliases = map[string]string{
 	"upstream_host": FieldService, "upstream": FieldService, "proxy_upstream_name": FieldService,
 }
 
-type jsonParser struct{}
-
-// NewJSONParser parses single-line JSON objects, mapping common keys to
+// jsonParser parses single-line JSON objects, mapping common keys to
 // normalized fields and keeping all other scalar keys verbatim.
-func NewJSONParser() Parser { return jsonParser{} }
-
-func (jsonParser) Kind() ProfileKind { return ProfileJSON }
+type jsonParser struct{}
 
 func (jsonParser) Parse(line string) (Fields, bool) {
 	line = strings.TrimSpace(line)

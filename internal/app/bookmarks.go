@@ -8,17 +8,11 @@ import (
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // bookmarksFilePath returns the path to the bookmarks file.
-// Resolves the lfk state directory via internal/paths.
 func bookmarksFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "bookmarks.yaml")
+	return stateFilePath("bookmarks.yaml")
 }
 
 // loadBookmarks reads bookmarks from the YAML file on disk.
@@ -97,28 +91,7 @@ func saveBookmarks(bookmarks []model.Bookmark) error {
 		// Keep a backup of the current file before overwriting.
 		_ = copyFile(path, bakPath)
 	}
-	// Atomic write: write to a temp file in the same directory, fsync, then rename.
-	tmp, err := os.CreateTemp(dir, ".bookmarks-*.yaml.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	// Fsync to ensure data is flushed to stable storage before rename.
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return os.Rename(tmpPath, path)
+	return writeFileDurable(path, data)
 }
 
 // copyFile copies src to dst, overwriting dst if it exists.

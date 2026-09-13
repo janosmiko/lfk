@@ -119,15 +119,6 @@ func (f *FieldOwners) Empty() bool {
 	return f == nil || f.root == nil || (len(f.root.fields) == 0 && len(f.root.items) == 0)
 }
 
-// Managers returns the distinct field managers, sorted. The order is stable
-// so a color assigned to a manager does not move between renders.
-func (f *FieldOwners) Managers() []string {
-	if f == nil {
-		return nil
-	}
-	return f.managers
-}
-
 // At returns the owner of an exact path. A path with no manager of its own
 // returns false; the caller decides whether to inherit from an ancestor.
 func (f *FieldOwners) At(path []PathSeg) (FieldOwner, bool) {

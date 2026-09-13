@@ -6,21 +6,10 @@ import (
 	"github.com/janosmiko/lfk/internal/tainted"
 )
 
-// overlayNsScroll is the persistent scroll position for the namespace overlay.
-var overlayNsScroll int
-
-// ResetOverlayNsScroll resets the namespace overlay scroll position (call when opening the overlay).
-func ResetOverlayNsScroll() { overlayNsScroll = 0 }
-
-// GetOverlayNsScroll returns the current scroll offset of the namespace
-// overlay. Used by mouse click resolution to translate a click row into
-// the correct item index in the underlying items slice.
-func GetOverlayNsScroll() int { return overlayNsScroll }
-
-// SetOverlayNsScroll updates the namespace-overlay scroll state. Called by
-// the namespace OverlayList helper on every render so mouse-click row
-// resolution stays in sync with the rendered scroll window.
-func SetOverlayNsScroll(s int) { overlayNsScroll = s }
+// OverlayNsScroll is the persistent scroll position for the namespace
+// overlay, read by mouse click resolution and written by the OverlayList
+// helper on every render.
+var OverlayNsScroll int
 
 // ErrorLogEntry stores a single application log entry with its timestamp and severity level.
 type ErrorLogEntry struct {

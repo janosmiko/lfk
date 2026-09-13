@@ -309,9 +309,9 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 // caller's `cursor` (selectable-index) is translated to the display index
 // inside the items slice so OverlayList can highlight the right row.
 //
-// Scroll lives in ui.overlaySchemeScroll so the mouse-click resolver in
-// update_overlays_selectors.go reads it via ui.GetOverlaySchemeScroll;
-// the helper updates it on every render via ui.SetOverlaySchemeScroll.
+// Scroll lives in ui.OverlaySchemeScroll so the mouse-click resolver in
+// update_overlays_selectors.go can read it. This helper updates it on
+// every render.
 func renderColorschemeOverlay(m Model, height int) string {
 	// contentH = total inner content the OverlayList block must fill
 	// (overlay box height minus lipgloss's 1+1 vertical padding).
@@ -319,7 +319,7 @@ func renderColorschemeOverlay(m Model, height int) string {
 	// the remainder is the items budget.
 	contentH := max(height-2, 1)
 	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
-	ui.SetOverlaySchemeVisible(maxVisible)
+	ui.OverlaySchemeVisible = maxVisible
 
 	items, cursorDisplayIdx := buildColorschemeItems(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor)
 	if len(items) == 0 {
@@ -333,10 +333,10 @@ func renderColorschemeOverlay(m Model, height int) string {
 		}, min(50, m.width-10)-4)
 	}
 
-	prev := ui.GetOverlaySchemeScroll()
+	prev := ui.OverlaySchemeScroll
 	identity := func(from, to int) int { return to - from }
 	scroll := ui.VimScrollOff(prev, cursorDisplayIdx, len(items), maxVisible, ui.ConfigScrollOff, identity)
-	ui.SetOverlaySchemeScroll(scroll)
+	ui.OverlaySchemeScroll = scroll
 
 	return ui.RenderOverlayList(items, ui.OverlayListConfig{
 		Title:            "Select Color Scheme",
@@ -674,21 +674,19 @@ func padRight(s string, width int) string {
 // collapses into a single ✓ — both signals "this row is in effect right
 // now" and the OverlayList active marker conveys the same information.
 //
-// Mouse-click resolution reads overlayNsScroll via ui.GetOverlayNsScroll();
-// the helper stores its computed scroll offset there before rendering so
-// the click handler keeps resolving rows correctly.
+// Mouse-click resolution reads ui.OverlayNsScroll. This helper stores its
+// computed scroll offset there before rendering so the click handler keeps
+// resolving rows correctly.
 func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 	contentH := max(height-2, 1)
 	maxVisible := min(max(contentH-overlayListChromeFilterable(), 1), max(len(items), 1))
-	// Namespace scroll lives in ui.overlayNsScroll so the mouse-click row
-	// resolver can read it. VimScrollOff gives sticky scrolloff behaviour;
-	// stateless cursor-only math pinned the cursor to viewport edges,
-	// which made scroll-up feel like the list was shifting instead of the
-	// cursor moving (issue reported during smoke testing).
-	prev := ui.GetOverlayNsScroll()
+	// VimScrollOff gives sticky scrolloff behaviour. Stateless cursor-only
+	// math pinned the cursor to viewport edges, making scroll-up look like
+	// the list was shifting instead of the cursor moving.
+	prev := ui.OverlayNsScroll
 	identity := func(from, to int) int { return to - from }
 	scroll := ui.VimScrollOff(prev, m.overlayCursor, len(items), maxVisible, ui.ConfigScrollOff, identity)
-	ui.SetOverlayNsScroll(scroll)
+	ui.OverlayNsScroll = scroll
 
 	listItems := make([]ui.OverlayListItem, len(items))
 	for i, it := range items {
