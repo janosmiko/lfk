@@ -1,6 +1,10 @@
 package k8s
 
 import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -820,6 +824,69 @@ func TestRestartResource_DaemonSetWithFake(t *testing.T) {
 }
 
 // --- GetPodSelector ---
+
+func (c *Client) GetPodSelector(ctx context.Context, contextName, namespace, kind, name string) (string, error) {
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return "", err
+	}
+
+	var labels map[string]string
+
+	switch kind {
+	case "Deployment":
+		obj, err := cs.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("getting deployment %s: %w", name, err)
+		}
+		if obj.Spec.Selector != nil {
+			labels = obj.Spec.Selector.MatchLabels
+		}
+	case "StatefulSet":
+		obj, err := cs.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("getting statefulset %s: %w", name, err)
+		}
+		if obj.Spec.Selector != nil {
+			labels = obj.Spec.Selector.MatchLabels
+		}
+	case "DaemonSet":
+		obj, err := cs.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("getting daemonset %s: %w", name, err)
+		}
+		if obj.Spec.Selector != nil {
+			labels = obj.Spec.Selector.MatchLabels
+		}
+	case "Job":
+		obj, err := cs.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("getting job %s: %w", name, err)
+		}
+		if obj.Spec.Selector != nil {
+			labels = obj.Spec.Selector.MatchLabels
+		}
+	case "Service":
+		obj, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return "", fmt.Errorf("getting service %s: %w", name, err)
+		}
+		labels = obj.Spec.Selector
+	default:
+		return "", nil
+	}
+
+	if len(labels) == 0 {
+		return "", nil
+	}
+
+	parts := make([]string, 0, len(labels))
+	for k, v := range labels {
+		parts = append(parts, k+"="+v)
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ","), nil
+}
 
 func TestGetPodSelector_Deployment(t *testing.T) {
 	dep := &appsv1.Deployment{
@@ -2034,6 +2101,54 @@ func TestGetResourceEvents_ReportingComponentFallback(t *testing.T) {
 }
 
 // --- GetPodsUsingPVC ---
+
+// GetPodsUsingPVC returns the names of pods that reference the given PVC in the specified namespace.
+func (c *Client) GetPodsUsingPVC(ctx context.Context, kubeCtx, namespace, pvcName string) ([]string, error) {
+	dynClient, err := c.dynamicForContext(kubeCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	podGVR := schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "pods",
+	}
+
+	list, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing pods: %w", err)
+	}
+
+	var podNames []string
+	for _, item := range list.Items {
+		spec, ok := item.Object["spec"].(map[string]any)
+		if !ok {
+			continue
+		}
+		volumes, ok := spec["volumes"].([]any)
+		if !ok {
+			continue
+		}
+		for _, v := range volumes {
+			vol, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			pvc, ok := vol["persistentVolumeClaim"].(map[string]any)
+			if !ok {
+				continue
+			}
+			if claimName, _ := pvc["claimName"].(string); claimName == pvcName {
+				podNames = append(podNames, item.GetName())
+				break
+			}
+		}
+	}
+
+	sort.Strings(podNames)
+	return podNames, nil
+}
 
 func TestGetPodsUsingPVC(t *testing.T) {
 	pod1 := &unstructured.Unstructured{

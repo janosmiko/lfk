@@ -180,20 +180,24 @@ func TestRenderSyncWave_FocusedPhaseMarker(t *testing.T) {
 	entry := SyncWaveTimelineEntry{
 		Phases: []SyncWavePhaseEntry{
 			{Name: "PreSync"},
-			{Name: "Sync", Focused: true},
+			{Name: "Sync"},
 		},
+		SidebarCursor: 1,
+		ActivePane:    SyncWavePaneSidebar,
 	}
-	got := RenderSyncWaveTimeline(entry, 100, 30)
-	// The focus marker is "▸" or "▾" (focused row uses bold/▸ chevron).
-	assert.Contains(t, got, "Sync")
+	focused := RenderSyncWaveTimeline(entry, 100, 30)
+	assert.Contains(t, focused, "Sync")
+
+	entry.ActivePane = SyncWavePaneBody
+	unfocused := RenderSyncWaveTimeline(entry, 100, 30)
+	assert.NotEqual(t, focused, unfocused,
+		"the sidebar cursor row must render differently when its pane is active vs inactive")
 }
 
 // buildLongPhase produces a single-phase entry with `n` resource rows in
 // a single wave. The scroll argument feeds the global
-// SyncWaveTimelineEntry.BodyScroll — there is no per-phase scroll any
-// more. focused is preserved purely so existing tests can keep asserting
-// against a focused row marker.
-func buildLongPhase(n int, focused bool, scroll int) SyncWaveTimelineEntry {
+// SyncWaveTimelineEntry.BodyScroll — there is no per-phase scroll any more.
+func buildLongPhase(n int, scroll int) SyncWaveTimelineEntry {
 	resources := make([]SyncWaveResourceEntry, n)
 	for i := range n {
 		resources[i] = SyncWaveResourceEntry{
@@ -208,9 +212,8 @@ func buildLongPhase(n int, focused bool, scroll int) SyncWaveTimelineEntry {
 		BodyScroll: scroll,
 		Phases: []SyncWavePhaseEntry{
 			{
-				Name:    "Sync",
-				Focused: focused,
-				Waves:   []SyncWaveBucketEntry{{Wave: 0, Resources: resources}},
+				Name:  "Sync",
+				Waves: []SyncWaveBucketEntry{{Wave: 0, Resources: resources}},
 			},
 		},
 	}
@@ -221,7 +224,7 @@ func TestRenderSyncWave_ScrollClipsBody(t *testing.T) {
 	// Global scroll counts every body line — including the phase
 	// header, which is body line 0. So scroll=6 skips the phase header
 	// + r000..r004, leaving r005 as the first content row.
-	entry := buildLongPhase(total, true, 6)
+	entry := buildLongPhase(total, 6)
 	// Use a tall enough viewport that height never clips the body —
 	// only the scroll offset should advance the body window.
 	got := RenderSyncWaveTimeline(entry, 100, 200)
@@ -237,7 +240,7 @@ func TestRenderSyncWave_ScrollClipsBody(t *testing.T) {
 func TestRenderSyncWave_HeightClipsToViewport(t *testing.T) {
 	const total = 60
 	const height = 10
-	entry := buildLongPhase(total, false, 0)
+	entry := buildLongPhase(total, 0)
 	got := RenderSyncWaveTimeline(entry, 100, height)
 	lines := strings.Split(got, "\n")
 	assert.LessOrEqual(t, len(lines), height,
@@ -248,7 +251,7 @@ func TestRenderSyncWave_HeaderPreservedWhenClipping(t *testing.T) {
 	// Even when the viewport is small, the header rows (title, last-op,
 	// live-phase, divider) must remain visible — clipping happens on the
 	// body rows only.
-	entry := buildLongPhase(40, true, 0)
+	entry := buildLongPhase(40, 0)
 	entry.LivePhase = "Running"
 	entry.LastOperation = &SyncWaveLastOperation{
 		Phase:      "Running",

@@ -28,11 +28,3 @@ func FieldManagerStyle(manager string, dim bool) lipgloss.Style {
 	}
 	return style
 }
-
-// FieldManagerColorIndex returns which palette slot a manager lands in. The
-// help and the legend use it to show the same color as the gutter.
-func FieldManagerColorIndex(manager string) int {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(manager))
-	return int(h.Sum32()) % len(fieldManagerPalette())
-}

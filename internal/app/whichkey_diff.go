@@ -11,7 +11,7 @@ import (
 // the visual handler has no case for the toggles, the search key, the folds, or
 // q — pressing them there is a silent no-op, not a fallthrough.
 //
-// The diff itself is resolved once because ui.computeDiff builds an O(nxm) LCS
+// The diff itself is resolved once because ui.ComputeDiffLines builds an O(nxm) LCS
 // table (overlay_diff.go:20-50) and three entries need a different fact off the
 // same pass: the visible-line count handleDiffNormalCopy stops at, the fold
 // region under the cursor, and the text the yank would copy.
@@ -43,7 +43,7 @@ type wkDiffCtx struct {
 
 // newWKDiffCtx resolves the diff and the cursor's line once per availability
 // pass. Safe on a zero-value Model: the cache pointer is nil-safe and
-// computeDiff of two empty strings yields no lines, so every bound below is a
+// ComputeDiffLines of two empty strings yields no lines, so every bound below is a
 // length compare.
 //
 // The diff comes from the viewer's memo, not a fresh pass: this runs on every

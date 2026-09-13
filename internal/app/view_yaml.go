@@ -336,13 +336,13 @@ func yamlAdjustedCols(ctx yamlRenderCtx) (anchorCol, cursorCol, colStart, colEnd
 }
 
 // yamlPrependGutter prepends the cursor indicator, line number, and fold prefix.
-func yamlPrependGutter(content, lineNum, foldPrefix string, isCursor, isSelected, visualMode bool, curCol int, rawContent string) string {
+func yamlPrependGutter(content, lineNum, foldPrefix string, isCursor, isSelected, visualMode bool, curCol int) string {
 	if isCursor {
 		if visualMode {
 			return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix + content
 		}
 		return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix +
-			ui.RenderCursorAtCol(content, rawContent, curCol)
+			ui.RenderCursorAtCol(content, curCol)
 	}
 	if isSelected {
 		return ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNum) + foldPrefix + content
@@ -401,7 +401,7 @@ func renderYAMLWrappedLine(result []string, contentLine, foldPrefix string, visI
 		}
 		if si == 0 {
 			lineNum := yamlLineNumStr(origLine, ctx.gutterWidth)
-			hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen, sub)
+			hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen)
 		} else {
 			pad := strings.Repeat(" ", 1+ctx.gutterWidth+1+yamlFoldPrefixLen+2)
 			hl = pad + hl
@@ -426,7 +426,7 @@ func renderYAMLNonWrappedLine(result []string, contentLine, foldPrefix string, v
 		hl = ui.RenderVisualSelection(contentLine, ctx.visualType, visIdx, ctx.selStart, ctx.selEnd, ctx.visualStart, adjAnchor, adjCursor, adjColStart, adjColEnd)
 	}
 	lineNum := yamlLineNumStr(origLine, ctx.gutterWidth)
-	hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen, contentLine)
+	hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen)
 	if visIdx == ctx.yamlCursor {
 		hl += yamlBlameInline(ctx, origLine, lipgloss.Width(hl))
 	}

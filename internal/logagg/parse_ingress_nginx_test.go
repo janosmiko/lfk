@@ -40,7 +40,7 @@ func TestIngressNginxParser_Parse(t *testing.T) {
 			wantOK: false,
 		},
 	}
-	p := NewIngressNginxParser()
+	p := ingressNginxParser{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := p.Parse(tt.line)
@@ -61,11 +61,5 @@ func TestIngressNginxParser_Parse(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestIngressNginxParser_Kind(t *testing.T) {
-	if NewIngressNginxParser().Kind() != ProfileIngressNginx {
-		t.Error("Kind() != ProfileIngressNginx")
 	}
 }

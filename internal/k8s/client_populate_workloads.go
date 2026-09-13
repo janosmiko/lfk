@@ -28,10 +28,8 @@ func populatePodDetails(ti *model.Item, obj map[string]any, status, spec map[str
 		if ready, ok := csMap["ready"].(bool); ok && ready {
 			readyCount++
 		}
-		if rc, ok := csMap["restartCount"].(int64); ok {
+		if rc, ok := intFromMap(csMap, "restartCount"); ok {
 			restartCount += rc
-		} else if rcf, ok := csMap["restartCount"].(float64); ok {
-			restartCount += int64(rcf)
 		}
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyCount, totalContainers)
@@ -186,17 +184,13 @@ func populateDeploymentDetails(ti *model.Item, obj, status, spec map[string]any)
 	if status == nil || spec == nil {
 		return
 	}
-	var specReplicas int64 = 1
-	if r, ok := spec["replicas"].(int64); ok {
+	specReplicas := int64(1)
+	if r, ok := intFromMap(spec, "replicas"); ok {
 		specReplicas = r
-	} else if r, ok := spec["replicas"].(float64); ok {
-		specReplicas = int64(r)
 	}
 	var readyReplicas int64
-	if r, ok := status["readyReplicas"].(int64); ok {
+	if r, ok := intFromMap(status, "readyReplicas"); ok {
 		readyReplicas = r
-	} else if r, ok := status["readyReplicas"].(float64); ok {
-		readyReplicas = int64(r)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
@@ -229,17 +223,13 @@ func populateStatefulSetDetails(ti *model.Item, obj, status, spec map[string]any
 	if status == nil || spec == nil {
 		return
 	}
-	var specReplicas int64 = 1
-	if r, ok := spec["replicas"].(int64); ok {
+	specReplicas := int64(1)
+	if r, ok := intFromMap(spec, "replicas"); ok {
 		specReplicas = r
-	} else if r, ok := spec["replicas"].(float64); ok {
-		specReplicas = int64(r)
 	}
 	var readyReplicas int64
-	if r, ok := status["readyReplicas"].(int64); ok {
+	if r, ok := intFromMap(status, "readyReplicas"); ok {
 		readyReplicas = r
-	} else if r, ok := status["readyReplicas"].(float64); ok {
-		readyReplicas = int64(r)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
@@ -273,15 +263,11 @@ func populateDaemonSetDetails(ti *model.Item, obj, status, spec map[string]any) 
 		return
 	}
 	var desired, ready int64
-	if d, ok := status["desiredNumberScheduled"].(int64); ok {
+	if d, ok := intFromMap(status, "desiredNumberScheduled"); ok {
 		desired = d
-	} else if d, ok := status["desiredNumberScheduled"].(float64); ok {
-		desired = int64(d)
 	}
-	if r, ok := status["numberReady"].(int64); ok {
+	if r, ok := intFromMap(status, "numberReady"); ok {
 		ready = r
-	} else if r, ok := status["numberReady"].(float64); ok {
-		ready = int64(r)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", ready, desired)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired", Value: fmt.Sprintf("%d", desired)})
@@ -315,16 +301,12 @@ func populateReplicaSetDetails(ti *model.Item, obj, status, spec map[string]any)
 		return
 	}
 	var specReplicas int64
-	if r, ok := spec["replicas"].(int64); ok {
+	if r, ok := intFromMap(spec, "replicas"); ok {
 		specReplicas = r
-	} else if r, ok := spec["replicas"].(float64); ok {
-		specReplicas = int64(r)
 	}
 	var readyReplicas int64
-	if r, ok := status["readyReplicas"].(int64); ok {
+	if r, ok := intFromMap(status, "readyReplicas"); ok {
 		readyReplicas = r
-	} else if r, ok := status["readyReplicas"].(float64); ok {
-		readyReplicas = int64(r)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired", Value: fmt.Sprintf("%d", specReplicas)})

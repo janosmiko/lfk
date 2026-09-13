@@ -70,3 +70,11 @@ func TestSweepStaleHot_PrunesColdAutoState(t *testing.T) {
 	assert.True(t, ic.isPromoted("", promoted))
 	assert.True(t, ic.getAutoState("", denied).isDenied())
 }
+
+// isDenied separates denyGVR's permanent verdict from noteWatchFailure's
+// expiring one, which cacheBlocked folds together.
+func (s *gvrAutoState) isDenied() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.denied
+}

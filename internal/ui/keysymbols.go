@@ -99,11 +99,10 @@ func iconModeDrawsSymbols() bool {
 	return false
 }
 
-// splitModifierChord splits a modified chord into its modifier names and the
-// key they apply to. ok is false for anything that is not one — a plain binding,
-// a binding that merely contains "+" (the literal "+" key, "ctrl++"), or a
-// segment that is not a known modifier.
-func splitModifierChord(key string) (mods []string, last string, ok bool) {
+// SplitModifierChord splits a modified chord into its modifier names and the
+// key they apply to. ok is false for the literal "+" key ("ctrl++") and any
+// unmodified or unrecognized-modifier binding.
+func SplitModifierChord(key string) (mods []string, last string, ok bool) {
 	parts := strings.Split(key, "+")
 	if len(parts) < 2 {
 		return nil, "", false
@@ -118,14 +117,6 @@ func splitModifierChord(key string) (mods []string, last string, ok bool) {
 		return nil, "", false
 	}
 	return parts[:len(parts)-1], last, true
-}
-
-// SplitModifierChord exposes splitModifierChord to other packages that need
-// the raw modifier set behind a binding — e.g. the which-key panel's sort,
-// which groups entries by modifier tier and must not grow a second chord
-// parser next to this one.
-func SplitModifierChord(key string) (mods []string, last string, ok bool) {
-	return splitModifierChord(key)
 }
 
 // titleKeyName uppercases a chord's key rune-wise, so a multibyte key is never
@@ -159,7 +150,7 @@ func KeyChordDisplay(key string) string {
 		}
 		return key
 	}
-	chord, last, ok := splitModifierChord(key)
+	chord, last, ok := SplitModifierChord(key)
 	if !ok {
 		return key
 	}

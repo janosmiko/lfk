@@ -14,77 +14,43 @@ import (
 )
 
 // SuspendArgoWorkflow sets spec.suspend=true on an Argo Workflow.
-func (c *Client) SuspendArgoWorkflow(contextName, namespace, name string) error {
+// patchWorkflow applies a merge patch to an ArgoWorkflow, wrapping any error
+// with the verb naming the caller's action (e.g. "suspending", "terminating").
+func patchWorkflow(c *Client, contextName, namespace, name string, patch []byte, verb string) error {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
 	}
 
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
-	patch := []byte(`{"spec":{"suspend":true}}`)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
 		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
 	)
 	if err != nil {
-		return fmt.Errorf("suspending workflow %s: %w", name, err)
+		return fmt.Errorf("%s workflow %s: %w", verb, name, err)
 	}
 	return nil
 }
 
+func (c *Client) SuspendArgoWorkflow(contextName, namespace, name string) error {
+	return patchWorkflow(c, contextName, namespace, name, []byte(`{"spec":{"suspend":true}}`), "suspending")
+}
+
 // ResumeArgoWorkflow sets spec.suspend=false on an Argo Workflow.
 func (c *Client) ResumeArgoWorkflow(contextName, namespace, name string) error {
-	dynClient, err := c.dynamicForContext(contextName)
-	if err != nil {
-		return err
-	}
-
-	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
-	patch := []byte(`{"spec":{"suspend":false}}`)
-	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
-	)
-	if err != nil {
-		return fmt.Errorf("resuming workflow %s: %w", name, err)
-	}
-	return nil
+	return patchWorkflow(c, contextName, namespace, name, []byte(`{"spec":{"suspend":false}}`), "resuming")
 }
 
 // StopArgoWorkflow sets spec.shutdown="Stop" on an Argo Workflow.
 // This stops new steps from running but allows exit handlers to execute.
 func (c *Client) StopArgoWorkflow(contextName, namespace, name string) error {
-	dynClient, err := c.dynamicForContext(contextName)
-	if err != nil {
-		return err
-	}
-
-	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
-	patch := []byte(`{"spec":{"shutdown":"Stop"}}`)
-	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
-	)
-	if err != nil {
-		return fmt.Errorf("stopping workflow %s: %w", name, err)
-	}
-	return nil
+	return patchWorkflow(c, contextName, namespace, name, []byte(`{"spec":{"shutdown":"Stop"}}`), "stopping")
 }
 
 // TerminateArgoWorkflow sets spec.shutdown="Terminate" on an Argo Workflow.
 // This immediately terminates the workflow without running exit handlers.
 func (c *Client) TerminateArgoWorkflow(contextName, namespace, name string) error {
-	dynClient, err := c.dynamicForContext(contextName)
-	if err != nil {
-		return err
-	}
-
-	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
-	patch := []byte(`{"spec":{"shutdown":"Terminate"}}`)
-	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{FieldManager: FieldManager()},
-	)
-	if err != nil {
-		return fmt.Errorf("terminating workflow %s: %w", name, err)
-	}
-	return nil
+	return patchWorkflow(c, contextName, namespace, name, []byte(`{"spec":{"shutdown":"Terminate"}}`), "terminating")
 }
 
 // ResubmitArgoWorkflow creates a new Workflow from an existing one's spec.

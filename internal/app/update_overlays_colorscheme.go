@@ -111,7 +111,7 @@ func (m Model) handleColorschemeNormalModeExtended(msg tea.KeyPressMsg, filtered
 	case "home":
 		m.pendingG = false
 		m.schemeCursor = 0
-		ui.ResetOverlaySchemeScroll()
+		ui.OverlaySchemeScroll = 0
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
@@ -120,7 +120,7 @@ func (m Model) handleColorschemeNormalModeExtended(msg tea.KeyPressMsg, filtered
 		if selectableCount > 0 {
 			m.schemeCursor = selectableCount - 1
 		}
-		ui.ResetOverlaySchemeScroll()
+		ui.OverlaySchemeScroll = 0
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
@@ -128,7 +128,7 @@ func (m Model) handleColorschemeNormalModeExtended(msg tea.KeyPressMsg, filtered
 		if m.pendingG {
 			m.pendingG = false
 			m.schemeCursor = 0
-			ui.ResetOverlaySchemeScroll()
+			ui.OverlaySchemeScroll = 0
 			m.previewSchemeAtCursor(filtered)
 			return m, nil
 		}
@@ -139,7 +139,7 @@ func (m Model) handleColorschemeNormalModeExtended(msg tea.KeyPressMsg, filtered
 		if selectableCount > 0 {
 			m.schemeCursor = selectableCount - 1
 		}
-		ui.ResetOverlaySchemeScroll()
+		ui.OverlaySchemeScroll = 0
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
@@ -182,7 +182,7 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.
 		switch handlePastedText(&m.schemeFilter, []rune(msg.Text)) {
 		case filterContinue:
 			m.schemeCursor = 0
-			ui.ResetOverlaySchemeScroll()
+			ui.OverlaySchemeScroll = 0
 			m.previewSchemeAtCursor(m.filteredSchemeNames())
 			return m, nil
 		case filterPasteMultiline:
@@ -200,7 +200,7 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.
 		m.schemeFilterEntryName = ""
 		m.schemeFilter.Clear()
 		m.schemeCursor = 0
-		ui.ResetOverlaySchemeScroll()
+		ui.OverlaySchemeScroll = 0
 		if target != "" {
 			for i, n := range m.filteredSchemeNames() {
 				if n == target {
@@ -214,7 +214,7 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.
 	case filterAccept:
 		m.schemeFilterMode = false
 		m.schemeCursor = 0
-		ui.ResetOverlaySchemeScroll()
+		ui.OverlaySchemeScroll = 0
 		filtered := m.filteredSchemeNames()
 		// When the filter narrows to a single scheme, Enter is unambiguous:
 		// commit it and close. The live preview already applied the theme on
@@ -240,7 +240,7 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyPressMsg) (tea.Model, tea.
 		return m.closeTabOrQuit()
 	case filterContinue:
 		m.schemeCursor = 0
-		ui.ResetOverlaySchemeScroll()
+		ui.OverlaySchemeScroll = 0
 		m.previewSchemeAtCursor(m.filteredSchemeNames())
 		return m, nil
 	}
@@ -291,8 +291,8 @@ func (m *Model) filteredSchemeNames() []string {
 // item currently visible in the colorscheme overlay viewport.
 func (m *Model) schemeFirstVisibleSelectable() int {
 	items := m.schemeDisplayItems()
-	start := ui.GetOverlaySchemeScroll()
-	end := min(start+ui.GetOverlaySchemeVisible(), len(items))
+	start := ui.OverlaySchemeScroll
+	end := min(start+ui.OverlaySchemeVisible, len(items))
 	for i := start; i < end; i++ {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx
@@ -305,8 +305,8 @@ func (m *Model) schemeFirstVisibleSelectable() int {
 // item currently visible in the colorscheme overlay viewport.
 func (m *Model) schemeLastVisibleSelectable() int {
 	items := m.schemeDisplayItems()
-	start := ui.GetOverlaySchemeScroll()
-	end := min(start+ui.GetOverlaySchemeVisible(), len(items))
+	start := ui.OverlaySchemeScroll
+	end := min(start+ui.OverlaySchemeVisible, len(items))
 	for i := end - 1; i >= start; i-- {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx

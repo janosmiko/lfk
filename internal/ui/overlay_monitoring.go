@@ -9,37 +9,15 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// overlaySchemeScroll is the persistent scroll position for the colorscheme overlay.
-var overlaySchemeScroll int
+// OverlaySchemeScroll is the persistent scroll position for the colorscheme
+// overlay, written by renderColorschemeOverlay on every render and read by
+// mouse-click row resolution in update_overlays_selectors.go.
+var OverlaySchemeScroll int
 
-// ResetOverlaySchemeScroll resets the colorscheme overlay scroll to the top.
-func ResetOverlaySchemeScroll() { overlaySchemeScroll = 0 }
-
-// GetOverlaySchemeScroll returns the current colorscheme overlay scroll position.
-func GetOverlaySchemeScroll() int { return overlaySchemeScroll }
-
-// SetOverlaySchemeScroll updates the colorscheme-overlay scroll state. Called
-// by the renderColorschemeOverlay helper on every render so mouse-click row
-// resolution in update_overlays_selectors.go keeps resolving rows correctly.
-func SetOverlaySchemeScroll(s int) { overlaySchemeScroll = s }
-
-// overlaySchemeVisible mirrors the viewport size last used by the
-// colorscheme overlay renderer so the mouse-click / page-scroll
-// handlers can resolve hit rows against the correct viewport. The
-// renderer writes this on every render via SetOverlaySchemeVisible;
-// the default 20 matches the legacy constant for the brief window
-// before the first render.
-var overlaySchemeVisible = 20
-
-// GetOverlaySchemeVisible returns the current colorscheme overlay
-// viewport size (number of display lines, including any interleaved
-// section headers).
-func GetOverlaySchemeVisible() int { return overlaySchemeVisible }
-
-// SetOverlaySchemeVisible updates the viewport size to match what the
-// renderer is actually painting. Called from renderColorschemeOverlay
-// on every render.
-func SetOverlaySchemeVisible(n int) { overlaySchemeVisible = n }
+// OverlaySchemeVisible mirrors the colorscheme overlay's rendered viewport
+// size so mouse-click / page-scroll handlers resolve hit rows correctly.
+// The default 20 covers the brief window before the first render.
+var OverlaySchemeVisible = 20
 
 // ErrorLogVisualParams holds visual selection state for the error log overlay.
 type ErrorLogVisualParams struct {
@@ -343,7 +321,7 @@ func renderErrorLogEntry(entry ErrorLogEntry, contentW int, vp ErrorLogVisualPar
 			// left over from a vertical move onto a shorter line lands on the
 			// text rather than parking in the padding past end-of-line.
 			col := min(vp.CursorCol, max(ansi.StringWidth(lines[0])-1, 0))
-			lines[0] = RenderCursorAtCol(lines[0], "", col)
+			lines[0] = RenderCursorAtCol(lines[0], col)
 		}
 	}
 

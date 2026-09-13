@@ -208,18 +208,6 @@ func NewWithCap(threshold time.Duration, completedCap int) *Registry {
 	}
 }
 
-// SetLingerDurationForTest overrides DefaultLingerDuration on this
-// registry. Tests use it to make linger-window assertions fast without
-// real-time waits. Production code MUST NOT call this.
-func (r *Registry) SetLingerDurationForTest(d time.Duration) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.lingerDuration = d
-}
-
 // Start records a new tracked task and returns its ID. The caller MUST
 // call Finish (typically via defer inside the goroutine) when the work
 // completes, regardless of success/error/cancel.
@@ -602,13 +590,6 @@ func (r *Registry) SnapshotCompleted() []CompletedTask {
 	out := make([]CompletedTask, len(r.completed))
 	copy(out, r.completed)
 	return out
-}
-
-// NextIDForTest exposes the next-ID atomic for use by integration tests
-// in the parent package. Production code MUST NOT call this — use
-// Snapshot or Len instead.
-func (r *Registry) NextIDForTest() uint64 {
-	return r.nextID.Load()
 }
 
 // InjectCompletedForTest prepends a synthetic CompletedTask onto the

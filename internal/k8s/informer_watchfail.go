@@ -87,11 +87,3 @@ func (ic *informerCache) noteWatchFailure(contextName string, gvr schema.GroupVe
 		"context", contextName, "gvr", gvr.String(),
 		"cooldown", ic.watchFailureCooldown.String(), "error", err)
 }
-
-// hasEntry reports whether a live informer exists for (contextName, gvr).
-func (ic *informerCache) hasEntry(contextName string, gvr schema.GroupVersionResource) bool {
-	ic.mu.Lock()
-	defer ic.mu.Unlock()
-	_, ok := ic.entries[contextName][gvr]
-	return ok
-}

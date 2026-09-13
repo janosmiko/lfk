@@ -37,10 +37,7 @@ type EventViewerParams struct {
 // renderer can place a block cursor or per-character selection
 // highlight on the correct physical sub-line + column.
 type wrappedEventChunk struct {
-	text       string // full sub-line text including any leading indent
-	indentCols int    // leading pad width within text
-	origStart  int    // index of first original-line char in this chunk
-	origLen    int    // count of original-line chars in this chunk
+	text string // full sub-line text including any leading indent
 }
 
 // wrappedEventChunks splits a logical event line into physical sub-lines
@@ -53,28 +50,19 @@ type wrappedEventChunk struct {
 func wrappedEventChunks(line string, contentW, hangingIndent int) []wrappedEventChunk {
 	runes := []rune(line)
 	if contentW <= 0 || len(runes) <= contentW {
-		return []wrappedEventChunk{{text: line, origLen: len(runes)}}
+		return []wrappedEventChunk{{text: line}}
 	}
 	// Clamp the indent: leave at least 8 chars per continuation line.
 	if hangingIndent < 0 || hangingIndent >= contentW-8 {
 		hangingIndent = 0
 	}
-	out := []wrappedEventChunk{{
-		text:      string(runes[:contentW]),
-		origStart: 0,
-		origLen:   contentW,
-	}}
+	out := []wrappedEventChunk{{text: string(runes[:contentW])}}
 	pad := strings.Repeat(" ", hangingIndent)
 	chunkSize := contentW - hangingIndent
 	pos := contentW
 	for pos < len(runes) {
 		n := min(chunkSize, len(runes)-pos)
-		out = append(out, wrappedEventChunk{
-			text:       pad + string(runes[pos:pos+n]),
-			indentCols: hangingIndent,
-			origStart:  pos,
-			origLen:    n,
-		})
+		out = append(out, wrappedEventChunk{text: pad + string(runes[pos:pos+n])})
 		pos += n
 	}
 	return out
@@ -178,7 +166,7 @@ func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 		}
 
 		if opts.IsCursor && i == 0 {
-			text = RenderCursorAtCol(text, "", opts.CursorCol)
+			text = RenderCursorAtCol(text, opts.CursorCol)
 		}
 		sb.WriteString(text)
 	}
@@ -471,7 +459,7 @@ func renderEventCursorLine(p EventViewerParams, fitLine string, ctx eventLineCon
 	if p.SearchQuery != "" {
 		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
 	}
-	return gutter + RenderCursorAtCol(displayLine, fitLine, p.CursorCol)
+	return gutter + RenderCursorAtCol(displayLine, p.CursorCol)
 }
 
 // renderEventNormalLine renders a non-wrap, non-cursor, non-selected line.

@@ -44,3 +44,16 @@ func TestPortForwardManagerUpdateCallback(t *testing.T) {
 	mgr.StopAll()
 	assert.Empty(t, updates) // No actual entries to trigger on.
 }
+
+// ActiveCount returns the number of active (running) port forwards.
+func (m *PortForwardManager) ActiveCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	count := 0
+	for _, e := range m.entries {
+		if e.Status == PortForwardRunning || e.Status == PortForwardStarting {
+			count++
+		}
+	}
+	return count
+}

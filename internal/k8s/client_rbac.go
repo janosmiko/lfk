@@ -58,12 +58,6 @@ func (c *Client) CheckRBAC(ctx context.Context, contextName, namespace, group, r
 	return results, nil
 }
 
-// GetSelfRules returns all access rules for the current user in the given namespace
-// using SelfSubjectRulesReview.
-func (c *Client) GetSelfRules(ctx context.Context, contextName, namespace string) ([]AccessRule, error) {
-	return c.GetSelfRulesAs(ctx, contextName, namespace, "")
-}
-
 // GetSelfRulesAs returns all access rules for the specified user/ServiceAccount in the given namespace.
 // The asUser parameter must be in the format "system:serviceaccount:<namespace>:<name>" for ServiceAccounts.
 // If asUser is empty, it checks the current user's permissions.
@@ -530,54 +524,6 @@ func (c *Client) GetResourceEvents(ctx context.Context, kubeCtx, namespace, name
 	})
 
 	return events, nil
-}
-
-// GetPodsUsingPVC returns the names of pods that reference the given PVC in the specified namespace.
-func (c *Client) GetPodsUsingPVC(ctx context.Context, kubeCtx, namespace, pvcName string) ([]string, error) {
-	dynClient, err := c.dynamicForContext(kubeCtx)
-	if err != nil {
-		return nil, err
-	}
-
-	podGVR := schema.GroupVersionResource{
-		Group:    "",
-		Version:  "v1",
-		Resource: "pods",
-	}
-
-	list, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("listing pods: %w", err)
-	}
-
-	var podNames []string
-	for _, item := range list.Items {
-		spec, ok := item.Object["spec"].(map[string]any)
-		if !ok {
-			continue
-		}
-		volumes, ok := spec["volumes"].([]any)
-		if !ok {
-			continue
-		}
-		for _, v := range volumes {
-			vol, ok := v.(map[string]any)
-			if !ok {
-				continue
-			}
-			pvc, ok := vol["persistentVolumeClaim"].(map[string]any)
-			if !ok {
-				continue
-			}
-			if claimName, _ := pvc["claimName"].(string); claimName == pvcName {
-				podNames = append(podNames, item.GetName())
-				break
-			}
-		}
-	}
-
-	sort.Strings(podNames)
-	return podNames, nil
 }
 
 // PatchLabels patches the labels on a resource using a merge patch.

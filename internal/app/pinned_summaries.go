@@ -6,15 +6,15 @@ package app
 
 import (
 	"fmt"
-	"path/filepath"
 	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/paths"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+const pinnedSummariesFileName = "pinned_summaries.yaml"
 
 // maxPinnedSummaries caps how many summaries one scope may pin: each pinned
 // kind is a full cluster-wide list call on every dashboard refresh.
@@ -43,21 +43,12 @@ func defaultPinsDisabled() bool {
 	return ui.ConfigPinnedSummariesSet && len(ui.ConfigPinnedSummaries) == 0
 }
 
-// pinnedSummariesFilePath returns the path to the pinned-summaries state file.
-func pinnedSummariesFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "pinned_summaries.yaml")
-}
-
 // loadPinnedSummariesState reads pinned dashboard summaries from disk.
-func loadPinnedSummariesState() *PinnedState { return loadPinStateFile(pinnedSummariesFilePath()) }
+func loadPinnedSummariesState() *PinnedState { return loadPinStateFile(pinnedSummariesFileName) }
 
 // savePinnedSummariesState writes pinned dashboard summaries to disk.
 func savePinnedSummariesState(s *PinnedState) error {
-	return savePinStateFile(pinnedSummariesFilePath(), s)
+	return savePinStateFile(pinnedSummariesFileName, s)
 }
 
 // effectivePinnedSummaries merges config-level pinned summaries with the
