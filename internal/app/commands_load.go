@@ -440,9 +440,9 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 	// the right CRD. Core types (Extra="v1") have no group component and
 	// fall through to the Kind-only lookup below.
 	if sel.Extra != "" && sel.Kind != "" {
-		parts := strings.SplitN(sel.Extra, "/", 2)
-		if len(parts) == 2 && parts[0] != "" {
-			if rt, ok := model.FindResourceTypeByKindAndGroup(sel.Kind, parts[0], crds); ok {
+		group, _, found := strings.Cut(sel.Extra, "/")
+		if found && group != "" {
+			if rt, ok := model.FindResourceTypeByKindAndGroup(sel.Kind, group, crds); ok {
 				return rt, true
 			}
 		}
