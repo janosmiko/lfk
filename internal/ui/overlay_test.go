@@ -921,7 +921,7 @@ func TestDiffViewTotalLines(t *testing.T) {
 
 func TestComputeDiff(t *testing.T) {
 	t.Run("identical lines", func(t *testing.T) {
-		lines := computeDiff("a\nb\nc", "a\nb\nc")
+		lines := ComputeDiffLines("a\nb\nc", "a\nb\nc")
 		assert.Len(t, lines, 3)
 		for _, l := range lines {
 			assert.Equal(t, byte('='), l.status)
@@ -929,7 +929,7 @@ func TestComputeDiff(t *testing.T) {
 	})
 
 	t.Run("left only lines", func(t *testing.T) {
-		lines := computeDiff("a\nb\nc", "a\nc")
+		lines := ComputeDiffLines("a\nb\nc", "a\nc")
 		// a is common, b is left-only, c is common.
 		assert.Len(t, lines, 3)
 		assert.Equal(t, byte('='), lines[0].status)
@@ -939,7 +939,7 @@ func TestComputeDiff(t *testing.T) {
 	})
 
 	t.Run("right only lines", func(t *testing.T) {
-		lines := computeDiff("a\nc", "a\nb\nc")
+		lines := ComputeDiffLines("a\nc", "a\nb\nc")
 		assert.Len(t, lines, 3)
 		assert.Equal(t, byte('='), lines[0].status)
 		assert.Equal(t, byte('>'), lines[1].status)
@@ -948,7 +948,7 @@ func TestComputeDiff(t *testing.T) {
 	})
 
 	t.Run("completely different", func(t *testing.T) {
-		lines := computeDiff("a\nb", "c\nd")
+		lines := ComputeDiffLines("a\nb", "c\nd")
 		// No common lines, so all are additions/removals.
 		assert.Len(t, lines, 4)
 		leftCount := 0
@@ -966,7 +966,7 @@ func TestComputeDiff(t *testing.T) {
 	})
 
 	t.Run("empty inputs", func(t *testing.T) {
-		lines := computeDiff("", "")
+		lines := ComputeDiffLines("", "")
 		assert.Len(t, lines, 0)
 	})
 }

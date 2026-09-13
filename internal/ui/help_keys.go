@@ -121,7 +121,7 @@ func helpKeyDisplaySeparated(key string) string {
 
 // chordText is helpKeyDisplay's per-token worker.
 func chordText(tok string) string {
-	mods, last, ok := splitModifierChord(strings.ToLower(tok))
+	mods, last, ok := SplitModifierChord(strings.ToLower(tok))
 	if !ok {
 		return tok
 	}
@@ -160,7 +160,7 @@ func helpKeySymbols(key string) string {
 	bareKeyEligible := !strings.ContainsAny(key, " -")
 	symbols := mapChordTokens(key, func(tok string) string {
 		lower := strings.ToLower(tok)
-		if _, _, ok := splitModifierChord(lower); ok {
+		if _, _, ok := SplitModifierChord(lower); ok {
 			return KeyChordDisplay(lower)
 		}
 		if bareKeyEligible {

@@ -705,7 +705,7 @@ func buildPreviewBody(parsed ParsedLogPreview, contentWidth int) []string {
 		return lines
 	}
 	for src := range strings.SplitSeq(body, "\n") {
-		lines = append(lines, wrapLine(sanitizeLogLine(src, ConfigLogRenderAnsi), contentWidth)...)
+		lines = append(lines, WrapLine(sanitizeLogLine(src, ConfigLogRenderAnsi), contentWidth)...)
 	}
 	return lines
 }
@@ -731,7 +731,7 @@ func renderPreviewFields(fields []LogPreviewField, width int) []string {
 		prefix := keyStyle.Render(key) + strings.Repeat(" ", keyWidth-lipgloss.Width(key)) + sepStyle.Render(" : ")
 		first := true
 		for line := range strings.SplitSeq(f.Value, "\n") {
-			chunks := wrapLine(sanitizeLogLine(line, ConfigLogRenderAnsi), availForValue)
+			chunks := WrapLine(sanitizeLogLine(line, ConfigLogRenderAnsi), availForValue)
 			if len(chunks) == 0 {
 				chunks = []string{""}
 			}

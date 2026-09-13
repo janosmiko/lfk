@@ -46,7 +46,7 @@ func TestEnvoyParser_Parse(t *testing.T) {
 			wantOK: false,
 		},
 	}
-	p := NewEnvoyParser()
+	p := envoyParser{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := p.Parse(tt.line)
@@ -70,16 +70,10 @@ func TestEnvoyParser_Parse(t *testing.T) {
 	}
 }
 
-func TestEnvoyParser_Kind(t *testing.T) {
-	if NewEnvoyParser().Kind() != ProfileEnvoy {
-		t.Error("Kind() != ProfileEnvoy")
-	}
-}
-
 // TestEnvoyParser_TruncatedLine verifies that a truncated Envoy log line (fewer
 // than 5 quoted tokens) does not set host/service even when it parses successfully.
 func TestEnvoyParser_TruncatedLine(t *testing.T) {
-	p := NewEnvoyParser()
+	p := envoyParser{}
 
 	// Truncated line: only request-line quoted token (1 quoted token) — method/path/status still extracted.
 	truncLine := `[2023-10-10T13:55:36.000Z] "GET /api/health HTTP/1.1" 200 - 0 5 3 2`

@@ -318,7 +318,7 @@ func TestCenteredOverlayBoxMatchesActualRenderAtNarrowHeights(t *testing.T) {
 				{Name: "staging"},
 			}
 			m.overlayCursor = 0
-			ui.ResetOverlayNsScroll()
+			ui.OverlayNsScroll = 0
 
 			box, ok := m.centeredOverlayBox()
 			assert.True(t, ok)
@@ -415,7 +415,7 @@ func TestOverlayMouseClickNamespaceItemSetsCursorAndApplies(t *testing.T) {
 		{Name: "monitoring"},
 	}
 	m.overlayCursor = 0
-	ui.ResetOverlayNsScroll()
+	ui.OverlayNsScroll = 0
 
 	// Namespace overlay layout (RenderNamespaceOverlay):
 	//   inner rows: 0=title, 1=title-pad, 2=filter, 3=blank,
@@ -441,7 +441,7 @@ func TestOverlayMouseClickNamespaceFilterRowIsNoOp(t *testing.T) {
 	m.overlay = overlayNamespace
 	m.overlayItems = []model.Item{{Name: "default"}}
 	m.overlayCursor = 0
-	ui.ResetOverlayNsScroll()
+	ui.OverlayNsScroll = 0
 
 	// Filter row is inner row 2, screen y = 9 + 2 + 2 = 13.
 	ret, _ := m.handleMouse(tea.MouseClickMsg{
