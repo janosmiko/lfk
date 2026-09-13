@@ -94,28 +94,17 @@ const (
 // frame and caused width-overflow soft-wraps that mangled borders. A
 // single-line divider plus surface-bg fill gives clear visual hierarchy
 // without doubling chrome columns.
-var crashTabSeparatorStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(ColorBorder)).
-	Background(SurfaceBg)
+var crashTabSeparatorStyle lipgloss.Style
 
 // crashSectionStyle styles Summary section headers ("Init Containers",
 // "Containers", "Last termination of <name>") so they stand out from the
 // body lines without using a separate bordered sub-panel per section.
-// SurfaceBg is matched by ApplyTheme / applyNoColorTheme.
-var crashSectionStyle = lipgloss.NewStyle().
-	Bold(true).
-	Underline(true).
-	Foreground(lipgloss.Color(ColorPrimary)).
-	Background(SurfaceBg)
+var crashSectionStyle lipgloss.Style
 
 // crashHeaderStyle styles the top-of-tab header on the Logs / Describe /
 // Events tabs (e.g. "LOGS · previous · container=app"). Bold + primary
-// color gives the header a clear visual weight above the body. SurfaceBg
-// is matched by ApplyTheme / applyNoColorTheme.
-var crashHeaderStyle = lipgloss.NewStyle().
-	Bold(true).
-	Foreground(lipgloss.Color(ColorPrimary)).
-	Background(SurfaceBg)
+// color gives the header a clear visual weight above the body.
+var crashHeaderStyle lipgloss.Style
 
 // RenderCrashInvestigatorOverlay renders the full crash investigator
 // overlay body (excluding the surrounding overlay frame, which the
