@@ -610,6 +610,98 @@ func TestBuiltinFilterPresets_ServiceNoEndpoints(t *testing.T) {
 	require.NotNil(t, findPreset(presets, "LB No IP"), "existing Service preset must remain")
 }
 
+// Pins the per-kind behavior of the four orphan lookup functions before
+// they are collapsed into one table.
+func TestOrphanKindFunctions_Characterisation(t *testing.T) {
+	kinds := []string{
+		"Pod", "Secret", "ConfigMap", "Service",
+		"PersistentVolumeClaim", "HorizontalPodAutoscaler",
+		"PodDisruptionBudget", "NetworkPolicy",
+		"Role", "ClusterRole", "RoleBinding", "ClusterRoleBinding",
+	}
+	wantPresetName := map[string]string{
+		"Pod":                     "Orphans",
+		"Secret":                  "Unmounted",
+		"ConfigMap":               "Unmounted",
+		"Service":                 "No Endpoints",
+		"PersistentVolumeClaim":   "Unused",
+		"HorizontalPodAutoscaler": "Dangling",
+		"PodDisruptionBudget":     "Dangling",
+		"NetworkPolicy":           "Dangling",
+		"Role":                    "Unbound",
+		"ClusterRole":             "Unbound",
+		"RoleBinding":             "Dangling",
+		"ClusterRoleBinding":      "Dangling",
+	}
+	wantDescription := map[string]string{
+		"Pod":                     "No owner reference",
+		"Secret":                  "No Pod / template / Ingress / SA refers to it",
+		"ConfigMap":               "No Pod or workload template refers to it",
+		"Service":                 "Zero ready+notReady endpoints",
+		"PersistentVolumeClaim":   "Not mounted by any Pod or template",
+		"HorizontalPodAutoscaler": "scaleTargetRef points to a missing workload",
+		"PodDisruptionBudget":     "Selector matches no live / templated pods",
+		"NetworkPolicy":           "podSelector matches no live / templated pods",
+		"Role":                    "No RoleBinding refers to it",
+		"ClusterRole":             "No RoleBinding / ClusterRoleBinding refers to it",
+		"RoleBinding":             "Missing role or empty subjects",
+		"ClusterRoleBinding":      "Missing role or empty subjects",
+	}
+	wantPoolName := map[string]string{
+		"Pod":                     "pod-sentinel",
+		"Secret":                  "secret-sentinel",
+		"ConfigMap":               "configmap-sentinel",
+		"Service":                 "service-sentinel",
+		"PersistentVolumeClaim":   "pvc-sentinel",
+		"HorizontalPodAutoscaler": "hpa-sentinel",
+		"PodDisruptionBudget":     "pdb-sentinel",
+		"NetworkPolicy":           "netpol-sentinel",
+		"Role":                    "role-sentinel",
+		"ClusterRole":             "clusterrole-sentinel",
+		"RoleBinding":             "rolebinding-sentinel",
+		"ClusterRoleBinding":      "clusterrolebinding-sentinel",
+	}
+	report := &k8s.OrphanReport{
+		Pods:                []k8s.OrphanItem{{Name: "pod-sentinel"}},
+		Secrets:             []k8s.OrphanItem{{Name: "secret-sentinel"}},
+		ConfigMaps:          []k8s.OrphanItem{{Name: "configmap-sentinel"}},
+		Services:            []k8s.OrphanItem{{Name: "service-sentinel"}},
+		PVCs:                []k8s.OrphanItem{{Name: "pvc-sentinel"}},
+		HPAs:                []k8s.OrphanItem{{Name: "hpa-sentinel"}},
+		PDBs:                []k8s.OrphanItem{{Name: "pdb-sentinel"}},
+		NetworkPolicies:     []k8s.OrphanItem{{Name: "netpol-sentinel"}},
+		Roles:               []k8s.OrphanItem{{Name: "role-sentinel"}},
+		ClusterRoles:        []k8s.OrphanItem{{Name: "clusterrole-sentinel"}},
+		RoleBindings:        []k8s.OrphanItem{{Name: "rolebinding-sentinel"}},
+		ClusterRoleBindings: []k8s.OrphanItem{{Name: "clusterrolebinding-sentinel"}},
+	}
+
+	for _, kind := range kinds {
+		t.Run(kind, func(t *testing.T) {
+			pool := orphanPoolForKind(report, kind)
+			require.Len(t, pool, 1)
+			assert.Equal(t, wantPoolName[kind], pool[0].Name)
+
+			assert.True(t, needsOrphanCache(kind))
+
+			presets := orphanPresetsForKind(kind, map[orphanCacheKey]*k8s.OrphanReport{}, orphanCacheKey{})
+			require.Len(t, presets, 1)
+			assert.Equal(t, wantPresetName[kind], presets[0].Name)
+			assert.Equal(t, wantDescription[kind], presets[0].Description)
+			assert.Equal(t, "O", presets[0].Key)
+
+			assert.Equal(t, wantPresetName[kind], orphanPresetNameForKind(kind))
+		})
+	}
+
+	t.Run("unknown kind", func(t *testing.T) {
+		assert.Nil(t, orphanPoolForKind(report, "Bogus"))
+		assert.False(t, needsOrphanCache("Bogus"))
+		assert.Nil(t, orphanPresetsForKind("Bogus", map[orphanCacheKey]*k8s.OrphanReport{}, orphanCacheKey{}))
+		assert.Equal(t, "Unmounted", orphanPresetNameForKind("Bogus"))
+	})
+}
+
 func TestNeedsOrphanCache_OrphanKinds(t *testing.T) {
 	for _, kind := range []string{"Pod", "Secret", "ConfigMap", "Service"} {
 		t.Run(kind, func(t *testing.T) {
