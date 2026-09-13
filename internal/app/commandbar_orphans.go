@@ -112,25 +112,10 @@ func findOrphanPreset(presets []FilterPreset, kind string) *FilterPreset {
 }
 
 // orphanPresetNameForKind returns the preset Name used by the orphan filter
-// preset for the given Kind. The names must match those defined in filters.go.
+// preset for the given Kind, from orphanKindTable in filters.go.
 func orphanPresetNameForKind(kind string) string {
-	switch kind {
-	case "Pod":
-		return "Orphans"
-	case "Service":
-		return "No Endpoints"
-	case "Secret", "ConfigMap":
-		return "Unmounted"
-	case "PersistentVolumeClaim":
-		return "Unused"
-	case "HorizontalPodAutoscaler",
-		"PodDisruptionBudget",
-		"NetworkPolicy",
-		"RoleBinding",
-		"ClusterRoleBinding":
-		return "Dangling"
-	case "Role", "ClusterRole":
-		return "Unbound"
+	if info, ok := orphanKindTable[kind]; ok {
+		return info.presetName
 	}
 	return "Unmounted"
 }
