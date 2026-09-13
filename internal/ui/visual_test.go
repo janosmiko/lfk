@@ -15,7 +15,6 @@ func TestRenderCursorAtCol(t *testing.T) {
 	tests := []struct {
 		name       string
 		styledLine string
-		plainLine  string
 		col        int
 		wantSubstr []string
 		wantAbsent []string
@@ -23,56 +22,49 @@ func TestRenderCursorAtCol(t *testing.T) {
 		{
 			name:       "negative column returns styled line unchanged",
 			styledLine: "hello world",
-			plainLine:  "hello world",
 			col:        -1,
 			wantSubstr: []string{"hello world"},
 		},
 		{
 			name:       "cursor at first character",
 			styledLine: "hello",
-			plainLine:  "hello",
 			col:        0,
 			wantSubstr: []string{"h", "ello"},
 		},
 		{
 			name:       "cursor at middle character",
 			styledLine: "hello",
-			plainLine:  "hello",
 			col:        2,
 			wantSubstr: []string{"he", "l", "lo"},
 		},
 		{
 			name:       "cursor at last character",
 			styledLine: "hello",
-			plainLine:  "hello",
 			col:        4,
 			wantSubstr: []string{"hell", "o"},
 		},
 		{
 			name:       "cursor past end appends highlighted space",
 			styledLine: "hello",
-			plainLine:  "hello",
 			col:        10,
 			wantSubstr: []string{"hello", " "},
 		},
 		{
 			name:       "cursor at exact end appends highlighted space",
 			styledLine: "abc",
-			plainLine:  "abc",
 			col:        3,
 			wantSubstr: []string{"abc", " "},
 		},
 		{
 			name:       "empty line with cursor at 0 appends space",
 			styledLine: "",
-			plainLine:  "",
 			col:        0,
 			wantSubstr: []string{" "},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := RenderCursorAtCol(tt.styledLine, tt.plainLine, tt.col)
+			result := RenderCursorAtCol(tt.styledLine, tt.col)
 			for _, sub := range tt.wantSubstr {
 				assert.Contains(t, result, sub, "result should contain %q", sub)
 			}
@@ -110,7 +102,7 @@ func TestRenderCursorAtCol_PreservesANSIInPlainLine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := RenderCursorAtCol(line, line, tt.col)
+			result := RenderCursorAtCol(line, tt.col)
 
 			assert.Contains(t, result, "\x1b[90m",
 				"original SGR opener must remain intact, not split by the cursor wrapper")

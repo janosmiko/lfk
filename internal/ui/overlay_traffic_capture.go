@@ -29,7 +29,6 @@ type CaptureOverlayEntry struct {
 	SnapLen int
 	// Phase A: filter input + presets
 	FilterInputValue   string
-	FilterInputCursor  int
 	FilterPresets      []string
 	FilterPresetCursor int
 

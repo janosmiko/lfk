@@ -48,8 +48,6 @@ func TestDynamicForContext_CachedSameInstance(t *testing.T) {
 // different QPS/Burst, so they must be distinct instances.
 func TestThrottledClientCachedSeparately(t *testing.T) {
 	c := newCacheTestClient(t)
-	RateLimitOverridesEnabled = true
-	t.Cleanup(func() { RateLimitOverridesEnabled = false })
 
 	fg, err := c.clientsetForContext("plain")
 	require.NoError(t, err)

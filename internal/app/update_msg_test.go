@@ -1060,7 +1060,7 @@ func TestP4UpdateFinalizerSearchMsg(t *testing.T) {
 	m := bp4()
 	msg := finalizerSearchResultMsg{
 		results: []k8s.FinalizerMatch{
-			{Name: "pod-1", Namespace: "default", Kind: "Pod", Finalizers: []string{"kubernetes"}},
+			{Name: "pod-1", Namespace: "default", Kind: "Pod"},
 		},
 	}
 	result, _ := m.Update(msg)
