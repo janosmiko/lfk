@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 const maxHistoryEntries = 500
@@ -40,11 +39,7 @@ type commandHistory struct {
 // historyFilePathFor returns the path to the named history file. Returns
 // "" when the state directory cannot be resolved.
 func historyFilePathFor(name string) string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, name)
+	return stateFilePath(name)
 }
 
 // loadCommandHistory reads command bar history from disk.
