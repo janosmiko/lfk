@@ -17,10 +17,11 @@ import (
 func TestExplorerFrameGolden(t *testing.T) {
 	prevNoColor, prevTransparent, prevContrast := ui.ConfigNoColor, ui.ConfigTransparentBg, ui.ConfigMinContrastRatio
 	prevIcons, prevTint, prevLayout := ui.IconMode, ui.ConfigRowStatusTint, ui.ActiveTableLayout
+	prevTheme := ui.ActiveTheme
 	t.Cleanup(func() {
 		ui.ConfigNoColor, ui.ConfigTransparentBg, ui.ConfigMinContrastRatio = prevNoColor, prevTransparent, prevContrast
 		ui.IconMode, ui.ConfigRowStatusTint, ui.ActiveTableLayout = prevIcons, prevTint, prevLayout
-		ui.ApplyTheme(ui.DefaultTheme())
+		ui.ApplyTheme(prevTheme)
 	})
 
 	for _, tc := range []struct {
