@@ -567,16 +567,20 @@ func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart
 }
 
 // trailingSGRRun matches a run of SGR sequences at the end of a string,
-// leadingSGRRun matches one at the start.
+// leadingSGRRun matches one at the start. ":" is included as a valid SGR
+// sub-parameter separator, e.g. colon-form truecolor \x1b[38:2::r:g:bm.
 var (
-	trailingSGRRun = regexp.MustCompile(`(?:\x1b\[[0-9;]*m)+$`)
-	leadingSGRRun  = regexp.MustCompile(`^(?:\x1b\[[0-9;]*m)+`)
+	trailingSGRRun = regexp.MustCompile(`(?:\x1b\[[0-9;:]*m)+$`)
+	leadingSGRRun  = regexp.MustCompile(`^(?:\x1b\[[0-9;:]*m)+`)
 )
 
 // padWithinTrailingSGR inserts pad spaces before line's trailing SGR run
-// so the pad keeps the style that was still open there, instead of landing
-// after the reset in the terminal's default color.
+// so the pad keeps that style instead of landing after the reset. pad<=0
+// is a no-op so an escape the matcher misses can't go negative here.
 func padWithinTrailingSGR(s string, pad int) string {
+	if pad <= 0 {
+		return s
+	}
 	at := len(s)
 	if loc := trailingSGRRun.FindStringIndex(s); loc != nil {
 		at = loc[0]
@@ -584,10 +588,13 @@ func padWithinTrailingSGR(s string, pad int) string {
 	return s[:at] + strings.Repeat(" ", pad) + s[at:]
 }
 
-// padWithinLeadingSGR inserts pad spaces after line's leading SGR run (the
-// style ansi.TruncateLeft carries over from before the cut) so the pad
-// keeps that style instead of the terminal's default color.
+// padWithinLeadingSGR inserts pad spaces after line's leading SGR run, the
+// style ansi.TruncateLeft carries over from before the cut. Same pad<=0
+// guard as padWithinTrailingSGR.
 func padWithinLeadingSGR(s string, pad int) string {
+	if pad <= 0 {
+		return s
+	}
 	at := len(leadingSGRRun.FindString(s))
 	return s[:at] + strings.Repeat(" ", pad) + s[at:]
 }

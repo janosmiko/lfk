@@ -197,6 +197,47 @@ func TestPlaceOverlay_KeepsFullRowWidthAndBackgroundWhenWideRuneStraddlesRightOv
 	assert.Equal(t, sgrAt(row, padCol+1), sgrAt(row, padCol), "pad cell must keep its neighbour's background color")
 }
 
+// colonFormBgLine hand-crafts a colon-form truecolor SGR background line
+// (\x1b[38:2::r:g:bm), the form lipgloss itself doesn't emit but a terminal
+// or another tool's output can carry.
+func colonFormBgLine(content string) string {
+	return "\x1b[48:2::18:52:86m" + content + "\x1b[m"
+}
+
+func TestPlaceOverlay_NoPanicOnColonFormSGRAtRightOverlayEdge(t *testing.T) {
+	const width, height = 20, 3
+	const marker = "XXXXXX"
+	bgLine := colonFormBgLine(strings.Repeat("A", 12) + "网" + strings.Repeat("A", 6))
+	bg := strings.Join([]string{bgLine, bgLine, bgLine}, "\n")
+	overlay := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Render(marker)
+
+	require.NotPanics(t, func() {
+		got := PlaceOverlay(width, height, overlay, bg)
+		lines := strings.Split(got, "\n")
+		require.Len(t, lines, height)
+		for i, line := range lines {
+			assert.Equal(t, width, lipgloss.Width(line), "row %d is not the full requested width", i)
+		}
+	})
+}
+
+func TestPlaceOverlayBottom_NoPanicOnColonFormSGRAtRightOverlayEdge(t *testing.T) {
+	const width, height, margin = 20, 6, 0
+	const marker = "YYYYYY"
+	bgLine := colonFormBgLine(strings.Repeat("A", 12) + "网" + strings.Repeat("A", 6))
+	bg := strings.Join([]string{bgLine, bgLine, bgLine, bgLine, bgLine, bgLine}, "\n")
+	overlay := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Render(marker)
+
+	require.NotPanics(t, func() {
+		got := PlaceOverlayBottom(width, height, margin, overlay, bg)
+		lines := strings.Split(got, "\n")
+		require.Len(t, lines, height)
+		for i, line := range lines {
+			assert.Equal(t, width, lipgloss.Width(line), "row %d is not the full requested width", i)
+		}
+	})
+}
+
 func TestPlaceOverlayBottom_KeepsFullRowWidthAndBackgroundWhenWideRuneStraddlesRightOverlayEdge(t *testing.T) {
 	const width, height, margin = 20, 6, 0
 	const marker = "YYYYYY"
