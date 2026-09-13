@@ -458,7 +458,7 @@ func (m Model) fetchCommandBarResourceNames(resourceType, namespace string) tea.
 	}
 
 	return func() tea.Msg {
-		items, err := client.GetResources(context.Background(), kctx, namespace, rt)
+		items, err := client.GetResources(context.Background(), kctx, namespace, rt, false)
 		if err != nil {
 			return commandBarNamesFetchedMsg{cacheKey: cacheKey, names: nil}
 		}

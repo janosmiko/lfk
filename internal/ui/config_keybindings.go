@@ -473,7 +473,7 @@ func IsNamedKey(s string) bool { return namedKeys[s] }
 // as a word ("ctrl+p", "shift+tab", "pgup", "f12"). So the modifiers come off
 // first and the key under them must then be a single rune or a named key.
 //
-// splitModifierChord is deliberately not reused: it refuses the literal "+" key
+// SplitModifierChord is deliberately not reused: it refuses the literal "+" key
 // ("ctrl++") so the display path leaves such chords textual, but that is a real
 // keypress this predicate has to accept.
 func IsSingleKeypress(s string) bool {

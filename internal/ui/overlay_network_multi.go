@@ -12,24 +12,12 @@ import (
 // stacked, with the same diagrams as the single-policy visualizer. A non-empty
 // query highlights matching text in the visible lines.
 func RenderNetworkPoliciesOverlay(info ResourceNetpolsEntry, scroll, width, height int, query string) string {
-	return renderScrollableLines(buildNetpolsOverlayLines(info, width), scroll, width, height, query)
+	return renderScrollableLines(NetworkPoliciesOverlayLines(info, width), scroll, width, height, query)
 }
 
 // NetworkPoliciesOverlayLines returns the full (unscrolled) styled line list
 // of the multi-policy view, for search/match scanning by the key handler.
 func NetworkPoliciesOverlayLines(info ResourceNetpolsEntry, width int) []string {
-	return buildNetpolsOverlayLines(info, width)
-}
-
-// NetworkPoliciesOverlayLineCount returns the total line count of the
-// multi-policy view at the given width, for scroll clamping.
-func NetworkPoliciesOverlayLineCount(info ResourceNetpolsEntry, width int) int {
-	return len(buildNetpolsOverlayLines(info, width))
-}
-
-// buildNetpolsOverlayLines composes the full (unscrolled) line list for the
-// multi-policy view.
-func buildNetpolsOverlayLines(info ResourceNetpolsEntry, width int) []string {
 	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(SurfaceBg)
 	arrowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 	boxBorderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBorder)).Background(SurfaceBg)
@@ -54,6 +42,12 @@ func buildNetpolsOverlayLines(info ResourceNetpolsEntry, width int) []string {
 	}
 	lines = append(lines, "")
 	return flattenRenderedLines(lines)
+}
+
+// NetworkPoliciesOverlayLineCount returns the total line count of the
+// multi-policy view at the given width, for scroll clamping.
+func NetworkPoliciesOverlayLineCount(info ResourceNetpolsEntry, width int) int {
+	return len(NetworkPoliciesOverlayLines(info, width))
 }
 
 // renderNetpolMultiBody renders the summary line and the stacked per-policy

@@ -207,22 +207,34 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, item *model.Item,
 ) string {
-	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
-	inputs := plainCellInputs{item: item, ns: ns, ready: ready, restarts: restarts, status: status, age: age, widths: widths}
 	var row strings.Builder
 	for _, key := range order {
-		if key == "Name" {
+		switch {
+		case key == "Name":
 			row.WriteString(plainNameCellWithBadge(name, item, nameW))
-			continue
-		}
-		if col := renderableBuiltin(key, widths); col != nil {
-			row.WriteString(col.plain(inputs))
-			continue
-		}
-		for _, ec := range extraCols {
-			if ec.key == key {
-				row.WriteString(plainExtraCell(ec, item))
-				break
+		case key == "Context" && contextW > 0:
+			clusterName := ""
+			if item != nil {
+				clusterName = item.ClusterName
+			}
+			row.WriteString(padRight(Truncate(SanitizeTerminalText(clusterName), contextW-1), contextW))
+		case key == "Namespace":
+			row.WriteString(padRight(Truncate(SanitizeTerminalText(ns), nsW-1), nsW))
+		case key == "Ready":
+			row.WriteString(padRight(SanitizeTerminalText(ready), readyW))
+		case key == "Restarts":
+			row.WriteString(padRight(restarts, restartsW))
+		case key == "Status":
+			abbrev := AbbreviateStatusForWidth(SanitizeTerminalText(status), statusW-1)
+			row.WriteString(padRight(Truncate(abbrev, statusW-1), statusW))
+		case key == "Age":
+			row.WriteString(padRight(age, ageW))
+		default:
+			for _, ec := range extraCols {
+				if ec.key == key {
+					row.WriteString(plainExtraCell(ec, item))
+					break
+				}
 			}
 		}
 	}
@@ -237,22 +249,35 @@ func formatTableRowStyledOrdered(item model.Item,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, anyRecentRestart bool, nameOverride *lipgloss.Style,
 ) string {
-	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
-	inputs := styledCellInputs{item: item, widths: widths, anyRecentRestart: anyRecentRestart}
 	var base strings.Builder
 	for _, key := range order {
-		if key == "Name" {
+		switch {
+		case key == "Name":
 			base.WriteString(styledNameCell(item, nameW, nameOverride))
-			continue
-		}
-		if col := renderableBuiltin(key, widths); col != nil {
-			base.WriteString(col.styled(inputs))
-			continue
-		}
-		for _, ec := range extraCols {
-			if ec.key == key {
-				base.WriteString(styledExtraCell(ec, &item))
-				break
+		case key == "Context" && contextW > 0:
+			base.WriteString(DimStyle.Render(padRight(Truncate(SanitizeTerminalText(item.ClusterName), contextW-1), contextW)))
+		case key == "Namespace":
+			ns := SanitizeTerminalText(item.Namespace)
+			if ns == "" {
+				ns = "-"
+			}
+			base.WriteString(DimStyle.Render(padRight(Truncate(ns, nsW-1), nsW)))
+		case key == "Ready":
+			base.WriteString(DimStyle.Render(padRight(SanitizeTerminalText(item.Ready), readyW)))
+		case key == "Restarts":
+			base.WriteString(styledRestartsCell(item, restartsW, anyRecentRestart))
+		case key == "Status":
+			val := AbbreviateStatusForWidth(SanitizeTerminalText(item.Status), statusW-1)
+			base.WriteString(StatusStyle(val).Render(padRight(Truncate(val, statusW-1), statusW)))
+		case key == "Age":
+			age := LiveAge(item)
+			base.WriteString(AgeStyle(age).Render(padRight(age, ageW)))
+		default:
+			for _, ec := range extraCols {
+				if ec.key == key {
+					base.WriteString(styledExtraCell(ec, &item))
+					break
+				}
 			}
 		}
 	}

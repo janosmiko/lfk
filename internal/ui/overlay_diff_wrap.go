@@ -129,7 +129,7 @@ func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLine
 		}
 
 		if vl.IsFoldPlaceholder {
-			ph := padToWidth(DiffFoldPlaceholderText(vl.HiddenCount), colWidth)
+			ph := padRight(DiffFoldPlaceholderText(vl.HiddenCount), colWidth)
 			rows = append(rows, leftInd+emptyGutter+ph+sep+rightInd+emptyGutter+ph)
 			continue
 		}
@@ -155,8 +155,8 @@ func buildWrappedDiffRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLine
 					}
 				}
 			}
-			lcell := padToWidth(styleDiffSub(subAt(leftSubs, r), leftStyle, searchQuery, isCurrent), colWidth)
-			rcell := padToWidth(styleDiffSub(subAt(rightSubs, r), rightStyle, searchQuery, isCurrent), colWidth)
+			lcell := padRight(styleDiffSub(subAt(leftSubs, r), leftStyle, searchQuery, isCurrent), colWidth)
+			rcell := padRight(styleDiffSub(subAt(rightSubs, r), rightStyle, searchQuery, isCurrent), colWidth)
 			rows = append(rows, li+lg+lcell+sep+ri+rg+rcell)
 		}
 
@@ -224,8 +224,8 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 		if vl.IsFoldPlaceholder {
 			placeholder := DiffFoldPlaceholderText(vl.HiddenCount)
 			gutterPadL := strings.Repeat(" ", gutterWidth)
-			leftPlaceholder := padToWidth(placeholder, colWidth)
-			rightPlaceholder := padToWidth(placeholder, colWidth)
+			leftPlaceholder := padRight(placeholder, colWidth)
+			rightPlaceholder := padRight(placeholder, colWidth)
 			row := leftCursorInd + gutterPadL + leftPlaceholder + separatorStyle.Render(" | ") + rightCursorInd + gutterPadL + rightPlaceholder
 			rows = append(rows, row)
 			continue
@@ -244,19 +244,19 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 				leftText, rightText = applyDiffVisualSelection(dl.left, dl.right, vp, visIdx, selStart, selEnd, colWidth)
 			} else {
 				if searchQuery != "" {
-					leftText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery, isCurrent))
-					rightText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery, isCurrent))
+					leftText = normalStyle.Render(highlightDiffSearchInLine(Truncate(dl.left, colWidth), searchQuery, isCurrent))
+					rightText = normalStyle.Render(highlightDiffSearchInLine(Truncate(dl.right, colWidth), searchQuery, isCurrent))
 				} else {
-					leftText = normalStyle.Render(truncateToWidth(dl.left, colWidth))
-					rightText = normalStyle.Render(truncateToWidth(dl.right, colWidth))
+					leftText = normalStyle.Render(Truncate(dl.left, colWidth))
+					rightText = normalStyle.Render(Truncate(dl.right, colWidth))
 				}
 			}
 			// Block cursor on cursor line (non-visual mode).
 			if isCursorLine && !vp.VisualMode {
 				if vp.CursorSide == 0 {
-					leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
+					leftText = RenderCursorAtCol(leftText, vp.CursorCol)
 				} else {
-					rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
+					rightText = RenderCursorAtCol(rightText, vp.CursorCol)
 				}
 			}
 			leftCol = leftText
@@ -272,12 +272,12 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			if isSelected && vp.CursorSide == 0 {
 				leftText = applyDiffVisualSide(dl.left, vp, visIdx, selStart, selEnd)
 			} else if searchQuery != "" {
-				leftText = removedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery, isCurrent))
+				leftText = removedStyle.Render(highlightDiffSearchInLine(Truncate(dl.left, colWidth), searchQuery, isCurrent))
 			} else {
-				leftText = removedStyle.Render(truncateToWidth(dl.left, colWidth))
+				leftText = removedStyle.Render(Truncate(dl.left, colWidth))
 			}
 			if isCursorLine && !vp.VisualMode && vp.CursorSide == 0 {
-				leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
+				leftText = RenderCursorAtCol(leftText, vp.CursorCol)
 			}
 			leftCol = leftText
 			rightCol = ""
@@ -291,12 +291,12 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			if isSelected && vp.CursorSide == 1 {
 				rightText = applyDiffVisualSide(dl.right, vp, visIdx, selStart, selEnd)
 			} else if searchQuery != "" {
-				rightText = addedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery, isCurrent))
+				rightText = addedStyle.Render(highlightDiffSearchInLine(Truncate(dl.right, colWidth), searchQuery, isCurrent))
 			} else {
-				rightText = addedStyle.Render(truncateToWidth(dl.right, colWidth))
+				rightText = addedStyle.Render(Truncate(dl.right, colWidth))
 			}
 			if isCursorLine && !vp.VisualMode && vp.CursorSide == 1 {
-				rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
+				rightText = RenderCursorAtCol(rightText, vp.CursorCol)
 			}
 			leftCol = ""
 			rightCol = rightText
@@ -306,7 +306,7 @@ func buildSideBySideRows(raw []diffLine, vis []VisibleDiffLine, scroll, maxLines
 			}
 			rightNum++
 		}
-		row := leftCursorInd + leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightCursorInd + rightGutter + padToWidth(rightCol, colWidth)
+		row := leftCursorInd + leftGutter + padRight(leftCol, colWidth) + separatorStyle.Render(" | ") + rightCursorInd + rightGutter + padRight(rightCol, colWidth)
 		rows = append(rows, row)
 	}
 	return rows

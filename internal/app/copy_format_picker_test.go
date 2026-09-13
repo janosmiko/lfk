@@ -223,7 +223,7 @@ func TestCopyTableColumnsForLevel_OnlyNonEmptyBuiltins(t *testing.T) {
 		{Name: "a", Namespace: "default", Status: "Running"},
 		{Name: "b", Namespace: "default", Status: "Pending"},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Namespace", "Status"}, got,
 		"only Name plus populated built-ins; Ready/Restarts/Age skipped because empty")
 }
@@ -233,7 +233,7 @@ func TestCopyTableColumnsForLevel_BuiltinOrder(t *testing.T) {
 	items := []model.Item{
 		{Name: "a", Namespace: "n", Ready: "1/1", Status: "Running", Restarts: "0", Age: "1d"},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Namespace", "Ready", "Status", "Restarts", "Age"}, got)
 }
 
@@ -242,17 +242,8 @@ func TestCopyTableColumnsForLevel_ExtraColumnsDeduped(t *testing.T) {
 		{Name: "a", Columns: []model.KeyValue{{Key: "Image", Value: "x:1"}}},
 		{Name: "b", Columns: []model.KeyValue{{Key: "Image", Value: "x:2"}, {Key: "Node", Value: "n1"}}},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Image", "Node"}, got, "extra columns deduped, original order preserved")
-}
-
-func TestCopyTableColumnsForLevel_LevelParamReserved(t *testing.T) {
-	// Same items at different levels should produce identical output today —
-	// `level` is reserved for future per-level customization.
-	items := []model.Item{{Name: "a", Status: "Running"}}
-	resources := copyTableColumnsForLevel(model.LevelResources, items)
-	clusters := copyTableColumnsForLevel(model.LevelClusters, items)
-	assert.Equal(t, resources, clusters, "level parameter is currently inert")
 }
 
 // withActiveColumnState sets the ui.Active* column-state globals for a test
@@ -278,7 +269,7 @@ func TestCopyTableColumnsForLevel_HiddenBuiltinExcluded(t *testing.T) {
 	items := []model.Item{
 		{Name: "a", Namespace: "n", Ready: "1/1", Status: "Running", Restarts: "0", Age: "1d"},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Ready", "Status", "Restarts"}, got,
 		"hidden built-ins (Namespace, Age) must not appear in the copied table")
 }
@@ -292,7 +283,7 @@ func TestCopyTableColumnsForLevel_SessionExtrasRestrictsToVisible(t *testing.T) 
 			{Key: "Node", Value: "n1"},
 		}},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Image"}, got,
 		"only extras in ActiveSessionColumns appear; Node hidden by user is excluded")
 }
@@ -303,7 +294,7 @@ func TestCopyTableColumnsForLevel_OrderRespected(t *testing.T) {
 	items := []model.Item{
 		{Name: "a", Namespace: "n", Ready: "1/1", Status: "Running", Restarts: "0", Age: "1d"},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Status", "Ready", "Restarts", "Age", "Namespace"}, got,
 		"column order must follow ui.ActiveColumnOrder")
 }
@@ -317,7 +308,7 @@ func TestCopyTableColumnsForLevel_OrderReorderExtras(t *testing.T) {
 			{Key: "Node", Value: "n1"},
 		}},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Namespace", "Node", "Image"}, got,
 		"extras follow user reorder, not item-discovery order")
 }
@@ -335,7 +326,7 @@ func TestCopyTableColumnsForLevel_InternalKeysFiltered(t *testing.T) {
 			{Key: "cond:Ready", Value: "skip"},
 		}},
 	}
-	got := copyTableColumnsForLevel(model.LevelResources, items)
+	got := copyTableColumnsForLevel(items)
 	assert.Equal(t, []string{"Name", "Image"}, got,
 		"internal-prefixed Columns keys must be filtered out of the copy")
 }

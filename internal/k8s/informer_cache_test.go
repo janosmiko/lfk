@@ -74,7 +74,7 @@ func TestGetResources_InformerCache_NamespaceSwitchHitsCache(t *testing.T) {
 	t.Cleanup(c.Shutdown)
 
 	// First list — primes the informer (the underlying watch fires one LIST).
-	itemsAll, err := c.GetResources(t.Context(), "", "", podRT)
+	itemsAll, err := c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 	require.Len(t, itemsAll, 3)
 
@@ -84,11 +84,11 @@ func TestGetResources_InformerCache_NamespaceSwitchHitsCache(t *testing.T) {
 	// Switch to team-a, then team-b, then back to all-namespaces. Each call
 	// is the moment the user pressed the namespace selector — under the
 	// pre-#86 code these would have round-tripped to the apiserver.
-	itemsA, err := c.GetResources(t.Context(), "", "team-a", podRT)
+	itemsA, err := c.GetResources(t.Context(), "", "team-a", podRT, false)
 	require.NoError(t, err)
-	itemsB, err := c.GetResources(t.Context(), "", "team-b", podRT)
+	itemsB, err := c.GetResources(t.Context(), "", "team-b", podRT, false)
 	require.NoError(t, err)
-	itemsAll2, err := c.GetResources(t.Context(), "", "", podRT)
+	itemsAll2, err := c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"api-1", "api-2"}, []string{itemsA[0].Name, itemsA[1].Name})
@@ -111,7 +111,7 @@ func TestGetResources_InformerCache_OffModeHitsApiserverEveryTime(t *testing.T) 
 	c.SetInformerCacheMode(InformerCacheOff)
 
 	for range 3 {
-		_, err := c.GetResources(t.Context(), "", "team-a", podRT)
+		_, err := c.GetResources(t.Context(), "", "team-a", podRT, false)
 		require.NoError(t, err)
 	}
 
@@ -134,7 +134,7 @@ func TestGetResources_InformerCache_PicksUpDeletes(t *testing.T) {
 	t.Cleanup(c.Shutdown)
 
 	// Warm the cache.
-	items, err := c.GetResources(t.Context(), "", "team-a", podRT)
+	items, err := c.GetResources(t.Context(), "", "team-a", podRT, false)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 
@@ -146,7 +146,7 @@ func TestGetResources_InformerCache_PicksUpDeletes(t *testing.T) {
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		items, err = c.GetResources(t.Context(), "", "team-a", podRT)
+		items, err = c.GetResources(t.Context(), "", "team-a", podRT, false)
 		require.NoError(t, err)
 		if len(items) == 1 {
 			break
@@ -220,7 +220,7 @@ func TestInformerCache_ConcurrentStopAndDemoteNoPanic(t *testing.T) {
 		withTunedThresholds(c, 1, 5, 1)
 
 		// Warm up: promotes on first list (1 item >= promoteAt=1).
-		_, err := c.GetResources(t.Context(), "", "", podRT)
+		_, err := c.GetResources(t.Context(), "", "", podRT, false)
 		require.NoError(t, err, "iter %d", iter)
 		require.True(t, c.informers.isPromoted("", podGVR()), "iter %d", iter)
 
@@ -235,7 +235,7 @@ func TestInformerCache_ConcurrentStopAndDemoteNoPanic(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-barrier
-			_, _ = c.GetResources(t.Context(), "", "", podRT)
+			_, _ = c.GetResources(t.Context(), "", "", podRT, false)
 		}()
 		go func() {
 			defer wg.Done()
@@ -294,7 +294,7 @@ func TestInformerCache_StopWaitsForGoroutines(t *testing.T) {
 	c.SetInformerCacheMode(InformerCacheAlways)
 
 	// Force the informer to start by issuing a list.
-	_, err := c.GetResources(t.Context(), "", "", podRT)
+	_, err := c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 	require.Greater(t, runtime.NumGoroutine(), baseline,
 		"expected new goroutines for inf.Run + sync watcher")
@@ -354,7 +354,7 @@ func TestGetResources_InformerCache_AutoPromote(t *testing.T) {
 
 	// First call: direct LIST against the apiserver (cache not yet warm).
 	// Result has 4 items, which crosses promoteAt.
-	_, err := c.GetResources(t.Context(), "", "", podRT)
+	_, err := c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 	listsAfterFirst := listActionCount(dc.Actions())
 	require.Equal(t, 1, listsAfterFirst, "first auto-mode call should LIST the apiserver directly")
@@ -364,12 +364,12 @@ func TestGetResources_InformerCache_AutoPromote(t *testing.T) {
 	// Second call: routed through the informer. The informer's own initial
 	// LIST counts as one apiserver call; subsequent namespace switches do
 	// not. Wait briefly for the watch to populate before asserting items.
-	_, err = c.GetResources(t.Context(), "", "team-a", podRT)
+	_, err = c.GetResources(t.Context(), "", "team-a", podRT, false)
 	require.NoError(t, err)
 
 	// Third call (different namespace) — must not add another apiserver list.
 	listsBefore := listActionCount(dc.Actions())
-	_, err = c.GetResources(t.Context(), "", "team-b", podRT)
+	_, err = c.GetResources(t.Context(), "", "team-b", podRT, false)
 	require.NoError(t, err)
 	assert.Equal(t, listsBefore, listActionCount(dc.Actions()),
 		"after promotion, namespace switching should be served from the cache")
@@ -393,14 +393,14 @@ func TestGetResources_InformerCache_AutoDemote(t *testing.T) {
 	// is the minimum to exercise the consecutive-call counter.
 
 	// Warm up: first list promotes the GVR (2 items >= promoteAt=1).
-	_, err := c.GetResources(t.Context(), "", "", podRT)
+	_, err := c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 	require.True(t, c.informers.isPromoted("", podGVR()), "expected promotion after first list")
 
 	// Three more cached lists, each below demoteBelow. The third must trip
 	// the demote: state flips back to direct and the watch is torn down.
 	for i := range 3 {
-		_, err := c.GetResources(t.Context(), "", "", podRT)
+		_, err := c.GetResources(t.Context(), "", "", podRT, false)
 		require.NoError(t, err, "cached list iteration %d", i)
 	}
 	assert.False(t, c.informers.isPromoted("", podGVR()),
@@ -409,7 +409,7 @@ func TestGetResources_InformerCache_AutoDemote(t *testing.T) {
 	// Verify the watch was actually closed by re-promoting and observing
 	// that a fresh informer was started — i.e. demote is not a no-op.
 	listsBefore := listActionCount(dc.Actions())
-	_, err = c.GetResources(t.Context(), "", "", podRT)
+	_, err = c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 	listsAfter := listActionCount(dc.Actions())
 	assert.Greater(t, listsAfter, listsBefore,
@@ -777,12 +777,12 @@ func TestGetResources_ClusterScopedIgnoresNamespace(t *testing.T) {
 
 			// Warm the cache with an all-namespaces list, the state the user
 			// reaches before they pick a namespace.
-			warm, err := c.GetResources(t.Context(), "", "", rt)
+			warm, err := c.GetResources(t.Context(), "", "", rt, false)
 			require.NoError(t, err)
 			require.Len(t, warm, 2)
 
 			// Pick a namespace. A cluster-scoped kind must ignore it.
-			scoped, err := c.GetResources(t.Context(), "", "team-a", rt)
+			scoped, err := c.GetResources(t.Context(), "", "team-a", rt, false)
 			require.NoError(t, err)
 			require.Len(t, scoped, 2,
 				"cluster-scoped resources must ignore the selected namespace (issue #676)")
@@ -805,11 +805,11 @@ func TestGetResources_NamespacedStillFiltersByNamespace(t *testing.T) {
 	c.SetInformerCacheMode(InformerCacheAlways)
 	t.Cleanup(c.Shutdown)
 
-	all, err := c.GetResources(t.Context(), "", "", podRT)
+	all, err := c.GetResources(t.Context(), "", "", podRT, false)
 	require.NoError(t, err)
 	require.Len(t, all, 2)
 
-	scoped, err := c.GetResources(t.Context(), "", "team-a", podRT)
+	scoped, err := c.GetResources(t.Context(), "", "team-a", podRT, false)
 	require.NoError(t, err)
 	require.Len(t, scoped, 1)
 	assert.Equal(t, "api-1", scoped[0].Name)

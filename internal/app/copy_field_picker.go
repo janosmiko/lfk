@@ -79,7 +79,7 @@ func (m Model) handleExplorerActionKeyCopyField() (tea.Model, tea.Cmd, bool) {
 	m.copyFieldPicker = copyFieldPickerState{
 		active:        true,
 		mode:          copyFieldModeColumns,
-		columnEntries: buildCopyFieldColumnEntries(m.nav.Level, scope),
+		columnEntries: buildCopyFieldColumnEntries(scope),
 		fieldsLoaded:  fetchCmd == nil,
 		fieldsErr:     fieldsErr,
 		scope:         scope,
@@ -101,8 +101,8 @@ func (m Model) handleExplorerActionKeyCopyField() (tea.Model, tea.Cmd, bool) {
 // scope as picker rows: the column header as the path, the first
 // item's cell as the value. Reuses the Y-table column set so the rows
 // match what the explorer displays.
-func buildCopyFieldColumnEntries(level model.Level, scope []model.Item) []copyFieldEntry {
-	cols := copyTableColumnsForLevel(level, scope)
+func buildCopyFieldColumnEntries(scope []model.Item) []copyFieldEntry {
+	cols := copyTableColumnsForLevel(scope)
 	entries := make([]copyFieldEntry, 0, len(cols))
 	for _, c := range cols {
 		entries = append(entries, copyFieldEntry{

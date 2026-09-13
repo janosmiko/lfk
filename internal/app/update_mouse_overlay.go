@@ -144,7 +144,7 @@ func (m Model) activateOverlayItemAt(innerY int) (tea.Model, tea.Cmd, bool) {
 		if rowInItems < 0 || rowInItems >= visibleCount {
 			return m, nil, false
 		}
-		idx := ui.GetOverlayNsScroll() + rowInItems
+		idx := ui.OverlayNsScroll + rowInItems
 		if idx < 0 || idx >= len(items) {
 			return m, nil, false
 		}

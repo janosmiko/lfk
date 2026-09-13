@@ -40,7 +40,7 @@ func TestJSONParser_Parse(t *testing.T) {
 			},
 		},
 	}
-	p := NewJSONParser()
+	p := jsonParser{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := p.Parse(tt.line)
@@ -112,7 +112,7 @@ func TestLogfmtParser_Parse(t *testing.T) {
 			},
 		},
 	}
-	p := NewLogfmtParser()
+	p := logfmtParser{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := p.Parse(tt.line)
