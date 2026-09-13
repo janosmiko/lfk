@@ -16,225 +16,107 @@ type tetromino struct {
 	color     int // 1..7 maps to kubetrisPieceColors
 }
 
-// tetrominoes holds the seven standard pieces (I, O, T, S, Z, J, L) with SRS rotation data.
-// Each rotation state is stored in a 4x4 grid (row-major: [row][col]).
+// tetrominoBaseShapes holds only the rotation-0 grid for I, O, T, S, Z, J, L.
 //
 //nolint:gochecknoglobals // game constant data
-var tetrominoes = [7]tetromino{
-	// I piece (color 1 = cyan)
+var tetrominoBaseShapes = [7][4][4]bool{
+	// I piece
 	{
-		rotations: [4][4][4]bool{
-			// Rotation 0
-			{
-				{false, false, false, false},
-				{true, true, true, true},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			// Rotation 1
-			{
-				{false, false, true, false},
-				{false, false, true, false},
-				{false, false, true, false},
-				{false, false, true, false},
-			},
-			// Rotation 2
-			{
-				{false, false, false, false},
-				{false, false, false, false},
-				{true, true, true, true},
-				{false, false, false, false},
-			},
-			// Rotation 3
-			{
-				{false, true, false, false},
-				{false, true, false, false},
-				{false, true, false, false},
-				{false, true, false, false},
-			},
-		},
-		color: 1,
+		{false, false, false, false},
+		{true, true, true, true},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
-	// O piece (color 2 = yellow)
+	// O piece
 	{
-		rotations: [4][4][4]bool{
-			{
-				{false, true, true, false},
-				{false, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, true, false},
-				{false, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, true, false},
-				{false, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, true, false},
-				{false, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-		},
-		color: 2,
+		{false, true, true, false},
+		{false, true, true, false},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
-	// T piece (color 3 = purple)
+	// T piece
 	{
-		rotations: [4][4][4]bool{
-			{
-				{false, true, false, false},
-				{true, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, false, false},
-				{false, true, true, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, false, false, false},
-				{true, true, true, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, false, false},
-				{true, true, false, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-		},
-		color: 3,
+		{false, true, false, false},
+		{true, true, true, false},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
-	// S piece (color 4 = green)
+	// S piece
 	{
-		rotations: [4][4][4]bool{
-			{
-				{false, true, true, false},
-				{true, true, false, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, false, false},
-				{false, true, true, false},
-				{false, false, true, false},
-				{false, false, false, false},
-			},
-			{
-				{false, false, false, false},
-				{false, true, true, false},
-				{true, true, false, false},
-				{false, false, false, false},
-			},
-			{
-				{true, false, false, false},
-				{true, true, false, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-		},
-		color: 4,
+		{false, true, true, false},
+		{true, true, false, false},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
-	// Z piece (color 5 = red)
+	// Z piece
 	{
-		rotations: [4][4][4]bool{
-			{
-				{true, true, false, false},
-				{false, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, false, true, false},
-				{false, true, true, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, false, false, false},
-				{true, true, false, false},
-				{false, true, true, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, false, false},
-				{true, true, false, false},
-				{true, false, false, false},
-				{false, false, false, false},
-			},
-		},
-		color: 5,
+		{true, true, false, false},
+		{false, true, true, false},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
-	// J piece (color 6 = blue)
+	// J piece
 	{
-		rotations: [4][4][4]bool{
-			{
-				{true, false, false, false},
-				{true, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, true, false},
-				{false, true, false, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, false, false, false},
-				{true, true, true, false},
-				{false, false, true, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, false, false},
-				{false, true, false, false},
-				{true, true, false, false},
-				{false, false, false, false},
-			},
-		},
-		color: 6,
+		{true, false, false, false},
+		{true, true, true, false},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
-	// L piece (color 7 = orange)
+	// L piece
 	{
-		rotations: [4][4][4]bool{
-			{
-				{false, false, true, false},
-				{true, true, true, false},
-				{false, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{false, true, false, false},
-				{false, true, false, false},
-				{false, true, true, false},
-				{false, false, false, false},
-			},
-			{
-				{false, false, false, false},
-				{true, true, true, false},
-				{true, false, false, false},
-				{false, false, false, false},
-			},
-			{
-				{true, true, false, false},
-				{false, true, false, false},
-				{false, true, false, false},
-				{false, false, false, false},
-			},
-		},
-		color: 7,
+		{false, false, true, false},
+		{true, true, true, false},
+		{false, false, false, false},
+		{false, false, false, false},
 	},
+}
+
+// tetrominoColors maps each base shape to its kubetrisPieceColors index (1..7).
+//
+//nolint:gochecknoglobals // game constant data
+var tetrominoColors = [7]int{1, 2, 3, 4, 5, 6, 7}
+
+// tetrominoSpinBoxes: I spins the full 4x4, O a 2x2 shifted one column right, rest a top-left 3x3.
+//
+//nolint:gochecknoglobals // game constant data
+var tetrominoSpinBoxes = [7]struct{ col, size int }{
+	{0, 4}, // I
+	{1, 2}, // O
+	{0, 3}, // T
+	{0, 3}, // S
+	{0, 3}, // Z
+	{0, 3}, // J
+	{0, 3}, // L
+}
+
+// tetrominoes holds all seven pieces with all four rotation states.
+//
+//nolint:gochecknoglobals // game constant data
+var tetrominoes = buildTetrominoes()
+
+func buildTetrominoes() [7]tetromino {
+	var out [7]tetromino
+	for i, base := range tetrominoBaseShapes {
+		box := tetrominoSpinBoxes[i]
+		out[i].color = tetrominoColors[i]
+		out[i].rotations[0] = base
+		for rot := 1; rot < 4; rot++ {
+			out[i].rotations[rot] = spin(out[i].rotations[rot-1], box.col, box.size)
+		}
+	}
+	return out
+}
+
+// spin rotates the piece 90 degrees clockwise within its box (rows 0..size,
+// columns boxCol..boxCol+size), leaving the rest of the 4x4 grid false.
+func spin(grid [4][4]bool, boxCol, size int) [4][4]bool {
+	var out [4][4]bool
+	for row := range size {
+		for col := range size {
+			out[row][boxCol+col] = grid[size-1-col][boxCol+row]
+		}
+	}
+	return out
 }
 
 // SRS wall kick data for J, L, S, T, Z pieces.
