@@ -87,6 +87,9 @@ func writeOutput(path string, themes []themeEntry, skipped, failed int) error {
 
 	w := bufio.NewWriter(f)
 	for _, entry := range themes {
+		if strings.ContainsAny(entry.Name, "\t\r\n") {
+			return fmt.Errorf("scheme name %q contains a tab or newline, which would break its TSV row", entry.Name)
+		}
 		fields := themeFields(entry.Theme)
 		cols := append([]string{entry.Name, strconv.FormatBool(entry.IsLight)}, fields[:]...)
 		if _, err := fmt.Fprintln(w, strings.Join(cols, "\t")); err != nil {

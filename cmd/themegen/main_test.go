@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -649,6 +650,22 @@ func TestWriteOutput(t *testing.T) {
 		err := writeOutput("/nonexistent/dir/file.tsv", nil, 0, 0)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "creating output file")
+	})
+
+	t.Run("rejects a scheme name that breaks the tsv row", func(t *testing.T) {
+		pal := buildPaletteArray(fullPalette())
+
+		for _, name := range []string{"bad\tname", "bad\rname", "bad\nname"} {
+			dir := t.TempDir()
+			outPath := filepath.Join(dir, "out.tsv")
+			themes := []themeEntry{
+				{Name: name, Theme: rawTheme{Background: "#1a1b26", Foreground: "#c0caf5", Palette: pal}, IsLight: false},
+			}
+
+			err := writeOutput(outPath, themes, 0, 0)
+			require.Error(t, err, "name %q", name)
+			assert.Contains(t, err.Error(), fmt.Sprintf("%q", name))
+		}
 	})
 }
 
