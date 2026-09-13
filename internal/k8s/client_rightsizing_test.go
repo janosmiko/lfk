@@ -647,6 +647,7 @@ func TestScaleQuantityByHeadroom(t *testing.T) {
 		{name: "unparseable quantity returns input unchanged", q: "not-a-quantity", headroom: 2.0, want: "not-a-quantity"},
 		{name: "CPU quantity scales and snaps to milli suffix", q: "100m", headroom: 2.0, want: "200m"},
 		{name: "memory quantity scales and snaps to Mi suffix", q: "100Mi", headroom: 2.0, want: "200Mi"},
+		{name: "fractional-byte memory quantity scales before truncation", q: "0.0006Ki", headroom: 2.0, want: "1Mi"},
 	}
 
 	for _, tc := range cases {

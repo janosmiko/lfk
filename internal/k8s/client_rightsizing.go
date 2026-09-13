@@ -519,11 +519,10 @@ func scaleQuantityByFactor(q string, factor float64, isMemory bool) string {
 		return q
 	}
 	if isMemory {
-		// MilliValue() for memory returns bytes×1000. Convert back to
-		// bytes before scaling so SnapMemBytesToCanonical sees the right
-		// unit.
-		bytes := parsed.MilliValue() / 1000
-		return SnapMemBytesToCanonical(int64(float64(bytes) * factor))
+		// Scale the milli value before dividing by 1000, or a sub-byte
+		// quantity truncates to 0 before factor is ever applied.
+		bytes := int64(float64(parsed.MilliValue()) * factor / 1000)
+		return SnapMemBytesToCanonical(bytes)
 	}
 	return SnapCPUMilliToCanonical(int64(float64(parsed.MilliValue()) * factor))
 }
