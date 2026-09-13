@@ -142,48 +142,50 @@ func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
 		"MEM": true, "MEM/R": true, "MEM/L": true,
 		"CPU%": true, "MEM%": true, "Uptime": true,
 	}
-	// Build lookup from old items. Carry over whatever metrics columns the
-	// item already had so the column set stays visually stable across watch
-	// ticks -- including "n/a" placeholders set by the node enrichment path
-	// when metrics-server returned nothing. The previous hasUsage gate
-	// dropped the carryover whenever every value was empty/zero, which made
-	// the metrics columns flicker out and back in on each refresh.
-	// The key includes the cluster: in union mode the same namespace+name can
-	// exist in several clusters and must not share carried columns.
+	// Prepend so carried metrics lead the raw request/limit columns
+	// (CPU Req, CPU Lim, Mem Req, Mem Lim) that podMetricsEnrichedMsg reads.
+	carryOverColumnsFrom(oldItems, newItems, metricsKeys, true)
+}
+
+// The cluster is part of the match key because in union mode the same
+// namespace+name can exist in several clusters and must not share columns.
+func carryOverColumnsFrom(oldItems, newItems []model.Item, keys map[string]bool, prependCarried bool) {
 	type itemKey struct{ cluster, ns, name string }
-	oldMetrics := make(map[itemKey][]model.KeyValue)
+	old := make(map[itemKey][]model.KeyValue)
 	for _, item := range oldItems {
 		var cols []model.KeyValue
 		for _, kv := range item.Columns {
-			if metricsKeys[kv.Key] {
+			if keys[kv.Key] {
 				cols = append(cols, kv)
 			}
 		}
 		if len(cols) > 0 {
-			oldMetrics[itemKey{item.ClusterName, item.Namespace, item.Name}] = cols
+			old[itemKey{item.ClusterName, item.Namespace, item.Name}] = cols
 		}
 	}
-	if len(oldMetrics) == 0 {
+	if len(old) == 0 {
 		return
 	}
-	// Apply to new items: prepend carried-over metrics columns while keeping
-	// the raw request/limit columns (CPU Req, CPU Lim, Mem Req, Mem Lim) so
-	// that podMetricsEnrichedMsg can still read them to compute percentages.
 	for i := range newItems {
 		key := itemKey{newItems[i].ClusterName, newItems[i].Namespace, newItems[i].Name}
-		cols, ok := oldMetrics[key]
+		cols, ok := old[key]
 		if !ok {
 			continue
 		}
 		var kept []model.KeyValue
 		for _, kv := range newItems[i].Columns {
-			if !metricsKeys[kv.Key] {
+			if !keys[kv.Key] {
 				kept = append(kept, kv)
 			}
 		}
 		merged := make([]model.KeyValue, 0, len(cols)+len(kept))
-		merged = append(merged, cols...)
-		merged = append(merged, kept...)
+		if prependCarried {
+			merged = append(merged, cols...)
+			merged = append(merged, kept...)
+		} else {
+			merged = append(merged, kept...)
+			merged = append(merged, cols...)
+		}
 		newItems[i].Columns = merged
 	}
 }
@@ -211,48 +213,13 @@ func (m *Model) carryOverServiceEndpointColumns(newItems []model.Item) {
 // carryOverServiceEndpointColumns, shared with the right-pane list preview
 // (see carryOverMetricsColumnsFrom).
 func carryOverServiceEndpointColumnsFrom(oldItems, newItems []model.Item) {
+	// The populator never writes these on the new item, so stripping them
+	// from newItems.Columns is a no-op today, kept for when it might.
 	endpointKeys := map[string]bool{
 		"Backing Endpoints": true,
 		"Endpoints":         true,
 	}
-	// Cluster-qualified key: see carryOverMetricsColumnsFrom.
-	type itemKey struct{ cluster, ns, name string }
-	old := make(map[itemKey][]model.KeyValue)
-	for _, item := range oldItems {
-		var cols []model.KeyValue
-		for _, kv := range item.Columns {
-			if endpointKeys[kv.Key] {
-				cols = append(cols, kv)
-			}
-		}
-		if len(cols) > 0 {
-			old[itemKey{item.ClusterName, item.Namespace, item.Name}] = cols
-		}
-	}
-	if len(old) == 0 {
-		return
-	}
-	for i := range newItems {
-		key := itemKey{newItems[i].ClusterName, newItems[i].Namespace, newItems[i].Name}
-		cols, ok := old[key]
-		if !ok {
-			continue
-		}
-		// Drop any rollup columns that arrived on the new item (the
-		// populator only writes "Type / Cluster IP / ..." for Services,
-		// so this loop is a no-op today — but keeping it makes the
-		// helper safe if the populator ever starts writing them too).
-		var kept []model.KeyValue
-		for _, kv := range newItems[i].Columns {
-			if !endpointKeys[kv.Key] {
-				kept = append(kept, kv)
-			}
-		}
-		merged := make([]model.KeyValue, 0, len(kept)+len(cols))
-		merged = append(merged, kept...)
-		merged = append(merged, cols...)
-		newItems[i].Columns = merged
-	}
+	carryOverColumnsFrom(oldItems, newItems, endpointKeys, false)
 }
 
 // clampAllCursors ensures all cursor positions are within bounds after resize.

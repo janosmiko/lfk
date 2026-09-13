@@ -27,8 +27,8 @@ func (r *ResolvedDiff) LineText(visibleIdx, side int, unified bool) string {
 }
 
 // DiffCache memoizes the last ResolvedDiff so a caller that resolves the same
-// diff every frame pays computeDiff's O(nxm) LCS table once instead of once
-// per frame.
+// diff every frame pays ComputeDiffLines's O(nxm) LCS table once instead of
+// once per frame.
 //
 // Validity is checked against the INPUTS rather than tracked by a generation
 // counter the mutation sites would have to remember to bump: foldState is
@@ -53,7 +53,7 @@ func (c *DiffCache) Resolve(left, right string, foldState []bool) *ResolvedDiff 
 	if c != nil && c.resolved != nil && c.left == left && c.right == right && slices.Equal(c.foldState, foldState) {
 		return c.resolved
 	}
-	lines := computeDiff(left, right)
+	lines := ComputeDiffLines(left, right)
 	regions := ComputeDiffFoldRegionsFromLines(lines)
 	resolved := &ResolvedDiff{
 		lines:   lines,

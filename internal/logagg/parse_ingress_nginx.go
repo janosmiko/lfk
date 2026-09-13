@@ -11,13 +11,9 @@ import (
 // Group 1 = request_time (seconds, float), group 2 = proxy_upstream_name.
 var ingressTailRe = regexp.MustCompile(`"\s+\d+\s+([\d.]+)\s+\[([^\]]*)\]`)
 
-type ingressNginxParser struct{}
-
-// NewIngressNginxParser parses the NGINX Ingress Controller default
+// ingressNginxParser parses the NGINX Ingress Controller default
 // log-format-upstream, which is CLF-core plus ingress-specific trailing fields.
-func NewIngressNginxParser() Parser { return ingressNginxParser{} }
-
-func (ingressNginxParser) Kind() ProfileKind { return ProfileIngressNginx }
+type ingressNginxParser struct{}
 
 func (ingressNginxParser) Parse(line string) (Fields, bool) {
 	m := nginxRe.FindStringSubmatch(line)

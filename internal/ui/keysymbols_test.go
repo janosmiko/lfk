@@ -165,7 +165,7 @@ func TestHelpKeyDisplay_UnaffectedBySymbolMode(t *testing.T) {
 // East_Asian_Width=Ambiguous, same category as the modifier arrowheads
 // above — a runewidth table change that started measuring it as 2 would
 // silently widen every multi-key help row and shift every description one
-// column right of where padKeyLeft expects it.
+// column right of where padLeft expects it.
 func TestHelpKeySeparator_IsSingleCell(t *testing.T) {
 	assert.Equal(t, 1, lipgloss.Width("·"), `"·" must measure one cell`)
 	assert.Equal(t, 3, lipgloss.Width(helpKeySeparator), "helpKeySeparator (space + dot + space) must measure three cells")

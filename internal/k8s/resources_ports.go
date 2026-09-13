@@ -4,8 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func containerPortsFromContainers(containers []corev1.Container) []ContainerPort {
+	var ports []ContainerPort
+	for _, container := range containers {
+		for _, p := range container.Ports {
+			ports = append(ports, ContainerPort{
+				Name:          p.Name,
+				ContainerPort: p.ContainerPort,
+				Protocol:      string(p.Protocol),
+			})
+		}
+	}
+	return ports
+}
 
 func (c *Client) GetContainerPorts(ctx context.Context, contextName, namespace, podName string) ([]ContainerPort, error) {
 	cs, err := c.clientsetForContext(contextName)
@@ -18,17 +33,7 @@ func (c *Client) GetContainerPorts(ctx context.Context, contextName, namespace, 
 		return nil, fmt.Errorf("getting pod %s: %w", podName, err)
 	}
 
-	var ports []ContainerPort
-	for _, container := range pod.Spec.Containers {
-		for _, p := range container.Ports {
-			ports = append(ports, ContainerPort{
-				Name:          p.Name,
-				ContainerPort: p.ContainerPort,
-				Protocol:      string(p.Protocol),
-			})
-		}
-	}
-	return ports, nil
+	return containerPortsFromContainers(pod.Spec.Containers), nil
 }
 
 func (c *Client) GetServicePorts(ctx context.Context, contextName, namespace, svcName string) ([]ContainerPort, error) {
@@ -64,17 +69,7 @@ func (c *Client) GetDeploymentPorts(ctx context.Context, contextName, namespace,
 		return nil, fmt.Errorf("getting deployment %s: %w", name, err)
 	}
 
-	var ports []ContainerPort
-	for _, container := range dep.Spec.Template.Spec.Containers {
-		for _, p := range container.Ports {
-			ports = append(ports, ContainerPort{
-				Name:          p.Name,
-				ContainerPort: p.ContainerPort,
-				Protocol:      string(p.Protocol),
-			})
-		}
-	}
-	return ports, nil
+	return containerPortsFromContainers(dep.Spec.Template.Spec.Containers), nil
 }
 
 func (c *Client) GetStatefulSetPorts(ctx context.Context, contextName, namespace, name string) ([]ContainerPort, error) {
@@ -88,17 +83,7 @@ func (c *Client) GetStatefulSetPorts(ctx context.Context, contextName, namespace
 		return nil, fmt.Errorf("getting statefulset %s: %w", name, err)
 	}
 
-	var ports []ContainerPort
-	for _, container := range sts.Spec.Template.Spec.Containers {
-		for _, p := range container.Ports {
-			ports = append(ports, ContainerPort{
-				Name:          p.Name,
-				ContainerPort: p.ContainerPort,
-				Protocol:      string(p.Protocol),
-			})
-		}
-	}
-	return ports, nil
+	return containerPortsFromContainers(sts.Spec.Template.Spec.Containers), nil
 }
 
 func (c *Client) GetDaemonSetPorts(ctx context.Context, contextName, namespace, name string) ([]ContainerPort, error) {
@@ -112,15 +97,5 @@ func (c *Client) GetDaemonSetPorts(ctx context.Context, contextName, namespace, 
 		return nil, fmt.Errorf("getting daemonset %s: %w", name, err)
 	}
 
-	var ports []ContainerPort
-	for _, container := range ds.Spec.Template.Spec.Containers {
-		for _, p := range container.Ports {
-			ports = append(ports, ContainerPort{
-				Name:          p.Name,
-				ContainerPort: p.ContainerPort,
-				Protocol:      string(p.Protocol),
-			})
-		}
-	}
-	return ports, nil
+	return containerPortsFromContainers(ds.Spec.Template.Spec.Containers), nil
 }
