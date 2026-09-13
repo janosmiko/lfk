@@ -64,7 +64,7 @@ The Hardware category lists ResourceClaims, ResourceClaimTemplates, ResourceSlic
 
 When Prometheus holds less history than the window, the header adds the real span, for example `over last 7d (data: 5h)`. A new workload therefore cannot pass for a week of evidence.
 
-The chip shows `snapshot` with no `[N/M]` counter when it is the only strategy available. To unlock the others, point lfk at Prometheus or VictoriaMetrics (see [config-reference.md](config-reference.md#monitoring)) or create a VPA in `Off` mode for the workload. Then cycle with `[` and `]`. Keys and headroom are in [keybindings.md](keybindings.md#right-sizing-advisor).
+The chip shows `snapshot` with no `[N/M]` counter when it is the only strategy available. lfk finds Prometheus or VictoriaMetrics in the cluster by its Service labels. If the chip still shows only `snapshot`, point lfk at it (see [config-reference.md](config-reference.md#monitoring)) or create a VPA in `Off` mode for the workload. Then cycle with `[` and `]`. Keys and headroom are in [keybindings.md](keybindings.md#right-sizing-advisor).
 
 ## Pod quarantine
 
