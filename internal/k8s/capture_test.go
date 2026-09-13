@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func (m *CaptureManager) ActiveCount() int {
 func (m *CaptureManager) FindByPod(kubectx, ns, pod string) (int, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, e := range m.entries {
+	for _, e := range slices.Backward(m.entries) {
 		if e.Status != CaptureRunning && e.Status != CaptureStarting {
 			continue
 		}
@@ -176,6 +177,24 @@ func TestCaptureManager_FindByPod(t *testing.T) {
 
 	if _, ok := m.FindByPod("ctx", "ns", "other"); ok {
 		t.Error("FindByPod returned ok for unrelated pod")
+	}
+}
+
+func TestCaptureManager_FindByPod_ReturnsNewestMatch(t *testing.T) {
+	m := NewCaptureManager()
+	req := CaptureRequest{Context: "ctx", Namespace: "ns", PodName: "pod1"}
+	m.entries = []*CaptureEntry{
+		{ID: 1, Status: CaptureStopped, Request: req},
+		{ID: 2, Status: CaptureRunning, Request: req},
+		{ID: 3, Status: CaptureRunning, Request: req},
+	}
+
+	gotID, ok := m.FindByPod("ctx", "ns", "pod1")
+	if !ok {
+		t.Fatal("FindByPod returned !ok for active capture")
+	}
+	if gotID != 3 {
+		t.Errorf("FindByPod ID = %d, want %d (newest)", gotID, 3)
 	}
 }
 
