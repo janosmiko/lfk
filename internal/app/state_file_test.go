@@ -55,3 +55,16 @@ func TestSaveStateFile_Permissions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
 }
+
+func TestSaveStateFile_TightensExistingPermissions(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LFK_STATE_DIR", dir)
+	path := filepath.Join(dir, "fixture.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("value: old"), 0o644))
+
+	require.NoError(t, saveStateFile("fixture.yaml", stateFileFixture{Value: "x"}))
+
+	fileInfo, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
+}

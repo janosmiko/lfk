@@ -58,5 +58,10 @@ func saveStateFile[T any](name string, v T) error {
 	if err != nil {
 		return err
 	}
+	// os.WriteFile only applies the mode on create. Tighten an existing file
+	// from an older version or a manual copy before writing over it.
+	if err := os.Chmod(path, 0o600); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	return os.WriteFile(path, data, 0o600)
 }
