@@ -3,9 +3,10 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	"sigs.k8s.io/yaml"
 
@@ -352,11 +353,7 @@ func (sets *UnionSetsConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	out := make([]UnionSetConfig, 0, len(mapped))
-	names := make([]string, 0, len(mapped))
-	for name := range mapped {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(mapped))
 	for _, name := range names {
 		cfg := mapped[name]
 		out = append(out, UnionSetConfig{

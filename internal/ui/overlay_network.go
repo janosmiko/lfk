@@ -2,8 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -15,18 +15,12 @@ import (
 // of ingress/egress rules using box-drawing characters and arrows. A non-empty
 // query highlights matching text in the visible lines.
 func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height int, query string) string {
-	return renderScrollableLines(buildNetpolOverlayLines(info, width), scroll, width, height, query)
+	return renderScrollableLines(NetworkPolicyOverlayLines(info, width), scroll, width, height, query)
 }
 
 // NetworkPolicyOverlayLines returns the full (unscrolled) styled line list of
 // the single-policy view, for search/match scanning by the key handler.
 func NetworkPolicyOverlayLines(info NetworkPolicyEntry, width int) []string {
-	return buildNetpolOverlayLines(info, width)
-}
-
-// buildNetpolOverlayLines composes the full (unscrolled) line list for the
-// single-policy view.
-func buildNetpolOverlayLines(info NetworkPolicyEntry, width int) []string {
 	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(SurfaceBg)
 	arrowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 	boxBorderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBorder)).Background(SurfaceBg)
@@ -56,7 +50,7 @@ func flattenRenderedLines(lines []string) []string {
 // NetworkPolicyOverlayLineCount returns the total line count of the
 // single-policy view at the given width, for scroll clamping.
 func NetworkPolicyOverlayLineCount(info NetworkPolicyEntry, width int) int {
-	return len(buildNetpolOverlayLines(info, width))
+	return len(NetworkPolicyOverlayLines(info, width))
 }
 
 // OverlayMaxScroll returns the bottom scroll position for a scrollable
@@ -93,7 +87,7 @@ func renderNetpolHeader(info NetworkPolicyEntry, greenStyle, labelStyle, section
 	case len(info.PodSelector) == 0:
 		lines = append(lines, OverlayDimStyle.Render("  (all pods in namespace)"))
 	default:
-		for _, k := range sortedKeys(info.PodSelector) {
+		for _, k := range slices.Sorted(maps.Keys(info.PodSelector)) {
 			lines = append(lines, fmt.Sprintf("  %s", labelStyle.Render(k+"="+info.PodSelector[k])))
 		}
 	}
@@ -135,7 +129,7 @@ func renderNetpolTargetLabel(info NetworkPolicyEntry) string {
 	if len(info.PodSelector) == 0 {
 		return "(all pods)"
 	}
-	keys := sortedKeys(info.PodSelector)
+	keys := slices.Sorted(maps.Keys(info.PodSelector))
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		parts = append(parts, k+"="+info.PodSelector[k])
@@ -143,16 +137,11 @@ func renderNetpolTargetLabel(info NetworkPolicyEntry) string {
 	return strings.Join(parts, "\n")
 }
 
-// hasPolicyType returns true if the policy types list contains the given type.
-func hasPolicyType(types []string, target string) bool {
-	return slices.Contains(types, target)
-}
-
 // renderNetpolDirectionRules renders ingress and egress rule sections.
 func renderNetpolDirectionRules(info NetworkPolicyEntry, targetLabel string, width int, sectionStyle, boxBorderStyle, arrowStyle, labelStyle, cidrStyle, greenStyle lipgloss.Style) []string {
 	var lines []string
-	hasIngress := hasPolicyType(info.PolicyTypes, "Ingress")
-	hasEgress := hasPolicyType(info.PolicyTypes, "Egress")
+	hasIngress := slices.Contains(info.PolicyTypes, "Ingress")
+	hasEgress := slices.Contains(info.PolicyTypes, "Egress")
 
 	if hasIngress || len(info.IngressRules) > 0 {
 		lines = append(lines, sectionStyle.Render("INGRESS RULES"))
@@ -205,16 +194,6 @@ func renderNetpolRuleLabel(rule NetpolRuleEntry, idx int) string {
 		out += OverlayDimStyle.Render("  L7: " + rule.L7)
 	}
 	return out
-}
-
-// sortedKeys returns the keys of a map sorted alphabetically.
-func sortedKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // renderScrollableLines applies scroll/clamp logic and returns the visible body string.
@@ -294,11 +273,7 @@ func renderNetpolRuleDiagram(
 		case "Pod":
 			peerLines = append(peerLines, OverlayNormalStyle.Render("Pod:"))
 			if len(peer.Selector) > 0 {
-				peerKeys := make([]string, 0, len(peer.Selector))
-				for k := range peer.Selector {
-					peerKeys = append(peerKeys, k)
-				}
-				sort.Strings(peerKeys)
+				peerKeys := slices.Sorted(maps.Keys(peer.Selector))
 				for _, k := range peerKeys {
 					peerLines = append(peerLines, labelSt.Render(truncLabel(k+"="+peer.Selector[k])))
 				}
@@ -312,11 +287,7 @@ func renderNetpolRuleDiagram(
 			peerLines = append(peerLines, OverlayNormalStyle.Render("NS: "+truncLabel(peer.Namespace)))
 			if len(peer.Selector) > 0 {
 				peerLines = append(peerLines, OverlayNormalStyle.Render("Pod:"))
-				nsPodKeys := make([]string, 0, len(peer.Selector))
-				for k := range peer.Selector {
-					nsPodKeys = append(nsPodKeys, k)
-				}
-				sort.Strings(nsPodKeys)
+				nsPodKeys := slices.Sorted(maps.Keys(peer.Selector))
 				for _, k := range nsPodKeys {
 					peerLines = append(peerLines, labelSt.Render(truncLabel(k+"="+peer.Selector[k])))
 				}

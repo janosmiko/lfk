@@ -14,6 +14,7 @@ func TestApplyForegroundIdleTimeoutConfig(t *testing.T) {
 		{"empty keeps default", "", DefaultForegroundIdleTimeout},
 		{"valid parses", "300s", 300 * time.Second},
 		{"zero disables", "0s", 0},
+		{"negative clamps to zero", "-5s", 0},
 		{"above max clamps", "30m", MaxWatchInterval},
 		{"invalid keeps default", "xyz", DefaultForegroundIdleTimeout},
 	}

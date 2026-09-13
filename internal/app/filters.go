@@ -357,9 +357,9 @@ func matchReadyMismatch(item model.Item) bool {
 	if item.Ready == "" {
 		return false
 	}
-	parts := strings.SplitN(item.Ready, "/", 2)
-	if len(parts) == 2 {
-		return parts[0] != parts[1]
+	num, denom, found := strings.Cut(item.Ready, "/")
+	if found {
+		return num != denom
 	}
 	return false
 }

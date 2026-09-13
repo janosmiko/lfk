@@ -6,12 +6,8 @@ import (
 
 var logfmtPairRe = regexp.MustCompile(`(\w[\w.-]*)=("([^"]*)"|\S+)`)
 
+// logfmtParser parses key=value (logfmt) lines.
 type logfmtParser struct{}
-
-// NewLogfmtParser parses key=value (logfmt) lines.
-func NewLogfmtParser() Parser { return logfmtParser{} }
-
-func (logfmtParser) Kind() ProfileKind { return ProfileLogfmt }
 
 func (logfmtParser) Parse(line string) (Fields, bool) {
 	matches := logfmtPairRe.FindAllStringSubmatch(line, -1)

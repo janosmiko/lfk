@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
-	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -187,11 +186,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			"List "+model.DisplayNameFor(rt)+" (union)",
 			strings.Join(unionCtxs, ", "),
 			func(ctx context.Context) tea.Msg {
-				var listOpts []k8s.ListOption
-				if !forPreview {
-					listOpts = append(listOpts, k8s.PreferCache())
-				}
-				items, err := client.GetResourcesUnion(ctx, unionCtxs, ns, rt, listOpts...)
+				items, err := client.GetResourcesUnion(ctx, unionCtxs, ns, rt, !forPreview)
 				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 			},
 		)
@@ -278,11 +273,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		listName,
 		bgtaskTarget(kctx, ns),
 		func(ctx context.Context) tea.Msg {
-			var listOpts []k8s.ListOption
-			if !forPreview {
-				listOpts = append(listOpts, k8s.PreferCache())
-			}
-			items, err := client.GetResources(ctx, kctx, ns, rt, listOpts...)
+			items, err := client.GetResources(ctx, kctx, ns, rt, !forPreview)
 			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 		},
 	)
@@ -440,9 +431,9 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 	// the right CRD. Core types (Extra="v1") have no group component and
 	// fall through to the Kind-only lookup below.
 	if sel.Extra != "" && sel.Kind != "" {
-		parts := strings.SplitN(sel.Extra, "/", 2)
-		if len(parts) == 2 && parts[0] != "" {
-			if rt, ok := model.FindResourceTypeByKindAndGroup(sel.Kind, parts[0], crds); ok {
+		group, _, found := strings.Cut(sel.Extra, "/")
+		if found && group != "" {
+			if rt, ok := model.FindResourceTypeByKindAndGroup(sel.Kind, group, crds); ok {
 				return rt, true
 			}
 		}

@@ -28,7 +28,7 @@ var secretGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: 
 // items therefore carry only Name/Namespace/Age/Deletion/OwnerReferences — no
 // "secret:<key>" data columns and no "Type" column. Per-secret data is loaded
 // lazily by the UI layer when the user selects a specific secret.
-func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, opts ...ListOption) ([]model.Item, error) {
+func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, preferCache bool) ([]model.Item, error) {
 	// Virtual security resource types — dispatched to the injected manager.
 	if rt.APIGroup == model.SecurityVirtualAPIGroup {
 		return c.getSecurityFindings(ctx, contextName, namespace, rt)
@@ -80,7 +80,6 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// The informer cache holds an unfiltered snapshot, so a field selector
 	// must bypass it and go straight to a direct list.
 	mode, infs := c.informerSnapshot()
-	lo := resolveListOpts(opts)
 	// allowed gates every path below (markHot, cache read, auto-promotion),
 	// not just markHot -- informerAllowed needs rt.Verbs, which the gvr-keyed
 	// cache state below doesn't carry.
@@ -89,7 +88,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// GVR: skip the cache branch this once instead of blocking on a sync
 	// that just began.
 	justStarted := false
-	if lo.preferCache && mode != InformerCacheOff && infs != nil && allowed {
+	if preferCache && mode != InformerCacheOff && infs != nil && allowed {
 		if infs.informerRunning(contextName, gvr) {
 			infs.markHot(contextName, gvr)
 		} else {

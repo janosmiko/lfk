@@ -405,7 +405,7 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	for i := scroll; i < end && len(result) < height; i++ {
 		line := lines[i]
 		isSelected := selStart >= 0 && i >= selStart && i <= selEnd
-		wrapped := wrapLine(line, availWidth)
+		wrapped := WrapLine(line, availWidth)
 		for j, wl := range wrapped {
 			if skipped < topSkip {
 				skipped++
@@ -472,19 +472,10 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	return result, cursorRow, cursorCol
 }
 
-// WrapLine splits a line into chunks of at most width runes.
-// Exported for reuse in YAML, describe, and diff view wrapping.
+// WrapLine hard-wraps a line to width visual columns, for reuse in YAML,
+// describe, and diff view wrapping. Uses ansi.Hardwrap so embedded SGR
+// sequences survive the split instead of leaking "0m"/"[NNm" as literal text.
 func WrapLine(line string, width int) []string {
-	return wrapLine(line, width)
-}
-
-// wrapLine splits a line into chunks of at most width runes.
-// wrapLine hard-wraps a log line to width visual columns. Uses ansi.Hardwrap
-// so embedded SGR sequences (kyverno timestamps, klog level colors, etc.)
-// stay intact across the split — rune-slicing instead would split mid-CSI
-// and leak "0m"/"[NNm" as literal text or chop real content because escape
-// bytes are zero-width but consume rune budget.
-func wrapLine(line string, width int) []string {
 	if width <= 0 {
 		return []string{line}
 	}

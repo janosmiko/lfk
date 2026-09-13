@@ -112,13 +112,7 @@ func formatSparklineWindow(d time.Duration) string {
 
 // ClampSparklineWidth restricts n to [MinSparklineWidth, MaxSparklineWidth].
 func ClampSparklineWidth(n int) int {
-	if n < MinSparklineWidth {
-		return MinSparklineWidth
-	}
-	if n > MaxSparklineWidth {
-		return MaxSparklineWidth
-	}
-	return n
+	return min(max(n, MinSparklineWidth), MaxSparklineWidth)
 }
 
 // ClampSparklineInterval restricts d to [MinSparklineInterval,
@@ -128,13 +122,7 @@ func ClampSparklineInterval(d time.Duration) time.Duration {
 	if d <= 0 {
 		return 0
 	}
-	if d < MinSparklineInterval {
-		return MinSparklineInterval
-	}
-	if d > MaxWatchInterval {
-		return MaxWatchInterval
-	}
-	return d
+	return min(max(d, MinSparklineInterval), MaxWatchInterval)
 }
 
 // applySparklineConfig wires the three YAML keys into their runtime globals.

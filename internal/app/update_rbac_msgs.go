@@ -90,9 +90,9 @@ func (m Model) updateCanISAList(msg canISAListMsg) (tea.Model, tea.Cmd) {
 	// Add ServiceAccounts.
 	for _, sa := range msg.accounts {
 		var name, ns string
-		if parts := strings.SplitN(sa, "/", 2); len(parts) == 2 {
-			ns = parts[0]
-			name = parts[1]
+		if nsPart, namePart, found := strings.Cut(sa, "/"); found {
+			ns = nsPart
+			name = namePart
 		} else {
 			ns = m.namespace
 			name = sa

@@ -3,6 +3,8 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -113,11 +115,7 @@ func quarantineConfirmNotes(st quarantineState, ownedByController bool) []ui.Con
 // quarantineRestoreNotes names the label pairs a Restore puts back. Routing
 // resumes rather than being taken away, so there is nothing to warn about.
 func quarantineRestoreNotes(restored map[string]string) []ui.ConfirmNote {
-	keys := make([]string, 0, len(restored))
-	for k := range restored {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(restored))
 	return []ui.ConfirmNote{{Label: "Scope", Text: quarantineLabelScope(keys)}}
 }
 

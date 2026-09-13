@@ -2,8 +2,10 @@ package k8s
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -155,11 +157,7 @@ func collectContexts(sources []kubeconfigSource, fallbackCurrent string) (map[st
 			}
 			cfg = loaded
 		}
-		names := make([]string, 0, len(cfg.Contexts))
-		for name := range cfg.Contexts {
-			names = append(names, name)
-		}
-		sort.Strings(names)
+		names := slices.Sorted(maps.Keys(cfg.Contexts))
 		for _, name := range names {
 			ctx := cfg.Contexts[name]
 			ns := ""

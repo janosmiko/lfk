@@ -49,17 +49,17 @@ func TestDetectKind_PrefersStructuredOverGeneric(t *testing.T) {
 }
 
 func TestParserFor(t *testing.T) {
-	if ParserFor(ProfileTraefikJSON).Kind() != ProfileTraefikJSON {
-		t.Error("ParserFor(traefik) returned wrong kind")
+	if _, ok := ParserFor(ProfileTraefikJSON).(traefikParser); !ok {
+		t.Error("ParserFor(traefik) returned wrong type")
 	}
-	if ParserFor("nonsense").Kind() != ProfileJSON {
+	if _, ok := ParserFor("nonsense").(jsonParser); !ok {
 		t.Error("ParserFor(unknown) should fall back to JSON")
 	}
-	if ParserFor(ProfileIngressNginx).Kind() != ProfileIngressNginx {
-		t.Error("ParserFor(ingress-nginx) returned wrong kind")
+	if _, ok := ParserFor(ProfileIngressNginx).(ingressNginxParser); !ok {
+		t.Error("ParserFor(ingress-nginx) returned wrong type")
 	}
-	if ParserFor(ProfileEnvoy).Kind() != ProfileEnvoy {
-		t.Error("ParserFor(envoy) returned wrong kind")
+	if _, ok := ParserFor(ProfileEnvoy).(envoyParser); !ok {
+		t.Error("ParserFor(envoy) returned wrong type")
 	}
 }
 

@@ -63,7 +63,7 @@ func TestGetResources_LonghornNode_ReplicaCountColumn(t *testing.T) {
 	)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetResources(t.Context(), "", "longhorn-system", longhornNodeRT)
+	items, err := c.GetResources(t.Context(), "", "longhorn-system", longhornNodeRT, false)
 	require.NoError(t, err)
 
 	got := map[string]string{}
@@ -114,7 +114,7 @@ func TestGetResources_NonLonghorn_NoReplicaColumn(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	rt := model.ResourceTypeEntry{APIGroup: "", APIVersion: "v1", Resource: "pods", Kind: "Pod", Namespaced: true}
-	items, err := c.GetResources(t.Context(), "", "default", rt)
+	items, err := c.GetResources(t.Context(), "", "default", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	for _, kv := range items[0].Columns {

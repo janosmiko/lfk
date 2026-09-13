@@ -43,7 +43,7 @@ func TestInformerCache_WatchNetworkErrorsDemote(t *testing.T) {
 	var items []model.Item
 	var err error
 	for time.Now().Before(deadline) {
-		items, err = c.GetResources(t.Context(), "", "team-a", podRT)
+		items, err = c.GetResources(t.Context(), "", "team-a", podRT, false)
 		require.NoError(t, err)
 		if c.informers.cacheBlocked("", gvr) {
 			break

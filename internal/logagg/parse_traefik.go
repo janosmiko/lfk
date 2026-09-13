@@ -6,13 +6,9 @@ import (
 	"strings"
 )
 
-type traefikParser struct{}
-
-// NewTraefikJSONParser parses Traefik access logs in JSON format. Duration is
+// traefikParser parses Traefik access logs in JSON format. Duration is
 // reported in nanoseconds and converted to milliseconds.
-func NewTraefikJSONParser() Parser { return traefikParser{} }
-
-func (traefikParser) Kind() ProfileKind { return ProfileTraefikJSON }
+type traefikParser struct{}
 
 func (traefikParser) Parse(line string) (Fields, bool) {
 	line = strings.TrimSpace(line)

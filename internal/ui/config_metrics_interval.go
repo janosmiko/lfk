@@ -20,13 +20,7 @@ func ClampMetricsInterval(d time.Duration) time.Duration {
 	if d <= 0 {
 		return 0
 	}
-	if d < MinMetricsInterval {
-		return MinMetricsInterval
-	}
-	if d > MaxWatchInterval {
-		return MaxWatchInterval
-	}
-	return d
+	return min(max(d, MinMetricsInterval), MaxWatchInterval)
 }
 
 func applyMetricsIntervalConfig(raw string) {

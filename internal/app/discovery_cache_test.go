@@ -4,13 +4,86 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// FieldSelector and Priority are set here to prove they never reach the file.
+func fixtureDiscoveryCacheEntries() []model.ResourceTypeEntry {
+	return []model.ResourceTypeEntry{
+		{
+			DisplayName:   "Pods",
+			Kind:          "Pod",
+			APIGroup:      "",
+			APIVersion:    "v1",
+			Resource:      "pods",
+			FieldSelector: "status.phase=Running",
+			Namespaced:    true,
+			Verbs:         []string{"get", "list", "watch"},
+			Icon:          model.Icon{Unicode: "□", Simple: "[Po]", Emoji: "\U0001F535", NerdFont: "\U000f01a7"},
+			PrinterColumns: []model.PrinterColumn{
+				{Name: "Sync Status", Type: "string", JSONPath: ".status.sync.status", Priority: 1},
+				{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
+			},
+		},
+		{
+			Kind:           "Application",
+			APIGroup:       "argoproj.io",
+			APIVersion:     "v1alpha1",
+			Resource:       "applications",
+			Namespaced:     true,
+			RequiresCRD:    true,
+			Deprecated:     true,
+			DeprecationMsg: "use v2",
+		},
+	}
+}
+
+// testdata/discovery_cache_fixture.yaml was captured from the pre-refactor
+// mirror types. A marshal producing different bytes changed the on-disk shape.
+func TestDiscoveryCacheFixtureBytesMatch(t *testing.T) {
+	state := DiscoveryCacheHostState{
+		SchemaVersion: discoveryCacheSchemaVersion,
+		Host:          "https://dev.example.com:6443",
+		UpdatedAt:     time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+		Entries:       fixtureDiscoveryCacheEntries(),
+	}
+	got, err := yaml.Marshal(state)
+	require.NoError(t, err)
+
+	want, err := os.ReadFile("testdata/discovery_cache_fixture.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, string(want), string(got))
+}
+
+func TestDiscoveryCacheFixtureLoadsUnchanged(t *testing.T) {
+	host := "https://dev.example.com:6443"
+	withKubeCacheDir(t)
+	path := discoveryCacheFilePathForHost(host)
+	require.NotEmpty(t, path)
+
+	fixture, err := os.ReadFile("testdata/discovery_cache_fixture.yaml")
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, fixture, 0o644))
+
+	loaded := loadDiscoveryCacheForHost(host)
+	require.NotNil(t, loaded)
+	assert.Equal(t, host, loaded.Host)
+	assert.Equal(t, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), loaded.UpdatedAt)
+
+	// FieldSelector and Priority never persist, so they come back zeroed.
+	want := fixtureDiscoveryCacheEntries()
+	want[0].FieldSelector = ""
+	want[0].PrinterColumns[0].Priority = 0
+	assert.Equal(t, want, loaded.Entries)
+}
 
 // withKubeCacheDir points KUBECACHEDIR at a fresh temp dir so each test
 // gets an isolated discovery cache without touching the user's home

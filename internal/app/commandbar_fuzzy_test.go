@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,17 @@ func TestSubsequenceSpan(t *testing.T) {
 	span, ok = subsequenceSpan("anything", "")
 	assert.True(t, ok)
 	assert.Zero(t, span)
+}
+
+func TestFuzzyScoreLower_BonusCapAtHundred(t *testing.T) {
+	longText := "prod-" + strings.Repeat("x", 96)
+	// A 101-char candidate crosses the length-bonus cap: score must stay
+	// at the tier floor (5000) rather than going negative.
+	assert.Equal(t, 5000, fuzzyScoreLower(longText, "prod"))
+
+	farText := strings.Repeat("x", 100) + "prod"
+	// A substring match past index 100 crosses the position-bonus cap too.
+	assert.Equal(t, 2000, fuzzyScoreLower(farText, "prod"))
 }
 
 func TestFilterSuggestionsFuzzy_Ranking(t *testing.T) {

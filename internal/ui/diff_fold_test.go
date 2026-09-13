@@ -65,7 +65,7 @@ func TestBuildVisibleDiffLines(t *testing.T) {
 		lines[i] = "line"
 	}
 	content := strings.Join(lines, "\n")
-	diffLines := computeDiff(content, content)
+	diffLines := ComputeDiffLines(content, content)
 	regions := ComputeDiffFoldRegionsFromLines(diffLines)
 
 	t.Run("no folds applied shows all lines", func(t *testing.T) {
@@ -208,10 +208,10 @@ func TestUpdateDiffSearchMatches(t *testing.T) {
 }
 
 func TestDiffSearchColumnInLine(t *testing.T) {
-	assert.Equal(t, 6, DiffSearchColumnInLine("name: test value", "test"))
-	assert.Equal(t, 0, DiffSearchColumnInLine("test at start", "test"))
-	assert.Equal(t, -1, DiffSearchColumnInLine("no match", "xyz"))
-	assert.Equal(t, -1, DiffSearchColumnInLine("", "test"))
+	assert.Equal(t, 6, FindColumnInLine("name: test value", "test"))
+	assert.Equal(t, 0, FindColumnInLine("test at start", "test"))
+	assert.Equal(t, -1, FindColumnInLine("no match", "xyz"))
+	assert.Equal(t, -1, FindColumnInLine("", "test"))
 }
 
 func TestDiffVisibleIndexForOriginal(t *testing.T) {

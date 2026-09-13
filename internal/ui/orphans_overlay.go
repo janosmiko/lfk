@@ -47,13 +47,7 @@ func OrphanScrollForCursor(scroll, cursor, bodyHeight, total int) int {
 // (kind switch, filter typed) so a stale offset doesn't render past
 // len(rows).
 func OrphanClampScroll(scroll, total, bodyHeight int) int {
-	if total <= bodyHeight {
-		return 0
-	}
-	maxScroll := total - bodyHeight
-	scroll = max(scroll, 0)
-	scroll = min(scroll, maxScroll)
-	return scroll
+	return ClampScroll(scroll, total, bodyHeight)
 }
 
 // OrphanBodyHeight returns the number of body rows that fit inside an

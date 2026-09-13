@@ -28,7 +28,7 @@ func TestGetResources_PreferCache_PromotesBelowThreshold(t *testing.T) {
 	t.Cleanup(c.Shutdown)
 	withTunedThresholds(c, 1000, 500, 3)
 
-	items, err := c.GetResources(t.Context(), "", "team-a", podRT, PreferCache())
+	items, err := c.GetResources(t.Context(), "", "team-a", podRT, true)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -110,7 +110,7 @@ func TestInformerCache_WatchForbiddenFallsBackPermanentlyAndLogsOnce(t *testing.
 	var items []model.Item
 	var err error
 	for time.Now().Before(deadline) {
-		items, err = c.GetResources(t.Context(), "", "team-a", podRT)
+		items, err = c.GetResources(t.Context(), "", "team-a", podRT, false)
 		require.NoError(t, err)
 		if c.informers.getAutoState("", gvr).isDenied() {
 			break
@@ -166,7 +166,7 @@ func TestObserveDirectListSize_IgnoresFieldSelectedList(t *testing.T) {
 	filteredRT := podRT
 	filteredRT.FieldSelector = "status.phase=Running"
 
-	_, err := c.GetResources(t.Context(), "", "", filteredRT)
+	_, err := c.GetResources(t.Context(), "", "", filteredRT, false)
 	require.NoError(t, err)
 
 	assert.False(t, c.informers.isPromoted("", podGVR()),

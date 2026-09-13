@@ -46,6 +46,7 @@ func TestGetResourcesUnion_FanOutStampingAndSort(t *testing.T) {
 		contexts,
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, items, 4, "two pods × two contexts = four merged rows")
@@ -95,6 +96,7 @@ func TestGetResourcesUnion_SortsSameNameClusterByNamespace(t *testing.T) {
 		[]string{"blue"},
 		"",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
@@ -112,6 +114,7 @@ func TestGetResourcesUnion_EmptyContextsList(t *testing.T) {
 		nil,
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		false,
 	)
 	require.NoError(t, err)
 	assert.Empty(t, items)
@@ -145,6 +148,7 @@ func TestGetResourcesUnion_UsesStandardGetResources(t *testing.T) {
 		[]string{"solo-cluster"},
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
@@ -157,6 +161,7 @@ func TestGetResourcesUnion_UsesStandardGetResources(t *testing.T) {
 		"solo-cluster",
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		false,
 	)
 	require.NoError(t, err)
 	require.Len(t, plain, 1)
