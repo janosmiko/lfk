@@ -76,6 +76,23 @@ func computeDiff(leftText, rightText string) []diffLine {
 	return result
 }
 
+// diffTabWidth matches SingleLineCell's tab expansion (kv_editor.go) so a
+// tab-bearing line sizes and truncates the same way across viewers.
+const diffTabWidth = "    "
+
+// expandDiffTabs sizes width-based rendering (padRight, Truncate, WrapLine)
+// on tab-free text so a tab's terminal column advance isn't measured as
+// zero cells. Diffing, folding, and copy paths keep using computeDiff as-is.
+func expandDiffTabs(lines []diffLine) []diffLine {
+	out := make([]diffLine, len(lines))
+	for i, dl := range lines {
+		dl.left = strings.ReplaceAll(dl.left, "\t", diffTabWidth)
+		dl.right = strings.ReplaceAll(dl.right, "\t", diffTabWidth)
+		out[i] = dl
+	}
+	return out
+}
+
 // ComputeDiffLines is the exported wrapper for computeDiff.
 func ComputeDiffLines(left, right string) []diffLine {
 	return computeDiff(left, right)
@@ -109,7 +126,7 @@ type DiffVisualParams struct {
 // currentMatchLine is the original diff line index of the current n/N match
 // (-1 means none). That line gets the distinct SelectedSearchHighlightStyle.
 func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, currentMatchLine int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
-	rawDiffLines := computeDiff(left, right)
+	rawDiffLines := expandDiffTabs(computeDiff(left, right))
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
 	// Styles for diff highlighting.
@@ -249,7 +266,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 // currentMatchLine is the original diff line index of the current n/N match
 // (-1 means none). That line gets the distinct SelectedSearchHighlightStyle.
 func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, currentMatchLine int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
-	rawDiffLines := computeDiff(left, right)
+	rawDiffLines := expandDiffTabs(computeDiff(left, right))
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
 	// Styles.

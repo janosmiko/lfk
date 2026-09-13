@@ -109,6 +109,26 @@ func TestRenderBackgroundTasksOverlayFitsInWidthWideRows(t *testing.T) {
 	}
 }
 
+func TestRenderBackgroundTasksOverlayCJKKindStaysWithinColumn(t *testing.T) {
+	t.Parallel()
+	rows := []BackgroundTaskRow{
+		{
+			Status:    TaskStatusRunning,
+			Kind:      strings.Repeat("中", 6),
+			Name:      "x",
+			Target:    "y",
+			StartedAt: time.Now().Add(-5 * time.Second),
+		},
+	}
+	width := 60
+	innerW := width - 6
+	got := RenderBackgroundTasksOverlayWithSubtitle(rows, ModeRunning, "", 0, width, 15)
+	lines := strings.Split(got, "\n")
+	dataLine := lines[3]
+	assert.LessOrEqual(t, lipgloss.Width(dataLine), innerW,
+		"CJK data row must not exceed inner width %d (got %d): %q", innerW, lipgloss.Width(dataLine), dataLine)
+}
+
 func TestRenderBackgroundTasksOverlayLifecycleBreakdown(t *testing.T) {
 	t.Parallel()
 	// Footer shows the per-status breakdown so the user can see the

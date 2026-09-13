@@ -145,12 +145,13 @@ func RenderBackgroundTasksOverlayWithSubtitle(rows []BackgroundTaskRow, mode Bac
 	for _, r := range visible {
 		statusText, statusStyle := bgtStatusCell(r, statusW, mode, dimStyle)
 		lastCol := bgtLastColCell(r, mode, now)
-		body := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s",
-			prioW, ansi.Truncate(priorityLabel(r.Priority), prioW, "…"),
-			kindW, ansi.Truncate(r.Kind, kindW, "…"),
-			nameW, ansi.Truncate(r.Name, nameW, "…"),
-			targetW, ansi.Truncate(r.Target, targetW, "…"),
-			lastColW, lastCol)
+		body := strings.Join([]string{
+			padRight(ansi.Truncate(priorityLabel(r.Priority), prioW, "…"), prioW),
+			padRight(ansi.Truncate(r.Kind, kindW, "…"), kindW),
+			padRight(ansi.Truncate(r.Name, nameW, "…"), nameW),
+			padRight(ansi.Truncate(r.Target, targetW, "…"), targetW),
+			padRight(lastCol, lastColW),
+		}, "  ")
 		// Queued and finished rows render dimmer than running rows so
 		// the user's eye lands on what's actively executing.
 		bodyRendered := rowStyle.Render(body)
