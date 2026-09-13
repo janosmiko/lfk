@@ -6,6 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestClamp01(t *testing.T) {
+	assert.Equal(t, 0.0, clamp01(-1))
+	assert.Equal(t, 1.0, clamp01(2))
+	assert.Equal(t, 0.5, clamp01(0.5))
+	assert.Equal(t, 0.0, clamp01(0))
+	assert.Equal(t, 1.0, clamp01(1))
+}
+
 func TestDefaultKeybindings_CriticalDefaults(t *testing.T) {
 	kb := DefaultKeybindings()
 	// Verify critical defaults

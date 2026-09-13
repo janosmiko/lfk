@@ -129,24 +129,12 @@ var ConfigWatchThrottle = DefaultWatchThrottle
 
 // ClampForegroundIdleTimeout restricts d to [0, MaxWatchInterval]. 0 disables.
 func ClampForegroundIdleTimeout(d time.Duration) time.Duration {
-	if d < 0 {
-		return 0
-	}
-	if d > MaxWatchInterval {
-		return MaxWatchInterval
-	}
-	return d
+	return min(max(d, 0), MaxWatchInterval)
 }
 
 // clamp01 restricts v to [0.0, 1.0].
 func clamp01(v float64) float64 {
-	if v < 0 {
-		return 0
-	}
-	if v > 1 {
-		return 1
-	}
-	return v
+	return min(max(v, 0), 1)
 }
 
 // ClampWatchInterval restricts d to [MinWatchInterval, MaxWatchInterval].
@@ -156,13 +144,7 @@ func ClampWatchInterval(d time.Duration) time.Duration {
 	if d <= 0 {
 		return 0
 	}
-	if d < MinWatchInterval {
-		return MinWatchInterval
-	}
-	if d > MaxWatchInterval {
-		return MaxWatchInterval
-	}
-	return d
+	return min(max(d, MinWatchInterval), MaxWatchInterval)
 }
 
 // ConfigLogPath holds the log_path value from the config file (if any).

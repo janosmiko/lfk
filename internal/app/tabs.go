@@ -2,7 +2,8 @@ package app
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -106,11 +107,7 @@ func (m *Model) fetchFingerprint() string {
 		b.WriteString("|")
 	}
 	if len(m.selectedNamespaces) > 0 {
-		keys := make([]string, 0, len(m.selectedNamespaces))
-		for k := range m.selectedNamespaces {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(m.selectedNamespaces))
 		if m.nsSelectionNegated {
 			b.WriteString("!")
 		}

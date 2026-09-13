@@ -2,8 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -87,7 +87,7 @@ func renderNetpolHeader(info NetworkPolicyEntry, greenStyle, labelStyle, section
 	case len(info.PodSelector) == 0:
 		lines = append(lines, OverlayDimStyle.Render("  (all pods in namespace)"))
 	default:
-		for _, k := range sortedKeys(info.PodSelector) {
+		for _, k := range slices.Sorted(maps.Keys(info.PodSelector)) {
 			lines = append(lines, fmt.Sprintf("  %s", labelStyle.Render(k+"="+info.PodSelector[k])))
 		}
 	}
@@ -129,7 +129,7 @@ func renderNetpolTargetLabel(info NetworkPolicyEntry) string {
 	if len(info.PodSelector) == 0 {
 		return "(all pods)"
 	}
-	keys := sortedKeys(info.PodSelector)
+	keys := slices.Sorted(maps.Keys(info.PodSelector))
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		parts = append(parts, k+"="+info.PodSelector[k])
@@ -194,16 +194,6 @@ func renderNetpolRuleLabel(rule NetpolRuleEntry, idx int) string {
 		out += OverlayDimStyle.Render("  L7: " + rule.L7)
 	}
 	return out
-}
-
-// sortedKeys returns the keys of a map sorted alphabetically.
-func sortedKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // renderScrollableLines applies scroll/clamp logic and returns the visible body string.
@@ -283,11 +273,7 @@ func renderNetpolRuleDiagram(
 		case "Pod":
 			peerLines = append(peerLines, OverlayNormalStyle.Render("Pod:"))
 			if len(peer.Selector) > 0 {
-				peerKeys := make([]string, 0, len(peer.Selector))
-				for k := range peer.Selector {
-					peerKeys = append(peerKeys, k)
-				}
-				sort.Strings(peerKeys)
+				peerKeys := slices.Sorted(maps.Keys(peer.Selector))
 				for _, k := range peerKeys {
 					peerLines = append(peerLines, labelSt.Render(truncLabel(k+"="+peer.Selector[k])))
 				}
@@ -301,11 +287,7 @@ func renderNetpolRuleDiagram(
 			peerLines = append(peerLines, OverlayNormalStyle.Render("NS: "+truncLabel(peer.Namespace)))
 			if len(peer.Selector) > 0 {
 				peerLines = append(peerLines, OverlayNormalStyle.Render("Pod:"))
-				nsPodKeys := make([]string, 0, len(peer.Selector))
-				for k := range peer.Selector {
-					nsPodKeys = append(nsPodKeys, k)
-				}
-				sort.Strings(nsPodKeys)
+				nsPodKeys := slices.Sorted(maps.Keys(peer.Selector))
 				for _, k := range nsPodKeys {
 					peerLines = append(peerLines, labelSt.Render(truncLabel(k+"="+peer.Selector[k])))
 				}

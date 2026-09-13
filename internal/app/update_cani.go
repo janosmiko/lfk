@@ -102,11 +102,10 @@ func (m *Model) processCanIRoleRules(rules []k8s.AccessRule) {
 	groupMap := make(map[string][]model.CanIResource)
 
 	for key, verbSet := range perms {
-		parts := strings.SplitN(key, "/", 2)
-		if len(parts) != 2 {
+		group, resource, found := strings.Cut(key, "/")
+		if !found {
 			continue
 		}
-		group, resource := parts[0], parts[1]
 		verbs := make(map[string]bool, len(canIAllVerbs))
 		for _, v := range canIAllVerbs {
 			verbs[v] = verbSet[v]
@@ -147,11 +146,10 @@ func (m *Model) processCanIRules(rules []k8s.AccessRule) {
 		if strings.HasSuffix(key, "/*") {
 			continue
 		}
-		parts := strings.SplitN(key, "/", 2)
-		if len(parts) != 2 || parts[1] == "*" {
+		group, resource, found := strings.Cut(key, "/")
+		if !found || resource == "*" {
 			continue
 		}
-		group, resource := parts[0], parts[1]
 		if groupHasResource(groupMap, group, resource) {
 			continue
 		}
@@ -192,11 +190,11 @@ func addCanIResourcesFromRules(metas map[canIResourceRef]model.CanIResource, rul
 		if strings.HasSuffix(key, "/*") {
 			continue
 		}
-		parts := strings.SplitN(key, "/", 2)
-		if len(parts) != 2 {
+		group, resource, found := strings.Cut(key, "/")
+		if !found {
 			continue
 		}
-		addCanIResourceMeta(metas, parts[0], parts[1], parts[1])
+		addCanIResourceMeta(metas, group, resource, resource)
 	}
 }
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"math"
 	"net/netip"
 	"sort"
@@ -264,7 +265,7 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 	case "Restarts":
 		return compareNumericCmp(a.Restarts, b.Restarts)
 	case "Status":
-		if c := cmpInt(ui.StatusSortRank(a.Status), ui.StatusSortRank(b.Status)); c != 0 {
+		if c := cmp.Compare(ui.StatusSortRank(a.Status), ui.StatusSortRank(b.Status)); c != 0 {
 			return c
 		}
 		// Same bucket: group identical status strings. Without this, every
@@ -286,7 +287,7 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 	case "Cluster IP", "Pod IP", "External IPs":
 		return compareIPCmp(getColumnValue(a, colName), getColumnValue(b, colName))
 	case "Severity":
-		return cmpInt(severityRank(getColumnValue(a, "Severity")), severityRank(getColumnValue(b, "Severity")))
+		return cmp.Compare(severityRank(getColumnValue(a, "Severity")), severityRank(getColumnValue(b, "Severity")))
 	case sortColEventLastSeen:
 		return compareLastSeenCmp(a, b)
 	case ChangedColumnKey:
@@ -309,52 +310,8 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 	return compareColumnValuesCmp(va, vb)
 }
 
-func cmpInt(a, b int) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func cmpFloat(a, b float64) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func cmpInt64(a, b int64) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	default:
-		return 0
-	}
-}
-
-func cmpUint64(a, b uint64) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	default:
-		return 0
-	}
-}
-
 func compareReadyCmp(a, b string) int {
-	return cmpFloat(parseReadyRatio(a), parseReadyRatio(b))
+	return cmp.Compare(parseReadyRatio(a), parseReadyRatio(b))
 }
 
 func parseReadyRatio(s string) float64 {
@@ -373,7 +330,7 @@ func parseReadyRatio(s string) float64 {
 func compareNumericCmp(a, b string) int {
 	na, _ := strconv.Atoi(strings.TrimSpace(a))
 	nb, _ := strconv.Atoi(strings.TrimSpace(b))
-	return cmpInt(na, nb)
+	return cmp.Compare(na, nb)
 }
 
 // compareResourceValuesCmp compares two CPU/MEM column values numerically.
@@ -387,7 +344,7 @@ func compareResourceValuesCmp(a, b, col string) int {
 	vb, okB := ui.ParseResourceValueOK(b, isCPU)
 	switch {
 	case okA && okB:
-		return cmpInt64(va, vb)
+		return cmp.Compare(va, vb)
 	case okA:
 		return -1
 	case okB:
@@ -406,7 +363,12 @@ func comparePercentCmp(a, b string) int {
 	pb, okB := parsePercent(b)
 	switch {
 	case okA && okB:
-		return cmpFloat(pa, pb)
+		// A CRD printer column can render "NaN%". cmp.Compare ranks NaN
+		// below every value, unlike the <,> check it replaces here.
+		if math.IsNaN(pa) || math.IsNaN(pb) {
+			return 0
+		}
+		return cmp.Compare(pa, pb)
 	case okA:
 		return -1
 	case okB:
@@ -444,14 +406,7 @@ func compareAgeCmp(a, b model.Item) int {
 		return -1
 	}
 	// Newer timestamps are "less" (render higher in ascending view).
-	switch {
-	case a.CreatedAt.After(b.CreatedAt):
-		return -1
-	case a.CreatedAt.Before(b.CreatedAt):
-		return 1
-	default:
-		return 0
-	}
+	return b.CreatedAt.Compare(a.CreatedAt)
 }
 
 // compareChangedCmp compares by the real change timestamp instead of the
@@ -466,14 +421,7 @@ func compareChangedCmp(a, b model.Item) int {
 	switch {
 	case okA && okB:
 		// Newer sorts first in ascending view, matching Age.
-		switch {
-		case ta.After(tb):
-			return -1
-		case ta.Before(tb):
-			return 1
-		default:
-			return 0
-		}
+		return tb.Compare(ta)
 	case okA:
 		return -1
 	case okB:
@@ -497,14 +445,7 @@ func compareLastSeenCmp(a, b model.Item) int {
 	case bZero:
 		return -1
 	}
-	switch {
-	case a.LastSeen.After(b.LastSeen):
-		return -1
-	case a.LastSeen.Before(b.LastSeen):
-		return 1
-	default:
-		return 0
-	}
+	return b.LastSeen.Compare(a.LastSeen)
 }
 
 // comparePortsCmp compares Service "Ports" column values numerically by
@@ -517,7 +458,7 @@ func comparePortsCmp(a, b string) int {
 	na, okA := leadingPortNumber(a)
 	nb, okB := leadingPortNumber(b)
 	if okA && okB {
-		if c := cmpInt(na, nb); c != 0 {
+		if c := cmp.Compare(na, nb); c != 0 {
 			return c
 		}
 		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
@@ -551,7 +492,7 @@ func compareDurationCmp(a, b string) int {
 	da, errA := time.ParseDuration(strings.TrimSpace(a))
 	db, errB := time.ParseDuration(strings.TrimSpace(b))
 	if errA == nil && errB == nil {
-		return cmpInt64(int64(da), int64(db))
+		return cmp.Compare(int64(da), int64(db))
 	}
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }
@@ -606,7 +547,7 @@ func compareUptimeCmp(a, b string) int {
 	db, okB := parseAgeDuration(b)
 	switch {
 	case okA && okB:
-		return cmpInt64(int64(da), int64(db))
+		return cmp.Compare(int64(da), int64(db))
 	case okA:
 		return -1
 	case okB:
@@ -626,7 +567,7 @@ func compareRelativeAgoCmp(a, b string) int {
 	db, okB := parseRelativeAgo(b)
 	switch {
 	case okA && okB:
-		return cmpInt64(int64(da), int64(db))
+		return cmp.Compare(int64(da), int64(db))
 	case okA:
 		return -1
 	case okB:
@@ -652,7 +593,7 @@ func compareREVCmp(a, b string) int {
 	na, errA := strconv.ParseUint(strings.TrimSpace(a), 10, 64)
 	nb, errB := strconv.ParseUint(strings.TrimSpace(b), 10, 64)
 	if errA == nil && errB == nil {
-		return cmpUint64(na, nb)
+		return cmp.Compare(na, nb)
 	}
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }
@@ -700,7 +641,7 @@ func compareColumnValuesCmp(a, b string) int {
 		va := ui.ParseResourceValue(a, false)
 		vb := ui.ParseResourceValue(b, false)
 		if va != 0 || vb != 0 {
-			return cmpInt64(va, vb)
+			return cmp.Compare(va, vb)
 		}
 	}
 
@@ -708,7 +649,12 @@ func compareColumnValuesCmp(a, b string) int {
 	na, errA := strconv.ParseFloat(strings.TrimSpace(a), 64)
 	nb, errB := strconv.ParseFloat(strings.TrimSpace(b), 64)
 	if errA == nil && errB == nil {
-		return cmpFloat(na, nb)
+		// A CRD printer column can render "NaN". cmp.Compare ranks NaN
+		// below every value, unlike the <,> check it replaces here.
+		if math.IsNaN(na) || math.IsNaN(nb) {
+			return 0
+		}
+		return cmp.Compare(na, nb)
 	}
 
 	// Fall back to lexicographic comparison.

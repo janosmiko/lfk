@@ -19,14 +19,7 @@ func compareUptimeItemCmp(a, b model.Item) int {
 	}
 	// A later boot is a shorter uptime, which sorts first ascending — the
 	// same direction the string comparator gives.
-	switch {
-	case a.BootedAt.After(b.BootedAt):
-		return -1
-	case a.BootedAt.Before(b.BootedAt):
-		return 1
-	default:
-		return 0
-	}
+	return b.BootedAt.Compare(a.BootedAt)
 }
 
 // carryOverBootedAt copies the node boot time onto freshly loaded items, keyed
