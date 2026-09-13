@@ -1,0 +1,34 @@
+entries:
+- api_group: ""
+  api_version: v1
+  display_name: Pods
+  icon:
+    emoji: "\U0001F535"
+    nerd_font: "\U000F01A7"
+    simple: '[Po]'
+    unicode: □
+  kind: Pod
+  namespaced: true
+  printer_columns:
+  - json_path: .status.sync.status
+    name: Sync Status
+    type: string
+  - json_path: .metadata.creationTimestamp
+    name: Age
+    type: date
+  resource: pods
+  verbs:
+  - get
+  - list
+  - watch
+- api_group: argoproj.io
+  api_version: v1alpha1
+  deprecated: true
+  deprecation_msg: use v2
+  kind: Application
+  namespaced: true
+  requires_crd: true
+  resource: applications
+host: https://dev.example.com:6443
+schema_version: 2
+updated_at: "2026-01-02T03:04:05Z"
