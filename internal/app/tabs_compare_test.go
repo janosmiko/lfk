@@ -249,6 +249,56 @@ func TestParseAgeDuration(t *testing.T) {
 	}
 }
 
+func TestComparePrimaryColumn_Severity(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want int
+	}{
+		{"CRIT before HIGH", "CRIT", "HIGH", -1},
+		{"HIGH before MED", "HIGH", "MED", -1},
+		{"MED before LOW", "MED", "LOW", -1},
+		{"LOW before unknown", "LOW", "?", -1},
+		{"equal", "HIGH", "HIGH", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := itemWithCol("Severity", tt.a)
+			b := itemWithCol("Severity", tt.b)
+			got := comparePrimaryColumn(a, b, "Severity")
+			if (got < 0) != (tt.want < 0) || (got > 0) != (tt.want > 0) {
+				t.Errorf("comparePrimaryColumn(%q, %q, Severity) = %d, want sign of %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareColumnValuesCmp(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want int
+	}{
+		{"resource quantity ordered", "100Mi", "200Mi", -1},
+		{"plain number ordered", "5", "10", -1},
+		{"plain number equal", "10", "10", 0},
+		{"fallback lexicographic", "banana", "apple", 1},
+		// A CRD printer column can hold arbitrary text, so a cell reading
+		// literally "NaN" parses as a float. Pinned as equal, matching the
+		// old hand-rolled comparator's <,> only check on both sides.
+		{"NaN cell treated as equal to a real number", "NaN", "5", 0},
+		{"NaN cell equals another NaN cell", "NaN", "NaN", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareColumnValuesCmp(tt.a, tt.b)
+			if (got < 0) != (tt.want < 0) || (got > 0) != (tt.want > 0) {
+				t.Errorf("compareColumnValuesCmp(%q, %q) = %d, want sign of %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCompareUptimeCmp(t *testing.T) {
 	tests := []struct {
 		name string
