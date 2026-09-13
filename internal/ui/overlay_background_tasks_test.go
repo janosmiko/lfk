@@ -321,6 +321,41 @@ func TestRenderBackgroundTasksOverlay_QueuedRowsInUnifiedTable(t *testing.T) {
 	assert.Contains(t, got, "Queued #2")
 }
 
+// TestRenderBackgroundTasksOverlay_PriorityColumnHiddenWhenDisabled pins
+// that show_priority_in_tasks_overlay: false hides the PRIORITY column.
+func TestRenderBackgroundTasksOverlay_PriorityColumnHiddenWhenDisabled(t *testing.T) {
+	orig := scheduler.ConfigShowPriorityInOverlay
+	scheduler.ConfigShowPriorityInOverlay = false
+	defer func() { scheduler.ConfigShowPriorityInOverlay = orig }()
+
+	rows := []BackgroundTaskRow{
+		{Kind: "APIDiscovery", Priority: scheduler.PriorityCritical, Name: "API discovery", Target: "y", StartedAt: time.Now()},
+		{Kind: "ResourceList", Priority: scheduler.PriorityHigh, Name: "List Pods", Target: "y", StartedAt: time.Now()},
+	}
+	const width = 100
+	got := RenderBackgroundTasksOverlayWithSubtitle(rows, ModeRunning, "", 0, width, 15)
+
+	assert.NotContains(t, got, "PRIORITY")
+	assert.NotContains(t, got, "CRITICAL")
+	assert.NotContains(t, got, "HIGH")
+
+	lines := strings.Split(got, "\n")
+	const innerW = width - 6
+	var rowLine string
+	for _, line := range lines {
+		if strings.Contains(line, "ResourceList") && strings.Contains(line, "List Pods") {
+			rowLine = line
+			break
+		}
+	}
+	if rowLine == "" {
+		t.Fatalf("could not find data row in overlay output:\n%s", got)
+	}
+	rowW := lipgloss.Width(rowLine)
+	assert.Equal(t, innerW, rowW,
+		"other columns must absorb the freed width (got %d, want %d)", rowW, innerW)
+}
+
 func TestRenderBackgroundTasksOverlay_PriorityChips(t *testing.T) {
 	t.Parallel()
 	rows := []BackgroundTaskRow{
