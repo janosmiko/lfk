@@ -508,6 +508,7 @@ slow-responding clusters where calls hold a worker for seconds:
 | `scheduler.critical_reserved_slots` | int | `1` | Workers that prefer Critical work (clamped to ≤ half the pool). |
 | `scheduler.low_reserved_slots` | int | `2` | Workers that prefer Low (background) work so metrics/events/dashboards always have a slot even while the foreground floods the pool. Clamped to leave ≥1 general worker. |
 | `scheduler.aging_threshold` | int | `8` | Max higher-priority dispatches a background task waits behind before it is promoted for one task. `0` disables aging (strict priority). |
+| `scheduler.show_priority_in_tasks_overlay` | bool | `true` | Show the PRIORITY column in the background tasks overlay (backtick key). `false` hides it and gives the freed width to the other columns. |
 
 Reserved workers are not idle: a reserved worker prefers its lane but falls
 back to any other queued work when its lane is empty, so reservations bias
@@ -530,6 +531,7 @@ scheduler:
   critical_reserved_slots: 1
   low_reserved_slots: 2   # always keep slots for metrics/events/dashboards
   aging_threshold: 8      # 0 = strict priority; higher = background waits longer
+  show_priority_in_tasks_overlay: true
 ```
 
 ## Theme

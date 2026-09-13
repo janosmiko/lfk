@@ -373,12 +373,14 @@ resource_columns:
 #   low_reserved_slots   - workers that prefer background work (default 2)
 #   aging_threshold      - promote a starved background task after N higher-prio
 #                          dispatches (default 8; 0 = strict priority)
+#   show_priority_in_tasks_overlay - PRIORITY column in the tasks overlay (default true)
 # scheduler:
 #   k8s_client_qps: 50
 #   k8s_client_burst: 100
 #   workers_per_context: 8
 #   low_reserved_slots: 2
 #   aging_threshold: 8
+#   show_priority_in_tasks_overlay: true
 
 # ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
 # Override settings per kubeconfig context name.
