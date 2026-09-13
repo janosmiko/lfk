@@ -1,7 +1,8 @@
 package model
 
 import (
-	"sort"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -31,11 +32,7 @@ func ObjectFieldsAt(root any, segs []string) []ObjectField {
 	}
 	switch t := v.(type) {
 	case map[string]any:
-		keys := make([]string, 0, len(t))
-		for k := range t {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(t))
 		out := make([]ObjectField, 0, len(keys))
 		for _, k := range keys {
 			out = append(out, objectFieldFor(k, t[k]))

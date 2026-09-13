@@ -2,7 +2,8 @@ package app
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -60,11 +61,7 @@ func flattenCopyFields(root any) []copyFieldEntry {
 				out = append(out, newCopyFieldEntry(path, v))
 				return
 			}
-			keys := make([]string, 0, len(t))
-			for k := range t {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
+			keys := slices.Sorted(maps.Keys(t))
 			for _, k := range keys {
 				if k == "managedFields" && len(path) == 1 && path[0].key == "metadata" {
 					continue

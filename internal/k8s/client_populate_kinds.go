@@ -3,6 +3,8 @@ package k8s
 import (
 	"encoding/base64"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -209,11 +211,7 @@ func populateConfigMapDetails(ti *model.Item, obj map[string]any) {
 	if !ok {
 		return
 	}
-	keys := make([]string, 0, len(data))
-	for k := range data {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(data))
 	for _, k := range keys {
 		if v, ok := data[k].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "data:" + k, Value: v})
@@ -223,11 +221,7 @@ func populateConfigMapDetails(ti *model.Item, obj map[string]any) {
 
 func populateSecretDetails(ti *model.Item, obj map[string]any) {
 	if data, ok := obj["data"].(map[string]any); ok {
-		keys := make([]string, 0, len(data))
-		for k := range data {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(data))
 		for _, k := range keys {
 			if encoded, ok := data[k].(string); ok {
 				decoded, err := base64.StdEncoding.DecodeString(encoded)

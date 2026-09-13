@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,11 +72,7 @@ func (c *Client) QuarantineTargets(ctx context.Context, contextName, namespace s
 	}
 	sort.Strings(services)
 
-	keys = make([]string, 0, len(keySet))
-	for k := range keySet {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys = slices.Sorted(maps.Keys(keySet))
 	return services, keys, nil
 }
 

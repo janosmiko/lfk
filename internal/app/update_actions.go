@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -678,11 +680,7 @@ func bulkClustersConfirmSuffix(m Model) string {
 	if len(seen) == 0 {
 		return ""
 	}
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(seen))
 	return fmt.Sprintf(" across [%s]", strings.Join(names, ", "))
 }
 

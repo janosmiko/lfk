@@ -2,7 +2,8 @@ package app
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -712,11 +713,7 @@ func (m Model) buildNsLabelText() string {
 		return m.namespace
 	}
 
-	names := make([]string, 0, len(m.selectedNamespaces))
-	for ns := range m.selectedNamespaces {
-		names = append(names, ns)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(m.selectedNamespaces))
 
 	if m.nsSelectionNegated {
 		for i, ns := range names {

@@ -3,6 +3,8 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -237,11 +239,7 @@ func formatLabels(lbls map[string]string) string {
 	if len(lbls) == 0 {
 		return "(all)"
 	}
-	keys := make([]string, 0, len(lbls))
-	for k := range lbls {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(lbls))
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		parts = append(parts, k+"="+lbls[k])

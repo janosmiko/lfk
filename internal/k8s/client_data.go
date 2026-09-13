@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -48,7 +49,8 @@ func (c *Client) GetSecretData(ctx context.Context, contextName, namespace, name
 
 // UpdateSecretData updates a secret's data with the provided values.
 func (c *Client) UpdateSecretData(contextName, namespace, name string, data map[string]string) error {
-	logger.Info("Updating Secret data", "context", contextName, "namespace", namespace, "name", name, "keys", sortedKeys(data))
+	// Only the keys are logged. Secret values are sensitive.
+	logger.Info("Updating Secret data", "context", contextName, "namespace", namespace, "name", name, "keys", slices.Sorted(maps.Keys(data)))
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -69,17 +71,6 @@ func (c *Client) UpdateSecretData(contextName, namespace, name string, data map[
 		return fmt.Errorf("updating secret: %w", err)
 	}
 	return nil
-}
-
-// sortedKeys returns the keys of m as a deterministic slice for logging.
-// Values are deliberately not logged (Secret values are sensitive).
-func sortedKeys(m map[string]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // GetConfigMapData fetches a ConfigMap and returns its key-value pairs.
@@ -110,7 +101,7 @@ func (c *Client) GetConfigMapData(ctx context.Context, contextName, namespace, n
 
 // UpdateConfigMapData updates a ConfigMap's data with the provided values.
 func (c *Client) UpdateConfigMapData(contextName, namespace, name string, data map[string]string) error {
-	logger.Info("Updating ConfigMap data", "context", contextName, "namespace", namespace, "name", name, "keys", sortedKeys(data))
+	logger.Info("Updating ConfigMap data", "context", contextName, "namespace", namespace, "name", name, "keys", slices.Sorted(maps.Keys(data)))
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
