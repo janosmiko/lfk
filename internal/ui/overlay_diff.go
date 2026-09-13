@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -565,13 +566,39 @@ func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart
 	return RenderVisualSelection(plainText, vp.VisualType, visIdx, selStart, selEnd, vp.VisualStart, vp.VisualCol, vp.CursorCol, colStart, colEnd)
 }
 
+// trailingSGRRun matches a run of SGR sequences at the end of a string,
+// leadingSGRRun matches one at the start.
+var (
+	trailingSGRRun = regexp.MustCompile(`(?:\x1b\[[0-9;]*m)+$`)
+	leadingSGRRun  = regexp.MustCompile(`^(?:\x1b\[[0-9;]*m)+`)
+)
+
+// padWithinTrailingSGR inserts pad spaces before line's trailing SGR run
+// so the pad keeps the style that was still open there, instead of landing
+// after the reset in the terminal's default color.
+func padWithinTrailingSGR(s string, pad int) string {
+	at := len(s)
+	if loc := trailingSGRRun.FindStringIndex(s); loc != nil {
+		at = loc[0]
+	}
+	return s[:at] + strings.Repeat(" ", pad) + s[at:]
+}
+
+// padWithinLeadingSGR inserts pad spaces after line's leading SGR run (the
+// style ansi.TruncateLeft carries over from before the cut) so the pad
+// keeps that style instead of the terminal's default color.
+func padWithinLeadingSGR(s string, pad int) string {
+	at := len(leadingSGRRun.FindString(s))
+	return s[:at] + strings.Repeat(" ", pad) + s[at:]
+}
+
 // truncateBgLeft truncates line to col cells, padding with a space when the
 // cut lands inside a wide rune (ansi.Truncate drops it whole) so the overlay
 // after it still starts exactly at col.
 func truncateBgLeft(line string, col int) string {
 	s := ansi.Truncate(line, col, "")
 	if w := lipgloss.Width(s); w < col {
-		s += strings.Repeat(" ", col-w)
+		s = padWithinTrailingSGR(s, col-w)
 	}
 	return s
 }
@@ -583,7 +610,7 @@ func truncateBgRight(line string, col int) string {
 	s := ansi.TruncateLeft(line, col, "")
 	want := max(lipgloss.Width(line)-col, 0)
 	if w := lipgloss.Width(s); w < want {
-		s = strings.Repeat(" ", want-w) + s
+		s = padWithinLeadingSGR(s, want-w)
 	}
 	return s
 }

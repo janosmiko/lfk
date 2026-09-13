@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -131,4 +132,47 @@ func TestPlaceOverlayBottom_KeepsFullRowWidthWhenWideRuneStraddlesOverlayEdge(t 
 
 	wantCol := (width - lipgloss.Width(marker)) / 2
 	assert.Equal(t, wantCol, overlayColumn(t, lines[height-1], marker), "overlay must start at the centered column")
+}
+
+// leadingSGR matches an SGR run at the start of a string. A local copy, not
+// the production regex, so this test judges output bytes independently of
+// the fix under test.
+var leadingSGR = regexp.MustCompile(`^(?:\x1b\[[0-9;]*m)+`)
+
+// sgrAt returns the SGR sequence active at a single cell, using ansi.Cut to
+// extract just that cell with its surrounding styling context intact.
+func sgrAt(row string, col int) string {
+	return leadingSGR.FindString(ansi.Cut(row, col, col+1))
+}
+
+func TestPlaceOverlay_PadCellAtWideRuneEdgeKeepsBackgroundColor(t *testing.T) {
+	const width, height = 20, 3
+	const marker = "XXXXXX"
+	fixedBg := lipgloss.Color("#123456")
+	bgLine := lipgloss.NewStyle().Background(fixedBg).Render(strings.Repeat("A", 6) + "网" + strings.Repeat("A", 12))
+	bg := strings.Join([]string{bgLine, bgLine, bgLine}, "\n")
+	overlay := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Render(marker)
+
+	got := PlaceOverlay(width, height, overlay, bg)
+	row := strings.Split(got, "\n")[1]
+
+	startCol := (width - lipgloss.Width(marker)) / 2
+	padCol := startCol - 1
+	assert.Equal(t, sgrAt(row, padCol-1), sgrAt(row, padCol), "pad cell must keep its neighbour's background color")
+}
+
+func TestPlaceOverlayBottom_PadCellAtWideRuneEdgeKeepsBackgroundColor(t *testing.T) {
+	const width, height, margin = 20, 6, 0
+	const marker = "YYYYYY"
+	fixedBg := lipgloss.Color("#123456")
+	bgLine := lipgloss.NewStyle().Background(fixedBg).Render(strings.Repeat("A", 6) + "世界" + strings.Repeat("A", 10))
+	bg := strings.Join([]string{bgLine, bgLine, bgLine, bgLine, bgLine, bgLine}, "\n")
+	overlay := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Render(marker)
+
+	got := PlaceOverlayBottom(width, height, margin, overlay, bg)
+	row := strings.Split(got, "\n")[height-1]
+
+	startCol := (width - lipgloss.Width(marker)) / 2
+	padCol := startCol - 1
+	assert.Equal(t, sgrAt(row, padCol-1), sgrAt(row, padCol), "pad cell must keep its neighbour's background color")
 }
