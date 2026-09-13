@@ -1030,7 +1030,11 @@
         },
         "k8s_client_qps": { "type": "integer" },
         "k8s_client_burst": { "type": "integer" },
-        "show_priority_in_tasks_overlay": { "type": "boolean" },
+        "show_priority_in_tasks_overlay": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the PRIORITY column in the background tasks overlay (backtick key). Set false to hide it and give the freed width to the other columns."
+        },
         "aging_threshold": {
           "type": "integer",
           "description": "Bounds priority starvation: a background task runs after at most this many higher-priority dispatches. 0 disables aging."
