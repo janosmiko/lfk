@@ -603,14 +603,16 @@ func truncateBgLeft(line string, col int) string {
 	return s
 }
 
-// truncateBgRight truncates line to the cells from col onward, padding with
-// a space when the cut lands inside a wide rune (ansi.TruncateLeft drops it
-// whole) so the row after the overlay still reaches the line's full width.
+// truncateBgRight truncates line to the cells from col onward. A wide rune
+// straddling col comes back whole (ansi.TruncateLeft never splits one), so
+// it is dropped and replaced with a space to keep the row at its full width.
 func truncateBgRight(line string, col int) string {
 	s := ansi.TruncateLeft(line, col, "")
 	want := max(lipgloss.Width(line)-col, 0)
-	if w := lipgloss.Width(s); w < want {
-		s = padWithinLeadingSGR(s, want-w)
+	if w := lipgloss.Width(s); w > want {
+		at := len(leadingSGRRun.FindString(s))
+		cluster, clusterWidth := ansi.FirstGraphemeCluster(s[at:], ansi.GraphemeWidth)
+		s = padWithinLeadingSGR(s[:at]+s[at+len(cluster):], want-(w-clusterWidth))
 	}
 	return s
 }

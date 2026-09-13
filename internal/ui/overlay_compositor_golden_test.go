@@ -176,3 +176,43 @@ func TestPlaceOverlayBottom_PadCellAtWideRuneEdgeKeepsBackgroundColor(t *testing
 	padCol := startCol - 1
 	assert.Equal(t, sgrAt(row, padCol-1), sgrAt(row, padCol), "pad cell must keep its neighbour's background color")
 }
+
+func TestPlaceOverlay_KeepsFullRowWidthAndBackgroundWhenWideRuneStraddlesRightOverlayEdge(t *testing.T) {
+	const width, height = 20, 3
+	const marker = "XXXXXX"
+	fixedBg := lipgloss.Color("#123456")
+	bgLine := lipgloss.NewStyle().Background(fixedBg).Render(strings.Repeat("A", 12) + "网" + strings.Repeat("A", 6))
+	bg := strings.Join([]string{bgLine, bgLine, bgLine}, "\n")
+	overlay := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Render(marker)
+
+	got := PlaceOverlay(width, height, overlay, bg)
+	lines := strings.Split(got, "\n")
+	require.Len(t, lines, height)
+	for i, line := range lines {
+		assert.Equal(t, width, lipgloss.Width(line), "row %d is not the full requested width", i)
+	}
+
+	row := lines[1]
+	padCol := (width-lipgloss.Width(marker))/2 + lipgloss.Width(marker)
+	assert.Equal(t, sgrAt(row, padCol+1), sgrAt(row, padCol), "pad cell must keep its neighbour's background color")
+}
+
+func TestPlaceOverlayBottom_KeepsFullRowWidthAndBackgroundWhenWideRuneStraddlesRightOverlayEdge(t *testing.T) {
+	const width, height, margin = 20, 6, 0
+	const marker = "YYYYYY"
+	fixedBg := lipgloss.Color("#123456")
+	bgLine := lipgloss.NewStyle().Background(fixedBg).Render(strings.Repeat("A", 12) + "世" + strings.Repeat("A", 6))
+	bg := strings.Join([]string{bgLine, bgLine, bgLine, bgLine, bgLine, bgLine}, "\n")
+	overlay := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError)).Render(marker)
+
+	got := PlaceOverlayBottom(width, height, margin, overlay, bg)
+	lines := strings.Split(got, "\n")
+	require.Len(t, lines, height)
+	for i, line := range lines {
+		assert.Equal(t, width, lipgloss.Width(line), "row %d is not the full requested width", i)
+	}
+
+	row := lines[height-1]
+	padCol := (width-lipgloss.Width(marker))/2 + lipgloss.Width(marker)
+	assert.Equal(t, sgrAt(row, padCol+1), sgrAt(row, padCol), "pad cell must keep its neighbour's background color")
+}
