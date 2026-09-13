@@ -994,7 +994,7 @@ Available strategies (priority order; unavailable ones are skipped):
    targets the workload. The recommender's target is multiplied by the active headroom
    (raw target at headroom = 1.0).
 2. **1d-max** — Prometheus `max_over_time` peak over the last 1 day × headroom.
-   Available when a Prometheus endpoint is configured for the cluster.
+   Available when lfk finds Prometheus in the cluster or a Prometheus endpoint is configured.
 3. **1d-avg** — Prometheus `avg_over_time` over the last 1 day × headroom.
 4. **7d-p95** — Prometheus `quantile_over_time(0.95, ...)` over the last 7 days × headroom.
 5. **snapshot** — current metrics-server usage × headroom (always available as the
