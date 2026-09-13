@@ -3,6 +3,8 @@ package ui
 import (
 	"strconv"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // CaptureOverlayEntry is the presentation-only struct passed to the renderer.
@@ -157,7 +159,7 @@ func buildCaptureConfig(e CaptureOverlayEntry, contentW int) string {
 		case !b.Available:
 			label := b.Label
 			if b.Reason != "" {
-				label = b.Label + " (" + truncate(b.Reason, 30) + ")"
+				label = b.Label + " (" + ansi.Truncate(b.Reason, 30, "…") + ")"
 			}
 			chip = OverlayDimStyle.Render(label)
 		default:
@@ -386,19 +388,4 @@ func formatCaptureBytes(n int64) string {
 
 func formatCaptureFloat1(f float64) string {
 	return strconv.FormatFloat(f, 'f', 1, 64)
-}
-
-// truncate returns s if it fits in n runes, otherwise s truncated and "…".
-func truncate(s string, n int) string {
-	if n <= 0 {
-		return ""
-	}
-	rs := []rune(s)
-	if len(rs) <= n {
-		return s
-	}
-	if n == 1 {
-		return "…"
-	}
-	return string(rs[:n-1]) + "…"
 }

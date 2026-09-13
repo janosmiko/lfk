@@ -971,31 +971,31 @@ func TestComputeDiff(t *testing.T) {
 	})
 }
 
-func TestTruncateToWidth(t *testing.T) {
+func TestTruncate_OverlayCases(t *testing.T) {
 	t.Run("short string unchanged", func(t *testing.T) {
-		assert.Equal(t, "hello", truncateToWidth("hello", 10))
+		assert.Equal(t, "hello", Truncate("hello", 10))
 	})
 
 	t.Run("long string truncated", func(t *testing.T) {
-		result := truncateToWidth("hello world this is long", 10)
+		result := Truncate("hello world this is long", 10)
 		assert.LessOrEqual(t, len(result), 10)
 		assert.True(t, strings.HasSuffix(result, "~"))
 	})
 
 	t.Run("empty string", func(t *testing.T) {
-		assert.Equal(t, "", truncateToWidth("", 10))
+		assert.Equal(t, "", Truncate("", 10))
 	})
 }
 
-func TestPadToWidth(t *testing.T) {
+func TestPadRight_OverlayCases(t *testing.T) {
 	t.Run("short string padded", func(t *testing.T) {
-		result := padToWidth("hi", 10)
+		result := padRight("hi", 10)
 		assert.Equal(t, 10, len(result))
 		assert.True(t, strings.HasPrefix(result, "hi"))
 	})
 
 	t.Run("exact width unchanged", func(t *testing.T) {
-		result := padToWidth("1234567890", 10)
+		result := padRight("1234567890", 10)
 		assert.Equal(t, "1234567890", result)
 	})
 }

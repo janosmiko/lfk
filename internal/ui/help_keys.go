@@ -3,8 +3,6 @@ package ui
 import (
 	"strings"
 	"unicode"
-
-	"charm.land/lipgloss/v2"
 )
 
 // helpKeyDisplayModifiers is the display casing for each modifier name.
@@ -173,14 +171,4 @@ func helpKeySymbols(key string) string {
 		return tok
 	})
 	return applyKeySeparator(symbols)
-}
-
-// padKeyLeft right-aligns s in a cell of width w. Padding is measured with
-// lipgloss.Width, not len: the modifier glyphs are multibyte and a
-// byte-counted %*s pad would leave the column ragged.
-func padKeyLeft(s string, w int) string {
-	if pad := w - lipgloss.Width(s); pad > 0 {
-		return strings.Repeat(" ", pad) + s
-	}
-	return s
 }

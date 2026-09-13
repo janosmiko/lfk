@@ -484,31 +484,6 @@ func TestRenderResourceTree(t *testing.T) {
 	})
 }
 
-// --- truncateStr ---
-
-func TestTruncateStr(t *testing.T) {
-	tests := []struct {
-		name     string
-		s        string
-		maxLen   int
-		expected string
-	}{
-		{"fits exactly", "hello", 5, "hello"},
-		{"fits with room", "hi", 5, "hi"},
-		{"needs truncation with ellipsis", "hello world", 8, "hello..."},
-		{"maxLen 3 no ellipsis", "hello", 3, "hel"},
-		{"maxLen 2 no ellipsis", "hello", 2, "he"},
-		{"maxLen 1 no ellipsis", "hello", 1, "h"},
-		{"empty string", "", 5, ""},
-		{"maxLen 4 with ellipsis", "abcdef", 4, "a..."},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, truncateStr(tt.s, tt.maxLen))
-		})
-	}
-}
-
 // --- VimScrollOff ---
 
 func TestVimScrollOff(t *testing.T) {
