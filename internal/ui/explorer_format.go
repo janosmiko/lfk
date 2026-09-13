@@ -217,7 +217,7 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 			if item != nil {
 				clusterName = item.ClusterName
 			}
-			row.WriteString(padRight(Truncate(clusterName, contextW-1), contextW))
+			row.WriteString(padRight(Truncate(SanitizeTerminalText(clusterName), contextW-1), contextW))
 		case key == "Namespace":
 			row.WriteString(padRight(Truncate(SanitizeTerminalText(ns), nsW-1), nsW))
 		case key == "Ready":
@@ -255,7 +255,7 @@ func formatTableRowStyledOrdered(item model.Item,
 		case key == "Name":
 			base.WriteString(styledNameCell(item, nameW, nameOverride))
 		case key == "Context" && contextW > 0:
-			base.WriteString(DimStyle.Render(padRight(Truncate(item.ClusterName, contextW-1), contextW)))
+			base.WriteString(DimStyle.Render(padRight(Truncate(SanitizeTerminalText(item.ClusterName), contextW-1), contextW)))
 		case key == "Namespace":
 			ns := SanitizeTerminalText(item.Namespace)
 			if ns == "" {
