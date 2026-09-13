@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,6 +67,11 @@ func TestContextNamespace(t *testing.T) {
 }
 
 // --- KubeconfigPaths ---
+
+// KubeconfigPaths returns the colon-separated kubeconfig paths used by this client.
+func (c *Client) KubeconfigPaths() string {
+	return strings.Join(c.loadingRules.Precedence, ":")
+}
 
 func TestKubeconfigPaths(t *testing.T) {
 	c := newTestClient(t)

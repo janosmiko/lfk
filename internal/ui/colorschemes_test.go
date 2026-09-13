@@ -29,6 +29,62 @@ func TestBuiltinSchemes(t *testing.T) {
 	}
 }
 
+func TestBuiltinSchemesSnapshot(t *testing.T) {
+	schemes := BuiltinSchemes()
+	assert.Len(t, schemes, 462)
+
+	assert.Equal(t, Theme{
+		Primary:    "#bd93f9",
+		Secondary:  "#50fa7b",
+		Text:       "#f8f8f2",
+		SelectedFg: "#282a36",
+		SelectedBg: "#bd93f9",
+		Border:     "#6272a4",
+		Dimmed:     "#6272a4",
+		Error:      "#ff5555",
+		Warning:    "#f1fa8c",
+		Purple:     "#ff79c6",
+		Base:       "#282a36",
+		BarBg:      "#343642",
+		Surface:    "#2e303c",
+	}, schemes["dracula"])
+	assert.False(t, IsLightScheme("dracula"))
+
+	assert.Equal(t, Theme{
+		Primary:    "#2e7de9",
+		Secondary:  "#587539",
+		Text:       "#3760bf",
+		SelectedFg: "#e1e2e7",
+		SelectedBg: "#2e7de9",
+		Border:     "#a1a6c5",
+		Dimmed:     "#a1a6c5",
+		Error:      "#f52a65",
+		Warning:    "#8c6c3e",
+		Purple:     "#9854f1",
+		Base:       "#e1e2e7",
+		BarBg:      "#d3d4d9",
+		Surface:    "#dadbe0",
+	}, schemes["tokyonight-day"])
+	assert.True(t, IsLightScheme("tokyonight-day"))
+
+	assert.Equal(t, Theme{
+		Primary:    "#89b4fa",
+		Secondary:  "#a6e3a1",
+		Text:       "#cdd6f4",
+		SelectedFg: "#1e1e2e",
+		SelectedBg: "#89b4fa",
+		Border:     "#585b70",
+		Dimmed:     "#585b70",
+		Error:      "#f38ba8",
+		Warning:    "#f9e2af",
+		Purple:     "#f5c2e7",
+		Base:       "#1e1e2e",
+		BarBg:      "#2b2b3a",
+		Surface:    "#242434",
+	}, schemes["catppuccin-mocha"])
+	assert.False(t, IsLightScheme("catppuccin-mocha"))
+}
+
 func TestBuiltinSchemesContainExpectedThemes(t *testing.T) {
 	schemes := BuiltinSchemes()
 	expected := []string{

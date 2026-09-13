@@ -211,19 +211,6 @@ func (m *PortForwardManager) SeedTerminalEntryForTest(id int, shownAt time.Time)
 	})
 }
 
-// ActiveCount returns the number of active (running) port forwards.
-func (m *PortForwardManager) ActiveCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	count := 0
-	for _, e := range m.entries {
-		if e.Status == PortForwardRunning || e.Status == PortForwardStarting {
-			count++
-		}
-	}
-	return count
-}
-
 // Start starts a new port forward using kubectl port-forward as a background process.
 // It returns the entry ID for tracking. The port forward starts in PortForwardStarting
 // status and transitions to PortForwardRunning only after kubectl confirms readiness

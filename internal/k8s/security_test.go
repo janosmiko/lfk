@@ -198,7 +198,7 @@ func TestGetResourcesDispatchesSecurityAPIGroup(t *testing.T) {
 		APIGroup: model.SecurityVirtualAPIGroup,
 		Resource: "findings-trivy-operator",
 	}
-	items, err := c.GetResources(t.Context(), "kctx", "", rt)
+	items, err := c.GetResources(t.Context(), "kctx", "", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	assert.Equal(t, "__security_finding_group__", items[0].Kind)

@@ -89,12 +89,9 @@ func TestRenderRightsizingOverlay_EstimatedSourceHidesBounds(t *testing.T) {
 }
 
 func TestRenderRightsizingOverlay_EmptyUsageRendersDash(t *testing.T) {
-	// Regression: when a container had no live metrics, the USAGE cell
-	// rendered blank (instead of a dim em-dash) AND broke row alignment
-	// because `orDash` returned an ANSI-styled `—` whose escape bytes
-	// counted as runes — `rsTruncate` cut mid-escape and the visible `—`
-	// never reached the screen. Now the empty-cell handling lives at the
-	// cell-renderer level (`valueCellOrDash`) so content stays plain.
+	// A container with no live metrics must show a dim dash in the USAGE
+	// cell and keep the row aligned. Cell truncation must never cut the
+	// dash's styling apart.
 	data := makeFixture("estimated", []model.ContainerRec{{
 		Name: "split-brain-fix",
 		CPU:  model.ResourceRec{}, // no usage at all

@@ -15,18 +15,12 @@ import (
 // of ingress/egress rules using box-drawing characters and arrows. A non-empty
 // query highlights matching text in the visible lines.
 func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height int, query string) string {
-	return renderScrollableLines(buildNetpolOverlayLines(info, width), scroll, width, height, query)
+	return renderScrollableLines(NetworkPolicyOverlayLines(info, width), scroll, width, height, query)
 }
 
 // NetworkPolicyOverlayLines returns the full (unscrolled) styled line list of
 // the single-policy view, for search/match scanning by the key handler.
 func NetworkPolicyOverlayLines(info NetworkPolicyEntry, width int) []string {
-	return buildNetpolOverlayLines(info, width)
-}
-
-// buildNetpolOverlayLines composes the full (unscrolled) line list for the
-// single-policy view.
-func buildNetpolOverlayLines(info NetworkPolicyEntry, width int) []string {
 	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(SurfaceBg)
 	arrowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 	boxBorderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBorder)).Background(SurfaceBg)
@@ -56,7 +50,7 @@ func flattenRenderedLines(lines []string) []string {
 // NetworkPolicyOverlayLineCount returns the total line count of the
 // single-policy view at the given width, for scroll clamping.
 func NetworkPolicyOverlayLineCount(info NetworkPolicyEntry, width int) int {
-	return len(buildNetpolOverlayLines(info, width))
+	return len(NetworkPolicyOverlayLines(info, width))
 }
 
 // OverlayMaxScroll returns the bottom scroll position for a scrollable
@@ -143,16 +137,11 @@ func renderNetpolTargetLabel(info NetworkPolicyEntry) string {
 	return strings.Join(parts, "\n")
 }
 
-// hasPolicyType returns true if the policy types list contains the given type.
-func hasPolicyType(types []string, target string) bool {
-	return slices.Contains(types, target)
-}
-
 // renderNetpolDirectionRules renders ingress and egress rule sections.
 func renderNetpolDirectionRules(info NetworkPolicyEntry, targetLabel string, width int, sectionStyle, boxBorderStyle, arrowStyle, labelStyle, cidrStyle, greenStyle lipgloss.Style) []string {
 	var lines []string
-	hasIngress := hasPolicyType(info.PolicyTypes, "Ingress")
-	hasEgress := hasPolicyType(info.PolicyTypes, "Egress")
+	hasIngress := slices.Contains(info.PolicyTypes, "Ingress")
+	hasEgress := slices.Contains(info.PolicyTypes, "Egress")
 
 	if hasIngress || len(info.IngressRules) > 0 {
 		lines = append(lines, sectionStyle.Render("INGRESS RULES"))

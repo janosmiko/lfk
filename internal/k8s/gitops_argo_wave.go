@@ -33,7 +33,6 @@ type SyncWaveTimeline struct {
 	LastOperation *SyncOperationSummary
 	LivePhase     string // operationState.phase: "" | "Running" | "Succeeded" | "Failed" | "Error" | "Terminating"
 	Revision      string // last operation revision (short)
-	FetchedAt     time.Time
 	// Loading is true between the fast skeleton fetch and the slow wave-
 	// annotation fan-out. The renderer surfaces this as "Loading wave map…"
 	// in the header and the app layer chains a full fetch when Loading is
@@ -403,7 +402,6 @@ func buildSyncWaveTimelineFromApp(app *unstructured.Unstructured, appName, names
 	tl := &SyncWaveTimeline{
 		AppName:      appName,
 		AppNamespace: namespace,
-		FetchedAt:    time.Now(),
 		Loading:      wavesByIndex == nil,
 	}
 	statusMap, _ := app.Object["status"].(map[string]any)

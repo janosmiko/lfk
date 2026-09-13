@@ -71,194 +71,108 @@ var (
 
 var (
 	// Column styles.
-	ActiveColumnStyle = lipgloss.NewStyle().
-				Padding(0, 1).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(ColorPrimary))
-
-	InactiveColumnStyle = lipgloss.NewStyle().
-				Padding(0, 1).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(ColorBorder))
+	ActiveColumnStyle   lipgloss.Style
+	InactiveColumnStyle lipgloss.Style
 
 	// Item styles.
-	SelectedStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color(ColorSelectedFg)).
-			Background(lipgloss.Color(ColorSelectedBg))
-
-	NormalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
-
-	DimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
+	SelectedStyle lipgloss.Style
+	NormalStyle   lipgloss.Style
+	DimStyle      lipgloss.Style
 
 	// BarDimStyle is DimStyle but with bar background (for status bar hints).
-	BarDimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
+	BarDimStyle lipgloss.Style
 
 	// BarNormalStyle is NormalStyle but with bar background (for status bar text).
-	BarNormalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
+	BarNormalStyle lipgloss.Style
 
 	// Category header in resource type list.
-	CategoryStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDimmed)).
-			Bold(true).
-			Italic(true)
+	CategoryStyle lipgloss.Style
 
 	// Category header rendered as a full-width "bar" with a distinct background, used by explorer columns to separate groups.
-	CategoryBarStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorPrimary)).
-				Bold(true)
+	CategoryBarStyle lipgloss.Style
 
 	// Resource type icon style.
-	IconStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
+	IconStyle lipgloss.Style
 
 	// Status colors: Green=running, Blue=progressing, Red=error, Grey=completed/other, Amber=warning.
-	StatusRunning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary))
-	StatusProgressing = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
-	StatusFailed      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
-	StatusOther       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
-	StatusWarning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
+	StatusRunning     lipgloss.Style
+	StatusProgressing lipgloss.Style
+	StatusFailed      lipgloss.Style
+	StatusOther       lipgloss.Style
+	StatusWarning     lipgloss.Style
 
 	// Whole-row status tint (issue #540). Colors mirror the Status cell (StatusFailed = error, StatusProgressing = primary) so
 	// the row tint and the cell never disagree. Fg variants recolor the row text. Bg variants lay a muted severity background.
-	RowTintFailedFg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
-	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
-	RowTintFailedBg      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
-				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend)))
-	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).
-				Background(lipgloss.Color(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend)))
+	RowTintFailedFg      lipgloss.Style
+	RowTintProgressingFg lipgloss.Style
+	RowTintFailedBg      lipgloss.Style
+	RowTintProgressingBg lipgloss.Style
 	// Cursor row in background mode: the status background blended toward the
 	// selection color so the cursor stays visible on a tinted row (#540 UAT).
-	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true).
-				Background(lipgloss.Color(blendHexToward(blendHexToward(defaultColorBase, defaultColorError, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
-	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile)).Bold(true).
-					Background(lipgloss.Color(blendHexToward(blendHexToward(defaultColorBase, defaultColorPrimary, rowTintBgBlend), defaultColorSelectedBg, rowTintCursorBlend)))
+	RowTintFailedCursorBg      lipgloss.Style
+	RowTintProgressingCursorBg lipgloss.Style
 
 	// Title bar (full-width background).
-	TitleBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color(ColorBarBg)).
-			Foreground(lipgloss.Color(ColorFile)).
-			Padding(0, 1)
-
-	TitleBreadcrumbStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(ColorPrimary)).
-				Background(lipgloss.Color(ColorBarBg))
-
-	TitleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color(ColorPrimary)).
-			Padding(0, 1)
+	TitleBarStyle        lipgloss.Style
+	TitleBreadcrumbStyle lipgloss.Style
+	TitleStyle           lipgloss.Style
 
 	// Namespace badge in title bar.
-	NamespaceBadgeStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSelectedFg)).
-				Background(lipgloss.Color(ColorPrimary)).
-				Bold(true).
-				Padding(0, 1)
+	NamespaceBadgeStyle lipgloss.Style
 
 	// Read-only badge in title bar. Warning color so it's hard to miss.
-	ReadOnlyBadgeStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSelectedFg)).
-				Background(lipgloss.Color(ColorWarning)).
-				Bold(true).
-				Padding(0, 1)
+	ReadOnlyBadgeStyle lipgloss.Style
 
 	// Demo-mode badge: ReadOnlyBadgeStyle with a distinguishing purple background.
-	DemoBadgeStyle = ReadOnlyBadgeStyle.Background(lipgloss.Color(ColorPurple))
+	DemoBadgeStyle lipgloss.Style
 
 	// Subtle [RO] marker for list rows. Foreground-only so it doesn't
 	// compete with the row content the way a solid-background badge does.
 	// Same visual weight as CurrentMarkerStyle (* prefix).
-	ReadOnlyMarkerStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorWarning)).
-				Bold(true)
+	ReadOnlyMarkerStyle lipgloss.Style
 
 	// Column header with underline and icon.
-	HeaderStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color(ColorPrimary)).
-			Underline(true)
-
-	HeaderIconStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorPrimary))
+	HeaderStyle     lipgloss.Style
+	HeaderIconStyle lipgloss.Style
 
 	// SortActiveHeaderStyle highlights the header label and sort arrow of the
 	// column the table is currently sorted by, so the active sort column reads
 	// distinctly against the dim of the inactive headers.
-	SortActiveHeaderStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(ColorPrimary))
+	SortActiveHeaderStyle lipgloss.Style
 
 	// Namespace indicator in top-right (kept for compat).
-	NamespaceStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorWarning)).
-			Bold(true).
-			Padding(0, 1)
+	NamespaceStyle lipgloss.Style
 
 	// Full screen YAML view.
-	YamlViewStyle = lipgloss.NewStyle().
-			Padding(1, 2)
+	YamlViewStyle lipgloss.Style
 
 	// YAML key highlighting.
-	YamlKeyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorPrimary)).
-			Bold(true)
-
-	YamlValueStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
-
-	YamlPunctuationStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorDimmed))
-
-	YamlCommentStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorDimmed)).
-				Italic(true)
+	YamlKeyStyle         lipgloss.Style
+	YamlValueStyle       lipgloss.Style
+	YamlPunctuationStyle lipgloss.Style
+	YamlCommentStyle     lipgloss.Style
 
 	// YAML syntax highlighting: value types.
-	YamlStringStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorSecondary))
-
-	YamlNumberStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorOrange))
-
-	YamlBoolStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorOrange)).
-			Bold(true)
-
-	YamlNullStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorPurple)).
-			Italic(true)
-
-	YamlAnchorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorCyan)).
-			Bold(true)
-
-	YamlTagStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorPurple))
-
-	YamlBlockScalarStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorPurple)).
-				Bold(true)
+	YamlStringStyle      lipgloss.Style
+	YamlNumberStyle      lipgloss.Style
+	YamlBoolStyle        lipgloss.Style
+	YamlNullStyle        lipgloss.Style
+	YamlAnchorStyle      lipgloss.Style
+	YamlTagStyle         lipgloss.Style
+	YamlBlockScalarStyle lipgloss.Style
 
 	// Status bar (full-width background).
-	StatusBarBgStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color(ColorBarBg)).
-				Foreground(lipgloss.Color(ColorDimmed)).
-				Padding(0, 1)
-
-	StatusBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDimmed)).
-			Padding(0, 1)
+	StatusBarBgStyle lipgloss.Style
+	StatusBarStyle   lipgloss.Style
 
 	// Help key style (for status bar hints).
-	HelpKeyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorSecondary)).
-			Bold(true)
+	HelpKeyStyle lipgloss.Style
 
 	// Schema side pane (ctrl+k): the header names the field and carries
 	// the accent. The description is prose to read, so it stays plain.
-	FieldDocHeaderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
-	FieldDocTextStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
-	FieldDocErrorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
+	FieldDocHeaderStyle lipgloss.Style
+	FieldDocTextStyle   lipgloss.Style
+	FieldDocErrorStyle  lipgloss.Style
 
 	// Which-key panel. The panel draws one flat list with no section
 	// headers, so the description's color is the only thing left that says
@@ -278,116 +192,71 @@ var (
 	// keeps Secondary because HelpKeyStyle draws every hint-bar hotkey in that
 	// same green bold. Actions is what moved, having held Secondary since the
 	// accent sat on the KEY rather than on the description.
-	WhichKeyKeyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
-	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
+	WhichKeyKeyStyle  lipgloss.Style
+	WhichKeyDescStyle lipgloss.Style
 	// Actions is the largest group, so it stays neutral and the five smaller
 	// groups carry the accents. Sharing WhichKeyDescStyle is deliberate: exactly
 	// one group may be neutral, pinned by the group-style guard.
-	WhichKeyActionsStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorFile))
-	WhichKeyViewsStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
-	WhichKeyFilterStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorCyan))
-	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPurple))
-	WhichKeySortStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
-	WhichKeySettingsStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorOrange))
+	WhichKeyActionsStyle   lipgloss.Style
+	WhichKeyViewsStyle     lipgloss.Style
+	WhichKeyFilterStyle    lipgloss.Style
+	WhichKeySelectionStyle lipgloss.Style
+	WhichKeySortStyle      lipgloss.Style
+	WhichKeySettingsStyle  lipgloss.Style
 
 	// Error style.
-	ErrorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorError)).
-			Bold(true)
+	ErrorStyle lipgloss.Style
 
 	// Current context marker.
-	CurrentMarkerStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSecondary)).
-				Bold(true)
+	CurrentMarkerStyle lipgloss.Style
 
 	// Overlay styles (namespace selector, action menu).
-	OverlayStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(ColorPrimary)).
-			Padding(1, 2)
-
-	OverlayTitleStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(ColorPrimary)).
-				Padding(0, 0, 1, 0)
-
-	OverlaySelectedStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(ColorSelectedFg)).
-				Background(lipgloss.Color(ColorSelectedBg))
-
-	OverlayNormalStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorFile))
-
-	OverlayFilterStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSecondary)).
-				Bold(true)
-
-	OverlayDimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(ColorDimmed))
+	OverlayStyle         lipgloss.Style
+	OverlayTitleStyle    lipgloss.Style
+	OverlaySelectedStyle lipgloss.Style
+	OverlayNormalStyle   lipgloss.Style
+	OverlayFilterStyle   lipgloss.Style
+	OverlayDimStyle      lipgloss.Style
 
 	// Confirm overlay styles.
-	OverlayWarningStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorError)).
-				Bold(true)
+	OverlayWarningStyle lipgloss.Style
 
 	// Scale input style.
-	OverlayInputStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorFile)).
-				Bold(true).
-				Underline(true)
+	OverlayInputStyle lipgloss.Style
 
 	// Parent highlight style (dimmer than active selection).
-	ParentHighlightStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color(ColorFile)).
-				Background(lipgloss.Color(ColorBorder))
+	ParentHighlightStyle lipgloss.Style
 
 	// Status message style (temporary success/error in status bar).
-	StatusMessageOkStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSecondary)).
-				Bold(true)
-
-	StatusMessageErrStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorError)).
-				Bold(true)
+	StatusMessageOkStyle  lipgloss.Style
+	StatusMessageErrStyle lipgloss.Style
 
 	// SearchHighlightStyle highlights search/filter matches in item names.
-	SearchHighlightStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color(ColorWarning)).
-				Foreground(lipgloss.Color(ColorBase)).
-				Bold(true)
+	SearchHighlightStyle lipgloss.Style
 
 	// SelectedSearchHighlightStyle highlights the currently selected search
 	// match (the one n/N steps to). The distinct purple background (vs the
 	// warning-yellow used by regular matches) and underline together make the
 	// current match visually unambiguous across themes. Foreground stays the
 	// same dark base color so text remains legible on both backgrounds.
-	SelectedSearchHighlightStyle = lipgloss.NewStyle().
-					Background(lipgloss.Color(ColorPurple)).
-					Foreground(lipgloss.Color(ColorBase)).
-					Bold(true).
-					Underline(true)
+	SelectedSearchHighlightStyle lipgloss.Style
 
 	// SelectionMarkerStyle styles the checkmark shown on multi-selected items.
-	SelectionMarkerStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSecondary)).
-				Bold(true)
+	SelectionMarkerStyle lipgloss.Style
 
 	// SelectionCountStyle styles the selection count badge in the status bar.
-	SelectionCountStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorSelectedFg)).
-				Background(lipgloss.Color(ColorSecondary)).
-				Bold(true)
+	SelectionCountStyle lipgloss.Style
 
 	// YamlCursorIndicatorStyle styles the gutter indicator on the YAML cursor line.
-	YamlCursorIndicatorStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color(ColorPrimary))
+	YamlCursorIndicatorStyle lipgloss.Style
 
 	// DeprecationStyle styles the deprecation warning indicator on resource type items.
-	DeprecationStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(ColorWarning))
+	DeprecationStyle lipgloss.Style
 )
+
+func init() {
+	ApplyTheme(DefaultTheme())
+}
 
 // FillLinesBg post-processes a multi-line string so that the background color
 // is continuous across each line. It does two things:

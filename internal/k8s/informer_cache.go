@@ -305,14 +305,6 @@ func (ic *informerCache) isPromoted(contextName string, gvr schema.GroupVersionR
 	return state.hot || state.promoted
 }
 
-// isDenied separates denyGVR's permanent verdict from noteWatchFailure's
-// expiring one, which cacheBlocked folds together.
-func (s *gvrAutoState) isDenied() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.denied
-}
-
 // markHot marks (contextName, gvr) hot and starts its informer if needed.
 // Returns true on a first-ever start, so GetResources can skip the cache
 // branch this once rather than block the same call waiting for a fresh sync.

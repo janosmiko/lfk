@@ -2,16 +2,14 @@ package app
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
-	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 )
+
+const portForwardStateFileName = "portforwards.yaml"
 
 // PortForwardState represents a single persisted port forward.
 type PortForwardState struct {
@@ -30,48 +28,18 @@ type PortForwardStates struct {
 
 // portForwardStatePath returns the path to the port forward state file.
 func portForwardStatePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "portforwards.yaml")
+	return stateFilePath(portForwardStateFileName)
 }
 
 // loadPortForwardState reads saved port forwards from disk.
 func loadPortForwardState() *PortForwardStates {
-	path := portForwardStatePath()
-	if path == "" {
-		return &PortForwardStates{}
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			logger.Warn("Failed to read port-forward state", "error", err, "path", path)
-		}
-		return &PortForwardStates{}
-	}
-	var s PortForwardStates
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Port-forward state file is corrupt; ignoring", "error", err, "path", path)
-		return &PortForwardStates{}
-	}
+	s := loadStateFile[PortForwardStates](portForwardStateFileName)
 	return &s
 }
 
 // savePortForwardState writes port forward state to disk.
 func savePortForwardState(s *PortForwardStates) error {
-	path := portForwardStatePath()
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(s)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+	return saveStateFile(portForwardStateFileName, s)
 }
 
 // saveCurrentPortForwards persists all running port forwards to disk.

@@ -46,11 +46,6 @@ func sourcesFromPaths(paths []string) []kubeconfigSource {
 	return out
 }
 
-// KubeconfigPaths returns the colon-separated kubeconfig paths used by this client.
-func (c *Client) KubeconfigPaths() string {
-	return strings.Join(c.loadingRules.Precedence, ":")
-}
-
 // KubeconfigPathForContext returns the kubeconfig file path that defines the
 // given context. The argument is the lfk display name (which may have been
 // disambiguated from the original kubeconfig context name). Falls back to
@@ -59,9 +54,9 @@ func (c *Client) KubeconfigPaths() string {
 // names) still get a sensible KUBECONFIG.
 //
 // Subprocess invocations (kubectl, helm, etc.) must use this single source
-// file rather than KubeconfigPaths because clientcmd's merge collapses
-// clusters and users that share names across files — see issue #23 and
-// restConfigForContext for the in-process equivalent.
+// file because clientcmd's merge collapses clusters and users that share
+// names across files — see issue #23 and restConfigForContext for the
+// in-process equivalent.
 func (c *Client) KubeconfigPathForContext(displayName string) string {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()

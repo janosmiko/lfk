@@ -62,12 +62,12 @@ func TestNewDemoClient_ListsPodsAndDeployments(t *testing.T) {
 	ctx := t.Context()
 
 	podsRT := model.ResourceTypeEntry{APIGroup: "", APIVersion: "v1", Resource: "pods", Kind: "Pod", Namespaced: true}
-	pods, err := c.GetResources(ctx, c.CurrentContext(), demo.NamespaceDemo, podsRT)
+	pods, err := c.GetResources(ctx, c.CurrentContext(), demo.NamespaceDemo, podsRT, false)
 	require.NoError(t, err)
 	assert.NotEmpty(t, pods)
 
 	deploymentsRT := model.ResourceTypeEntry{APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Kind: "Deployment", Namespaced: true}
-	deployments, err := c.GetResources(ctx, c.CurrentContext(), demo.NamespaceDemo, deploymentsRT)
+	deployments, err := c.GetResources(ctx, c.CurrentContext(), demo.NamespaceDemo, deploymentsRT, false)
 	require.NoError(t, err)
 	assert.NotEmpty(t, deployments)
 }

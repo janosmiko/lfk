@@ -279,7 +279,7 @@ func (m Model) handleKeyThemeSelector() Model {
 	m.schemeCursor = 0
 	m.schemeFilter.Clear()
 	m.schemeOriginalName = ui.ActiveSchemeName
-	ui.ResetOverlaySchemeScroll()
+	ui.OverlaySchemeScroll = 0
 	// Position cursor on the currently active scheme.
 	selectIdx := 0
 	for _, e := range m.schemeEntries {
@@ -407,7 +407,7 @@ func (m Model) namespaceSelectorItems(items []model.Item) []model.Item {
 func (m Model) openNamespaceSelectorForContext(contextName string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNamespace
 	m.overlayFilter.Clear()
-	ui.ResetOverlayNsScroll()
+	ui.OverlayNsScroll = 0
 	m.nsSelectionModified = false
 	// Snapshot the scope now, before Space/Tab/A editing mutates the live
 	// selection during the session. Commit (Enter) and the in-overlay quick

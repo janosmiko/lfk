@@ -545,8 +545,8 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 		// Type indicator and styling.
 		var dot, reasonStr string
 		// padRight/Truncate measure visual columns, matching maxReasonW
-		// above. truncateStr and fmt's "%-*s" both count runes, which
-		// mismeasures a wide (e.g. CJK) or multibyte Reason.
+		// above. fmt's "%-*s" counts runes, which mismeasures a wide
+		// (e.g. CJK) Reason.
 		if e.warning {
 			dot = errorStyle.Render("\u25cf")
 			reasonStr = errorStyle.Bold(true).Render(padRight(Truncate(e.reason, maxReasonW), maxReasonW))
@@ -579,17 +579,6 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	}
 
 	return b.String()
-}
-
-// truncateStr truncates a string to maxLen characters.
-func truncateStr(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
 }
 
 // FormatCPU formats millicores into a human-readable string.

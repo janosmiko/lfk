@@ -186,7 +186,7 @@ func TestGetResources_PodCertificateRequestColumns(t *testing.T) {
 		Kind: "PodCertificateRequest", APIGroup: "certificates.k8s.io", APIVersion: "v1",
 		Resource: "podcertificaterequests", Namespaced: true,
 	}
-	items, err := c.GetResources(t.Context(), "test-ctx", "default", rt)
+	items, err := c.GetResources(t.Context(), "test-ctx", "default", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -225,7 +225,7 @@ func TestGetResources_ClusterTrustBundleColumns(t *testing.T) {
 		Kind: "ClusterTrustBundle", APIGroup: "certificates.k8s.io", APIVersion: "v1",
 		Resource: "clustertrustbundles", Namespaced: false,
 	}
-	items, err := c.GetResources(t.Context(), "test-ctx", "", rt)
+	items, err := c.GetResources(t.Context(), "test-ctx", "", rt, false)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 

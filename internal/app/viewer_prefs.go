@@ -7,7 +7,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/paths"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -102,11 +101,7 @@ func newViewerPrefValues() viewerPrefValues {
 }
 
 func viewerPrefsFilePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "viewer_prefs.yaml")
+	return stateFilePath("viewer_prefs.yaml")
 }
 
 // loadViewerPrefsState reads the file, returning an all-nil state when it is

@@ -3,21 +3,14 @@ package app
 import (
 	"math/rand/v2"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // tipStatePath returns the path of the tip-rotation cursor file, or "" when
 // no state directory is available (tips then fall back to a random pick).
 func tipStatePath() string {
-	dir, err := paths.StateDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(dir, "tip-cursor")
+	return stateFilePath("tip-cursor")
 }
 
 // nextStartupTip returns the next tip in the rotation and advances the

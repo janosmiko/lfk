@@ -126,6 +126,13 @@ func ApplyTheme(t Theme) {
 	ColorBase = t.Base
 	ColorBarBg = t.BarBg
 	ColorSurface = t.Surface
+	buildThemeStyles(t)
+}
+
+// buildThemeStyles assigns every theme style global from t. It reads the
+// Color* slots for the colors that have no Theme field, so callers set those
+// slots first.
+func buildThemeStyles(t Theme) {
 	// baseBg is applied to all column/content text styles so the theme
 	// background shows behind text (ANSI resets from inner styled content
 	// would otherwise clear the container background). NoColor when transparent.
@@ -190,13 +197,13 @@ func ApplyTheme(t Theme) {
 	RowTintFailedFg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error)).Background(baseBg)
 	RowTintProgressingFg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Background(baseBg)
 	RowTintFailedBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
-		Background(lipgloss.Color(blendHexToward(t.Base, t.Error, rowTintBgBlend)))
+		Background(lipgloss.Color(blendHex(t.Base, t.Error, rowTintBgBlend)))
 	RowTintProgressingBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).
-		Background(lipgloss.Color(blendHexToward(t.Base, t.Primary, rowTintBgBlend)))
+		Background(lipgloss.Color(blendHex(t.Base, t.Primary, rowTintBgBlend)))
 	RowTintFailedCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
-		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Error, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+		Background(lipgloss.Color(blendHex(blendHex(t.Base, t.Error, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
 	RowTintProgressingCursorBg = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text)).Bold(true).
-		Background(lipgloss.Color(blendHexToward(blendHexToward(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
+		Background(lipgloss.Color(blendHex(blendHex(t.Base, t.Primary, rowTintBgBlend), t.SelectedBg, rowTintCursorBlend)))
 
 	var barBg color.Color = lipgloss.NoColor{}
 	if !ConfigTransparentBg {
@@ -365,9 +372,9 @@ func ApplyTheme(t Theme) {
 		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
 		wkOrange = EnforceMinContrast(wkOrange, t.Base, ConfigMinContrastRatio)
 	}
-	// No Background here (nor in theme_nocolor.go): the panel paints its own
-	// background per render from BaseBg, which also tracks the transparency
-	// setting, so baking one in would double-set it.
+	// No Background here: the panel paints its own background per render from
+	// BaseBg, which also tracks the transparency setting, so baking one in
+	// would double-set it.
 	WhichKeyKeyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Bold(true)
 	WhichKeyDescStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
 	WhichKeyActionsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Text))
@@ -435,12 +442,6 @@ func ApplyTheme(t Theme) {
 		Foreground(lipgloss.Color(t.Dimmed)).
 		Background(surfaceBg)
 
-	// Crash investigator inner panel + section/header styles. Reassigned
-	// here so the surface background and border foreground track the
-	// active theme. Init-time values capture SurfaceBg=NoColor{} before
-	// any theme is applied, so without this refresh borders / underlines
-	// would render fg-only and "punch through" to the terminal's default
-	// background.
 	crashTabSeparatorStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Border)).
 		Background(surfaceBg)
