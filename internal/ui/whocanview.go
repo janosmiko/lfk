@@ -57,8 +57,8 @@ func RenderWhoCanView(p WhoCanViewParams) string {
 	headerRow := renderWhoCanHeaderRow(p.VerbCursor, p.NamespaceLabel, p.Width)
 
 	// Two columns: resources picker (left, 20%), subjects (right, rest).
-	// 20% matches caniview's leftW — resource names rarely exceed 20 cols
-	// so a wider picker just steals space from the subjects table where
+	// 20% matches caniview's leftW — resource names are short so a
+	// wider picker just steals space from the subjects table where
 	// long Via paths actually need it.
 	usable := max(p.Width-4, 20)
 	leftW := max(10, usable*20/100)
@@ -258,7 +258,9 @@ func renderWhoCanSubjects(rows []WhoCanRow, scroll int, loading bool, resource s
 		kindW, ansi.Truncate("KIND", kindW, "…"),
 		nsW, ansi.Truncate("NAMESPACE", nsW, "…"),
 		viaW, ansi.Truncate("VIA", viaW, "…"))
-	colHeaderLine := BarDimStyle.Bold(true).Render(colHeader)
+	// The per-column floors (nameW 10, viaW 8) add up to more than a
+	// very narrow pane has, so cut the assembled line as a backstop.
+	colHeaderLine := BarDimStyle.Bold(true).Render(Truncate(colHeader, width))
 
 	bodyHeight := max(height-1, 1) // -1 for column header
 	scroll = max(scroll, 0)
@@ -269,7 +271,7 @@ func renderWhoCanSubjects(rows []WhoCanRow, scroll int, loading bool, resource s
 
 	body := make([]string, 0, end-scroll)
 	for _, r := range rows[scroll:end] {
-		body = append(body, renderWhoCanRow(r, nameW, kindW, nsW, viaW))
+		body = append(body, Truncate(renderWhoCanRow(r, nameW, kindW, nsW, viaW), width))
 	}
 	return colHeaderLine + "\n" + strings.Join(body, "\n")
 }

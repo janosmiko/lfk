@@ -215,10 +215,14 @@ func (m Model) renderCanIOverlay(background string) string {
 	// surfaceBg here would paint a visible "frame" of a different shade
 	// around the inner baseBg content — the user reported this.
 	canIContent = ui.FillLinesBg(canIContent, overlayW-4, ui.BaseBg)
-	overlay := ui.OverlayStyle.
+	// BoxWidth/BoxHeight (not Width/Height): lipgloss v2 counts the
+	// border inside Width/Height, so a direct Width(overlayW) leaves a
+	// content area of overlayW-6 while RenderCanIView emits overlayW-4
+	// wide lines. Every line wrapped by 2 cols, the box grew past
+	// overlayH, and PlaceOverlay mis-centered it offscreen.
+	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle.
 		Background(ui.BaseBg).
-		BorderBackground(ui.BaseBg).
-		Width(overlayW).Height(overlayH).
+		BorderBackground(ui.BaseBg), overlayW), overlayH).
 		Render(canIContent)
 	bg := ui.PadToHeight(background, m.height)
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)

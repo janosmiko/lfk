@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -59,9 +61,15 @@ func TestRenderCanIMiddleHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("narrow width still contains RESOURCE", func(t *testing.T) {
-		header := renderCanIMiddleHeader(40)
+	t.Run("keeps the RESOURCE label while the name column fits it", func(t *testing.T) {
+		header := renderCanIMiddleHeader(60)
 		assert.Contains(t, header, "RESOURCE")
+	})
+
+	t.Run("cuts the RESOURCE label once the name column is narrower", func(t *testing.T) {
+		header := renderCanIMiddleHeader(40)
+		assert.NotContains(t, header, "RESOURCE")
+		assert.LessOrEqual(t, lipgloss.Width(header), 40)
 	})
 }
 
@@ -235,5 +243,53 @@ func TestRenderCanIView(t *testing.T) {
 		result := RenderCanIView(nil, nil, 0, 0, "test-user", []string{"ns1"}, 80, 20, "", 0, false)
 		assert.Contains(t, result, "No groups")
 		assert.Contains(t, result, "No resources in this group")
+	})
+
+	t.Run("no line exceeds the given width at 80 cols", func(t *testing.T) {
+		groups := []string{"core (3)", "apps (5)", "apiextensions.k8s.io (12)"}
+		resources := []model.CanIResource{
+			{Resource: "deployments", Verbs: map[string]bool{"get": true, "list": true, "delete": true}},
+			{Resource: "statefulsets", Verbs: map[string]bool{"get": true}},
+			{Resource: "pods", Verbs: map[string]bool{}},
+		}
+		result := RenderCanIView(groups, resources, 0, 0, "Current User", []string{""}, 68, 17, "", 0, false)
+		for i, line := range strings.Split(result, "\n") {
+			assert.LessOrEqual(t, lipgloss.Width(line), 68, "line %d must fit the 80-col overlay content area", i)
+		}
+	})
+
+	t.Run("resource rows never exceed the middle pane", func(t *testing.T) {
+		resources := []model.CanIResource{
+			{Resource: "deployments", Verbs: map[string]bool{"get": true}},
+			{Resource: "verylongresourcename", Verbs: map[string]bool{"get": true, "delete": true}},
+		}
+		for _, w := range []int{16, 40, 50, 78} {
+			lines := renderCanIResources(resources, w, 10, 0)
+			for i, line := range lines {
+				assert.LessOrEqual(t, lipgloss.Width(line), w, "resource line %d must fit pane width %d", i, w)
+			}
+			header := renderCanIMiddleHeader(w)
+			assert.LessOrEqual(t, lipgloss.Width(header), w, "header must fit pane width %d", w)
+		}
+	})
+
+	t.Run("verb columns line up between header and resource rows", func(t *testing.T) {
+		resources := []model.CanIResource{
+			{Resource: "deployments", Verbs: map[string]bool{"get": true}},
+		}
+		// 50 is the middle pane on an 80-col terminal, where the name
+		// column shrinks below the width of the "RESOURCE" label.
+		for _, w := range []int{50, 60, 78, 120} {
+			header := ansi.Strip(renderCanIMiddleHeader(w))
+			row := ansi.Strip(renderCanIResources(resources, w, 1, 0)[0])
+
+			beforeGET, _, hasGET := strings.Cut(header, "GET")
+			rowIdx := strings.IndexAny(row, "✓?·")
+			if !hasGET || rowIdx < 0 {
+				t.Fatalf("no verb block at pane width %d: header=%q row=%q", w, header, row)
+			}
+			assert.Equal(t, lipgloss.Width(beforeGET), lipgloss.Width(row[:rowIdx]),
+				"verb block must start at the same column at pane width %d", w)
+		}
 	})
 }

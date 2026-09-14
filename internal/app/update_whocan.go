@@ -426,11 +426,15 @@ func (m Model) renderWhoCanOverlay(background string) string {
 	})
 	// Match Can-I: baseBg end-to-end so the overlay frame doesn't show
 	// as a different shade than the title bar / column boxes inside.
+	// BoxWidth/BoxHeight (not Width/Height): lipgloss v2 counts the
+	// border inside Width/Height, so a direct Width(overlayW) leaves a
+	// content area of overlayW-6 while RenderWhoCanView emits overlayW-4
+	// wide lines. Every line wrapped by 2 cols and PlaceOverlay
+	// mis-centered the box offscreen.
 	content = ui.FillLinesBg(content, overlayW-4, ui.BaseBg)
-	overlay := ui.OverlayStyle.
+	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle.
 		Background(ui.BaseBg).
-		BorderBackground(ui.BaseBg).
-		Width(overlayW).Height(overlayH).
+		BorderBackground(ui.BaseBg), overlayW), overlayH).
 		Render(content)
 	bg := ui.PadToHeight(background, m.height)
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)

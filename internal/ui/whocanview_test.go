@@ -152,6 +152,28 @@ func TestRenderWhoCanSubjects_RowsFitAvailableWidth(t *testing.T) {
 	}
 }
 
+// The title plus the eight verb chips need 74 cols, so on an 80-col
+// terminal the header row overflowed the overlay and wrapped.
+func TestRenderWhoCanView_LinesFitOverlayWidth(t *testing.T) {
+	rows := []WhoCanRow{
+		{Kind: "User", Name: "alice", Namespace: "", Via: "ClusterRoleBinding/admins → ClusterRole/cluster-admin"},
+	}
+	for _, width := range []int{40, 68, 80, 120} {
+		t.Run("width="+itoa(width), func(t *testing.T) {
+			out := RenderWhoCanView(WhoCanViewParams{
+				Resources:      []string{"pods", "secrets"},
+				NamespaceLabel: "ns: all",
+				Subjects:       rows,
+				Width:          width, Height: 17,
+			})
+			for i, line := range strings.Split(out, "\n") {
+				assert.LessOrEqualf(t, lipgloss.Width(line), width,
+					"line %d (%q) exceeds the %d-col overlay content area", i, line, width)
+			}
+		})
+	}
+}
+
 // TestRenderWhoCanRow_CellsBindBaseBackground locks in the fix for
 // the "background swap" the user reported. Subject rows live inside
 // the InactiveColumnStyle box (baseBg). Cell text rendered with fg-
