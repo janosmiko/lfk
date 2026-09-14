@@ -63,33 +63,35 @@ func (c *Client) GetResourceTree(ctx context.Context, contextName, namespace, ki
 		}
 	}
 
+	tc := newTreeCache(dynClient)
+
 	switch kind {
 	case "Deployment":
-		err = c.buildDeploymentTree(ctx, dynClient, namespace, name, root)
+		err = c.buildDeploymentTree(ctx, tc, namespace, name, root)
 	case "StatefulSet", "DaemonSet", "Job":
-		err = c.buildPodOwnerTree(ctx, dynClient, namespace, kind, name, root)
+		err = c.buildPodOwnerTree(ctx, tc, namespace, kind, name, root)
 	case "ReplicaSet":
-		err = c.buildPodOwnerTree(ctx, dynClient, namespace, "ReplicaSet", name, root)
+		err = c.buildPodOwnerTree(ctx, tc, namespace, "ReplicaSet", name, root)
 	case "CronJob":
-		err = c.buildCronJobTree(ctx, dynClient, namespace, name, root)
+		err = c.buildCronJobTree(ctx, tc, namespace, name, root)
 	case "Service":
 		err = c.buildServiceTree(ctx, contextName, namespace, name, root)
 	case "Node":
 		err = c.buildNodeTree(ctx, dynClient, name, root)
 	case "HelmRelease":
-		err = c.buildHelmReleaseTree(ctx, dynClient, contextName, namespace, name, root)
+		err = c.buildHelmReleaseTree(ctx, tc, contextName, namespace, name, root)
 	case "Pod":
 		err = c.buildPodTree(ctx, contextName, namespace, name, root)
 	default:
-		err = c.buildGenericOwnerTree(ctx, dynClient, namespace, kind, name, root)
+		err = c.buildGenericOwnerTree(ctx, tc, namespace, kind, name, root)
 	}
 
 	return root, err
 }
 
-func (c *Client) buildDeploymentTree(ctx context.Context, dynClient dynamic.Interface, namespace, deploymentName string, root *model.ResourceNode) error {
+func (c *Client) buildDeploymentTree(ctx context.Context, tc *treeCache, namespace, deploymentName string, root *model.ResourceNode) error {
 	rsGVR := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}
-	rsList, err := dynClient.Resource(rsGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	rsItems, err := tc.list(ctx, rsGVR, namespace)
 	if err != nil {
 		return fmt.Errorf("listing replicasets: %w", err)
 	}
@@ -99,7 +101,7 @@ func (c *Client) buildDeploymentTree(ctx context.Context, dynClient dynamic.Inte
 		status string
 	}
 	var ownedRS []rsInfo
-	for _, rs := range rsList.Items {
+	for _, rs := range rsItems {
 		for _, ref := range rs.GetOwnerReferences() {
 			if ref.Kind == "Deployment" && ref.Name == deploymentName {
 				ownedRS = append(ownedRS, rsInfo{
@@ -127,16 +129,14 @@ func (c *Client) buildDeploymentTree(ctx context.Context, dynClient dynamic.Inte
 	}
 
 	podGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	podList, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	podItems, err := tc.list(ctx, podGVR, namespace)
 	if err != nil {
 		return fmt.Errorf("listing pods: %w", err)
 	}
 
-	// Single existsFn shared across all pods in this loop so the cache
-	// dedupes ref lookups across replicas of the same Deployment.
-	existsFn := newRefExistsFn(ctx, dynClient, namespace)
+	existsFn := tc.existsFor(ctx, namespace)
 
-	for _, pod := range podList.Items {
+	for _, pod := range podItems {
 		for _, ref := range pod.GetOwnerReferences() {
 			if ref.Kind == "ReplicaSet" {
 				if rsNode, ok := rsSet[ref.Name]; ok {
@@ -157,16 +157,16 @@ func (c *Client) buildDeploymentTree(ctx context.Context, dynClient dynamic.Inte
 	return nil
 }
 
-func (c *Client) buildPodOwnerTree(ctx context.Context, dynClient dynamic.Interface, namespace, ownerKind, ownerName string, root *model.ResourceNode) error {
+func (c *Client) buildPodOwnerTree(ctx context.Context, tc *treeCache, namespace, ownerKind, ownerName string, root *model.ResourceNode) error {
 	podGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	podList, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	podItems, err := tc.list(ctx, podGVR, namespace)
 	if err != nil {
 		return fmt.Errorf("listing pods: %w", err)
 	}
 
-	existsFn := newRefExistsFn(ctx, dynClient, namespace)
+	existsFn := tc.existsFor(ctx, namespace)
 
-	for _, pod := range podList.Items {
+	for _, pod := range podItems {
 		for _, ref := range pod.GetOwnerReferences() {
 			if ref.Kind == ownerKind && ref.Name == ownerName {
 				podNode := &model.ResourceNode{
@@ -185,7 +185,7 @@ func (c *Client) buildPodOwnerTree(ctx context.Context, dynClient dynamic.Interf
 	return nil
 }
 
-func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.Interface, namespace, ownerKind, ownerName string, root *model.ResourceNode) error {
+func (c *Client) buildGenericOwnerTree(ctx context.Context, tc *treeCache, namespace, ownerKind, ownerName string, root *model.ResourceNode) error {
 	intermediateGVRs := []struct {
 		gvr  schema.GroupVersionResource
 		kind string
@@ -200,11 +200,11 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 	var intermediateNodes []*model.ResourceNode
 
 	for _, ig := range intermediateGVRs {
-		list, err := dynClient.Resource(ig.gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
+		items, err := tc.list(ctx, ig.gvr, namespace)
 		if err != nil {
 			continue
 		}
-		for _, item := range list.Items {
+		for _, item := range items {
 			for _, ref := range item.GetOwnerReferences() {
 				if ref.Kind == ownerKind && ref.Name == ownerName {
 					nodeName := item.GetName()
@@ -222,7 +222,7 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 	}
 
 	podGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	podList, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	podItems, err := tc.list(ctx, podGVR, namespace)
 	if err != nil {
 		return fmt.Errorf("listing pods: %w", err)
 	}
@@ -232,9 +232,9 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 		intermediateMap[n.Name] = n
 	}
 
-	existsFn := newRefExistsFn(ctx, dynClient, namespace)
+	existsFn := tc.existsFor(ctx, namespace)
 
-	for _, pod := range podList.Items {
+	for _, pod := range podItems {
 		for _, ref := range pod.GetOwnerReferences() {
 			podNode := &model.ResourceNode{
 				Name:      pod.GetName(),
@@ -266,11 +266,11 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 		{schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}, "Service"},
 	}
 	for _, dg := range directChildGVRs {
-		list, err := dynClient.Resource(dg.gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
+		items, err := tc.list(ctx, dg.gvr, namespace)
 		if err != nil {
 			continue
 		}
-		for _, item := range list.Items {
+		for _, item := range items {
 			for _, ref := range item.GetOwnerReferences() {
 				if ref.Kind == ownerKind && ref.Name == ownerName {
 					root.Children = append(root.Children, &model.ResourceNode{
@@ -288,14 +288,14 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 	return nil
 }
 
-func (c *Client) buildCronJobTree(ctx context.Context, dynClient dynamic.Interface, namespace, cronJobName string, root *model.ResourceNode) error {
+func (c *Client) buildCronJobTree(ctx context.Context, tc *treeCache, namespace, cronJobName string, root *model.ResourceNode) error {
 	jobGVR := schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}
-	jobList, err := dynClient.Resource(jobGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	jobItems, err := tc.list(ctx, jobGVR, namespace)
 	if err != nil {
 		return fmt.Errorf("listing jobs: %w", err)
 	}
 
-	for _, job := range jobList.Items {
+	for _, job := range jobItems {
 		for _, ref := range job.GetOwnerReferences() {
 			if ref.Kind == "CronJob" && ref.Name == cronJobName {
 				jobNode := &model.ResourceNode{
@@ -305,7 +305,7 @@ func (c *Client) buildCronJobTree(ctx context.Context, dynClient dynamic.Interfa
 					Status:    extractStatus(job.Object),
 				}
 				root.Children = append(root.Children, jobNode)
-				if podErr := c.buildPodOwnerTree(ctx, dynClient, namespace, "Job", job.GetName(), jobNode); podErr != nil {
+				if podErr := c.buildPodOwnerTree(ctx, tc, namespace, "Job", job.GetName(), jobNode); podErr != nil {
 					// Tree build proceeds without this Job's pods. Log so
 					// operators can see why they aren't appearing.
 					logger.Warn("Resource tree: building pod owner tree for job failed; pods skipped",

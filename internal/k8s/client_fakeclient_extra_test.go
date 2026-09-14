@@ -760,7 +760,7 @@ func TestBuildDeploymentTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "deploy", Kind: "Deployment", Namespace: "default"}
-	err := c.buildDeploymentTree(t.Context(), dc, "default", "deploy", root)
+	err := c.buildDeploymentTree(t.Context(), newTreeCache(dc), "default", "deploy", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "ReplicaSet", root.Children[0].Kind)
@@ -787,7 +787,7 @@ func TestBuildPodOwnerTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "my-sts", Kind: "StatefulSet", Namespace: "default"}
-	err := c.buildPodOwnerTree(t.Context(), dc, "default", "StatefulSet", "my-sts", root)
+	err := c.buildPodOwnerTree(t.Context(), newTreeCache(dc), "default", "StatefulSet", "my-sts", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "Pod", root.Children[0].Kind)
@@ -810,7 +810,7 @@ func TestBuildCronJobTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "my-cron", Kind: "CronJob", Namespace: "default"}
-	err := c.buildCronJobTree(t.Context(), dc, "default", "my-cron", root)
+	err := c.buildCronJobTree(t.Context(), newTreeCache(dc), "default", "my-cron", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "Job", root.Children[0].Kind)
@@ -843,7 +843,7 @@ func TestBuildCronJobTree_LogsPodOwnerTreeError(t *testing.T) {
 	defer func() { logger.Logger = orig }()
 
 	root := &model.ResourceNode{Name: "my-cron", Kind: "CronJob", Namespace: "default"}
-	err := c.buildCronJobTree(t.Context(), dc, "default", "my-cron", root)
+	err := c.buildCronJobTree(t.Context(), newTreeCache(dc), "default", "my-cron", root)
 	require.NoError(t, err, "the tree must still render without the pods on failure")
 	require.Len(t, root.Children, 1)
 	assert.Equal(t, "Job", root.Children[0].Kind)
@@ -973,7 +973,7 @@ func TestBuildGenericOwnerTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "my-cluster", Kind: "Cluster", Namespace: "default"}
-	err := c.buildGenericOwnerTree(t.Context(), dc, "default", "Cluster", "my-cluster", root)
+	err := c.buildGenericOwnerTree(t.Context(), newTreeCache(dc), "default", "Cluster", "my-cluster", root)
 	require.NoError(t, err)
 	assert.Greater(t, len(root.Children), 0)
 }

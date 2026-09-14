@@ -3,8 +3,6 @@ package k8s
 import (
 	"context"
 
-	"k8s.io/client-go/dynamic"
-
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -12,7 +10,7 @@ import (
 // A helm release is not an API object, so nothing carries an ownerReference
 // back to it: membership comes from the rendered manifest in the release
 // secret, and only the workload children below have an owner chain to walk.
-func (c *Client) buildHelmReleaseTree(ctx context.Context, dynClient dynamic.Interface, contextName, namespace, releaseName string, root *model.ResourceNode) error {
+func (c *Client) buildHelmReleaseTree(ctx context.Context, tc *treeCache, contextName, namespace, releaseName string, root *model.ResourceNode) error {
 	items, err := c.getHelmManagedResources(ctx, contextName, namespace, releaseName)
 	if err != nil {
 		return err
@@ -33,7 +31,7 @@ func (c *Client) buildHelmReleaseTree(ctx context.Context, dynClient dynamic.Int
 		if childNS == "" {
 			childNS = namespace
 		}
-		if childErr := c.buildHelmWorkloadChildren(ctx, dynClient, childNS, item.Kind, item.Name, node); childErr != nil {
+		if childErr := c.buildHelmWorkloadChildren(ctx, tc, childNS, item.Kind, item.Name, node); childErr != nil {
 			// The release tree still renders without this workload's pods.
 			logger.Warn("Resource tree: building helm workload children failed; pods skipped",
 				"release", releaseName, "kind", item.Kind, "name", item.Name,
@@ -44,14 +42,14 @@ func (c *Client) buildHelmReleaseTree(ctx context.Context, dynClient dynamic.Int
 	return nil
 }
 
-func (c *Client) buildHelmWorkloadChildren(ctx context.Context, dynClient dynamic.Interface, namespace, kind, name string, node *model.ResourceNode) error {
+func (c *Client) buildHelmWorkloadChildren(ctx context.Context, tc *treeCache, namespace, kind, name string, node *model.ResourceNode) error {
 	switch kind {
 	case "Deployment":
-		return c.buildDeploymentTree(ctx, dynClient, namespace, name, node)
+		return c.buildDeploymentTree(ctx, tc, namespace, name, node)
 	case "StatefulSet", "DaemonSet", "Job", "ReplicaSet":
-		return c.buildPodOwnerTree(ctx, dynClient, namespace, kind, name, node)
+		return c.buildPodOwnerTree(ctx, tc, namespace, kind, name, node)
 	case "CronJob":
-		return c.buildCronJobTree(ctx, dynClient, namespace, name, node)
+		return c.buildCronJobTree(ctx, tc, namespace, name, node)
 	default:
 		return nil
 	}

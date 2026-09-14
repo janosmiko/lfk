@@ -43,10 +43,9 @@ type existsFn func(kind, name string) bool
 // envFrom.*.optional=true, volume.*.optional=true) are never flagged. A nil
 // exists skips the check entirely (used by tests and callers that don't need it).
 //
-// At large scale (e.g. a Deployment with N replicas) the same Secret will be
-// emitted under each Pod and existence-checked once per pod. Cross-pod dedup is
-// intentionally deferred — if it ever becomes a perf issue, batch a LIST per
-// kind at GetResourceTree level.
+// At large scale (e.g. a Deployment with N replicas) the same Secret is emitted
+// under each Pod, but treeCache hands every Pod in one tree the same exists, so
+// the GET happens once per (kind, name).
 func appendPodRefs(podNode *model.ResourceNode, podObj map[string]any, namespace string, exists existsFn) {
 	spec, _ := podObj["spec"].(map[string]any)
 	if spec == nil {
