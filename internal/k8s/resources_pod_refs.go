@@ -3,8 +3,10 @@ package k8s
 import (
 	"context"
 
+	"golang.org/x/sync/errgroup"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
@@ -47,9 +49,27 @@ type existsFn func(kind, name string) bool
 // under each Pod, but treeCache hands every Pod in one tree the same exists, so
 // the GET happens once per (kind, name).
 func appendPodRefs(podNode *model.ResourceNode, podObj map[string]any, namespace string, exists existsFn) {
+	for _, r := range collectPodRefs(podObj) {
+		status := ""
+		if r.required && exists != nil && !exists(r.kind, r.name) {
+			status = model.MissingRefStatus
+		}
+		podNode.Children = append(podNode.Children, &model.ResourceNode{
+			Name:      r.name,
+			Kind:      r.kind,
+			Namespace: namespace,
+			Status:    status,
+			Group:     "refs",
+		})
+	}
+}
+
+// collectPodRefs returns the Pod's distinct references in emit order:
+// ServiceAccount, ConfigMap, Secret, PersistentVolumeClaim.
+func collectPodRefs(podObj map[string]any) []refEntry {
 	spec, _ := podObj["spec"].(map[string]any)
 	if spec == nil {
-		return
+		return nil
 	}
 
 	// Per-bucket ordered slices preserve stable emit order while the seen map
@@ -128,21 +148,11 @@ func appendPodRefs(podNode *model.ResourceNode, podObj map[string]any, namespace
 		}
 	}
 
+	refs := make([]refEntry, 0, len(sas)+len(cms)+len(secrets)+len(pvcs))
 	for _, bucket := range [][]refEntry{sas, cms, secrets, pvcs} {
-		for _, r := range bucket {
-			status := ""
-			if r.required && exists != nil && !exists(r.kind, r.name) {
-				status = model.MissingRefStatus
-			}
-			podNode.Children = append(podNode.Children, &model.ResourceNode{
-				Name:      r.name,
-				Kind:      r.kind,
-				Namespace: namespace,
-				Status:    status,
-				Group:     "refs",
-			})
-		}
+		refs = append(refs, bucket...)
 	}
+	return refs
 }
 
 func collectContainerRefs(c map[string]any, add func(kind, name string, optional bool)) {
@@ -228,40 +238,94 @@ func collectVolumeRefs(v map[string]any, add func(kind, name string, optional bo
 	}
 }
 
-// newRefExistsFn returns an existsFn that resolves Secret/ConfigMap/PVC/SA
-// existence via the dynamic client in the given namespace. The returned
-// closure caches results so repeated lookups for the same (kind, name) within
-// a single tree build cost one GET. Errors other than IsNotFound are treated
-// as "exists" so transient RBAC/network failures don't false-flag refs.
-//
-// The provided ctx is reused for every kube GET the closure issues. It does
-// not impose its own timeout: pass a context with a deadline or cancellation,
-// or a slow apiserver blocks indefinitely.
-//
-// The cache map is not safe for concurrent use. The closure assumes
-// sequential calls within a single tree build (which is how
-// build*Tree paths invoke it today).
+var refGVRs = map[string]schema.GroupVersionResource{
+	"Secret":                {Group: "", Version: "v1", Resource: "secrets"},
+	"ConfigMap":             {Group: "", Version: "v1", Resource: "configmaps"},
+	"PersistentVolumeClaim": {Group: "", Version: "v1", Resource: "persistentvolumeclaims"},
+	"ServiceAccount":        {Group: "", Version: "v1", Resource: "serviceaccounts"},
+}
+
+// refPrefetchLimit bounds warm's concurrent GETs so a release with hundreds of
+// refs does not flood the apiserver.
+const refPrefetchLimit = 8
+
+// refChecker resolves ref existence in one namespace and caches every answer.
+// ctx carries no timeout of its own: pass one with a deadline, or a slow
+// apiserver blocks indefinitely. cache is not safe for concurrent use.
+type refChecker struct {
+	ctx       context.Context
+	dyn       dynamic.Interface
+	namespace string
+	cache     map[refKey]bool
+}
+
+func newRefChecker(ctx context.Context, dynClient dynamic.Interface, namespace string) *refChecker {
+	return &refChecker{ctx: ctx, dyn: dynClient, namespace: namespace, cache: map[refKey]bool{}}
+}
+
+func (r *refChecker) exists(kind, name string) bool {
+	k := refKey{kind: kind, name: name}
+	if v, ok := r.cache[k]; ok {
+		return v
+	}
+	v := r.lookup(k)
+	r.cache[k] = v
+
+	return v
+}
+
+// lookup treats every error but IsNotFound as "exists", so a transient RBAC or
+// network failure does not false-flag a ref.
+func (r *refChecker) lookup(k refKey) bool {
+	gvr, ok := refGVRs[k.kind]
+	if !ok {
+		return true
+	}
+	_, err := r.dyn.Resource(gvr).Namespace(r.namespace).Get(r.ctx, k.name, metav1.GetOptions{})
+
+	return err == nil || !apierrors.IsNotFound(err)
+}
+
+// warm resolves every required ref of pods up front, in parallel. Serially the
+// tree build paid one round trip per distinct ref, which dominates its runtime
+// on a release with many workloads.
+func (r *refChecker) warm(pods []unstructured.Unstructured) {
+	var todo []refKey
+	seen := map[refKey]bool{}
+	for i := range pods {
+		for _, ref := range collectPodRefs(pods[i].Object) {
+			k := refKey{kind: ref.kind, name: ref.name}
+			if !ref.required || seen[k] {
+				continue
+			}
+			seen[k] = true
+			if _, cached := r.cache[k]; !cached {
+				todo = append(todo, k)
+			}
+		}
+	}
+	if len(todo) == 0 {
+		return
+	}
+
+	results := make([]bool, len(todo))
+	var g errgroup.Group
+	g.SetLimit(refPrefetchLimit)
+	for i, k := range todo {
+		g.Go(func() error {
+			results[i] = r.lookup(k)
+
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	// Written from one goroutine only, after every worker has finished.
+	for i, k := range todo {
+		r.cache[k] = results[i]
+	}
+}
+
 func newRefExistsFn(ctx context.Context, dynClient dynamic.Interface, namespace string) existsFn {
-	gvrFor := map[string]schema.GroupVersionResource{
-		"Secret":                {Group: "", Version: "v1", Resource: "secrets"},
-		"ConfigMap":             {Group: "", Version: "v1", Resource: "configmaps"},
-		"PersistentVolumeClaim": {Group: "", Version: "v1", Resource: "persistentvolumeclaims"},
-		"ServiceAccount":        {Group: "", Version: "v1", Resource: "serviceaccounts"},
-	}
-	cache := map[refKey]bool{}
-	return func(kind, name string) bool {
-		k := refKey{kind: kind, name: name}
-		if v, ok := cache[k]; ok {
-			return v
-		}
-		gvr, ok := gvrFor[kind]
-		if !ok {
-			cache[k] = true
-			return true
-		}
-		_, err := dynClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
-		exists := err == nil || !apierrors.IsNotFound(err)
-		cache[k] = exists
-		return exists
-	}
+	return newRefChecker(ctx, dynClient, namespace).exists
 }

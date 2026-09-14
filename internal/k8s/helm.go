@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -185,30 +186,21 @@ func (c *Client) GetHelmReleaseYAML(ctx context.Context, contextName, namespace,
 		return "", err
 	}
 
-	listOpts := metav1.ListOptions{
-		LabelSelector: "owner=helm,name=" + name,
-	}
-	secretList, err := cs.CoreV1().Secrets(namespace).List(ctx, listOpts)
+	// The summary is labels only, so skip the release blobs where we can.
+	latest, err := latestHelmReleaseObject(ctx, cs, c.helmMetadataClient(contextName), namespace, name)
 	if err != nil {
-		return "", fmt.Errorf("listing helm secrets: %w", err)
+		return "", err
 	}
 
-	if len(secretList.Items) == 0 {
-		return "", fmt.Errorf("no helm release found for %s", name)
-	}
-
-	// Find the latest revision.
-	latest := latestHelmReleaseSecret(secretList.Items)
-
-	// Build a summary (not the compressed data).
+	labels := latest.GetLabels()
 	info := map[string]any{
-		"name":      latest.Labels["name"],
-		"namespace": latest.Namespace,
-		"version":   latest.Labels["version"],
-		"status":    latest.Labels["status"],
-		"created":   latest.CreationTimestamp.Format(time.RFC3339),
-		"modified":  latest.Labels["modifiedAt"],
-		"secret":    latest.Name,
+		"name":      labels["name"],
+		"namespace": latest.GetNamespace(),
+		"version":   labels["version"],
+		"status":    labels["status"],
+		"created":   latest.GetCreationTimestamp().Format(time.RFC3339),
+		"modified":  labels["modifiedAt"],
+		"secret":    latest.GetName(),
 	}
 
 	data, err := yaml.Marshal(info)
@@ -228,7 +220,7 @@ func (c *Client) getHelmManagedResources(ctx context.Context, contextName, names
 	// latest helm release secret. This covers every kind the chart actually
 	// installs (including cluster-scoped and custom resources) regardless of
 	// whether chart authors set instance labels uniformly.
-	if items, ok := c.collectHelmResourcesFromManifest(ctx, cs, namespace, releaseName); ok {
+	if items, ok := c.collectHelmResourcesFromManifest(ctx, cs, c.helmMetadataClient(contextName), namespace, releaseName); ok {
 		return items, nil
 	}
 
@@ -245,8 +237,8 @@ func (c *Client) getHelmManagedResources(ctx context.Context, contextName, names
 // the existing collectHelm* helpers. The second return value is false when no
 // usable manifest could be loaded, signalling the caller to fall back to
 // label-based discovery.
-func (c *Client) collectHelmResourcesFromManifest(ctx context.Context, cs kubernetes.Interface, namespace, releaseName string) ([]model.Item, bool) {
-	secret, ok := findLatestHelmReleaseSecret(ctx, cs, namespace, releaseName)
+func (c *Client) collectHelmResourcesFromManifest(ctx context.Context, cs kubernetes.Interface, mc metadata.Interface, namespace, releaseName string) ([]model.Item, bool) {
+	secret, ok := findLatestHelmReleaseSecret(ctx, cs, mc, namespace, releaseName)
 	if !ok {
 		return nil, false
 	}
@@ -276,7 +268,7 @@ func (c *Client) collectHelmResourcesFromManifest(ctx context.Context, cs kubern
 
 	// Enrich workload kinds with live status (Ready column) by merging with
 	// the existing label-based collectors, matching on Kind+Name.
-	enrichHelmWorkloadStatus(ctx, cs, namespace, releaseName, items, mergeIndex)
+	enrichHelmWorkloadStatus(ctx, cs, namespace, items, mergeIndex)
 
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].Kind != items[j].Kind {
@@ -329,38 +321,106 @@ func (c *Client) collectHelmResourcesByLabels(ctx context.Context, cs kubernetes
 	return items
 }
 
+// helmMetadataClient returns the metadata-only client for a context, or nil
+// when it is unavailable, which leaves callers on their typed fallback.
+func (c *Client) helmMetadataClient(contextName string) metadata.Interface {
+	mc, err := c.metadataForContext(contextName)
+	if err != nil || mc == nil {
+		return nil
+	}
+	return mc
+}
+
+// latestHelmReleaseObject returns the newest release secret of releaseName as
+// metadata, for callers that need its labels but not its blob.
+func latestHelmReleaseObject(ctx context.Context, cs kubernetes.Interface, mc metadata.Interface, namespace, releaseName string) (metav1.Object, error) {
+	if metas, ok := listHelmReleaseMetadata(ctx, mc, namespace, releaseName); ok {
+		if len(metas) == 0 {
+			return nil, fmt.Errorf("no helm release found for %s", releaseName)
+		}
+		return &metas[latestHelmReleaseIndex(len(metas), func(i int) metav1.Object { return &metas[i] })], nil
+	}
+
+	list, err := cs.CoreV1().Secrets(namespace).List(ctx, helmReleaseSelector(releaseName))
+	if err != nil {
+		return nil, fmt.Errorf("listing helm secrets: %w", err)
+	}
+	if len(list.Items) == 0 {
+		return nil, fmt.Errorf("no helm release found for %s", releaseName)
+	}
+	latest := latestHelmReleaseSecret(list.Items)
+	return &latest, nil
+}
+
+// helmReleaseSelector selects every retained revision of one release.
+func helmReleaseSelector(releaseName string) metav1.ListOptions {
+	return metav1.ListOptions{LabelSelector: "owner=helm,name=" + releaseName}
+}
+
 // findLatestHelmReleaseSecret returns the newest helm release secret for the
-// given release name in namespace, or ok=false if none exists. The latest is
-// determined by the revision (version label).
-func findLatestHelmReleaseSecret(ctx context.Context, cs kubernetes.Interface, namespace, releaseName string) (corev1.Secret, bool) {
-	opts := metav1.ListOptions{LabelSelector: "owner=helm,name=" + releaseName}
-	list, err := cs.CoreV1().Secrets(namespace).List(ctx, opts)
+// given release name in namespace, or ok=false if none exists. Helm retains
+// ten revisions and each secret embeds the whole rendered manifest, so the
+// typed LIST a nil mc falls back to pulls megabytes to read one.
+func findLatestHelmReleaseSecret(ctx context.Context, cs kubernetes.Interface, mc metadata.Interface, namespace, releaseName string) (corev1.Secret, bool) {
+	if metas, ok := listHelmReleaseMetadata(ctx, mc, namespace, releaseName); ok {
+		if len(metas) == 0 {
+			return corev1.Secret{}, false
+		}
+		name := metas[latestHelmReleaseIndex(len(metas), func(i int) metav1.Object { return &metas[i] })].Name
+		secret, err := cs.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err == nil {
+			return *secret, true
+		}
+		logger.Warn("Helm: failed to fetch latest release secret; falling back to a full list", "release", releaseName, "error", err)
+	}
+
+	list, err := cs.CoreV1().Secrets(namespace).List(ctx, helmReleaseSelector(releaseName))
 	if err != nil || len(list.Items) == 0 {
 		return corev1.Secret{}, false
 	}
 	return latestHelmReleaseSecret(list.Items), true
 }
 
-// latestHelmReleaseSecret returns the highest-revision release secret. The helm
-// `version` label is the authoritative revision. CreationTimestamp only breaks
-// ties (its 1s granularity collides on fast install/rollback and CI upgrades,
-// and the API's name-sort orders "v10" before "v2"). items must be non-empty.
+// listHelmReleaseMetadata lists the release secrets' metadata, without the
+// release blobs. ok is false when no metadata client is available or the API
+// call fails, so callers keep their typed fallback.
+func listHelmReleaseMetadata(ctx context.Context, mc metadata.Interface, namespace, releaseName string) ([]metav1.PartialObjectMetadata, bool) {
+	if mc == nil {
+		return nil, false
+	}
+	list, err := mc.Resource(secretGVR).Namespace(namespace).List(ctx, helmReleaseSelector(releaseName))
+	if err != nil {
+		logger.Warn("Helm: metadata list failed; falling back to a full list", "release", releaseName, "error", err)
+		return nil, false
+	}
+	return list.Items, true
+}
+
+// latestHelmReleaseSecret returns the highest-revision release secret.
+// items must be non-empty.
 func latestHelmReleaseSecret(items []corev1.Secret) corev1.Secret {
-	latest := items[0]
-	latestVer := helmReleaseRevision(latest)
-	for _, s := range items[1:] {
-		v := helmReleaseRevision(s)
-		if v > latestVer || (v == latestVer && s.CreationTimestamp.After(latest.CreationTimestamp.Time)) {
-			latest, latestVer = s, v
+	return items[latestHelmReleaseIndex(len(items), func(i int) metav1.Object { return &items[i] })]
+}
+
+// latestHelmReleaseIndex returns the index of the highest-revision release
+// object. CreationTimestamp only breaks ties: its 1s granularity collides on
+// fast install/rollback and CI upgrades. n must be positive.
+func latestHelmReleaseIndex(n int, at func(int) metav1.Object) int {
+	best, bestVer := 0, helmReleaseRevision(at(0))
+	for i := 1; i < n; i++ {
+		o := at(i)
+		v := helmReleaseRevision(o)
+		if v > bestVer || (v == bestVer && o.GetCreationTimestamp().After(at(best).GetCreationTimestamp().Time)) {
+			best, bestVer = i, v
 		}
 	}
-	return latest
+	return best
 }
 
 // helmReleaseRevision parses the integer revision from a release secret's
 // `version` label, returning 0 when absent or malformed.
-func helmReleaseRevision(s corev1.Secret) int {
-	n, _ := strconv.Atoi(s.Labels["version"])
+func helmReleaseRevision(o metav1.Object) int {
+	n, _ := strconv.Atoi(o.GetLabels()["version"])
 	return n
 }
 
@@ -410,28 +470,20 @@ func helmRefKey(kind, namespace, name string) string {
 // mergeIndex is keyed by Kind+Namespace+Name against the canonical ref
 // identity so the display-name transform applied to the Name field does not
 // break matching.
-func enrichHelmWorkloadStatus(ctx context.Context, cs kubernetes.Interface, namespace, releaseName string, items []model.Item, mergeIndex map[string]int) {
+func enrichHelmWorkloadStatus(ctx context.Context, cs kubernetes.Interface, namespace string, items []model.Item, mergeIndex map[string]int) {
 	if len(mergeIndex) == 0 {
 		return
 	}
-	// Collect live workloads in the release namespace using every known
-	// selector. The final empty selector picks up workloads that are in the
-	// manifest but don't carry instance labels — exactly the Cilium-style
-	// case we're fixing.
-	labelSelectors := []string{
-		"app.kubernetes.io/instance=" + releaseName,
-		"release=" + releaseName,
-		"",
-	}
+	// Membership comes from the manifest, not from labels, so an unselected
+	// list is both correct and cheaper: it covers the Cilium-style workloads
+	// that carry no instance label, and mergeIndex drops the rest.
+	opts := metav1.ListOptions{}
 
 	seen := make(map[string]bool)
 	var live []model.Item
-	for _, selector := range labelSelectors {
-		opts := metav1.ListOptions{LabelSelector: selector}
-		collectHelmDeployments(&live, seen, cs, ctx, namespace, opts)
-		collectHelmStatefulSets(&live, seen, cs, ctx, namespace, opts)
-		collectHelmDaemonSets(&live, seen, cs, ctx, namespace, opts)
-	}
+	collectHelmDeployments(&live, seen, cs, ctx, namespace, opts)
+	collectHelmStatefulSets(&live, seen, cs, ctx, namespace, opts)
+	collectHelmDaemonSets(&live, seen, cs, ctx, namespace, opts)
 	if len(live) == 0 {
 		return
 	}

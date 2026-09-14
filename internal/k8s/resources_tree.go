@@ -134,7 +134,12 @@ func (c *Client) buildDeploymentTree(ctx context.Context, tc *treeCache, namespa
 		return fmt.Errorf("listing pods: %w", err)
 	}
 
-	existsFn := tc.existsFor(ctx, namespace)
+	podItems = podsOwnedBy(podItems, func(ref metav1.OwnerReference) bool {
+		_, ok := rsSet[ref.Name]
+
+		return ref.Kind == "ReplicaSet" && ok
+	})
+	existsFn := tc.existsFor(ctx, namespace, podItems)
 
 	for _, pod := range podItems {
 		for _, ref := range pod.GetOwnerReferences() {
@@ -164,7 +169,10 @@ func (c *Client) buildPodOwnerTree(ctx context.Context, tc *treeCache, namespace
 		return fmt.Errorf("listing pods: %w", err)
 	}
 
-	existsFn := tc.existsFor(ctx, namespace)
+	podItems = podsOwnedBy(podItems, func(ref metav1.OwnerReference) bool {
+		return ref.Kind == ownerKind && ref.Name == ownerName
+	})
+	existsFn := tc.existsFor(ctx, namespace, podItems)
 
 	for _, pod := range podItems {
 		for _, ref := range pod.GetOwnerReferences() {
@@ -232,7 +240,14 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, tc *treeCache, names
 		intermediateMap[n.Name] = n
 	}
 
-	existsFn := tc.existsFor(ctx, namespace)
+	podItems = podsOwnedBy(podItems, func(ref metav1.OwnerReference) bool {
+		if _, ok := intermediateMap[ref.Name]; ok {
+			return true
+		}
+
+		return ref.Kind == ownerKind && ref.Name == ownerName
+	})
+	existsFn := tc.existsFor(ctx, namespace, podItems)
 
 	for _, pod := range podItems {
 		for _, ref := range pod.GetOwnerReferences() {
