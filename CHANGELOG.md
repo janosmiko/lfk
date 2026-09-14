@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.14](https://github.com/janosmiko/lfk/compare/v0.18.13...v0.18.14) (2026-09-14)
+
+
+### Bug Fixes
+
+* **rbac-explorer:** window size ([#786](https://github.com/janosmiko/lfk/issues/786)) ([3251357](https://github.com/janosmiko/lfk/commit/3251357a9c459228740aa4e8fddad944bec5c368))
+
+
+### Performance Improvements
+
+* cut redundant API calls from the helm release resource tree ([#792](https://github.com/janosmiko/lfk/issues/792)) ([e8d63f2](https://github.com/janosmiko/lfk/commit/e8d63f2b6333ee880d1dde6a73d383b752a56e7f))
+* share namespace lists across one resource tree build ([#787](https://github.com/janosmiko/lfk/issues/787)) ([e229d84](https://github.com/janosmiko/lfk/commit/e229d8457b83493c43b64be3a8fe330f75d97537))
+
 ## [0.18.13](https://github.com/janosmiko/lfk/compare/v0.18.12...v0.18.13) (2026-09-13)
 
 
