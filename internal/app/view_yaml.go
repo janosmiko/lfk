@@ -47,6 +47,19 @@ func (m Model) viewYAML() string {
 	// Build visible lines with fold indicators, respecting collapsed sections.
 	visLines, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 
+	// Clamp the cursor before anything reads it. Collapsing a fold shortens
+	// visLines without moving the cursor, and the scroll offset below treats an
+	// out-of-range cursor as no offset, which strands it off the bottom.
+	if m.yamlView.cursor < 0 {
+		m.yamlView.cursor = 0
+	}
+	if m.yamlView.cursor >= len(visLines) {
+		m.yamlView.cursor = len(visLines) - 1
+	}
+	if m.yamlView.cursor < 0 {
+		m.yamlView.cursor = 0
+	}
+
 	yamlScroll := m.yamlView.scroll
 	if yamlScroll >= len(visLines) {
 		yamlScroll = len(visLines) - 1
@@ -76,17 +89,6 @@ func (m Model) viewYAML() string {
 	currentMatchLine := -1
 	if len(m.yamlView.matchLines) > 0 && m.yamlView.matchIdx >= 0 && m.yamlView.matchIdx < len(m.yamlView.matchLines) {
 		currentMatchLine = m.yamlView.matchLines[m.yamlView.matchIdx]
-	}
-
-	// Clamp yamlCursor to valid range.
-	if m.yamlView.cursor < 0 {
-		m.yamlView.cursor = 0
-	}
-	if m.yamlView.cursor >= len(visLines) {
-		m.yamlView.cursor = len(visLines) - 1
-	}
-	if m.yamlView.cursor < 0 {
-		m.yamlView.cursor = 0
 	}
 
 	// Compute visual selection range (if active).

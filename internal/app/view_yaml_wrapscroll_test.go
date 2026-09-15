@@ -65,3 +65,17 @@ func TestViewYAML_CursorSubLineStaysOnScreen(t *testing.T) {
 		})
 	}
 }
+
+// Collapsing a fold shortens the visible lines without moving the cursor, so
+// the renderer clamps it. The scroll offset has to be derived from the clamped
+// cursor: the raw one is out of range, and out of range means no offset at all.
+func TestViewYAML_CursorOffTheEndStillLandsOnScreen(t *testing.T) {
+	m := yamlTallLineModel(t)
+	m.yamlView.visualCurCol = yamlFoldPrefixLen + 616
+
+	visLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	m.yamlView.cursor = len(visLines) + 3
+
+	assert.Contains(t, m.viewYAML(), ui.CursorBlockStyle.Render("L"),
+		"the cursor renders on its own sub-line after the clamp")
+}

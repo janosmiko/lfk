@@ -136,6 +136,36 @@ func TestLogSearch_NextMatchAfterAWideGlyph(t *testing.T) {
 	}
 }
 
+// Backward search walks the line by cutting off the part it has already
+// searched. A zero-width cluster at column 0 advanced the cut by nothing, so
+// the same slice came back forever and the UI froze.
+func TestLogSearch_BackwardScanTerminatesOnZeroWidthClusters(t *testing.T) {
+	tests := []struct {
+		name  string
+		line  string
+		query string
+		want  int
+	}{
+		{"leading combining mark", "́x", "́", 0},
+		{"rightmost of two wide glyphs", "界界", "界", 2},
+		{"ascii after a wide glyph", "界ab", "b", 3},
+		{"no match", "abc", "z", -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			done := make(chan int, 1)
+			go func() { done <- findLastMatchInStr(tt.line, tt.query) }()
+
+			select {
+			case got := <-done:
+				assert.Equal(t, tt.want, got)
+			case <-time.After(2 * time.Second):
+				t.Fatal("findLastMatchInStr never returned: the cut stopped shrinking")
+			}
+		})
+	}
+}
+
 // The clipboard has to hold the text the highlight covered. Slicing runes at a
 // cell column copied a different substring on any line with a wide glyph.
 func TestLogVisualYank_WideRunes(t *testing.T) {

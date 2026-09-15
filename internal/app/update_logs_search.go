@@ -144,10 +144,11 @@ func findLastMatchInStr(text, query string) int {
 		}
 		lastCol = offset + col
 		w := ui.LineWidth(remaining)
-		// Step past the whole matched character. Advancing a single cell
-		// would land inside a wide rune and drop it from the next slice.
-		next := ui.ColumnOf(remaining, ui.RuneIndexAt(remaining, col)+1)
-		if next >= w {
+		// Step past the whole matched character. A rune step stalls on a
+		// combining mark, which adds no cell, and the unchanged slice then
+		// matches again forever.
+		next := stepCol(remaining, col, 1)
+		if next >= w || next <= col {
 			break
 		}
 		remaining = ui.CutCols(remaining, next, w)
