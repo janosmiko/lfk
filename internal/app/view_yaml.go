@@ -41,6 +41,8 @@ func (m Model) viewYAML() string {
 	hint := m.yamlHintBar(fullWidth)
 
 	maxLines := max(m.height-4, 3)
+	// Content width for wrapping/truncation: border (2) + padding (2).
+	contentWidth := max(m.width-4, 10)
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
 	visLines, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
@@ -52,14 +54,19 @@ func (m Model) viewYAML() string {
 	if yamlScroll < 0 {
 		yamlScroll = 0
 	}
-	viewport := visLines[yamlScroll:]
-	if len(viewport) > maxLines {
-		viewport = viewport[:maxLines]
-	}
-
 	// Compute line number gutter width.
 	totalOrigLines := len(strings.Split(m.yamlView.content, "\n"))
 	gutterWidth := max(len(fmt.Sprintf("%d", totalOrigLines)), 2)
+
+	topSkip := 0
+	if m.yamlView.wrap {
+		topSkip = yamlWrapTopSkip(visLines, yamlScroll, m.yamlView.cursor,
+			yamlWrapWidth(contentWidth, gutterWidth), maxLines,
+			m.yamlCursorCol()-yamlFoldPrefixLen)
+	}
+	// Each source line fills at least one row, so this many of them always
+	// covers the viewport plus the rows scrolled off its top.
+	viewport := visLines[yamlScroll:min(yamlScroll+maxLines+topSkip, len(visLines))]
 
 	// Build a set of original matching lines for search highlight.
 	matchSet := make(map[int]bool)
@@ -98,11 +105,6 @@ func (m Model) viewYAML() string {
 		visualColEnd = max(m.yamlView.visualCol, m.yamlCursorCol())
 	}
 
-	// Content width for wrapping/truncation.
-	contentWidth := max(
-		// border (2) + padding (2)
-		m.width-4, 10)
-
 	// Apply YAML highlighting to visible lines, with search highlights and cursor.
 	renderCtx := yamlRenderCtx{
 		blame:          m.yamlView.blame,
@@ -127,6 +129,7 @@ func (m Model) viewYAML() string {
 		visualColStart: visualColStart,
 		visualColEnd:   visualColEnd,
 		wrap:           m.yamlView.wrap,
+		topSkip:        topSkip,
 	}
 	highlightedLines := renderYAMLViewportLines(viewport, renderCtx)
 
@@ -277,7 +280,13 @@ type yamlRenderCtx struct {
 	selStart, selEnd                    int
 	visualColStart, visualColEnd        int
 	wrap                                bool
+	// topSkip is how many wrapped rows the viewport drops off its top.
+	topSkip int
 }
+
+// rowBudget is how many rows the renderer may produce, the visible ones plus
+// the ones scrolled off the top.
+func (c yamlRenderCtx) rowBudget() int { return c.maxLines + c.topSkip }
 
 // renderYAMLViewportLines renders visible YAML lines with highlighting, search, and cursor.
 func renderYAMLViewportLines(viewport []string, ctx yamlRenderCtx) []string {
@@ -295,11 +304,11 @@ func renderYAMLViewportLines(viewport []string, ctx yamlRenderCtx) []string {
 		} else {
 			highlighted = renderYAMLNonWrappedLine(highlighted, contentLine, foldPrefix, visIdx, origLine, ctx)
 		}
-		if len(highlighted) >= ctx.maxLines {
+		if len(highlighted) >= ctx.rowBudget() {
 			break
 		}
 	}
-	return highlighted
+	return highlighted[min(ctx.topSkip, len(highlighted)):]
 }
 
 // splitFoldPrefix separates the fold indicator prefix from the YAML content.
@@ -336,18 +345,17 @@ func yamlAdjustedCols(ctx yamlRenderCtx) (anchorCol, cursorCol, colStart, colEnd
 }
 
 // yamlPrependGutter prepends the cursor indicator, line number, and fold prefix.
-func yamlPrependGutter(content, lineNum, foldPrefix string, isCursor, isSelected, visualMode bool, curCol int) string {
-	if isCursor {
-		if visualMode {
-			return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix + content
-		}
-		return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix +
-			ui.RenderCursorAtCol(content, curCol)
-	}
-	if isSelected {
+// The caller draws the block cursor first, so on a wrapped line it can land on
+// the sub-line that holds its column rather than always on the first one.
+func yamlPrependGutter(content, lineNum, foldPrefix string, isCursor, isSelected bool) string {
+	switch {
+	case isCursor:
+		return ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNum) + foldPrefix + content
+	case isSelected:
 		return ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNum) + foldPrefix + content
+	default:
+		return " " + ui.DimStyle.Render(lineNum) + foldPrefix + content
 	}
-	return " " + ui.DimStyle.Render(lineNum) + foldPrefix + content
 }
 
 // yamlBlameInline renders the field-manager note that trails the cursor line,
@@ -387,30 +395,96 @@ func yamlBlameParts(entry blameLine) []string {
 	return parts
 }
 
+// yamlWrapIndent is the extra indent a wrapped continuation sub-line carries
+// past the gutter, so it reads as a continuation and not a new key.
+const yamlWrapIndent = 2
+
+// yamlGutterOverhead is the width the cursor bar, line number, and fold prefix
+// take before the content starts.
+func yamlGutterOverhead(gutterWidth int) int {
+	return 1 + gutterWidth + 1 + yamlFoldPrefixLen
+}
+
+// yamlWrapWidth returns how many columns a wrapped row can hold. Continuation
+// rows carry an extra indent, so the width has to budget for it or they render
+// wider than the content area and the outer width guard cuts their tail.
+func yamlWrapWidth(contentWidth, gutterWidth int) int {
+	return max(contentWidth-yamlGutterOverhead(gutterWidth)-yamlWrapIndent, 10)
+}
+
+// yamlCursorSubLine returns the index of the wrapped row that carries the block
+// cursor.
+func yamlCursorSubLine(subs []string, srcWidth, wrapWidth, col int) int {
+	if len(subs) == 0 {
+		return -1
+	}
+	base := 0
+	for i, text := range subs {
+		sub := ui.SubLine{Text: text, Base: base, SrcWidth: srcWidth, WrapWidth: wrapWidth}
+		if sub.OwnsCursor(col) {
+			return i
+		}
+		base += sub.Width()
+	}
+	return len(subs) - 1
+}
+
+// yamlWrapTopSkip returns how many wrapped rows to drop off the top so the
+// cursor's own row stays on screen. The viewer scrolls whole source lines, so
+// a line taller than the viewport would otherwise never show its tail.
+func yamlWrapTopSkip(visLines []string, scroll, cursor, wrapWidth, maxLines, cursorCol int) int {
+	if maxLines <= 0 || cursor < scroll || cursor >= len(visLines) {
+		return 0
+	}
+	row := 0
+	for i := scroll; i < cursor; i++ {
+		_, content := splitFoldPrefix(visLines[i])
+		row += len(ui.WrapLine(content, wrapWidth))
+	}
+	_, content := splitFoldPrefix(visLines[cursor])
+	subs := ui.WrapLine(content, wrapWidth)
+	row += max(yamlCursorSubLine(subs, lipgloss.Width(content), wrapWidth, cursorCol), 0)
+	return max(row-maxLines+1, 0)
+}
+
 // renderYAMLWrappedLine renders a single YAML line with word wrapping.
 func renderYAMLWrappedLine(result []string, contentLine, foldPrefix string, visIdx, origLine int, ctx yamlRenderCtx) []string {
-	gutterOverhead := 1 + ctx.gutterWidth + 1 + yamlFoldPrefixLen
-	wrapWidth := max(ctx.contentWidth-gutterOverhead, 10)
+	gutterOverhead := yamlGutterOverhead(ctx.gutterWidth)
+	wrapWidth := yamlWrapWidth(ctx.contentWidth, ctx.gutterWidth)
 	subLines := ui.WrapLine(contentLine, wrapWidth)
-	for si, sub := range subLines {
-		hl := yamlApplySearchHighlight(sub, ctx.searchQuery, origLine, ctx.currentMatch, ctx.matchSet)
-		isSelected := ctx.visualMode && visIdx >= ctx.selStart && visIdx <= ctx.selEnd
-		if isSelected && si == 0 {
-			adjAnchor, adjCursor, adjColStart, adjColEnd := yamlAdjustedCols(ctx)
-			hl = ui.RenderVisualSelection(sub, ctx.visualType, visIdx, ctx.selStart, ctx.selEnd, ctx.visualStart, adjAnchor, adjCursor, adjColStart, adjColEnd)
+	srcWidth := lipgloss.Width(contentLine)
+	adjAnchor, adjCursor, _, _ := yamlAdjustedCols(ctx)
+	isSelected := ctx.visualMode && visIdx >= ctx.selStart && visIdx <= ctx.selEnd
+	cursorSub := -1
+	if visIdx == ctx.yamlCursor && !ctx.visualMode {
+		cursorSub = yamlCursorSubLine(subLines, srcWidth, wrapWidth, adjCursor)
+	}
+	// base tracks where each sub-line starts in content-line columns. A wide
+	// rune can stop a sub-line short of wrapWidth, so accumulate measured
+	// widths instead of multiplying by the wrap width.
+	base := 0
+	for si, text := range subLines {
+		sub := ui.SubLine{Text: text, Base: base, SrcWidth: srcWidth, WrapWidth: wrapWidth}
+		base += sub.Width()
+
+		hl := yamlApplySearchHighlight(text, ctx.searchQuery, origLine, ctx.currentMatch, ctx.matchSet)
+		if isSelected {
+			hl = ui.RenderVisualSelectionSub(sub, ctx.visualType, visIdx, ctx.selStart, ctx.selEnd, ctx.visualStart, adjAnchor, adjCursor)
+		}
+		if si == cursorSub {
+			hl = ui.RenderCursorAtCol(hl, sub.ClampCol(adjCursor))
 		}
 		if si == 0 {
 			lineNum := yamlLineNumStr(origLine, ctx.gutterWidth)
-			hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen)
+			hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected)
 		} else {
-			pad := strings.Repeat(" ", 1+ctx.gutterWidth+1+yamlFoldPrefixLen+2)
-			hl = pad + hl
+			hl = strings.Repeat(" ", gutterOverhead+yamlWrapIndent) + hl
 		}
 		if si == len(subLines)-1 && visIdx == ctx.yamlCursor {
 			hl += yamlBlameInline(ctx, origLine, lipgloss.Width(hl))
 		}
 		result = append(result, hl)
-		if len(result) >= ctx.maxLines {
+		if len(result) >= ctx.rowBudget() {
 			break
 		}
 	}
@@ -421,12 +495,15 @@ func renderYAMLWrappedLine(result []string, contentLine, foldPrefix string, visI
 func renderYAMLNonWrappedLine(result []string, contentLine, foldPrefix string, visIdx, origLine int, ctx yamlRenderCtx) []string {
 	hl := yamlApplySearchHighlight(contentLine, ctx.searchQuery, origLine, ctx.currentMatch, ctx.matchSet)
 	isSelected := ctx.visualMode && visIdx >= ctx.selStart && visIdx <= ctx.selEnd
+	adjAnchor, adjCursor, adjColStart, adjColEnd := yamlAdjustedCols(ctx)
 	if isSelected {
-		adjAnchor, adjCursor, adjColStart, adjColEnd := yamlAdjustedCols(ctx)
 		hl = ui.RenderVisualSelection(contentLine, ctx.visualType, visIdx, ctx.selStart, ctx.selEnd, ctx.visualStart, adjAnchor, adjCursor, adjColStart, adjColEnd)
 	}
+	if visIdx == ctx.yamlCursor && !ctx.visualMode {
+		hl = ui.RenderCursorAtCol(hl, adjCursor)
+	}
 	lineNum := yamlLineNumStr(origLine, ctx.gutterWidth)
-	hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected, ctx.visualMode, ctx.visualCurCol-yamlFoldPrefixLen)
+	hl = yamlPrependGutter(hl, lineNum, foldPrefix, visIdx == ctx.yamlCursor, isSelected)
 	if visIdx == ctx.yamlCursor {
 		hl += yamlBlameInline(ctx, origLine, lipgloss.Width(hl))
 	}

@@ -25,9 +25,13 @@ func RenderCursorAtCol(styledLine string, col int) string {
 		// Cursor is past end of line: append a highlighted space.
 		return styledLine + CursorBlockStyle.Render(" ")
 	}
-	before := ansi.Truncate(styledLine, col, "")
-	cursorChar := ansi.Strip(ansi.Cut(styledLine, col, col+1))
-	after := ansi.TruncateLeft(styledLine, col+1, "")
+	// A double-width glyph needs both its columns, or the cut yields an empty
+	// cell and the glyph disappears.
+	start := SnapColStart(styledLine, col)
+	end := SnapColEnd(styledLine, start+1)
+	before := ansi.Truncate(styledLine, start, "")
+	cursorChar := ansi.Strip(ansi.Cut(styledLine, start, end))
+	after := ansi.TruncateLeft(styledLine, end, "")
 	return before + CursorBlockStyle.Render(cursorChar) + after
 }
 
@@ -69,35 +73,116 @@ func RenderVisualSelection(line string, visualType rune, lineIdx, selStart, selE
 // fully highlighted. When anchor and cursor are on the same line, highlight
 // between the two columns.
 func renderCharSelection(line string, lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) string {
+	start, end, whole := charSelectionRange(lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol)
+	if whole {
+		// Strip producer ANSI so the selection style owns the visual
+		// presentation (same rule as line-mode V).
+		return SelectedStyle.Render(ansi.Strip(line))
+	}
+	return highlightColumnRange(line, lineWidth, start, end)
+}
+
+// charSelectionRange returns the half-open column range selected on lineIdx in
+// character visual mode. whole reports a line lying between anchor and cursor,
+// which is selected end to end.
+func charSelectionRange(lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) (start, end int, whole bool) {
 	if selStart == selEnd {
-		// Single line: highlight between the two column positions.
-		cStart := min(anchorCol, cursorCol)
-		cEnd := max(anchorCol, cursorCol) + 1
-		return highlightColumnRange(line, lineWidth, cStart, cEnd)
+		return min(anchorCol, cursorCol), max(anchorCol, cursorCol) + 1, false
 	}
 
-	// Determine direction: anchor is at selStart (downward) or selEnd (upward).
-	// startCol/endCol are the columns for selStart/selEnd lines respectively.
-	var startCol, endCol int
-	if anchorLine <= selStart {
-		// Downward: anchor is at top, cursor at bottom.
-		startCol = anchorCol
-		endCol = cursorCol
-	} else {
-		// Upward: cursor is at top, anchor at bottom.
-		startCol = cursorCol
-		endCol = anchorCol
+	// Anchor sits at selStart when the selection grew downward, at selEnd when
+	// it grew upward.
+	startCol, endCol := anchorCol, cursorCol
+	if anchorLine > selStart {
+		startCol, endCol = cursorCol, anchorCol
 	}
 
-	if lineIdx == selStart {
-		return highlightColumnRange(line, lineWidth, startCol, lineWidth)
+	switch lineIdx {
+	case selStart:
+		return startCol, lineWidth, false
+	case selEnd:
+		return 0, endCol + 1, false
+	default:
+		return 0, 0, true
 	}
-	if lineIdx == selEnd {
-		return highlightColumnRange(line, lineWidth, 0, endCol+1)
+}
+
+// SubLine locates one wrapped sub-line inside its source line, so a renderer
+// can translate selection and cursor columns into the slice of the line this
+// sub-line actually shows.
+type SubLine struct {
+	Text string
+	// Base is the source column where Text starts.
+	Base int
+	// SrcWidth is the width of the whole source line.
+	SrcWidth int
+	// WrapWidth is how many columns the rendered row can hold.
+	WrapWidth int
+}
+
+// Width returns the visual width of the sub-line.
+func (s SubLine) Width() int { return ansi.StringWidth(s.Text) }
+
+// OwnsCursor reports whether the block cursor at source column col belongs on
+// this sub-line. A cursor past the end of the source line goes on the last one.
+func (s SubLine) OwnsCursor(col int) bool {
+	w := s.Width()
+	if col >= s.SrcWidth {
+		return s.Base+w >= s.SrcWidth
 	}
-	// Middle line: fully highlighted. Strip producer ANSI so the selection
-	// style owns the visual presentation (same rule as line-mode V).
-	return SelectedStyle.Render(ansi.Strip(line))
+	return col >= s.Base && col < s.Base+w
+}
+
+// ClampCol converts source column col into this sub-line's column space. A
+// marker parked past a sub-line that already fills the row widens it by one,
+// and the viewer's width guard then truncates the marker away.
+func (s SubLine) ClampCol(col int) int {
+	local := col - s.Base
+	w := s.Width()
+	if local >= w && w >= s.WrapWidth && w > 0 {
+		return w - 1
+	}
+	return local
+}
+
+// RenderVisualSelectionSub renders one wrapped sub-line. Columns arrive in
+// source-line space, so a sub-line past the first must shift them or the
+// highlight lands on the wrong text. Other arguments match RenderVisualSelection.
+func RenderVisualSelectionSub(s SubLine, visualType rune, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) string {
+	switch visualType {
+	case 'v':
+		start, end, whole := charSelectionRange(s.SrcWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol)
+		if whole {
+			return SelectedStyle.Render(ansi.Strip(s.Text))
+		}
+		return s.highlightRange(start, end)
+	case 'B':
+		return s.highlightRange(min(anchorCol, cursorCol), max(anchorCol, cursorCol)+1)
+	default: // 'V' or zero value: line mode selects every sub-line whole.
+		return SelectedStyle.Render(ansi.Strip(s.Text))
+	}
+}
+
+// highlightRange highlights the part of source range [start, end) inside this
+// sub-line. A sub-line the range misses stays untouched: highlightColumnRange's
+// past-the-line fallback would park a cell on every sub-line of a wrapped line.
+func (s SubLine) highlightRange(start, end int) string {
+	w := s.Width()
+	lo := max(start-s.Base, 0)
+	hi := min(end-s.Base, w)
+	if hi > lo {
+		return highlightColumnRange(s.Text, w, lo, hi)
+	}
+	if end <= start || start < s.SrcWidth || s.Base+w < s.SrcWidth {
+		return s.Text
+	}
+	// The selection is parked past the end of the source line: an empty line,
+	// or a cursor that ran off the last column. Show it on the final sub-line.
+	c := s.ClampCol(start)
+	if c < 0 || c >= w {
+		return s.Text + SelectedStyle.Render(" ")
+	}
+	return highlightColumnRange(s.Text, w, c, c+1)
 }
 
 // renderBlockSelection highlights a rectangular visual-column range on the line.
@@ -127,6 +212,10 @@ func highlightColumnRange(line string, lineWidth, colStart, colEnd int) string {
 		return line
 	}
 
+	// Widen to whole characters: a range ending mid-glyph would drop it from
+	// both the highlight and the tail after it.
+	colStart = SnapColStart(line, colStart)
+	colEnd = SnapColEnd(line, colEnd)
 	before := ansi.Truncate(line, colStart, "")
 	selected := ansi.Strip(ansi.Cut(line, colStart, colEnd))
 	after := ansi.TruncateLeft(line, colEnd, "")
