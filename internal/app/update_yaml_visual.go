@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) handleYAMLVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -35,14 +37,12 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLVisualCopy()
 	case "h", "left":
 		if m.yamlView.visualType == 'v' || m.yamlView.visualType == 'B' {
-			if m.yamlView.visualCurCol > yamlFoldPrefixLen {
-				m.yamlView.visualCurCol--
-			}
+			m.yamlView.visualCurCol = m.yamlStepCol(-1)
 		}
 		return m, nil
 	case "l", "right":
 		if m.yamlView.visualType == 'v' || m.yamlView.visualType == 'B' {
-			m.yamlView.visualCurCol++
+			m.yamlView.visualCurCol = m.yamlStepCol(1)
 		}
 		return m, nil
 	case "j", "down":
@@ -124,6 +124,16 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 }
 
 func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
+	clipText, lineCount := m.buildYAMLYankText()
+	visualType := m.yamlView.visualType
+	m.yamlView.visualMode = false
+	m.setStatusMessage(formatVisualYank(clipText, visualType, lineCount), false)
+	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+}
+
+// buildYAMLYankText returns the clipboard text and selection size for the
+// active visual selection in the YAML viewer.
+func (m Model) buildYAMLYankText() (string, int) {
 	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	selStart := min(m.yamlView.visualStart, m.yamlView.cursor)
 	selEnd := max(m.yamlView.visualStart, m.yamlView.cursor)
@@ -134,90 +144,25 @@ func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
 		selEnd = len(mapping) - 1
 	}
 	origLines := strings.Split(m.yamlView.content, "\n")
-	var clipText string
-	switch m.yamlView.visualType {
-	case 'v':
-		clipText = m.yamlVisualCopyChar(selStart, selEnd, mapping, origLines)
-	case 'B':
-		clipText = m.yamlVisualCopyBlock(selStart, selEnd, mapping, origLines)
-	default:
-		clipText = m.yamlVisualCopyLine(selStart, selEnd, mapping, origLines)
-	}
-	lineCount := selEnd - selStart + 1
-	visualType := m.yamlView.visualType
-	m.yamlView.visualMode = false
-	m.setStatusMessage(formatVisualYank(clipText, visualType, lineCount), false)
-	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+	selected := yamlSelectedSourceLines(selStart, selEnd, mapping, origLines)
+	// Columns lose the fold prefix here: it is viewer chrome, not document text.
+	clipText := visualCopyText(selected, 0, len(selected)-1, m.yamlView.visualType,
+		m.yamlView.visualCol-yamlFoldPrefixLen, m.yamlView.visualCurCol-yamlFoldPrefixLen,
+		m.yamlView.visualStart > m.yamlView.cursor)
+	return clipText, selEnd - selStart + 1
 }
 
-func (m Model) yamlVisualCopyChar(selStart, selEnd int, mapping []int, origLines []string) string {
-	var parts []string
-	anchorCol := m.yamlView.visualCol - yamlFoldPrefixLen
-	cursorCol := m.yamlView.visualCurCol - yamlFoldPrefixLen
-	startCol, endCol := anchorCol, cursorCol
-	if m.yamlView.visualStart > m.yamlView.cursor {
-		startCol, endCol = cursorCol, anchorCol
-	}
-	for i := selStart; i <= selEnd; i++ {
-		if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
-			continue
-		}
-		line := origLines[mapping[i]]
-		runes := []rune(line)
-		if selStart == selEnd {
-			cs := min(anchorCol, cursorCol)
-			ce := max(anchorCol, cursorCol) + 1
-			if cs > len(runes) {
-				cs = len(runes)
-			}
-			if ce > len(runes) {
-				ce = len(runes)
-			}
-			parts = append(parts, string(runes[cs:ce]))
-		} else if i == selStart {
-			cs := min(startCol, len(runes))
-			parts = append(parts, string(runes[cs:]))
-		} else if i == selEnd {
-			ce := min(endCol+1, len(runes))
-			parts = append(parts, string(runes[:ce]))
-		} else {
-			parts = append(parts, line)
-		}
-	}
-	return strings.Join(parts, "\n")
-}
-
-func (m Model) yamlVisualCopyBlock(selStart, selEnd int, mapping []int, origLines []string) string {
-	colStart := min(m.yamlView.visualCol, m.yamlView.visualCurCol) - yamlFoldPrefixLen
-	colEnd := max(m.yamlView.visualCol, m.yamlView.visualCurCol) - yamlFoldPrefixLen + 1
-	var parts []string
-	for i := selStart; i <= selEnd; i++ {
-		if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
-			continue
-		}
-		line := origLines[mapping[i]]
-		runes := []rune(line)
-		cs := colStart
-		ce := colEnd
-		if cs > len(runes) {
-			cs = len(runes)
-		}
-		if ce > len(runes) {
-			ce = len(runes)
-		}
-		parts = append(parts, string(runes[cs:ce]))
-	}
-	return strings.Join(parts, "\n")
-}
-
-func (m Model) yamlVisualCopyLine(selStart, selEnd int, mapping []int, origLines []string) string {
+// yamlSelectedSourceLines returns the document lines behind visible rows
+// selStart..selEnd. A row with no source line behind it, such as a fold
+// placeholder, is left out.
+func yamlSelectedSourceLines(selStart, selEnd int, mapping []int, origLines []string) []string {
 	var selected []string
 	for i := selStart; i <= selEnd; i++ {
 		if i < len(mapping) && mapping[i] >= 0 && mapping[i] < len(origLines) {
 			selected = append(selected, origLines[mapping[i]])
 		}
 	}
-	return strings.Join(selected, "\n")
+	return selected
 }
 
 // applyYAMLTextObject resolves an `iw`/`aw`/`iW`/`aW` text object on the
@@ -264,10 +209,7 @@ func (m *Model) yamlWordMotionStep(key string) {
 
 	switch key {
 	case "$":
-		lineLen := len([]rune(visLines[m.yamlView.cursor]))
-		if lineLen > 0 {
-			m.yamlView.visualCurCol = lineLen - 1
-		}
+		m.yamlView.visualCurCol = max(lastCol(visLines[m.yamlView.cursor]), yamlFoldPrefixLen)
 	case "^":
 		col := max(firstNonWhitespace(visLines[m.yamlView.cursor]), yamlFoldPrefixLen)
 		m.yamlView.visualCurCol = col
@@ -287,14 +229,13 @@ func (m *Model) yamlWordMotionStep(key string) {
 }
 
 func (m *Model) yamlWordForward(visLines []string, motionFn func(string, int) int) {
-	lineLen := len([]rune(visLines[m.yamlView.cursor]))
+	lineLen := ui.LineWidth(visLines[m.yamlView.cursor])
 	newCol := motionFn(visLines[m.yamlView.cursor], m.yamlView.visualCurCol)
 	if newCol >= lineLen && m.yamlView.cursor < len(visLines)-1 {
 		m.yamlView.cursor++
 		newCol = motionFn(visLines[m.yamlView.cursor], 0)
-		nextLineLen := len([]rune(visLines[m.yamlView.cursor]))
-		if newCol >= nextLineLen {
-			newCol = max(nextLineLen-1, 0)
+		if newCol >= ui.LineWidth(visLines[m.yamlView.cursor]) {
+			newCol = lastCol(visLines[m.yamlView.cursor])
 		}
 		m.yamlView.visualCurCol = max(yamlFoldPrefixLen, newCol)
 		m.ensureYAMLCursorVisible()
@@ -307,7 +248,7 @@ func (m *Model) yamlWordBackward(visLines []string, motionFn func(string, int) i
 	newCol := motionFn(visLines[m.yamlView.cursor], m.yamlView.visualCurCol)
 	if newCol < 0 && m.yamlView.cursor > 0 {
 		m.yamlView.cursor--
-		lineLen := len([]rune(visLines[m.yamlView.cursor]))
+		lineLen := ui.LineWidth(visLines[m.yamlView.cursor])
 		newCol = max(motionFn(visLines[m.yamlView.cursor], lineLen), 0)
 		m.yamlView.visualCurCol = max(yamlFoldPrefixLen, newCol)
 		m.ensureYAMLCursorVisible()

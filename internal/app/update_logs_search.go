@@ -1,6 +1,9 @@
 package app
 
 import (
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/janosmiko/lfk/internal/tainted"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -16,17 +19,24 @@ func (m *Model) logDisplayLine(lineIdx int) string {
 	return line
 }
 
-// logJumpToCol sets the cursor to the given line and rune column.
-func (m *Model) logJumpToCol(lineIdx, runeCol int) {
+// logMotionLine returns the text the cursor columns address. It runs the same
+// sanitize the renderer does, which expands tabs, and drops producer ANSI, so
+// one column counts one of the cells actually drawn.
+func (m *Model) logMotionLine(lineIdx int) string {
+	return ansi.Strip(tainted.SanitizeLogBody(m.logDisplayLine(lineIdx), ui.ConfigLogRenderAnsi))
+}
+
+// logJumpToCol sets the cursor to the given line and cell column.
+func (m *Model) logJumpToCol(lineIdx, col int) {
 	m.logView.cursor = lineIdx
-	m.logView.visualCurCol = runeCol
+	m.logView.visualCurCol = col
 	m.logView.follow = false
 	m.ensureLogCursorVisible()
 }
 
 // logFindFirstMatch finds the first match in a line and jumps to it.
 func (m *Model) logFindFirstMatch(lineIdx int, query string) bool {
-	dl := m.logDisplayLine(lineIdx)
+	dl := m.logMotionLine(lineIdx)
 	col := ui.FindColumnInLine(dl, query)
 	if col < 0 {
 		return false
@@ -37,7 +47,7 @@ func (m *Model) logFindFirstMatch(lineIdx int, query string) bool {
 
 // logFindLastMatch finds the last (rightmost) match in a line and jumps to it.
 func (m *Model) logFindLastMatch(lineIdx int, query string) bool {
-	dl := m.logDisplayLine(lineIdx)
+	dl := m.logMotionLine(lineIdx)
 	if !ui.MatchLine(dl, query) {
 		return false
 	}
@@ -69,17 +79,16 @@ func (m *Model) findNextLogMatch(forward bool) {
 func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 	// Check for another match on the current line after the cursor.
 	if start >= 0 && start < len(m.logView.lines) {
-		dl := m.logDisplayLine(start)
-		runes := []rune(dl)
-		// Clamp: logVisualCurCol carries the column from a previously
-		// focused line and may exceed this line's rune length. Forward
-		// uses +1 because the search starts after (not at) the cursor.
-		end := min(m.logView.visualCurCol+1, len(runes))
-		curBytePos := len(string(runes[:end]))
-		if curBytePos < len(dl) {
-			col := ui.FindColumnInLine(dl[curBytePos:], rawQuery)
+		dl := m.logMotionLine(start)
+		w := ui.LineWidth(dl)
+		// Start after the whole character under the cursor. A column one cell
+		// on lands inside a wide glyph, and CutCols widens back to its start,
+		// so the match offset would count from a column that was never cut.
+		from := ui.SnapColEnd(dl, m.logView.visualCurCol+1)
+		if from < w {
+			col := ui.FindColumnInLine(ui.CutCols(dl, from, w), rawQuery)
 			if col >= 0 {
-				m.logJumpToCol(start, m.logView.visualCurCol+1+col)
+				m.logJumpToCol(start, from+col)
 				return
 			}
 		}
@@ -99,14 +108,12 @@ func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 func (m *Model) findNextLogMatchBackward(rawQuery string, start int) {
 	// Check for a match on the current line before the cursor.
 	if start >= 0 && start < len(m.logView.lines) {
-		dl := m.logDisplayLine(start)
-		runes := []rune(dl)
-		// Clamp: logVisualCurCol may exceed this line's rune length;
-		// backward search ends at (excluding) the cursor.
-		end := min(m.logView.visualCurCol, len(runes))
-		curBytePos := len(string(runes[:end]))
-		if curBytePos > 0 {
-			lastCol := findLastMatchInStr(dl[:curBytePos], rawQuery)
+		dl := m.logMotionLine(start)
+		// Clamp: visualCurCol may exceed this line's width. Backward search
+		// ends at the cursor, excluding it.
+		to := min(m.logView.visualCurCol, ui.LineWidth(dl))
+		if to > 0 {
+			lastCol := findLastMatchInStr(ui.CutCols(dl, 0, to), rawQuery)
 			if lastCol >= 0 {
 				m.logJumpToCol(start, lastCol)
 				return
@@ -136,13 +143,16 @@ func findLastMatchInStr(text, query string) int {
 			break
 		}
 		lastCol = offset + col
-		advanceRunes := col + 1
-		runes := []rune(remaining)
-		if advanceRunes >= len(runes) {
+		w := ui.LineWidth(remaining)
+		// Step past the whole matched character. A rune step stalls on a
+		// combining mark, which adds no cell, and the unchanged slice then
+		// matches again forever.
+		next := stepCol(remaining, col, 1)
+		if next >= w || next <= col {
 			break
 		}
-		remaining = string(runes[advanceRunes:])
-		offset += advanceRunes
+		remaining = ui.CutCols(remaining, next, w)
+		offset += next
 	}
 	return lastCol
 }

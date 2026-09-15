@@ -132,11 +132,11 @@ func (m Model) handleDiffNormalKey(msg tea.KeyPressMsg, foldRegions []ui.DiffFol
 		return m, nil
 	case "h", "left":
 		n := consumeCountPrefix(&m.diffView.lineInput)
-		m.diffView.visualCurCol = max(m.diffView.visualCurCol-n, 0)
+		m.diffView.visualCurCol = m.diffStepCol(-n, foldRegions)
 		return m, nil
 	case "l", "right":
 		n := consumeCountPrefix(&m.diffView.lineInput)
-		m.diffView.visualCurCol += n
+		m.diffView.visualCurCol = m.diffStepCol(n, foldRegions)
 		return m, nil
 	case "g":
 		if m.pendingG {
@@ -267,15 +267,18 @@ func (m Model) handleDiffG(maxCursor, visibleLines, maxScroll int) (tea.Model, t
 	return m, nil
 }
 
+// diffStepCol moves the cursor column by n characters on the line under the
+// cursor.
+func (m *Model) diffStepCol(n int, foldRegions []ui.DiffFoldRegion) int {
+	return stepCol(m.diffCurrentLineText(foldRegions), m.diffView.visualCurCol, n)
+}
+
 // diffWordMotion applies a word/cursor motion in diff view.
 func (m *Model) diffWordMotion(key string, foldRegions []ui.DiffFoldRegion) {
 	lineText := m.diffCurrentLineText(foldRegions)
 	switch key {
 	case "$":
-		lineLen := len([]rune(lineText))
-		if lineLen > 0 {
-			m.diffView.visualCurCol = lineLen - 1
-		}
+		m.diffView.visualCurCol = lastCol(lineText)
 	case "^":
 		m.diffView.visualCurCol = firstNonWhitespace(lineText)
 	case "w":
@@ -350,9 +353,8 @@ func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll 
 
 // diffClampCol clamps a column to the end of a line.
 func diffClampCol(col int, lineText string) int {
-	lineLen := len([]rune(lineText))
-	if col >= lineLen {
-		return max(lineLen-1, 0)
+	if col >= ui.LineWidth(lineText) {
+		return lastCol(lineText)
 	}
 	return col
 }
@@ -418,14 +420,12 @@ func (m Model) handleDiffVisualKey(msg tea.KeyPressMsg, foldRegions []ui.DiffFol
 		return m, nil
 	case "h", "left":
 		if m.diffView.visualType == 'v' || m.diffView.visualType == 'B' {
-			if m.diffView.visualCurCol > 0 {
-				m.diffView.visualCurCol--
-			}
+			m.diffView.visualCurCol = m.diffStepCol(-1, foldRegions)
 		}
 		return m, nil
 	case "l", "right":
 		if m.diffView.visualType == 'v' || m.diffView.visualType == 'B' {
-			m.diffView.visualCurCol++
+			m.diffView.visualCurCol = m.diffStepCol(1, foldRegions)
 		}
 		return m, nil
 	case "0":

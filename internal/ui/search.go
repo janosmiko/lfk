@@ -605,7 +605,7 @@ func highlightSpansPerStyle(line, plain string, spans [][2]int, normalStyle, cur
 	return b.String()
 }
 
-// FindColumnInLine returns the rune column of the first match of rawQuery in
+// FindColumnInLine returns the cell column of the first match of rawQuery in
 // line, or -1 if not found. Used for cursor positioning after search.
 func FindColumnInLine(line, rawQuery string) int {
 	if rawQuery == "" || line == "" {
@@ -624,25 +624,24 @@ func FindColumnInLine(line, rawQuery string) int {
 			if col < 0 {
 				return -1
 			}
-			return len([]rune(line[:col]))
+			return ansi.StringWidth(line[:col])
 		}
 		loc := re.FindStringIndex(line)
 		if loc == nil {
 			return -1
 		}
-		return len([]rune(line[:loc[0]]))
+		return ansi.StringWidth(line[:loc[0]])
 	case SearchFuzzy:
 		// For fuzzy, find the position of the first matching character.
 		queryLower := strings.ToLower(query)
 		lineLower := strings.ToLower(line)
-		lineRunes := []rune(lineLower)
 		queryRunes := []rune(queryLower)
 		if len(queryRunes) == 0 {
 			return -1
 		}
-		for i, r := range lineRunes {
+		for i, r := range lineLower {
 			if r == queryRunes[0] {
-				return i
+				return ansi.StringWidth(lineLower[:i])
 			}
 		}
 		return -1
@@ -651,6 +650,6 @@ func FindColumnInLine(line, rawQuery string) int {
 		if col < 0 {
 			return -1
 		}
-		return len([]rune(line[:col]))
+		return ansi.StringWidth(line[:col])
 	}
 }

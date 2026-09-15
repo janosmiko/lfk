@@ -406,7 +406,14 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 		line := lines[i]
 		isSelected := selStart >= 0 && i >= selStart && i <= selEnd
 		wrapped := WrapLine(line, availWidth)
+		srcWidth := ansi.StringWidth(line)
+		// base tracks where each sub-line starts in source-line columns. A
+		// wide rune can stop a sub-line short of availWidth, so accumulate
+		// measured widths instead of multiplying by the wrap width.
+		base := 0
 		for j, wl := range wrapped {
+			sub := SubLine{Text: wl, Base: base, SrcWidth: srcWidth, WrapWidth: availWidth}
+			base += sub.Width()
 			if skipped < topSkip {
 				skipped++
 				continue
@@ -415,61 +422,69 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 				break
 			}
 
+			// The block cursor goes on whichever sub-line holds its column,
+			// not always the first one.
+			drawCursor := i == cursor && !isSelected && sub.OwnsCursor(visualCurCol)
+
 			if isSelected {
 				// Highlight raw content first, then prepend line numbers
 				// to avoid column offset mismatch.
-				wl = RenderVisualSelection(wl, visualType, i, selStart, selEnd, visualStart, visualCol, visualCurCol, min(visualCol, visualCurCol), max(visualCol, visualCurCol))
-				if lineNumbers {
-					if j == 0 {
-						numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
-						wl = DimStyle.Render(numStr) + wl
-					} else {
-						wl = strings.Repeat(" ", lineNumWidth) + wl
-					}
-				}
-			} else {
-				// Colorize pod prefix for non-selected, non-cursor first sub-lines.
-				if j == 0 && i != cursor {
-					wl = colorizePodPrefix(wl)
-				}
-				if lineNumbers && (i != cursor || j != 0) {
-					// Non-cursor lines get line numbers here.
-					// Cursor line's number is added after RenderCursorAtCol.
-					if j == 0 {
-						numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
-						wl = DimStyle.Render(numStr) + wl
-					} else {
-						wl = strings.Repeat(" ", lineNumWidth) + wl
-					}
-				}
+				wl = RenderVisualSelectionSub(sub, visualType, i, selStart, selEnd, visualStart, visualCol, visualCurCol)
+			} else if j == 0 && !drawCursor {
+				// Keyed on the cursor's sub-line, not its source line: the
+				// cursor can sit on a continuation row while the prefix, which
+				// only ever lives on the first one, still needs its color.
+				wl = colorizePodPrefix(wl)
 			}
 
-			// Cursor gutter indicator and block cursor at column (only on first wrapped sub-line).
-			if i == cursor && j == 0 {
-				if isSelected {
-					wl = YamlCursorIndicatorStyle.Render("\u258e") + wl
-				} else {
-					cursorLine := RenderCursorAtCol(wl, visualCurCol)
-					if lineNumbers {
-						numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
-						cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
-					}
-					wl = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
-					// Record cursor position for search-match current highlighting.
-					cursorRow = len(result)
-					cursorCol = 1 + visualCurCol
-					if lineNumbers {
-						cursorCol = 1 + lineNumWidth + visualCurCol
-					}
+			localCol := sub.ClampCol(visualCurCol)
+			if drawCursor {
+				// Before the line number, so the gutter is not shifted into
+				// the cursor's column space.
+				wl = RenderCursorAtCol(wl, localCol)
+				// Only the first sub-line can carry a pod prefix. A wrapped
+				// row that merely opens with a bracket is not one.
+				if j == 0 {
+					wl = colorizePodPrefix(wl)
 				}
-			} else {
+			}
+			if lineNumbers {
+				wl = logWrapLineNum(i, j, lineNumWidth, isSelected, i == cursor) + wl
+			}
+
+			switch {
+			case i == cursor && j == 0:
+				wl = YamlCursorIndicatorStyle.Render("\u258e") + wl
+			default:
 				wl = " " + wl
+			}
+
+			if drawCursor {
+				// Record cursor position for search-match current highlighting.
+				cursorRow = len(result)
+				cursorCol = 1 + localCol
+				if lineNumbers {
+					cursorCol = 1 + lineNumWidth + localCol
+				}
 			}
 
 			result = append(result, wl)
 		}
 	}
 	return result, cursorRow, cursorCol
+}
+
+// logWrapLineNum returns the line-number gutter for one wrapped sub-line. Only
+// the first sub-line carries a number. The rest pad to keep content aligned.
+func logWrapLineNum(lineIdx, subIdx, width int, isSelected, isCursor bool) string {
+	if subIdx != 0 {
+		return strings.Repeat(" ", width)
+	}
+	numStr := fmt.Sprintf("%*d ", width-1, lineIdx+1)
+	if isCursor && !isSelected {
+		return YamlCursorIndicatorStyle.Render(numStr)
+	}
+	return DimStyle.Render(numStr)
 }
 
 // WrapLine hard-wraps a line to width visual columns, for reuse in YAML,

@@ -248,7 +248,7 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyH()
 	case "l", "right":
 		n := consumeCountPrefix(&m.yamlView.lineInput)
-		m.yamlView.visualCurCol += n
+		m.yamlView.visualCurCol = m.yamlStepCol(n)
 		return m, nil
 	case "0":
 		return m.handleYAMLKeyZero()
@@ -507,52 +507,26 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 	}
 	line := visibleLines[m.yamlView.cursor]
 
-	runes := []rune(line)
+	w := ui.LineWidth(line)
 	if forward {
-		// Search for a match after the current cursor position.
-		// Clamp: yamlVisualCurCol carries the column from a previously
-		// focused line and may exceed this line's rune length. Forward
-		// uses +1 because the search starts after (not at) the cursor.
-		end := min(m.yamlView.visualCurCol+1, len(runes))
-		curBytePos := len(string(runes[:end]))
-		if curBytePos < len(line) {
-			remainder := line[curBytePos:]
-			col := ui.FindColumnInLine(remainder, rawQuery)
+		// Start after the whole character under the cursor. A column one cell
+		// on lands inside a wide glyph, and CutCols widens back to its start,
+		// so the match offset would count from a column that was never cut.
+		from := ui.SnapColEnd(line, m.yamlView.visualCurCol+1)
+		if from < w {
+			col := ui.FindColumnInLine(ui.CutCols(line, from, w), rawQuery)
 			if col >= 0 {
-				m.yamlView.visualCurCol = m.yamlView.visualCurCol + 1 + col
+				m.yamlView.visualCurCol = from + col
 				return true
 			}
 		}
 	} else {
-		// Search for a match before the current cursor position.
-		// Clamp: yamlVisualCurCol may exceed this line's rune length;
-		// backward search ends at (excluding) the cursor.
-		end := min(m.yamlView.visualCurCol, len(runes))
-		curBytePos := len(string(runes[:end]))
-		if curBytePos > 0 {
-			prefix := line[:curBytePos]
-			// For backward search, find the last match in the prefix.
-			// FindColumnInLine returns the first match. Iterate to find the last.
-			lastCol := -1
-			remaining := prefix
-			offset := 0
-			for {
-				col := ui.FindColumnInLine(remaining, rawQuery)
-				if col < 0 {
-					break
-				}
-				lastCol = offset + col
-				// Advance past this match to find the next one.
-				advanceRunes := col + 1
-				runes := []rune(remaining)
-				if advanceRunes >= len(runes) {
-					break
-				}
-				remaining = string(runes[advanceRunes:])
-				offset += advanceRunes
-			}
-			if lastCol >= 0 {
-				m.yamlView.visualCurCol = lastCol
+		// Clamp: visualCurCol may exceed this line's width. Backward search
+		// ends at the cursor, excluding it.
+		to := min(m.yamlView.visualCurCol, w)
+		if to > 0 {
+			if last := findLastMatchInStr(ui.CutCols(line, 0, to), rawQuery); last >= 0 {
+				m.yamlView.visualCurCol = last
 				return true
 			}
 		}
@@ -744,8 +718,18 @@ func (m Model) handleYAMLKeyZ() (tea.Model, tea.Cmd) {
 
 func (m Model) handleYAMLKeyH() (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlView.lineInput)
-	m.yamlView.visualCurCol = max(m.yamlView.visualCurCol-n, yamlFoldPrefixLen)
+	m.yamlView.visualCurCol = m.yamlStepCol(-n)
 	return m, nil
+}
+
+// yamlStepCol moves the cursor column by n characters on the visible line under
+// the cursor, holding it clear of the fold prefix.
+func (m *Model) yamlStepCol(n int) int {
+	visLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(visLines) {
+		return max(m.yamlView.visualCurCol+n, yamlFoldPrefixLen)
+	}
+	return max(stepCol(visLines[m.yamlView.cursor], m.yamlView.visualCurCol, n), yamlFoldPrefixLen)
 }
 
 func (m Model) handleYAMLKeyZero() (tea.Model, tea.Cmd) {
