@@ -297,6 +297,9 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 	case overlayColumnToggle:
 		c, w, h := m.renderOverlayColumnToggle()
 		return c, w, h, true
+	case overlayKeymaps:
+		c, w, h := m.renderOverlayKeymaps()
+		return c, w, h, true
 	case overlayFinalizerSearch:
 		c, w, h := m.renderOverlayFinalizerSearch()
 		return c, w, h, true

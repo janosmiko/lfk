@@ -69,12 +69,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return mdl, cmd
 	}
 
-	// The which-key leader arms in every mode that has a catalog, not only the
-	// explorer. It must run ahead of handleModeKey so it wins the "?" it
-	// shares with kb.Help, the same ordering handleExplorerSelectionKey gives
-	// it inside the explorer.
-	if mdl, cmd, handled := m.handleViewerWhichKeyLeader(msg); handled {
-		return mdl, cmd
+	// Runs ahead of handleModeKey so it wins the "?" it shares with kb.Help,
+	// same ordering as handleExplorerSelectionKey inside the explorer.
+	if leader := ui.ActiveKeybindings.WhichKeyLeader; leader != "" && msg.String() == leader && m.mode != modeExplorer {
+		cat, ok := whichKeyCatalogs[m.mode]
+		if ok && !cat.inputFocused(&m) {
+			mdl := m.openKeymapsOverlay()
+			return mdl, nil
+		}
 	}
 
 	// Dispatch to mode-specific handlers.

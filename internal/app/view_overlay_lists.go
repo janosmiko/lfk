@@ -27,6 +27,7 @@ var (
 	overlayHelmHistoryScrollPos  int
 	overlayHelmRollbackScrollPos int
 	overlayRollbackScrollPos     int
+	overlayKeymapsScrollPos      int
 )
 
 // overlayListScroll computes the new viewport start using
@@ -308,6 +309,34 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 		EmptyMessage:     "No matching columns",
 		Height:           contentH,
 	}, width-6)
+}
+
+// renderOverlayKeymaps renders the searchable keymaps overlay, sized off
+// m.width/m.height the way renderOverlayFilterPreset sizes itself.
+func (m Model) renderOverlayKeymaps() (string, int, int) {
+	filtered := m.filteredKeymapsItems()
+	items := make([]ui.OverlayListItem, len(filtered))
+	for i, it := range filtered {
+		items[i] = it.OverlayListItem
+	}
+	cfg := ui.OverlayListConfig{
+		Title:           "Keymaps",
+		Cursor:          m.keymapsCursor,
+		Filterable:      true,
+		Filter:          m.keymapsFilter.Value,
+		FilterActive:    m.keymapsFilterMode,
+		ShowKey:         true,
+		ShowDescription: true,
+		EmptyMessage:    "No keymaps match",
+	}
+	overlayW := ui.OverlayListWidth(items, cfg, m.width-10)
+	overlayH := min(m.height-6, 22)
+	contentH := max(overlayH-2, 1)
+	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
+	cfg.Scroll = overlayListScroll(&overlayKeymapsScrollPos, m.keymapsCursor, len(items), maxVisible)
+	cfg.MaxVisible = maxVisible
+	cfg.Height = contentH
+	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayW, overlayH
 }
 
 // renderColorschemeOverlay maps the colorscheme picker (with its group-
