@@ -139,6 +139,7 @@ func TestNewModel_StartupResourceWithNoSavedSessionBuildsSyntheticTab(t *testing
 	require.NotNil(t, m.pendingSession)
 	require.Len(t, m.pendingSession.Tabs, 1)
 	assert.Equal(t, "deploy", m.pendingSession.Tabs[0].ResourceType)
+	assert.True(t, m.restoringSession, "restore guard must be armed when startup resource creates a synthetic session")
 }
 
 func TestNewModel_StartupResourceFlagBeatsConfig(t *testing.T) {
