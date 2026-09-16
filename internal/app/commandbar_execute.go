@@ -519,29 +519,7 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 		itemName := strings.ToLower(item.Name)
 		itemKind := strings.ToLower(item.Kind)
 
-		itemSingular := toSingular(itemResource)
-		nameSingular := toSingular(itemName)
-
-		// Check resource name match (plural or singular).
-		nameMatch := itemResource == resolved || itemSingular == resolved ||
-			itemName == resolved || nameSingular == resolved ||
-			itemKind == resolved
-
-		// If a target group was specified, also check the group.
-		groupMatch := true
-		if targetGroup != "" {
-			// Extra format: "group/version/resource" — group is the first segment.
-			parts := strings.Split(item.Extra, "/")
-			var itemGroup string
-			if len(parts) >= 3 {
-				itemGroup = strings.ToLower(parts[0])
-			} else if len(parts) == 2 {
-				itemGroup = "core" // "v1/resource" format
-			}
-			groupMatch = strings.Contains(itemGroup, targetGroup)
-		}
-
-		if nameMatch && groupMatch {
+		if resourceNameMatches(resolved, targetGroup, itemResource, itemName, itemKind, groupFromExtra(item.Extra)) {
 			matches = append(matches, match{index: i, item: item})
 		}
 	}

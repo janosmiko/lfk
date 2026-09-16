@@ -81,6 +81,10 @@
       "description": "Show the cluster dashboard when entering a context. Set false to go directly to resource types.",
       "default": true
     },
+    "startup_resource": {
+      "type": "string",
+      "description": "Open lfk directly on this resource type's list: a plural/singular/Kind name (e.g. \"deploy\", \"Deployment\") or \"name.group\" for a CRD. Overridden by the --resource flag."
+    },
     "custom_actions": {
       "type": ["object", "null"],
       "description": "User-defined actions per resource type, keyed by Kind name (e.g. \"Pod\").",

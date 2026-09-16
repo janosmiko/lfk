@@ -103,6 +103,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.Dashboard != nil {
 		ConfigDashboard = *cfg.Dashboard
 	}
+	ConfigStartupResource = cfg.StartupResource
 	applyTerminalConfig(cfg.Terminal)
 	applyExecShellsConfig(cfg.ExecShells)
 	if cfg.ScrollbackLines != 0 {

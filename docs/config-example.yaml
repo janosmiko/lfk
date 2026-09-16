@@ -261,6 +261,11 @@ log_path: /tmp/lfk.log
 # Set to false to go directly to the resource types list.
 dashboard: true
 
+# ─── Startup Resource ──────────────────────────────────────────────────────────
+# Open directly on a resource type's list: a plural/singular/Kind name or
+# "name.group" for a CRD. Overridden by --resource.
+# startup_resource: deploy
+
 # ─── Monitoring Endpoints ──────────────────────────────────────────────────────
 # Configure Prometheus and Alertmanager endpoints per cluster context.
 # Keys are kubeconfig context names; the special key "_global" applies to

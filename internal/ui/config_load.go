@@ -29,13 +29,17 @@ type configFile struct {
 	// canonical home. The flat keys of the same name are deprecated aliases
 	// kept for backward compatibility. When both are set, the appearance group
 	// wins (it is merged down onto the flat fields at load time).
-	Appearance    *AppearanceConfig `json:"appearance" yaml:"appearance"`
-	Colorscheme   string            `json:"colorscheme" yaml:"colorscheme"`
-	Layout        string            `json:"layout" yaml:"layout"`
-	Theme         Theme             `json:"theme" yaml:"theme"`
-	Keybindings   Keybindings       `json:"keybindings" yaml:"keybindings"`
-	LogPath       string            `json:"log_path" yaml:"log_path"`
-	Abbreviations map[string]string `json:"abbreviations" yaml:"abbreviations"`
+	Appearance  *AppearanceConfig `json:"appearance" yaml:"appearance"`
+	Colorscheme string            `json:"colorscheme" yaml:"colorscheme"`
+	Layout      string            `json:"layout" yaml:"layout"`
+	Theme       Theme             `json:"theme" yaml:"theme"`
+	Keybindings Keybindings       `json:"keybindings" yaml:"keybindings"`
+	LogPath     string            `json:"log_path" yaml:"log_path"`
+	// StartupResource opens lfk directly on this resource type's list: a
+	// plural/singular/Kind name (e.g. "deploy", "Deployment") or "name.group"
+	// for a CRD. Overridden by the --resource flag.
+	StartupResource string            `json:"startup_resource" yaml:"startup_resource"`
+	Abbreviations   map[string]string `json:"abbreviations" yaml:"abbreviations"`
 	// Icons controls icon display mode: "unicode" (default), "simple" (ASCII labels), "emoji" (emoji), "none" (no icons).
 	Icons string `json:"icons" yaml:"icons"`
 	// ResourceColumns maps resource Kind names (case-insensitive, e.g. "Pod", "Deployment")
