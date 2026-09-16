@@ -209,6 +209,8 @@ func (m Model) primeWhichKeyCells() Model {
 // armed "g" still swallows the next key there. Moving the explorer onto this
 // earlier hook would turn "g?" into a panel instead of the silent no-op
 // handleGotoChord makes it.
+//
+//nolint:unused // caller moved to the keymaps overlay. Task 3 removes this.
 func (m Model) handleViewerWhichKeyLeader(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 	if m.mode == modeExplorer {
 		return m, nil, false

@@ -564,6 +564,10 @@ type Model struct {
 	schemeOriginalName    string // scheme name before opening overlay, for cancel restore
 	schemeFilterEntryName string // scheme name selected when filter mode was entered. Restored on Esc
 
+	keymapsCursor     int // keymaps overlay cursor (which-key leader key)
+	keymapsFilter     TextInput
+	keymapsFilterMode bool
+
 	serviceEndpointsCache map[string]*k8s.ServiceEndpoints // stale-while-revalidate cache for the Service endpoint rollup. See commands_load_preview.go
 	// orphanCache holds the most recent OrphanReport per (kubeContext, namespace). See commands_orphans.go
 	orphanCache        map[orphanCacheKey]*k8s.OrphanReport

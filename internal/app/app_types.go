@@ -111,6 +111,7 @@ const (
 	overlayExportTemplate     // destination picker for Export Template (clipboard / file / template list)
 	overlayExportStrip        // field-category picker over the Export Template destinations (s key)
 	overlayPodResize          // in-place Pod CPU/memory resize (action menu key r on a Pod)
+	overlayKeymaps            // searchable keymaps overlay (which-key leader key)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
