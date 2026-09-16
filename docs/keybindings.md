@@ -31,7 +31,7 @@ Teleport history records owner, port-forward, orphan, finding, and mark jumps. H
 
 ## Goto navigation
 
-Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the goto which-key popup (configurable via `which_key_enabled` and `which_key_delay_ms`); `esc` or any unmapped key closes it.
+Vim-style `g`-prefix chords that switch the active resource type while keeping the current context and namespace filter. Press `g` to open the goto popup (configurable via `which_key_enabled`); `esc` or any unmapped key closes it.
 
 | Key | Resource |
 |---|---|
@@ -73,7 +73,7 @@ chords, which all start with `g`; re-point the ones you use at the new prefix.
 | Key | Action |
 |---|---|
 | `F1` | Toggle help screen |
-| `?` | Which-key action panel — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps — see [Keymaps Overlay](#keymaps-overlay) |
 | `P` | Toggle between details summary and YAML preview |
 | `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) |
 | `F` | Cycle layout: hide sidebar -> fullscreen -> restore (dashboards toggle fullscreen) |
@@ -314,11 +314,11 @@ When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and
 
 When items are selected, press `x` to open the bulk action menu (delete, force delete, scale, restart, diff).
 
-See [Which-Key Panel](#which-key-panel) for the `?` action panel.
+See [Keymaps Overlay](#keymaps-overlay) for the `?` key.
 
-## Which-Key Panel
+## Keymaps Overlay
 
-`?` opens a panel above the status bar listing the hotkeys actionable right now as one flat list, no section headers -- like neovim's which-key. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first, then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. Within each of those, letters and digits come first, then punctuation, then named keys (`F1`, `Space`, `Tab`). The panel is as tall as its content, capped at 25 rows and at the terminal height; longer content scrolls.
+`?` opens a searchable overlay listing all hotkeys available right now, organized by category. Search with `/`, arrow up/down to navigate, Enter to select. Entries flow down each column before moving right, clustered by category (below) so each color forms one contiguous run, and sorted within a category by modifier: plain keys first, then `Ctrl` chords, then `Alt`, then `Ctrl+Alt`. Within each of those, letters and digits come first, then punctuation, then named keys (`F1`, `Space`, `Tab`).
 
 The panel is context-aware per view. In the explorer it lists what the current row supports; in a fullscreen viewer it lists what that viewer supports in its current state -- visual mode swaps the yank and hides the normal-mode keys, an armed count prefix relabels `y`, the log viewer's follow, severity, and `--previous` toggles read their current direction, and the diff viewer's `Tab` disappears in unified mode.
 
@@ -343,9 +343,7 @@ The panel is context-aware per view. In the explorer it lists what the current r
 | `Esc` | Close |
 | any other key | Close, and still run normally |
 
-`?` no longer closes the panel -- it toggles the entry order. The chosen order is saved the moment you press the key and survives a restart; it is stored in `~/.local/state/lfk/whichkey_prefs.yaml`, never written back to your config file.
-
-Precedence: the saved choice wins over `which_key_grouped` (default `true`), which is only the startup default for someone who has never toggled. The state file also records the `which_key_grouped` value in force at the time, so changing that setting afterwards retires the saved choice and the new default applies again. Delete the state file to reset.
+Press `?` again to toggle between category order and key order. The chosen order is saved and survives a restart in `~/.local/state/lfk/whichkey_prefs.yaml`.
 
 Descriptions are colored by category, since there are no headers to say it. Keys keep one accent throughout -- the same green the hint bar draws hotkeys in, and no category uses it, so the key never matches the description beside it. In key order the color is the only category cue left, so both modes carry it. A legend row at the bottom of the panel names each color in that color, so the mapping doesn't have to be memorized -- only the categories actually offered on the current row appear in it, and it is omitted with `no_color`.
 
@@ -372,7 +370,7 @@ Keys render as glyphs when `icons` allows them; `simple`, `none`, and `no_color`
 
 `nerdfont` uses which-key.nvim's keycap glyphs (plain arrow keycaps for `left`/`right`/`up`/`down` — Material Design Icons has no dedicated keyboard-arrow set) and pads each modifier with a space, since the proportional Nerd Font variants draw a keycap wider than one cell. `unicode` keeps `enter`/`esc` as words: `⏎`/`⎋` are easily confused at one cell; `tab`/`backspace`/the arrows each have one unambiguous glyph, so those switch. The goto popup (`g`) has no categories and keeps a single description color.
 
-`?` is the leader in every view that has a panel, so `F1` is the help key there. Inside a search or filter prompt `?` stays a literal character. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the panel off (`?` then opens help again). `which_key_leader_delay_ms` (default `0`) delays the reveal, `which_key_grouped` (default `true`) sets the startup entry order until the leader key toggles it (saved in `~/.local/state/lfk/whichkey_prefs.yaml`).
+`?` opens the keymaps overlay in the explorer and fullscreen viewers. Inside a search or filter prompt `?` stays a literal character. Rebind with `which_key_leader`; set `which_key_enabled: false` to turn the overlay off (`?` then opens help instead).
 
 ## Bookmarks
 
@@ -465,7 +463,7 @@ The in-app screen is a quick reference: one binding per line, keys right-aligned
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
 | `Ctrl+K` | Toggle the schema side pane for the attribute under the cursor (configurable via `field_doc`) |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
@@ -491,7 +489,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `P` | Open the whole resource in the full YAML viewer |
 | `I` | Open the API Explorer at the selected item's schema |
 | `Ctrl+K` | Toggle the schema side pane for the selected item (configurable via `field_doc`) |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Full help |
 | `q` | Close the Object Explorer |
 | `Esc` | Clear filter / back one level / close at root |
@@ -525,7 +523,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
@@ -540,7 +538,7 @@ Press `b` on a resource to see what constrains it: ResourceQuotas and LimitRange
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Enter` | Jump to the row's object |
 | `R` | Re-run the scan |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `q` / `Esc` | Back to explorer |
 
 ## Log Viewer
@@ -589,7 +587,7 @@ Press `b` on a resource to see what constrains it: ResourceQuotas and LimitRange
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Full help |
 | `q` / `Esc` | Close log viewer |
 
@@ -625,7 +623,7 @@ Log Top aggregates a resource's logs into a table grouped by parsed attributes (
 | `n` / `N` | Next / previous search match |
 | `Tab` | Cycle the dimension `Enter` drills into |
 | `Enter` | Drill into selected group (descends to the next unused dimension, marked `▸` in its column header) |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `Esc` / `q` | Pop drill level, or return to log viewer |
 
 ## Exec Mode (embedded terminal)
@@ -710,7 +708,7 @@ from `terminal:` in the config.
 | `#` | Toggle line numbers |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `u` | Toggle unified/side-by-side view |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Full help |
 | `q` / `Esc` | Back to explorer |
 
@@ -749,7 +747,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy N lines from cursor (count-prefixed yank) |
-| `?` | Which-key panel (fullscreen viewer only) — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps (fullscreen viewer only) — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Open this help, scrolled to the Event Timeline section (`?` too, in the overlay) |
 | `q` / `Esc` | Close overlay (or exit fullscreen back to overlay) |
 
@@ -889,7 +887,7 @@ The editor picks one of two modes based on the value being edited:
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `?` | Which-key panel for this view — see [Which-Key Panel](#which-key-panel) |
+| `?` | Search keymaps for this view — see [Keymaps Overlay](#keymaps-overlay) |
 | `F1` | Full help |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |

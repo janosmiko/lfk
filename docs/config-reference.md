@@ -168,7 +168,7 @@ appearance:
 | `row_status_tint` | string | `"foreground"` | Emphasize failed/progressing rows as a fallback for when the Status cell is not visible. See [Row status tint](#row-status-tint) below. |
 | `layout` | string | `"normal"` | Default explorer layout for new tabs. One of: `"normal"` (three-column), `"sidebar_hidden"` (middle + right only), `"fullscreen"` (middle only). The `F` key cycles through these modes at runtime. |
 
-`icons` also decides how the which-key panel and the help screen's key column draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
+`icons` also decides how the keymaps overlay and the help screen's key column draw keys: Nerd Font keycaps (`󰘴 D`), Unicode symbols (`⌃D`), or names (`ctrl+d`).
 
 ### Row status tint
 

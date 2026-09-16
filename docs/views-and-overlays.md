@@ -52,7 +52,7 @@ Listed in `viewMode` declaration order.
 | `modeCredits`     | `:credits`                            | Scrolling credits screen.                                              |
 
 > Note: `?` also opens `modeHelp` from the overlays and exec mode, where
-> no which-key panel claims the key.
+> the keymaps overlay is not available.
 
 ## Fullscreen flags inside `modeExplorer`
 
