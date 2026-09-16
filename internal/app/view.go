@@ -166,17 +166,7 @@ func (m Model) renderView() string {
 			}
 		}
 
-		// Which-key panel. The leader arms in every mode with a catalog, so a
-		// fullscreen viewer draws the same bottom-anchored panel the explorer
-		// does. The viewer's own hint bar is swapped for the panel's
-		// scroll/close hints via the same last-line replacement the overlay
-		// branch above uses — the panel covers content rows, not the bar.
-		if m.whichKey.armed && m.whichKey.shown {
-			m.height = fullHeight
-			m = m.primeWhichKeyCells()
-			view = replaceLastLine(view, m.whichKeyLeaderHintBar())
-			view = m.renderWhichKeyLeader(view)
-		}
+		m = m.primeWhichKeyCells()
 
 		// Render help screen as overlay on top of the fullscreen view.
 		// Use fullHeight-1 for the overlay so the bottom status bar line
@@ -228,7 +218,6 @@ func (m Model) renderView() string {
 	// Render which-key popup when g prefix is armed and delay has elapsed.
 	// Placed after regular overlays so a real overlay still wins.
 	view = m.renderWhichKey(view)
-	view = m.renderWhichKeyLeader(view)
 
 	// Render help screen as an overlay on top of the explorer view.
 	// The status bar (bottom line) already renders the help search prompt,

@@ -161,7 +161,7 @@ func TestRenderWhichKeyPanel_ScrollClampsToTheEnd(t *testing.T) {
 	m := whichKeyTestModel()
 	m.width, m.height = 80, 24
 
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok || lay.maxScroll == 0 {
 		t.Fatalf("precondition: the full catalog must overflow at 80x24; maxScroll=%d", lay.maxScroll)
@@ -233,7 +233,7 @@ func TestRenderWhichKeyPanel_ColumnsAreUniformAndKeysRightAligned(t *testing.T) 
 	m := whichKeyTestModel()
 	m.width, m.height = 120, 40
 
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok {
 		t.Fatal("precondition: the panel must lay out at 120x40")
@@ -333,7 +333,7 @@ func TestRenderWhichKeyPanel_GeometryInvariantsAcrossAllSizes(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 
 	m := whichKeyTestModel()
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	fifthColAt := -1
 
 	for w := whichKeyMinWidth; w <= 250; w++ {
@@ -413,7 +413,7 @@ func TestWhichKeyOuterMarginFor_CheckpointsMatchOrBeatTheOldFlatMargin(t *testin
 
 	m := whichKeyTestModel()
 	m.height = 40
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("width=%d", tc.width), func(t *testing.T) {
 			if got := whichKeyOuterMarginFor(tc.width); got != tc.wantMargin {
@@ -463,114 +463,6 @@ func whichKeyLineGaps(line string, left, right rune) (int, int) {
 		}
 	}
 	return li, len(r) - ri - 1
-}
-
-// whichKeyRenderBenchModel is a full-catalog leader panel at the given size,
-// armed and shown, i.e. exactly what View() renders on every frame while the
-// user is paging.
-func whichKeyRenderBenchModel(w, h int) Model {
-	m := whichKeyTestModel()
-	m.width, m.height = w, h
-	m.whichKey = whichKeyState{armed: true, shown: true}
-	return m
-}
-
-// BenchmarkWhichKeyLeaderRender measures the per-frame cost of the panel.
-// Layout is what the hint bar and the scroll keys also pay, so it is measured
-// on its own alongside the full styled render.
-func BenchmarkWhichKeyLeaderRender(b *testing.B) {
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-
-	sizes := []struct {
-		name string
-		w, h int
-	}{
-		{"80x24", 80, 24},
-		{"120x40", 120, 40},
-	}
-	for _, s := range sizes {
-		m := whichKeyRenderBenchModel(s.w, s.h)
-		bg := strings.Repeat("x\n", s.h)
-		b.Run(s.name+"/Layout", func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderCells())
-			}
-		})
-		b.Run(s.name+"/Full", func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				_ = m.renderWhichKeyLeader(bg)
-			}
-		})
-	}
-}
-
-// wkLeaderRenderAllocPerRow caps allocations per RENDERED ROW of the panel.
-// Normalised per row on purpose: the panel is now as tall as its content, so a
-// flat per-call ceiling would move every time the catalog or the default
-// terminal size changes, and would say nothing about whether the layout itself
-// got more expensive. Measured at 78 allocs/row for the uniform-column grid
-// (61 before the group colors and the legend row landed), against 162/row for
-// the per-column-widest + gap-spreading layout it replaced — that old layout
-// would fail this guard, which is the point. The threshold still sits well
-// above the measurement so CI hardware variance can't flake it, while
-// a reintroduced per-cell re-measure or a whole-catalog render (instead of just
-// the viewport) still trips it.
-const wkLeaderRenderAllocPerRow = 140
-
-func TestWhichKeyLeaderRender_AllocationCeiling(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-
-	m := whichKeyRenderBenchModel(80, 24)
-	lay, ok := m.whichKeyLayoutFor(m.whichKeyLeaderCells())
-	if !ok {
-		t.Fatal("precondition: the panel must lay out at 80x24")
-	}
-	bg := strings.Repeat("x\n", 24)
-	res := testing.Benchmark(func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			_ = m.renderWhichKeyLeader(bg)
-		}
-	})
-	perRow := float64(res.MemAllocs) / float64(res.N) / float64(lay.viewRows)
-	if perRow > wkLeaderRenderAllocPerRow {
-		t.Fatalf("renderWhichKeyLeader allocates %.0f times per rendered row (threshold %d); the panel re-lays out on every frame, so a per-cell re-measure or a render of the whole catalog costs a full frame", perRow, wkLeaderRenderAllocPerRow)
-	}
-	t.Logf("renderWhichKeyLeader: %.0f allocs/op over %d rows = %.0f/row (threshold %d)",
-		float64(res.MemAllocs)/float64(res.N), lay.viewRows, perRow, wkLeaderRenderAllocPerRow)
-}
-
-// wkLeaderLayoutAllocThreshold caps the layout-only pass, which the hint bar
-// runs on every frame in ADDITION to the render above just to decide whether
-// to advertise the scroll keys. (The cells themselves are built once per frame
-// now — see primeWhichKeyCells — but the layout is still derived twice.)
-// Measured at 117 allocs/op, up from 61 before the group colors and the legend
-// row landed. The benchmark below builds the cells too, so the measurement
-// covers the worst case, not the cached one.
-const wkLeaderLayoutAllocThreshold = 200
-
-func TestWhichKeyLeaderLayout_AllocationCeiling(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-
-	m := whichKeyRenderBenchModel(80, 24)
-	res := testing.Benchmark(func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			_, _ = m.whichKeyLayoutFor(m.whichKeyLeaderCells())
-		}
-	})
-	allocs := float64(res.MemAllocs) / float64(res.N)
-	if allocs > wkLeaderLayoutAllocThreshold {
-		t.Fatalf("whichKeyLayoutFor allocates %.0f times per call (threshold %d); it must stay a plain row count, never a styled render", allocs, wkLeaderLayoutAllocThreshold)
-	}
-	t.Logf("whichKeyLayoutFor: %.0f allocs/op (threshold %d)", allocs, wkLeaderLayoutAllocThreshold)
 }
 
 // wkBoxGeometry measures a rendered panel's bordered box: the column its left
@@ -626,10 +518,9 @@ func TestWhichKeyPanel_GeometryIsScrollInvariantUnderTransparentBg(t *testing.T)
 	for _, size := range [][2]int{{200, 10}, {120, 20}, {80, 14}} {
 		m := whichKeyTestModel()
 		m.width, m.height = size[0], size[1]
-		m.whichKey.armed = true
 		m.whichKey.shown = true
 
-		cells := m.whichKeyLeaderCells()
+		cells := whichKeyActionCells(m)
 		lay, ok := m.whichKeyLayoutFor(cells)
 		if !ok {
 			t.Fatalf("%dx%d: the panel must lay out", size[0], size[1])
@@ -685,10 +576,9 @@ func TestWhichKeyLegend_StaysCentredUnderTransparentBg(t *testing.T) {
 
 	m := whichKeyTestModel()
 	m.width, m.height = 200, 10
-	m.whichKey.armed = true
 	m.whichKey.shown = true
 
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok || lay.legendRows == 0 || lay.maxScroll == 0 {
 		t.Fatalf("precondition: need a scrollable panel with a legend (ok=%v legendRows=%d maxScroll=%d)",

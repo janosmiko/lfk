@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -29,11 +28,10 @@ var whichKeyModeNames = func() map[viewMode]string {
 // the registry and pick up no coverage at all.
 //
 // The explorer is the one exclusion, and only because it already has the
-// equivalent sweeps of its own: TestAvailableWhichKeyActions_NoDuplicateKeysOffered,
-// TestWhichKeyLeader_AllEntriesReachableViaScrolling and the level-scoping
-// table. It also has no ui.ViewerHelpRows context — its keys are documented in
-// the general help sections, which TestWhichKeyRegistry_CoversEveryBinding
-// checks instead.
+// equivalent sweeps of its own: TestAvailableWhichKeyActions_NoDuplicateKeysOffered
+// and the level-scoping table. It also has no ui.ViewerHelpRows context — its
+// keys are documented in the general help sections, which
+// TestWhichKeyRegistry_CoversEveryBinding checks instead.
 func whichKeyViewerCatalogs() []whichKeyModeCatalog {
 	out := make([]whichKeyModeCatalog, 0, len(whichKeyCatalogList))
 	for _, mc := range whichKeyCatalogList {
@@ -63,20 +61,15 @@ func TestWhichKeyCatalogs_RegistryIsTheOnlySeam(t *testing.T) {
 	}
 }
 
-// TestWhichKeyCatalogs_EveryCatalogHasARenderSite ties the registry to the two
-// places renderView actually draws the panel: the explorer branch and the
-// fullscreen branch (view.go). Registering a catalog for a mode in neither one
-// arms the leader — and so hands whichKeyLeaderIntercept esc and ctrl+d/ctrl+u
-// to swallow — with nothing on screen to show for it. Invisible but stateful is
-// the worst thing a discovery aid can be, and no other guard would catch it:
-// they all call renderWhichKeyLeader directly rather than through renderView.
+// A catalog registered for neither the explorer nor a fullscreen mode is
+// unreachable: nothing ever dispatches "?" to it.
 func TestWhichKeyCatalogs_EveryCatalogHasARenderSite(t *testing.T) {
 	for _, mc := range whichKeyCatalogList {
 		if mc.mode == modeExplorer || isFullscreenRenderMode(mc.mode) {
 			continue
 		}
-		t.Errorf("%s has a catalog but renderView draws the panel in neither the explorer "+
-			"nor the fullscreen branch; add it to isFullscreenRenderMode or drop the catalog", mc.name)
+		t.Errorf("%s has a catalog but is neither the explorer nor a fullscreen mode; "+
+			"add it to isFullscreenRenderMode or drop the catalog", mc.name)
 	}
 }
 
@@ -465,60 +458,6 @@ func TestWhichKeyCatalogs_ZeroValueModelDoesNotPanic(t *testing.T) {
 	}
 }
 
-// TestWhichKeyCatalogs_AllEntriesReachableViaScrolling is the viewer half of
-// TestWhichKeyLeader_AllEntriesReachableViaScrolling: no entry may be
-// unreachable at any terminal size, and the scroll keys must actually get
-// there. Driven through the real key path and asserted on rendered text.
-func TestWhichKeyCatalogs_AllEntriesReachableViaScrolling(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	ui.ConfigWhichKeyLeaderDelayMs = 0
-
-	for _, mc := range whichKeyViewerCatalogs() {
-		for _, size := range [][2]int{{80, 14}, {80, 24}, {120, 40}} {
-			name := fmt.Sprintf("%s/%dx%d", mc.name, size[0], size[1])
-			t.Run(name, func(t *testing.T) {
-				m := whichKeyViewerModel(mc.mode)
-				m.width, m.height = size[0], size[1]
-
-				out, _ := m.handleKey(leaderKey())
-				m = out.(Model)
-				if !m.whichKey.shown {
-					t.Fatal("precondition: the leader must show the panel")
-				}
-				cells := m.whichKeyLeaderCells()
-				if len(cells) == 0 {
-					t.Fatal("the viewer catalog offered nothing at all")
-				}
-				lay, ok := m.whichKeyLayoutFor(cells)
-				if !ok {
-					t.Fatal("the panel must lay out")
-				}
-
-				bg := strings.Repeat("\n", m.height)
-				var rendered strings.Builder
-				rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
-				for step := 0; m.whichKey.scroll < lay.maxScroll; step++ {
-					if step > lay.bodyRows {
-						t.Fatalf("ctrl+d never reached the end (%d of %d)", m.whichKey.scroll, lay.maxScroll)
-					}
-					out, _ = m.handleKey(keyMsg(ui.ActiveKeybindings.PageDown))
-					m = out.(Model)
-					rendered.WriteString("\n")
-					rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
-				}
-				for _, c := range cells {
-					drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
-					if !strings.Contains(rendered.String(), drawn) {
-						t.Errorf("%q never appears at any scroll offset — unreachable", drawn)
-					}
-				}
-			})
-		}
-	}
-}
-
 // TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode: the catalog is keyed on
 // m.mode, so no mode may offer a label only some OTHER catalogue declares — a
 // viewer can never show the explorer's Delete/Scale rows, and the explorer can
@@ -562,15 +501,9 @@ func TestWhichKeyCatalogs_PanelIsScopedToItsOwnMode(t *testing.T) {
 	}
 }
 
-// TestWhichKeyCatalogs_UncataloguedModeOffersNothing: a mode with no catalog
-// must let the leader key fall through rather than open an empty box.
-//
-// modeExec is the deliberate one. handleExecKey forwards every unclaimed
-// keystroke straight into the PTY (ptyexec.go:186-202), so a catalog there
-// would advertise keys the shell swallows AND steal "?" from the program
-// running inside it — the panel's own arming runs ahead of handleModeKey
-// (update_keys.go:71-77). Its keymap is the Ctrl+] prefix, which is a chord
-// the panel has no way to express. The help screen documents it instead.
+// modeExec forwards every unclaimed keystroke to the PTY (ptyexec.go:186-202),
+// so it must offer nothing rather than steal "?" from the program running
+// inside it.
 func TestWhichKeyCatalogs_UncataloguedModeOffersNothing(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
@@ -581,9 +514,6 @@ func TestWhichKeyCatalogs_UncataloguedModeOffersNothing(t *testing.T) {
 		m.mode = mode
 		if got := m.availableWhichKeyActions(); len(got) != 0 {
 			t.Errorf("mode %v has no catalog but offered %d entries", mode, len(got))
-		}
-		if m.whichKeyLeaderArmable() {
-			t.Errorf("mode %v has no catalog but reports the leader armable", mode)
 		}
 	}
 }
@@ -1077,101 +1007,3 @@ func TestWhichKeyDescribe_YankHiddenWithTheCursorOffContent(t *testing.T) {
 }
 
 // --- rendering ---
-
-// TestPrimeWhichKeyCells_LeaderWinsOverAStalePendingG pins the ORDER of the two
-// cases in primeWhichKeyCells, which is load-bearing and looks arbitrary.
-//
-// pendingG and armed are only mutually exclusive in the explorer, where
-// handleGotoChord swallows the leader key while the g prefix is up. In a viewer
-// they are not: g sets pendingG (update_logs_normal.go), the default branch of
-// an unrecognised key clears only lineInput, so pendingG survives, and the
-// leader can then arm on top of it. Test armed second and the log viewer's
-// leader panel silently renders the explorer's goto cheatsheet instead of its
-// own keys. Every phase-2 viewer inherits the same stale-pendingG quirk
-// (update_diff.go, update_explain.go, the object explorer).
-func TestPrimeWhichKeyCells_LeaderWinsOverAStalePendingG(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-
-	m := whichKeyViewerModel(modeLogs)
-	m.pendingG = true // left behind by a g the viewer never cleared
-	m.whichKey.armed = true
-	m.whichKey.shown = true
-
-	m = m.primeWhichKeyCells()
-	if len(m.whichKey.cells) == 0 {
-		t.Fatal("the primed frame cache must hold the log viewer's cells")
-	}
-
-	descs := make([]string, 0, len(m.whichKey.cells))
-	for _, c := range m.whichKey.cells {
-		descs = append(descs, c.desc)
-	}
-	if !slices.Contains(descs, "Follow new lines") {
-		t.Errorf("an armed leader must show the log viewer's own cells; got %v", descs)
-	}
-	for _, gotoDesc := range []string{"list top", "Pods", "Deployments"} {
-		if slices.Contains(descs, gotoDesc) {
-			t.Errorf("the goto popup's %q leaked into the leader panel; primeWhichKeyCells must test armed before pendingG", gotoDesc)
-		}
-	}
-}
-
-// wkLastLine returns the bottom line of a rendered view — the hint bar in every
-// mode.
-func wkLastLine(view string) string {
-	lines := strings.Split(view, "\n")
-	return lines[len(lines)-1]
-}
-
-// TestWhichKeyCatalogs_PanelRendersOverEveryCatalogedMode proves the whole path
-// end to end for EVERY registered catalog: the leader key draws the bordered
-// panel over the mode's own content and swaps its hint bar for the panel's.
-//
-// This is the only guard that goes through renderView, which makes it the only
-// one that would notice a catalog whose panel is armed but never drawn — the
-// rest call renderWhichKeyLeader directly and so render a panel view.go would
-// not. Driven off the registry for exactly that reason: a phase-2 viewer left
-// out of this sweep would be the one thing nothing else covers.
-func TestWhichKeyCatalogs_PanelRendersOverEveryCatalogedMode(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	ui.ConfigWhichKeyLeaderDelayMs = 0
-
-	for _, mc := range whichKeyCatalogList {
-		t.Run(mc.name, func(t *testing.T) {
-			m := whichKeyViewerModel(mc.mode)
-			m.width, m.height = 100, 30
-			before := wkLastLine(stripANSI(m.renderView()))
-
-			out, _ := m.handleKey(leaderKey())
-			m = out.(Model)
-			if !m.whichKey.shown {
-				t.Fatal("precondition: the leader must show the panel")
-			}
-			cells := m.whichKeyLeaderCells()
-			if len(cells) == 0 {
-				t.Fatal("the catalog offered nothing at all")
-			}
-			lay, ok := m.whichKeyLayoutFor(cells)
-			if !ok {
-				t.Fatal("the panel must lay out at 100x30")
-			}
-
-			view := stripANSI(m.renderView())
-			drawn := cells[0].keyText() + " " + ui.Truncate(cells[0].desc, lay.grid.descW)
-			if !strings.Contains(view, drawn) {
-				t.Errorf("the panel must render %q over %s:\n%s", drawn, mc.name, view)
-			}
-			after := wkLastLine(view)
-			if !strings.Contains(after, "esc: close") {
-				t.Errorf("%s's hint bar must be the panel's while it is up; got %q", mc.name, after)
-			}
-			if after == before {
-				t.Errorf("%s's own hint bar must be swapped out, not kept; both read %q", mc.name, before)
-			}
-		})
-	}
-}

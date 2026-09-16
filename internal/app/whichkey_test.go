@@ -22,19 +22,30 @@ func restoreWhichKeyGlobals(t *testing.T) {
 	kb := ui.ActiveKeybindings
 	enabled := ui.ConfigWhichKeyEnabled
 	delay := ui.ConfigWhichKeyDelayMs
-	leaderDelay := ui.ConfigWhichKeyLeaderDelayMs
-	grouped := ui.ConfigWhichKeyGrouped
 	dim := ui.ConfigDimOverlay
 	icons := ui.IconMode
 	t.Cleanup(func() {
 		ui.ActiveKeybindings = kb
 		ui.ConfigWhichKeyEnabled = enabled
 		ui.ConfigWhichKeyDelayMs = delay
-		ui.ConfigWhichKeyLeaderDelayMs = leaderDelay
-		ui.ConfigWhichKeyGrouped = grouped
 		ui.ConfigDimOverlay = dim
 		ui.IconMode = icons
 	})
+}
+
+// whichKeyActionCells builds the current mode's full action list as cells,
+// the same way the removed leader panel did, for tests that need a larger
+// and more varied cell set than the goto popup's short list provides.
+func whichKeyActionCells(m Model) []whichKeyCell {
+	acts := m.availableWhichKeyActions()
+	kb := ui.ActiveKeybindings
+	cells := make([]whichKeyCell, 0, len(acts))
+	for _, a := range acts {
+		cells = append(cells, whichKeyCell{key: a.Key(kb), desc: a.Label, group: a.Group, order: a.Order})
+	}
+	sortWhichKeyCells(cells, true)
+	fillWhichKeyDisplay(cells)
+	return cells
 }
 
 // gotoTestModel returns an explorer model at LevelResourceTypes with a
@@ -359,7 +370,7 @@ func TestWhichKeyGridFor_GeometryIgnoresEntryOrder(t *testing.T) {
 	for _, icons := range []string{"nerdfont", "unicode", "simple"} {
 		ui.IconMode = icons
 		m := whichKeyTestModel()
-		grouped := m.whichKeyLeaderCells()
+		grouped := whichKeyActionCells(m)
 		byKey := append([]whichKeyCell(nil), grouped...)
 		sortWhichKeyCells(byKey, false)
 		reversed := append([]whichKeyCell(nil), grouped...)

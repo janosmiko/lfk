@@ -264,7 +264,9 @@ func (m Model) whichKeyCells() []whichKeyCell {
 	if pn := ui.ActiveKeybindings.PreviousNamespace; ui.GotoChordReachable(pn, prefix) {
 		cells = append(cells, whichKeyCell{key: strings.TrimPrefix(pn, prefix), desc: "Previous namespace"})
 	}
-	sortWhichKeyCells(cells, m.whichKeyGrouped())
+	// No groups on this popup, so ungrouped (pure key order) is the only sort
+	// that applies.
+	sortWhichKeyCells(cells, false)
 	fillWhichKeyDisplay(cells)
 	return cells
 }
