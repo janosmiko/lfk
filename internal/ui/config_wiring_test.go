@@ -24,6 +24,7 @@ import (
 const fullConfigYAML = `
 colorscheme: dracula
 log_path: /tmp/lfk-wiring-test.log
+startup_resource: deploy
 icons: nerdfont
 dashboard: false
 terminal: mux
@@ -213,6 +214,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	// Identity / pipeline-level settings.
 	assert.Equal(t, "dracula", ActiveSchemeName, "colorscheme")
 	assert.Equal(t, "/tmp/lfk-wiring-test.log", ConfigLogPath, "log_path")
+	assert.Equal(t, "deploy", ConfigStartupResource, "startup_resource")
 	assert.Equal(t, "ctrl+f5", ActiveKeybindings.Refresh, "keybindings")
 	assert.Equal(t, "ctrl+k", ActiveKeybindings.WhichKeyLeader, "keybindings.which_key_leader")
 	assert.Equal(t, "pod", SearchAbbreviations["zz"], "abbreviations")
@@ -477,6 +479,7 @@ var wiringCoveredFields = map[string]string{
 	"theme":                      "TestMergeThemeOverrides (mergeThemeOverrides is the LoadConfig wiring point)",
 	"keybindings":                "TestLoadConfig_AllSettingsWired + config_keybindings_test.go",
 	"log_path":                   "TestLoadConfig_AllSettingsWired",
+	"startup_resource":           "TestLoadConfig_AllSettingsWired",
 	"abbreviations":              "TestLoadConfig_AllSettingsWired",
 	"icons":                      "TestLoadConfig_AllSettingsWired",
 	"resource_columns":           "TestLoadConfig_AllSettingsWired",
@@ -593,6 +596,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origKB := ActiveKeybindings
 	origAbbr := SearchAbbreviations
 	origLogPath := ConfigLogPath
+	origStartupResource := ConfigStartupResource
 	origIcon := IconMode
 	origDashboard := ConfigDashboard
 	origTerminal := ConfigTerminalMode
@@ -697,6 +701,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ActiveKeybindings = origKB
 		SearchAbbreviations = origAbbr
 		ConfigLogPath = origLogPath
+		ConfigStartupResource = origStartupResource
 		IconMode = origIcon
 		ConfigDashboard = origDashboard
 		ConfigTerminalMode = origTerminal

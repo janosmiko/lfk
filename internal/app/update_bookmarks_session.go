@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -194,6 +197,13 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 			cmds = append(cmds, m.loadResources(false))
 			return m, tea.Batch(cmds...)
 		}
+		// A ref with no slash is a friendly name (startup resource), not a
+		// stale "group/version/resource" ref, so tell the user it did not
+		// resolve instead of silently landing on the resource-type browser.
+		if !ok && !needsDiscovery && !strings.Contains(sess.ResourceType, "/") {
+			m.setStatusMessage(fmt.Sprintf("Startup resource not found: %s", sess.ResourceType), true)
+			cmds = append(cmds, scheduleStatusClear())
+		}
 	}
 
 	if needsDiscovery {
@@ -321,7 +331,16 @@ func resolveSessionResourceType(ref string, discovered []model.ResourceTypeEntry
 	if rt, ok := model.FindResourceTypeIn(ref, discovered); ok {
 		return rt, true
 	}
-	return model.FindResourceTypeIn(ref, model.SeedResources())
+	if rt, ok := model.FindResourceTypeIn(ref, model.SeedResources()); ok {
+		return rt, true
+	}
+	// A startup resource stores a friendly name instead of a
+	// "group/version/resource" ref, so fall back to the `:resource`
+	// command bar's matching rules.
+	if rt, ok := resolveResourceTypeByName(ref, discovered); ok {
+		return rt, true
+	}
+	return resolveResourceTypeByName(ref, model.SeedResources())
 }
 
 func contextInList(ctx string, items []model.Item) bool {

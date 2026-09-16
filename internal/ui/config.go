@@ -150,6 +150,10 @@ func ClampWatchInterval(d time.Duration) time.Duration {
 // ConfigLogPath holds the log_path value from the config file (if any).
 var ConfigLogPath string
 
+// ConfigStartupResource holds the startup_resource value from the config
+// file (if any). The --resource flag overrides it.
+var ConfigStartupResource string
+
 // SearchAbbreviations maps short abbreviations to full resource type names for search.
 var SearchAbbreviations map[string]string
 

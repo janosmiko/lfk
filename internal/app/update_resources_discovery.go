@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -144,7 +147,12 @@ func (m Model) resumeDeferredSessionRestore(msgContext string, entries []model.R
 		name := m.sessionResourceNameAwaitingDiscovery
 		m.sessionResourceTypeAwaitingDiscovery = ""
 		m.sessionResourceNameAwaitingDiscovery = ""
-		if rt, ok := model.FindResourceTypeIn(ref, entries); ok {
+		rt, ok := model.FindResourceTypeIn(ref, entries)
+		if !ok {
+			// A startup resource carries a friendly name, not a ref.
+			rt, ok = resolveResourceTypeByName(ref, entries)
+		}
+		if ok {
 			rtRef := rt.ResourceRef()
 			for i, item := range merged {
 				if item.Extra == rtRef {
@@ -175,6 +183,13 @@ func (m Model) resumeDeferredSessionRestore(msgContext string, entries []model.R
 		// Discovery answered and this cluster has no such type. The parked
 		// filter and cursor have nowhere to land.
 		m.dropDeferredSessionRestore()
+		// A ref with no slash is a friendly name (startup resource); tell the
+		// user it did not resolve instead of silently dropping the request.
+		if !strings.Contains(ref, "/") {
+			m.setStatusMessage(fmt.Sprintf("Startup resource not found: %s", ref), true)
+			m.finishSessionRestore()
+			return m, scheduleStatusClear(), true
+		}
 	}
 	return m, nil, false
 }

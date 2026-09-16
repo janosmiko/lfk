@@ -296,6 +296,10 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		}
 	}
 
+	if resource := effectiveStartupResource(opts); resource != "" {
+		m.pendingSession = applyStartupResource(m.pendingSession, resource, contextName, defaultNS, startupAllNamespaces)
+	}
+
 	m.applyPinnedTypes()
 
 	m.helpSearchInput = textinput.New()

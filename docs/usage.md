@@ -68,6 +68,10 @@ lfk --read-only
 # Override the watch-mode polling interval (default 2s; clamped to [500ms, 10m])
 lfk --watch-interval 5s
 
+# Open directly on a resource type's list: a plural/singular/Kind name or
+# "name.group" for a CRD. Wins over startup_resource in the config file.
+lfk --resource deploy
+
 # Use a specific kubeconfig via environment variable
 KUBECONFIG=/path/to/config lfk
 
