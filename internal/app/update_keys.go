@@ -93,6 +93,8 @@ func (m *Model) inputActive() bool {
 		m.yamlView.searchMode || m.logView.searchActive || m.logView.filterActive ||
 		m.logTop.filterActive || m.logTop.searchActive ||
 		m.helpSearchActive || m.explainSearchActive ||
+		(m.mode == modeHelp && m.helpFilterActive) ||
+		(m.mode == modeObjectExplorer && m.objectExplorerView.filterActive) ||
 		m.diffView.searchMode || m.describeView.searchActive
 }
 
