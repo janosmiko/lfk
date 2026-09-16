@@ -61,7 +61,7 @@ func resourceNameMatches(resolved, targetGroup, itemResource, itemName, itemKind
 	if targetGroup == "" {
 		return true
 	}
-	return strings.Contains(itemGroup, targetGroup)
+	return itemGroup == targetGroup
 }
 
 // groupFromExtra extracts the API group (lowercased) from an Extra field

@@ -32,6 +32,7 @@ func TestResolveResourceTypeByName(t *testing.T) {
 
 	discovered := []model.ResourceTypeEntry{
 		{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+		{Kind: "Widget", APIGroup: "notexample.io", APIVersion: "v1", Resource: "widgets", Namespaced: true},
 		{Kind: "Widget", APIGroup: "example.io", APIVersion: "v1", Resource: "widgets", Namespaced: true},
 		{Kind: "Widget", APIGroup: "other.io", APIVersion: "v1", Resource: "widgets", Namespaced: true},
 	}
