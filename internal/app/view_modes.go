@@ -391,6 +391,11 @@ func (m *Model) ensureLogCursorVisible() {
 // sub-line to the viewport's bottom row when scrolling down. Cursor's first
 // sub-line to row 0 when scrolling up. Drops scrolloff for simplicity.
 func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
+	// A filter can empty the view while the cursor still reads 0, and the wrap
+	// math below indexes the cursor's line directly.
+	if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
+		return
+	}
 	availWidth := m.logWrapAvailWidth()
 
 	// Cursor above scroll → snap top.
@@ -401,17 +406,32 @@ func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
 		return
 	}
 
+	// Sanitizing a line allocates, and this runs on every cursor keystroke.
+	cursorLine := m.logMotionLine(m.logView.cursor)
+
 	// Compute the visual row where cursor's first wrapped sub-line will
 	// land given the current (logScroll, logWrapTopSkip).
 	cursorTopRow := -m.logView.wrapTopSkip
 	for i := m.logView.scroll; i < m.logView.cursor && i < len(m.logView.lines); i++ {
-		cursorTopRow += wrappedLineCount(m.logDisplayLine(i), availWidth)
+		cursorTopRow += wrappedLineCount(m.logMotionLine(i), availWidth)
 	}
-	cursorWrap := wrappedLineCount(m.logDisplayLine(m.logView.cursor), availWidth)
+	cursorWrap := wrappedLineCount(cursorLine, availWidth)
 	cursorBottomRow := cursorTopRow + cursorWrap - 1
 
-	if cursorBottomRow < viewH {
+	// Test the cursor's own sub-line, not the line's last one. Walking back
+	// along an over-height line leaves its bottom inside the viewport while the
+	// cursor has already moved above the top of it.
+	cursorRow := cursorTopRow + logCursorSubLineIndex(cursorLine, availWidth, m.logView.visualCurCol)
+	if cursorRow >= 0 && cursorRow < viewH && cursorBottomRow < viewH {
 		return // already visible
+	}
+	if cursorRow < 0 {
+		// Clipped above: re-anchor on the cursor's line and let the sub-line
+		// skip below place it.
+		m.logView.scroll = m.logView.cursor
+		m.logView.wrapTopSkip = logCursorSubLineSkip(cursorLine, availWidth, m.logView.visualCurCol, viewH)
+		m.clampLogScroll()
+		return
 	}
 
 	// Cursor's last sub-line is off the bottom. Place it at viewH-1 by
@@ -419,17 +439,17 @@ func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
 	// rows above sum to (viewH - cursorWrap).
 	target := viewH - cursorWrap
 	if target <= 0 {
-		// Cursor itself wraps to more than viewH rows: show its first
-		// viewH sub-lines so the cursor indicator (always on sub-line 0)
-		// stays visible at the top.
+		// The cursor line alone is taller than the viewport, so the window has
+		// to follow the cursor's own sub-line. It is no longer always sub-line
+		// zero: the block cursor now sits wherever its column falls.
 		m.logView.scroll = m.logView.cursor
-		m.logView.wrapTopSkip = 0
+		m.logView.wrapTopSkip = logCursorSubLineSkip(cursorLine, availWidth, m.logView.visualCurCol, viewH)
 		m.clampLogScroll()
 		return
 	}
 	accumulated := 0
 	for i := m.logView.cursor - 1; i >= 0; i-- {
-		wc := wrappedLineCount(m.logDisplayLine(i), availWidth)
+		wc := wrappedLineCount(m.logMotionLine(i), availWidth)
 		if accumulated+wc >= target {
 			m.logView.scroll = i
 			m.logView.wrapTopSkip = accumulated + wc - target
@@ -471,7 +491,7 @@ func (m *Model) logMaxScrollAndSkip() (int, int) {
 			// is longer than the rendered one and we'd overestimate
 			// wraps, shrinking maxScroll and pushing the tail off the
 			// bottom when following.
-			visualLines += wrappedLineCount(m.logDisplayLine(i), availWidth)
+			visualLines += wrappedLineCount(m.logMotionLine(i), availWidth)
 			if visualLines >= viewH {
 				maxScroll = i
 				topSkip = visualLines - viewH
@@ -502,17 +522,37 @@ func (m *Model) logWrapAvailWidth() int {
 	return max(contentWidth-1-lineNumWidth, 10)
 }
 
-// wrappedLineCount returns how many visual lines a source line produces
-// when wrapped at the given width.
+// logCursorSubLineIndex returns which wrapped sub-line holds col. It wraps
+// through ui.WrapLine so the boundaries match the renderer's.
+func logCursorSubLineIndex(line string, availWidth, col int) int {
+	subs := ui.WrapLine(line, availWidth)
+	idx, base := 0, 0
+	for i, sub := range subs {
+		idx = i
+		w := lipgloss.Width(sub)
+		if col < base+w {
+			break
+		}
+		base += w
+	}
+	return idx
+}
+
+// logCursorSubLineSkip returns the wrapTopSkip that keeps the cursor's own
+// wrapped sub-line inside a viewport too short to hold the whole source line.
+func logCursorSubLineSkip(line string, availWidth, col, viewH int) int {
+	idx := logCursorSubLineIndex(line, availWidth, col)
+	if idx < viewH {
+		return 0
+	}
+	return idx - viewH + 1
+}
+
+// wrappedLineCount returns how many visual lines a source line wraps to. It
+// wraps rather than divides: a wide glyph never straddles a row boundary, so
+// only the renderer's own rows count correctly.
 func wrappedLineCount(line string, width int) int {
-	if width <= 0 {
-		return 1
-	}
-	n := len([]rune(line))
-	if n == 0 {
-		return 1
-	}
-	return (n + width - 1) / width
+	return len(ui.WrapLine(line, width))
 }
 
 // renderScrollbackView formats the visible window of the scrollback ring

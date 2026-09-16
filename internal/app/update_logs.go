@@ -18,12 +18,13 @@ func (m Model) handleLogKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	// Handle visual select mode keys.
 	if m.logView.visualMode {
-		return m.handleLogVisualKey(msg)
+		ret, cmd := m.handleLogVisualKey(msg)
+		return withLogCursorColVisible(ret), cmd
 	}
 
 	// Try movement keys.
 	if ret, cmd, ok := m.handleLogMovementKey(msg); ok {
-		return ret, cmd
+		return withLogCursorColVisible(ret), cmd
 	}
 	// Try action/mode keys.
 	if ret, cmd, ok := m.handleLogActionKey(msg); ok {
@@ -31,6 +32,18 @@ func (m Model) handleLogKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.logView.lineInput = ""
 	return m, nil
+}
+
+// withLogCursorColVisible scrolls the wrapped viewport to the cursor's own
+// sub-line. Horizontal motions change only the column, so they never reach the
+// vertical scroll path and can walk the cursor off the bottom of the viewport.
+func withLogCursorColVisible(model tea.Model) tea.Model {
+	m, ok := model.(Model)
+	if !ok || !m.logView.wrap || m.logView.follow {
+		return model
+	}
+	m.adjustLogScrollForCursorWrap(max(m.logContentHeight(), 1))
+	return m
 }
 
 // handleLogMovementKey handles cursor/scroll movement keys in the log viewer.

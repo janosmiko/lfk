@@ -135,23 +135,28 @@ func (m Model) handleLogKeyG2() (tea.Model, tea.Cmd) {
 
 func (m Model) handleLogKeyH() Model {
 	n := consumeCountPrefix(&m.logView.lineInput)
-	m.logView.visualCurCol = max(m.logView.visualCurCol-n, 0)
+	m.logView.visualCurCol = m.logStepCol(-n)
 	return m
 }
 
 func (m Model) handleLogKeyL() Model {
 	n := consumeCountPrefix(&m.logView.lineInput)
-	m.logView.visualCurCol += n
+	m.logView.visualCurCol = m.logStepCol(n)
 	return m
+}
+
+// logStepCol moves the cursor column by n characters on the current line.
+func (m *Model) logStepCol(n int) int {
+	if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
+		return max(m.logView.visualCurCol+n, 0)
+	}
+	return stepCol(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol, n)
 }
 
 func (m Model) handleLogKeyDollar() Model {
 	m.logView.lineInput = ""
 	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
-		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-		if lineLen > 0 {
-			m.logView.visualCurCol = lineLen - 1
-		}
+		m.logView.visualCurCol = lastCol(m.logMotionLine(m.logView.cursor))
 	}
 	return m
 }
@@ -162,14 +167,14 @@ func (m Model) handleLogKeyE() Model {
 		if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 			break
 		}
-		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-		newCol := wordEnd(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		lineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
+		newCol := wordEnd(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol)
 		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
 			m.logView.cursor++
-			newCol = wordEnd(m.logView.lines[m.logView.cursor], 0)
-			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+			newCol = wordEnd(m.logMotionLine(m.logView.cursor), 0)
+			nextLineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
 			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
+				newCol = lastCol(m.logMotionLine(m.logView.cursor))
 			}
 			m.logView.visualCurCol = newCol
 			m.clampLogScroll()
@@ -186,11 +191,11 @@ func (m Model) handleLogKeyB() Model {
 		if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 			break
 		}
-		newCol := prevWordStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		newCol := prevWordStart(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol)
 		if newCol < 0 && m.logView.cursor > 0 {
 			m.logView.cursor--
-			lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-			newCol = max(prevWordStart(m.logView.lines[m.logView.cursor], lineLen), 0)
+			lineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
+			newCol = max(prevWordStart(m.logMotionLine(m.logView.cursor), lineLen), 0)
 			m.logView.visualCurCol = newCol
 			m.clampLogScroll()
 		} else {
@@ -264,14 +269,14 @@ func (m Model) handleLogKeyW() Model {
 		if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 			break
 		}
-		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-		newCol := nextWordStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		lineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
+		newCol := nextWordStart(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol)
 		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
 			m.logView.cursor++
-			newCol = nextWordStart(m.logView.lines[m.logView.cursor], 0)
-			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+			newCol = nextWordStart(m.logMotionLine(m.logView.cursor), 0)
+			nextLineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
 			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
+				newCol = lastCol(m.logMotionLine(m.logView.cursor))
 			}
 			m.logView.visualCurCol = newCol
 			m.clampLogScroll()
@@ -288,14 +293,14 @@ func (m Model) handleLogKeyW2() Model {
 		if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 			break
 		}
-		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-		newCol := nextWORDStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		lineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
+		newCol := nextWORDStart(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol)
 		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
 			m.logView.cursor++
-			newCol = nextWORDStart(m.logView.lines[m.logView.cursor], 0)
-			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+			newCol = nextWORDStart(m.logMotionLine(m.logView.cursor), 0)
+			nextLineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
 			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
+				newCol = lastCol(m.logMotionLine(m.logView.cursor))
 			}
 			m.logView.visualCurCol = newCol
 			m.clampLogScroll()
@@ -312,14 +317,14 @@ func (m Model) handleLogKeyE2() Model {
 		if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 			break
 		}
-		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-		newCol := WORDEnd(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		lineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
+		newCol := WORDEnd(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol)
 		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
 			m.logView.cursor++
-			newCol = WORDEnd(m.logView.lines[m.logView.cursor], 0)
-			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+			newCol = WORDEnd(m.logMotionLine(m.logView.cursor), 0)
+			nextLineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
 			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
+				newCol = lastCol(m.logMotionLine(m.logView.cursor))
 			}
 			m.logView.visualCurCol = newCol
 			m.clampLogScroll()
@@ -336,11 +341,11 @@ func (m Model) handleLogKeyB2() Model {
 		if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 			break
 		}
-		newCol := prevWORDStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		newCol := prevWORDStart(m.logMotionLine(m.logView.cursor), m.logView.visualCurCol)
 		if newCol < 0 && m.logView.cursor > 0 {
 			m.logView.cursor--
-			lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
-			newCol = max(prevWORDStart(m.logView.lines[m.logView.cursor], lineLen), 0)
+			lineLen := ui.LineWidth(m.logMotionLine(m.logView.cursor))
+			newCol = max(prevWORDStart(m.logMotionLine(m.logView.cursor), lineLen), 0)
 			m.logView.visualCurCol = newCol
 			m.clampLogScroll()
 		} else {
@@ -353,7 +358,7 @@ func (m Model) handleLogKeyB2() Model {
 func (m Model) handleLogKeyCaret() Model {
 	m.logView.lineInput = ""
 	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
-		m.logView.visualCurCol = firstNonWhitespace(m.logView.lines[m.logView.cursor])
+		m.logView.visualCurCol = firstNonWhitespace(m.logMotionLine(m.logView.cursor))
 	}
 	return m
 }
@@ -564,7 +569,7 @@ func (m Model) handleLogNormalCopy() (tea.Model, tea.Cmd) {
 	end := min(m.logView.cursor+n, len(m.logView.lines))
 	parts := make([]string, 0, end-m.logView.cursor)
 	for i := m.logView.cursor; i < end; i++ {
-		parts = append(parts, m.logDisplayLine(i))
+		parts = append(parts, m.logMotionLine(i))
 	}
 	m.setStatusMessage(formatCopiedLines(len(parts)), false)
 	return m, tea.Batch(copyToSystemClipboard(strings.Join(parts, "\n")), scheduleStatusClear())

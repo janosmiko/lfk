@@ -1,6 +1,10 @@
 package app
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/janosmiko/lfk/internal/ui"
+)
 
 // visualCopyText extracts text from lines based on visual selection mode.
 // This is shared between describe and diff visual copy.
@@ -19,7 +23,9 @@ func visualCopyText(lines []string, selStart, selEnd int, mode rune, anchorCol, 
 	}
 }
 
-// visualCopyChar extracts character-mode visual selection text.
+// visualCopyChar extracts character-mode visual selection text. Columns are
+// cell columns, the same unit the selection highlight is drawn in, so the
+// clipboard holds exactly the text the user saw highlighted.
 func visualCopyChar(lines []string, selStart, selEnd, anchorCol, cursorCol int, reversed bool) string {
 	var parts []string
 	startCol, endCol := anchorCol, cursorCol
@@ -28,24 +34,15 @@ func visualCopyChar(lines []string, selStart, selEnd, anchorCol, cursorCol int, 
 	}
 	for i := selStart; i <= selEnd; i++ {
 		line := lines[i]
-		runes := []rune(line)
-		if selStart == selEnd {
-			cs := min(anchorCol, cursorCol)
-			ce := max(anchorCol, cursorCol) + 1
-			if cs > len(runes) {
-				cs = len(runes)
-			}
-			if ce > len(runes) {
-				ce = len(runes)
-			}
-			parts = append(parts, string(runes[cs:ce]))
-		} else if i == selStart {
-			cs := min(startCol, len(runes))
-			parts = append(parts, string(runes[cs:]))
-		} else if i == selEnd {
-			ce := min(endCol+1, len(runes))
-			parts = append(parts, string(runes[:ce]))
-		} else {
+		w := ui.LineWidth(line)
+		switch {
+		case selStart == selEnd:
+			parts = append(parts, ui.CutCols(line, min(anchorCol, cursorCol), max(anchorCol, cursorCol)+1))
+		case i == selStart:
+			parts = append(parts, ui.CutCols(line, startCol, w))
+		case i == selEnd:
+			parts = append(parts, ui.CutCols(line, 0, endCol+1))
+		default:
 			parts = append(parts, line)
 		}
 	}
@@ -58,17 +55,7 @@ func visualCopyBlock(lines []string, selStart, selEnd, col1, col2 int) string {
 	colEnd := max(col1, col2) + 1
 	var parts []string
 	for i := selStart; i <= selEnd; i++ {
-		line := lines[i]
-		runes := []rune(line)
-		cs := colStart
-		ce := colEnd
-		if cs > len(runes) {
-			cs = len(runes)
-		}
-		if ce > len(runes) {
-			ce = len(runes)
-		}
-		parts = append(parts, string(runes[cs:ce]))
+		parts = append(parts, ui.CutCols(lines[i], colStart, colEnd))
 	}
 	return strings.Join(parts, "\n")
 }
