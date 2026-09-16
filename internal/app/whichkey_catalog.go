@@ -257,15 +257,3 @@ func (m *Model) availableWhichKeyActions() []whichKeyEntry {
 	}
 	return cat.available(m)
 }
-
-// whichKeyLeaderArmable reports whether the leader key should open the panel in
-// the current mode: the panel is enabled, the mode has a catalog, and no text
-// input owns the keyboard — inside a search or filter prompt "?" is a
-// character the user is typing, not a command.
-func (m *Model) whichKeyLeaderArmable() bool {
-	if !ui.ConfigWhichKeyEnabled {
-		return false
-	}
-	cat, ok := whichKeyCatalogs[m.mode]
-	return ok && !cat.inputFocused(m)
-}

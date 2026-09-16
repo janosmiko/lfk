@@ -143,7 +143,6 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		sessionColumns:             colPrefs.sessionColumns,
 		hiddenBuiltinColumns:       colPrefs.hiddenBuiltinColumns,
 		columnOrder:                colPrefs.columnOrder,
-		whichKey:                   whichKeyState{grouping: loadWhichKeyGrouping()},
 		activeSession:              activeSession,
 		cursorMemory:               make(map[string]int),
 		filterMemory:               make(map[string]savedFilter),

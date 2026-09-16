@@ -17,24 +17,20 @@ import (
 
 // --- Exec terminal (deliberately uncatalogued) ---
 
-// TestWhichKeyExec_LeaderNeverArmsInThePTY is the executable half of the
-// exec-mode decision. handleExecKey forwards every unclaimed keystroke into the
-// PTY (ptyexec.go:186-202), so the leader must stay unarmed there and leave "?"
-// to the program running inside — a shell prompt, a pager's help, vim's
-// register. Giving exec a catalog would consume "?" one dispatch step earlier
-// (update_keys.go:71-77) and the PTY would never see it.
-func TestWhichKeyExec_LeaderNeverArmsInThePTY(t *testing.T) {
+// handleExecKey forwards every unclaimed keystroke into the PTY
+// (ptyexec.go:186-202), so exec has no which-key catalog and "?" must reach
+// the program running inside instead of opening the overlay.
+func TestWhichKeyExec_LeaderNeverOpensOverlayInThePTY(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
-	ui.ConfigWhichKeyLeaderDelayMs = 0
 
 	m := whichKeyTestModel()
 	m.mode = modeExec
 	out, _ := m.handleKey(leaderKey())
 	got := out.(Model)
-	if got.whichKey.armed || got.whichKey.shown {
-		t.Errorf("the leader must not arm in the exec terminal; armed=%v shown=%v", got.whichKey.armed, got.whichKey.shown)
+	if got.overlay == overlayKeymaps {
+		t.Error("the leader must not open the keymaps overlay in the exec terminal")
 	}
 	if got.mode != modeExec {
 		t.Errorf("the key must fall through to handleExecKey, not change mode; got %v", got.mode)
@@ -283,11 +279,8 @@ func TestWhichKeyExplain_HelpKeyIgnoresTheHelpRebind(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLevelledViewers_QuitLabelsSayCloseNotBack pins the label against
-// its handler in the two viewers that have levels. handleExplainKeyQ and
-// exitObjectExplorer both leave outright at any depth; the step back one level
-// is esc's, and esc is never advertised (whichKeyLeaderIntercept eats it while
-// the panel is shown). "Back" there named the wrong key's behaviour.
+// handleExplainKeyQ and exitObjectExplorer both leave outright at any depth.
+// Stepping back one level is esc's job, so "q" must never be labelled "Back".
 func TestWhichKeyLevelledViewers_QuitLabelsSayCloseNotBack(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()

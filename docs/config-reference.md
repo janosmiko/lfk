@@ -38,8 +38,6 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `goto_targets` | map | `{}` | Extra g-prefix goto chords. Key = full chord (e.g. `gA`), which must be `jump_top` plus one keypress (`gA`, `gctrl+p`); value = `{kind, group, name}`. Overrides built-ins on collision. |
 | `which_key_enabled` | bool | `true` | Show the goto popup while the `g` prefix is pending, and the action panel while the which-key leader (`?`) is armed (explorer and every fullscreen viewer except exec mode). |
 | `which_key_delay_ms` | int | `0` | Delay before the goto popup appears (ms, 0-2000). |
-| `which_key_leader_delay_ms` | int | `0` | Delay before the which-key action panel appears (ms, 0-2000). |
-| `which_key_grouped` | bool | `true` | Startup order of the action panel: `true` groups by category, `false` sorts by key. The leader key toggles it and saves the choice to `~/.local/state/lfk/whichkey_prefs.yaml`, which then outranks this setting; changing this setting afterwards retires the saved choice. |
 | `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |
 | `exec_shells` | list[string] | `["bash -i", "ash", "sh"]` | Shell preference order for exec into a Linux container. Entries may carry arguments. The last entry runs even when it is absent, so it must be a shell every image ships. Entries with shell metacharacters are dropped. |
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context and per-union-set in `~/.local/state/lfk/pinned.yaml`). |
@@ -1252,7 +1250,6 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `$XDG_STATE_HOME/lfk/hidden_types.yaml` | Per-context and per-union-set hidden resource types, managed via the action menu (`x`) at the resource types level (default: `~/.local/state/lfk/hidden_types.yaml`) |
 | `$XDG_STATE_HOME/lfk/pinned_summaries.yaml` | Per-context and per-union-set resource-type summaries pinned to the cluster dashboard, managed via the action menu (default: `~/.local/state/lfk/pinned_summaries.yaml`) |
 | `$XDG_STATE_HOME/lfk/viewer_prefs.yaml` | Log, YAML, diff, describe, and explorer display toggles from their runtime keys, auto-managed; outranks the `log_viewer` and viewer-default config groups (default: `~/.local/state/lfk/viewer_prefs.yaml`) |
-| `$XDG_STATE_HOME/lfk/whichkey_prefs.yaml` | Which-key panel entry order from the leader-key toggle, auto-managed; outranks `which_key_grouped` (default: `~/.local/state/lfk/whichkey_prefs.yaml`) |
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
 
 State files stored at the legacy `~/.config/lfk/` location are automatically migrated to the new XDG state directory on first access.

@@ -128,7 +128,7 @@ func TestWhichKeyStyles_NoColorKeepsTheKeyBold(t *testing.T) {
 
 // The catalog's Group must survive onto the cell — that is the only path by
 // which the accent reaches the screen.
-func TestWhichKeyLeaderCells_CarryTheCatalogGroup(t *testing.T) {
+func TestWhichKeyActionCells_CarryTheCatalogGroup(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	ui.ConfigWhichKeyEnabled = true
@@ -150,7 +150,7 @@ func TestWhichKeyLeaderCells_CarryTheCatalogGroup(t *testing.T) {
 	}
 	groups := map[whichKeyGroup]bool{}
 	st := newWhichKeyCellStyles()
-	for _, c := range m.whichKeyLeaderCells() {
+	for _, c := range whichKeyActionCells(m) {
 		// Comparing against the catalog's own group, not merely against "":
 		// one wrong-but-non-empty group on every cell would pass that.
 		switch want, ok := byKey[c.key]; {
@@ -223,7 +223,7 @@ func TestWhichKeyGroupStyles_NoColorCollapsesButStillRenders(t *testing.T) {
 	ui.ConfigWhichKeyEnabled = true
 	m := whichKeyTestModel()
 	m.width, m.height = 120, 40
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
 	if !strings.Contains(out, cells[0].desc) {
 		t.Errorf("no-color panel dropped its first entry %q:\n%s", cells[0].desc, out)
@@ -352,7 +352,7 @@ func TestRenderWhichKeyPanel_SymbolsNeverExceedTerminalWidth(t *testing.T) {
 		for _, size := range [][2]int{{20, 12}, {40, 16}, {80, 24}, {120, 40}, {186, 40}, {187, 40}, {227, 40}, {228, 40}, {250, 40}} {
 			m := whichKeyTestModel()
 			m.width, m.height = size[0], size[1]
-			cells := m.whichKeyLeaderCells()
+			cells := whichKeyActionCells(m)
 			lay, ok := m.whichKeyLayoutFor(cells)
 			if !ok {
 				continue // too small to draw at all — covered elsewhere
@@ -385,7 +385,7 @@ func TestWhichKeyCell_KeyStaysTheRawBinding(t *testing.T) {
 	for _, a := range m.availableWhichKeyActions() {
 		bound[a.Key(kb)] = true
 	}
-	for _, c := range m.whichKeyLeaderCells() {
+	for _, c := range whichKeyActionCells(m) {
 		if !bound[c.key] {
 			t.Errorf("cell key %q is not a binding; the symbol form must not be stored", c.key)
 		}
