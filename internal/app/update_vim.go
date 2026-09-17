@@ -136,6 +136,11 @@ func colIndex(cols []int, col int) int {
 	switch {
 	case i >= len(cols):
 		i = len(cols) - 1
+	case exact:
+		// Skip past duplicate offsets from zero-width clusters.
+		for i+1 < len(cols)-1 && cols[i+1] == col {
+			i++
+		}
 	case !exact && i > 0:
 		i--
 	}

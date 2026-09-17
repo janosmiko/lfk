@@ -53,6 +53,14 @@ func TestWordMotion_GraphemeClusters(t *testing.T) {
 	}
 }
 
+// A zero-width cluster (tab) shares its column offset with the next visible
+// character. Without the duplicate-offset guard in colIndex, w/W stays stuck.
+func TestWordMotion_ZeroWidthTab(t *testing.T) {
+	line := "\tfoo bar"
+	assert.Equal(t, 4, nextWordStart(line, 0))
+	assert.Equal(t, 4, nextWORDStart(line, 0))
+}
+
 // W/B/E share nextStart/wordEndWith/prevStart with w/b/e, so a WORD-motion
 // regression would share the same broken column arithmetic.
 func TestWORDMotion_GraphemeClusters(t *testing.T) {
