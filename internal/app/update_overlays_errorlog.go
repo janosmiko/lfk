@@ -224,22 +224,15 @@ func (m Model) errorLogYank() (tea.Model, tea.Cmd) {
 		}
 		for i := selStart; i <= selEnd && i < len(reversed); i++ {
 			plain := ui.ErrorLogEntryPlainText(reversed[i])
-			runes := []rune(plain)
-			if selStart == selEnd {
+			switch {
+			case selStart == selEnd:
 				// Single line: extract between columns.
-				cStart := min(startCol, endCol)
-				cEnd := min(max(startCol, endCol)+1, len(runes))
-				if cStart < len(runes) {
-					lines = append(lines, string(runes[cStart:cEnd]))
-				}
-			} else if i == selStart {
-				if startCol < len(runes) {
-					lines = append(lines, string(runes[startCol:]))
-				}
-			} else if i == selEnd {
-				cEnd := min(endCol+1, len(runes))
-				lines = append(lines, string(runes[:cEnd]))
-			} else {
+				lines = append(lines, ui.CutCols(plain, min(startCol, endCol), max(startCol, endCol)+1))
+			case i == selStart:
+				lines = append(lines, ui.CutCols(plain, startCol, ui.LineWidth(plain)))
+			case i == selEnd:
+				lines = append(lines, ui.CutCols(plain, 0, endCol+1))
+			default:
 				lines = append(lines, plain)
 			}
 		}
