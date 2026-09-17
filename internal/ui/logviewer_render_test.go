@@ -385,6 +385,9 @@ func TestRenderLines_CursorInsidePodPrefixKeepsText(t *testing.T) {
 		for name, got := range map[string]string{"wrapped": wrapped[0], "plain": plain[0]} {
 			assert.Equal(t, "▎"+line, ansi.Strip(got), "%s col=%d", name, col)
 			assert.Contains(t, got, prefixColor, "%s col=%d", name, col)
+			before, _, found := strings.Cut(got, CursorBlockStyle.Render(line[col:col+1]))
+			assert.True(t, found, "%s col=%d: no cursor block", name, col)
+			assert.Equal(t, "▎"+line[:col], ansi.Strip(before), "%s col=%d", name, col)
 		}
 	}
 }
