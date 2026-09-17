@@ -23,17 +23,6 @@ func (m Model) handleExplorerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// The which-key leader is a pure overlay: the scroll keys move it, esc
-	// closes it, and every other key closes it and then runs its normal action.
-	// Because every listed action already has a bare binding here, "run the
-	// listed action" and "fall through" are the same thing — one dispatch path,
-	// so the panel can never disagree with what the key actually does.
-	mdl, consumed := m.whichKeyLeaderIntercept(msg)
-	m = mdl
-	if consumed {
-		return m, nil
-	}
-
 	if m.pendingMark {
 		m.pendingMark = false
 		key := msg.String()
@@ -113,25 +102,25 @@ func ctrlSpaceAlias(binding string) string {
 // which-key leader. Split out of handleExplorerNavKey to keep that function
 // under the gocyclo budget; it must stay ahead of handleExplorerUIKey in the
 // chain so the leader wins the "?" it shares with kb.Help.
-func (m Model) handleExplorerSelectionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+func (m Model) handleExplorerSelectionKey(msg tea.KeyPressMsg) (tea.Model, bool) {
 	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case kb.SelectRange, ctrlSpaceAlias(kb.SelectRange):
-		return m.handleKeySelectRange(), nil, true
+		return m.handleKeySelectRange(), true
 	case kb.ToggleSelect:
-		return m.handleKeyToggleSelect(), nil, true
+		return m.handleKeyToggleSelect(), true
 	case kb.SelectAll:
-		return m.handleKeySelectAll(), nil, true
+		return m.handleKeySelectAll(), true
 	case kb.WhichKeyLeader:
-		// With the panel disabled the leader key opens nothing, so let it fall
-		// through to whatever else claims it (kb.Help, by default).
-		if !ui.ConfigWhichKeyEnabled {
-			return m, nil, false
+		// No catalog, or a filter/search input owns the keyboard: let the key
+		// fall through to whatever else claims it (kb.Help, by default).
+		cat, ok := whichKeyCatalogs[m.mode]
+		if !ok || cat.inputFocused(&m) {
+			return m, false
 		}
-		mdl, cmd := m.armWhichKeyLeader()
-		return mdl, cmd, true
+		return m.openKeymapsOverlay(), true
 	}
-	return m, nil, false
+	return m, false
 }
 
 func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
@@ -153,8 +142,8 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	if mdl, cmd, handled := m.handleExplorerJumpKey(msg); handled {
 		return mdl, cmd, true
 	}
-	if mdl, cmd, handled := m.handleExplorerSelectionKey(msg); handled {
-		return mdl, cmd, true
+	if mdl, handled := m.handleExplorerSelectionKey(msg); handled {
+		return mdl, nil, true
 	}
 
 	switch msg.String() {

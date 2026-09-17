@@ -187,15 +187,13 @@ func TestSortWhichKeyCells_IsDeterministic(t *testing.T) {
 	}
 }
 
-// TestWhichKeyLeaderCells_AreSorted: the panel's entries must come out sorted,
-// not in catalog declaration order, which is what made the old panel look
-// arbitrary. With the group headers gone this now covers the WHOLE list rather
-// than each section separately.
-func TestWhichKeyLeaderCells_AreSorted(t *testing.T) {
+// TestWhichKeyActionCells_AreSorted: sortWhichKeyCells must sort the full
+// action catalog, not just leave it in catalog declaration order.
+func TestWhichKeyActionCells_AreSorted(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	cells := whichKeyTestModel().whichKeyLeaderCells()
+	cells := whichKeyActionCells(whichKeyTestModel())
 	want := slices.Clone(cells)
 	sortWhichKeyCells(want, true)
 	if !slices.Equal(cells, want) {
@@ -298,14 +296,14 @@ func TestWkKeyShapeRank_ClassifiesEveryKeyShape(t *testing.T) {
 	}
 }
 
-// The same property on the real panel: the catalog's own "f1" (Full help) must
-// come after every single-character key of its group and before the group's
-// first ctrl chord.
-func TestWhichKeyLeaderCells_NamedKeysSortAfterTheLetters(t *testing.T) {
+// The same property on the real catalog: "f1" (Full help) must come after
+// every single-character key of its group and before the group's first ctrl
+// chord.
+func TestWhichKeyActionCells_NamedKeysSortAfterTheLetters(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	cells := whichKeyTestModel().whichKeyLeaderCells()
+	cells := whichKeyActionCells(whichKeyTestModel())
 	namedAt, lastSingleAt, firstChordAt := -1, -1, -1
 	var group whichKeyGroup
 	for i, c := range cells {
@@ -497,15 +495,14 @@ func TestWkOrderRank_UnsetFallsThroughToTheLargestRank(t *testing.T) {
 	}
 }
 
-// TestWhichKeyRegistry_SortGroupOrderMatchesTheUserDecision is the end-to-end
-// version of TestSortWhichKeyCells_ExplicitOrderOverridesTheKeySort, run
+// End-to-end version of TestSortWhichKeyCells_ExplicitOrderOverridesTheKeySort
 // against the real catalog: SortPrev/SortNext/SortFlip/SortReset must render
-// as "<", ">", "=", "-" in that order once wired through whichKeyLeaderCells.
+// as "<", ">", "=", "-" in that order.
 func TestWhichKeyRegistry_SortGroupOrderMatchesTheUserDecision(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 
-	cells := whichKeyTestModel().whichKeyLeaderCells()
+	cells := whichKeyActionCells(whichKeyTestModel())
 	var sortKeys []string
 	for _, c := range cells {
 		if c.group == wkSort {

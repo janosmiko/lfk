@@ -53,6 +53,8 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	m.logView.podFilterActive = false
 	m.logView.containerFilterActive = false
 	m.columnToggleFilterActive = false
+	m.keymapsFilterMode = false
+	m.keymapsFilter.Clear()
 	m.overlayFilter.Clear()
 	m.bookmarkFilter.Clear()
 	m.templateFilter.Clear()
@@ -110,6 +112,8 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.CopyYAML
 	case overlayCopyField:
 		return key == kb.CopyField
+	case overlayKeymaps:
+		return key == kb.WhichKeyLeader
 	}
 	return false
 }
@@ -189,6 +193,9 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd,
 		return mdl, cmd, true
 	case overlayFilterPreset:
 		mdl, cmd := m.handleFilterPresetOverlayKey(msg)
+		return mdl, cmd, true
+	case overlayKeymaps:
+		mdl, cmd := m.handleKeymapsOverlayKey(msg)
 		return mdl, cmd, true
 	}
 	return m, nil, false

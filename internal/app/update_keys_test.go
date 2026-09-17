@@ -702,13 +702,13 @@ func TestPush2HandleKeyExplorerModeColon(t *testing.T) {
 	assert.True(t, rm.commandBarActive)
 }
 
-// In the explorer "?" arms the which-key leader rather than opening help.
+// In the explorer "?" opens the keymaps overlay rather than help.
 func TestPush2HandleKeyExplorerModeQuestion(t *testing.T) {
 	m := basePush80v2Model()
 	result, _ := m.handleKey(keyMsg("?"))
 	rm := result.(Model)
 	assert.NotEqual(t, modeHelp, rm.mode)
-	assert.True(t, rm.whichKey.armed)
+	assert.Equal(t, overlayKeymaps, rm.overlay)
 }
 
 func TestPush3HandleKeyHelp(t *testing.T) {

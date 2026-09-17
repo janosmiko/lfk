@@ -17,17 +17,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.statusMessageTip = false
 	}
 
-	// The which-key leader must claim its keys before ANY other handler gets a
-	// chance to — mouse-toggle, tab-switch, and mode-specific handlers below
-	// all run ahead of handleExplorerKey's own copy of this guard (kept there
-	// too, for callers that invoke it directly), and previously left the leader
-	// armed indefinitely after, e.g., the mouse-capture toggle key.
-	mdl, consumed := m.whichKeyLeaderIntercept(msg)
-	m = mdl
-	if consumed {
-		return m, nil
-	}
-
 	// Handle regular overlays first so when an overlay (e.g. the theme
 	// selector) is opened on top of the error log, its own keys —
 	// including j/k navigation and Esc — reach handleOverlayKey instead
@@ -69,12 +58,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return mdl, cmd
 	}
 
-	// The which-key leader arms in every mode that has a catalog, not only the
-	// explorer. It must run ahead of handleModeKey so it wins the "?" it
-	// shares with kb.Help, the same ordering handleExplorerSelectionKey gives
-	// it inside the explorer.
-	if mdl, cmd, handled := m.handleViewerWhichKeyLeader(msg); handled {
-		return mdl, cmd
+	// Runs ahead of handleModeKey so it wins the "?" it shares with kb.Help,
+	// same ordering as handleExplorerSelectionKey inside the explorer.
+	if leader := ui.ActiveKeybindings.WhichKeyLeader; leader != "" && msg.String() == leader && m.mode != modeExplorer {
+		cat, ok := whichKeyCatalogs[m.mode]
+		if ok && !cat.inputFocused(&m) {
+			mdl := m.openKeymapsOverlay()
+			return mdl, nil
+		}
 	}
 
 	// Dispatch to mode-specific handlers.

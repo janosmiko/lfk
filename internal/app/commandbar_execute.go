@@ -267,21 +267,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 	// command-palette autocomplete without forcing the user to memorize
 	// single-letter chords.
 	case "errors", "warnings":
-		// Equivalent to the `!` hotkey on the Events list -- toggles the
-		// "warnings only" filter. No-op (with status hint) when invoked
-		// outside the Events view since there's nothing to filter.
-		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Event" {
-			m.warningEventsOnly = !m.warningEventsOnly
-			m.rebuildEventsFromCache()
-			if m.warningEventsOnly {
-				m.setStatusMessage("Showing warnings only", false)
-			} else {
-				m.setStatusMessage("Showing all events", false)
-			}
-			return m, scheduleStatusClear()
-		}
-		m.setStatusMessage(":errors only applies to the Events view", true)
-		return m, scheduleStatusClear()
+		return m.executeErrorsCommand()
 
 	case "bookmarks":
 		m.overlay = overlayBookmarks
@@ -311,6 +297,10 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 
 	case "sessions":
 		return m.openSessionsOverlay()
+
+	case "keymaps":
+		m = m.openKeymapsOverlay()
+		return m, nil
 
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
@@ -592,6 +582,24 @@ func (m Model) executeDashboardCommand() (tea.Model, tea.Cmd) {
 // executeMonitoringCommand navigates to the Monitoring dashboard.
 func (m Model) executeMonitoringCommand() (tea.Model, tea.Cmd) {
 	return m.navigateToSelector("__monitoring__")
+}
+
+// executeErrorsCommand toggles the Events "warnings only" filter, mirroring
+// the `!` hotkey. No-op (with a status hint) outside the Events view since
+// there's nothing to filter.
+func (m Model) executeErrorsCommand() (tea.Model, tea.Cmd) {
+	if m.nav.Level != model.LevelResources || m.nav.ResourceType.Kind != "Event" {
+		m.setStatusMessage(":errors only applies to the Events view", true)
+		return m, scheduleStatusClear()
+	}
+	m.warningEventsOnly = !m.warningEventsOnly
+	m.rebuildEventsFromCache()
+	if m.warningEventsOnly {
+		m.setStatusMessage("Showing warnings only", false)
+	} else {
+		m.setStatusMessage("Showing all events", false)
+	}
+	return m, scheduleStatusClear()
 }
 
 // navigateToSelector finds an item by its Extra/Kind value and navigates into it.

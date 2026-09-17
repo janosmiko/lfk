@@ -109,7 +109,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 			title: "Views & Tools",
 			bindings: []helpEntry{
 				{kb.HelpScreenKey(), "Toggle help screen"},
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{kb.TogglePreview, "Toggle details / YAML preview"},
 				{kb.TogglePreviewLogs, "Toggle live-log preview pane"},
 				{kb.Fullscreen, "Cycle layout: sidebar, fullscreen, restore"},
@@ -292,7 +292,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "YAML View", context: "YAML View",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{kb.ToggleFold, "Toggle fold on section under cursor"},
 				{kb.ToggleFoldAll, "Toggle all folds"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
@@ -309,7 +309,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Describe View", context: "Describe View",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
 				{"q/esc", "Back to explorer"},
 			}...),
@@ -317,7 +317,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Diff View", context: "Diff View",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{"tab", "Switch cursor side (side-by-side mode)"},
 				{kb.ToggleFold, "Toggle fold unchanged section at cursor"},
 				{kb.ToggleFoldAll, "Toggle all folds"},
@@ -330,7 +330,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "API Explorer", context: "API Explorer",
 			bindings: append([]helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{"j/k", "Navigate fields"},
 				{"l/enter", "Drill into field (Object/array types)"},
 				{"h/Backspace", "Go back one level"},
@@ -347,7 +347,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Object Explorer", context: "Object Explorer",
 			bindings: append([]helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{"j/k", "Navigate fields"},
 				{"l/enter/Right", "Drill into object/array field"},
 				{"h/Backspace/Left", "Go back one level"},
@@ -400,7 +400,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Log Viewer", context: "Log Viewer",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{kb.ToggleFollow, "Toggle follow mode (auto-scroll)"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
 				{kb.ToggleLineNumbers, "Toggle line numbers"},
@@ -421,7 +421,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Log Top", context: "Log Top",
 			bindings: []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{"j/k", "Navigate rows"},
 				{kb.JumpTop + "/" + kb.JumpBottom, "Jump to top / bottom"},
 				{".", "Group-by field picker (multi-select)"},
@@ -441,7 +441,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Constraints View", context: "Constraints View",
 			bindings: []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now"},
+				{kb.WhichKeyLeader, "Search keymaps"},
 				{kb.Down + "/" + kb.Up, "Navigate rows"},
 				{kb.JumpTop + "/" + kb.JumpBottom, "Jump to top / bottom"},
 				{kb.PageDown + "/" + kb.PageUp, "Half page down / up"},
@@ -457,7 +457,7 @@ func viewerHelpSections(kb Keybindings) []helpSection {
 			// documented in Navigation and Actions where they dispatch.
 			title: "Event Timeline", context: "Event Timeline",
 			bindings: append(textViewHelpEntries(kb), []helpEntry{
-				{kb.WhichKeyLeader, "Which-key panel: hotkeys actionable now (fullscreen)"},
+				{kb.WhichKeyLeader, "Search keymaps (fullscreen)"},
 				{kb.Fullscreen, "Toggle fullscreen event viewer"},
 				{kb.ToggleWrap, "Toggle line wrapping"},
 				{"q/esc", "Close overlay (or exit fullscreen)"},
