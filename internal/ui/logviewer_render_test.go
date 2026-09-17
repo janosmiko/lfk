@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -369,6 +370,26 @@ func TestRenderLogViewer(t *testing.T) {
 			"bottom border row must sit directly above the footer; got %q",
 			lines[len(lines)-2])
 	})
+}
+
+func TestRenderLines_CursorInsidePodPrefixKeepsText(t *testing.T) {
+	resetPodPrefixColors()
+	t.Cleanup(resetPodPrefixColors)
+	line := "[pod/alertmanager-0/alertmanager] time=2026 level=ERROR"
+	colored := colorizePodPrefix(line)
+	prefixColor, _, _ := strings.Cut(colored, "[pod")
+	assert.NotEmpty(t, prefixColor)
+	for col := range 12 {
+		wrapped, _, _ := renderWrappedLines([]string{line}, 0, 5, 200, false, 0, 0, -1, -1, -1, 0, 0, col, 0)
+		plain, _, _ := renderPlainLines([]string{line}, 0, 5, 200, false, 0, 0, -1, -1, -1, 0, 0, col)
+		for name, got := range map[string]string{"wrapped": wrapped[0], "plain": plain[0]} {
+			assert.Equal(t, "▎"+line, ansi.Strip(got), "%s col=%d", name, col)
+			assert.Contains(t, got, prefixColor, "%s col=%d", name, col)
+			before, _, found := strings.Cut(got, CursorBlockStyle.Render(line[col:col+1]))
+			assert.True(t, found, "%s col=%d: no cursor block", name, col)
+			assert.Equal(t, "▎"+line[:col], ansi.Strip(before), "%s col=%d", name, col)
+		}
+	}
 }
 
 // --- colorizePodPrefix ---
