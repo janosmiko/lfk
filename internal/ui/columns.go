@@ -209,8 +209,10 @@ func isCharBoundaryPlain(line string, col int) int {
 	return ansi.StringWidth(ansi.Cut(line, 0, toAnsiBudget(line, col)))
 }
 
-const keycapCombiningMark = "\xe2\x83\xa3" // U+20E3
-const keycapVS16 = "\xef\xb8\x8f"          // U+FE0F
+const (
+	keycapCombiningMark = "\xe2\x83\xa3" // U+20E3
+	keycapVS16          = "\xef\xb8\x8f" // U+FE0F
+)
 
 // toAnsiBudget converts a display column into the column ansi.Cut needs:
 // its walk credits a keycap one cell against StringWidth's two, so each one

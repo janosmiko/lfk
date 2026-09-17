@@ -78,15 +78,28 @@ func TestRenderCursorAtCol(t *testing.T) {
 // Regression: ansi.Cut undercounts a keycap's width, which used to drag it
 // into the cell meant for the character after it.
 func TestRenderCursorAtCol_KeycapSequence(t *testing.T) {
+	origNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = origNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+
 	const keycap = "1️⃣"
 	line := keycap + "x"
 
+	styledX := CursorBlockStyle.Render("x")
+	styledKeycap := CursorBlockStyle.Render(keycap)
+
 	onX := RenderCursorAtCol(line, 2)
 	assert.Contains(t, onX, keycap, "the keycap glyph stays outside the cursor cell")
-	assert.Contains(t, onX, CursorBlockStyle.Render("x"))
+	assert.Contains(t, onX, styledX)
+	assert.NotContains(t, onX, styledKeycap, "keycap must not be inside the cursor cell")
 
 	onKeycap := RenderCursorAtCol(line, 0)
-	assert.Contains(t, onKeycap, CursorBlockStyle.Render(keycap))
+	assert.Contains(t, onKeycap, styledKeycap)
+	assert.NotContains(t, onKeycap, styledX, "trailing x must not be inside the cursor cell")
 	assert.True(t, strings.HasSuffix(onKeycap, "x"), "the trailing character stays outside the cursor cell")
 }
 
