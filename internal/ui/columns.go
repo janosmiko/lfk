@@ -128,8 +128,8 @@ func RuneIndexAt(line string, col int) int {
 // the tab's own index, the rule SnapColStart applies to a wide glyph too.
 func runeIndexAtCol(runes []rune, col int) int {
 	pos, start := 0, 0
-	for i := 0; i <= len(runes); i++ {
-		if i < len(runes) && runes[i] != '\t' {
+	for i := range runes {
+		if runes[i] != '\t' {
 			continue
 		}
 		seg := string(runes[start:i])
@@ -138,15 +138,17 @@ func runeIndexAtCol(runes []rune, col int) int {
 			return start + len([]rune(ansi.Truncate(seg, col-pos, "")))
 		}
 		pos += segWidth
-		if i == len(runes) {
-			break
-		}
 		tw := tabWidthAt(pos)
 		if pos+tw > col {
 			return i
 		}
 		pos += tw
 		start = i + 1
+	}
+	tail := string(runes[start:])
+	tailWidth := ansi.StringWidth(tail)
+	if pos+tailWidth > col {
+		return start + len([]rune(ansi.Truncate(tail, col-pos, "")))
 	}
 	return len(runes)
 }
