@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.18.15](https://github.com/janosmiko/lfk/compare/v0.18.14...v0.18.15) (2026-09-17)
+
+
+### Features
+
+* open on a configured resource view at startup ([#800](https://github.com/janosmiko/lfk/issues/800)) ([64b5595](https://github.com/janosmiko/lfk/commit/64b559511622e843a6c81fd58a6e990f4e7151c9))
+
+
+### Bug Fixes
+
+* color pod prefix before drawing log cursor ([#808](https://github.com/janosmiko/lfk/issues/808)) ([2296280](https://github.com/janosmiko/lfk/commit/22962801aaa56f17a1286b6b5b0346650374cf29))
+* count cells not runes in error log overlay yank ([#803](https://github.com/janosmiko/lfk/issues/803)) ([002abe9](https://github.com/janosmiko/lfk/commit/002abe98455e0599ef395e6667500c059efd5dd5))
+* count terminal cells, not runes, in viewer cursor columns ([#797](https://github.com/janosmiko/lfk/issues/797)) ([9b9ef71](https://github.com/janosmiko/lfk/commit/9b9ef71b87c230baf248f10b755c7696124fef8b))
+* expand tabs before diff viewer measures columns ([#807](https://github.com/janosmiko/lfk/issues/807)) ([65bf906](https://github.com/janosmiko/lfk/commit/65bf9060c12cd4d0fda93dd3ec03b99d735dcfda))
+* keep tab hotkeys inert while typing in explorer and help filters ([#799](https://github.com/janosmiko/lfk/issues/799)) ([0c986ad](https://github.com/janosmiko/lfk/commit/0c986ad870d7bf168e8a3a96c2050eb46224dc04))
+* step word motions over grapheme clusters ([#805](https://github.com/janosmiko/lfk/issues/805)) ([6e3c09a](https://github.com/janosmiko/lfk/commit/6e3c09a84fc5f6915597c58b3e8aa6f871880a1e))
+* work around ansi keycap width contradiction ([#806](https://github.com/janosmiko/lfk/issues/806)) ([4c7ecf1](https://github.com/janosmiko/lfk/commit/4c7ecf159113e5bcf309f96b26931d500217beab))
+
+
+### Performance Improvements
+
+* reuse built visible lines in YAML motions ([#804](https://github.com/janosmiko/lfk/issues/804)) ([1f16d9a](https://github.com/janosmiko/lfk/commit/1f16d9a48edf0e4a63bf829575f741fd0fd374e6))
+* sanitize log motion line once per keystroke ([#802](https://github.com/janosmiko/lfk/issues/802)) ([e489ece](https://github.com/janosmiko/lfk/commit/e489ece58b5839a8b792f996c5855f7739219758))
+
 ## [0.18.14](https://github.com/janosmiko/lfk/compare/v0.18.13...v0.18.14) (2026-09-14)
 
 
