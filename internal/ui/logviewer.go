@@ -327,10 +327,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 				line = DimStyle.Render(numStr) + line
 			}
 		} else {
-			// Colorize pod prefix for non-selected, non-cursor lines.
-			if i != cursor {
-				line = colorizePodPrefix(line)
-			}
+			line = colorizePodPrefix(line)
 			if lineNumbers && i != cursor {
 				// Non-cursor lines get line numbers here.
 				// Cursor line's number is added after RenderCursorAtCol to avoid it being stripped.
@@ -354,7 +351,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 					numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
 					cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 				}
-				line = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
+				line = YamlCursorIndicatorStyle.Render("\u258e") + cursorLine
 				// Record where in the result slice this cursor row lands and its
 				// search-match column. The gutter indicator is 1 visual cell. The
 				// optional line-number gutter follows. Then content at visualCurCol.
@@ -430,10 +427,10 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 				// Highlight raw content first, then prepend line numbers
 				// to avoid column offset mismatch.
 				wl = RenderVisualSelectionSub(sub, visualType, i, selStart, selEnd, visualStart, visualCol, visualCurCol)
-			} else if j == 0 && !drawCursor {
-				// Keyed on the cursor's sub-line, not its source line: the
-				// cursor can sit on a continuation row while the prefix, which
-				// only ever lives on the first one, still needs its color.
+			} else if j == 0 {
+				// Only the first sub-line can carry a pod prefix. A wrapped
+				// row that merely opens with a bracket is not one. Colorize
+				// before the cursor: the prefix parser needs the raw "[".
 				wl = colorizePodPrefix(wl)
 			}
 
@@ -442,11 +439,6 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 				// Before the line number, so the gutter is not shifted into
 				// the cursor's column space.
 				wl = RenderCursorAtCol(wl, localCol)
-				// Only the first sub-line can carry a pod prefix. A wrapped
-				// row that merely opens with a bracket is not one.
-				if j == 0 {
-					wl = colorizePodPrefix(wl)
-				}
 			}
 			if lineNumbers {
 				wl = logWrapLineNum(i, j, lineNumWidth, isSelected, i == cursor) + wl
