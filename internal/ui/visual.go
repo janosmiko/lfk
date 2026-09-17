@@ -29,9 +29,9 @@ func RenderCursorAtCol(styledLine string, col int) string {
 	// cell and the glyph disappears.
 	start := SnapColStart(styledLine, col)
 	end := SnapColEnd(styledLine, start+1)
-	before := ansi.Truncate(styledLine, start, "")
-	cursorChar := ansi.Strip(ansi.Cut(styledLine, start, end))
-	after := ansi.TruncateLeft(styledLine, end, "")
+	before := CutCols(styledLine, 0, start)
+	cursorChar := ansi.Strip(CutCols(styledLine, start, end))
+	after := CutCols(styledLine, end, visualWidth)
 	return before + CursorBlockStyle.Render(cursorChar) + after
 }
 
@@ -190,12 +190,9 @@ func renderBlockSelection(line string, lineWidth, colStart, colEnd int) string {
 	return highlightColumnRange(line, lineWidth, colStart, colEnd+1)
 }
 
-// highlightColumnRange highlights visible characters from colStart (inclusive)
-// to colEnd (exclusive). The line may carry producer SGR sequences. The
-// before/after segments keep their original styling (ansi.Truncate /
-// TruncateLeft preserve embedded ANSI), while the selected slice is rendered
-// through SelectedStyle on stripped text so the selection's fg/bg pair
-// applies cleanly without colliding with producer colors.
+// highlightColumnRange highlights colStart..colEnd. The selected slice is
+// stripped and rendered through SelectedStyle so it doesn't collide with
+// producer colors. CutCols keeps the rest of the line's original SGR styling.
 func highlightColumnRange(line string, lineWidth, colStart, colEnd int) string {
 	if colStart < 0 {
 		colStart = 0
@@ -216,8 +213,8 @@ func highlightColumnRange(line string, lineWidth, colStart, colEnd int) string {
 	// both the highlight and the tail after it.
 	colStart = SnapColStart(line, colStart)
 	colEnd = SnapColEnd(line, colEnd)
-	before := ansi.Truncate(line, colStart, "")
-	selected := ansi.Strip(ansi.Cut(line, colStart, colEnd))
-	after := ansi.TruncateLeft(line, colEnd, "")
+	before := CutCols(line, 0, colStart)
+	selected := ansi.Strip(CutCols(line, colStart, colEnd))
+	after := CutCols(line, colEnd, lineWidth)
 	return before + SelectedStyle.Render(selected) + after
 }

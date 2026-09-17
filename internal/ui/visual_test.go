@@ -75,6 +75,21 @@ func TestRenderCursorAtCol(t *testing.T) {
 	}
 }
 
+// Regression: ansi.Cut undercounts a keycap's width, which used to drag it
+// into the cell meant for the character after it.
+func TestRenderCursorAtCol_KeycapSequence(t *testing.T) {
+	const keycap = "1️⃣"
+	line := keycap + "x"
+
+	onX := RenderCursorAtCol(line, 2)
+	assert.Contains(t, onX, keycap, "the keycap glyph stays outside the cursor cell")
+	assert.Contains(t, onX, CursorBlockStyle.Render("x"))
+
+	onKeycap := RenderCursorAtCol(line, 0)
+	assert.Contains(t, onKeycap, CursorBlockStyle.Render(keycap))
+	assert.True(t, strings.HasSuffix(onKeycap, "x"), "the trailing character stays outside the cursor cell")
+}
+
 // Regression for kyverno-style log lines: producers that emit colored
 // timestamps (`\x1b[90m2026-...`) reach the log viewer with the SGR sequence
 // preserved (ConfigLogRenderAnsi defaults on). With rune-based slicing, any
