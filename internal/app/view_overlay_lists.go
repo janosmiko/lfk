@@ -322,8 +322,8 @@ func (m Model) renderOverlayKeymaps() (string, int, int) {
 	if m.keymapsFilter.Value != "" {
 		subtitle = fmt.Sprintf("%d / %d", len(filtered), len(all))
 	}
-	overlayW := max(m.width*75/100, 50)
-	overlayH := min(m.height-4, 28)
+	overlayW := min(max(m.width*65/100, 50), 80)
+	overlayH := min(m.height-6, 25)
 	contentH := max(overlayH-2, 1)
 	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
 	cfg := ui.OverlayListConfig{
