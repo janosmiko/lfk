@@ -231,3 +231,13 @@ func TestColumnRuneRoundTrip_WithTabs(t *testing.T) {
 		}
 	}
 }
+
+// A standalone U+20E3 without U+FE0F is not the full emoji keycap form.
+// ansi.StringWidth and ansi.Cut agree on 1 cell, so no deficit adjustment.
+func TestToAnsiBudget_StandaloneKeycapMark(t *testing.T) {
+	line := "1⃣x"
+	assert.Equal(t, 2, LineWidth(line), "1-cell keycap + 1-cell x")
+	assert.Equal(t, 2, RuneIndexAt(line, 1), "col 1 is the x at rune index 2")
+	assert.Equal(t, 1, SnapColStart(line, 1), "col 1 is a valid boundary")
+	assert.Equal(t, "x", CutCols(line, 1, 2))
+}
