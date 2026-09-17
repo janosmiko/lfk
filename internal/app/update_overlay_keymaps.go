@@ -52,7 +52,7 @@ func (m *Model) keymapsOverlayItems() []keymapItem {
 const (
 	keymapsGroupW = 9 // len("Selection"), the longest group name
 	keymapsKeyW   = 6
-	keymapsBadgeW = keymapsGroupW + 2 + keymapsKeyW // group + gap + key
+	keymapsBadgeW = keymapsGroupW + 2 + keymapsKeyW + 1 // group + gap + key + scrollbar pad
 )
 
 func keymapsBadge(group, key string) string {
@@ -60,7 +60,8 @@ func keymapsBadge(group, key string) string {
 	ks := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Background(ui.SurfaceBg).Bold(true)
 	return gs.Render(fmt.Sprintf("%-*s", keymapsGroupW, group)) +
 		lipgloss.NewStyle().Background(ui.SurfaceBg).Render("  ") +
-		ks.Render(fmt.Sprintf("%*s", keymapsKeyW, key))
+		ks.Render(fmt.Sprintf("%*s", keymapsKeyW, key)) +
+		lipgloss.NewStyle().Background(ui.SurfaceBg).Render(" ")
 }
 
 func keymapsGroupStyle(g whichKeyGroup) lipgloss.Style {
