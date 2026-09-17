@@ -322,7 +322,13 @@ func (m Model) renderOverlayKeymaps() (string, int, int) {
 	if m.keymapsFilter.Value != "" {
 		subtitle = fmt.Sprintf("%d / %d", len(filtered), len(all))
 	}
-	overlayW := min(max(m.width*65/100, 50), 80)
+	nameW := 0
+	for _, it := range items {
+		if w := lipgloss.Width(it.Name); w > nameW {
+			nameW = w
+		}
+	}
+	overlayW := ui.OverlayContentWidth(nameW+keymapsBadgeW+2, m.width-10)
 	overlayH := min(m.height-6, 25)
 	contentH := max(overlayH-2, 1)
 	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
