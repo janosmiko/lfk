@@ -1,5 +1,10 @@
 package app
 
+import (
+	"maps"
+	"slices"
+)
+
 // yamlViewState holds all state for the full-screen YAML viewer (the `y`
 // view). It groups the previously flat yaml* fields on Model into one
 // cohesive value, mirroring the sub-state pattern already used by
@@ -46,6 +51,10 @@ type yamlViewState struct {
 
 	sections  []yamlSection   // parsed hierarchical sections
 	collapsed map[string]bool // collapsed state per section key (persists across resources)
+
+	// visCache memoizes buildVisibleLines across the render and the
+	// per-keystroke handlers that need the same slice.
+	visCache *yamlVisibleLinesCache
 }
 
 // resetBlame turns the field-manager note off. Blame is per resource and
@@ -54,4 +63,43 @@ func (s *yamlViewState) resetBlame() {
 	s.blameOn = false
 	s.blameLoading = false
 	s.blame = nil
+}
+
+// yamlVisibleLinesCache memoizes buildVisibleLines, checked against its
+// inputs rather than a generation counter: collapsed mutates in place at
+// several call sites, and a counter is one missed bump from serving stale.
+type yamlVisibleLinesCache struct {
+	content   string
+	sections  []yamlSection
+	collapsed map[string]bool
+	visLines  []string
+	mapping   []int
+	valid     bool
+}
+
+// resolve returns buildVisibleLines(content, sections, collapsed), reusing
+// the previous result when all three inputs are unchanged. Nil-safe: a
+// zero-value holder resolves correctly, just without memoization.
+func (c *yamlVisibleLinesCache) resolve(content string, sections []yamlSection, collapsed map[string]bool) ([]string, []int) {
+	if c != nil && c.valid && c.content == content &&
+		slices.Equal(c.sections, sections) && maps.Equal(c.collapsed, collapsed) {
+		return c.visLines, c.mapping
+	}
+	visLines, mapping := buildVisibleLines(content, sections, collapsed)
+	if c == nil {
+		return visLines, mapping
+	}
+	c.content = content
+	c.sections = sections
+	// Cloned, not aliased: collapsed mutates in place, an aliased map could
+	// never report as changed.
+	c.collapsed = maps.Clone(collapsed)
+	c.visLines = visLines
+	c.mapping = mapping
+	c.valid = true
+	return visLines, mapping
+}
+
+func (m Model) yamlVisibleLines() ([]string, []int) {
+	return m.yamlView.visCache.resolve(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 }

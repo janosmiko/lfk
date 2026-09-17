@@ -45,7 +45,7 @@ func (m Model) viewYAML() string {
 	contentWidth := max(m.width-4, 10)
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
-	visLines, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	visLines, mapping := m.yamlVisibleLines()
 
 	// Clamp the cursor before anything reads it. Collapsing a fold shortens
 	// visLines without moving the cursor, and the scroll offset below treats an

@@ -123,7 +123,7 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // children and continues with the lines that follow.
 func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlView.lineInput)
-	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	_, mapping := m.yamlVisibleLines()
 	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(mapping) {
 		return m, nil
 	}
@@ -343,7 +343,7 @@ func (m Model) handleYAMLKeyCtrlE() (tea.Model, tea.Cmd) {
 
 // handleYAMLKeyFoldToggle toggles the fold on the section at the cursor position.
 func (m Model) handleYAMLKeyFoldToggle() (tea.Model, tea.Cmd) {
-	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	_, mapping := m.yamlVisibleLines()
 	sec := sectionAtScrollPos(m.yamlView.cursor, mapping, m.yamlView.sections)
 	if sec != "" {
 		if m.yamlView.collapsed == nil {
@@ -359,7 +359,7 @@ func (m Model) handleYAMLKeyFoldToggle() (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			_, newMapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+			_, newMapping := m.yamlVisibleLines()
 			for vi, orig := range newMapping {
 				if orig == startLine {
 					m.yamlView.cursor = vi
@@ -468,7 +468,7 @@ func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
 	}
 
 	// Convert original line to visible line.
-	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	_, mapping := m.yamlVisibleLines()
 	visIdx := originalToVisible(targetOrig, mapping)
 	if visIdx < 0 {
 		return
@@ -481,7 +481,7 @@ func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
 	m.yamlView.cursor = visIdx
 	// Move cursor column to the match position within the visible line
 	// (which includes fold prefixes).
-	visibleLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	visibleLines, _ := m.yamlVisibleLines()
 	if visIdx >= 0 && visIdx < len(visibleLines) {
 		col := ui.FindColumnInLine(visibleLines[visIdx], m.yamlView.searchText.Value)
 		if col >= 0 {
@@ -501,7 +501,7 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 	rawQuery := m.yamlView.searchText.Value
 
 	// Use visible lines (which include fold prefixes) for accurate column positions.
-	visibleLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	visibleLines, _ := m.yamlVisibleLines()
 	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(visibleLines) {
 		return false
 	}
@@ -552,7 +552,7 @@ func (m *Model) updateYAMLSearchMatches() {
 // findYAMLMatchFromCursor returns the index of the first match at or after the
 // current cursor position. Wraps to 0 if no match is found after the cursor.
 func (m *Model) findYAMLMatchFromCursor() int {
-	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	_, mapping := m.yamlVisibleLines()
 	origLine := 0
 	if m.yamlView.cursor >= 0 && m.yamlView.cursor < len(mapping) {
 		origLine = mapping[m.yamlView.cursor]
@@ -630,7 +630,7 @@ func (m Model) handleYAMLKeyObjectExplorer() (tea.Model, tea.Cmd) {
 // the visible cursor to a physical line and parsing the path there. Returns nil
 // when there is no resolvable path.
 func (m Model) yamlCursorPath() []string {
-	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	_, mapping := m.yamlVisibleLines()
 	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(mapping) {
 		return nil
 	}
@@ -650,7 +650,7 @@ func (m *Model) applyYAMLPendingCursor() {
 	if origLine < 0 {
 		return
 	}
-	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	_, mapping := m.yamlVisibleLines()
 	if vis := originalToVisible(origLine, mapping); vis >= 0 {
 		m.yamlView.cursor = vis
 		m.ensureYAMLCursorVisible()
@@ -725,7 +725,7 @@ func (m Model) handleYAMLKeyH() (tea.Model, tea.Cmd) {
 // yamlStepCol moves the cursor column by n characters on the visible line under
 // the cursor, holding it clear of the fold prefix.
 func (m *Model) yamlStepCol(n int) int {
-	visLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	visLines, _ := m.yamlVisibleLines()
 	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(visLines) {
 		return max(m.yamlView.visualCurCol+n, yamlFoldPrefixLen)
 	}
