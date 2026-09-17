@@ -262,11 +262,11 @@ func TestNextWORDStart(t *testing.T) {
 			expected: 0,
 		},
 		{
-			// A tab fills no cell, so "bar" starts at column 3, not 4.
+			// A tab runs to the next 8-column stop, so "bar" starts at 8.
 			name:     "tab separator",
 			line:     "foo\tbar",
 			col:      0,
-			expected: 3,
+			expected: 8,
 		},
 	}
 	for _, tt := range tests {
@@ -386,11 +386,9 @@ func TestFirstNonWhitespace(t *testing.T) {
 	}{
 		{"no leading whitespace", "hello", 0},
 		{"leading spaces", "   hello", 3},
-		// Motions answer in cell columns and a tab fills no cell, so a raw
-		// tab moves nothing. The log viewer expands tabs before a motion
-		// sees the line, which is what makes the column match the screen.
-		{"leading tabs", "\t\thello", 0},
-		{"mixed leading whitespace", "  \thello", 2},
+		// Each tab runs to its own 8-column stop.
+		{"leading tabs", "\t\thello", 16},
+		{"mixed leading whitespace", "  \thello", 8},
 		{"all whitespace", "     ", 0},
 		{"empty string", "", 0},
 		{"single char", "a", 0},

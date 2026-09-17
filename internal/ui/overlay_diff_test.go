@@ -3,6 +3,7 @@ package ui
 import (
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -198,4 +199,24 @@ func TestUnifiedDiffViewTotalLines(t *testing.T) {
 			assert.Equal(t, tt.expected, UnifiedDiffViewTotalLines(tt.left, tt.right, nil, nil))
 		})
 	}
+}
+
+// expandTabs must land every character on the column columns.go's motions
+// compute for the same raw line - that agreement is the fix: a cursor
+// column addresses what the renderer actually drew.
+func TestExpandTabs_MatchesColumnModel(t *testing.T) {
+	raw := "key:\tvalue\tend"
+	expanded := expandTabs(raw)
+
+	assert.Equal(t, ansi.StringWidth(expanded), LineWidth(raw))
+	for i := range []rune(raw) {
+		want := ColumnOf(raw, i)
+		got := ansi.StringWidth(ansi.Cut(expanded, 0, want))
+		assert.Equal(t, want, got, "rune %d: expanded text disagrees with the column model", i)
+	}
+}
+
+func TestExpandTabs_UsesTabStopsNotAFlatRun(t *testing.T) {
+	assert.Equal(t, "a       b", expandTabs("a\tb"))
+	assert.Equal(t, "12345   b", expandTabs("12345\tb"))
 }

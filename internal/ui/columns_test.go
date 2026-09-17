@@ -158,3 +158,65 @@ func TestCharCols_KeycapWidthDisagreesUpstream(t *testing.T) {
 	require.Equal(t, 2, LineWidth(ansi.Cut(keycap, 0, 1)), "one cut column already carries the whole glyph")
 	assert.NotEqual(t, 1, SnapColStart(keycap+"x", 2), "so column 2 is not a cut boundary")
 }
+
+// A tab is one character whose width runs to the next 8-column tab stop,
+// same as a terminal draws it, so the diff/log viewer's cursor lands where
+// the renderer actually put the following character.
+func TestCharCols_TabsRunToNextTabStop(t *testing.T) {
+	// a=0 b=1, tab starts at 2 and fills to the col-8 stop, c=8 d=9.
+	assert.Equal(t, []int{0, 1, 2, 8, 9, 10}, CharCols("ab\tcd"))
+	assert.Equal(t, 10, LineWidth("ab\tcd"))
+}
+
+func TestCharCols_TabWidthDependsOnStartColumn(t *testing.T) {
+	// A tab starting mid-stop only fills the remaining columns.
+	assert.Equal(t, []int{0, 1, 2, 3, 4, 5, 8, 9, 10}, CharCols("12345\tab"))
+}
+
+// SnapColStart/SnapColEnd treat a tab as one unit: any column inside its span
+// snaps to its start or its end, never to a point inside it - there is no
+// half a tab stop to draw.
+func TestSnapCol_SnapsTabAsOneUnit(t *testing.T) {
+	line := "ab\tcd"
+	for col := 3; col < 8; col++ {
+		assert.Equal(t, 2, SnapColStart(line, col), "col %d snaps back to the tab's start", col)
+		assert.Equal(t, 8, SnapColEnd(line, col), "col %d snaps forward past the tab", col)
+	}
+	assert.Equal(t, 2, SnapColStart(line, 2))
+	assert.Equal(t, 8, SnapColEnd(line, 8))
+}
+
+// CutCols must extract the raw tab byte, not the spaces a renderer would
+// draw for it - the clipboard keeps what was in the source text.
+func TestCutCols_KeepsRawTabAcrossItsSpan(t *testing.T) {
+	line := "ab\tcd"
+	assert.Equal(t, "\t", CutCols(line, 2, 8))
+	assert.Equal(t, "ab\t", CutCols(line, 0, 8))
+	assert.Equal(t, "\tcd", CutCols(line, 2, 10))
+	assert.Equal(t, "ab\tcd", CutCols(line, 0, 10))
+}
+
+func TestColumnOf_RuneIndexAt_TabAware(t *testing.T) {
+	line := "ab\tcd" // runes: a b \t c d
+	assert.Equal(t, 0, ColumnOf(line, 0))
+	assert.Equal(t, 1, ColumnOf(line, 1))
+	assert.Equal(t, 2, ColumnOf(line, 2), "start of the tab")
+	assert.Equal(t, 8, ColumnOf(line, 3), "'c' starts after the tab stop")
+	assert.Equal(t, 9, ColumnOf(line, 4))
+
+	assert.Equal(t, 0, RuneIndexAt(line, 0))
+	assert.Equal(t, 2, RuneIndexAt(line, 2))
+	assert.Equal(t, 2, RuneIndexAt(line, 5), "a mid-tab column belongs to the tab")
+	assert.Equal(t, 3, RuneIndexAt(line, 8))
+}
+
+// Motions convert column to rune index and back. A tab-bearing line must
+// round-trip exactly like any other character.
+func TestColumnRuneRoundTrip_WithTabs(t *testing.T) {
+	for _, line := range []string{"ab\tcd", "\tleading", "trailing\t", "12345\tab\txy"} {
+		for i := range []rune(line) {
+			col := ColumnOf(line, i)
+			assert.Equal(t, i, RuneIndexAt(line, col), "line %q rune %d", line, i)
+		}
+	}
+}

@@ -57,8 +57,8 @@ func TestWordMotion_GraphemeClusters(t *testing.T) {
 // character. Without the duplicate-offset guard in colIndex, w/W stays stuck.
 func TestWordMotion_ZeroWidthTab(t *testing.T) {
 	line := "\tfoo bar"
-	assert.Equal(t, 4, nextWordStart(line, 0))
-	assert.Equal(t, 4, nextWORDStart(line, 0))
+	assert.Equal(t, 8, nextWordStart(line, 0))
+	assert.Equal(t, 8, nextWORDStart(line, 0))
 }
 
 // W/B/E share nextStart/wordEndWith/prevStart with w/b/e, so a WORD-motion

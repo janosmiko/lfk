@@ -77,21 +77,40 @@ func ComputeDiffLines(leftText, rightText string) []diffLine {
 	return result
 }
 
-// diffTabWidth matches SingleLineCell's tab expansion (kv_editor.go) so a
-// tab-bearing line sizes and truncates the same way across viewers.
-const diffTabWidth = "    "
-
-// expandDiffTabs sizes width-based rendering (padRight, Truncate, WrapLine)
-// on tab-free text so a tab's terminal column advance isn't measured as
-// zero cells. Diffing, folding, and copy paths keep using ComputeDiffLines as-is.
+// expandDiffTabs sizes width-based rendering on tab-free text. Diffing and
+// copy paths keep ComputeDiffLines raw - columns.go's motions treat a raw
+// tab as running to the same tabStopWidth stop this expands to.
 func expandDiffTabs(lines []diffLine) []diffLine {
 	out := make([]diffLine, len(lines))
 	for i, dl := range lines {
-		dl.left = strings.ReplaceAll(dl.left, "\t", diffTabWidth)
-		dl.right = strings.ReplaceAll(dl.right, "\t", diffTabWidth)
+		dl.left = expandTabs(dl.left)
+		dl.right = expandTabs(dl.right)
 		out[i] = dl
 	}
 	return out
+}
+
+// expandTabs replaces each tab with spaces to the next tabStopWidth column,
+// rather than a flat run, so it lands where columns.go's motions do.
+func expandTabs(s string) string {
+	if !strings.ContainsRune(s, '\t') {
+		return s
+	}
+	segs := strings.Split(s, "\t")
+	var b strings.Builder
+	b.Grow(len(s))
+	col := 0
+	for i, seg := range segs {
+		b.WriteString(seg)
+		col += ansi.StringWidth(seg)
+		if i == len(segs)-1 {
+			break
+		}
+		n := tabWidthAt(col)
+		b.WriteString(strings.Repeat(" ", n))
+		col += n
+	}
+	return b.String()
 }
 
 // DiffViewTotalLines returns the total number of scrollable lines for a
