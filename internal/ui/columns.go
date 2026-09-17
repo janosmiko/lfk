@@ -16,7 +16,27 @@ func LineWidth(line string) int { return ansi.StringWidth(line) }
 // the line's width last. A flag or a ZWJ emoji family is several runes but one
 // glyph, so runes list columns the line does not have, and out of order.
 func CharCols(line string) []int {
-	cols := make([]int, 0, len(line)+1)
+	_, cols := ClusterCols(line)
+	return cols
+}
+
+// ClusterCols splits line into its grapheme clusters alongside the column
+// each one starts at: clusters[i] starts at cols[i]. cols also carries the
+// line's width as its last, unpaired entry, matching CharCols.
+func ClusterCols(line string) (clusters []string, cols []int) {
+	return clusterCols(line, true)
+}
+
+// AllClusterCols is ClusterCols without dropping zero-width clusters, so an
+// unexpanded tab or another control character still counts as its own
+// character for classification, even though it draws nothing on screen.
+func AllClusterCols(line string) (clusters []string, cols []int) {
+	return clusterCols(line, false)
+}
+
+func clusterCols(line string, dropZeroWidth bool) (clusters []string, cols []int) {
+	clusters = make([]string, 0, len(line))
+	cols = make([]int, 0, len(line)+1)
 	col, state := 0, -1
 	for rest := line; rest != ""; {
 		var cluster string
@@ -24,13 +44,14 @@ func CharCols(line string) []int {
 		// keycap, and ansi is what the renderer draws with.
 		cluster, rest, _, state = uniseg.FirstGraphemeClusterInString(rest, state)
 		w := ansi.StringWidth(cluster)
-		if w == 0 {
+		if w == 0 && dropZeroWidth {
 			continue
 		}
+		clusters = append(clusters, cluster)
 		cols = append(cols, col)
 		col += w
 	}
-	return append(cols, col)
+	return clusters, append(cols, col)
 }
 
 // ColumnOf returns the cell column where the rune at runeIdx starts. An index

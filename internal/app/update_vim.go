@@ -2,79 +2,23 @@ package app
 
 import (
 	"slices"
+	"unicode/utf8"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // Motion columns are cell columns, matching what the renderer draws. Each
-// motion converts to a rune index to classify characters and converts the
-// answer back, so a wide rune moves the cursor by the two columns it fills.
+// motion converts to a grapheme-cluster index to classify characters and
+// converts the answer back, so a combining mark or a ZWJ emoji counts as one.
 
 // nextWordStart returns the column of the next word start (vim 'w' motion).
-// Returns the line width (past end) when no next word exists on this line,
-// signaling cross-line needed.
-func nextWordStart(line string, col int) int {
-	runes := []rune(line)
-	n := len(runes)
-	i := ui.RuneIndexAt(line, col)
-	if n == 0 || i >= n-1 {
-		return ui.LineWidth(line)
-	}
-	// Skip current word characters.
-	for i < n && !isWordBoundary(runes[i]) {
-		i++
-	}
-	// Skip whitespace/punctuation.
-	for i < n && isWordBoundary(runes[i]) {
-		i++
-	}
-	return ui.ColumnOf(line, i)
-}
+func nextWordStart(line string, col int) int { return nextStart(line, col, isWordBoundary) }
 
 // wordEnd returns the column of the current/next word end (vim 'e' motion).
-// Returns the line width (past end) when no next word end exists on this line,
-// signaling cross-line needed.
-func wordEnd(line string, col int) int {
-	runes := []rune(line)
-	n := len(runes)
-	i := ui.RuneIndexAt(line, col)
-	if n == 0 || i >= n-1 {
-		return ui.LineWidth(line)
-	}
-	i++
-	// Skip whitespace/punctuation.
-	for i < n && isWordBoundary(runes[i]) {
-		i++
-	}
-	if i >= n {
-		return ui.LineWidth(line)
-	}
-	// Move to end of word.
-	for i < n-1 && !isWordBoundary(runes[i+1]) {
-		i++
-	}
-	return ui.ColumnOf(line, i)
-}
+func wordEnd(line string, col int) int { return wordEndWith(line, col, isWordBoundary) }
 
 // prevWordStart returns the column of the previous word start (vim 'b' motion).
-// Returns -1 when no previous word exists on this line, signaling cross-line needed.
-func prevWordStart(line string, col int) int {
-	runes := []rune(line)
-	n := len(runes)
-	if n == 0 || col <= 0 {
-		return -1
-	}
-	i := ui.RuneIndexAt(line, col) - 1
-	// Skip whitespace/punctuation.
-	for i > 0 && isWordBoundary(runes[i]) {
-		i--
-	}
-	// Move to start of word.
-	for i > 0 && !isWordBoundary(runes[i-1]) {
-		i--
-	}
-	return ui.ColumnOf(line, i)
-}
+func prevWordStart(line string, col int) int { return prevStart(line, col, isWordBoundary) }
 
 // isWordBoundary returns true if the rune is whitespace or punctuation (non-word character).
 func isWordBoundary(r rune) bool {
@@ -85,71 +29,81 @@ func isWordBoundary(r rune) bool {
 
 // nextWORDStart returns the column of the next WORD start (vim 'W' motion).
 // WORDs are whitespace-delimited (only spaces and tabs are boundaries).
-// Returns the line width (past end) when no next WORD exists on this line,
-// signaling cross-line needed.
-func nextWORDStart(line string, col int) int {
-	runes := []rune(line)
-	n := len(runes)
-	i := ui.RuneIndexAt(line, col)
-	if n == 0 || i >= n-1 {
-		return ui.LineWidth(line)
-	}
-	// Skip current WORD characters (non-whitespace).
-	for i < n && !isWORDBoundary(runes[i]) {
-		i++
-	}
-	// Skip whitespace.
-	for i < n && isWORDBoundary(runes[i]) {
-		i++
-	}
-	return ui.ColumnOf(line, i)
-}
+func nextWORDStart(line string, col int) int { return nextStart(line, col, isWORDBoundary) }
 
 // prevWORDStart returns the column of the previous WORD start (vim 'B' motion).
 // WORDs are whitespace-delimited (only spaces and tabs are boundaries).
-// Returns -1 when no previous WORD exists on this line, signaling cross-line needed.
-func prevWORDStart(line string, col int) int {
-	runes := []rune(line)
-	n := len(runes)
-	if n == 0 || col <= 0 {
-		return -1
-	}
-	i := ui.RuneIndexAt(line, col) - 1
-	// Skip whitespace.
-	for i > 0 && isWORDBoundary(runes[i]) {
-		i--
-	}
-	// Move to start of WORD (non-whitespace).
-	for i > 0 && !isWORDBoundary(runes[i-1]) {
-		i--
-	}
-	return ui.ColumnOf(line, i)
-}
+func prevWORDStart(line string, col int) int { return prevStart(line, col, isWORDBoundary) }
 
 // WORDEnd returns the column of the current/next WORD end (vim 'E' motion).
 // WORDs are whitespace-delimited (only spaces and tabs are boundaries).
-// Returns the line width (past end) when no next WORD end exists on this line,
-// signaling cross-line needed.
-func WORDEnd(line string, col int) int {
-	runes := []rune(line)
-	n := len(runes)
-	i := ui.RuneIndexAt(line, col)
+func WORDEnd(line string, col int) int { return wordEndWith(line, col, isWORDBoundary) }
+
+// nextStart is the shared body of nextWordStart/nextWORDStart. Returns the
+// line width (past end) when no next word exists, signaling cross-line needed.
+func nextStart(line string, col int, isBoundary func(rune) bool) int {
+	clusters, cols := ui.AllClusterCols(line)
+	n := len(clusters)
+	i := colIndex(cols, col)
+	if n == 0 || i >= n-1 {
+		return ui.LineWidth(line)
+	}
+	for i < n && !clusterIsBoundary(clusters[i], isBoundary) {
+		i++
+	}
+	for i < n && clusterIsBoundary(clusters[i], isBoundary) {
+		i++
+	}
+	return cols[i]
+}
+
+// wordEndWith is the shared body of wordEnd/WORDEnd. Returns the line width
+// (past end) when no next word end exists, signaling cross-line needed.
+func wordEndWith(line string, col int, isBoundary func(rune) bool) int {
+	clusters, cols := ui.AllClusterCols(line)
+	n := len(clusters)
+	i := colIndex(cols, col)
 	if n == 0 || i >= n-1 {
 		return ui.LineWidth(line)
 	}
 	i++
-	// Skip whitespace.
-	for i < n && isWORDBoundary(runes[i]) {
+	for i < n && clusterIsBoundary(clusters[i], isBoundary) {
 		i++
 	}
 	if i >= n {
 		return ui.LineWidth(line)
 	}
-	// Move to end of WORD (non-whitespace).
-	for i < n-1 && !isWORDBoundary(runes[i+1]) {
+	for i < n-1 && !clusterIsBoundary(clusters[i+1], isBoundary) {
 		i++
 	}
-	return ui.ColumnOf(line, i)
+	return cols[i]
+}
+
+// prevStart is the shared body of prevWordStart/prevWORDStart. Returns -1
+// when no previous word exists, signaling cross-line needed.
+func prevStart(line string, col int, isBoundary func(rune) bool) int {
+	clusters, cols := ui.AllClusterCols(line)
+	if len(clusters) == 0 || col <= 0 {
+		return -1
+	}
+	i := colIndex(cols, col) - 1
+	if i < 0 {
+		return -1
+	}
+	for i > 0 && clusterIsBoundary(clusters[i], isBoundary) {
+		i--
+	}
+	for i > 0 && !clusterIsBoundary(clusters[i-1], isBoundary) {
+		i--
+	}
+	return cols[i]
+}
+
+// clusterIsBoundary classifies a grapheme cluster by its base rune, matching
+// isWordBoundary/isWORDBoundary's rune-level rules.
+func clusterIsBoundary(cluster string, isBoundary func(rune) bool) bool {
+	r, _ := utf8.DecodeRuneInString(cluster)
+	return isBoundary(r)
 }
 
 // lastCol returns the column the final character of line starts at (vim '$'
@@ -170,19 +124,22 @@ func stepCol(line string, col, n int) int {
 	if line == "" {
 		return max(col+n, 0)
 	}
-	// Step through the columns characters start at, not through runes. A rune
-	// index has to be mapped back to a column, and a zero-width rune with no
-	// character before it maps back to the one the cursor already sits on.
 	cols := ui.CharCols(line)
+	i := colIndex(cols, col)
+	return cols[min(max(i+n, 0), len(cols)-1)]
+}
+
+// colIndex reports the index of the character occupying column col. A column
+// landing inside a wide character reports the character it starts.
+func colIndex(cols []int, col int) int {
 	i, exact := slices.BinarySearch(cols, col)
 	switch {
 	case i >= len(cols):
 		i = len(cols) - 1
 	case !exact && i > 0:
-		// col landed inside a wide character.
 		i--
 	}
-	return cols[min(max(i+n, 0), len(cols)-1)]
+	return i
 }
 
 // firstNonWhitespace returns the column of the first non-space/tab character (vim '^' motion).
