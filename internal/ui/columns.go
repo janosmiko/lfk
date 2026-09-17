@@ -135,7 +135,7 @@ func runeIndexAtCol(runes []rune, col int) int {
 		seg := string(runes[start:i])
 		segWidth := ansi.StringWidth(seg)
 		if pos+segWidth > col {
-			return start + len([]rune(ansi.Truncate(seg, col-pos, "")))
+			return start + len([]rune(ansi.Truncate(seg, toAnsiBudget(seg, col-pos), "")))
 		}
 		pos += segWidth
 		tw := tabWidthAt(pos)
@@ -148,7 +148,7 @@ func runeIndexAtCol(runes []rune, col int) int {
 	tail := string(runes[start:])
 	tailWidth := ansi.StringWidth(tail)
 	if pos+tailWidth > col {
-		return start + len([]rune(ansi.Truncate(tail, col-pos, "")))
+		return start + len([]rune(ansi.Truncate(tail, toAnsiBudget(tail, col-pos), "")))
 	}
 	return len(runes)
 }
@@ -206,7 +206,38 @@ func SnapColEnd(line string, col int) int {
 // of the cut short of it otherwise. ansi.Cut drops a glyph the cut only half
 // covers, so a mid-glyph column yields a short prefix.
 func isCharBoundaryPlain(line string, col int) int {
-	return ansi.StringWidth(ansi.Cut(line, 0, col))
+	return ansi.StringWidth(ansi.Cut(line, 0, toAnsiBudget(line, col)))
+}
+
+const (
+	keycapCombiningMark = "\xe2\x83\xa3" // U+20E3
+	keycapVS16          = "\xef\xb8\x8f" // U+FE0F
+)
+
+// toAnsiBudget converts a display column into the column ansi.Cut needs:
+// its walk credits a keycap one cell against StringWidth's two, so each one
+// fully before col must be un-credited from the request.
+func toAnsiBudget(line string, col int) int {
+	deficit, pos := 0, 0
+	for {
+		i := strings.Index(line[pos:], keycapCombiningMark)
+		if i < 0 {
+			break
+		}
+		markStart := pos + i
+		end := markStart + len(keycapCombiningMark)
+		if markStart < len(keycapVS16) ||
+			line[markStart-len(keycapVS16):markStart] != keycapVS16 {
+			pos = end
+			continue
+		}
+		if ansi.StringWidth(line[:end]) > col {
+			break
+		}
+		deficit++
+		pos = end
+	}
+	return col - deficit
 }
 
 // CutCols returns the text between cell columns start and end, end exclusive.
@@ -222,7 +253,7 @@ func CutCols(line string, start, end int) string {
 		return ""
 	}
 	if !strings.ContainsRune(line, '\t') {
-		return ansi.Cut(line, start, end)
+		return ansi.Cut(line, toAnsiBudget(line, start), toAnsiBudget(line, end))
 	}
 	return cutColsTabAware(line, start, end)
 }
@@ -240,7 +271,7 @@ func cutColsTabAware(line string, start, end int) string {
 			cutFrom := max(start-col, 0)
 			cutTo := min(end-col, segWidth)
 			if cutTo > cutFrom {
-				b.WriteString(ansi.Cut(seg, cutFrom, cutTo))
+				b.WriteString(ansi.Cut(seg, toAnsiBudget(seg, cutFrom), toAnsiBudget(seg, cutTo)))
 			}
 		}
 		col += segWidth

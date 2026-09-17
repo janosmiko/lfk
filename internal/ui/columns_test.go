@@ -86,6 +86,8 @@ func TestCutCols(t *testing.T) {
 		{"negative start", "hello", -2, 2, "he"},
 		{"whole wide rune", "界a", 0, 2, "界"},
 		{"after wide rune", "界a", 2, 3, "a"},
+		{"keycap glyph alone", "1️⃣x", 0, 2, "1️⃣"},
+		{"text after a keycap", "1️⃣x", 2, 3, "x"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,6 +130,7 @@ func TestCharCols_MatchesTheRenderersBoundaries(t *testing.T) {
 		"", " ", "plain ascii text",
 		"日本語text", "a\U0001F600b", "éclair", "́x",
 		zwjFamily + "x",
+		"1️⃣x", "x1️⃣y", "1️⃣1️⃣yz",
 		"\U0001F1EF\U0001F1F5\U0001F1E9\U0001F1EA",
 		"tab\there", "ctrl\x07char", "mixed 界 á \U0001F600 end",
 		"́̂̃", "界a\U0001F1EF\U0001F1F5é",
@@ -147,16 +150,24 @@ func TestCharCols_MatchesTheRenderersBoundaries(t *testing.T) {
 }
 
 // Keycaps are the one construct where ansi contradicts itself: StringWidth
-// calls the glyph two cells, Cut and Truncate treat it as one. Columns follow
-// StringWidth, which is what wrapping and the width guard use, so the cursor
-// can sit a cell off on such a line. Delete this and put keycaps back in the
-// corpus above once ansi agrees with itself.
-func TestCharCols_KeycapWidthDisagreesUpstream(t *testing.T) {
+// calls the glyph two cells, Cut and Truncate treat it as one. toAnsiBudget
+// works around it below. Delete both once ansi agrees with itself.
+func TestAnsiCutKeycapDeficit_UpstreamQuirk(t *testing.T) {
 	const keycap = "1️⃣"
 
 	require.Equal(t, 2, LineWidth(keycap), "the measured width")
 	require.Equal(t, 2, LineWidth(ansi.Cut(keycap, 0, 1)), "one cut column already carries the whole glyph")
-	assert.NotEqual(t, 1, SnapColStart(keycap+"x", 2), "so column 2 is not a cut boundary")
+}
+
+// toAnsiBudget compensates for the quirk above, so SnapColStart and CutCols
+// land on the column a keycap sequence actually names.
+func TestToAnsiBudget_KeycapWorkaround(t *testing.T) {
+	const keycap = "1️⃣"
+	line := keycap + "x"
+
+	assert.Equal(t, 2, SnapColStart(line, 2), "the column right after the keycap is a real boundary")
+	assert.Equal(t, keycap, CutCols(line, 0, 2))
+	assert.Equal(t, "x", CutCols(line, 2, 3))
 }
 
 // A tab is one character whose width runs to the next 8-column tab stop,
@@ -219,4 +230,14 @@ func TestColumnRuneRoundTrip_WithTabs(t *testing.T) {
 			assert.Equal(t, i, RuneIndexAt(line, col), "line %q rune %d", line, i)
 		}
 	}
+}
+
+// A standalone U+20E3 without U+FE0F is not the full emoji keycap form.
+// ansi.StringWidth and ansi.Cut agree on 1 cell, so no deficit adjustment.
+func TestToAnsiBudget_StandaloneKeycapMark(t *testing.T) {
+	line := "1⃣x"
+	assert.Equal(t, 2, LineWidth(line), "1-cell keycap + 1-cell x")
+	assert.Equal(t, 2, RuneIndexAt(line, 1), "col 1 is the x at rune index 2")
+	assert.Equal(t, 1, SnapColStart(line, 1), "col 1 is a valid boundary")
+	assert.Equal(t, "x", CutCols(line, 1, 2))
 }
