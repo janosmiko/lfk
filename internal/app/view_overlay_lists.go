@@ -311,31 +311,34 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 	}, width-6)
 }
 
-// renderOverlayKeymaps renders the searchable keymaps overlay, sized off
-// m.width/m.height the way renderOverlayFilterPreset sizes itself.
 func (m Model) renderOverlayKeymaps() (string, int, int) {
-	filtered := m.filteredKeymapsItems()
+	all := m.keymapsOverlayItems()
+	filtered := keymapsFilter(all, m.keymapsFilter.Value)
 	items := make([]ui.OverlayListItem, len(filtered))
 	for i, it := range filtered {
 		items[i] = it.OverlayListItem
 	}
-	cfg := ui.OverlayListConfig{
-		Title:           "Keymaps",
-		Cursor:          m.keymapsCursor,
-		Filterable:      true,
-		Filter:          m.keymapsFilter.Value,
-		FilterActive:    m.keymapsFilterMode,
-		ShowKey:         true,
-		ShowDescription: true,
-		EmptyMessage:    "No keymaps match",
+	subtitle := fmt.Sprintf("%d keymaps", len(all))
+	if m.keymapsFilter.Value != "" {
+		subtitle = fmt.Sprintf("%d / %d", len(filtered), len(all))
 	}
-	overlayW := ui.OverlayListWidth(items, cfg, m.width-10)
-	overlayH := min(m.height-6, 22)
+	overlayW := max(m.width*75/100, 50)
+	overlayH := min(m.height-4, 28)
 	contentH := max(overlayH-2, 1)
 	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
-	cfg.Scroll = overlayListScroll(&overlayKeymapsScrollPos, m.keymapsCursor, len(items), maxVisible)
-	cfg.MaxVisible = maxVisible
-	cfg.Height = contentH
+	cfg := ui.OverlayListConfig{
+		Title:        "Keymaps",
+		Subtitle:     subtitle,
+		Cursor:       m.keymapsCursor,
+		Filterable:   true,
+		Filter:       m.keymapsFilter.Value,
+		FilterActive: m.keymapsFilterMode,
+		BadgeWidth:   keymapsBadgeW,
+		Scroll:       overlayListScroll(&overlayKeymapsScrollPos, m.keymapsCursor, len(items), maxVisible),
+		MaxVisible:   maxVisible,
+		Height:       contentH,
+		EmptyMessage: "No keymaps match",
+	}
 	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayW, overlayH
 }
 

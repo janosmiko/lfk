@@ -285,6 +285,13 @@ func (m Model) overlayHintBarEditor() string {
 	case overlayColumnToggle:
 		return m.overlayHintBarOverlayColumnToggle()
 	case overlayKeymaps:
+		if m.keymapsFilterMode {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				{Key: "enter", Desc: "accept"},
+				{Key: "esc", Desc: "clear"},
+			})
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "navigate"},
 			{Key: "enter", Desc: "execute"},

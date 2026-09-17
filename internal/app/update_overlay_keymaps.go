@@ -1,17 +1,18 @@
 package app
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// keymapItem is one row of the keymaps overlay: the underlying which-key
-// entry rendered as an OverlayListItem, plus the raw (unformatted) key
-// string needed to synthesize a keypress on Enter.
 type keymapItem struct {
 	ui.OverlayListItem
-	rawKey string
+	rawKey     string
+	displayKey string
 }
 
 // openKeymapsOverlay resets the overlay's cursor and filter and opens it.
@@ -19,7 +20,7 @@ type keymapItem struct {
 // (e.g. previewSchemeAtCursor's siblings), so callers reassign `m`.
 func (m Model) openKeymapsOverlay() Model {
 	m.keymapsCursor = 0
-	m.keymapsFilterMode = false
+	m.keymapsFilterMode = true
 	m.keymapsFilter.Clear()
 	m.overlay = overlayKeymaps
 	return m
@@ -33,27 +34,67 @@ func (m *Model) keymapsOverlayItems() []keymapItem {
 	items := make([]keymapItem, 0, len(actions))
 	for _, a := range actions {
 		raw := a.Key(ui.ActiveKeybindings)
-		items = append(items, keymapItem{
-			Key:         ui.KeyChordDisplay(raw),
-			Name:        a.Label,
-			Description: string(a.Group),
-			rawKey:      raw,
+		group := string(a.Group)
+		key := ui.KeyChordDisplay(raw)
+		items = append(items, keymapItem{ //nolint:modernize // can't drop embedded label with named fields
+			OverlayListItem: ui.OverlayListItem{
+				Name:        a.Label,
+				Description: group,
+				Badge:       keymapsBadge(group, key),
+			},
+			rawKey:     raw,
+			displayKey: key,
 		})
 	}
 	return items
 }
 
-// filteredKeymapsItems returns keymapsOverlayItems narrowed by the current
-// filter text, matched against the label, group, and displayed key.
+const (
+	keymapsGroupW = 9 // len("Selection"), the longest group name
+	keymapsKeyW   = 6
+	keymapsBadgeW = keymapsGroupW + 2 + keymapsKeyW // group + gap + key
+)
+
+func keymapsBadge(group, key string) string {
+	gs := keymapsGroupStyle(whichKeyGroup(group))
+	ks := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Background(ui.SurfaceBg).Bold(true)
+	return gs.Render(fmt.Sprintf("%-*s", keymapsGroupW, group)) +
+		lipgloss.NewStyle().Background(ui.SurfaceBg).Render("  ") +
+		ks.Render(fmt.Sprintf("%*s", keymapsKeyW, key))
+}
+
+func keymapsGroupStyle(g whichKeyGroup) lipgloss.Style {
+	var base lipgloss.Style
+	switch g {
+	case wkActions:
+		base = ui.WhichKeyActionsStyle
+	case wkViews:
+		base = ui.WhichKeyViewsStyle
+	case wkFilter:
+		base = ui.WhichKeyFilterStyle
+	case wkSelection:
+		base = ui.WhichKeySelectionStyle
+	case wkSort:
+		base = ui.WhichKeySortStyle
+	case wkSettings:
+		base = ui.WhichKeySettingsStyle
+	default:
+		base = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed))
+	}
+	return base.Background(ui.SurfaceBg)
+}
+
 func (m *Model) filteredKeymapsItems() []keymapItem {
-	items := m.keymapsOverlayItems()
-	if m.keymapsFilter.Value == "" {
+	return keymapsFilter(m.keymapsOverlayItems(), m.keymapsFilter.Value)
+}
+
+func keymapsFilter(items []keymapItem, query string) []keymapItem {
+	if query == "" {
 		return items
 	}
-	query := m.keymapsFilter.Value
 	filtered := make([]keymapItem, 0, len(items))
 	for _, it := range items {
-		if ui.MatchLine(it.Name, query) || ui.MatchLine(it.Description, query) || ui.MatchLine(it.Key, query) {
+		if ui.MatchLine(it.Name, query) || ui.MatchLine(it.Description, query) || ui.MatchLine(it.displayKey, query) {
 			filtered = append(filtered, it)
 		}
 	}

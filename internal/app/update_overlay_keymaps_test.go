@@ -16,7 +16,7 @@ func TestKeymapsOverlayItems_ReturnsNonEmptyWithKeyAndName(t *testing.T) {
 		t.Fatal("expected at least one keymap item for the explorer catalog")
 	}
 	for _, it := range items {
-		if it.Key == "" {
+		if it.displayKey == "" {
 			t.Errorf("item %q has no displayed key", it.Name)
 		}
 		if it.Name == "" {
@@ -45,7 +45,7 @@ func TestKeymapsFilteredItems_FiltersByText(t *testing.T) {
 		t.Fatalf("filtering by %q dropped every item", target)
 	}
 	for _, it := range filtered {
-		if !ui.MatchLine(it.Name, target) && !ui.MatchLine(it.Description, target) && !ui.MatchLine(it.Key, target) {
+		if !ui.MatchLine(it.Name, target) && !ui.MatchLine(it.Description, target) && !ui.MatchLine(it.displayKey, target) {
 			t.Errorf("item %q does not match filter %q", it.Name, target)
 		}
 	}
@@ -60,6 +60,8 @@ func TestKeymapsOverlayKey_EnterClosesAndReturnsCmd(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
+	// Exit filter mode first (overlay opens with filter active).
+	m.keymapsFilterMode = false
 
 	mdl, cmd := m.handleKeymapsOverlayKey(keyMsg("enter"))
 	out := mdl.(Model)
@@ -78,6 +80,8 @@ func TestKeymapsOverlayKey_EscCloses(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
+	// Exit filter mode first (overlay opens with filter active).
+	m.keymapsFilterMode = false
 
 	mdl, _ := m.handleKeymapsOverlayKey(keyMsg("esc"))
 	out := mdl.(Model)
@@ -90,6 +94,8 @@ func TestKeymapsOverlayKey_CursorMovesWithJK(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
+	// Exit filter mode so j/k navigate instead of typing into the filter.
+	m.keymapsFilterMode = false
 
 	if len(m.filteredKeymapsItems()) < 2 {
 		t.Fatal("need at least two catalog entries to test cursor movement")
@@ -105,6 +111,31 @@ func TestKeymapsOverlayKey_CursorMovesWithJK(t *testing.T) {
 	out = mdl.(Model)
 	if out.keymapsCursor != 0 {
 		t.Fatalf("k should move cursor back to 0, got %d", out.keymapsCursor)
+	}
+}
+
+func TestKeymapsOverlayItems_BadgeContainsGroupAndKey(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+
+	items := m.keymapsOverlayItems()
+	for _, it := range items {
+		if it.Badge == "" {
+			t.Errorf("item %q has no badge", it.Name)
+		}
+		if it.Description == "" {
+			t.Errorf("item %q has no group in Description (needed for filter matching)", it.Name)
+		}
+	}
+}
+
+func TestKeymapsOverlay_OpensInFilterMode(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel().openKeymapsOverlay()
+	if !m.keymapsFilterMode {
+		t.Fatal("keymaps overlay should open with filter active")
 	}
 }
 
