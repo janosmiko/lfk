@@ -331,7 +331,7 @@ func (m Model) renderOverlayKeymaps() (string, int, int) {
 	overlayW := ui.OverlayContentWidth(nameW+keymapsBadgeW+2, m.width-10)
 	overlayH := min(m.height-6, 25)
 	contentH := max(overlayH-2, 1)
-	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
+	maxVisible := max(contentH-overlayListChromeFilterable()-1, 1) // -1: subtitle row
 	cfg := ui.OverlayListConfig{
 		Title:        "Keymaps",
 		Subtitle:     subtitle,

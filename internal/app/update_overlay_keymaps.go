@@ -20,7 +20,7 @@ type keymapItem struct {
 // (e.g. previewSchemeAtCursor's siblings), so callers reassign `m`.
 func (m Model) openKeymapsOverlay() Model {
 	m.keymapsCursor = 0
-	m.keymapsFilterMode = true
+	m.keymapsFilterMode = false
 	m.keymapsFilter.Clear()
 	m.overlay = overlayKeymaps
 	return m

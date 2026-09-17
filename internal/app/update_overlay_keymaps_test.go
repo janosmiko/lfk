@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -60,8 +61,6 @@ func TestKeymapsOverlayKey_EnterClosesAndReturnsCmd(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
-	// Exit filter mode first (overlay opens with filter active).
-	m.keymapsFilterMode = false
 
 	mdl, cmd := m.handleKeymapsOverlayKey(keyMsg("enter"))
 	out := mdl.(Model)
@@ -80,8 +79,6 @@ func TestKeymapsOverlayKey_EscCloses(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
-	// Exit filter mode first (overlay opens with filter active).
-	m.keymapsFilterMode = false
 
 	mdl, _ := m.handleKeymapsOverlayKey(keyMsg("esc"))
 	out := mdl.(Model)
@@ -94,8 +91,6 @@ func TestKeymapsOverlayKey_CursorMovesWithJK(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
-	// Exit filter mode so j/k navigate instead of typing into the filter.
-	m.keymapsFilterMode = false
 
 	if len(m.filteredKeymapsItems()) < 2 {
 		t.Fatal("need at least two catalog entries to test cursor movement")
@@ -130,12 +125,35 @@ func TestKeymapsOverlayItems_BadgeContainsGroupAndKey(t *testing.T) {
 	}
 }
 
-func TestKeymapsOverlay_OpensInFilterMode(t *testing.T) {
+func TestKeymapsOverlay_OpensInNormalModeAndSlashFilters(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()
 	m := whichKeyTestModel().openKeymapsOverlay()
-	if !m.keymapsFilterMode {
-		t.Fatal("keymaps overlay should open with filter active")
+	if m.keymapsFilterMode {
+		t.Fatal("keymaps overlay should open in normal mode")
+	}
+	mdl, _ := m.handleKeymapsOverlayKey(keyMsg("/"))
+	if !mdl.(Model).keymapsFilterMode {
+		t.Fatal("/ should enter filter mode")
+	}
+}
+
+func TestRenderOverlayKeymaps_LastItemVisibleAfterG(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel().openKeymapsOverlay()
+	m.height = 30
+	overlayKeymapsScrollPos = 0
+	t.Cleanup(func() { overlayKeymapsScrollPos = 0 })
+
+	mdl, _ := m.handleKeymapsOverlayKey(keyMsg("G"))
+	m = mdl.(Model)
+	items := m.filteredKeymapsItems()
+	last := items[len(items)-1].Name
+
+	view, _, _ := m.renderOverlayKeymaps()
+	if !strings.Contains(stripANSI(view), last) {
+		t.Fatalf("last item %q not rendered after G:\n%s", last, stripANSI(view))
 	}
 }
 
