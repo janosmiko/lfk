@@ -565,7 +565,7 @@ Press `b` on a resource to see what constrains it: ResourceQuotas and LimitRange
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (sets shared Ctrl+D/Ctrl+U step) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `F` | Toggle follow mode (auto-scroll to new logs) |
-| `f` | Filter log lines live (default match type set by `search_mode`; `~`fuzzy, `\`literal override it); narrows the view to matching lines |
+| `f` | Filter log lines live (default match type from `search_mode`, `~`fuzzy and `\`literal override it), narrows the view to matching lines |
 | `i` / `o` | Lower / raise the minimum log severity shown |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `#` | Toggle line numbers |

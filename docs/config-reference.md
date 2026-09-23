@@ -560,7 +560,7 @@ All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify th
 
 All keybindings can be overridden. Only specify the keys you want to change -- defaults apply for everything else. See [`keybindings.md`](keybindings.md) for the full list.
 
-The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The log viewer additionally honors `filter` (live text filter, default match type set by `search_mode`; `~`fuzzy, `\`literal override it) and `severity_up`/`severity_down` (step the minimum log severity shown). The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
+The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The log viewer additionally honors `filter` (live text filter, default match type from `search_mode`, `~`fuzzy and `\`literal override it) and `severity_up`/`severity_down` (step the minimum log severity shown). The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
 
 | Field | Default | Action |
 |---|---|---|
