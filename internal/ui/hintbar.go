@@ -72,7 +72,7 @@ func FormatHintPartsFit(hints []HintEntry, maxWidth int) string {
 // truth for hint bar styling -- if the style needs to change, only this
 // function needs updating.
 func RenderHintBar(hints []HintEntry, width int) string {
-	content := FormatHintParts(hints)
+	content := FormatHintPartsFit(hints, width-StatusBarBgStyle.GetHorizontalFrameSize())
 	return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(content)
 }
 
