@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // claimJumpState remembers which pod and claim index handleExplorerActionKeyJumpClaim
@@ -14,16 +15,12 @@ type claimJumpState struct {
 	index  int    // claim index to use on the next press for that pod
 }
 
-// Repeated presses on the same pod cycle through its "claim:N" columns
-// (populatePodResourceClaims), wrapping back to the first after the last.
-func (m Model) handleExplorerActionKeyJumpClaim() (tea.Model, tea.Cmd, bool) {
-	sel := m.selectedMiddleItem()
+// resourceClaimsFor reads sel's "claim:N" columns, shared by the handler and
+// the which-key availability predicate so they can never disagree.
+func resourceClaimsFor(sel *model.Item) (claims []string, hasUnresolvedClaims bool) {
 	if sel == nil {
-		return m, nil, true
+		return nil, false
 	}
-
-	var claims []string
-	hasUnresolvedClaims := false
 	for _, kv := range sel.Columns {
 		if strings.HasPrefix(kv.Key, "claim:") {
 			claims = append(claims, kv.Value)
@@ -32,6 +29,18 @@ func (m Model) handleExplorerActionKeyJumpClaim() (tea.Model, tea.Cmd, bool) {
 			hasUnresolvedClaims = true
 		}
 	}
+	return claims, hasUnresolvedClaims
+}
+
+// Repeated presses on the same pod cycle through its "claim:N" columns
+// (populatePodResourceClaims), wrapping back to the first after the last.
+func (m Model) handleExplorerActionKeyJumpClaim() (tea.Model, tea.Cmd, bool) {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil, true
+	}
+
+	claims, hasUnresolvedClaims := resourceClaimsFor(sel)
 	if len(claims) == 0 {
 		if hasUnresolvedClaims {
 			m.setStatusMessage("Resource claim not created yet", true)

@@ -220,6 +220,125 @@ func TestDispatchKeymapsSelection_GotoChordReplaysBothKeys(t *testing.T) {
 	}
 }
 
+// A rebound Goto* field can be any chord IsSingleKeypress accepts, not just a
+// single plain rune (docs/config-reference.md cites "gctrl+p" as valid).
+func TestDispatchKeymapsSelection_GotoChordWithModifierSuffix(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ActiveKeybindings.GotoDeployments = "gctrl+p"
+	m := gotoTestModel().openKeymapsOverlay()
+
+	var target keymapItem
+	found := false
+	for _, it := range m.keymapsOverlayItems() {
+		if it.Name == "Go to Deployments" {
+			target = it
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("keymaps overlay is missing \"Go to Deployments\"")
+	}
+	if target.rawKey != "gctrl+p" {
+		t.Fatalf("rawKey = %q, want %q", target.rawKey, "gctrl+p")
+	}
+
+	mdl, cmd := dispatchKeymapsSelection(m, target)
+	chord, ok := cmd().(keymapsChordMsg)
+	if !ok || len(chord) != 2 {
+		t.Fatalf("cmd produced %T, want a 2-key keymapsChordMsg", cmd())
+	}
+	if chord[0].String() != "g" || chord[1].String() != "ctrl+p" {
+		t.Fatalf("chord keys = %q,%q, want g and ctrl+p", chord[0].String(), chord[1].String())
+	}
+	out, _ := mdl.(Model).Update(chord)
+	final := out.(Model)
+	if final.nav.ResourceType.Kind != "Deployment" {
+		t.Fatalf("nav.ResourceType.Kind = %q, want Deployment", final.nav.ResourceType.Kind)
+	}
+}
+
+// A named-key suffix ("gtab") must dispatch the same as a plain-rune one.
+func TestDispatchKeymapsSelection_GotoChordWithNamedKeySuffix(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ActiveKeybindings.GotoDeployments = "gtab"
+	m := gotoTestModel().openKeymapsOverlay()
+
+	var target keymapItem
+	for _, it := range m.keymapsOverlayItems() {
+		if it.Name == "Go to Deployments" {
+			target = it
+		}
+	}
+	if target.rawKey != "gtab" {
+		t.Fatalf("rawKey = %q, want %q", target.rawKey, "gtab")
+	}
+
+	mdl, cmd := dispatchKeymapsSelection(m, target)
+	chord, ok := cmd().(keymapsChordMsg)
+	if !ok || len(chord) != 2 {
+		t.Fatalf("cmd produced %T, want a 2-key keymapsChordMsg", cmd())
+	}
+	if chord[0].String() != "g" || chord[1].String() != "tab" {
+		t.Fatalf("chord keys = %q,%q, want g and tab", chord[0].String(), chord[1].String())
+	}
+	out, _ := mdl.(Model).Update(chord)
+	final := out.(Model)
+	if final.nav.ResourceType.Kind != "Deployment" {
+		t.Fatalf("nav.ResourceType.Kind = %q, want Deployment", final.nav.ResourceType.Kind)
+	}
+}
+
+// A rebound JumpTop prefix must still be recognized and split correctly.
+func TestDispatchKeymapsSelection_GotoChordWithReboundPrefix(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ActiveKeybindings.JumpTop = "z"
+	ui.ActiveKeybindings.GotoDeployments = "zctrl+p"
+	m := gotoTestModel().openKeymapsOverlay()
+
+	var target keymapItem
+	for _, it := range m.keymapsOverlayItems() {
+		if it.Name == "Go to Deployments" {
+			target = it
+		}
+	}
+	if target.rawKey != "zctrl+p" {
+		t.Fatalf("rawKey = %q, want %q", target.rawKey, "zctrl+p")
+	}
+
+	_, cmd := dispatchKeymapsSelection(m, target)
+	chord, ok := cmd().(keymapsChordMsg)
+	if !ok || len(chord) != 2 {
+		t.Fatalf("cmd produced %T, want a 2-key keymapsChordMsg", cmd())
+	}
+	if chord[0].String() != "z" || chord[1].String() != "ctrl+p" {
+		t.Fatalf("chord keys = %q,%q, want z and ctrl+p", chord[0].String(), chord[1].String())
+	}
+}
+
+func TestIsGotoChordRawKey_AcceptsAnyIsSingleKeypressSuffix(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	ui.ActiveKeybindings.JumpTop = "g"
+
+	cases := map[string]bool{
+		"gd":       true,
+		"gctrl+p":  true,
+		"gtab":     true,
+		"gshift+a": true,
+		"g":        false, // prefix alone is not a chord
+		"d":        false, // no prefix at all
+		"gg":       true,  // second "g" is itself a single keypress suffix
+	}
+	for raw, want := range cases {
+		if got := isGotoChordRawKey(raw); got != want {
+			t.Errorf("isGotoChordRawKey(%q) = %v, want %v", raw, got, want)
+		}
+	}
+}
+
 // GotoPods was mistakenly left reachable only from the g-prefix popup.
 func TestKeymapsOverlayItems_IncludesRemainingGotoChords(t *testing.T) {
 	restoreWhichKeyGlobals(t)

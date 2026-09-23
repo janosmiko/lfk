@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -120,18 +119,14 @@ func (m Model) handleKeymapsOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 // g-then-d press produces, and handleGotoChord's lookup would not match it.
 type keymapsChordMsg []tea.KeyPressMsg
 
-// isGotoChordRawKey reports whether raw is a chord's binding string (the
-// JumpTop prefix plus exactly one more key, no modifier) rather than a
-// single physical keypress.
+// isGotoChordRawKey uses ui.IsSingleKeypress, the same rule the config
+// loader validates goto_* chords against, so "gctrl+p" and "gtab" count too.
 func isGotoChordRawKey(raw string) bool {
 	prefix := ui.ActiveKeybindings.JumpTop
 	if prefix == "" || raw == prefix || !strings.HasPrefix(raw, prefix) {
 		return false
 	}
-	if strings.Contains(raw, "+") {
-		return false
-	}
-	return utf8.RuneCountInString(strings.TrimPrefix(raw, prefix)) == 1
+	return ui.IsSingleKeypress(strings.TrimPrefix(raw, prefix))
 }
 
 // dispatchKeymapsSelection closes the overlay and replays the selected

@@ -376,6 +376,103 @@ func TestAvailableWhichKeyActions_TabMovesRequireMultipleTabs(t *testing.T) {
 	}
 }
 
+// Regression: handleExplorerActionKeyJumpOwner (update_keys_actions.go)
+// toasts "No owner references found" without an owner: column.
+func TestAvailableWhichKeyActions_JumpOwnerRequiresOwnerColumn(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Jump to owner") {
+		t.Fatal("jump to owner must be hidden without an owner: column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "owner:1", Value: "apps/v1||ReplicaSet||rs-1"},
+	}}})
+	m.setCursor(0)
+	if !slices.Contains(whichKeyLabels(m), "Jump to owner") {
+		t.Fatal("jump to owner must be offered with a well-formed owner: column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "owner:1", Value: "malformed"},
+	}}})
+	m.setCursor(0)
+	if slices.Contains(whichKeyLabels(m), "Jump to owner") {
+		t.Fatal("jump to owner must be hidden when the owner: column can't be parsed")
+	}
+
+	for _, lvl := range []model.Level{model.LevelOwned, model.LevelContainers} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+			{Key: "owner:1", Value: "apps/v1||ReplicaSet||rs-1"},
+		}}})
+		m.setCursor(0)
+		if !slices.Contains(whichKeyLabels(m), "Jump to owner") {
+			t.Errorf("jump to owner must be offered at %s with an owner: column", levelName[lvl])
+		}
+	}
+	for _, lvl := range []model.Level{model.LevelClusters, model.LevelResourceTypes} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+			{Key: "owner:1", Value: "apps/v1||ReplicaSet||rs-1"},
+		}}})
+		m.setCursor(0)
+		if slices.Contains(whichKeyLabels(m), "Jump to owner") {
+			t.Errorf("jump to owner must be hidden at %s regardless of columns", levelName[lvl])
+		}
+	}
+}
+
+// Regression: handleExplorerActionKeyJumpClaim (update_keys_jump_claim.go)
+// toasts without a claim: column, even when a "Resource Claims" placeholder
+// column is present.
+func TestAvailableWhichKeyActions_JumpClaimRequiresClaimColumn(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+		t.Fatal("jump to resource claim must be hidden without a claim: column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "Resource Claims", Value: "1"},
+	}}})
+	m.setCursor(0)
+	if slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+		t.Fatal("jump to resource claim must stay hidden with only the unresolved placeholder column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "claim:0", Value: "claim-1"},
+	}}})
+	m.setCursor(0)
+	if !slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+		t.Fatal("jump to resource claim must be offered once a claim: column exists")
+	}
+
+	m2 := whichKeyTestModel()
+	m2.nav.Level = model.LevelOwned
+	m2.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "claim:0", Value: "claim-1"},
+	}}})
+	m2.setCursor(0)
+	if !slices.Contains(whichKeyLabels(m2), "Jump to resource claim") {
+		t.Error("jump to resource claim must be offered at LevelOwned with a claim: column")
+	}
+	for _, lvl := range []model.Level{model.LevelClusters, model.LevelResourceTypes} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+			{Key: "claim:0", Value: "claim-1"},
+		}}})
+		m.setCursor(0)
+		if slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+			t.Errorf("jump to resource claim must be hidden at %s regardless of columns", levelName[lvl])
+		}
+	}
+}
+
 // Regression: jumpToPreviousNamespace (namespace_history.go) no-ops with a
 // toast when no previous scope was recorded yet, so the panel must not
 // advertise it until a namespace switch has actually happened.

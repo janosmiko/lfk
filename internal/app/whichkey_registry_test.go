@@ -613,15 +613,17 @@ type wkLevelScopingCase struct {
 // guard, so an undocumented omission fails CI rather than sitting in a comment.
 func wkLevelScopingExclusions() map[string]string {
 	return map[string]string{
-		"Diff two selected":     "needs exactly 2 selected rows, not level-dependent alone",
-		"Mouse capture":         "needs m.mouseAvailable, false by default here",
-		"Show ignored findings": "needs a security-prefixed kind",
-		"Jump back":             "needs m.jumpBackStack non-empty, not level-dependent alone",
-		"Next tab":              "needs len(m.tabs) > 1, not level-dependent alone",
-		"Previous tab":          "needs len(m.tabs) > 1, not level-dependent alone",
-		"Move tab left":         "needs len(m.tabs) > 1, not level-dependent alone",
-		"Move tab right":        "needs len(m.tabs) > 1, not level-dependent alone",
-		"Previous namespace":    "needs a recorded previous scope and single-namespace mode, not level-dependent alone",
+		"Diff two selected":      "needs exactly 2 selected rows, not level-dependent alone",
+		"Mouse capture":          "needs m.mouseAvailable, false by default here",
+		"Show ignored findings":  "needs a security-prefixed kind",
+		"Jump back":              "needs m.jumpBackStack non-empty, not level-dependent alone",
+		"Next tab":               "needs len(m.tabs) > 1, not level-dependent alone",
+		"Previous tab":           "needs len(m.tabs) > 1, not level-dependent alone",
+		"Move tab left":          "needs len(m.tabs) > 1, not level-dependent alone",
+		"Move tab right":         "needs len(m.tabs) > 1, not level-dependent alone",
+		"Previous namespace":     "needs a recorded previous scope and single-namespace mode, not level-dependent alone",
+		"Jump to owner":          "needs a parseable owner: column, not level-dependent alone",
+		"Jump to resource claim": "needs a claim: column, not level-dependent alone",
 	}
 }
 
@@ -660,8 +662,6 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Go to Clusters level", "", "", allLevels},
 		{"Go to Types level", "", "", allLevels},
 		{"Go to Resources level", "", "", allLevels},
-		{"Jump to owner", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
-		{"Jump to resource claim", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
 		// LevelOwned is excluded: the handler only toggles Event grouping at
 		// LevelResources (finding: handleKeyExpandCollapse's kind check).
 		{"Expand/collapse groups", "Event", "", []model.Level{model.LevelResourceTypes, model.LevelResources}},

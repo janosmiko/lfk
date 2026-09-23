@@ -509,6 +509,24 @@ func wkPreviousNamespaceAvailable(c *wkCtx) bool {
 	return wkNotAtClusters(c) && !c.m.unionMode && c.m.previousNsScope != nil
 }
 
+// wkJumpOwnerAvailable mirrors handleExplorerActionKeyJumpOwner
+// (update_keys_actions.go): it toasts instead of navigating when the row has
+// no parseable owner: column.
+func wkJumpOwnerAvailable(c *wkCtx) bool {
+	return wkOnRow(c) && len(ownerRefsFor(c.sel)) > 0
+}
+
+// wkJumpClaimAvailable mirrors handleExplorerActionKeyJumpClaim
+// (update_keys_jump_claim.go): it toasts instead of navigating when the pod
+// has no claim: column, even with an unresolved "Resource Claims" placeholder.
+func wkJumpClaimAvailable(c *wkCtx) bool {
+	if !wkKindIn("Pod")(c) {
+		return false
+	}
+	claims, _ := resourceClaimsFor(c.sel)
+	return len(claims) > 0
+}
+
 // whichKeyExplorerActionList is the full catalog for explorer mode. Plain
 // cursor motion (h/j/k/l, gg/G, ctrl+d/u) is absent by construction — the
 // panel is for actions the user is unlikely to remember, not for that.
@@ -562,8 +580,8 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.LevelCluster }, Label: "Go to Clusters level", Group: wkNavigate},
 	{Key: func(kb ui.Keybindings) string { return kb.LevelTypes }, Label: "Go to Types level", Group: wkNavigate},
 	{Key: func(kb ui.Keybindings) string { return kb.LevelResources }, Label: "Go to Resources level", Group: wkNavigate},
-	{Key: func(kb ui.Keybindings) string { return kb.JumpOwner }, Label: "Jump to owner", Group: wkNavigate, Avail: wkOnRow},
-	{Key: func(kb ui.Keybindings) string { return kb.JumpClaim }, Label: "Jump to resource claim", Group: wkNavigate, Avail: wkKindIn("Pod")},
+	{Key: func(kb ui.Keybindings) string { return kb.JumpOwner }, Label: "Jump to owner", Group: wkNavigate, Avail: wkJumpOwnerAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.JumpClaim }, Label: "Jump to resource claim", Group: wkNavigate, Avail: wkJumpClaimAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.JumpBack }, Label: "Jump back", Group: wkNavigate, Avail: wkJumpBackAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.ExpandCollapse }, Label: "Expand/collapse groups", Group: wkNavigate, Avail: wkExpandCollapseAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.NewTab }, Label: "New tab", Group: wkNavigate, Avail: wkNewTabAvailable},
