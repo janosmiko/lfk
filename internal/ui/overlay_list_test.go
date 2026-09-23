@@ -383,6 +383,7 @@ func TestRenderOverlayList(t *testing.T) {
 		plain := ansi.Strip(out)
 		assert.Contains(t, plain, "[fuzzy] ~asd")
 		assert.NotContains(t, plain, "/ ~asd")
+		assert.NotContains(t, plain, "~: fuzzy", "the fuzzy hotkey hint belongs in the bottom hint bar, not the overlay body")
 	})
 
 	t.Run("FilterModeAware keeps the / glyph in substring mode", func(t *testing.T) {

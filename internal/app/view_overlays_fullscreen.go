@@ -195,8 +195,7 @@ func (m Model) renderCanIOverlay(background string) string {
 	var hintBar string
 	if m.canISearchActive {
 		label := ui.SearchModePromptLabel(m.canISearchInput.Value, "/")
-		hint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
-		searchBar := ui.HelpKeyStyle.Render(label) + ui.BarNormalStyle.Render(m.canISearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.canISearchInput.CursorRight()) + ui.BarDimStyle.Render("  ") + hint
+		searchBar := ui.HelpKeyStyle.Render(label) + ui.BarNormalStyle.Render(m.canISearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.canISearchInput.CursorRight())
 		hintBar = ui.StatusBarBgStyle.Width(innerW).Render(searchBar)
 	} else if m.canISearchQuery != "" {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.canISearchQuery)

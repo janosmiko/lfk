@@ -63,6 +63,7 @@ func (m Model) overlayHintBarBookmarks() string {
 	case bookmarkModeFilter:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "clear"},
 		})
@@ -97,6 +98,14 @@ func (m Model) overlayHintBarBookmarks() string {
 }
 
 func (m Model) overlayHintBarOverlayLogContainerSelect() string {
+	if m.logView.containerFilterActive {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type", Desc: "filter"},
+			ui.SearchModeHintEntry(),
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "clear"},
+		})
+	}
 	hints := []ui.HintEntry{
 		{Key: "space", Desc: "select"},
 		{Key: "enter", Desc: "apply"},
@@ -113,6 +122,7 @@ func (m Model) overlayHintBarOverlayTemplates() string {
 	if m.templateSearchMode {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "clear"},
 		})
@@ -282,6 +292,7 @@ func (m Model) overlayHintBarOverlayFinalizerSearch() string {
 	if m.finalizerSearch.filterActive {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "clear"},
 		})
@@ -343,6 +354,7 @@ func (m Model) overlayHintBarOverlayCanI() string {
 	if m.canISearchActive {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type", Desc: "search"},
+			ui.SearchModeHintEntry(),
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "clear"},
 		})
@@ -372,6 +384,7 @@ func (m Model) overlayHintBarOverlayColumnToggle() string {
 	if m.columnToggleFilterActive {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "esc", Desc: "clear/close"},
 		})
 	}

@@ -172,9 +172,6 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		case cfg.FilterActive:
 			b.WriteString(OverlayFilterStyle.Render(prefix + cfg.Filter))
 			b.WriteString(OverlayDimStyle.Render("█"))
-			if cfg.FilterModeAware {
-				b.WriteString("  " + FormatHintParts([]HintEntry{SearchModeHintEntry()}))
-			}
 		case cfg.Filter != "":
 			b.WriteString(OverlayFilterStyle.Render(prefix + cfg.Filter))
 		default:

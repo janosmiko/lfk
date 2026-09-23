@@ -126,6 +126,14 @@ func (m Model) overlayHintBarDialog() string {
 func (m Model) overlayHintBarSelector() string {
 	switch m.overlay {
 	case overlayNamespace:
+		if m.nsFilterMode {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				ui.SearchModeHintEntry(),
+				{Key: "enter", Desc: "apply"},
+				{Key: "esc", Desc: "clear"},
+			})
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "space", Desc: "select"},
 			{Key: "tab", Desc: "exclude"},
@@ -168,6 +176,14 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "esc", Desc: "close"},
 		})
 	case overlayPodSelect, overlayLogPodSelect:
+		if m.logView.podFilterActive {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				ui.SearchModeHintEntry(),
+				{Key: "enter", Desc: "apply"},
+				{Key: "esc", Desc: "clear"},
+			})
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "/", Desc: "filter"},
 			{Key: "j/k", Desc: "navigate"},
@@ -199,12 +215,28 @@ func (m Model) overlayHintBarSelector() string {
 	case overlayTemplates:
 		return m.overlayHintBarOverlayTemplates()
 	case overlayCanISubject:
+		if m.canISubjectFilterMode {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				ui.SearchModeHintEntry(),
+				{Key: "enter", Desc: "apply"},
+				{Key: "esc", Desc: "clear"},
+			})
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "enter", Desc: "select"},
 			{Key: "/", Desc: "filter"},
 			{Key: "esc", Desc: "cancel"},
 		})
 	case overlayExplainSearch:
+		if m.explainRecursiveFilterActive {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				ui.SearchModeHintEntry(),
+				{Key: "enter", Desc: "apply"},
+				{Key: "esc", Desc: "clear"},
+			})
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "enter", Desc: "navigate"},
 			{Key: "/", Desc: "filter"},
