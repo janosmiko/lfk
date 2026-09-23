@@ -220,6 +220,72 @@ func TestDispatchKeymapsSelection_GotoChordReplaysBothKeys(t *testing.T) {
 	}
 }
 
+// GotoPods was mistakenly left reachable only from the g-prefix popup.
+func TestKeymapsOverlayItems_IncludesRemainingGotoChords(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := gotoTestModel().openKeymapsOverlay()
+
+	var target keymapItem
+	found := false
+	for _, it := range m.keymapsOverlayItems() {
+		if it.Name == "Go to Pods" {
+			target = it
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("keymaps overlay is missing \"Go to Pods\"")
+	}
+	if target.rawKey != "gp" {
+		t.Fatalf("rawKey = %q, want %q", target.rawKey, "gp")
+	}
+
+	mdl, cmd := dispatchKeymapsSelection(m, target)
+	chord, ok := cmd().(keymapsChordMsg)
+	if !ok || len(chord) != 2 {
+		t.Fatalf("cmd produced %T, want a 2-key keymapsChordMsg", cmd())
+	}
+	out, _ := mdl.(Model).Update(chord)
+	final := out.(Model)
+	if final.nav.ResourceType.Kind != "Pod" {
+		t.Fatalf("nav.ResourceType.Kind = %q, want Pod", final.nav.ResourceType.Kind)
+	}
+}
+
+// The single-char chord "g\\" must replay the same as any other goto chord.
+func TestDispatchKeymapsSelection_PreviousNamespaceReplaysChord(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+	m.previousNsScope = &nsScope{namespace: "kube-system"}
+	m = m.openKeymapsOverlay()
+
+	var target keymapItem
+	found := false
+	for _, it := range m.keymapsOverlayItems() {
+		if it.Name == "Previous namespace" {
+			target = it
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("keymaps overlay is missing \"Previous namespace\"")
+	}
+	if target.rawKey != `g\` {
+		t.Fatalf("rawKey = %q, want %q", target.rawKey, `g\`)
+	}
+
+	_, cmd := dispatchKeymapsSelection(m, target)
+	chord, ok := cmd().(keymapsChordMsg)
+	if !ok || len(chord) != 2 {
+		t.Fatalf("cmd produced %T, want a 2-key keymapsChordMsg", cmd())
+	}
+	if chord[0].String() != "g" || chord[1].String() != `\` {
+		t.Fatalf("chord keys = %q,%q, want g and backslash", chord[0].String(), chord[1].String())
+	}
+}
+
 func TestKeymapsWhichKeyLeader_OpensOverlay(t *testing.T) {
 	restoreWhichKeyGlobals(t)
 	ui.ActiveKeybindings = ui.DefaultKeybindings()

@@ -376,6 +376,27 @@ func TestAvailableWhichKeyActions_TabMovesRequireMultipleTabs(t *testing.T) {
 	}
 }
 
+// Regression: jumpToPreviousNamespace (namespace_history.go) no-ops with a
+// toast when no previous scope was recorded yet, so the panel must not
+// advertise it until a namespace switch has actually happened.
+func TestAvailableWhichKeyActions_PreviousNamespaceRequiresRecordedScope(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Previous namespace") {
+		t.Fatal("previous namespace must be hidden with no recorded scope")
+	}
+	m.previousNsScope = &nsScope{namespace: "kube-system"}
+	if !slices.Contains(whichKeyLabels(m), "Previous namespace") {
+		t.Fatal("previous namespace must be offered once a scope is recorded")
+	}
+	m.unionMode = true
+	if slices.Contains(whichKeyLabels(m), "Previous namespace") {
+		t.Fatal("previous namespace must be hidden in union mode")
+	}
+}
+
 // Regression: handleKeyPinGroup (update_keys_explorer.go) refuses a
 // collapsed-group header and the Dashboards pseudo-category with a toast
 // ("Select a resource type to pin"/"This item cannot be pinned"), and blocks

@@ -502,6 +502,13 @@ func wkJumpBackAvailable(c *wkCtx) bool {
 	return len(c.m.jumpBackStack) > 0
 }
 
+// wkPreviousNamespaceAvailable mirrors jumpToPreviousNamespace's guards
+// (namespace_history.go): a selected context, single-namespace mode, and a
+// recorded previous scope.
+func wkPreviousNamespaceAvailable(c *wkCtx) bool {
+	return wkNotAtClusters(c) && !c.m.unionMode && c.m.previousNsScope != nil
+}
+
 // whichKeyExplorerActionList is the full catalog for explorer mode. Plain
 // cursor motion (h/j/k/l, gg/G, ctrl+d/u) is absent by construction — the
 // panel is for actions the user is unlikely to remember, not for that.
@@ -564,17 +571,22 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.PrevTab }, Label: "Previous tab", Group: wkNavigate, Avail: wkMultiTabAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.MoveTabLeft }, Label: "Move tab left", Group: wkNavigate, Avail: wkMultiTabAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.MoveTabRight }, Label: "Move tab right", Group: wkNavigate, Avail: wkMultiTabAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoPods }, Label: "Go to Pods", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoDeployments }, Label: "Go to Deployments", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoServices }, Label: "Go to Services", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoNodes }, Label: "Go to Nodes", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoNamespaces }, Label: "Go to Namespaces", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoIngresses }, Label: "Go to Ingresses", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoJobs }, Label: "Go to Jobs", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoCronJobs }, Label: "Go to CronJobs", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoReplicaSets }, Label: "Go to ReplicaSets", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoDaemonSets }, Label: "Go to DaemonSets", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoStatefulSets }, Label: "Go to StatefulSets", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoConfigMaps }, Label: "Go to ConfigMaps", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoSecrets }, Label: "Go to Secrets", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoHPAs }, Label: "Go to HPAs", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoPVCs }, Label: "Go to PVCs", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoPVs }, Label: "Go to PVs", Group: wkNavigate, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.GotoPDBs }, Label: "Go to PodDisruptionBudgets", Group: wkNavigate, Avail: wkNotAtClusters},
 
 	// Views
@@ -608,6 +620,7 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.FilterPresets }, Label: "Filter presets", Group: wkFilter, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.NamespaceSelector }, Label: "Namespace selector", Group: wkFilter, Avail: wkNotAtClusters},
 	{Key: func(kb ui.Keybindings) string { return kb.AllNamespaces }, Label: "All namespaces", Group: wkFilter, Avail: wkAllNamespacesAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.PreviousNamespace }, Label: "Previous namespace", Group: wkFilter, Avail: wkPreviousNamespaceAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.CommandBar }, Label: "Command bar", Group: wkFilter},
 
 	// Sort. SortPrev/SortNext/SortFlip carry an explicit Order (USER DECISION:

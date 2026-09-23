@@ -621,6 +621,7 @@ func wkLevelScopingExclusions() map[string]string {
 		"Previous tab":          "needs len(m.tabs) > 1, not level-dependent alone",
 		"Move tab left":         "needs len(m.tabs) > 1, not level-dependent alone",
 		"Move tab right":        "needs len(m.tabs) > 1, not level-dependent alone",
+		"Previous namespace":    "needs a recorded previous scope and single-namespace mode, not level-dependent alone",
 	}
 }
 
@@ -666,17 +667,22 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Expand/collapse groups", "Event", "", []model.Level{model.LevelResourceTypes, model.LevelResources}},
 		{"New tab", "", "", allLevels},
 		{"Set bookmark", "", "", allLevels},
+		{"Go to Pods", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to Deployments", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to Services", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to Nodes", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to Namespaces", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to Ingresses", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to Jobs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to CronJobs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to ReplicaSets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to DaemonSets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to StatefulSets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to ConfigMaps", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to Secrets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to HPAs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to PVCs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to PVs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Go to PodDisruptionBudgets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 
 		{"Details / YAML preview", "", "", allLevels},
@@ -861,16 +867,5 @@ func whichKeyExcludedBindings() map[string]string {
 		// listed action, so listing it would advertise the panel from inside
 		// the panel.
 		"WhichKeyLeader": "the leader key itself",
-
-		// These goto chords keep their g-prefix popup (renderWhichKey) as their
-		// only surface. The task's requested subset is registered below instead,
-		// replayed as two keys by dispatchKeymapsSelection.
-		"GotoPods": "goto chord, has its own popup", "GotoNodes": "goto chord, has its own popup",
-		"GotoJobs": "goto chord, has its own popup", "GotoSecrets": "goto chord, has its own popup",
-		"GotoPVs": "goto chord, has its own popup",
-		// PreviousNamespace ("g\\") is dispatched by the same handleGotoChord
-		// and listed in the same goto popup (whichKeyCells), even though it
-		// swaps namespace scope rather than switching resource type.
-		"PreviousNamespace": "goto chord, has its own popup",
 	}
 }
