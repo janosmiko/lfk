@@ -37,6 +37,7 @@ log_tail_lines: 250
 log_tail_lines_short: 7
 log_render_ansi: false
 log_top_default_profile: traefik-json
+search_mode: fuzzy
 log_viewer:
   show_preview: false
   show_prefixes: false
@@ -232,6 +233,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 7, ConfigLogTailLinesShort, "log_tail_lines_short")
 	assert.False(t, ConfigLogRenderAnsi, "log_render_ansi")
 	assert.Equal(t, "traefik-json", ConfigLogTopDefaultProfile, "log_top_default_profile")
+	assert.Equal(t, DefaultSearchModeFuzzy, ConfigDefaultSearchMode, "search_mode")
 	assert.False(t, ConfigLogShowPreview, "log_viewer.show_preview")
 	assert.False(t, ConfigLogShowPrefixes, "log_viewer.show_prefixes")
 	assert.True(t, ConfigLogShowTimestamps, "log_viewer.show_timestamps")
@@ -498,6 +500,7 @@ var wiringCoveredFields = map[string]string{
 	"log_tail_lines_short":       "TestLoadConfig_AllSettingsWired",
 	"log_render_ansi":            "TestLoadConfig_AllSettingsWired (deprecated flat alias)",
 	"log_top_default_profile":    "TestLoadConfig_AllSettingsWired",
+	"search_mode":                "TestLoadConfig_AllSettingsWired + TestSearchMode_InvalidFallsBack",
 	"log_viewer":                 "TestLoadConfig_AllSettingsWired + config_log_viewer_test.go (TestLogViewer_*)",
 	"yaml_viewer":                "TestLoadConfig_AllSettingsWired",
 	"diff_viewer":                "TestLoadConfig_AllSettingsWired",
@@ -612,6 +615,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origTailShort := ConfigLogTailLinesShort
 	origAnsi := ConfigLogRenderAnsi
 	origLogTopProfile := ConfigLogTopDefaultProfile
+	origSearchMode := ConfigDefaultSearchMode
 	origShowPreview := ConfigLogShowPreview
 	origShowPrefixes := ConfigLogShowPrefixes
 	origShowTimestamps := ConfigLogShowTimestamps
@@ -717,6 +721,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigLogTailLinesShort = origTailShort
 		ConfigLogRenderAnsi = origAnsi
 		ConfigLogTopDefaultProfile = origLogTopProfile
+		ConfigDefaultSearchMode = origSearchMode
 		ConfigLogShowPreview = origShowPreview
 		ConfigLogShowPrefixes = origShowPrefixes
 		ConfigLogShowTimestamps = origShowTimestamps

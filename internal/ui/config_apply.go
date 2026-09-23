@@ -155,6 +155,7 @@ func applyConfigOptions(cfg configFile) {
 		ConfigDimOverlay = *cfg.DimOverlay
 	}
 	applyRowStatusTint(cfg.RowStatusTint)
+	applySearchMode(cfg.SearchMode)
 	applyExplorerLayout(cfg.Layout)
 	if cfg.TransparentBg != nil {
 		ConfigTransparentBg = *cfg.TransparentBg

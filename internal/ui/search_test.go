@@ -312,8 +312,8 @@ func TestSearchModeIndicator(t *testing.T) {
 		want     string
 	}{
 		{"error", ""},
-		{"err.r", "[RE] "},
-		{"~fuzzy", "[~] "},
+		{"err.r", "[regex] "},
+		{"~fuzzy", "[fuzzy] "},
 		{`\literal.*`, ""},
 		{"", ""},
 	}
