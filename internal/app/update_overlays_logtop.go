@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/logagg"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // logTopGroupByCandidates returns a sorted list of all field names seen in the
@@ -156,16 +157,15 @@ func (m *Model) logTopColumnList() []string {
 	return append(append([]string(nil), m.logTop.colOrder...), m.logTopAllMetrics()...)
 }
 
-// logTopFilteredColumns returns columns filtered by colFilter (case-insensitive substring).
+// logTopFilteredColumns returns columns MatchLine accepts for colFilter.
 func (m *Model) logTopFilteredColumns() []string {
 	all := m.logTopColumnList()
 	if m.logTop.colFilter == "" {
 		return all
 	}
-	q := strings.ToLower(m.logTop.colFilter)
 	out := all[:0:0]
 	for _, c := range all {
-		if strings.Contains(strings.ToLower(c), q) {
+		if ui.MatchLine(c, m.logTop.colFilter) {
 			out = append(out, c)
 		}
 	}

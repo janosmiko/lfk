@@ -69,7 +69,9 @@ func (m Model) viewDescribe() string {
 	case m.hasStatusMessage():
 		hint = m.renderStatusHint()
 	case m.describeView.searchActive:
-		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorRight())
+		label := ui.SearchModePromptLabel(m.describeView.searchInput.Value, ui.ActiveKeybindings.Search)
+		modeHint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
+		searchBar := ui.HelpKeyStyle.Render(label) + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorRight()) + ui.BarDimStyle.Render("  ") + modeHint
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	case m.describeView.searchQuery != "":
 		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.describeView.searchQuery)
@@ -109,7 +111,7 @@ func (m Model) viewDescribe() string {
 	colEnd := max(m.describeView.visualCol, m.describeView.cursorCol)
 
 	// Search query for highlighting.
-	lowerQuery := strings.ToLower(m.describeView.searchQuery)
+	searchQuery := m.describeView.searchQuery
 
 	// When wrap is enabled, use a simplified rendering path (no column cursor).
 	if m.describeView.wrap {
@@ -169,15 +171,15 @@ func (m Model) viewDescribe() string {
 			}
 		} else if isCursorLine {
 			displayLine := plainLine
-			if lowerQuery != "" {
-				displayLine = highlightDescribeSearchLine(plainLine, lowerQuery)
+			if searchQuery != "" {
+				displayLine = highlightDescribeSearchLine(plainLine, searchQuery)
 			}
 			cursorLine := ui.RenderCursorAtCol(displayLine, m.describeView.cursorCol)
 			renderedLines = append(renderedLines, ui.YamlCursorIndicatorStyle.Render("\u258e")+cursorLine)
 		} else {
 			displayLine := plainLine
-			if lowerQuery != "" {
-				displayLine = highlightDescribeSearchLine(plainLine, lowerQuery)
+			if searchQuery != "" {
+				displayLine = highlightDescribeSearchLine(plainLine, searchQuery)
 			}
 			renderedLines = append(renderedLines, " "+displayLine)
 		}
@@ -196,33 +198,14 @@ func (m Model) viewDescribe() string {
 }
 
 // highlightDescribeSearchLine highlights search matches in a single line of
-// the describe view. The query should be pre-lowered for case-insensitive matching.
-func highlightDescribeSearchLine(line, lowerQuery string) string {
-	if lowerQuery == "" {
-		return line
-	}
-	lowerLine := strings.ToLower(line)
+// the describe view and the fullscreen event viewer, honoring the active
+// search_mode (substring/regex/fuzzy) and the ~/\ prefix overrides.
+func highlightDescribeSearchLine(line, rawQuery string) string {
 	matchStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(ui.ColorSelectedFg)).
 		Background(lipgloss.Color(ui.ColorWarning)).
 		Bold(true)
-
-	var result strings.Builder
-	pos := 0
-	for pos < len(line) {
-		idx := strings.Index(lowerLine[pos:], lowerQuery)
-		if idx < 0 {
-			result.WriteString(line[pos:])
-			break
-		}
-		if idx > 0 {
-			result.WriteString(line[pos : pos+idx])
-		}
-		matchEnd := min(pos+idx+len(lowerQuery), len(line))
-		result.WriteString(matchStyle.Render(line[pos+idx : matchEnd]))
-		pos = matchEnd
-	}
-	return result.String()
+	return ui.HighlightMatchStyled(line, rawQuery, matchStyle)
 }
 
 func (m Model) viewExplain() string {

@@ -203,6 +203,7 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "enter", Desc: "apply"},
 			{Key: "t", Desc: "transparent bg"},
 			{Key: "/", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "esc", Desc: "cancel"},
 		})
 	case overlayFilterPreset:
@@ -247,6 +248,7 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "j/k", Desc: "navigate"},
 			{Key: "enter", Desc: "jump"},
 			{Key: "/", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "esc", Desc: "close"},
 		})
 	case overlayLogTopGroupBy, overlayLogTopProfile, overlayLogTopColumns:
@@ -254,6 +256,7 @@ func (m Model) overlayHintBarSelector() string {
 	case overlayClusterColor:
 		if m.clusterColorFilterMode {
 			return m.renderHints([]ui.HintEntry{
+				ui.SearchModeHintEntry(),
 				{Key: "enter", Desc: "accept filter"},
 				{Key: "esc", Desc: "clear filter"},
 			})
@@ -288,6 +291,7 @@ func (m Model) overlayHintBarEditor() string {
 			if m.whoCan.resourceFilterActive {
 				return m.renderHints([]ui.HintEntry{
 					{Key: "type", Desc: "narrow list"},
+					ui.SearchModeHintEntry(),
 					{Key: "enter", Desc: "accept"},
 					{Key: "esc", Desc: "clear"},
 				})
@@ -374,6 +378,7 @@ func (m Model) overlayHintBarMisc() string {
 		if m.orphans.filterActive {
 			return m.renderHints([]ui.HintEntry{
 				{Key: "type", Desc: "filter"},
+				ui.SearchModeHintEntry(),
 				{Key: "enter", Desc: "apply"},
 				{Key: "esc", Desc: "clear"},
 			})

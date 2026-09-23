@@ -399,8 +399,9 @@ func (m Model) renderWhoCanOverlay(background string) string {
 	var footerBar string
 	switch {
 	case m.whoCan.resourceFilterActive:
+		label := ui.SearchModePromptLabel(m.whoCan.resourceFilter.Value, "/")
 		footerBar = ui.StatusBarBgStyle.Width(innerW).Render(
-			ui.HelpKeyStyle.Render("/") +
+			ui.HelpKeyStyle.Render(label) +
 				ui.BarNormalStyle.Render(m.whoCan.resourceFilter.CursorLeft()) +
 				ui.BarDimStyle.Render("█") +
 				ui.BarNormalStyle.Render(m.whoCan.resourceFilter.CursorRight()),

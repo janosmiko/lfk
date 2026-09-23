@@ -1,9 +1,8 @@
 package app
 
 import (
-	"strings"
-
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // orphanKind is the kind chip filter at the top of the orphan overlay.
@@ -178,7 +177,5 @@ func matchesOrphanFilter(it k8s.OrphanItem, query string) bool {
 	if query == "" {
 		return true
 	}
-	q := strings.ToLower(query)
-	return strings.Contains(strings.ToLower(it.Namespace), q) ||
-		strings.Contains(strings.ToLower(it.Name), q)
+	return ui.MatchLine(it.Namespace, query) || ui.MatchLine(it.Name, query)
 }

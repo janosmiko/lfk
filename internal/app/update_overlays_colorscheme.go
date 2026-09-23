@@ -275,12 +275,11 @@ func (m *Model) filteredSchemeNames() []string {
 		}
 		return result
 	}
-	lower := strings.ToLower(m.schemeFilter.Value)
 	for _, e := range m.schemeEntries {
 		if e.IsHeader {
 			continue
 		}
-		if strings.Contains(e.Name, lower) {
+		if ui.MatchLine(e.Name, m.schemeFilter.Value) {
 			result = append(result, e.Name)
 		}
 	}

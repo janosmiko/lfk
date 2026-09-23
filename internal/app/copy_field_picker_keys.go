@@ -13,6 +13,7 @@ func copyFieldPickerHints() []ui.HintEntry {
 	return []ui.HintEntry{
 		{Key: "tab", Desc: "columns/fields"},
 		{Key: "/", Desc: "filter"},
+		ui.SearchModeHintEntry(),
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "enter", Desc: "copy value"},
 		{Key: "esc", Desc: "close"},

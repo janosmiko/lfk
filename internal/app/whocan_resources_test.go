@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func TestWhoCanCollectResources_DedupesAndSorts(t *testing.T) {
@@ -53,4 +54,16 @@ func TestWhoCanFilterResources_CaseInsensitiveSubstring(t *testing.T) {
 
 func TestWhoCanFilterResources_NoMatchReturnsEmpty(t *testing.T) {
 	assert.Empty(t, whoCanFilterResources([]string{"pods", "secrets"}, "xyz"))
+}
+
+func TestWhoCanFilterResources_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+	all := []string{"pods", "pods/exec", "secrets", "configmaps"}
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	assert.Equal(t, []string{"secrets"}, whoCanFilterResources(all, "scrts"))
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	assert.Equal(t, []string{"pods", "configmaps"}, whoCanFilterResources(all, "^(pods|configmaps)$"))
 }

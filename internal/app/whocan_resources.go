@@ -2,9 +2,9 @@ package app
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // whoCanCollectResources flattens the Can-I groups into a sorted,
@@ -35,18 +35,15 @@ func whoCanCollectResources(groups []model.CanIGroup) []string {
 	return out
 }
 
-// whoCanFilterResources narrows the full resource list to entries that
-// contain the (case-insensitive) substring in q. Empty q returns the
-// full list unchanged. Substring match (not prefix) so users can find
-// "pods/exec" by typing "exec".
+// whoCanFilterResources narrows the full resource list to entries MatchLine
+// accepts for q. Empty q returns the full list unchanged.
 func whoCanFilterResources(all []string, q string) []string {
 	if q == "" {
 		return all
 	}
-	q = strings.ToLower(q)
 	out := make([]string, 0, len(all))
 	for _, r := range all {
-		if strings.Contains(strings.ToLower(r), q) {
+		if ui.MatchLine(r, q) {
 			out = append(out, r)
 		}
 	}

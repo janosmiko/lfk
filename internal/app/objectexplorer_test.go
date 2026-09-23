@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func choreTreeItem() model.Item {
@@ -243,6 +244,27 @@ func TestObjectExplorer_Filter(t *testing.T) {
 	m = pressTree(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	assert.Equal(t, "", m.objectExplorerView.filter)
 	assert.Len(t, m.objectExplorerView.visible(), 4)
+}
+
+func TestObjectExplorer_FilterHonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	m := objectExplorerModel(t)
+	result, _ := m.openObjectExplorer()
+	m = result.(Model)
+	rt := &m.objectExplorerView
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	rt.filter = "sttus" // typo-tolerant match for "status"
+	vis := rt.visible()
+	require.Len(t, vis, 1)
+	assert.Equal(t, "status", vis[0].Key)
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	rt.filter = "^(kind|status)$"
+	vis = rt.visible()
+	require.Len(t, vis, 2)
 }
 
 func TestObjectExplorer_CopyPath(t *testing.T) {

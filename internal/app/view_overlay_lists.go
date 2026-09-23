@@ -331,12 +331,13 @@ func renderColorschemeOverlay(m Model, height int) string {
 	items, cursorDisplayIdx := buildColorschemeItems(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor)
 	if len(items) == 0 {
 		return ui.RenderOverlayList(nil, ui.OverlayListConfig{
-			Title:        "Select Color Scheme",
-			Filterable:   true,
-			Filter:       m.schemeFilter.Value,
-			FilterActive: m.schemeFilterMode,
-			EmptyMessage: "No matching schemes",
-			Height:       contentH,
+			Title:           "Select Color Scheme",
+			Filterable:      true,
+			Filter:          m.schemeFilter.Value,
+			FilterActive:    m.schemeFilterMode,
+			FilterModeAware: true,
+			EmptyMessage:    "No matching schemes",
+			Height:          contentH,
 		}, min(50, m.width-10)-4)
 	}
 
@@ -351,6 +352,7 @@ func renderColorschemeOverlay(m Model, height int) string {
 		Filterable:       true,
 		Filter:           m.schemeFilter.Value,
 		FilterActive:     m.schemeFilterMode,
+		FilterModeAware:  true,
 		ShowActiveMarker: true,
 		Scroll:           scroll,
 		MaxVisible:       maxVisible,
@@ -653,13 +655,14 @@ func renderClusterColorOverlay(m Model, innerW, contentH int) string {
 		titleText = "Set cluster color"
 	}
 	return ui.RenderOverlayList(items, ui.OverlayListConfig{
-		Title:        titleText,
-		Cursor:       m.clusterColorOverlayCursor,
-		Filterable:   true,
-		Filter:       m.clusterColorFilter.Value,
-		FilterActive: m.clusterColorFilterMode,
-		BadgeWidth:   swatchW,
-		Height:       contentH,
+		Title:           titleText,
+		Cursor:          m.clusterColorOverlayCursor,
+		Filterable:      true,
+		Filter:          m.clusterColorFilter.Value,
+		FilterActive:    m.clusterColorFilterMode,
+		FilterModeAware: true,
+		BadgeWidth:      swatchW,
+		Height:          contentH,
 	}, innerW)
 }
 

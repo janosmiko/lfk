@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/ui"
 
 	"github.com/janosmiko/lfk/internal/tainted"
 )
@@ -380,6 +381,26 @@ func TestEventTimelineSearchNextPrev(t *testing.T) {
 	ret2, _ := result.handleEventTimelineOverlayKey(runeKey('N'))
 	result2 := ret2.(Model)
 	assert.Equal(t, 0, result2.eventTimelineCursor)
+}
+
+func TestFindNextEventMatch_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	m := newEventModel(3)
+	m.eventTimelineLines = []string{"deploy scaled", "pod evicted", "backup completed"}
+	m.eventTimelineCursor = 0
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m.eventTimelineSearchQuery = "evctd" // typo-tolerant match for "evicted"
+	m.findNextEventMatch(true)
+	assert.Equal(t, 1, m.eventTimelineCursor)
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m.eventTimelineCursor = 0
+	m.eventTimelineSearchQuery = "^backup"
+	m.findNextEventMatch(true)
+	assert.Equal(t, 2, m.eventTimelineCursor)
 }
 
 func TestEventTimelineEscClearsSearchFirst(t *testing.T) {

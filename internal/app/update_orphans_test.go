@@ -9,9 +9,23 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/janosmiko/lfk/internal/k8s"
 	mdl "github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMatchesOrphanFilter_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+	it := k8s.OrphanItem{Namespace: "kube-system", Name: "orphaned-secret"}
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	assert.True(t, matchesOrphanFilter(it, "orphndscrt"), "typo-tolerant fuzzy match on name")
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	assert.True(t, matchesOrphanFilter(it, "^kube-"))
+	assert.False(t, matchesOrphanFilter(it, "^default$"))
+}
 
 func TestOpenOrphansOverlay_SetsOverlayAndFiresLoad(t *testing.T) {
 	m := newTestModel()

@@ -4,6 +4,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/janosmiko/lfk/internal/ui"
+	"github.com/stretchr/testify/assert"
 )
 
 // newLogTopColumnsModel returns a model in modeLogTop with parsed log data
@@ -288,3 +291,19 @@ func TestLogTopColumns_FilterNarrows(t *testing.T) {
 // TestLogTopColumns_FilterSlices checks that filtering is correctly excluded from
 // the _ import. Keeps slices in scope.
 var _ = slices.Contains[[]string]
+
+func TestLogTopFilteredColumns_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	m := &Model{}
+	m.logTop.colOrder = []string{"method", "path", "status"}
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m.logTop.colFilter = "sttus" // typo-tolerant match for "status"
+	assert.Contains(t, m.logTopFilteredColumns(), "status")
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m.logTop.colFilter = "^(method|path)$"
+	assert.Equal(t, []string{"method", "path"}, m.logTopFilteredColumns())
+}

@@ -92,10 +92,9 @@ func (rt *objectExplorerState) visibleTreeRows() []model.ObjectTreeRow {
 		}
 		return out
 	}
-	q := strings.ToLower(rt.filter)
 	out := make([]model.ObjectTreeRow, 0, len(rt.treeRows))
 	for _, r := range rt.treeRows {
-		if strings.Contains(strings.ToLower(r.Field.Key), q) {
+		if ui.MatchLine(r.Field.Key, rt.filter) {
 			out = append(out, r)
 		}
 	}

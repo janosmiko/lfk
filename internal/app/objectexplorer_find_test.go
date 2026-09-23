@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,6 +78,36 @@ func TestObjectExplorerFind_EscFromFilterKeepsOverlay(t *testing.T) {
 	m = pressFind(m, tea.KeyPressMsg{Code: tea.KeyEsc}) // leaves filter, not overlay
 	assert.False(t, m.objectExplorerView.findFilterActive)
 	assert.Equal(t, overlayObjectExplorerFind, m.overlay)
+}
+
+func TestObjectExplorerFind_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m := openFind(t)
+	m = pressFind(m, key("/"))
+	for _, r := range []string{"p", "h", "s", "e"} { // typo-tolerant match for "phase"
+		m = pressFind(m, key(r))
+	}
+	found := false
+	for _, res := range m.objectExplorerView.findResults {
+		if res.Segs[len(res.Segs)-1] == "phase" {
+			found = true
+		}
+	}
+	assert.True(t, found)
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m = openFind(t)
+	m = pressFind(m, key("/"))
+	for _, r := range []string{"^", "p", "h", "a", "s", "e", "$"} {
+		m = pressFind(m, key(r))
+	}
+	require.NotEmpty(t, m.objectExplorerView.findResults)
+	for _, res := range m.objectExplorerView.findResults {
+		assert.Equal(t, "phase", res.Segs[len(res.Segs)-1])
+	}
 }
 
 func TestObjectExplorerFind_OverlayRenders(t *testing.T) {

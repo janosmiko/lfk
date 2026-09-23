@@ -107,7 +107,10 @@ func (m *Model) recomputeFind() {
 	if rt.findFilter == "" {
 		rt.findResults = model.AllObjectPaths(rt.root, findResultLimit)
 	} else {
-		rt.findResults = model.FindObjectPaths(rt.root, rt.findFilter, findResultLimit)
+		query := rt.findFilter
+		rt.findResults = model.FindObjectPaths(rt.root, func(key string) bool {
+			return ui.MatchLine(key, query)
+		}, findResultLimit)
 	}
 	rt.findCursor = max(0, min(rt.findCursor, len(rt.findResults)-1))
 	rt.findScroll = 0
@@ -194,6 +197,7 @@ func (m Model) renderOverlayObjectExplorerFind() (string, int, int) {
 		Filterable:      true,
 		Filter:          rt.findFilter,
 		FilterActive:    rt.findFilterActive,
+		FilterModeAware: true,
 		ShowDescription: true,
 		Scroll:          rt.findScroll,
 		MaxVisible:      maxVisible,

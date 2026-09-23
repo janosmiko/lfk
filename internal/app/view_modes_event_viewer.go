@@ -78,7 +78,9 @@ func (m Model) eventViewerHintBar() string {
 		return m.renderStatusHint()
 	}
 	if m.eventTimelineSearchActive {
-		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorRight())
+		modeInd := ui.SearchModeIndicator(m.eventTimelineSearchInput.Value)
+		modeHint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(modeInd) + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorRight()) + ui.BarDimStyle.Render("  ") + modeHint
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 	if m.eventTimelineVisualMode != 0 {
@@ -107,7 +109,7 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 	selEnd := max(m.eventTimelineVisualStart, m.eventTimelineCursor)
 	colStart := min(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
 	colEnd := max(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
-	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
+	searchQuery := m.eventTimelineSearchQuery
 
 	if m.eventTimelineWrap {
 		return m.renderEventViewerLinesWrapped(lines, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd)
@@ -134,14 +136,14 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 			}
 		} else if isCursor {
 			displayLine := truncLine
-			if lowerQuery != "" {
-				displayLine = highlightDescribeSearchLine(displayLine, lowerQuery)
+			if searchQuery != "" {
+				displayLine = highlightDescribeSearchLine(displayLine, searchQuery)
 			}
 			visible = append(visible, ui.YamlCursorIndicatorStyle.Render("▎")+ui.RenderCursorAtCol(displayLine, m.eventTimelineCursorCol))
 		} else {
 			displayLine := truncLine
-			if lowerQuery != "" {
-				displayLine = highlightDescribeSearchLine(displayLine, lowerQuery)
+			if searchQuery != "" {
+				displayLine = highlightDescribeSearchLine(displayLine, searchQuery)
 			}
 			visible = append(visible, " "+displayLine)
 		}
@@ -181,7 +183,7 @@ func eventRowWrappedHeight(line string, contentW int) int {
 }
 
 func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd int) []string {
-	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
+	searchQuery := m.eventTimelineSearchQuery
 
 	var visible []string
 	for i := scroll; i < len(lines) && len(visible) < maxLines; i++ {
@@ -226,7 +228,7 @@ func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, l
 		case inSel && m.eventTimelineVisualMode == 'v':
 			opts.SelStart, opts.SelEnd = m.charSelectionRangeForLine(lines[i], i, selStart, selEnd)
 		default:
-			opts.LowerSearch = lowerQuery
+			opts.SearchQuery = searchQuery
 		}
 		block := ui.RenderWrappedEventRow(opts)
 		for sub := range strings.SplitSeq(block, "\n") {

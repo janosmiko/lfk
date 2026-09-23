@@ -66,6 +66,22 @@ func TestFilteredSchemeNames(t *testing.T) {
 		result := m.filteredSchemeNames()
 		assert.Empty(t, result)
 	})
+
+	t.Run("honors search_mode", func(t *testing.T) {
+		orig := ui.ConfigDefaultSearchMode
+		t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+		ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+		m := Model{
+			schemeEntries: entries,
+			schemeFilter:  TextInput{Value: "grvbxdrk"}, // typo-tolerant match for "gruvbox-dark"
+		}
+		assert.Contains(t, m.filteredSchemeNames(), "gruvbox-dark")
+
+		ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+		m.schemeFilter = TextInput{Value: "^dracula$"}
+		assert.Equal(t, []string{"dracula"}, m.filteredSchemeNames())
+	})
 }
 
 func TestCovColorschemeKeyEscEmpty(t *testing.T) {
