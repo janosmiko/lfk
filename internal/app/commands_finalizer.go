@@ -10,6 +10,7 @@ import (
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // searchFinalizers returns a command that scans resource types for resources
@@ -38,7 +39,7 @@ func (m Model) searchFinalizers(pattern string) tea.Cmd {
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
 			results, err := client.FindResourcesWithFinalizer(
-				context.Background(), kctx, ns, pattern, resourceTypes,
+				context.Background(), kctx, ns, finalizerMatcher(pattern), resourceTypes,
 			)
 			return finalizerSearchResultMsg{results: results, err: err}
 		},
@@ -98,4 +99,10 @@ type finalizerTarget struct {
 // use in the selection map.
 func finalizerMatchKey(m k8s.FinalizerMatch) string {
 	return m.Namespace + "/" + m.Kind + "/" + m.Name
+}
+
+// finalizerMatcher builds the search_mode-aware matcher FindResourcesWithFinalizer
+// applies to each finalizer name.
+func finalizerMatcher(pattern string) func(string) bool {
+	return func(f string) bool { return ui.MatchLine(f, pattern) }
 }

@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -1855,11 +1856,19 @@ func TestFindResourcesWithFinalizer(t *testing.T) {
 		{APIGroup: "", APIVersion: "v1", Resource: "configmaps", Kind: "ConfigMap", Namespaced: true},
 	}
 
-	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", "finalizer", rts)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", substringMatch("finalizer"), rts)
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
 	assert.Equal(t, "cm-with-finalizer", results[0].Name)
 	assert.Equal(t, "my.finalizer.io/cleanup", results[0].Matched)
+}
+
+// substringMatch mirrors the app layer's default-mode matcher (ui.MatchLine
+// falls back to a case-insensitive substring) without importing internal/ui,
+// which itself imports internal/k8s.
+func substringMatch(pattern string) func(string) bool {
+	q := strings.ToLower(pattern)
+	return func(s string) bool { return strings.Contains(strings.ToLower(s), q) }
 }
 
 func TestFindResourcesWithFinalizer_SkipsVirtualTypes(t *testing.T) {
@@ -1871,7 +1880,7 @@ func TestFindResourcesWithFinalizer_SkipsVirtualTypes(t *testing.T) {
 		{APIGroup: "_portforward", Resource: "portforwards"},
 	}
 
-	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "", "test", rts)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "", substringMatch("test"), rts)
 	require.NoError(t, err)
 	assert.Len(t, results, 0)
 }
@@ -1895,9 +1904,39 @@ func TestFindResourcesWithFinalizer_CaseInsensitive(t *testing.T) {
 		{APIGroup: "", APIVersion: "v1", Resource: "configmaps", Kind: "ConfigMap", Namespaced: true},
 	}
 
-	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", "myfinalizer", rts)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", substringMatch("myfinalizer"), rts)
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
+}
+
+// The scan delegates entirely to match, so a regex matcher works too.
+func TestFindResourcesWithFinalizer_HonorsArbitraryMatcher(t *testing.T) {
+	obj := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]any{
+				"name":       "cm1",
+				"namespace":  "default",
+				"finalizers": []any{"my.finalizer.io/cleanup"},
+			},
+		},
+	}
+	dc := newFakeDynClient(obj)
+	c := newFakeClient(nil, dc)
+
+	rts := []model.ResourceTypeEntry{
+		{APIGroup: "", APIVersion: "v1", Resource: "configmaps", Kind: "ConfigMap", Namespaced: true},
+	}
+
+	re := regexp.MustCompile(`^my\.[a-z]+\.io/cleanup$`)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", re.MatchString, rts)
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+
+	results, err = c.FindResourcesWithFinalizer(t.Context(), "", "default", func(string) bool { return false }, rts)
+	require.NoError(t, err)
+	assert.Empty(t, results)
 }
 
 // --- RemoveFinalizerFromResource ---
