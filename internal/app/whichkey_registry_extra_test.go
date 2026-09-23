@@ -336,6 +336,46 @@ func TestAvailableWhichKeyActions_SecurityIgnoreToggleOnlyOnSecurityView(t *test
 	}
 }
 
+// Regression: jumpBack (jump_history.go) is a no-op with a toast when the
+// teleport history is empty, so the panel must not advertise it until a
+// jump has actually been recorded.
+func TestAvailableWhichKeyActions_JumpBackRequiresHistory(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Jump back") {
+		t.Fatal("jump back must be hidden with an empty teleport history")
+	}
+	m.jumpBackStack = append(m.jumpBackStack, navSnapshot{})
+	if !slices.Contains(whichKeyLabels(m), "Jump back") {
+		t.Fatal("jump back must be offered once the teleport history is non-empty")
+	}
+}
+
+// Regression: handleExplorerActionKeyNextTab/PrevTab/MoveTab
+// (update_keys_actions_tabs.go) each silently no-op with a single tab, so the
+// panel must not advertise them until a second tab exists.
+func TestAvailableWhichKeyActions_TabMovesRequireMultipleTabs(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	labels := []string{"Next tab", "Previous tab", "Move tab left", "Move tab right"}
+
+	m := whichKeyTestModel()
+	for _, label := range labels {
+		if slices.Contains(whichKeyLabels(m), label) {
+			t.Fatalf("%q must be hidden with a single tab", label)
+		}
+	}
+	m.tabs = append(m.tabs, TabState{})
+	for _, label := range labels {
+		if !slices.Contains(whichKeyLabels(m), label) {
+			t.Fatalf("%q must be offered once a second tab exists", label)
+		}
+	}
+}
+
 // Regression: handleKeyPinGroup (update_keys_explorer.go) refuses a
 // collapsed-group header and the Dashboards pseudo-category with a toast
 // ("Select a resource type to pin"/"This item cannot be pinned"), and blocks

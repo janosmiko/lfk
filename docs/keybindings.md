@@ -349,10 +349,11 @@ Descriptions are colored by category, since there are no headers to say it. Keys
 
 | Category | Color | Examples |
 |---|---|---|
-| Actions | magenta | Delete, Edit, Logs, Copy |
+| Actions | plain text | Delete, Edit, Logs, Copy |
 | Views | blue | Resource map, RBAC browser, Task queue |
 | Filter | cyan | Filter, Search, Namespace selector |
 | Selection | purple | Toggle selection, Select range, Diff |
+| Navigate | magenta | Go to Deployments, Jump to owner, New tab |
 | Sort | amber | Sort next/previous, Flip, Reset |
 | Settings | orange | Watch mode, Read-only, Color scheme |
 

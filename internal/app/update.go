@@ -68,6 +68,8 @@ func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case keymapsChordMsg:
+		return m.replayKeymapsChord(msg)
 	case tea.PasteMsg:
 		// v2 splits bracketed paste out of the key stream; re-encode it so it
 		// reaches the focused input through the same routing as key presses.

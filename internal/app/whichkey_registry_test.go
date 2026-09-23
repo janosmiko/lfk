@@ -616,6 +616,11 @@ func wkLevelScopingExclusions() map[string]string {
 		"Diff two selected":     "needs exactly 2 selected rows, not level-dependent alone",
 		"Mouse capture":         "needs m.mouseAvailable, false by default here",
 		"Show ignored findings": "needs a security-prefixed kind",
+		"Jump back":             "needs m.jumpBackStack non-empty, not level-dependent alone",
+		"Next tab":              "needs len(m.tabs) > 1, not level-dependent alone",
+		"Previous tab":          "needs len(m.tabs) > 1, not level-dependent alone",
+		"Move tab left":         "needs len(m.tabs) > 1, not level-dependent alone",
+		"Move tab right":        "needs len(m.tabs) > 1, not level-dependent alone",
 	}
 }
 
@@ -650,6 +655,29 @@ func wkLevelScopingCases() []wkLevelScopingCase {
 		{"Toggle selection", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Select/deselect all", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
 		{"Select range", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+
+		{"Go to Clusters level", "", "", allLevels},
+		{"Go to Types level", "", "", allLevels},
+		{"Go to Resources level", "", "", allLevels},
+		{"Jump to owner", "", "", []model.Level{model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Jump to resource claim", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
+		// LevelOwned is excluded: the handler only toggles Event grouping at
+		// LevelResources (finding: handleKeyExpandCollapse's kind check).
+		{"Expand/collapse groups", "Event", "", []model.Level{model.LevelResourceTypes, model.LevelResources}},
+		{"New tab", "", "", allLevels},
+		{"Set bookmark", "", "", allLevels},
+		{"Go to Deployments", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to Services", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to Namespaces", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to Ingresses", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to CronJobs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to ReplicaSets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to DaemonSets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to StatefulSets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to ConfigMaps", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to HPAs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to PVCs", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
+		{"Go to PodDisruptionBudgets", "", "", []model.Level{model.LevelResourceTypes, model.LevelResources, model.LevelOwned, model.LevelContainers}},
 
 		{"Details / YAML preview", "", "", allLevels},
 		{"Live log preview", "Pod", "", []model.Level{model.LevelResources, model.LevelOwned}},
@@ -822,42 +850,24 @@ func whichKeyExplorerActions() []whichKeyAction {
 // registered in some catalog nor listed here.
 func whichKeyExcludedBindings() map[string]string {
 	return map[string]string{
-		// Navigation — excluded by design.
+		// Plain cursor motion — excluded by design.
 		"Left": "navigation", "Right": "navigation", "Down": "navigation", "Up": "navigation",
 		"Enter": "navigation", "JumpTop": "navigation", "JumpBottom": "navigation",
 		"PageDown": "navigation", "PageUp": "navigation", "PageForward": "navigation", "PageBack": "navigation",
-		"LevelCluster": "navigation", "LevelTypes": "navigation", "LevelResources": "navigation",
 		"PreviewDown": "navigation", "PreviewUp": "navigation",
-		"JumpOwner": "navigation", "JumpClaim": "navigation", "JumpBack": "navigation", "ExpandCollapse": "navigation",
 		"NextMatch": "navigation within search", "PrevMatch": "navigation within search",
 
 		// The leader itself: pressing it opens the panel rather than running a
 		// listed action, so listing it would advertise the panel from inside
 		// the panel.
 		"WhichKeyLeader": "the leader key itself",
-		// SetMark ("m") arms m.pendingMark and waits for the bookmark-slot key
-		// (update_keys_explorer.go:26-33,330-332). Unlike the g-prefix
-		// (armWhichKey/renderWhichKey), nothing renders while pendingMark is
-		// true — there is no popup, just a silent wait for the next key.
-		"SetMark": "chord prefix, no rendered continuation",
 
-		// Tabs: muscle-memory keys that would crowd out the actions.
-		"NewTab": "tab management", "NextTab": "tab management", "PrevTab": "tab management",
-		"MoveTabLeft": "tab management", "MoveTabRight": "tab management",
-
-		// Goto chords (whichkey.go): each is a full "g<x>" chord dispatched by
-		// handleGotoChord while the g prefix is armed, and already has its own
-		// which-key-style popup (renderWhichKey) distinct from the leader panel
-		// this registry drives.
-		"GotoPods": "goto chord, has its own popup", "GotoDeployments": "goto chord, has its own popup",
-		"GotoServices": "goto chord, has its own popup", "GotoNodes": "goto chord, has its own popup",
-		"GotoNamespaces": "goto chord, has its own popup", "GotoIngresses": "goto chord, has its own popup",
-		"GotoJobs": "goto chord, has its own popup", "GotoCronJobs": "goto chord, has its own popup",
-		"GotoReplicaSets": "goto chord, has its own popup", "GotoDaemonSets": "goto chord, has its own popup",
-		"GotoStatefulSets": "goto chord, has its own popup", "GotoConfigMaps": "goto chord, has its own popup",
-		"GotoSecrets": "goto chord, has its own popup", "GotoHPAs": "goto chord, has its own popup",
-		"GotoPVCs": "goto chord, has its own popup", "GotoPVs": "goto chord, has its own popup",
-		"GotoPDBs": "goto chord, has its own popup",
+		// These goto chords keep their g-prefix popup (renderWhichKey) as their
+		// only surface. The task's requested subset is registered below instead,
+		// replayed as two keys by dispatchKeymapsSelection.
+		"GotoPods": "goto chord, has its own popup", "GotoNodes": "goto chord, has its own popup",
+		"GotoJobs": "goto chord, has its own popup", "GotoSecrets": "goto chord, has its own popup",
+		"GotoPVs": "goto chord, has its own popup",
 		// PreviousNamespace ("g\\") is dispatched by the same handleGotoChord
 		// and listed in the same goto popup (whichKeyCells), even though it
 		// swaps namespace scope rather than switching resource type.

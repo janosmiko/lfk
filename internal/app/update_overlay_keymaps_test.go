@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -154,6 +155,68 @@ func TestRenderOverlayKeymaps_LastItemVisibleAfterG(t *testing.T) {
 	view, _, _ := m.renderOverlayKeymaps()
 	if !strings.Contains(stripANSI(view), last) {
 		t.Fatalf("last item %q not rendered after G:\n%s", last, stripANSI(view))
+	}
+}
+
+func TestKeymapsOverlayItems_IncludesNewTab(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel()
+
+	items := m.keymapsOverlayItems()
+	found := false
+	for _, it := range items {
+		if it.Name == "New tab" {
+			found = true
+			if it.displayKey != "t" {
+				t.Errorf("New tab displayKey = %q, want %q", it.displayKey, "t")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("keymaps overlay is missing \"New tab\"")
+	}
+}
+
+func TestDispatchKeymapsSelection_GotoChordReplaysBothKeys(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := gotoTestModel().openKeymapsOverlay()
+
+	var target keymapItem
+	found := false
+	for _, it := range m.keymapsOverlayItems() {
+		if it.Name == "Go to Deployments" {
+			target = it
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("keymaps overlay is missing \"Go to Deployments\"")
+	}
+	if target.rawKey != "gd" {
+		t.Fatalf("rawKey = %q, want %q", target.rawKey, "gd")
+	}
+
+	mdl, cmd := dispatchKeymapsSelection(m, target)
+	if cmd == nil {
+		t.Fatal("dispatching a goto chord must return a replay cmd")
+	}
+	chord, ok := cmd().(keymapsChordMsg)
+	if !ok || len(chord) != 2 {
+		t.Fatalf("cmd produced %T, want a 2-key keymapsChordMsg", cmd())
+	}
+	if chord[0].String() != "g" || chord[1].String() != "d" {
+		t.Fatalf("chord keys = %q,%q, want \"g\",\"d\"", chord[0].String(), chord[1].String())
+	}
+
+	out, _ := mdl.(Model).Update(chord)
+	final := out.(Model)
+	if final.nav.Level != model.LevelResources {
+		t.Fatalf("nav.Level = %v, want LevelResources", final.nav.Level)
+	}
+	if final.nav.ResourceType.Kind != "Deployment" {
+		t.Fatalf("nav.ResourceType.Kind = %q, want Deployment", final.nav.ResourceType.Kind)
 	}
 }
 

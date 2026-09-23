@@ -22,6 +22,7 @@ const (
 	wkSort      whichKeyGroup = "Sort"
 	wkFilter    whichKeyGroup = "Filter"
 	wkSettings  whichKeyGroup = "Settings"
+	wkNavigate  whichKeyGroup = "Navigate"
 )
 
 // whichKeyGroupOrder is the declared set of catalog groups, listed
@@ -31,7 +32,7 @@ const (
 // the allowlist TestWhichKeyRegistry_EveryEntryHasADeclaredGroup checks every
 // entry against. It is also the reading order for the catalog below.
 func whichKeyGroupOrder() []whichKeyGroup {
-	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkSort, wkSettings}
+	return []whichKeyGroup{wkActions, wkViews, wkFilter, wkSelection, wkNavigate, wkSort, wkSettings}
 }
 
 // wkPairSortColumn names the sort-column cycle, a bidirectional pair in both
@@ -472,9 +473,38 @@ func wkDiffAvailable(c *wkCtx) bool {
 	return c.level >= model.LevelResources && len(c.m.selectedItems) == 2
 }
 
-// whichKeyExplorerActionList is the full catalog for explorer mode. Navigation
-// bindings are absent by construction — the panel is for actions the user is
-// unlikely to remember, not for h/j/k/l.
+// wkExpandCollapseAvailable mirrors handleKeyExpandCollapse (update_keys.go):
+// the accordion toggle at LevelResourceTypes, Event de-duplication at
+// LevelResources (Event rows only), a no-op elsewhere.
+func wkExpandCollapseAvailable(c *wkCtx) bool {
+	if c.level == model.LevelResourceTypes {
+		return true
+	}
+	return c.level == model.LevelResources && c.kind == "Event"
+}
+
+// wkNewTabAvailable mirrors handleExplorerActionKeyNewTab
+// (update_keys_actions_tabs.go): blocked in union mode and at the 9-tab cap.
+func wkNewTabAvailable(c *wkCtx) bool {
+	return !c.m.unionMode && len(c.m.tabs) < 9
+}
+
+// wkMultiTabAvailable mirrors the guard handleExplorerActionKeyNextTab/
+// PrevTab/MoveTab (update_keys_actions_tabs.go) each open with: a single tab
+// makes the key a silent no-op.
+func wkMultiTabAvailable(c *wkCtx) bool {
+	return len(c.m.tabs) > 1
+}
+
+// wkJumpBackAvailable mirrors jumpBack (jump_history.go): a no-op with a
+// toast when the teleport history is empty.
+func wkJumpBackAvailable(c *wkCtx) bool {
+	return len(c.m.jumpBackStack) > 0
+}
+
+// whichKeyExplorerActionList is the full catalog for explorer mode. Plain
+// cursor motion (h/j/k/l, gg/G, ctrl+d/u) is absent by construction — the
+// panel is for actions the user is unlikely to remember, not for that.
 //
 // The section comments below match the render order now: the panel is one
 // flat list, no section headers, but sortWhichKeyCells clusters entries by
@@ -508,6 +538,7 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.Refresh }, Label: "Refresh view", Group: wkActions},
 	{Key: func(kb ui.Keybindings) string { return kb.CreateTemplate }, Label: "Create from template", Group: wkActions, Avail: wkCreateTemplateAvailable},
 	{Key: func(kb ui.Keybindings) string { return kb.Scale }, Label: "Scale", Group: wkActions, Avail: wkSingleCluster(wkWritableKindIn("Deployment", "StatefulSet", "ReplicaSet", "HorizontalPodAutoscaler"))},
+	{Key: func(kb ui.Keybindings) string { return kb.SetMark }, Label: "Set bookmark", Group: wkActions},
 
 	// Selection
 	{Key: func(kb ui.Keybindings) string { return kb.ToggleSelect }, Label: "Toggle selection", Group: wkSelection, Avail: wkOnRow},
@@ -519,6 +550,32 @@ var whichKeyExplorerActionList = []whichKeyAction{
 	{Key: func(kb ui.Keybindings) string { return kb.SelectAll }, Label: "Select/deselect all", Group: wkSelection, Avail: wkLevelResourcesUp},
 	{Key: func(kb ui.Keybindings) string { return kb.SelectRange }, Label: "Select range", Group: wkSelection, Avail: wkOnRow},
 	{Key: func(kb ui.Keybindings) string { return kb.Diff }, Label: "Diff two selected", Group: wkSelection, Avail: wkDiffAvailable},
+
+	// Navigate
+	{Key: func(kb ui.Keybindings) string { return kb.LevelCluster }, Label: "Go to Clusters level", Group: wkNavigate},
+	{Key: func(kb ui.Keybindings) string { return kb.LevelTypes }, Label: "Go to Types level", Group: wkNavigate},
+	{Key: func(kb ui.Keybindings) string { return kb.LevelResources }, Label: "Go to Resources level", Group: wkNavigate},
+	{Key: func(kb ui.Keybindings) string { return kb.JumpOwner }, Label: "Jump to owner", Group: wkNavigate, Avail: wkOnRow},
+	{Key: func(kb ui.Keybindings) string { return kb.JumpClaim }, Label: "Jump to resource claim", Group: wkNavigate, Avail: wkKindIn("Pod")},
+	{Key: func(kb ui.Keybindings) string { return kb.JumpBack }, Label: "Jump back", Group: wkNavigate, Avail: wkJumpBackAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.ExpandCollapse }, Label: "Expand/collapse groups", Group: wkNavigate, Avail: wkExpandCollapseAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.NewTab }, Label: "New tab", Group: wkNavigate, Avail: wkNewTabAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.NextTab }, Label: "Next tab", Group: wkNavigate, Avail: wkMultiTabAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.PrevTab }, Label: "Previous tab", Group: wkNavigate, Avail: wkMultiTabAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.MoveTabLeft }, Label: "Move tab left", Group: wkNavigate, Avail: wkMultiTabAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.MoveTabRight }, Label: "Move tab right", Group: wkNavigate, Avail: wkMultiTabAvailable},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoDeployments }, Label: "Go to Deployments", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoServices }, Label: "Go to Services", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoNamespaces }, Label: "Go to Namespaces", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoIngresses }, Label: "Go to Ingresses", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoCronJobs }, Label: "Go to CronJobs", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoReplicaSets }, Label: "Go to ReplicaSets", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoDaemonSets }, Label: "Go to DaemonSets", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoStatefulSets }, Label: "Go to StatefulSets", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoConfigMaps }, Label: "Go to ConfigMaps", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoHPAs }, Label: "Go to HPAs", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoPVCs }, Label: "Go to PVCs", Group: wkNavigate, Avail: wkNotAtClusters},
+	{Key: func(kb ui.Keybindings) string { return kb.GotoPDBs }, Label: "Go to PodDisruptionBudgets", Group: wkNavigate, Avail: wkNotAtClusters},
 
 	// Views
 	{Key: func(kb ui.Keybindings) string { return kb.TogglePreview }, Label: "Details / YAML preview", Group: wkViews, Avail: wkTogglePreviewAvailable},

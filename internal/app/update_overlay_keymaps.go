@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -79,6 +81,8 @@ func keymapsGroupStyle(g whichKeyGroup) lipgloss.Style {
 		base = ui.WhichKeySortStyle
 	case wkSettings:
 		base = ui.WhichKeySettingsStyle
+	case wkNavigate:
+		base = ui.WhichKeyNavigateStyle
 	default:
 		base = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed))
 	}
@@ -111,14 +115,54 @@ func (m Model) handleKeymapsOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	return m.handleKeymapsNormalMode(msg)
 }
 
+// keymapsChordMsg replays a g-prefix chord as the two keypresses it actually
+// is. One synthetic KeyPressMsg with Text "gd" is not what a real
+// g-then-d press produces, and handleGotoChord's lookup would not match it.
+type keymapsChordMsg []tea.KeyPressMsg
+
+// isGotoChordRawKey reports whether raw is a chord's binding string (the
+// JumpTop prefix plus exactly one more key, no modifier) rather than a
+// single physical keypress.
+func isGotoChordRawKey(raw string) bool {
+	prefix := ui.ActiveKeybindings.JumpTop
+	if prefix == "" || raw == prefix || !strings.HasPrefix(raw, prefix) {
+		return false
+	}
+	if strings.Contains(raw, "+") {
+		return false
+	}
+	return utf8.RuneCountInString(strings.TrimPrefix(raw, prefix)) == 1
+}
+
 // dispatchKeymapsSelection closes the overlay and replays the selected
-// entry's key as a synthetic keypress, so Enter has exactly the effect the
-// real key would have had.
+// entry's key(s), so Enter has exactly the effect the real key would have
+// had. A goto chord replays as two keypresses (keymapsChordMsg).
 func dispatchKeymapsSelection(m Model, selected keymapItem) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.keymapsFilter.Clear()
+	if isGotoChordRawKey(selected.rawKey) {
+		prefix := ui.ActiveKeybindings.JumpTop
+		chord := keymapsChordMsg{parseKeyBinding(prefix), parseKeyBinding(strings.TrimPrefix(selected.rawKey, prefix))}
+		return m, func() tea.Msg { return chord }
+	}
 	synthetic := parseKeyBinding(selected.rawKey)
 	return m, func() tea.Msg { return synthetic }
+}
+
+// replayKeymapsChord feeds each key of a goto chord through the normal key
+// handler in order, so the second key sees m.pendingG the same as it would
+// after a real first keypress armed it.
+func (m Model) replayKeymapsChord(chord keymapsChordMsg) (tea.Model, tea.Cmd) {
+	var mdl tea.Model = m
+	var cmds []tea.Cmd
+	for _, k := range chord {
+		var cmd tea.Cmd
+		mdl, cmd = mdl.(Model).handleKey(k)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	return mdl, tea.Batch(cmds...)
 }
 
 func (m Model) handleKeymapsNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
