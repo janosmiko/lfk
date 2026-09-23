@@ -71,6 +71,19 @@ func TestRenderHintBar_ZeroWidth(t *testing.T) {
 	}
 }
 
+func TestRenderHintBar_DropsEntryThatDoesNotFit(t *testing.T) {
+	hints := []HintEntry{
+		{Key: "q", Desc: "close"},
+		{Key: "S", Desc: "save"},
+	}
+	// 13 content cells fit "q: close | S:" exactly, so a word wrap would leave a bare "S:".
+	got := stripANSI(RenderHintBar(hints, 15))
+
+	assert.Contains(t, got, "q: close")
+	assert.NotContains(t, got, "S")
+	assert.Equal(t, 15, lipgloss.Width(got))
+}
+
 func TestFormatHintParts_SingleHint(t *testing.T) {
 	hints := []HintEntry{
 		{Key: "q", Desc: "quit"},
