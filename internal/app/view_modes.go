@@ -251,7 +251,9 @@ func (m Model) viewExplain() string {
 
 	// If search is active, show search bar instead of hints.
 	if m.explainSearchActive {
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.explainSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.explainSearchInput.CursorRight())
+		label := ui.SearchModePromptLabel(m.explainSearchInput.Value, "/")
+		modeHint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
+		searchBar := ui.HelpKeyStyle.Render(label) + ui.BarNormalStyle.Render(m.explainSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.explainSearchInput.CursorRight()) + ui.BarDimStyle.Render("  ") + modeHint
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	} else if m.explainSearchQuery != "" {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.explainSearchQuery)

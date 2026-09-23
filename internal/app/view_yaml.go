@@ -201,7 +201,8 @@ func (m Model) yamlHintBar(fullWidth int) string {
 		hint = m.renderStatusHint()
 	case m.yamlView.searchMode:
 		yamlModeInd := ui.SearchModeIndicator(m.yamlView.searchText.Value)
-		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
+		yamlModeHint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight()) + ui.BarDimStyle.Render("  ") + yamlModeHint
 		hint = ui.StatusBarBgStyle.Width(fullWidth).MaxWidth(fullWidth).MaxHeight(1).Render(searchBar)
 	case m.yamlView.searchText.Value != "":
 		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlView.matchIdx+1, len(m.yamlView.matchLines))

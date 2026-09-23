@@ -271,6 +271,7 @@ func RenderExplainSearchOverlay(results []model.ExplainField, cursor, scroll, ma
 		Filterable:      true,
 		Filter:          filterText,
 		FilterActive:    filterActive,
+		FilterModeAware: true,
 		ShowDescription: true,
 		Scroll:          scroll,
 		MaxVisible:      maxVisible,

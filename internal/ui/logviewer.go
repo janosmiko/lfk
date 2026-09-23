@@ -212,12 +212,14 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 	}
 	if searchActive {
 		modeInd := SearchModeIndicator(searchInput)
-		prompt := HelpKeyStyle.Render(ActiveKeybindings.Search) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
+		hint := FormatHintParts([]HintEntry{SearchModeHintEntry()})
+		prompt := HelpKeyStyle.Render(ActiveKeybindings.Search) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  ") + hint + BarDimStyle.Render("  (enter:apply  esc:cancel)")
 		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
 	}
 	if filterActive {
 		modeInd := SearchModeIndicator(filterInput)
-		prompt := HelpKeyStyle.Render(ActiveKeybindings.Filter) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + filterInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (esc:clear  enter:keep)")
+		hint := FormatHintParts([]HintEntry{SearchModeHintEntry()})
+		prompt := HelpKeyStyle.Render(ActiveKeybindings.Filter) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + filterInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  ") + hint + BarDimStyle.Render("  (esc:clear  enter:keep)")
 		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
 	}
 	if visualMode {

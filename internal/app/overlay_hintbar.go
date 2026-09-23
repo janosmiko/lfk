@@ -310,10 +310,14 @@ func (m Model) overlayHintBarMisc() string {
 		return m.renderHints(hints)
 	case overlayNetworkPolicy:
 		if m.netpolSearchActive {
+			modeInd := ui.SearchModeIndicator(m.netpolSearchInput.Value)
+			hint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
 			return ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) +
+				ui.BarDimStyle.Render(modeInd) +
 				ui.BarNormalStyle.Render(m.netpolSearchInput.CursorLeft()) +
 				ui.BarDimStyle.Render("█") +
-				ui.BarNormalStyle.Render(m.netpolSearchInput.CursorRight())
+				ui.BarNormalStyle.Render(m.netpolSearchInput.CursorRight()) +
+				ui.BarDimStyle.Render("  ") + hint
 		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "scroll"},

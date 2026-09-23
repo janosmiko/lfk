@@ -325,7 +325,8 @@ func (m Model) statusBar() string {
 		if m.filterBroadMode {
 			label = "filter " + m.broadModeSuffix()
 		}
-		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor)
+		hint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
+		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor) + ui.BarDimStyle.Render("  ") + hint
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 	if m.searchActive {
@@ -334,7 +335,8 @@ func (m Model) statusBar() string {
 		if m.searchBroadMode {
 			label = "search " + m.broadModeSuffix()
 		}
-		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor)
+		hint := ui.FormatHintParts([]ui.HintEntry{ui.SearchModeHintEntry()})
+		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor) + ui.BarDimStyle.Render("  ") + hint
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 	// When a status message is active, show it exclusively (hide key hints).
