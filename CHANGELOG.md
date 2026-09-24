@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.19.0](https://github.com/janosmiko/lfk/compare/v0.18.15...v0.19.0) (2026-09-24)
+
+
+### Features
+
+* configurable default search mode with visible mode indicator ([#817](https://github.com/janosmiko/lfk/issues/817)) ([542869c](https://github.com/janosmiko/lfk/commit/542869ca8e98b7cbe59d2871d9fa5bae7927eafd))
+* search keymaps overlay ([#801](https://github.com/janosmiko/lfk/issues/801)) ([a294a87](https://github.com/janosmiko/lfk/commit/a294a871af02ace4dc39f76f0163436f8b2fd180))
+
+
+### Bug Fixes
+
+* drop hint bar entries that do not fit instead of cutting them ([#815](https://github.com/janosmiko/lfk/issues/815)) ([043d441](https://github.com/janosmiko/lfk/commit/043d441268329fd8d0c45438a3c559fe9c0e4e0b))
+
 ## [0.18.15](https://github.com/janosmiko/lfk/compare/v0.18.14...v0.18.15) (2026-09-17)
 
 
