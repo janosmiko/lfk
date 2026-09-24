@@ -172,6 +172,16 @@ func TestOverlayHintBar_SearchModeHintWhileFiltering(t *testing.T) {
 		{"CanISubject", overlayCanISubject, func(m *Model) { m.canISubjectFilterMode = true }},
 		{"ExplainSearch", overlayExplainSearch, func(m *Model) { m.explainRecursiveFilterActive = true }},
 		{"FinalizerSearch", overlayFinalizerSearch, func(m *Model) { m.finalizerSearch.filterActive = true }},
+		{"ObjectExplorerFind", overlayObjectExplorerFind, func(m *Model) {}},
+		{"ClusterColorFilter", overlayClusterColor, func(m *Model) { m.clusterColorFilterMode = true }},
+		{"CanIWhoCanResourceFilter", overlayCanI, func(m *Model) {
+			m.canIMode = canIModeWhoCan
+			m.whoCan.resourceFilterActive = true
+		}},
+		{"EventTimelineSearch", overlayEventTimeline, func(m *Model) { m.eventTimelineSearchActive = true }},
+		{"SecretEditorSearch", overlaySecretEditor, func(m *Model) { m.editorSearch.active = true }},
+		{"ConfigMapEditorSearch", overlayConfigMapEditor, func(m *Model) { m.editorSearch.active = true }},
+		{"LabelEditorSearch", overlayLabelEditor, func(m *Model) { m.editorSearch.active = true }},
 	}
 
 	for _, tt := range overlays {
@@ -259,4 +269,15 @@ func TestOverlayHintBarOverlayRightsizing_HidesStrategyCycleWhenSingleAvailable(
 	got := m.overlayHintBar()
 	assert.NotContains(t, got, "[/]: strategy", "strategy cycle hint should NOT appear when only one strategy is available")
 	assert.Contains(t, got, "</>", "headroom cycle should still appear")
+}
+
+// The network policy overlay's search bar shows the active search-mode
+// indicator ("[fuzzy] "/"[regex] ") inline, not just the fuzzy/literal
+// hint the other filters use.
+func TestOverlayHintBar_NetworkPolicySearchShowsModeIndicator(t *testing.T) {
+	m := Model{overlay: overlayNetworkPolicy, width: 120}
+	m.netpolSearchActive = true
+	m.netpolSearchInput.Value = "~pod"
+	got := stripANSI(m.overlayHintBar())
+	assert.Contains(t, got, "[fuzzy]", "netpol search bar must show the fuzzy mode indicator for a ~ query")
 }

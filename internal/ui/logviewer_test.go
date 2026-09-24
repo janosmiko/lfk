@@ -456,3 +456,13 @@ func TestSanitizeLogBody_DelegatesToSanitizeLogLine(t *testing.T) {
 	assert.Equal(t, input, SanitizeLogBody(input, true), "SGR sequences survive when renderAnsi is true")
 	assert.NotEqual(t, input, SanitizeLogBody(input, false), "ESC is replaced when renderAnsi is false")
 }
+
+// --- RenderLogFooter ---
+
+// The log footer's filter bar shows the active search-mode label and
+// hint entry, matching the search bar's convention.
+func TestRenderLogFooter_FilterActiveShowsModeLabelAndHint(t *testing.T) {
+	out := stripANSI(RenderLogFooter(120, "", false, false, "", "", false, true, true, true, "~evict"))
+	assert.Contains(t, out, "[fuzzy]", "filter bar must show the fuzzy mode label for a ~ query")
+	assert.Contains(t, out, "~: fuzzy", "filter bar must advertise the fuzzy chord")
+}

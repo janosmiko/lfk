@@ -62,3 +62,23 @@ func TestLogTopHintBar_DrillHint(t *testing.T) {
 
 	_ = ui.RenderHintBar // keep import
 }
+
+// The Log Top search bar shows the active search-mode label and hint
+// entry while searching, mirroring the filter bar's convention.
+func TestViewLogTop_SearchModeLabelAndHint(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogTop
+	m.width = 300 // wide enough that the trailing "~: fuzzy" hint isn't dropped
+	m.logTop.searchActive = true
+	m.logTop.searchInput.Insert("~evict")
+
+	title := stripANSI(m.viewLogTop())
+	if !strings.Contains(title, "[fuzzy]") {
+		t.Errorf("viewLogTop() title should show the fuzzy mode label, got: %s", title)
+	}
+
+	hint := stripANSI(m.logTopHintBar())
+	if !strings.Contains(hint, "~") {
+		t.Errorf("logTopHintBar() should show the fuzzy/literal hint while searching, got: %s", hint)
+	}
+}

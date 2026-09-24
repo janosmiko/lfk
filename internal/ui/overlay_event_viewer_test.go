@@ -260,3 +260,70 @@ func TestRenderEventViewer_WrappedContinuationsHaveGutter(t *testing.T) {
 	pad := strings.Repeat(" ", 38)
 	assert.Contains(t, plain, pad+strings.Repeat("a", 12))
 }
+
+// Under wrap, a committed search query highlights matches on both the
+// first physical sub-line and every continuation sub-line.
+func TestRenderEventViewer_WrapHighlightsSearchOnFirstAndContinuationLines(t *testing.T) {
+	t.Parallel()
+	line := strings.Repeat("needle ", 30)
+	base := EventViewerParams{
+		Lines:  []string{line},
+		Width:  60,
+		Height: 20,
+		Wrap:   true,
+		Cursor: 0,
+	}
+	plain := RenderEventViewer(base)
+
+	withSearch := base
+	withSearch.SearchQuery = "needle"
+	highlighted := RenderEventViewer(withSearch)
+
+	assert.NotEqual(t, plain, highlighted, "a search query must change the wrapped rendering")
+	// The title also echoes the query, so compare only the body.
+	bodyOf := func(s string) string {
+		parts := strings.SplitN(stripANSI(s), "\n", 3)
+		return parts[len(parts)-1]
+	}
+	wantCount := strings.Count(bodyOf(plain), "needle")
+	assert.Equal(t, wantCount, strings.Count(bodyOf(highlighted), "needle"),
+		"every occurrence of the search term must survive highlighting")
+}
+
+// Outside wrap mode, a committed search query highlights matches on both
+// the cursor line and the surrounding non-cursor lines.
+func TestRenderEventViewer_NonWrapHighlightsCursorAndNormalLines(t *testing.T) {
+	t.Parallel()
+	base := EventViewerParams{
+		Lines:  []string{"needle one", "needle two", "needle three"},
+		Width:  60,
+		Height: 20,
+		Wrap:   false,
+		Cursor: 1,
+	}
+	plain := RenderEventViewer(base)
+
+	withSearch := base
+	withSearch.SearchQuery = "needle"
+	highlighted := RenderEventViewer(withSearch)
+
+	assert.NotEqual(t, plain, highlighted, "a search query must change the rendering")
+	for _, want := range base.Lines {
+		assert.Contains(t, stripANSI(highlighted), want, "line text must survive highlighting")
+	}
+}
+
+// The event viewer's search input footer shows the active search-mode
+// label for a ~/regex query, matching every other migrated search bar.
+func TestRenderEventViewer_SearchActiveFooterShowsModeLabel(t *testing.T) {
+	t.Parallel()
+	p := EventViewerParams{
+		Lines:        []string{"pod evicted"},
+		Width:        60,
+		Height:       20,
+		SearchActive: true,
+		SearchInput:  "~evict",
+	}
+	out := stripANSI(RenderEventViewer(p))
+	assert.Contains(t, out, "[fuzzy]", "search footer must show the fuzzy mode label for a ~ query")
+}

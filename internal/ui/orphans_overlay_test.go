@@ -95,3 +95,13 @@ func TestOrphanChipLines_MatchesRenderer(t *testing.T) {
 			"width=%d: OrphanChipLines must equal renderer row count", width)
 	}
 }
+
+// The orphans overlay's search row shows the active search-mode label
+// instead of a plain "/" prompt for a ~ query.
+func TestRenderOrphansOverlay_SearchShowsModeLabel(t *testing.T) {
+	out := stripANSI(RenderOrphansOverlay(
+		nil, OrphanCounts{}, 0, 0, 0, 80, 24,
+		"~pod", true, false, "", true,
+	))
+	assert.Contains(t, out, "[fuzzy]", "search row must show the fuzzy mode label for a ~ query")
+}
