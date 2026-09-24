@@ -76,12 +76,10 @@ func DetectSearchMode(rawQuery string) (SearchMode, string) {
 }
 
 // containsRegexMeta returns true if the string contains regex metacharacters.
-// [ and ] are excluded: a literal value like "[0]" or "[ERROR]" would
-// otherwise misfire as a character class in default mode.
 func containsRegexMeta(s string) bool {
 	for _, c := range s {
 		switch c {
-		case '.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|':
+		case '.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']':
 			return true
 		}
 	}

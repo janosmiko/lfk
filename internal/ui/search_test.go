@@ -29,8 +29,7 @@ func TestDetectSearchMode(t *testing.T) {
 		{"regex caret", "^error", SearchRegex, "^error"},
 		{"regex dollar", "error$", SearchRegex, "error$"},
 		{"regex pipe", "err|warn", SearchRegex, "err|warn"},
-		{"brackets alone are literal", "[abc]", SearchSubstring, "[abc]"},
-		{"brackets with other meta still regex", "[0-9]+", SearchRegex, "[0-9]+"},
+		{"regex brackets", "[abc]", SearchRegex, "[abc]"},
 		{"regex parens", "(err)", SearchRegex, "(err)"},
 		{"regex braces", "a{2}", SearchRegex, "a{2}"},
 		{"no metacharacters", "deployment", SearchSubstring, "deployment"},
@@ -63,8 +62,7 @@ func TestContainsRegexMeta(t *testing.T) {
 		{"{1,2}", true},
 		{"(group)", true},
 		{"a|b", true},
-		{"[class]", false},
-		{"[0-9]+", true},
+		{"[class]", true},
 		{"plain-text_123", false},
 	}
 	for _, tt := range tests {
@@ -94,11 +92,6 @@ func TestMatchLine(t *testing.T) {
 		{"regex no match", "errorXY", "error[0-9]+", false},
 		{"regex case insensitive", "ERROR42", "error[0-9]+", true},
 		{"regex fallback on invalid", "[invalid( pattern here", "[invalid(", true}, // falls back to substring containing "[invalid(".
-		{"bracket literal exact", "[0]", "[0]", true},
-		{"bracket literal no substring match", "[10]", "[0]", false},
-		{"bracket literal no char-class match", "port0", "[0]", false},
-		{"bracket literal log level", "[ERROR] boom", "[ERROR]", true},
-		{"bracket with other meta still regex", "value9", "[0-9]+", true},
 
 		// Fuzzy mode.
 		{"fuzzy match", "deployment", "~dplmnt", true},
