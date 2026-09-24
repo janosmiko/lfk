@@ -67,10 +67,36 @@ func TestDetectSearchMode_RegexDefault(t *testing.T) {
 	}
 }
 
-// TestDetectSearchMode_DefaultUnchanged pins today's behavior (auto-regex,
-// plain substring otherwise) when search_mode is left at "default".
-func TestDetectSearchMode_DefaultUnchanged(t *testing.T) {
-	setSearchMode(t, DefaultSearchModeDefault)
+func TestDetectSearchMode_LiteralDefault(t *testing.T) {
+	setSearchMode(t, DefaultSearchModeLiteral)
+
+	tests := []struct {
+		name      string
+		rawQuery  string
+		wantMode  SearchMode
+		wantQuery string
+	}{
+		{"plain stays substring", "deployment", SearchSubstring, "deployment"},
+		{"metacharacters stay literal", "err.r", SearchSubstring, "err.r"},
+		{"brackets stay literal", "[0]", SearchSubstring, "[0]"},
+		{"fuzzy prefix still fuzzy", "~deplymnt", SearchFuzzy, "deplymnt"},
+		{"literal escape strips the prefix", `\err.r`, SearchSubstring, "err.r"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mode, query := DetectSearchMode(tt.rawQuery)
+			if mode != tt.wantMode {
+				t.Errorf("mode = %d, want %d", mode, tt.wantMode)
+			}
+			if query != tt.wantQuery {
+				t.Errorf("query = %q, want %q", query, tt.wantQuery)
+			}
+		})
+	}
+}
+
+func TestDetectSearchMode_AutoDefault(t *testing.T) {
+	setSearchMode(t, DefaultSearchModeAuto)
 
 	mode, query := DetectSearchMode("err.r")
 	if mode != SearchRegex || query != "err.r" {
@@ -83,7 +109,7 @@ func TestDetectSearchMode_DefaultUnchanged(t *testing.T) {
 }
 
 func TestSearchModePromptLabel(t *testing.T) {
-	setSearchMode(t, DefaultSearchModeDefault)
+	setSearchMode(t, DefaultSearchModeAuto)
 
 	if got := SearchModePromptLabel("~asd", "/ "); got != "[fuzzy] " {
 		t.Errorf("got %q, want %q", got, "[fuzzy] ")
@@ -100,10 +126,16 @@ func TestSearchModePromptLabel(t *testing.T) {
 }
 
 func TestSearchModeHintEntry(t *testing.T) {
-	setSearchMode(t, DefaultSearchModeDefault)
+	setSearchMode(t, DefaultSearchModeAuto)
 	entry := SearchModeHintEntry()
 	if entry.Key != "~" || entry.Desc != "fuzzy" {
-		t.Errorf("default: got %+v, want {~ fuzzy}", entry)
+		t.Errorf("auto default: got %+v, want {~ fuzzy}", entry)
+	}
+
+	setSearchMode(t, DefaultSearchModeLiteral)
+	entry = SearchModeHintEntry()
+	if entry.Key != "~" || entry.Desc != "fuzzy" {
+		t.Errorf("literal default: got %+v, want {~ fuzzy}", entry)
 	}
 
 	setSearchMode(t, DefaultSearchModeRegex)

@@ -205,8 +205,8 @@ log_path: /tmp/lfk.log
 # log_top_default_profile: auto
 
 # Default match type for every search/filter input before any ~ (fuzzy) or
-# \ (literal) prefix. Valid: default, fuzzy, regex.
-# search_mode: default
+# \ (literal) prefix. Valid: auto, literal, fuzzy, regex.
+# search_mode: auto
 
 # ─── Log Viewer ──────────────────────────────────────────────────────────────
 # Settings for the log viewer (L key). The show_* defaults let you skip pressing

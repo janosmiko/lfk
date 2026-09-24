@@ -64,9 +64,9 @@ func TestFinalizerMatcher_HonorsSearchMode(t *testing.T) {
 		pattern string
 		want    bool
 	}{
-		{"default plain substring", ui.DefaultSearchModeDefault, "clean", true},
-		{"default plain no match", ui.DefaultSearchModeDefault, "xyz", false},
-		{"default regex auto-detect", ui.DefaultSearchModeDefault, `clean.*`, true},
+		{"default plain substring", ui.DefaultSearchModeAuto, "clean", true},
+		{"default plain no match", ui.DefaultSearchModeAuto, "xyz", false},
+		{"default regex auto-detect", ui.DefaultSearchModeAuto, `clean.*`, true},
 		{"fuzzy default typo tolerant", ui.DefaultSearchModeFuzzy, "cleanp", true},
 		{"regex default anchors", ui.DefaultSearchModeRegex, `^my\.finalizer\.io/cleanup$`, true},
 		{"literal prefix escapes regex meta", ui.DefaultSearchModeRegex, `\my.finalizer`, true},

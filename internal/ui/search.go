@@ -67,6 +67,8 @@ func DetectSearchMode(rawQuery string) (SearchMode, string) {
 		return SearchFuzzy, rawQuery
 	case DefaultSearchModeRegex:
 		return SearchRegex, rawQuery
+	case DefaultSearchModeLiteral:
+		return SearchSubstring, rawQuery
 	default:
 		if containsRegexMeta(rawQuery) {
 			return SearchRegex, rawQuery

@@ -4,6 +4,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -11,14 +12,17 @@ import (
 
 // Default search mode values, set via the `search_mode:` config key.
 const (
-	DefaultSearchModeDefault = "default" // substring, auto-regex, ~ fuzzy, \ literal (today's behavior)
-	DefaultSearchModeFuzzy   = "fuzzy"   // plain input matches fuzzy; ~ still fuzzy; \ forces literal substring
-	DefaultSearchModeRegex   = "regex"   // plain input matches regex; ~ still fuzzy; \ forces literal substring
+	DefaultSearchModeAuto    = "auto"    // substring, regex when the query has a metacharacter
+	DefaultSearchModeLiteral = "literal" // substring only, metacharacters match themselves
+	DefaultSearchModeFuzzy   = "fuzzy"
+	DefaultSearchModeRegex   = "regex"
 )
+
+var searchModes = []string{DefaultSearchModeAuto, DefaultSearchModeLiteral, DefaultSearchModeFuzzy, DefaultSearchModeRegex}
 
 // ConfigDefaultSearchMode selects the default match type DetectSearchMode
 // applies to a plain query (no ~ or \ prefix).
-var ConfigDefaultSearchMode = DefaultSearchModeDefault
+var ConfigDefaultSearchMode = DefaultSearchModeAuto
 
 // applySearchMode validates and applies the search_mode config value.
 // Empty keeps the compiled default. Unknown values warn and keep it too.
@@ -27,12 +31,11 @@ func applySearchMode(raw string) {
 	if v == "" {
 		return
 	}
-	switch v {
-	case DefaultSearchModeDefault, DefaultSearchModeFuzzy, DefaultSearchModeRegex:
+	if slices.Contains(searchModes, v) {
 		ConfigDefaultSearchMode = v
-	default:
-		logger.Warn("Invalid search_mode; using default",
-			"accepted", []string{DefaultSearchModeDefault, DefaultSearchModeFuzzy, DefaultSearchModeRegex},
-			"default", DefaultSearchModeDefault)
+		return
 	}
+	logger.Warn("Invalid search_mode; using default",
+		"accepted", searchModes,
+		"default", DefaultSearchModeAuto)
 }

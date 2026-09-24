@@ -158,8 +158,8 @@ type configFile struct {
 	// background), or "off" (status cell only).
 	RowStatusTint string `json:"row_status_tint" yaml:"row_status_tint"`
 	// SearchMode sets the default match type for search/filter inputs before
-	// any ~ or \ prefix: "default" (substring, auto-regex), "fuzzy", or
-	// "regex". Unknown values fall back to "default".
+	// any ~ or \ prefix: "auto" (substring, auto-regex), "literal", "fuzzy",
+	// or "regex". Unknown values fall back to "auto".
 	SearchMode string `json:"search_mode" yaml:"search_mode"`
 	// TransparentBg makes bar and surface backgrounds transparent so the terminal's
 	// own background shows through. Selection highlights remain opaque.

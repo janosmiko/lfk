@@ -11,8 +11,8 @@ func TestFilterKVKeys_HonorsSearchMode(t *testing.T) {
 		query string
 		want  []string
 	}{
-		{"default substring", DefaultSearchModeDefault, "key", []string{"API_KEY"}},
-		{"default regex auto-detect", DefaultSearchModeDefault, "^LOG.*", []string{"LOG_LEVEL"}},
+		{"default substring", DefaultSearchModeAuto, "key", []string{"API_KEY"}},
+		{"default regex auto-detect", DefaultSearchModeAuto, "^LOG.*", []string{"LOG_LEVEL"}},
 		{"fuzzy default typo tolerant", DefaultSearchModeFuzzy, "dtbrl", []string{"DATABASE_URL"}},
 		{"regex default anchors", DefaultSearchModeRegex, "^API_KEY$", []string{"API_KEY"}},
 	}

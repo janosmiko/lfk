@@ -210,9 +210,9 @@
     },
     "search_mode": {
       "type": "string",
-      "enum": ["default", "fuzzy", "regex"],
-      "default": "default",
-      "description": "Default match type for every search/filter input before any ~ (fuzzy) or \\ (literal) prefix. 'default' keeps substring matching with auto-detected regex."
+      "enum": ["auto", "literal", "fuzzy", "regex"],
+      "default": "auto",
+      "description": "Default match type for every search/filter input before any ~ (fuzzy) or \\ (literal) prefix. 'auto' matches substrings and switches to regex when the query has a regex metacharacter."
     },
     "yaml_viewer": {
       "type": ["object", "null"],
