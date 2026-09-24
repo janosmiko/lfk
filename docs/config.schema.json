@@ -208,6 +208,12 @@
       "default": "auto",
       "description": "Default Log Top parser profile. 'auto' detects the format from the loaded logs."
     },
+    "search_mode": {
+      "type": "string",
+      "enum": ["auto", "literal", "fuzzy", "regex"],
+      "default": "auto",
+      "description": "Default match type for every search/filter input before any ~ (fuzzy) or \\ (literal) prefix. 'auto' matches substrings and switches to regex when the query has a regex metacharacter."
+    },
     "yaml_viewer": {
       "type": ["object", "null"],
       "description": "YAML viewer startup-toggle defaults.",

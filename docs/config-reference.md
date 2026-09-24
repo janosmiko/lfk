@@ -68,6 +68,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `log_tail_lines_short` | int | `10` | **Deprecated** — use `log_viewer.tail_lines_short`. Number of log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
 | `log_render_ansi` | bool | `true` | **Deprecated** — use `log_viewer.render_ansi`. Render ANSI SGR sequences from log producers. |
 | `log_top_default_profile` | string | `auto` | Default Log Top parser: `auto`, `traefik-json`, `ingress-nginx`, `nginx-combined`, `envoy`, `json`, `logfmt`. |
+| `search_mode` | string | `"auto"` | Default match type for every search/filter input: `auto` (substring, regex when a metacharacter is typed), `literal`, `fuzzy`, `regex`. `~` (fuzzy) and `\` (literal) override per query. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `delete_propagation_policy` | string | `"background"` | Cascade policy the delete confirm starts on. `background`: delete now, garbage collector removes dependents (kubectl's default). `foreground`: keep the object until dependents are gone. `orphan`: leave dependents running. `none`: send no policy, letting the API server apply its per-resource default. `Tab` cycles it per delete; force delete clamps `none` to `background` because it runs through `kubectl`. |
 | `dim_overlay` | bool | `true` | **Deprecated** — use `appearance.dim_overlay`. Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
@@ -559,7 +560,7 @@ All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify th
 
 All keybindings can be overridden. Only specify the keys you want to change -- defaults apply for everything else. See [`keybindings.md`](keybindings.md) for the full list.
 
-The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The log viewer additionally honors `filter` (live text filter: `~`fuzzy, regex auto-detected, `\`literal) and `severity_up`/`severity_down` (step the minimum log severity shown). The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
+The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The log viewer additionally honors `filter` (live text filter, default match type from `search_mode`, `~`fuzzy and `\`literal override it) and `severity_up`/`severity_down` (step the minimum log severity shown). The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
 
 | Field | Default | Action |
 |---|---|---|

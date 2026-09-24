@@ -25,12 +25,9 @@ func (m Model) clusterColorForActiveContext() string {
 }
 
 // filteredClusterColorNames returns the colour-name list filtered by the
-// current overlay filter input. Filter is a case-insensitive substring
-// match. Empty filter returns all names. The "None" row is appended by
-// the caller — it stays anchored at the bottom regardless of the
-// filter so users can always reach the clear-action.
+// current overlay filter input. The "None" row is appended by the caller.
 func (m Model) filteredClusterColorNames() []string {
-	q := strings.ToLower(strings.TrimSpace(m.clusterColorFilter.Value))
+	q := strings.TrimSpace(m.clusterColorFilter.Value)
 	if q == "" {
 		out := make([]string, len(ui.ClusterColorNames))
 		copy(out, ui.ClusterColorNames)
@@ -38,7 +35,7 @@ func (m Model) filteredClusterColorNames() []string {
 	}
 	out := make([]string, 0, len(ui.ClusterColorNames))
 	for _, n := range ui.ClusterColorNames {
-		if strings.Contains(n, q) {
+		if ui.MatchLine(n, q) {
 			out = append(out, n)
 		}
 	}

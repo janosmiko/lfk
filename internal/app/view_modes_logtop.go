@@ -65,7 +65,7 @@ func (m Model) viewLogTop() string {
 	}
 	searchSuffix := ""
 	if m.logTop.searchActive {
-		searchSuffix = "  /" + m.logTop.searchInput.Value + "█"
+		searchSuffix = "  " + ui.SearchModePromptLabel(m.logTop.searchInput.Value, "/") + m.logTop.searchInput.Value + "█"
 	} else if m.logTop.searchQuery != "" {
 		searchSuffix = "  search: " + m.logTop.searchQuery
 	}
@@ -97,6 +97,9 @@ func (m Model) logTopHintBar() string {
 		{Key: "tab", Desc: "next dim"},
 		{Key: "enter", Desc: enterDesc},
 		{Key: "esc", Desc: "back"},
+	}
+	if m.logTop.searchActive {
+		hints = append(hints, ui.SearchModeHintEntry())
 	}
 	return ui.RenderHintBar(hints, m.width)
 }

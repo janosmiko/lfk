@@ -5,6 +5,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +52,32 @@ func TestCovSearchFinalizers(t *testing.T) {
 	require.True(t, ok)
 	// No resources with finalizers in fake client.
 	assert.NoError(t, result.err)
+}
+
+func TestFinalizerMatcher_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	tests := []struct {
+		name    string
+		mode    string
+		pattern string
+		want    bool
+	}{
+		{"default plain substring", ui.DefaultSearchModeAuto, "clean", true},
+		{"default plain no match", ui.DefaultSearchModeAuto, "xyz", false},
+		{"default regex auto-detect", ui.DefaultSearchModeAuto, `clean.*`, true},
+		{"fuzzy default typo tolerant", ui.DefaultSearchModeFuzzy, "cleanp", true},
+		{"regex default anchors", ui.DefaultSearchModeRegex, `^my\.finalizer\.io/cleanup$`, true},
+		{"literal prefix escapes regex meta", ui.DefaultSearchModeRegex, `\my.finalizer`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ui.ConfigDefaultSearchMode = tt.mode
+			got := finalizerMatcher(tt.pattern)("my.finalizer.io/cleanup")
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestCovSearchFinalizersAllTypes(t *testing.T) {

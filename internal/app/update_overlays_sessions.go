@@ -330,6 +330,14 @@ func (m Model) overlayHintBarSessions() string {
 			{Key: "esc", Desc: "cancel"},
 		})
 	}
+	if m.sessionsFilterMode {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type", Desc: "filter"},
+			ui.SearchModeHintEntry(),
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "clear"},
+		})
+	}
 	return m.renderHints([]ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "enter", Desc: "switch"},

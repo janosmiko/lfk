@@ -7,6 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // openTreeModeExplorer opens the Object Explorer on the chore fixture and
@@ -125,6 +127,28 @@ func TestObjectExplorerTree_FilterMatchesNestedKeys(t *testing.T) {
 	}
 	// Nested status.steps[0].phase is reachable through the filter.
 	assert.GreaterOrEqual(t, len(rows), 2)
+}
+
+func TestObjectExplorerTree_FilterHonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+	m := openTreeModeExplorer(t)
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m.objectExplorerView.filter = "phse" // typo-tolerant match for "phase"
+	rows := m.objectExplorerView.visibleTreeRows()
+	require.NotEmpty(t, rows)
+	for _, r := range rows {
+		assert.Equal(t, "phase", r.Field.Key)
+	}
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m.objectExplorerView.filter = "^phase$"
+	rows = m.objectExplorerView.visibleTreeRows()
+	require.NotEmpty(t, rows)
+	for _, r := range rows {
+		assert.Equal(t, "phase", r.Field.Key)
+	}
 }
 
 func TestObjectExplorerTree_ViewRendersGuides(t *testing.T) {

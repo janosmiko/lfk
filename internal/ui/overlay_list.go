@@ -65,6 +65,11 @@ type OverlayListConfig struct {
 	// filtering, so pressing "/" doesn't push the list down by one row.
 	Filterable bool
 
+	// FilterModeAware shows the fuzzy/regex mode label and hint instead of
+	// the "/" glyph. Set only when Filter is matched via MatchLine, not a
+	// plain substring check.
+	FilterModeAware bool
+
 	// Feature flags — render the matching item field/marker when true.
 	MultiSelect      bool
 	ShowActiveMarker bool
@@ -159,12 +164,16 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		b.WriteString("\n")
 	}
 	if cfg.Filterable || cfg.FilterActive || cfg.Filter != "" {
+		prefix := "/ "
+		if cfg.FilterModeAware {
+			prefix = SearchModePromptLabel(cfg.Filter, prefix)
+		}
 		switch {
 		case cfg.FilterActive:
-			b.WriteString(OverlayFilterStyle.Render("/ " + cfg.Filter))
+			b.WriteString(OverlayFilterStyle.Render(prefix + cfg.Filter))
 			b.WriteString(OverlayDimStyle.Render("█"))
 		case cfg.Filter != "":
-			b.WriteString(OverlayFilterStyle.Render("/ " + cfg.Filter))
+			b.WriteString(OverlayFilterStyle.Render(prefix + cfg.Filter))
 		default:
 			b.WriteString(OverlayDimStyle.Render("/ to filter"))
 		}

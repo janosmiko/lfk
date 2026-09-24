@@ -245,25 +245,19 @@ func (m *Model) closeCopyFieldPicker() {
 	}
 }
 
-// recomputeCopyFieldVisible refreshes the filtered entry list for the
-// active mode. Matching is case-insensitive over both the path and the
-// value — so "ExternalIP" matches status.addresses[ExternalIP].address
-// by path, and "34.1" matches it by value. Called only when the
-// filter, mode, or entries change, so per-keystroke navigation never
-// re-scans a large manifest (mirrors objectexplorer_find's
-// recomputeFind).
+// recomputeCopyFieldVisible refreshes the filtered entry list, matching
+// over both the path and the value — "34.1" matches an ExternalIP entry
+// by value as well as by path.
 func (m *Model) recomputeCopyFieldVisible() {
 	p := &m.copyFieldPicker
 	entries := m.copyFieldPickerCurrentEntries()
-	f := strings.ToLower(p.filter)
-	if f == "" {
+	if p.filter == "" {
 		p.visible = entries
 		return
 	}
 	out := make([]copyFieldEntry, 0, len(entries))
 	for _, e := range entries {
-		if strings.Contains(strings.ToLower(e.display), f) ||
-			strings.Contains(strings.ToLower(e.value), f) {
+		if ui.MatchLine(e.display, p.filter) || ui.MatchLine(e.value, p.filter) {
 			out = append(out, e)
 		}
 	}

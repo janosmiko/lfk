@@ -439,18 +439,15 @@ func SingleLineCell(s string, maxW int) string {
 	return Truncate(SanitizeTerminalText(flat), maxW)
 }
 
-// FilterKVKeys narrows `keys` to entries that contain `query` as a
-// case-insensitive substring. Empty query returns the input unchanged.
-// Used by the K/V editor renderers to apply the / search filter
-// without forcing the editor to mutate its source data structure.
+// FilterKVKeys narrows `keys` to entries MatchLine accepts for `query`.
+// Empty query returns the input unchanged.
 func FilterKVKeys(keys []string, query string) []string {
 	if query == "" {
 		return keys
 	}
-	q := strings.ToLower(query)
 	out := make([]string, 0, len(keys))
 	for _, k := range keys {
-		if strings.Contains(strings.ToLower(k), q) {
+		if MatchLine(k, query) {
 			out = append(out, k)
 		}
 	}
@@ -469,7 +466,7 @@ func RenderKVEditorSearchBar(query string, active bool) string {
 		Foreground(lipgloss.Color(ColorSecondary)).
 		Bold(true).
 		Background(BaseBg).
-		Render("/")
+		Render(SearchModePromptLabel(query, "/"))
 	body := query
 	if active {
 		body += "█"

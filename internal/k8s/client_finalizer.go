@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,12 +28,13 @@ type FinalizerMatch struct {
 	Age        string
 }
 
-// FindResourcesWithFinalizer iterates resource types, lists each via the dynamic
-// client, and returns resources whose metadata.finalizers contain a case-insensitive
-// substring match of the given pattern.
+// FindResourcesWithFinalizer returns resources with a finalizer accepted by
+// match. match is built by the caller (ui.MatchLine) so this package stays
+// free of a ui dependency.
 func (c *Client) FindResourcesWithFinalizer(
 	ctx context.Context,
-	contextName, namespace, pattern string,
+	contextName, namespace string,
+	match func(string) bool,
 	resourceTypes []model.ResourceTypeEntry,
 ) ([]FinalizerMatch, error) {
 	dynClient, err := c.dynamicForContext(contextName)
@@ -42,7 +42,6 @@ func (c *Client) FindResourcesWithFinalizer(
 		return nil, err
 	}
 
-	lowerPattern := strings.ToLower(pattern)
 	var results []FinalizerMatch
 
 	for _, rt := range resourceTypes {
@@ -84,7 +83,7 @@ func (c *Client) FindResourcesWithFinalizer(
 			}
 
 			for _, f := range finalizers {
-				if strings.Contains(strings.ToLower(f), lowerPattern) {
+				if match(f) {
 					age := ""
 					ts := item.GetCreationTimestamp()
 					if !ts.IsZero() {

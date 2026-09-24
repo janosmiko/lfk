@@ -49,31 +49,32 @@ const (
 	SearchFuzzy
 )
 
-// DetectSearchMode determines the search mode from the raw query string.
-// Returns the mode and the effective query (with prefix stripped if applicable).
-//
-// Modes:
-//   - "~" prefix: fuzzy match
-//   - "\" prefix: literal/escaped substring match
-//   - auto-detected regex metacharacters: regex mode
-//   - otherwise: plain substring
+// DetectSearchMode determines the search mode and effective query (prefix
+// stripped) from rawQuery. The ~ and \ prefixes always win. A plain query
+// falls through to ConfigDefaultSearchMode.
 func DetectSearchMode(rawQuery string) (SearchMode, string) {
 	if rawQuery == "" {
 		return SearchSubstring, ""
 	}
-	// Fuzzy prefix: ~
 	if strings.HasPrefix(rawQuery, "~") {
 		return SearchFuzzy, rawQuery[1:]
 	}
-	// Literal escape prefix: backslash
 	if strings.HasPrefix(rawQuery, `\`) {
 		return SearchSubstring, rawQuery[1:]
 	}
-	// Auto-detect regex: check for regex metacharacters.
-	if containsRegexMeta(rawQuery) {
+	switch ConfigDefaultSearchMode {
+	case DefaultSearchModeFuzzy:
+		return SearchFuzzy, rawQuery
+	case DefaultSearchModeRegex:
 		return SearchRegex, rawQuery
+	case DefaultSearchModeLiteral:
+		return SearchSubstring, rawQuery
+	default:
+		if containsRegexMeta(rawQuery) {
+			return SearchRegex, rawQuery
+		}
+		return SearchSubstring, rawQuery
 	}
-	return SearchSubstring, rawQuery
 }
 
 // containsRegexMeta returns true if the string contains regex metacharacters.
@@ -518,18 +519,37 @@ func highlightFuzzy(line, query string, style lipgloss.Style, restoreCodes strin
 }
 
 // SearchModeIndicator returns a short string to show in the search bar
-// indicating the active search mode: "" for substring, "[RE] " for regex,
-// "[~] " for fuzzy.
+// indicating the active search mode: "" for substring, "[regex] " for regex,
+// "[fuzzy] " for fuzzy.
 func SearchModeIndicator(rawQuery string) string {
 	mode, _ := DetectSearchMode(rawQuery)
 	switch mode {
 	case SearchRegex:
-		return "[RE] "
+		return "[regex] "
 	case SearchFuzzy:
-		return "[~] "
+		return "[fuzzy] "
 	default:
 		return ""
 	}
+}
+
+// SearchModePromptLabel returns SearchModeIndicator(rawQuery), or fallback
+// when the mode is substring/default. Use it where a literal glyph like "/ "
+// is the prompt's placeholder, and only fuzzy/regex modes should override it.
+func SearchModePromptLabel(rawQuery, fallback string) string {
+	if ind := SearchModeIndicator(rawQuery); ind != "" {
+		return ind
+	}
+	return fallback
+}
+
+// SearchModeHintEntry returns "~: fuzzy", or "\: literal" when
+// ConfigDefaultSearchMode is already fuzzy and ~ would be a no-op.
+func SearchModeHintEntry() HintEntry {
+	if ConfigDefaultSearchMode == DefaultSearchModeFuzzy {
+		return HintEntry{Key: `\`, Desc: "literal"}
+	}
+	return HintEntry{Key: "~", Desc: "fuzzy"}
 }
 
 // HighlightMatchCurrentAtCol highlights every match of rawQuery in line with

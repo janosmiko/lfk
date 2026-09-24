@@ -239,10 +239,12 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		hint = footerOverride
 	case searchMode:
 		diffModeInd := SearchModeIndicator(searchInput)
+		diffModeHint := FormatHintParts([]HintEntry{SearchModeHintEntry()})
 		searchBar := HelpKeyStyle.Render("type: search") + BarDimStyle.Render(" | ") +
 			HelpKeyStyle.Render("enter") + BarDimStyle.Render(": apply | ") +
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
-			BarDimStyle.Render("  "+ActiveKeybindings.Search) + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
+			BarDimStyle.Render("  "+ActiveKeybindings.Search) + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588") +
+			BarDimStyle.Render("  ") + diffModeHint
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
 	case vp.VisualMode:
 		hintContent := FormatHintParts([]HintEntry{
@@ -443,10 +445,12 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		hint = footerOverride
 	case searchMode:
 		diffModeInd := SearchModeIndicator(searchInput)
+		diffModeHint := FormatHintParts([]HintEntry{SearchModeHintEntry()})
 		searchBar := HelpKeyStyle.Render("type: search") + BarDimStyle.Render(" | ") +
 			HelpKeyStyle.Render("enter") + BarDimStyle.Render(": apply | ") +
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
-			BarDimStyle.Render("  "+ActiveKeybindings.Search) + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
+			BarDimStyle.Render("  "+ActiveKeybindings.Search) + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588") +
+			BarDimStyle.Render("  ") + diffModeHint
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
 	case vp.VisualMode:
 		hintContent := FormatHintParts([]HintEntry{

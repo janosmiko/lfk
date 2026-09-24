@@ -44,6 +44,7 @@ func (m Model) renderOverlayCopyField() (string, int, int) {
 		Filterable:      true,
 		Filter:          p.filter,
 		FilterActive:    p.filterActive,
+		FilterModeAware: true,
 		ShowDescription: true,
 		Scroll:          p.scroll,
 		MaxVisible:      maxVisible,

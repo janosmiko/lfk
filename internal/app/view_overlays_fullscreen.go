@@ -194,7 +194,8 @@ func (m Model) renderCanIOverlay(background string) string {
 	// Search bar shown inside the overlay. Normal hints moved to the main status bar.
 	var hintBar string
 	if m.canISearchActive {
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.canISearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.canISearchInput.CursorRight())
+		label := ui.SearchModePromptLabel(m.canISearchInput.Value, "/")
+		searchBar := ui.HelpKeyStyle.Render(label) + ui.BarNormalStyle.Render(m.canISearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.canISearchInput.CursorRight())
 		hintBar = ui.StatusBarBgStyle.Width(innerW).Render(searchBar)
 	} else if m.canISearchQuery != "" {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.canISearchQuery)

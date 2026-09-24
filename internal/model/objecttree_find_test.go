@@ -1,14 +1,26 @@
 package model
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// substringMatch mirrors the app layer's default-mode matcher (ui.MatchLine
+// falls back to a case-insensitive substring) without importing internal/ui,
+// which itself imports internal/model.
+func substringMatch(query string) func(string) bool {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return func(string) bool { return false }
+	}
+	return func(s string) bool { return strings.Contains(strings.ToLower(s), q) }
+}
+
 func TestFindObjectPaths_FindsNestedKeys(t *testing.T) {
-	matches := FindObjectPaths(choreObj(), "name", 0)
+	matches := FindObjectPaths(choreObj(), substringMatch("name"), 0)
 	// metadata.name, status.steps[0].name, status.steps[0].steps[0].name,
 	// status.steps[1].name
 	paths := make([][]string, 0, len(matches))
@@ -22,7 +34,7 @@ func TestFindObjectPaths_FindsNestedKeys(t *testing.T) {
 }
 
 func TestFindObjectPaths_CaseInsensitiveSubstring(t *testing.T) {
-	matches := FindObjectPaths(choreObj(), "PHA", 0)
+	matches := FindObjectPaths(choreObj(), substringMatch("PHA"), 0)
 	require.NotEmpty(t, matches)
 	for _, m := range matches {
 		last := m.Segs[len(m.Segs)-1]
@@ -31,11 +43,11 @@ func TestFindObjectPaths_CaseInsensitiveSubstring(t *testing.T) {
 }
 
 func TestFindObjectPaths_EmptyQuery(t *testing.T) {
-	assert.Empty(t, FindObjectPaths(choreObj(), "  ", 0))
+	assert.Empty(t, FindObjectPaths(choreObj(), substringMatch("  "), 0))
 }
 
 func TestFindObjectPaths_PreviewPopulated(t *testing.T) {
-	matches := FindObjectPaths(choreObj(), "phase", 0)
+	matches := FindObjectPaths(choreObj(), substringMatch("phase"), 0)
 	require.NotEmpty(t, matches)
 	// status.phase preview is the scalar value.
 	found := false
@@ -49,6 +61,6 @@ func TestFindObjectPaths_PreviewPopulated(t *testing.T) {
 }
 
 func TestFindObjectPaths_Limit(t *testing.T) {
-	matches := FindObjectPaths(choreObj(), "name", 2)
+	matches := FindObjectPaths(choreObj(), substringMatch("name"), 2)
 	assert.Len(t, matches, 2)
 }

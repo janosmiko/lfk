@@ -73,10 +73,9 @@ func (rt *objectExplorerState) visible() []model.ObjectField {
 	if rt.filter == "" {
 		return rt.level
 	}
-	q := strings.ToLower(rt.filter)
 	out := make([]model.ObjectField, 0, len(rt.level))
 	for _, f := range rt.level {
-		if strings.Contains(strings.ToLower(f.Key), q) {
+		if ui.MatchLine(f.Key, rt.filter) {
 			out = append(out, f)
 		}
 	}

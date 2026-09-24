@@ -317,6 +317,32 @@ func TestDescribeKeySearch(t *testing.T) {
 	assert.True(t, result.describeView.searchActive)
 }
 
+func TestFindNextDescribeMatch_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	m := &Model{
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "deploy scaled\npod evicted\nbackup completed",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
+	}
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m.describeView.searchQuery = "evctd" // typo-tolerant match for "evicted"
+	m.findNextDescribeMatch(true)
+	assert.Equal(t, 1, m.describeView.cursor)
+
+	m.describeView.cursor = 0
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m.describeView.searchQuery = "^backup"
+	m.findNextDescribeMatch(true)
+	assert.Equal(t, 2, m.describeView.cursor)
+}
+
 func TestDescribeKeyCopyCurrentLine(t *testing.T) {
 	m := Model{
 		mode: modeDescribe,

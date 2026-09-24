@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // copyFieldTestModel returns a model at LevelResources with one node row.
@@ -94,6 +95,24 @@ func TestCopyFieldPicker_ExternalIPFilterFindsAddressRow(t *testing.T) {
 	require.NotEmpty(t, vis)
 	assert.NotNil(t, findCopyFieldEntry(vis, "status.addresses[ExternalIP].address"),
 		"the address row is reachable via the semantic label, not just the type row")
+}
+
+func TestRecomputeCopyFieldVisible_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	m := copyFieldOpenPicker(t, copyFieldTestModel(t))
+	m = tabToFields(t, m)
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m.copyFieldPicker.filter = "extrnlip" // typo-tolerant match for "externalip"
+	m.recomputeCopyFieldVisible()
+	assert.NotNil(t, findCopyFieldEntry(m.visibleCopyFieldEntries(), "status.addresses[ExternalIP].address"))
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m.copyFieldPicker.filter = "External(IP|Hostname)"
+	m.recomputeCopyFieldVisible()
+	assert.NotNil(t, findCopyFieldEntry(m.visibleCopyFieldEntries(), "status.addresses[ExternalIP].address"))
 }
 
 func TestUpdateCopyFieldManifests_DroppedWhenPickerClosed(t *testing.T) {

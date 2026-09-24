@@ -209,6 +209,19 @@ func TestClusterColorOverlay_FilterNarrowsList(t *testing.T) {
 		"cursor resets to the first row when the filter changes so the highlight doesn't land on a stale index")
 }
 
+func TestFilteredClusterColorNames_HonorsSearchMode(t *testing.T) {
+	orig := ui.ConfigDefaultSearchMode
+	t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+	m := Model{clusterColorFilter: TextInput{Value: "mgnta"}} // typo-tolerant match for "magenta"
+	assert.Equal(t, []string{"magenta"}, m.filteredClusterColorNames())
+
+	ui.ConfigDefaultSearchMode = ui.DefaultSearchModeRegex
+	m.clusterColorFilter = TextInput{Value: "^(red|blue)$"}
+	assert.Equal(t, []string{"red", "blue"}, m.filteredClusterColorNames())
+}
+
 func TestClusterColorOverlay_FilterModeEscClearsFilter(t *testing.T) {
 	m := newClusterPickerModel(t)
 	ret, _ := m.handleKeyClusterColorPicker()

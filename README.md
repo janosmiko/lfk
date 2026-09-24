@@ -435,6 +435,8 @@ Every search and filter input auto-detects the mode from the query string:
 | Fuzzy | `~` prefix | `~deplymnt` |
 | Literal | `\` prefix | `\err.*` |
 
+This is the `auto` default of the `search_mode` config setting. Set it to `literal`, `fuzzy` or `regex` to use that mode for plain text. The `~` and `\` prefixes still override per query. The prompt shows the active mode, for example `[fuzzy] ` in place of `/`.
+
 All of them accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). A multiline paste shows a confirmation dialog.
 
 `Up` / `Down` recall previous queries. `/` and `f` share one history, the Log Viewer's `/` and the `:` command bar keep their own. All three survive restarts under `$XDG_STATE_HOME/lfk/`: [keybindings.md](docs/keybindings.md#log-viewer).

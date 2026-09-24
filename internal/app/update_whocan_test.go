@@ -568,3 +568,19 @@ func TestEnterWhoCanMode_RefreshesResourceOnEachEntry(t *testing.T) {
 	assert.Equal(t, "deployments", second.whoCan.resource,
 		"re-entry must refresh the resource from the current Can-I cursor — preserving the previous Who-Can target leaks stale results across pivots")
 }
+
+// The Who-Can resource filter's footer bar shows the active search-mode
+// label ("[fuzzy] ") in place of the plain "/" prompt for a ~ query.
+func TestRenderWhoCanOverlay_ResourceFilterShowsModeLabel(t *testing.T) {
+	m := Model{
+		canIMode: canIModeWhoCan,
+		width:    120,
+		height:   40,
+	}
+	m.whoCan.resourceList = []string{"pods", "secrets"}
+	m.whoCan.resourceFilterActive = true
+	m.whoCan.resourceFilter.Insert("~sec")
+
+	out := stripANSI(m.renderWhoCanOverlay(""))
+	assert.Contains(t, out, "[fuzzy]", "resource filter footer must show the fuzzy mode label for a ~ query")
+}

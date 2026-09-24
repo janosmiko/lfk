@@ -34,7 +34,7 @@ func RenderFinalizerSearchOverlay(
 	// prompt colour and cursor block read consistently across pickers.
 	if pattern == "" {
 		title := OverlayTitleStyle.Render("Finalizer Search")
-		prompt := OverlayFilterStyle.Render("/ "+filter) + OverlayDimStyle.Render("\u2588")
+		prompt := OverlayFilterStyle.Render(SearchModePromptLabel(filter, "/ ")+filter) + OverlayDimStyle.Render("\u2588")
 		body := title + "\n\n" +
 			OverlayDimStyle.Render("  Enter a finalizer name or pattern to search for.") + "\n\n" +
 			prompt
@@ -147,12 +147,13 @@ func RenderFinalizerSearchOverlay(
 	// Filter bar uses the same "/ <filter>" style as every other
 	// migrated overlay. Empty + inactive renders a dim "/ to filter"
 	// placeholder so the row's spot is stable.
+	prefix := SearchModePromptLabel(filter, "/ ")
 	var footer string
 	switch {
 	case filterActive:
-		footer = "\n" + OverlayFilterStyle.Render("/ "+filter) + OverlayDimStyle.Render("\u2588")
+		footer = "\n" + OverlayFilterStyle.Render(prefix+filter) + OverlayDimStyle.Render("\u2588")
 	case filter != "":
-		footer = "\n" + OverlayFilterStyle.Render("/ "+filter)
+		footer = "\n" + OverlayFilterStyle.Render(prefix+filter)
 	default:
 		footer = "\n" + OverlayDimStyle.Render("/ to filter")
 	}

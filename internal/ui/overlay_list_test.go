@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -369,6 +370,31 @@ func TestRenderOverlayList(t *testing.T) {
 		}, w)
 		assert.Contains(t, out, "alp")
 		assert.NotContains(t, out, "█") // no cursor when not in filter mode
+	})
+
+	t.Run("FilterModeAware shows fuzzy label in place of the / glyph", func(t *testing.T) {
+		snapshotSearchModeGlobal(t)
+		items := []OverlayListItem{{Name: "Alpha"}}
+		out := RenderOverlayList(items, OverlayListConfig{
+			Filter:          "~asd",
+			FilterActive:    true,
+			FilterModeAware: true,
+		}, w)
+		plain := ansi.Strip(out)
+		assert.Contains(t, plain, "[fuzzy] ~asd")
+		assert.NotContains(t, plain, "/ ~asd")
+		assert.NotContains(t, plain, "~: fuzzy", "the fuzzy hotkey hint belongs in the bottom hint bar, not the overlay body")
+	})
+
+	t.Run("FilterModeAware keeps the / glyph in substring mode", func(t *testing.T) {
+		snapshotSearchModeGlobal(t)
+		items := []OverlayListItem{{Name: "Alpha"}}
+		out := RenderOverlayList(items, OverlayListConfig{
+			Filter:          "alp",
+			FilterActive:    true,
+			FilterModeAware: true,
+		}, w)
+		assert.Contains(t, ansi.Strip(out), "/ alp")
 	})
 
 	t.Run("no filter row when filter empty and inactive", func(t *testing.T) {

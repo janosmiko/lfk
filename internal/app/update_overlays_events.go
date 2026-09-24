@@ -120,7 +120,6 @@ func (m *Model) findNextEventMatch(forward bool) {
 	if m.eventTimelineSearchQuery == "" || len(m.eventTimelineLines) == 0 {
 		return
 	}
-	query := strings.ToLower(m.eventTimelineSearchQuery)
 	start := m.eventTimelineCursor
 	total := len(m.eventTimelineLines)
 
@@ -131,7 +130,7 @@ func (m *Model) findNextEventMatch(forward bool) {
 		} else {
 			idx = (start - i + total) % total
 		}
-		if strings.Contains(strings.ToLower(m.eventTimelineLines[idx]), query) {
+		if ui.MatchLine(m.eventTimelineLines[idx], m.eventTimelineSearchQuery) {
 			m.eventTimelineCursor = idx
 			m.ensureEventCursorVisible()
 			return

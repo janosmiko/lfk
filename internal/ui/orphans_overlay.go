@@ -150,7 +150,7 @@ func RenderOrphansOverlay(
 		b.WriteString("\n")
 	}
 	if hasSearch {
-		b.WriteString(OverlayNormalStyle.Render("  / "))
+		b.WriteString(OverlayNormalStyle.Render("  " + SearchModePromptLabel(searchQuery, "/") + " "))
 		b.WriteString(OverlayInputStyle.Render(searchQuery))
 		if searchActive {
 			b.WriteString(OverlayDimStyle.Render("█"))

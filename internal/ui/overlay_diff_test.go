@@ -137,6 +137,19 @@ func TestRenderUnifiedDiffViewHonorsFooterOverride(t *testing.T) {
 	assert.NotContains(t, result, "q/esc", "default 'q/esc' hint must not also be drawn")
 }
 
+// The unified diff view's search bar shows the active search-mode
+// indicator and hint entry, matching the side-by-side view's search bar.
+func TestRenderUnifiedDiffViewSearchModeShowsIndicatorAndHint(t *testing.T) {
+	result := RenderUnifiedDiffView(
+		"a: 1", "a: 2", "before", "after",
+		0, 140, 30, false, false, "", nil, nil, true, "~a",
+		0, -1, DiffVisualParams{}, "",
+	)
+	out := stripANSI(result)
+	assert.Contains(t, out, "[fuzzy]", "search bar must show the fuzzy mode indicator for a ~ query")
+	assert.Contains(t, out, "~: fuzzy", "search bar must advertise the fuzzy chord")
+}
+
 // Empty override means "use the default hint bar" — important for the
 // majority of callers that don't paint a status message.
 func TestRenderDiffViewEmptyOverrideUsesDefault(t *testing.T) {

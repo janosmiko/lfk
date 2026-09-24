@@ -465,7 +465,6 @@ func (m *Model) findNextDescribeMatch(forward bool) {
 	if len(lines) == 0 {
 		return
 	}
-	query := strings.ToLower(m.describeView.searchQuery)
 	start := m.describeView.cursor
 	total := len(lines)
 
@@ -476,7 +475,7 @@ func (m *Model) findNextDescribeMatch(forward bool) {
 		} else {
 			idx = (start - i + total) % total
 		}
-		if strings.Contains(strings.ToLower(lines[idx]), query) {
+		if ui.MatchLine(lines[idx], m.describeView.searchQuery) {
 			m.describeView.cursor = idx
 			m.ensureDescribeCursorVisible()
 			return

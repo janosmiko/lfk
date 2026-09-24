@@ -99,7 +99,7 @@ type WrappedEventRowOpts struct {
 	SelStart      int  // absolute col on the logical line (inclusive)
 	SelEnd        int  // absolute col on the logical line (exclusive)
 	// Search highlight (applied only when no selection is active):
-	LowerSearch string
+	SearchQuery string
 	// Fullscreen suppresses the overlay-mode background style on plain
 	// rows: in fullscreen mode the surrounding FullscreenBorderStyle
 	// owns the body background, and applying OverlayNormalStyle here
@@ -145,13 +145,13 @@ func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 			case opts.SelEnd > opts.SelStart:
 				text = applyCharSelectionToFirstSubLine(text, opts.SelStart, opts.SelEnd)
 				styled = true
-			case opts.LowerSearch != "":
-				text = highlightEventSearchLine(text, opts.LowerSearch)
+			case opts.SearchQuery != "":
+				text = highlightEventSearchLine(text, opts.SearchQuery)
 				styled = true
 			}
-		} else if opts.LowerSearch != "" {
+		} else if opts.SearchQuery != "" {
 			// Highlight matches on continuation sub-lines too.
-			text = highlightEventSearchLine(text, opts.LowerSearch)
+			text = highlightEventSearchLine(text, opts.SearchQuery)
 			styled = true
 		}
 		if !styled && !opts.Fullscreen {
@@ -249,7 +249,7 @@ func RenderEventViewer(p EventViewerParams) string {
 	colEnd := max(p.VisualCol, p.CursorCol)
 
 	// Search query for highlighting.
-	lowerQuery := strings.ToLower(p.SearchQuery)
+	searchQuery := p.SearchQuery
 
 	// Available content width.
 	// Overlay mode: OverlayStyle adds border(2) + padding(4) = 6, plus 1 for gutter.
@@ -263,12 +263,12 @@ func RenderEventViewer(p EventViewerParams) string {
 	}
 
 	evLineCtx := eventLineContext{
-		contentW:   contentW,
-		lowerQuery: lowerQuery,
-		selStart:   selStart,
-		selEnd:     selEnd,
-		colStart:   colStart,
-		colEnd:     colEnd,
+		contentW:    contentW,
+		searchQuery: searchQuery,
+		selStart:    selStart,
+		selEnd:      selEnd,
+		colStart:    colStart,
+		colEnd:      colEnd,
 	}
 
 	// Resolve the start index so the cursor entry is visible under physical-line
@@ -308,7 +308,7 @@ func RenderEventViewer(p EventViewerParams) string {
 
 	// Search input / footer.
 	if p.SearchActive {
-		b.WriteString(OverlayFilterStyle.Render("/ " + p.SearchInput + "█"))
+		b.WriteString(OverlayFilterStyle.Render(SearchModePromptLabel(p.SearchInput, "/ ") + p.SearchInput + "█"))
 	} else {
 		// Footer info.
 		info := fmt.Sprintf("%d events", len(p.Lines))
@@ -355,12 +355,12 @@ func eventRowPhysicalLines(p EventViewerParams, i int, ctx eventLineContext) int
 
 // eventLineContext holds shared state for rendering individual event viewer lines.
 type eventLineContext struct {
-	contentW   int
-	lowerQuery string
-	selStart   int
-	selEnd     int
-	colStart   int
-	colEnd     int
+	contentW    int
+	searchQuery string
+	selStart    int
+	selEnd      int
+	colStart    int
+	colEnd      int
 }
 
 // renderEventViewerLine renders a single line in the event viewer.
@@ -395,7 +395,7 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 		case inSelection && p.VisualMode == 'v':
 			opts.SelStart, opts.SelEnd = charSelectionRangeForLine(p, ctx, i)
 		default:
-			opts.LowerSearch = ctx.lowerQuery
+			opts.SearchQuery = ctx.searchQuery
 		}
 		return RenderWrappedEventRow(opts)
 	}
@@ -457,7 +457,7 @@ func charSelectionRangeForLine(p EventViewerParams, ctx eventLineContext, i int)
 func renderEventCursorLine(p EventViewerParams, fitLine string, ctx eventLineContext, gutter string) string {
 	displayLine := fitLine
 	if p.SearchQuery != "" {
-		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
+		displayLine = highlightEventSearchLine(displayLine, ctx.searchQuery)
 	}
 	return gutter + RenderCursorAtCol(displayLine, p.CursorCol)
 }
@@ -466,7 +466,7 @@ func renderEventCursorLine(p EventViewerParams, fitLine string, ctx eventLineCon
 func renderEventNormalLine(p EventViewerParams, fitLine string, ctx eventLineContext, gutter string) string {
 	displayLine := fitLine
 	if p.SearchQuery != "" {
-		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
+		displayLine = highlightEventSearchLine(displayLine, ctx.searchQuery)
 	} else {
 		displayLine = OverlayNormalStyle.Render(displayLine)
 	}
@@ -474,31 +474,13 @@ func renderEventNormalLine(p EventViewerParams, fitLine string, ctx eventLineCon
 }
 
 // highlightEventSearchLine highlights search matches in a single line using
-// the overlay styles. The query should be pre-lowered for case-insensitive matching.
-func highlightEventSearchLine(line, lowerQuery string) string {
-	if lowerQuery == "" {
-		return OverlayNormalStyle.Render(line)
-	}
-	lowerLine := strings.ToLower(line)
+// the overlay styles, honoring the active search_mode (substring/regex/fuzzy)
+// and the ~/\ prefix overrides via ui.HighlightMatchStyledOver.
+func highlightEventSearchLine(line, rawQuery string) string {
 	matchStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(ColorSelectedFg)).
 		Background(lipgloss.Color(ColorWarning)).
 		Bold(true)
-
-	var result strings.Builder
-	pos := 0
-	for pos < len(line) {
-		idx := strings.Index(lowerLine[pos:], lowerQuery)
-		if idx < 0 {
-			result.WriteString(OverlayNormalStyle.Render(line[pos:]))
-			break
-		}
-		if idx > 0 {
-			result.WriteString(OverlayNormalStyle.Render(line[pos : pos+idx]))
-		}
-		matchEnd := pos + idx + len(lowerQuery)
-		result.WriteString(matchStyle.Render(line[pos+idx : matchEnd]))
-		pos = matchEnd
-	}
-	return result.String()
+	inner := HighlightMatchStyledOver(line, rawQuery, matchStyle, OverlayNormalStyle)
+	return RenderOverPrestyled(inner, OverlayNormalStyle)
 }

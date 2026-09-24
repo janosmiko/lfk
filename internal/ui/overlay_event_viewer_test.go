@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // A short line that fits within contentW must come back unchanged —
@@ -259,4 +260,72 @@ func TestRenderEventViewer_WrappedContinuationsHaveGutter(t *testing.T) {
 	// Continuation chunks (`pad + 12-or-fewer a's`) should appear.
 	pad := strings.Repeat(" ", 38)
 	assert.Contains(t, plain, pad+strings.Repeat("a", 12))
+}
+
+// Under wrap, a committed search query highlights matches on both the
+// first physical sub-line and every continuation sub-line.
+func TestRenderEventViewer_WrapHighlightsSearchOnFirstAndContinuationLines(t *testing.T) {
+	t.Parallel()
+	line := strings.Repeat("needle ", 30)
+	base := EventViewerParams{
+		Lines:  []string{line},
+		Width:  60,
+		Height: 20,
+		Wrap:   true,
+		Cursor: 0,
+	}
+	assertEventSearchHighlightsEveryLine(t, base, "needle", 4)
+}
+
+// assertEventSearchHighlightsEveryLine renders p with a matching query and
+// with a control query that matches nothing. Both take the search code path,
+// so a body line can only differ between them through match highlighting.
+func assertEventSearchHighlightsEveryLine(t *testing.T, p EventViewerParams, query string, wantLines int) {
+	t.Helper()
+	p.SearchQuery = "zzz"
+	control := strings.Split(RenderEventViewer(p), "\n")
+	p.SearchQuery = query
+	highlighted := strings.Split(RenderEventViewer(p), "\n")
+	require.Len(t, highlighted, len(control))
+
+	body := 0
+	for i := range control {
+		// The title echoes the query, so only lines holding the match text count.
+		if !strings.Contains(stripANSI(control[i]), query) {
+			continue
+		}
+		body++
+		assert.NotEqual(t, control[i], highlighted[i], "line %d: match not highlighted", i)
+		assert.Equal(t, stripANSI(control[i]), stripANSI(highlighted[i]), "line %d: text changed", i)
+	}
+	assert.GreaterOrEqual(t, body, wantLines, "expected at least %d body lines with a match", wantLines)
+}
+
+// Outside wrap mode, a committed search query highlights matches on both
+// the cursor line and the surrounding non-cursor lines.
+func TestRenderEventViewer_NonWrapHighlightsCursorAndNormalLines(t *testing.T) {
+	t.Parallel()
+	base := EventViewerParams{
+		Lines:  []string{"needle one", "needle two", "needle three"},
+		Width:  60,
+		Height: 20,
+		Wrap:   false,
+		Cursor: 1,
+	}
+	assertEventSearchHighlightsEveryLine(t, base, "needle", 3)
+}
+
+// The event viewer's search input footer shows the active search-mode
+// label for a ~/regex query, matching every other migrated search bar.
+func TestRenderEventViewer_SearchActiveFooterShowsModeLabel(t *testing.T) {
+	t.Parallel()
+	p := EventViewerParams{
+		Lines:        []string{"pod evicted"},
+		Width:        60,
+		Height:       20,
+		SearchActive: true,
+		SearchInput:  "~evict",
+	}
+	out := stripANSI(RenderEventViewer(p))
+	assert.Contains(t, out, "[fuzzy]", "search footer must show the fuzzy mode label for a ~ query")
 }

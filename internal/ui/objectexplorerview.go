@@ -59,8 +59,10 @@ func renderObjectExplorerLayout(d objectExplorerColumnDims, middleHeader string,
 	// Explorer's search), otherwise the key hints.
 	bottomBar := hintBar
 	if filterBar != "" {
+		label := SearchModePromptLabel(filterBar, "/")
+		modeHint := FormatHintParts([]HintEntry{SearchModeHintEntry()})
 		bottomBar = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(
-			HelpKeyStyle.Render("/") + BarNormalStyle.Render(filterBar))
+			HelpKeyStyle.Render(label) + BarNormalStyle.Render(filterBar) + BarDimStyle.Render("  ") + modeHint)
 	}
 
 	// Left column: the parent level's keys only (no values), with the

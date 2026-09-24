@@ -87,6 +87,7 @@ func renderPodSelectOverlay(m Model) string {
 		Filterable:      true,
 		Filter:          m.logView.podFilterText,
 		FilterActive:    m.logView.podFilterActive,
+		FilterModeAware: true,
 		ShowDescription: true,
 		Scroll:          overlayListScroll(&overlayPodScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:      maxVisible,
@@ -115,6 +116,7 @@ func renderCanISubjectOverlay(m Model, innerW int) string {
 		Filterable:      true,
 		Filter:          m.overlayFilter.Value,
 		FilterActive:    m.canISubjectFilterMode,
+		FilterModeAware: true,
 		ShowDescription: true,
 		Scroll:          overlayListScroll(&overlayCanISubjectScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:      maxVisible,
@@ -149,6 +151,7 @@ func renderBookmarkOverlay(m Model) string {
 		Filterable:      true,
 		Filter:          m.bookmarkFilter.Value,
 		FilterActive:    m.bookmarkSearchMode == bookmarkModeFilter,
+		FilterModeAware: true,
 		ShowKey:         true,
 		ShowDescription: true,
 		EmptyMessage:    "No bookmarks yet — press m<key> in the explorer to set a mark",
@@ -206,6 +209,7 @@ func renderSessionsOverlay(m Model) string {
 		Filterable:       true,
 		Filter:           m.sessionsFilter.Value,
 		FilterActive:     m.sessionsFilterMode,
+		FilterModeAware:  true,
 		ShowDescription:  true,
 		ShowActiveMarker: true,
 		EmptyMessage:     "No sessions",
@@ -230,15 +234,16 @@ func renderTemplateOverlay(m Model) (string, int) {
 	overlayH := min(25, m.height-6)
 	maxVisible := max(overlayH-5, 1)
 	cfg := ui.OverlayListConfig{
-		Title:        "Create from Template",
-		Cursor:       m.templateCursor,
-		Filterable:   true,
-		Filter:       m.templateFilter.Value,
-		FilterActive: m.templateSearchMode,
-		ShowStatus:   true,
-		Scroll:       overlayListScroll(&overlayTemplateScrollPos, m.templateCursor, len(src), maxVisible),
-		MaxVisible:   maxVisible,
-		EmptyMessage: "No templates available",
+		Title:           "Create from Template",
+		Cursor:          m.templateCursor,
+		Filterable:      true,
+		Filter:          m.templateFilter.Value,
+		FilterActive:    m.templateSearchMode,
+		FilterModeAware: true,
+		ShowStatus:      true,
+		Scroll:          overlayListScroll(&overlayTemplateScrollPos, m.templateCursor, len(src), maxVisible),
+		MaxVisible:      maxVisible,
+		EmptyMessage:    "No templates available",
 	}
 	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayH
 }
@@ -272,6 +277,7 @@ func renderLogContainerSelectOverlay(m Model) string {
 		Filterable:       true,
 		Filter:           m.logView.containerFilterText,
 		FilterActive:     m.logView.containerFilterActive,
+		FilterModeAware:  true,
 		ShowActiveMarker: true,
 		Scroll:           overlayListScroll(&overlayContainerScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:       maxVisible,
@@ -295,6 +301,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 		Filterable:       true,
 		Filter:           m.columnToggleFilter,
 		FilterActive:     m.columnToggleFilterActive,
+		FilterModeAware:  true,
 		ShowActiveMarker: true,
 		Scroll:           overlayListScroll(&overlayColumnToggleScrollPos, m.columnToggleCursor, len(entries), maxVisible),
 		MaxVisible:       maxVisible,
@@ -324,12 +331,13 @@ func renderColorschemeOverlay(m Model, height int) string {
 	items, cursorDisplayIdx := buildColorschemeItems(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor)
 	if len(items) == 0 {
 		return ui.RenderOverlayList(nil, ui.OverlayListConfig{
-			Title:        "Select Color Scheme",
-			Filterable:   true,
-			Filter:       m.schemeFilter.Value,
-			FilterActive: m.schemeFilterMode,
-			EmptyMessage: "No matching schemes",
-			Height:       contentH,
+			Title:           "Select Color Scheme",
+			Filterable:      true,
+			Filter:          m.schemeFilter.Value,
+			FilterActive:    m.schemeFilterMode,
+			FilterModeAware: true,
+			EmptyMessage:    "No matching schemes",
+			Height:          contentH,
 		}, min(50, m.width-10)-4)
 	}
 
@@ -344,6 +352,7 @@ func renderColorschemeOverlay(m Model, height int) string {
 		Filterable:       true,
 		Filter:           m.schemeFilter.Value,
 		FilterActive:     m.schemeFilterMode,
+		FilterModeAware:  true,
 		ShowActiveMarker: true,
 		Scroll:           scroll,
 		MaxVisible:       maxVisible,
@@ -376,12 +385,11 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 			selectIdx++
 		}
 	} else {
-		lower := strings.ToLower(filter)
 		for _, e := range entries {
 			if e.IsHeader {
 				continue
 			}
-			if !strings.Contains(e.Name, lower) {
+			if !ui.MatchLine(e.Name, filter) {
 				continue
 			}
 			if selectIdx == cursor {
@@ -646,13 +654,14 @@ func renderClusterColorOverlay(m Model, innerW, contentH int) string {
 		titleText = "Set cluster color"
 	}
 	return ui.RenderOverlayList(items, ui.OverlayListConfig{
-		Title:        titleText,
-		Cursor:       m.clusterColorOverlayCursor,
-		Filterable:   true,
-		Filter:       m.clusterColorFilter.Value,
-		FilterActive: m.clusterColorFilterMode,
-		BadgeWidth:   swatchW,
-		Height:       contentH,
+		Title:           titleText,
+		Cursor:          m.clusterColorOverlayCursor,
+		Filterable:      true,
+		Filter:          m.clusterColorFilter.Value,
+		FilterActive:    m.clusterColorFilterMode,
+		FilterModeAware: true,
+		BadgeWidth:      swatchW,
+		Height:          contentH,
 	}, innerW)
 }
 
@@ -711,6 +720,7 @@ func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 		Filterable:       true,
 		Filter:           m.overlayFilter.Value,
 		FilterActive:     m.nsFilterMode,
+		FilterModeAware:  true,
 		ShowActiveMarker: true,
 		Scroll:           scroll,
 		MaxVisible:       maxVisible,

@@ -213,18 +213,11 @@ type ObjectMatch struct {
 	Preview string   // value/summary preview
 }
 
-// FindObjectPaths walks the whole object and returns every map-key node whose
-// key (the last path segment) contains query, case-insensitively. Results are
-// capped at limit (<=0 means a sane default) and returned in a stable
-// pre-order.
-func FindObjectPaths(root any, query string, limit int) []ObjectMatch {
-	q := strings.ToLower(strings.TrimSpace(query))
-	if q == "" {
-		return nil
-	}
-	return collectObjectPaths(root, limit, func(key string) bool {
-		return strings.Contains(strings.ToLower(key), q)
-	})
+// FindObjectPaths walks the whole object and returns every map-key node
+// whose key (the last path segment) match accepts. match is built by the
+// caller (ui.MatchLine) so this package stays free of a ui dependency.
+func FindObjectPaths(root any, match func(key string) bool, limit int) []ObjectMatch {
+	return collectObjectPaths(root, limit, match)
 }
 
 // AllObjectPaths returns every map-key node in the object, in pre-order, capped

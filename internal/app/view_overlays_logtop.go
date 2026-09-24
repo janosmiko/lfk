@@ -26,6 +26,7 @@ func (m Model) overlayHintBarLogTop() string {
 			{Key: "space", Desc: "toggle"},
 			{Key: "J/K", Desc: "reorder"},
 			{Key: "/", Desc: "filter"},
+			ui.SearchModeHintEntry(),
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})
@@ -85,6 +86,7 @@ func (m Model) renderLogTopColumnsOverlay() (string, int, int) {
 		Filterable:       true,
 		Filter:           m.logTop.colFilter,
 		FilterActive:     m.logTop.colFilterActive,
+		FilterModeAware:  true,
 		ShowActiveMarker: true,
 		Scroll:           overlayListScroll(&overlayLogTopColScrollPos, m.overlayCursor, len(items), maxVisible),
 		MaxVisible:       maxVisible,
