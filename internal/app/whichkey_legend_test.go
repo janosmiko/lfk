@@ -121,7 +121,7 @@ func TestWhichKeyLegend_OmittedInNoColorMode(t *testing.T) {
 
 	m := whichKeyTestModel()
 	m.width, m.height = 120, 40
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok {
 		t.Fatal("precondition: the panel must lay out")
@@ -154,7 +154,7 @@ func TestWhichKeyLegend_ClusterLevelDropsUnavailableGroups(t *testing.T) {
 	m.setCursor(0)
 	m.width, m.height = 120, 40
 
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	groups := whichKeyPresentGroups(cells)
 	present := map[whichKeyGroup]bool{}
 	for _, g := range groups {
@@ -167,7 +167,7 @@ func TestWhichKeyLegend_ClusterLevelDropsUnavailableGroups(t *testing.T) {
 		t.Fatalf("Actions must still be present at LevelClusters (Action menu is always offered), got %v", groups)
 	}
 
-	out := stripANSI(m.renderWhichKeyLeader(strings.Repeat("\n", m.height)))
+	out := stripANSI(m.renderWhichKeyPanel(strings.Repeat("\n", m.height), cells, 0))
 	for _, absent := range []string{"Sort", "Selection"} {
 		if strings.Contains(out, absent) {
 			t.Errorf("LevelClusters legend must not name %q:\n%s", absent, out)
@@ -189,7 +189,7 @@ func TestWhichKeyLegend_SitsOnLastLineCentered(t *testing.T) {
 	m := whichKeyTestModel()
 	m.width, m.height = 120, 40
 
-	cells := m.whichKeyLeaderCells()
+	cells := whichKeyActionCells(m)
 	lay, ok := m.whichKeyLayoutFor(cells)
 	if !ok {
 		t.Fatal("precondition: the panel must lay out at 120x40")
@@ -249,55 +249,5 @@ func TestWhichKeyLegend_SitsOnLastLineCentered(t *testing.T) {
 	trail := innerW - lipgloss.Width(strings.TrimRight(inner, " "))
 	if diff := lead - trail; diff < -1 || diff > 1 {
 		t.Errorf("legend not centered: %d leading spaces vs %d trailing (want within 1 column), row=%q", lead, trail, inner)
-	}
-}
-
-// TestWhichKeyLegend_NeverMistakenForAnEntryByReachability guards the
-// interaction the review brief called out by name: a legend row must not
-// satisfy the "every available entry is reachable via scrolling" invariant
-// for a label it happens to share a substring with, and conversely the
-// reachability scan must still find every real entry once the legend has
-// claimed a row out of the viewport budget.
-func TestWhichKeyLegend_NeverMistakenForAnEntryByReachability(t *testing.T) {
-	restoreWhichKeyGlobals(t)
-	ui.ActiveKeybindings = ui.DefaultKeybindings()
-	ui.ConfigWhichKeyEnabled = true
-	ui.ConfigWhichKeyLeaderDelayMs = 0
-	m := whichKeyTestModel()
-	m.width, m.height = 80, 14
-
-	want := map[string]bool{}
-	for _, a := range m.availableWhichKeyActions() {
-		want[a.Label] = true
-	}
-
-	out, _ := m.handleExplorerKey(leaderKey())
-	m = out.(Model)
-	cells := m.whichKeyLeaderCells()
-	lay, ok := m.whichKeyLayoutFor(cells)
-	if !ok {
-		t.Fatal("precondition: the panel must lay out at 80x14")
-	}
-	if lay.legendRows == 0 {
-		t.Fatal("precondition: this catalog must trigger the legend at 80x14")
-	}
-
-	bg := strings.Repeat("\n", m.height)
-	var rendered strings.Builder
-	rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
-	for step := 0; m.whichKey.scroll < lay.maxScroll; step++ {
-		if step > lay.bodyRows {
-			t.Fatalf("ctrl+d never reached the end (%d of %d)", m.whichKey.scroll, lay.maxScroll)
-		}
-		out, _ = m.handleExplorerKey(keyMsg(ui.ActiveKeybindings.PageDown))
-		m = out.(Model)
-		rendered.WriteString("\n")
-		rendered.WriteString(stripANSI(m.renderWhichKeyLeader(bg)))
-	}
-	for _, c := range cells {
-		drawn := c.keyText() + " " + ui.Truncate(c.desc, lay.grid.descW)
-		if !strings.Contains(rendered.String(), drawn) {
-			t.Errorf("%q never appears at any scroll offset — the legend row must not have starved it", drawn)
-		}
 	}
 }

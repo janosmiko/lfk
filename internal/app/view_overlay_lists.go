@@ -27,6 +27,7 @@ var (
 	overlayHelmHistoryScrollPos  int
 	overlayHelmRollbackScrollPos int
 	overlayRollbackScrollPos     int
+	overlayKeymapsScrollPos      int
 )
 
 // overlayListScroll computes the new viewport start using
@@ -308,6 +309,44 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 		EmptyMessage:     "No matching columns",
 		Height:           contentH,
 	}, width-6)
+}
+
+func (m Model) renderOverlayKeymaps() (string, int, int) {
+	all := m.keymapsOverlayItems()
+	filtered := keymapsFilter(all, m.keymapsFilter.Value)
+	items := make([]ui.OverlayListItem, len(filtered))
+	for i, it := range filtered {
+		items[i] = it.OverlayListItem
+	}
+	subtitle := fmt.Sprintf("%d keymaps", len(all))
+	if m.keymapsFilter.Value != "" {
+		subtitle = fmt.Sprintf("%d / %d", len(filtered), len(all))
+	}
+	nameW := 0
+	for _, it := range items {
+		if w := lipgloss.Width(it.Name); w > nameW {
+			nameW = w
+		}
+	}
+	overlayW := ui.OverlayContentWidth(nameW+keymapsBadgeW+2, m.width-10)
+	overlayH := min(m.height-6, 25)
+	contentH := max(overlayH-2, 1)
+	maxVisible := max(contentH-overlayListChromeFilterable()-1, 1) // -1: subtitle row
+	cfg := ui.OverlayListConfig{
+		Title:           "Keymaps",
+		Subtitle:        subtitle,
+		Cursor:          m.keymapsCursor,
+		Filterable:      true,
+		Filter:          m.keymapsFilter.Value,
+		FilterActive:    m.keymapsFilterMode,
+		FilterModeAware: true,
+		BadgeWidth:      keymapsBadgeW,
+		Scroll:          overlayListScroll(&overlayKeymapsScrollPos, m.keymapsCursor, len(items), maxVisible),
+		MaxVisible:      maxVisible,
+		Height:          contentH,
+		EmptyMessage:    "No keymaps match",
+	}
+	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayW, overlayH
 }
 
 // renderColorschemeOverlay maps the colorscheme picker (with its group-

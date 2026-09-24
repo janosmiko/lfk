@@ -51,6 +51,7 @@ var builtinCommands = map[string]string{
 	"sessions":   "sessions",
 	"dashboard":  "dashboard",
 	"monitoring": "monitoring",
+	"keymaps":    "keymaps",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.

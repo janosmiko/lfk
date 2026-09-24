@@ -108,9 +108,9 @@ func ApplyTheme(t Theme) {
 	// lipgloss.Color(ColorX) call sites otherwise stay frozen at the default
 	// Tokyonight palette regardless of which theme is loaded.
 	//
-	// ColorOrange / ColorCyan have no Theme field (they are
+	// ColorOrange / ColorCyan / ColorMagenta have no Theme field (they are
 	// special-purpose constants — high-CPU warning amber, freshly-created cyan,
-	// which-key Actions magenta) and stay at their compile-time defaults.
+	// which-key Navigate magenta) and stay at their compile-time defaults.
 	ColorPrimary = t.Primary
 	ColorSecondary = t.Secondary
 	ColorFile = t.Text
@@ -123,6 +123,7 @@ func ApplyTheme(t Theme) {
 	ColorPurple = t.Purple
 	ColorOrange = defaultColorOrange
 	ColorCyan = defaultColorCyan
+	ColorMagenta = defaultColorMagenta
 	ColorBase = t.Base
 	ColorBarBg = t.BarBg
 	ColorSurface = t.Surface
@@ -367,10 +368,11 @@ func buildThemeStyles(t Theme) {
 	// ones that can sit badly on an unusually light Base — run them through the
 	// same contrast floor the theme colors got above when the user asked for
 	// one.
-	wkCyan, wkOrange := ColorCyan, ColorOrange
+	wkCyan, wkOrange, wkMagenta := ColorCyan, ColorOrange, ColorMagenta
 	if ConfigMinContrastRatio > 0 {
 		wkCyan = EnforceMinContrast(wkCyan, t.Base, ConfigMinContrastRatio)
 		wkOrange = EnforceMinContrast(wkOrange, t.Base, ConfigMinContrastRatio)
+		wkMagenta = EnforceMinContrast(wkMagenta, t.Base, ConfigMinContrastRatio)
 	}
 	// No Background here: the panel paints its own background per render from
 	// BaseBg, which also tracks the transparency setting, so baking one in
@@ -383,6 +385,7 @@ func buildThemeStyles(t Theme) {
 	WhichKeySelectionStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple))
 	WhichKeySortStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning))
 	WhichKeySettingsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkOrange))
+	WhichKeyNavigateStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(wkMagenta))
 
 	ErrorStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Error)).

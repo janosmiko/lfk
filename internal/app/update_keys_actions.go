@@ -479,27 +479,38 @@ func (m Model) handleExplorerActionKeyPreviewUp() (tea.Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
+// ownerRef is one parsed "owner:" column (populated by
+// populateOwnerReferences): apiVersion||kind||name.
+type ownerRef struct {
+	kind, name, apiVersion string
+}
+
+// ownerRefsFor parses sel's "owner:" columns, skipping any that aren't the
+// three-part apiVersion||kind||name shape. Shared by the handler and the
+// which-key availability predicate so they can never disagree.
+func ownerRefsFor(sel *model.Item) []ownerRef {
+	if sel == nil {
+		return nil
+	}
+	var owners []ownerRef
+	for _, kv := range sel.Columns {
+		if !strings.HasPrefix(kv.Key, "owner:") {
+			continue
+		}
+		parts := strings.SplitN(kv.Value, "||", 3)
+		if len(parts) == 3 {
+			owners = append(owners, ownerRef{apiVersion: parts[0], kind: parts[1], name: parts[2]})
+		}
+	}
+	return owners
+}
+
 func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 	sel := m.selectedMiddleItem()
 	if sel == nil {
 		return m, nil, true
 	}
-	type ownerRef struct {
-		kind, name, apiVersion string
-	}
-	var owners []ownerRef
-	for _, kv := range sel.Columns {
-		if strings.HasPrefix(kv.Key, "owner:") {
-			parts := strings.SplitN(kv.Value, "||", 3)
-			if len(parts) == 3 {
-				owners = append(owners, ownerRef{
-					apiVersion: parts[0],
-					kind:       parts[1],
-					name:       parts[2],
-				})
-			}
-		}
-	}
+	owners := ownerRefsFor(sel)
 	if len(owners) == 0 {
 		m.setStatusMessage("No owner references found", true)
 		return m, scheduleStatusClear(), true

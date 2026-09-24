@@ -304,7 +304,7 @@ Inside the namespace selector:
 
 ## Keybindings
 
-[docs/keybindings.md](docs/keybindings.md) is the complete reference, including the YAML view, Log Viewer, describe, diff, exec mode, and every sub-mode. Press `F1` in-app for the help screen, `?` for the which-key action panel.
+[docs/keybindings.md](docs/keybindings.md) is the complete reference, including the YAML view, Log Viewer, describe, diff, exec mode, and every sub-mode. Press `F1` in-app for the help screen, `?` to search keymaps.
 
 ### Move
 
@@ -325,7 +325,7 @@ Inside the namespace selector:
 | `0` / `1` / `2` | Clusters / resource types / resources level, both ways |
 | `o` | Owner or controller of the selected resource |
 | `Backspace` | Back through teleport history |
-| `g` + key | Goto resource type (`g` opens the which-key popup) |
+| `g` + key | Goto resource type (press `g` to open the goto menu) |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase context-aware, uppercase context-free) |
 | `\` / `A` | Namespace selector / toggle all-namespaces |
 | `g\` | Previous namespace |
@@ -354,7 +354,7 @@ Inside the namespace selector:
 
 | Key | Action |
 |---|---|
-| `F1` / `?` | Help screen / which-key action panel |
+| `F1` / `?` | Help screen / Search keymaps |
 | `P` | Details summary or YAML preview |
 | `M` | Resource relationship map |
 | `F` | Cycle layout: hide sidebar, fullscreen, restore |

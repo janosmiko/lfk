@@ -182,6 +182,7 @@ func TestOverlayHintBar_SearchModeHintWhileFiltering(t *testing.T) {
 		{"SecretEditorSearch", overlaySecretEditor, func(m *Model) { m.editorSearch.active = true }},
 		{"ConfigMapEditorSearch", overlayConfigMapEditor, func(m *Model) { m.editorSearch.active = true }},
 		{"LabelEditorSearch", overlayLabelEditor, func(m *Model) { m.editorSearch.active = true }},
+		{"Keymaps", overlayKeymaps, func(m *Model) { m.keymapsFilterMode = true }},
 	}
 
 	for _, tt := range overlays {

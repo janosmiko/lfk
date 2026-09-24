@@ -15,6 +15,7 @@ func applyNoColorTheme() {
 	ColorPurple = ""
 	ColorOrange = ""
 	ColorCyan = ""
+	ColorMagenta = ""
 	ColorBase = ""
 	ColorBarBg = ""
 	ColorSurface = ""
@@ -55,7 +56,7 @@ func applyNoColorTheme() {
 	FieldDocErrorStyle = FieldDocErrorStyle.Bold(true)
 
 	// Which-key groups get no substitute: the group accent is purely a color
-	// cue, six groups would need six legible attributes, and a half-applied
+	// cue, seven groups would need seven legible attributes, and a half-applied
 	// scheme reads as noise. Only the category hint is lost.
 
 	OverlaySelectedStyle = OverlaySelectedStyle.Reverse(true)

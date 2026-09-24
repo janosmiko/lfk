@@ -350,6 +350,7 @@ func whichKeyGroupStyles() map[whichKeyGroup]lipgloss.Style {
 		wkSelection: ui.WhichKeySelectionStyle.Background(bg),
 		wkSort:      ui.WhichKeySortStyle.Background(bg),
 		wkSettings:  ui.WhichKeySettingsStyle.Background(bg),
+		wkNavigate:  ui.WhichKeyNavigateStyle.Background(bg),
 	}
 }
 

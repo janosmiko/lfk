@@ -25,6 +25,7 @@ const (
 	defaultColorPurple     = "#bb9af7" // Purple - special values
 	defaultColorOrange     = "#ff9e64" // Orange - high usage warning
 	defaultColorCyan       = "#73daca" // Cyan - very new resources (< 1h)
+	defaultColorMagenta    = "#ff007c" // Magenta - which-key Navigate group accent
 	defaultColorBase       = "#24283b" // Dark background base
 	defaultColorBarBg      = "#313446" // Slightly lighter bar background
 	defaultColorSurface    = "#2a2e40" // Surface background for overlays
@@ -64,6 +65,7 @@ var (
 	ColorPurple     = defaultColorPurple
 	ColorOrange     = defaultColorOrange
 	ColorCyan       = defaultColorCyan
+	ColorMagenta    = defaultColorMagenta
 	ColorBase       = defaultColorBase
 	ColorBarBg      = defaultColorBarBg
 	ColorSurface    = defaultColorSurface
@@ -182,7 +184,7 @@ var (
 	// category — a risk the panel's most destructive entries (Delete, Force
 	// delete) would run head-first into.
 	//
-	// The group styles are not bold: bold is what marks the key, and six bold
+	// The group styles are not bold: bold is what marks the key, and seven bold
 	// colored sentences per panel is noise, not emphasis.
 	//
 	// WhichKeyDescStyle is the ungrouped default: the g-prefix goto popup has
@@ -194,7 +196,7 @@ var (
 	// accent sat on the KEY rather than on the description.
 	WhichKeyKeyStyle  lipgloss.Style
 	WhichKeyDescStyle lipgloss.Style
-	// Actions is the largest group, so it stays neutral and the five smaller
+	// Actions is the largest group, so it stays neutral and the six smaller
 	// groups carry the accents. Sharing WhichKeyDescStyle is deliberate: exactly
 	// one group may be neutral, pinned by the group-style guard.
 	WhichKeyActionsStyle   lipgloss.Style
@@ -203,6 +205,7 @@ var (
 	WhichKeySelectionStyle lipgloss.Style
 	WhichKeySortStyle      lipgloss.Style
 	WhichKeySettingsStyle  lipgloss.Style
+	WhichKeyNavigateStyle  lipgloss.Style
 
 	// Error style.
 	ErrorStyle lipgloss.Style

@@ -24,11 +24,11 @@ func helpSectionGroups() map[string]whichKeyGroup {
 		"Multi-Selection":  wkSelection,
 		"Actions":          wkActions,
 		"Modes & Settings": wkSettings,
+		"Navigation":       wkNavigate,
+		"Tabs":             wkNavigate,
 
-		"Navigation":  "",
 		"Command Bar": "",
 		"Bookmarks":   "",
-		"Tabs":        "",
 		"Mouse":       "",
 		"Help View":   "",
 		"General":     "",
@@ -64,6 +64,10 @@ func helpGroupExemptions() map[string]string {
 		// after this key. The registry files it under Views because
 		// handleKeyOpenMarks (update_keys.go) opens an overlay view.
 		"OpenMarks@Bookmarks": "opens the overlay the rest of the section documents; the registry files it under Views because it opens an overlay view",
+
+		// SetMark arms the mark-slot prompt the section's other rows follow.
+		// The registry files it under Actions since it acts on the current row.
+		"SetMark@Bookmarks": "arms the mark-slot prompt the section documents; the registry files it under Actions because it acts on the current row",
 
 		// The Mouse section is device-scoped: click/wheel/drag rows that only
 		// work while capture is on. toggleMouseCapture (update_mouse.go) is

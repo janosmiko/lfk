@@ -336,6 +336,164 @@ func TestAvailableWhichKeyActions_SecurityIgnoreToggleOnlyOnSecurityView(t *test
 	}
 }
 
+// Regression: jumpBack (jump_history.go) is a no-op with a toast when the
+// teleport history is empty, so the panel must not advertise it until a
+// jump has actually been recorded.
+func TestAvailableWhichKeyActions_JumpBackRequiresHistory(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Jump back") {
+		t.Fatal("jump back must be hidden with an empty teleport history")
+	}
+	m.jumpBackStack = append(m.jumpBackStack, navSnapshot{})
+	if !slices.Contains(whichKeyLabels(m), "Jump back") {
+		t.Fatal("jump back must be offered once the teleport history is non-empty")
+	}
+}
+
+// Regression: handleExplorerActionKeyNextTab/PrevTab/MoveTab
+// (update_keys_actions_tabs.go) each silently no-op with a single tab, so the
+// panel must not advertise them until a second tab exists.
+func TestAvailableWhichKeyActions_TabMovesRequireMultipleTabs(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	labels := []string{"Next tab", "Previous tab", "Move tab left", "Move tab right"}
+
+	m := whichKeyTestModel()
+	for _, label := range labels {
+		if slices.Contains(whichKeyLabels(m), label) {
+			t.Fatalf("%q must be hidden with a single tab", label)
+		}
+	}
+	m.tabs = append(m.tabs, TabState{})
+	for _, label := range labels {
+		if !slices.Contains(whichKeyLabels(m), label) {
+			t.Fatalf("%q must be offered once a second tab exists", label)
+		}
+	}
+}
+
+// Regression: handleExplorerActionKeyJumpOwner (update_keys_actions.go)
+// toasts "No owner references found" without an owner: column.
+func TestAvailableWhichKeyActions_JumpOwnerRequiresOwnerColumn(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Jump to owner") {
+		t.Fatal("jump to owner must be hidden without an owner: column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "owner:1", Value: "apps/v1||ReplicaSet||rs-1"},
+	}}})
+	m.setCursor(0)
+	if !slices.Contains(whichKeyLabels(m), "Jump to owner") {
+		t.Fatal("jump to owner must be offered with a well-formed owner: column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "owner:1", Value: "malformed"},
+	}}})
+	m.setCursor(0)
+	if slices.Contains(whichKeyLabels(m), "Jump to owner") {
+		t.Fatal("jump to owner must be hidden when the owner: column can't be parsed")
+	}
+
+	for _, lvl := range []model.Level{model.LevelOwned, model.LevelContainers} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+			{Key: "owner:1", Value: "apps/v1||ReplicaSet||rs-1"},
+		}}})
+		m.setCursor(0)
+		if !slices.Contains(whichKeyLabels(m), "Jump to owner") {
+			t.Errorf("jump to owner must be offered at %s with an owner: column", levelName[lvl])
+		}
+	}
+	for _, lvl := range []model.Level{model.LevelClusters, model.LevelResourceTypes} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+			{Key: "owner:1", Value: "apps/v1||ReplicaSet||rs-1"},
+		}}})
+		m.setCursor(0)
+		if slices.Contains(whichKeyLabels(m), "Jump to owner") {
+			t.Errorf("jump to owner must be hidden at %s regardless of columns", levelName[lvl])
+		}
+	}
+}
+
+// Regression: handleExplorerActionKeyJumpClaim (update_keys_jump_claim.go)
+// toasts without a claim: column, even when a "Resource Claims" placeholder
+// column is present.
+func TestAvailableWhichKeyActions_JumpClaimRequiresClaimColumn(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+		t.Fatal("jump to resource claim must be hidden without a claim: column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "Resource Claims", Value: "1"},
+	}}})
+	m.setCursor(0)
+	if slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+		t.Fatal("jump to resource claim must stay hidden with only the unresolved placeholder column")
+	}
+	m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "claim:0", Value: "claim-1"},
+	}}})
+	m.setCursor(0)
+	if !slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+		t.Fatal("jump to resource claim must be offered once a claim: column exists")
+	}
+
+	m2 := whichKeyTestModel()
+	m2.nav.Level = model.LevelOwned
+	m2.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+		{Key: "claim:0", Value: "claim-1"},
+	}}})
+	m2.setCursor(0)
+	if !slices.Contains(whichKeyLabels(m2), "Jump to resource claim") {
+		t.Error("jump to resource claim must be offered at LevelOwned with a claim: column")
+	}
+	for _, lvl := range []model.Level{model.LevelClusters, model.LevelResourceTypes} {
+		m := whichKeyTestModel()
+		m.nav.Level = lvl
+		m.setMiddleItems([]model.Item{{Name: "p1", Kind: "Pod", Columns: []model.KeyValue{
+			{Key: "claim:0", Value: "claim-1"},
+		}}})
+		m.setCursor(0)
+		if slices.Contains(whichKeyLabels(m), "Jump to resource claim") {
+			t.Errorf("jump to resource claim must be hidden at %s regardless of columns", levelName[lvl])
+		}
+	}
+}
+
+// Regression: jumpToPreviousNamespace (namespace_history.go) no-ops with a
+// toast when no previous scope was recorded yet, so the panel must not
+// advertise it until a namespace switch has actually happened.
+func TestAvailableWhichKeyActions_PreviousNamespaceRequiresRecordedScope(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+
+	m := whichKeyTestModel()
+	if slices.Contains(whichKeyLabels(m), "Previous namespace") {
+		t.Fatal("previous namespace must be hidden with no recorded scope")
+	}
+	m.previousNsScope = &nsScope{namespace: "kube-system"}
+	if !slices.Contains(whichKeyLabels(m), "Previous namespace") {
+		t.Fatal("previous namespace must be offered once a scope is recorded")
+	}
+	m.unionMode = true
+	if slices.Contains(whichKeyLabels(m), "Previous namespace") {
+		t.Fatal("previous namespace must be hidden in union mode")
+	}
+}
+
 // Regression: handleKeyPinGroup (update_keys_explorer.go) refuses a
 // collapsed-group header and the Dashboards pseudo-category with a toast
 // ("Select a resource type to pin"/"This item cannot be pinned"), and blocks
