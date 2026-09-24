@@ -30,6 +30,19 @@ func TestSearchMode_OmittedKeepsDefault(t *testing.T) {
 	assert.Equal(t, DefaultSearchModeAuto, ConfigDefaultSearchMode)
 }
 
+func TestSearchMode_ResetsOnReload(t *testing.T) {
+	for _, next := range []string{"confirm_on_exit: true\n", "search_mode: bogus\n"} {
+		t.Run(next, func(t *testing.T) {
+			snapshotSearchModeGlobal(t)
+
+			LoadConfig(writeConfigFile(t, "search_mode: fuzzy\n"))
+			LoadConfig(writeConfigFile(t, next))
+
+			assert.Equal(t, DefaultSearchModeAuto, ConfigDefaultSearchMode)
+		})
+	}
+}
+
 func TestSearchMode_AcceptsEachMode(t *testing.T) {
 	for _, mode := range []string{DefaultSearchModeAuto, DefaultSearchModeLiteral, DefaultSearchModeFuzzy, DefaultSearchModeRegex} {
 		t.Run(mode, func(t *testing.T) {

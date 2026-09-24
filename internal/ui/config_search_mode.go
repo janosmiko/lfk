@@ -25,8 +25,9 @@ var searchModes = []string{DefaultSearchModeAuto, DefaultSearchModeLiteral, Defa
 var ConfigDefaultSearchMode = DefaultSearchModeAuto
 
 // applySearchMode validates and applies the search_mode config value.
-// Empty keeps the compiled default. Unknown values warn and keep it too.
+// Empty and unknown values reset to auto, so a reload drops a stale mode.
 func applySearchMode(raw string) {
+	ConfigDefaultSearchMode = DefaultSearchModeAuto
 	v := strings.ToLower(raw)
 	if v == "" {
 		return
