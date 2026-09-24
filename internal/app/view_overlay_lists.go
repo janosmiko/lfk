@@ -385,12 +385,11 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 			selectIdx++
 		}
 	} else {
-		lower := strings.ToLower(filter)
 		for _, e := range entries {
 			if e.IsHeader {
 				continue
 			}
-			if !strings.Contains(e.Name, lower) {
+			if !ui.MatchLine(e.Name, filter) {
 				continue
 			}
 			if selectIdx == cursor {

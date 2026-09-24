@@ -333,12 +333,11 @@ func (m *Model) schemeDisplayItems() []schemeDisplayItem {
 			}
 		}
 	} else {
-		lower := strings.ToLower(m.schemeFilter.Value)
 		for _, e := range m.schemeEntries {
 			if e.IsHeader {
 				continue
 			}
-			if strings.Contains(e.Name, lower) {
+			if ui.MatchLine(e.Name, m.schemeFilter.Value) {
 				items = append(items, schemeDisplayItem{selectIdx: selectIdx})
 				selectIdx++
 			}

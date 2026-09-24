@@ -82,6 +82,26 @@ func TestFilteredSchemeNames(t *testing.T) {
 		m.schemeFilter = TextInput{Value: "^dracula$"}
 		assert.Equal(t, []string{"dracula"}, m.filteredSchemeNames())
 	})
+
+	// The cursor indexes filteredSchemeNames, so the rendered rows must match
+	// the same set or Enter applies a scheme the user never saw highlighted.
+	t.Run("rendered rows match filteredSchemeNames", func(t *testing.T) {
+		orig := ui.ConfigDefaultSearchMode
+		t.Cleanup(func() { ui.ConfigDefaultSearchMode = orig })
+		ui.ConfigDefaultSearchMode = ui.DefaultSearchModeFuzzy
+
+		m := Model{schemeEntries: entries, schemeFilter: TextInput{Value: "grvbxdrk"}}
+		want := m.filteredSchemeNames()
+		assert.Equal(t, []string{"gruvbox-dark"}, want)
+
+		assert.Len(t, m.schemeDisplayItems(), len(want))
+		rows, _ := buildColorschemeItems(entries, m.schemeFilter.Value, 0)
+		names := make([]string, len(rows))
+		for i, r := range rows {
+			names[i] = r.Name
+		}
+		assert.Equal(t, want, names)
+	})
 }
 
 func TestCovColorschemeKeyEscEmpty(t *testing.T) {
