@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // A short line that fits within contentW must come back unchanged —
@@ -273,21 +274,31 @@ func TestRenderEventViewer_WrapHighlightsSearchOnFirstAndContinuationLines(t *te
 		Wrap:   true,
 		Cursor: 0,
 	}
-	plain := RenderEventViewer(base)
+	assertEventSearchHighlightsEveryLine(t, base, "needle", 4)
+}
 
-	withSearch := base
-	withSearch.SearchQuery = "needle"
-	highlighted := RenderEventViewer(withSearch)
+// assertEventSearchHighlightsEveryLine renders p with a matching query and
+// with a control query that matches nothing. Both take the search code path,
+// so a body line can only differ between them through match highlighting.
+func assertEventSearchHighlightsEveryLine(t *testing.T, p EventViewerParams, query string, wantLines int) {
+	t.Helper()
+	p.SearchQuery = "zzz"
+	control := strings.Split(RenderEventViewer(p), "\n")
+	p.SearchQuery = query
+	highlighted := strings.Split(RenderEventViewer(p), "\n")
+	require.Len(t, highlighted, len(control))
 
-	assert.NotEqual(t, plain, highlighted, "a search query must change the wrapped rendering")
-	// The title also echoes the query, so compare only the body.
-	bodyOf := func(s string) string {
-		parts := strings.SplitN(stripANSI(s), "\n", 3)
-		return parts[len(parts)-1]
+	body := 0
+	for i := range control {
+		// The title echoes the query, so only lines holding the match text count.
+		if !strings.Contains(stripANSI(control[i]), query) {
+			continue
+		}
+		body++
+		assert.NotEqual(t, control[i], highlighted[i], "line %d: match not highlighted", i)
+		assert.Equal(t, stripANSI(control[i]), stripANSI(highlighted[i]), "line %d: text changed", i)
 	}
-	wantCount := strings.Count(bodyOf(plain), "needle")
-	assert.Equal(t, wantCount, strings.Count(bodyOf(highlighted), "needle"),
-		"every occurrence of the search term must survive highlighting")
+	assert.GreaterOrEqual(t, body, wantLines, "expected at least %d body lines with a match", wantLines)
 }
 
 // Outside wrap mode, a committed search query highlights matches on both
@@ -301,16 +312,7 @@ func TestRenderEventViewer_NonWrapHighlightsCursorAndNormalLines(t *testing.T) {
 		Wrap:   false,
 		Cursor: 1,
 	}
-	plain := RenderEventViewer(base)
-
-	withSearch := base
-	withSearch.SearchQuery = "needle"
-	highlighted := RenderEventViewer(withSearch)
-
-	assert.NotEqual(t, plain, highlighted, "a search query must change the rendering")
-	for _, want := range base.Lines {
-		assert.Contains(t, stripANSI(highlighted), want, "line text must survive highlighting")
-	}
+	assertEventSearchHighlightsEveryLine(t, base, "needle", 3)
 }
 
 // The event viewer's search input footer shows the active search-mode

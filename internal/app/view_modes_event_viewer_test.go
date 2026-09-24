@@ -1,26 +1,29 @@
 package app
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// renderEventViewerLines highlights a committed search query on both the
-// cursor line and the surrounding non-cursor lines. Passing the raw query
-// through (rather than a lowered copy) keeps ~/regex prefixes meaningful.
+// A control query that matches nothing takes the same search path, so a line
+// can only differ from it through match highlighting.
 func TestRenderEventViewerLines_HighlightsCursorAndNonCursorLines(t *testing.T) {
 	m := basePush80Model()
-	lines := []string{"warning pod evicted", "normal pod scheduled", "warning pod evicted"}
-	m.eventTimelineCursor = 1 // non-cursor lines are index 0 and 2
+	lines := []string{"warning pod evicted", "warning pod killed", "normal pod scheduled"}
+	m.eventTimelineCursor = 1
 
-	plain := m.renderEventViewerLines(lines, 0, len(lines), 40)
-
+	m.eventTimelineSearchQuery = "zzz"
+	control := m.renderEventViewerLines(lines, 0, len(lines), 40)
 	m.eventTimelineSearchQuery = "warning"
 	highlighted := m.renderEventViewerLines(lines, 0, len(lines), 40)
+	require.Len(t, highlighted, len(control))
 
-	assert.NotEqual(t, plain, highlighted, "a committed search query must change the rendered lines")
-	assert.Equal(t, stripANSI(strings.Join(plain, "\n")), stripANSI(strings.Join(highlighted, "\n")),
-		"highlighting must not alter the visible text")
+	assert.NotEqual(t, control[0], highlighted[0], "non-cursor match not highlighted")
+	assert.NotEqual(t, control[1], highlighted[1], "cursor match not highlighted")
+	assert.Equal(t, control[2], highlighted[2], "line without a match must not change")
+	for i := range control {
+		assert.Equal(t, stripANSI(control[i]), stripANSI(highlighted[i]), "line %d: text changed", i)
+	}
 }
