@@ -333,17 +333,18 @@ func (m Model) renderOverlayKeymaps() (string, int, int) {
 	contentH := max(overlayH-2, 1)
 	maxVisible := max(contentH-overlayListChromeFilterable()-1, 1) // -1: subtitle row
 	cfg := ui.OverlayListConfig{
-		Title:        "Keymaps",
-		Subtitle:     subtitle,
-		Cursor:       m.keymapsCursor,
-		Filterable:   true,
-		Filter:       m.keymapsFilter.Value,
-		FilterActive: m.keymapsFilterMode,
-		BadgeWidth:   keymapsBadgeW,
-		Scroll:       overlayListScroll(&overlayKeymapsScrollPos, m.keymapsCursor, len(items), maxVisible),
-		MaxVisible:   maxVisible,
-		Height:       contentH,
-		EmptyMessage: "No keymaps match",
+		Title:           "Keymaps",
+		Subtitle:        subtitle,
+		Cursor:          m.keymapsCursor,
+		Filterable:      true,
+		Filter:          m.keymapsFilter.Value,
+		FilterActive:    m.keymapsFilterMode,
+		FilterModeAware: true,
+		BadgeWidth:      keymapsBadgeW,
+		Scroll:          overlayListScroll(&overlayKeymapsScrollPos, m.keymapsCursor, len(items), maxVisible),
+		MaxVisible:      maxVisible,
+		Height:          contentH,
+		EmptyMessage:    "No keymaps match",
 	}
 	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayW, overlayH
 }

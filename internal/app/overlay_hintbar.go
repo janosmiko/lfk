@@ -288,6 +288,7 @@ func (m Model) overlayHintBarEditor() string {
 		if m.keymapsFilterMode {
 			return m.renderHints([]ui.HintEntry{
 				{Key: "type", Desc: "filter"},
+				ui.SearchModeHintEntry(),
 				{Key: "enter", Desc: "accept"},
 				{Key: "esc", Desc: "clear"},
 			})

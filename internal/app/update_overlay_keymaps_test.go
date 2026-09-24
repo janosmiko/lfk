@@ -419,3 +419,17 @@ func TestKeymapsWhichKeyLeader_OpensOverlay(t *testing.T) {
 		t.Error("opening the overlay should not schedule a cmd")
 	}
 }
+
+func TestRenderOverlayKeymaps_FilterShowsModeLabel(t *testing.T) {
+	restoreWhichKeyGlobals(t)
+	ui.ActiveKeybindings = ui.DefaultKeybindings()
+	m := whichKeyTestModel().openKeymapsOverlay()
+	m.height = 30
+	m.keymapsFilterMode = true
+	m.keymapsFilter.Set("~nwtb")
+
+	view, _, _ := m.renderOverlayKeymaps()
+	if !strings.Contains(stripANSI(view), "[fuzzy]") {
+		t.Errorf("keymaps filter must show the fuzzy mode label for a ~ query:\n%s", stripANSI(view))
+	}
+}
