@@ -350,25 +350,6 @@ func TestSanitizeLogLine_RenderAnsiEnabled_StripsNonSGRCSI(t *testing.T) {
 	}
 }
 
-func TestSanitizeLogLine_DropsC1CSIWithItsParameters(t *testing.T) {
-	cases := map[string]string{
-		"raw byte":     "pre\x9b1A\x9b2Kpost",
-		"UTF-8 rune":   "pre\u009b1A\u009b2Kpost",
-		"unterminated": "pre\u009b12",
-	}
-	for name, in := range cases {
-		t.Run(name, func(t *testing.T) {
-			want := "prepost"
-			if name == "unterminated" {
-				want = "pre"
-			}
-			for _, renderAnsi := range []bool{false, true} {
-				assert.Equal(t, want, sanitizeLogLine(in, renderAnsi))
-			}
-		})
-	}
-}
-
 func TestSanitizeLogLine_RenderAnsiEnabled_DropsBareESC(t *testing.T) {
 	// A bare ESC with no CSI introducer is dropped like any other
 	// control byte, so the terminal never waits on a follow-up byte.

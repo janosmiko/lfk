@@ -58,3 +58,39 @@ func TestSGRParameterBytesKeepLegitimateColour(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeLogBodyDropsEscapesAndControls(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{"progress-bar redraw", "\x1b[1A\x1b[2Kfrontend/en_AU", "frontend/en_AU"},
+		{"bare ESC", "pre\x1bpost", "prepost"},
+		{"ESC at end", "pre\x1b", "pre"},
+		{"raw C1 CSI", "pre\x9b1A\x9b2Kpost", "prepost"},
+		{"UTF-8 C1 CSI", "pre\u009b1A\u009b2Kpost", "prepost"},
+		{"unterminated C1 CSI", "pre\u009b12", "pre"},
+		{"raw C1 other", "pre\x85post", "prepost"},
+		{"UTF-8 C1 other", "pre\u0085post", "prepost"},
+		{"control bytes", "a\x00b\rc\x7fd", "abcd"},
+		{"OSC title ended by BEL", "pre\x1b]0;title\apost", "prepost"},
+		{"OSC hyperlink ended by ESC ST", "\x1b]8;;http://x\x1b\\link\x1b]8;;\x1b\\", "link"},
+		{"OSC unterminated", "pre\x1b]0;title", "pre"},
+		{"DCS ended by ESC ST", "pre\x1bPq#0\x1b\\post", "prepost"},
+		{"raw C1 OSC ended by raw ST", "pre\x9d0;title\x9cpost", "prepost"},
+		{"UTF-8 C1 OSC ended by UTF-8 ST", "pre\u009d0;title\u009cpost", "prepost"},
+		{"OSC payload with Ü is not cut early", "pre\x1b]0;Ü\apost", "prepost"},
+		{"plain text", "plain", "plain"},
+		{"tab expands", "a\tb", "a       b"},
+		{"multibyte kept", "café 日本", "café 日本"},
+		{"invalid non-C1 byte kept", "a\xe9b", "a\xe9b"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, renderAnsi := range []bool{false, true} {
+				assert.Equal(t, tc.want, tainted.SanitizeLogBody(tc.payload, renderAnsi))
+			}
+		})
+	}
+}

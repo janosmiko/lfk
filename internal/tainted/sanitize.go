@@ -59,8 +59,11 @@ func isBidiOverride(r rune) bool {
 // line into their shell would expect.
 const logTabWidth = 8
 
-// c1CSI is the 8-bit form of ESC [.
-const c1CSI = 0x9b
+// 8-bit forms of ESC [ and ESC \.
+const (
+	c1CSI = 0x9b
+	c1ST  = 0x9c
+)
 
 // SanitizeLogBody is the exported entry point to sanitizeLogLine for sinks
 // outside this file (describe content, command-bar output). It renders a
@@ -177,6 +180,9 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 			case c == c1CSI:
 				i = skipCSIBody(s, i+1)
 				continue
+			case isC1String(rune(c)):
+				i = skipStringBody(s, i+1)
+				continue
 			case c < 0x80 || c > 0x9f:
 				b.WriteByte(c)
 				if c >= 0xC0 {
@@ -186,6 +192,8 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 			i++
 		case r == c1CSI:
 			i = skipCSIBody(s, i+size)
+		case isC1String(r):
+			i = skipStringBody(s, i+size)
 		case r >= 0x80 && r <= 0x9f:
 			// Valid UTF-8 encoding of a C1 control character.
 			i += size
@@ -199,13 +207,47 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 	return b.String()
 }
 
-// skipEscape skips a whole CSI, even an unterminated one, so a progress-bar
-// redraw (ESC [1A ESC [2K) leaves no "[1A" text behind.
+// skipEscape skips a whole CSI or string sequence, even an unterminated one,
+// so a progress-bar redraw (ESC [1A ESC [2K) leaves no "[1A" text behind.
 func skipEscape(s string, i int) int {
-	if i+1 >= len(s) || s[i+1] != '[' {
+	switch {
+	case i+1 >= len(s):
 		return i + 1
+	case s[i+1] == '[':
+		return skipCSIBody(s, i+2)
+	case strings.IndexByte("]PX^_", s[i+1]) >= 0: // OSC, DCS, SOS, PM, APC
+		return skipStringBody(s, i+2)
 	}
-	return skipCSIBody(s, i+2)
+	return i + 1
+}
+
+// isC1String reports the 8-bit forms of OSC, DCS, SOS, PM and APC.
+func isC1String(r rune) bool {
+	switch r {
+	case 0x9d, 0x90, 0x98, 0x9e, 0x9f:
+		return true
+	}
+	return false
+}
+
+// skipStringBody returns the index after the BEL or ST that ends a string
+// sequence starting at s[j], or len(s) if it never ends. It decodes runes so
+// a payload character like "Ü" (0xC3 0x9C) is not mistaken for a raw ST.
+func skipStringBody(s string, j int) int {
+	for j < len(s) {
+		if s[j] == 0x07 {
+			return j + 1
+		}
+		if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
+			return j + 2
+		}
+		r, size := utf8.DecodeRuneInString(s[j:])
+		if r == c1ST || (r == utf8.RuneError && size == 1 && s[j] == c1ST) {
+			return j + size
+		}
+		j += size
+	}
+	return j
 }
 
 // skipCSIBody returns the index after the CSI parameters and final byte
