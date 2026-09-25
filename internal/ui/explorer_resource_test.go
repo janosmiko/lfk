@@ -829,7 +829,8 @@ func TestPreviewBodyPathsDropTheEscape(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			out := RenderResourceSummary(item, "", 100, 40)
 			assert.NotContains(t, out, escSGR, "the escape must not reach the pane")
-			assert.Contains(t, out, "\ufffd", "and the byte it stood for is marked, not dropped silently")
+			assert.NotContains(t, out, "[31m", "the whole sequence goes, not only the ESC")
+			assert.Contains(t, out, "FAILED")
 		})
 	}
 }

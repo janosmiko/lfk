@@ -277,29 +277,39 @@ func TestSanitizeLogLine_RenderAnsiDisabled(t *testing.T) {
 			// 20 chars -> col 24 (4 sp), +4 -> col 32 (4 sp), +5 -> col 40 (3 sp), +msg
 		},
 		{
-			name:     "null bytes replaced",
+			name:     "null bytes dropped",
 			input:    "hello\x00world",
-			expected: "hello\ufffdworld",
+			expected: "helloworld",
 		},
 		{
-			name:     "control chars replaced",
+			name:     "control chars dropped",
 			input:    "data\x01\x02\x03end",
-			expected: "data\ufffd\ufffd\ufffdend",
+			expected: "dataend",
 		},
 		{
-			name:     "DEL char replaced",
+			name:     "DEL char dropped",
 			input:    "before\x7fafter",
-			expected: "before\ufffdafter",
+			expected: "beforeafter",
+		},
+		{
+			name:     "carriage return dropped",
+			input:    "progress 10%\rprogress 20%",
+			expected: "progress 10%progress 20%",
 		},
 		{
 			name:     "mysql binary handshake",
 			input:    "5.5.5-10.6.25-MariaDB\x00Z$~sD7*k]\x00\x00\x00o7cn",
-			expected: "5.5.5-10.6.25-MariaDB\ufffdZ$~sD7*k]\ufffd\ufffd\ufffdo7cn",
+			expected: "5.5.5-10.6.25-MariaDBZ$~sD7*k]o7cn",
 		},
 		{
-			name:     "SGR escape is replaced when ANSI disabled",
+			name:     "SGR escape is dropped when ANSI disabled",
 			input:    "\x1b[0;33mWARNING\x1b[0m rest",
-			expected: "\ufffd[0;33mWARNING\ufffd[0m rest",
+			expected: "WARNING rest",
+		},
+		{
+			name:     "progress-bar redraw sequences dropped",
+			input:    "\x1b[1A\x1b[2K\x1b[1A\x1b[2Kfrontend/Magento/blank/en_AU",
+			expected: "frontend/Magento/blank/en_AU",
 		},
 	}
 	for _, tt := range tests {
@@ -320,41 +330,56 @@ func TestSanitizeLogLine_RenderAnsiEnabled_PreservesSGR(t *testing.T) {
 
 func TestSanitizeLogLine_RenderAnsiEnabled_StripsNonSGRCSI(t *testing.T) {
 	// Non-SGR CSI sequences (clear screen, cursor move) would corrupt
-	// the viewer layout, so they are treated as stray ESC bytes and
-	// replaced with U+FFFD even when renderAnsi is on.
+	// the viewer layout, so the whole sequence is dropped even when
+	// renderAnsi is on.
 	cases := []struct {
 		name  string
 		input string
+		want  string
 	}{
-		{"clear screen", "before\x1b[2Jafter"},
-		{"cursor up", "line1\x1b[3Aline2"},
-		{"erase to end of line", "foo\x1b[Kbar"},
+		{"clear screen", "before\x1b[2Jafter", "beforeafter"},
+		{"cursor up", "line1\x1b[3Aline2", "line1line2"},
+		{"erase to end of line", "foo\x1b[Kbar", "foobar"},
+		{"private marker", "pre\x1b[?25lpost", "prepost"},
+		{"unterminated at end of line", "tail\x1b[12", "tail"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			out := sanitizeLogLine(tc.input, true)
-			assert.NotContains(t, out, "\x1b",
-				"non-SGR escape bytes must be replaced, got %q", out)
-			assert.Contains(t, out, "\ufffd",
-				"replacement char must appear where ESC was, got %q", out)
+			assert.Equal(t, tc.want, sanitizeLogLine(tc.input, true))
 		})
 	}
 }
 
-func TestSanitizeLogLine_RenderAnsiEnabled_ReplacesBareESC(t *testing.T) {
-	// A bare ESC with no CSI introducer is treated the same as any
-	// other control byte; the replacement prevents the terminal from
-	// waiting on the next byte and mis-interpreting user output.
-	out := sanitizeLogLine("hello\x1bworld", true)
-	assert.Equal(t, "hello\ufffdworld", out)
+func TestSanitizeLogLine_DropsC1CSIWithItsParameters(t *testing.T) {
+	cases := map[string]string{
+		"raw byte":     "pre\x9b1A\x9b2Kpost",
+		"UTF-8 rune":   "pre\u009b1A\u009b2Kpost",
+		"unterminated": "pre\u009b12",
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			want := "prepost"
+			if name == "unterminated" {
+				want = "pre"
+			}
+			for _, renderAnsi := range []bool{false, true} {
+				assert.Equal(t, want, sanitizeLogLine(in, renderAnsi))
+			}
+		})
+	}
 }
 
-func TestSanitizeLogLine_RenderAnsiEnabled_KeepsNullAndBinaryAsReplacements(t *testing.T) {
+func TestSanitizeLogLine_RenderAnsiEnabled_DropsBareESC(t *testing.T) {
+	// A bare ESC with no CSI introducer is dropped like any other
+	// control byte, so the terminal never waits on a follow-up byte.
+	assert.Equal(t, "helloworld", sanitizeLogLine("hello\x1bworld", true))
+}
+
+func TestSanitizeLogLine_RenderAnsiEnabled_DropsNullAndBinary(t *testing.T) {
 	// Even with rendering on, actual binary (NUL, DEL, mid-range
-	// controls) must still be replaced — that's what the sanitizer
-	// exists for in the first place (MySQL handshake etc).
+	// controls) must still be removed (MySQL handshake etc).
 	out := sanitizeLogLine("\x1b[32mok\x1b[0m\x00tail", true)
-	assert.Equal(t, "\x1b[32mok\x1b[0m\ufffdtail", out)
+	assert.Equal(t, "\x1b[32mok\x1b[0mtail", out)
 }
 
 func TestSanitizeLogLine_RenderAnsiEnabled_PreservesMultibyte(t *testing.T) {
