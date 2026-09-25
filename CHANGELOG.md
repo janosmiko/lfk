@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/janosmiko/lfk/compare/v0.19.0...v0.19.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* drop cursor escapes and control bytes from log lines ([#818](https://github.com/janosmiko/lfk/issues/818)) ([e13cd4c](https://github.com/janosmiko/lfk/commit/e13cd4c70c845cad971b8df41ffa4a0fe46bb99d))
+
 ## [0.19.0](https://github.com/janosmiko/lfk/compare/v0.18.15...v0.19.0) (2026-09-24)
 
 
