@@ -48,7 +48,7 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `ansi` / `noansi` | Render ANSI SGR colors from log output |
 | `kyaml` / `nokyaml` | KYAML rendering in the YAML viewer |
 
-`noansi` replaces ESC bytes with U+FFFD (see `log_viewer.render_ansi` in [config-reference.md](config-reference.md)).
+`noansi` drops ANSI escape sequences (see `log_viewer.render_ansi` in [config-reference.md](config-reference.md)).
 
 ### `:scheduler`
 

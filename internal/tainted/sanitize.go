@@ -59,6 +59,13 @@ func isBidiOverride(r rune) bool {
 // line into their shell would expect.
 const logTabWidth = 8
 
+// 8-bit forms of ESC [, ESC \ and ESC ].
+const (
+	c1CSI = 0x9b
+	c1ST  = 0x9c
+	c1OSC = 0x9d
+)
+
 // SanitizeLogBody is the exported entry point to sanitizeLogLine for sinks
 // outside this file (describe content, command-bar output). It renders a
 // BODY rather than a name or title. Unlike SanitizeTerminalText, it keeps
@@ -68,9 +75,9 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 	return sanitizeLogLine(s, renderAnsi)
 }
 
-// sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
-// control range minus tab, and the C1 range U+0080-U+009F) with the
-// Unicode replacement character. It also expands tab characters to
+// sanitizeLogLine drops non-printable control bytes (NUL, DEL, the C0
+// control range minus tab, and the C1 range U+0080-U+009F). It also
+// expands tab characters to
 // spaces using a logTabWidth-column tab stop. Binary data from processes
 // like MySQL handshakes contains bytes that break terminal width
 // calculations and corrupt the viewer layout. C1 controls (raw or
@@ -90,9 +97,9 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 // When renderAnsi is true, valid CSI SGR sequences (ESC [ params m, the
 // ones that set colour, bold, underline, etc.) are preserved verbatim.
 // So log producers that emit ANSI colours render as intended. Non-SGR
-// CSI sequences (cursor movement, screen erase) remain unsafe for an
-// inline viewer and are still replaced. A bare ESC with no valid CSI
-// introducer is replaced too. Leaving it would cause terminals to wait
+// CSI sequences (cursor movement, screen erase) are unsafe for an inline
+// viewer, so the whole sequence is dropped. A bare ESC with no CSI
+// introducer is dropped too. Leaving it would cause terminals to wait
 // for a follow-up byte and mis-interpret subsequent output.
 //
 // C1 detection is decode-aware, not a raw byte-range check. A byte-level
@@ -100,7 +107,7 @@ func SanitizeLogBody(s string, renderAnsi bool) string {
 // ordinary non-ASCII runes. Many common accented Latin, CJK, emoji, and
 // box-drawing characters have a continuation byte in that range, and the
 // test would mangle them. Every non-ASCII byte is instead decoded to its
-// full rune. Only a rune that actually equals U+0080-U+009F is replaced,
+// full rune. Only a rune that actually equals U+0080-U+009F is dropped,
 // regardless of whether it arrived as a raw invalid byte or a valid
 // two-byte UTF-8 encoding. For example, 0xC2 0x9B stands for U+009B.
 // Anything else - including genuinely invalid UTF-8 outside the C1
@@ -127,13 +134,17 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 	i := 0
 	for i < len(s) {
 		c := s[i]
-		if renderAnsi && c == 0x1b {
-			if end := parseSGRSequence(s, i); end > i {
-				// SGR sequences are zero-width. Do not advance col.
-				b.WriteString(s[i:end])
-				i = end
-				continue
+		if c == 0x1b {
+			if renderAnsi {
+				if end := parseSGRSequence(s, i); end > i {
+					// SGR sequences are zero-width. Do not advance col.
+					b.WriteString(s[i:end])
+					i = end
+					continue
+				}
 			}
+			i = skipEscape(s, i)
+			continue
 		}
 		if c == '\t' {
 			n := logTabWidth - col%logTabWidth
@@ -145,12 +156,10 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 			continue
 		}
 		if c < 0x80 {
+			// Control bytes (< 32 and not tab, or DEL) are dropped.
 			if c >= 32 && c != 127 {
 				b.WriteByte(c)
 				col++
-			} else {
-				// Control byte (< 32 and not tab, or DEL).
-				b.WriteRune('\ufffd')
 			}
 			i++
 			continue
@@ -168,18 +177,26 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 			// behaviour for non-UTF-8 binary payloads. Column tracking
 			// mirrors the old approximation: only a would-be leading
 			// byte (>= 0xC0) counts as one cell.
-			if c >= 0x80 && c <= 0x9f {
-				b.WriteRune('\ufffd')
-			} else {
+			switch {
+			case c == c1CSI:
+				i = skipCSIBody(s, i+1)
+				continue
+			case isC1String(rune(c)):
+				i = skipStringBody(s, i+1, c == c1OSC)
+				continue
+			case c < 0x80 || c > 0x9f:
 				b.WriteByte(c)
 				if c >= 0xC0 {
 					col++
 				}
 			}
 			i++
+		case r == c1CSI:
+			i = skipCSIBody(s, i+size)
+		case isC1String(r):
+			i = skipStringBody(s, i+size, r == c1OSC)
 		case r >= 0x80 && r <= 0x9f:
 			// Valid UTF-8 encoding of a C1 control character.
-			b.WriteRune('\ufffd')
 			i += size
 		default:
 			// Ordinary multi-byte rune: copy through untouched.
@@ -189,6 +206,60 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 		}
 	}
 	return b.String()
+}
+
+// skipEscape skips a whole CSI or string sequence, even an unterminated one,
+// so a progress-bar redraw (ESC [1A ESC [2K) leaves no "[1A" text behind.
+func skipEscape(s string, i int) int {
+	switch {
+	case i+1 >= len(s):
+		return i + 1
+	case s[i+1] == '[':
+		return skipCSIBody(s, i+2)
+	case strings.IndexByte("]PX^_", s[i+1]) >= 0: // OSC, DCS, SOS, PM, APC
+		return skipStringBody(s, i+2, s[i+1] == ']')
+	}
+	return i + 1
+}
+
+// isC1String reports the 8-bit forms of OSC, DCS, SOS, PM and APC.
+func isC1String(r rune) bool {
+	switch r {
+	case c1OSC, 0x90, 0x98, 0x9e, 0x9f:
+		return true
+	}
+	return false
+}
+
+// skipStringBody skips to the ST (or BEL, which xterm accepts only for OSC).
+// It decodes runes so a payload "Ü" (0xC3 0x9C) is not taken for a raw ST.
+func skipStringBody(s string, j int, belEnds bool) int {
+	for j < len(s) {
+		if belEnds && s[j] == 0x07 {
+			return j + 1
+		}
+		if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
+			return j + 2
+		}
+		r, size := utf8.DecodeRuneInString(s[j:])
+		if r == c1ST || (r == utf8.RuneError && size == 1 && s[j] == c1ST) {
+			return j + size
+		}
+		j += size
+	}
+	return j
+}
+
+// skipCSIBody returns the index after the CSI parameters and final byte
+// starting at s[j].
+func skipCSIBody(s string, j int) int {
+	for j < len(s) && s[j] >= 0x20 && s[j] <= 0x3f {
+		j++
+	}
+	if j < len(s) && s[j] >= 0x40 && s[j] <= 0x7e {
+		j++
+	}
+	return j
 }
 
 // parseSGRSequence returns the index after a valid ESC [ ... m sequence

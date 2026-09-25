@@ -199,7 +199,7 @@ log_viewer:
 |-------|------|---------|-------------|
 | `tail_lines` | int | `100` | Log lines loaded initially via `--tail` (per container). Scrolling to the top loads older history. |
 | `tail_lines_short` | int | `10` | Log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
-| `render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) from log producers. `false` strips them (every ESC byte becomes `U+FFFD`); non-SGR CSI sequences are always stripped. Toggle at runtime with `:set ansi` / `:set noansi`. |
+| `render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) from log producers. `false` strips them. Non-SGR CSI sequences and control bytes are always stripped. Toggle at runtime with `:set ansi` / `:set noansi`. |
 | `show_preview` | bool | `true` | Startup default for the structured preview side panel. Runtime toggle: `toggle_preview` (`P`). |
 | `show_prefixes` | bool | `true` | Startup default for the `[pod/name/container]` line prefixes. Runtime toggle: `toggle_prefixes` (`p`). |
 | `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `toggle_timestamps` (`s`). |
