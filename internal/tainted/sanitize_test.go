@@ -78,6 +78,8 @@ func TestSanitizeLogBodyDropsEscapesAndControls(t *testing.T) {
 		{"OSC hyperlink ended by ESC ST", "\x1b]8;;http://x\x1b\\link\x1b]8;;\x1b\\", "link"},
 		{"OSC unterminated", "pre\x1b]0;title", "pre"},
 		{"DCS ended by ESC ST", "pre\x1bPq#0\x1b\\post", "prepost"},
+		{"BEL does not end DCS", "pre\x1bPa\ab\x1b\\post", "prepost"},
+		{"BEL does not end C1 APC", "pre\x9fa\ab\x9cpost", "prepost"},
 		{"raw C1 OSC ended by raw ST", "pre\x9d0;title\x9cpost", "prepost"},
 		{"UTF-8 C1 OSC ended by UTF-8 ST", "pre\u009d0;title\u009cpost", "prepost"},
 		{"OSC payload with Ü is not cut early", "pre\x1b]0;Ü\apost", "prepost"},

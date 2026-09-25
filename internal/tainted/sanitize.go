@@ -59,10 +59,11 @@ func isBidiOverride(r rune) bool {
 // line into their shell would expect.
 const logTabWidth = 8
 
-// 8-bit forms of ESC [ and ESC \.
+// 8-bit forms of ESC [, ESC \ and ESC ].
 const (
 	c1CSI = 0x9b
 	c1ST  = 0x9c
+	c1OSC = 0x9d
 )
 
 // SanitizeLogBody is the exported entry point to sanitizeLogLine for sinks
@@ -181,7 +182,7 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 				i = skipCSIBody(s, i+1)
 				continue
 			case isC1String(rune(c)):
-				i = skipStringBody(s, i+1)
+				i = skipStringBody(s, i+1, c == c1OSC)
 				continue
 			case c < 0x80 || c > 0x9f:
 				b.WriteByte(c)
@@ -193,7 +194,7 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 		case r == c1CSI:
 			i = skipCSIBody(s, i+size)
 		case isC1String(r):
-			i = skipStringBody(s, i+size)
+			i = skipStringBody(s, i+size, r == c1OSC)
 		case r >= 0x80 && r <= 0x9f:
 			// Valid UTF-8 encoding of a C1 control character.
 			i += size
@@ -216,7 +217,7 @@ func skipEscape(s string, i int) int {
 	case s[i+1] == '[':
 		return skipCSIBody(s, i+2)
 	case strings.IndexByte("]PX^_", s[i+1]) >= 0: // OSC, DCS, SOS, PM, APC
-		return skipStringBody(s, i+2)
+		return skipStringBody(s, i+2, s[i+1] == ']')
 	}
 	return i + 1
 }
@@ -224,18 +225,17 @@ func skipEscape(s string, i int) int {
 // isC1String reports the 8-bit forms of OSC, DCS, SOS, PM and APC.
 func isC1String(r rune) bool {
 	switch r {
-	case 0x9d, 0x90, 0x98, 0x9e, 0x9f:
+	case c1OSC, 0x90, 0x98, 0x9e, 0x9f:
 		return true
 	}
 	return false
 }
 
-// skipStringBody returns the index after the BEL or ST that ends a string
-// sequence starting at s[j], or len(s) if it never ends. It decodes runes so
-// a payload character like "Ü" (0xC3 0x9C) is not mistaken for a raw ST.
-func skipStringBody(s string, j int) int {
+// skipStringBody skips to the ST (or BEL, which xterm accepts only for OSC).
+// It decodes runes so a payload "Ü" (0xC3 0x9C) is not taken for a raw ST.
+func skipStringBody(s string, j int, belEnds bool) int {
 	for j < len(s) {
-		if s[j] == 0x07 {
+		if belEnds && s[j] == 0x07 {
 			return j + 1
 		}
 		if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
