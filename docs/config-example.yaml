@@ -215,6 +215,10 @@ log_path: /tmp/lfk.log
 # tail_lines / tail_lines_short / render_ansi were previously the
 # flat log_tail_lines / log_tail_lines_short / log_render_ansi keys (still
 # accepted as deprecated aliases; log_viewer wins when both are set).
+# A runtime toggle of show_preview, show_prefixes, show_timestamps,
+# preview_live, or wrap persists across restarts in
+# ~/.local/state/lfk/viewer_prefs.yaml and outranks the value set here.
+# If a value here has no effect, delete that file and restart lfk.
 # log_viewer:
 #   tail_lines: 100         # lines loaded initially via --tail (per container) (older history loads on scroll-up)
 #   tail_lines_short: 10    # lines loaded by the "Tail Logs" action; non-positive ignored
@@ -227,10 +231,13 @@ log_path: /tmp/lfk.log
 #   wrap: false             # log lines wrapped on open (toggle: >)
 
 # ─── Viewer Defaults ─────────────────────────────────────────────────────────
-# Startup defaults for the fullscreen YAML / diff / describe viewers. A toggle
-# changed at runtime resets to the configured default the next time the viewer
-# opens. Runtime toggles (configurable keybindings): toggle_wrap (>) wraps in
-# every viewer; toggle_line_numbers (#) and toggle_unified (u) for the diff viewer.
+# Startup defaults for the fullscreen YAML / diff / describe viewers and the
+# Object / API Explorers. Runtime toggles (configurable keybindings):
+# toggle_wrap (>) wraps in every viewer; toggle_line_numbers (#) and
+# toggle_unified (u) for the diff viewer.
+# A runtime toggle (except kyaml) persists across restarts in
+# ~/.local/state/lfk/viewer_prefs.yaml and outranks the value set here.
+# If a value here has no effect, delete that file and restart lfk.
 # yaml_viewer:
 #   wrap: false
 #   kyaml: false  # KYAML instead of block YAML (toggle: K)
