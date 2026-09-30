@@ -279,7 +279,7 @@ func TestUpdateActionPermissions_ErrorFailsOpenSilently(t *testing.T) {
 func TestActionQueries_LabelsExistInTheirMenu(t *testing.T) {
 	// Labels the menu builds at open time rather than listing statically:
 	// a deleting row has its Delete entry renamed to one of these.
-	generated := map[string]bool{"Force Delete": true, "Force Finalize": true}
+	generated := map[string]bool{"Force Delete": true, "Force Finalize": true, actionDeleteWithVolume: true}
 	for kind, byLabel := range actionQueries {
 		t.Run(kind, func(t *testing.T) {
 			menu := make(map[string]bool)

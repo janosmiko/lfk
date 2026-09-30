@@ -28,6 +28,10 @@ var actionQueries = map[string]map[string]k8s.PermissionQuery{
 		// Generated when a row is already deleting; see openResourceActionMenu.
 		"Force Finalize": {Resource: "pods", Verb: "patch"},
 	}),
+	// Generated for a Released CSI row; see openResourceActionMenu.
+	"PersistentVolume": {
+		actionDeleteWithVolume: {Resource: "persistentvolumes", Verb: "patch"},
+	},
 	"Deployment": mergeQueries(workloadQueries("deployments"), podRuntimeQueries(), map[string]k8s.PermissionQuery{
 		"Scale":    {Group: "apps", Resource: "deployments", Subresource: "scale", Verb: "update"},
 		"Rollback": {Group: "apps", Resource: "deployments", Verb: "patch"},

@@ -232,6 +232,9 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.
 			case "Force Finalize":
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s %s --type merge -p '{\"metadata\":{\"finalizers\":null}}'%s --context %s", rt.Resource, name, nsArg, ctx))
 				return m, m.removeFinalizers()
+			case actionDeleteWithVolume:
+				m.addLogEntry("DBG", "$ kubectl "+strings.Join(pvReclaimPatchArgs(rt, name, ctx), " "))
+				return m, m.setPVReclaimDelete()
 			case "Force Delete":
 				if model.IsLonghornNode(rt) {
 					m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s.longhorn.io %s --type merge -p '{\"spec\":{\"allowScheduling\":false}}'%s; kubectl delete %s.longhorn.io %s%s --context %s", rt.Resource, name, nsArg, rt.Resource, name, nsArg, ctx))

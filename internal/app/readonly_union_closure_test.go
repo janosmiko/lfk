@@ -51,6 +51,7 @@ func TestIsUnionAllowedActionForKind_ClosureOverMutatingActions(t *testing.T) {
 		// ArgoCD, Argo Workflows, cert-manager, KEDA, Helm) that
 		// don't compose meaningfully across clusters.
 		"Finalizer Remove":     nil,
+		"Delete with volume":   nil,
 		"Edit":                 nil,
 		"Secret Editor":        nil,
 		"ConfigMap Editor":     nil,
