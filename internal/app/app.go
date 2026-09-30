@@ -717,9 +717,9 @@ type Model struct {
 	commandBarNameCache   map[string][]string
 	commandBarNameLoading string // cache key currently being fetched ("" if idle)
 
-	// Stderr capture channel for exec credential plugin errors.
-	stderrChan    <-chan string
-	shutdownState // graceful-shutdown flags (m.shuttingDown, m.shutdownNotifier)
+	stderrChan    <-chan string   // stderr capture for exec credential plugin errors
+	shutdownState                 // graceful-shutdown flags (m.shuttingDown, m.shutdownNotifier)
+	execAuthTried map[string]bool // contexts already offered a terminal auth prompt
 	// Resource map view: shows relationship tree in the right column.
 	mapView      bool
 	resourceTree *model.ResourceNode

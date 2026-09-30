@@ -54,6 +54,7 @@ type resourcesLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	context    string
 	// silent marks this load as originating from a watch-mode refresh
 	// (or another caller that set Model.suppressBgtasks). Its downstream
 	// preview/metrics cmds in updateResourcesLoadedMain must also run

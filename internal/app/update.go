@@ -367,6 +367,10 @@ func (m Model) updateResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateExportTemplateReady(msg)
 		return mdl, cmd, true
 	}
+	if msg, ok := msg.(execAuthDoneMsg); ok {
+		mdl, cmd := m.updateExecAuthDone(msg)
+		return mdl, cmd, true
+	}
 	if mdl, cmd, ok := m.updateActionResultMsg(msg); ok {
 		return mdl, cmd, true
 	}

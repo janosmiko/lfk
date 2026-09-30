@@ -23,7 +23,9 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	isCurrentContext := m.nav.Context == msg.context ||
 		(m.isUnionSentinel() && len(m.unionContexts) > 0 && msg.context == m.unionContexts[0])
 	if msg.err != nil {
-		return m.handleAPIResourceDiscoveryError(msg, isCurrentContext)
+		authCmd := m.maybeExecAuth(msg.context, msg.err)
+		mdl, cmd := m.handleAPIResourceDiscoveryError(msg, isCurrentContext)
+		return mdl, tea.Batch(cmd, authCmd)
 	}
 	// Prepend LFK pseudo-resources (helm releases, port forwards) so they
 	// resolve via FindResourceType* and appear in the sidebar uniformly

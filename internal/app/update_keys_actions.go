@@ -210,6 +210,7 @@ func (m Model) handleExplorerDirectActionKeys(msg tea.KeyPressMsg) (tea.Model, t
 		ret, cmd := m.directActionLogs()
 		return ret, cmd, true
 	case kb.Refresh:
+		delete(m.execAuthTried, m.nav.Context)
 		ret, cmd := m.directActionRefresh()
 		return ret, cmd, true
 	case kb.Edit:
