@@ -20,6 +20,7 @@ var mutatingActions = map[string]bool{
 	"Delete":               true,
 	"Force Delete":         true,
 	"Force Finalize":       true,
+	"Delete with volume":   true,
 	"Finalizer Remove":     true,
 	"Edit":                 true,
 	"Secret Editor":        true,

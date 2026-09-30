@@ -75,6 +75,8 @@ func (m Model) openResourceActionMenu() Model {
 		}
 	}
 
+	actions = appendDeleteWithVolume(actions, kind, sel.Raw)
+
 	items := make([]model.Item, 0, len(actions))
 	for _, a := range actions {
 		// One gate for read-only mode and RBAC. It is kind-aware, so custom
@@ -602,6 +604,9 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 		return mdl, cmd, true
 	case "Vuln Scan":
 		mdl, cmd := m.executeActionVulnScan()
+		return mdl, cmd, true
+	case actionDeleteWithVolume:
+		mdl, cmd := m.executeActionDeleteWithVolume()
 		return mdl, cmd, true
 	case model.ActionLabelQuarantine:
 		mdl, cmd := m.executeActionQuarantine()

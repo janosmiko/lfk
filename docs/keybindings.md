@@ -1315,6 +1315,9 @@ The Longhorn Nodes list shows a `REPLICAS` column with the count of replicas sch
 ### PVC actions
 `g` Go to Pod, `b` Debug Mount, `B` Debug Pod, `v` Describe, `E` Edit, `D` Delete, `V` Events
 
+### PersistentVolume actions
+`v` Describe, `E` Edit, `D` Delete, `W` Delete with volume (Released CSI volume only), `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
+
 ### Default actions (all other resources)
 `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
