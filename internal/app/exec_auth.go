@@ -85,7 +85,10 @@ func (c *execAuthCmd) Run() error {
 	if err != nil {
 		return c.fail(fmt.Errorf("kubectl not found: %w", err))
 	}
-	cmd := exec.Command(bin, k8s.DemoKubectlArgs([]string{"get", "--raw", "/version", "--context", c.kubectlContext})...)
+	// The timeout also counts the time spent at the plugin prompt, so keep it long.
+	cmd := exec.Command(bin, k8s.DemoKubectlArgs([]string{
+		"get", "--raw", "/version", "--context", c.kubectlContext, "--request-timeout=5m",
+	})...)
 	cmd.Env = os.Environ()
 	if c.kubeconfig != "" {
 		cmd.Env = append(cmd.Env, "KUBECONFIG="+c.kubeconfig)

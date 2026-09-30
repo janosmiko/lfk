@@ -168,7 +168,7 @@ func TestExecAuthDone_ErrorKeepsGuard(t *testing.T) {
 }
 
 func TestExecAuthCmd_RunSuccess(t *testing.T) {
-	fakeKubectl(t, "echo 'Password: ' >&2")
+	argvPath := fakeKubectl(t, "echo 'Password: ' >&2")
 	var out bytes.Buffer
 	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
 	c.SetStdin(strings.NewReader(""))
@@ -177,6 +177,9 @@ func TestExecAuthCmd_RunSuccess(t *testing.T) {
 	assert.Contains(t, out.String(), "lfk: ctx-a auth plugin needs input")
 	assert.Contains(t, out.String(), "Password:", "plugin stderr must reach the stdout writer")
 	assert.NotContains(t, out.String(), "Press Enter")
+	argv, err := os.ReadFile(argvPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(argv), "--request-timeout=5m", "a stalled API server must not keep lfk suspended forever")
 }
 
 func TestExecAuthCmd_RunFailureWaitsForEnter(t *testing.T) {
