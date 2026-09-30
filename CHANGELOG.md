@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.2](https://github.com/janosmiko/lfk/compare/v0.19.1...v0.19.2) (2026-09-30)
+
+
+### Features
+
+* add delete with volume action for released PVs ([#833](https://github.com/janosmiko/lfk/issues/833)) ([fc03af9](https://github.com/janosmiko/lfk/commit/fc03af9a89143161153e3bf4446e3820bddfd638))
+
+
+### Bug Fixes
+
+* prompt for exec plugin login instead of hanging ([#831](https://github.com/janosmiko/lfk/issues/831)) ([922c22a](https://github.com/janosmiko/lfk/commit/922c22a6b5a7797ee63dfd4091b99847ae245d1c))
+
 ## [0.19.1](https://github.com/janosmiko/lfk/compare/v0.19.0...v0.19.1) (2026-09-25)
 
 
