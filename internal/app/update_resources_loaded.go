@@ -141,7 +141,10 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 		m.previewLoading = false
 		m.setErrorFromErr("Warning: ", msg.err)
 		if len(msg.items) == 0 {
-			return m, scheduleStatusClear()
+			// The discovery disk cache can hide a cold token, so auth is
+			// also triggered from the first failing resource load.
+			authCmd := m.maybeExecAuth(msg.context, msg.err)
+			return m, tea.Batch(scheduleStatusClear(), authCmd)
 		}
 	} else {
 		m.err = nil
@@ -508,7 +511,8 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 		m.err = msg.err
 		m.overlay = overlayNone
 		m.setErrorFromErr("Warning: ", msg.err)
-		return m, scheduleStatusClear()
+		authCmd := m.maybeExecAuth(msg.context, msg.err)
+		return m, tea.Batch(scheduleStatusClear(), authCmd)
 	}
 	m.err = nil
 	// Cache namespace items + names for command-bar autocompletion and

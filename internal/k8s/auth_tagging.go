@@ -92,6 +92,16 @@ func isExecCredentialError(err error) bool {
 	}
 }
 
+// IsExecPluginExitError reports whether err is an exec credential plugin that
+// ran and exited non-zero, as opposed to one that is missing or misconfigured.
+func IsExecPluginExitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "exec: executable ") && strings.Contains(s, " failed with exit code ")
+}
+
 // isAWSCommand reports whether the exec plugin command is the AWS CLI.
 func isAWSCommand(command string) bool {
 	return filepath.Base(command) == "aws"

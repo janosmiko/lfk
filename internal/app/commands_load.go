@@ -168,7 +168,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 				items := cached
 				rtCopy := rt
 				return func() tea.Msg {
-					return resourcesLoadedMsg{items: items, forPreview: true, gen: gen, silent: silent, rt: rtCopy}
+					return resourcesLoadedMsg{items: items, forPreview: true, gen: gen, context: kctx, silent: silent, rt: rtCopy}
 				}
 			}
 		}
@@ -187,7 +187,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			strings.Join(unionCtxs, ", "),
 			func(ctx context.Context) tea.Msg {
 				items, err := client.GetResourcesUnion(ctx, unionCtxs, ns, rt, !forPreview)
-				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, context: kctx, silent: silent, rt: rt}
 			},
 		)
 	}
@@ -206,7 +206,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			items := cached
 			rtCopy := rt
 			return func() tea.Msg {
-				return resourcesLoadedMsg{items: items, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+				return resourcesLoadedMsg{items: items, forPreview: forPreview, gen: gen, context: kctx, silent: silent, rt: rtCopy}
 			}
 		}
 	}
@@ -220,7 +220,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		if items, ok, err := m.client.GetSecurityFindingsForResourceCached(kctx, ns, refs); ok {
 			rtCopy := rt
 			return func() tea.Msg {
-				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, context: kctx, silent: silent, rt: rtCopy}
 			}
 		}
 		client := m.client
@@ -232,7 +232,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			bgtaskTarget(kctx, ns),
 			func(ctx context.Context) tea.Msg {
 				items, err := client.GetSecurityFindingsForResource(ctx, kctx, ns, refs)
-				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, context: kctx, silent: silent, rt: rtCopy}
 			},
 		)
 	}
@@ -246,7 +246,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		if items, ok, err := m.client.GetSecurityFindingsCached(kctx, ns, rt); ok {
 			rtCopy := rt
 			return func() tea.Msg {
-				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, context: kctx, silent: silent, rt: rtCopy}
 			}
 		}
 	}
@@ -274,7 +274,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		bgtaskTarget(kctx, ns),
 		func(ctx context.Context) tea.Msg {
 			items, err := client.GetResources(ctx, kctx, ns, rt, !forPreview)
-			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
+			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, context: kctx, silent: silent, rt: rt}
 		},
 	)
 }

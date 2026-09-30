@@ -309,6 +309,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.previewLogCacheOrder = nil
 	oldCtx := m.nav.Context
 	m.nav.Context = sel.Name
+	delete(m.execAuthTried, sel.Name)
 	m.invalidateOrphanCacheForContext(oldCtx)
 	m.recomputeReadOnly(sel.Name)
 	m.rescopeNamespaceForContext(sel.Name)

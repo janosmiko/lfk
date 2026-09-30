@@ -223,6 +223,17 @@ kubeconfig_ignore:
 
 The walk never descends into a `.git` directory, and that is not configurable.
 
+## Exec credential plugins
+
+If a kubeconfig exec plugin needs terminal input (for example kubelogin with
+`--grant-type=password`), lfk suspends, shows the prompt, and resumes after you
+answer. This needs `kubectl` on `PATH`.
+
+lfk prompts once per context. To retry, press refresh or open the context again from
+the context list. This works when the plugin caches the token it gets (kubelogin
+does). A plugin that caches nothing keeps failing inside lfk. In a multi-context
+(union) view it does not prompt. Open the context on its own to log in.
+
 ## Read-only mode
 
 Read-only mode disables every action that changes cluster state — delete,

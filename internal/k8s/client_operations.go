@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -456,6 +457,13 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	cfg, err := cc.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("building rest config for context %q: %w", displayName, err)
+	}
+	if cfg.ExecProvider != nil {
+		// Bubble Tea owns stdin, so a plugin prompt would hang unseen. The
+		// plugin fails fast and lfk suspends to run kubectl for the prompt.
+		ep := *cfg.ExecProvider
+		ep.InteractiveMode = clientcmdapi.NeverExecInteractiveMode
+		cfg.ExecProvider = &ep
 	}
 	qps, burst := foregroundRate(displayName)
 	applyRateLimit(cfg, qps, burst)
