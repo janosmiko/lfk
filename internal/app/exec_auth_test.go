@@ -195,38 +195,61 @@ func TestExecAuthCmd_RunFailureWaitsForEnter(t *testing.T) {
 }
 
 // countingScript counts its runs in a file and exits 1 until run number succeedOn.
-func countingScript(counter string, succeedOn int) string {
-	return `n=$(cat ` + counter + ` 2>/dev/null || echo 0)
+// The failure line mimics kubectl output for a failed exec credential plugin.
+func countingScript(counter string, succeedOn int, failLine string) string {
+	return `c="` + counter + `"
+n=$(cat "$c" 2>/dev/null || echo 0)
 n=$((n+1))
-echo $n > ` + counter + `
-if [ "$n" -lt ` + strconv.Itoa(succeedOn) + ` ]; then echo "bad password" >&2; exit 1; fi`
+echo $n > "$c"
+if [ "$n" -lt ` + strconv.Itoa(succeedOn) + ` ]; then echo "` + failLine + `" >&2; exit 1; fi`
+}
+
+const pluginFailLine = "Unable to connect to the server: getting credentials: exec: executable kubelogin failed with exit code 1"
+
+func runCount(t *testing.T, counter string) string {
+	t.Helper()
+	got, err := os.ReadFile(counter)
+	require.NoError(t, err)
+	return strings.TrimSpace(string(got))
 }
 
 func TestExecAuthCmd_RunRetriesUntilSuccess(t *testing.T) {
 	counter := filepath.Join(t.TempDir(), "count")
-	fakeKubectl(t, countingScript(counter, 3))
+	fakeKubectl(t, countingScript(counter, 3, pluginFailLine))
 	var out bytes.Buffer
 	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
 	c.SetStdin(strings.NewReader(""))
 	c.SetStdout(&out)
 	require.NoError(t, c.Run())
-	assert.Contains(t, out.String(), "Attempt 2/3")
-	assert.Contains(t, out.String(), "Attempt 3/3")
+	assert.Contains(t, out.String(), "Login failed, retrying (attempt 2/3)")
+	assert.Contains(t, out.String(), "Login failed, retrying (attempt 3/3)")
+	assert.Equal(t, "3", runCount(t, counter))
 	assert.NotContains(t, out.String(), "Press Enter")
 }
 
 func TestExecAuthCmd_RunFailsAfterMaxAttempts(t *testing.T) {
 	counter := filepath.Join(t.TempDir(), "count")
-	fakeKubectl(t, countingScript(counter, 100))
+	fakeKubectl(t, countingScript(counter, 100, pluginFailLine))
 	var out bytes.Buffer
 	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
 	c.SetStdin(strings.NewReader("\n"))
 	c.SetStdout(&out)
 	require.Error(t, c.Run())
-	got, err := os.ReadFile(counter)
-	require.NoError(t, err)
-	assert.Equal(t, "3", strings.TrimSpace(string(got)))
+	assert.Equal(t, "3", runCount(t, counter))
 	assert.Contains(t, out.String(), "Press Enter to return to lfk")
+}
+
+func TestExecAuthCmd_RunDoesNotRetryNonPluginFailure(t *testing.T) {
+	counter := filepath.Join(t.TempDir(), "count")
+	fakeKubectl(t, countingScript(counter, 100, "Unable to connect to the server: dial tcp: i/o timeout"))
+	var out bytes.Buffer
+	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
+	c.SetStdin(strings.NewReader("\n"))
+	c.SetStdout(&out)
+	require.Error(t, c.Run())
+	assert.Equal(t, "1", runCount(t, counter))
+	assert.Contains(t, out.String(), "Press Enter to return to lfk")
+	assert.NotContains(t, out.String(), "retrying")
 }
 
 func TestExecAuth_NilGuardMapSetOnFailedLoad(t *testing.T) {
