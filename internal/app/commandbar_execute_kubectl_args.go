@@ -32,10 +32,11 @@ func commandAffectsNamespaces(args []string) bool {
 
 // injectKubectlDefaults scans the args for -n/--namespace and
 // -A/--all-namespaces flags. If they are not present, it injects the current
-// namespace from the model. It always puts --context <current> first: kubectl
-// uses the last --context, so a real user flag still wins, while a fake one
-// (after "--", or the value of another flag) cannot fall back to the
-// kubeconfig current-context. Subcommands that don't accept
+// namespace from the model. For built-in verbs it puts --context <current>
+// first: kubectl uses the last --context, so a real user flag still wins, while
+// a fake one (after "--", or the value of another flag) cannot fall back to the
+// kubeconfig current-context. Plugin and unknown verbs get it appended, because
+// kubectl rejects flags before a plugin name. Subcommands that don't accept
 // namespace flags (explain, api-resources, version, config, cordon, etc.)
 // have only --context injected — injecting -A or -n on those would cause
 // kubectl to reject the command with "unknown flag".
@@ -53,7 +54,9 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 	}
 
 	result := make([]string, 0, len(args)+4)
-	if m.nav.Context != "" {
+	pin := m.nav.Context != ""
+	builtin := kubectlBuiltinVerbs[firstNonFlagToken(args)]
+	if pin && builtin {
 		result = append(result, "--context", m.kubectlContext(m.nav.Context))
 	}
 	result = append(result, args...)
@@ -77,7 +80,26 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 		}
 	}
 
+	if pin && !builtin {
+		result = append(result, "--context", m.kubectlContext(m.nav.Context))
+	}
 	return result
+}
+
+// kubectlBuiltinVerbs is the set of top-level kubectl commands (from
+// `kubectl --help`, without plugins). Any other verb is a plugin.
+var kubectlBuiltinVerbs = map[string]bool{
+	"create": true, "expose": true, "run": true, "set": true, "explain": true,
+	"get": true, "edit": true, "delete": true, "rollout": true, "scale": true,
+	"autoscale": true, "certificate": true, "cluster-info": true, "top": true,
+	"cordon": true, "uncordon": true, "drain": true, "taint": true,
+	"describe": true, "logs": true, "attach": true, "exec": true,
+	"port-forward": true, "proxy": true, "cp": true, "auth": true,
+	"debug": true, "events": true, "diff": true, "apply": true, "patch": true,
+	"replace": true, "wait": true, "kustomize": true, "label": true,
+	"annotate": true, "completion": true, "api-resources": true,
+	"api-versions": true, "config": true, "kuberc": true, "plugin": true,
+	"version": true, "help": true, "options": true,
 }
 
 // commandSupportsNamespaceFlags reports whether the given kubectl subcommand

@@ -175,7 +175,7 @@ func TestCommandBarReadOnly_Shell(t *testing.T) {
 	}
 }
 
-func TestInjectKubectlDefaults_AlwaysPinsContextAtFront(t *testing.T) {
+func TestInjectKubectlDefaults_BuiltinVerbPinsContextAtFront(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "my-ctx"
 	for _, args := range [][]string{
@@ -183,6 +183,7 @@ func TestInjectKubectlDefaults_AlwaysPinsContextAtFront(t *testing.T) {
 		{"delete", "pod", "x", "--", "--context=dev"},
 		{"--user", "--context", "delete", "pod", "x"},
 		{"--context=", "delete", "pod", "x"},
+		{"--context", "other", "get", "pods"},
 	} {
 		got := m.injectKubectlDefaults(args)
 		assert.Equal(t, []string{"--context", "my-ctx"}, got[:2], args)
@@ -190,9 +191,73 @@ func TestInjectKubectlDefaults_AlwaysPinsContextAtFront(t *testing.T) {
 	}
 }
 
-func TestInjectKubectlDefaults_ExplicitContextStillWinsByOrder(t *testing.T) {
+func TestInjectKubectlDefaults_PluginVerbAppendsContext(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "my-ctx"
-	got := m.injectKubectlDefaults([]string{"--context", "other", "get", "pods"})
-	assert.Equal(t, []string{"--context", "my-ctx", "--context", "other", "get", "pods"}, got[:6])
+	for _, args := range [][]string{
+		{"krew", "list"},
+		{"-n", "ns", "foo", "bar"},
+		{"somepluginverb"},
+	} {
+		got := m.injectKubectlDefaults(args)
+		assert.Equal(t, args, got[:len(args)], "plugin name stays first")
+		assert.Equal(t, []string{"--context", "my-ctx"}, got[len(got)-2:], args)
+	}
+}
+
+func TestCommandBarReadOnly_SubcommandMustFollowVerb(t *testing.T) {
+	for _, in := range []string{
+		"k rollout -l status restart deployment",
+		"k rollout -l status pause deployment x",
+		"k rollout -l status undo deployment x",
+		"k auth -f can-i reconcile",
+		"k config -x view set-context foo",
+		"k rollout -n ns status deploy x",
+	} {
+		m := baseModelWithFakeClient()
+		m.readOnly = true
+		r, _ := m.executeCommandBarInput(in)
+		assert.Contains(t, r.(Model).statusMessage, "Read-only mode", in)
+	}
+}
+
+func TestCommandBarReadOnly_EmptyNavContextUsesKubeconfigCurrent(t *testing.T) {
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+
+	t.Run("current_context_read_only_blocks", func(t *testing.T) {
+		ui.ConfigClusterReadOnly = map[string]bool{"test-ctx": true}
+		m := baseModelWithFakeClient()
+		m.nav.Context = ""
+		r, _ := m.executeCommandBarInput("k delete pod x")
+		assert.Contains(t, r.(Model).statusMessage, "Read-only mode")
+	})
+	t.Run("current_context_writable_runs", func(t *testing.T) {
+		ui.ConfigClusterReadOnly = nil
+		m := baseModelWithFakeClient()
+		m.nav.Context = ""
+		r, cmd := m.executeCommandBarInput("k delete pod x")
+		assert.NotNil(t, cmd)
+		assert.Empty(t, r.(Model).statusMessage)
+	})
+	t.Run("read_verb_runs_even_when_read_only", func(t *testing.T) {
+		ui.ConfigClusterReadOnly = map[string]bool{"test-ctx": true}
+		m := baseModelWithFakeClient()
+		m.nav.Context = ""
+		r, cmd := m.executeCommandBarInput("k get pods")
+		assert.NotNil(t, cmd)
+		assert.Empty(t, r.(Model).statusMessage)
+	})
+	t.Run("unknown_target_blocks", func(t *testing.T) {
+		ui.ConfigClusterReadOnly = nil
+		m := baseModelWithFakeClient()
+		m.nav.Context = ""
+		m.client = nil
+		assert.True(t, blockedFor(m, []string{"delete", "pod", "x"}))
+	})
+}
+
+func blockedFor(m Model, args []string) bool {
+	_, blocked := m.kubectlBlockedByReadOnly(args)
+	return blocked
 }

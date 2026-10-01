@@ -249,8 +249,9 @@ read-only verbs (`get`, `describe`, `logs`, `top`, `explain`,
 `api-resources`, `api-versions`, `version`, `cluster-info`, `events`,
 `diff`, `auth can-i|whoami`, `config view|get-contexts|current-context`,
 `rollout status|history`). Other verbs and plugins are blocked. With
-`--context <name>`, the check uses that context.
-A write through `--kubeconfig`, `--server`, or `--cluster` is checked against the current context only.
+`--context <name>`, the check uses that context. At the cluster picker, the
+check uses the kubeconfig current-context. A write through `--kubeconfig`,
+`--server`, or `--cluster` is checked against the current context only.
 
 Read-only is per-context (and per-tab). The UI surfaces it in two places:
 

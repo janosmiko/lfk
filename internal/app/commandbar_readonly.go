@@ -64,7 +64,9 @@ func isReadOnlyKubectl(args []string) (verb string, ok bool) {
 		return verb, true
 	}
 	if subs, has := kubectlReadOnlySubcommands[verb]; has {
-		return verb, subs[firstNonFlagToken(rest[1:])]
+		// A flag before the subcommand may consume the next token, so
+		// only the token right after the verb is trusted.
+		return verb, len(rest) > 1 && subs[rest[1]]
 	}
 	return verb, false
 }
@@ -113,7 +115,7 @@ func (m Model) kubectlBlockedByReadOnly(args []string) (string, bool) {
 	if verb == "" {
 		verb = "command"
 	}
-	if m.readOnlyForContext(m.nav.Context) {
+	if m.navTargetReadOnly() {
 		return verb, true
 	}
 	for _, c := range kubectlContextCandidates(args) {
@@ -122,4 +124,21 @@ func (m Model) kubectlBlockedByReadOnly(args []string) (string, bool) {
 		}
 	}
 	return verb, false
+}
+
+// navTargetReadOnly resolves read-only for the context a command without
+// --context runs against. At the cluster picker nav.Context is empty and
+// kubectl uses the kubeconfig current-context, so check that one instead.
+func (m Model) navTargetReadOnly() bool {
+	if m.nav.Context != "" {
+		return m.readOnlyForContext(m.nav.Context)
+	}
+	if m.cliReadOnly {
+		return true
+	}
+	if m.client == nil {
+		return true
+	}
+	cur := m.client.CurrentContext()
+	return cur == "" || m.effectiveContextReadOnly(cur)
 }
