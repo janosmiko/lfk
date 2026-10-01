@@ -80,7 +80,7 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 		}
 	}
 
-	if pin && !builtin {
+	if pin && !builtin && len(kubectlContextCandidates(args)) == 0 {
 		result = append(result, "--context", m.kubectlContext(m.nav.Context))
 	}
 	return result

@@ -1,11 +1,16 @@
 package app
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -260,4 +265,70 @@ func TestCommandBarReadOnly_EmptyNavContextUsesKubeconfigCurrent(t *testing.T) {
 func blockedFor(m Model, args []string) bool {
 	_, blocked := m.kubectlBlockedByReadOnly(args)
 	return blocked
+}
+
+func TestCommandBarReadOnly_ShellAtPickerUsesKubeconfigCurrent(t *testing.T) {
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"test-ctx": true}
+
+	m := baseModelWithFakeClient()
+	m.nav.Context = ""
+	r, _ := m.executeCommandBarInput("! kubectl delete pod x")
+	assert.Equal(t, readOnlyBlockedMessage("shell commands"), r.(Model).statusMessage)
+}
+
+func TestCommandBarReadOnly_DisplayNameAlias(t *testing.T) {
+	dir := t.TempDir()
+	paths := make([]string, 0, 2)
+	for _, f := range []string{"a", "b"} {
+		p := filepath.Join(dir, f)
+		require.NoError(t, os.WriteFile(p, []byte(fmt.Sprintf(`apiVersion: v1
+kind: Config
+current-context: dev
+clusters:
+- name: c
+  cluster:
+    server: https://%s.example.test:6443
+contexts:
+- name: dev
+  context:
+    cluster: c
+    user: u
+users:
+- name: u
+  user:
+    token: t
+`, f)), 0o600))
+		paths = append(paths, p)
+	}
+	t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
+	client, err := k8s.NewClient("", nil, true, nil)
+	require.NoError(t, err)
+
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"dev (b)": true}
+
+	m := baseModelWithFakeClient()
+	m.client = client
+	m.nav.Context = "other"
+	assert.True(t, blockedFor(m, []string{"delete", "pod", "x", "--context", "dev"}))
+	assert.True(t, blockedFor(m, []string{"delete", "pod", "x", "--context=dev"}))
+
+	ui.ConfigClusterReadOnly = map[string]bool{"unrelated": true}
+	assert.False(t, blockedFor(m, []string{"delete", "pod", "x", "--context", "dev"}))
+}
+
+func TestInjectKubectlDefaults_PluginVerbKeepsUserContext(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "my-ctx"
+	for _, args := range [][]string{
+		{"foo", "--context", "other"},
+		{"foo", "--context=other"},
+	} {
+		assert.Equal(t, args, m.injectKubectlDefaults(args), args)
+	}
+	got := m.injectKubectlDefaults([]string{"get", "pods", "--context=other"})
+	assert.Equal(t, []string{"--context", "my-ctx"}, got[:2], "built-in verbs keep the front pin")
 }

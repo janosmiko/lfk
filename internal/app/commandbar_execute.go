@@ -76,7 +76,7 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	}
 	switch classified {
 	case cmdShell:
-		if m.readOnlyForContext(m.nav.Context) {
+		if m.navTargetReadOnly() {
 			m.setStatusMessage(readOnlyBlockedMessage("shell commands"), true)
 			return m, scheduleStatusClear()
 		}

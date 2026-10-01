@@ -2,8 +2,6 @@ package app
 
 import (
 	"strings"
-
-	"github.com/janosmiko/lfk/internal/ui"
 )
 
 var kubectlReadOnlyVerbs = map[string]bool{
@@ -91,16 +89,24 @@ func kubectlContextCandidates(args []string) []string {
 }
 
 func (m Model) contextReadOnly(ctx string) bool {
-	if ctx == "" || ctx == m.nav.Context || ctx == m.kubectlContext(m.nav.Context) {
+	if ctx == "" || ctx == m.nav.Context {
 		return m.readOnlyForContext(m.nav.Context)
 	}
-	if m.cliReadOnly || m.readOnly {
+	if m.cliReadOnly || m.readOnly || m.effectiveContextReadOnly(ctx) {
 		return true
 	}
-	if v, set := m.contextROOverrides[ctx]; set {
-		return v
+	// kubectl sees the original name, but read_only is keyed on the display
+	// name. Duplicated names get a "name (file)" display name.
+	if m.client == nil {
+		return false
 	}
-	return ui.ResolveReadOnly(ctx, false)
+	items, _ := m.client.GetContexts()
+	for _, it := range items {
+		if m.client.OriginalContextName(it.Name) == ctx && m.effectiveContextReadOnly(it.Name) {
+			return true
+		}
+	}
+	return false
 }
 
 // kubectlBlockedByReadOnly reports whether a command bar kubectl invocation
