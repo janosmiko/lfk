@@ -178,6 +178,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.nav.ResourceName = ""
 		if m.unionMode && !m.hasUnionDashboardMemberBreadcrumb() {
 			m.nav.Context = UnionContextSentinel
+			m.applyReadOnlyForContext(UnionContextSentinel)
 		}
 		if cached, ok := m.itemCache[m.navKey()]; ok {
 			m.setMiddleItems(cached)
@@ -199,6 +200,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.nav.OwnedName = ""
 			if m.unionMode && !m.hasUnionDashboardMemberBreadcrumb() {
 				m.nav.Context = UnionContextSentinel
+				m.applyReadOnlyForContext(UnionContextSentinel)
 			}
 		} else {
 			m.nav.Level = model.LevelOwned
@@ -569,9 +571,7 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		// Push history before switching scope, so jump-back restores the
 		// origin namespace/cluster scope rather than the Pod's.
 		m.pushJumpHistory()
-		if m.unionMode && sel.ClusterName != "" {
-			m.nav.Context = sel.ClusterName
-		}
+		m.enterUnionRowContext(sel)
 		m.allNamespaces = false
 		m.namespace = sel.Namespace
 		m.selectedNamespaces = map[string]bool{sel.Namespace: true}
@@ -587,9 +587,7 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	} else if !m.allNamespaces {
 		m.nav.Namespace = m.namespace
 	}
-	if m.unionMode && sel.ClusterName != "" {
-		m.nav.Context = sel.ClusterName
-	}
+	m.enterUnionRowContext(sel)
 	m.saveCurrentSession()
 	if m.nav.ResourceType.Kind == "Pod" {
 		m.nav.OwnedName = sel.Name
@@ -624,9 +622,7 @@ func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
 	if sel.Kind == "__security_affected_resource__" {
 		return m.jumpToFindingResource(sel)
 	}
-	if m.unionMode && sel.ClusterName != "" {
-		m.nav.Context = sel.ClusterName
-	}
+	m.enterUnionRowContext(sel)
 	if sel.Kind == "Pod" {
 		m.saveCursor()
 		m.nav.OwnedName = sel.Name

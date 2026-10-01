@@ -96,10 +96,9 @@ func wkYAMLAPIExplorerAvailable(c *wkYAMLCtx) bool {
 
 // wkYAMLEditAvailable mirrors handleYAMLKeyCtrlE (update_yaml.go:289-301):
 // it needs a resolvable kind and a highlighted row, and the read-only branch
-// only toasts. m.readOnly is the field the handler itself reads — not
-// readOnlyForContext, which resolves against a different context.
+// only toasts.
 func wkYAMLEditAvailable(c *wkYAMLCtx) bool {
-	return !c.visual && c.kind != "" && c.sel != nil && !c.m.readOnly
+	return !c.visual && c.kind != "" && c.sel != nil && !c.m.readOnlyForRow(c.sel)
 }
 
 // wkYAMLRefreshAvailable mirrors handleYAMLRefresh (update_yaml.go:133-140),
