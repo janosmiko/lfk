@@ -2,6 +2,7 @@ package app
 
 import (
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -47,4 +48,23 @@ func shellEcho(t *testing.T, cmd string) string {
 	out, err := exec.Command("sh", "-c", cmd).Output()
 	require.NoError(t, err)
 	return strings.TrimRight(string(out), "\n")
+}
+
+func TestExpandCustomActionTemplateNoRescan(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "pwned")
+	payload := "$(touch " + marker + ")"
+	actx := actionContext{
+		name:      "{namespace}",
+		namespace: "{Image}",
+		context:   "{name}",
+		kind:      "Pod",
+		columns: []model.KeyValue{
+			{Key: "Message", Value: "{Image} {name} " + payload + " '; touch " + marker + "; '"},
+			{Key: "Image", Value: payload},
+		},
+	}
+
+	got := shellEcho(t, expandCustomActionTemplate("printf %s {name}-{namespace}-{context}-{Message}", actx))
+	assert.Equal(t, "{namespace}-{Image}-{name}-{Image} {name} "+payload+" '; touch "+marker+"; '", got)
+	assert.NoFileExists(t, marker)
 }

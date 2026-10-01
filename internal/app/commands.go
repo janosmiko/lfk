@@ -385,25 +385,25 @@ func expandCustomActionTemplate(cmdTemplate string, actx actionContext) string {
 	// metacharacters. Quoting neutralizes injection while still passing the
 	// value literally — adjacent quoted/unquoted words concatenate in the shell,
 	// so mid-token uses like /tmp/{name}.log stay correct.
-	result := cmdTemplate
-	result = strings.ReplaceAll(result, "{name}", shellQuote(actx.name))
-	result = strings.ReplaceAll(result, "{namespace}", shellQuote(actx.namespace))
-	result = strings.ReplaceAll(result, "{context}", shellQuote(actx.context))
-	result = strings.ReplaceAll(result, "{kind}", shellQuote(actx.kind))
+	// One strings.Replacer pass: substituted values are never rescanned, and
+	// on a tie the earlier pair wins, as in the old sequential order.
+	pairs := []string{
+		"{name}", shellQuote(actx.name),
+		"{namespace}", shellQuote(actx.namespace),
+		"{context}", shellQuote(actx.context),
+		"{kind}", shellQuote(actx.kind),
+	}
 
-	// Substitute column-based variables. The user writes {columnKey} where columnKey
-	// matches the column's Key field (case-insensitive, spaces removed). For example,
-	// a column with Key="Node" can be referenced as {Node} or {node}.
+	// The user writes {columnKey} where columnKey matches the column's Key field,
+	// exact or lowercased with spaces removed (e.g. {Node} or {nodeName}).
 	for _, kv := range actx.columns {
 		quoted := shellQuote(kv.Value)
-		// Exact match first (e.g., {Node} for Key="Node").
-		result = strings.ReplaceAll(result, "{"+kv.Key+"}", quoted)
-		// Also support camelCase-style references (e.g., {nodeName} for Key="Node").
+		pairs = append(pairs, "{"+kv.Key+"}", quoted)
 		lowerKey := strings.ToLower(strings.ReplaceAll(kv.Key, " ", ""))
 		if lowerKey != kv.Key {
-			result = strings.ReplaceAll(result, "{"+lowerKey+"}", quoted)
+			pairs = append(pairs, "{"+lowerKey+"}", quoted)
 		}
 	}
 
-	return result
+	return strings.NewReplacer(pairs...).Replace(cmdTemplate)
 }
