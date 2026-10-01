@@ -142,15 +142,15 @@ var kubectlGlobalFlagsWithValue = map[string]bool{
 	"--username":              true,
 }
 
-// firstNonFlagToken walks args, skipping leading kubectl global flags
-// (and the values of those that consume a separate token), and returns
-// the first positional token — typically the subcommand verb. Returns
-// "" if every token is a flag or the input is empty.
-func firstNonFlagToken(args []string) string {
+// argsFromVerb walks args, skipping leading kubectl global flags (and the
+// values of those that consume a separate token), and returns the slice
+// starting at the first positional token, typically the subcommand verb.
+// Returns nil if every token is a flag or the input is empty.
+func argsFromVerb(args []string) []string {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if !strings.HasPrefix(a, "-") {
-			return a
+			return args[i:]
 		}
 		// `--flag=value`: nothing extra to consume.
 		if strings.Contains(a, "=") {
@@ -159,6 +159,14 @@ func firstNonFlagToken(args []string) string {
 		if kubectlGlobalFlagsWithValue[a] && i+1 < len(args) {
 			i++ // skip the value
 		}
+	}
+	return nil
+}
+
+// firstNonFlagToken returns the subcommand verb, or "" if there is none.
+func firstNonFlagToken(args []string) string {
+	if rest := argsFromVerb(args); len(rest) > 0 {
+		return rest[0]
 	}
 	return ""
 }

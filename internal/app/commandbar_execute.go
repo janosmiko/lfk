@@ -69,6 +69,10 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	}
 	switch classified {
 	case cmdShell:
+		if m.readOnlyForContext(m.nav.Context) {
+			m.setStatusMessage(readOnlyBlockedMessage("shell commands"), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.executeShellCommand(extractShellCommand(input))
 	case cmdBuiltin:
 		return m.executeBuiltinCommand(input)
@@ -85,6 +89,10 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if verb, blocked := m.kubectlBlockedByReadOnly(fields); blocked {
+			m.setStatusMessage(readOnlyBlockedMessage("kubectl "+verb), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.executeKubectlCommand(input)
 	case cmdResourceJump:
 		return m.executeResourceJump(input)
