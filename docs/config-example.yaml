@@ -526,7 +526,7 @@ abbreviations:
 #   {namespace}  - Resource namespace
 #   {context}    - Kubeconfig context name
 #   {kind}       - Resource kind (e.g., "Pod")
-#   {<Column>}   - Any column value (e.g., {Node}, {IP}) — case-insensitive
+#   {<Column>}   - Any column value (e.g., {Node}, {IP}). Match the exact column key, or the key lowercased with spaces removed
 #
 # Commands are executed via `sh -c` with KUBECONFIG set.
 # Interactive commands (ssh, etc.) hand over the terminal.
