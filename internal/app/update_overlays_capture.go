@@ -180,7 +180,7 @@ func (m Model) startSelectedBackend() (tea.Model, tea.Cmd) {
 		}
 		return m, m.launchKubeshark(target)
 	default:
-		if m.readOnly {
+		if m.readOnlyForContext(m.actionCtx.context) {
 			m.setStatusMessage("kubectl-debug capture disabled by read-only — kubeshark hand-off available", true)
 			return m, nil
 		}

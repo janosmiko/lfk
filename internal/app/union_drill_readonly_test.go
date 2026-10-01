@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -124,4 +125,81 @@ func TestNavigateParent_UnionSentinelDropsMemberReadOnly(t *testing.T) {
 	rm := r.(Model)
 	require.Equal(t, UnionContextSentinel, rm.nav.Context)
 	assert.Equal(t, rm.cliReadOnly, rm.readOnly)
+}
+
+func unionMemberROModel(t *testing.T, cluster string) Model {
+	t.Helper()
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"prod": true}
+
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"dev", "prod"}
+	m.nav.Context = UnionContextSentinel
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true}
+	m.middleItems = []model.Item{{Name: "p", Kind: "Pod", Namespace: "default", ClusterName: cluster, Deleting: true}}
+	m.setCursor(0)
+	return m
+}
+
+func TestUnionRow_CtrlEEditHonorsMemberReadOnly(t *testing.T) {
+	for cluster, wantBlocked := range map[string]bool{"prod": true, "dev": false} {
+		t.Run(cluster, func(t *testing.T) {
+			m := unionMemberROModel(t, cluster)
+			r, _ := m.handleYAMLKeyCtrlE()
+			rm := r.(Model)
+			if wantBlocked {
+				assert.Equal(t, readOnlyBlockedMessage("Edit"), rm.statusMessage)
+			} else {
+				assert.NotEqual(t, readOnlyBlockedMessage("Edit"), rm.statusMessage)
+			}
+			c := &wkYAMLCtx{m: &m, kind: "Pod", sel: m.selectedMiddleItem()}
+			assert.Equal(t, !wantBlocked, wkYAMLEditAvailable(c))
+		})
+	}
+}
+
+func TestUnionRow_CaptureKubectlDebugHonorsMemberReadOnly(t *testing.T) {
+	for cluster, wantBlocked := range map[string]bool{"prod": true, "dev": false} {
+		t.Run(cluster, func(t *testing.T) {
+			m := unionMemberROModel(t, cluster)
+			m.actionCtx = actionContext{kind: "Pod", name: "p", namespace: "default", context: cluster}
+			m.captureOverlay.targetKind = "Pod"
+			m.captureOverlay.targetName = "p"
+			m.captureOverlay.targetNS = "default"
+			m.captureOverlay.selectedBackend = k8s.BackendKubectlDebug
+			r, _ := m.startSelectedBackend()
+			rm := r.(Model)
+			ro := "kubectl-debug capture disabled by read-only"
+			if wantBlocked {
+				assert.Contains(t, rm.statusMessage, ro)
+			} else {
+				assert.NotContains(t, rm.statusMessage, ro)
+			}
+		})
+	}
+}
+
+func TestUnionRow_DirectForceDeleteHonorsMemberReadOnly(t *testing.T) {
+	for cluster, wantBlocked := range map[string]bool{"prod": true, "dev": false} {
+		t.Run(cluster, func(t *testing.T) {
+			m := unionMemberROModel(t, cluster)
+			r, _ := m.directActionForceDelete()
+			rm := r.(Model)
+			if wantBlocked {
+				assert.NotEqual(t, overlayConfirmType, rm.overlay)
+				assert.Equal(t, readOnlyBlockedMessage("Force Delete"), rm.statusMessage)
+			} else {
+				assert.Equal(t, overlayConfirmType, rm.overlay)
+			}
+		})
+	}
+}
+
+func TestUnionRow_DirectDeleteEscalationHonorsMemberReadOnly(t *testing.T) {
+	m := unionMemberROModel(t, "prod")
+	r, _ := m.directActionDelete()
+	assert.NotEqual(t, overlayConfirmType, r.(Model).overlay)
 }

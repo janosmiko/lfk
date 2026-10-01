@@ -111,7 +111,7 @@ func (m Model) handleSecretEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.secretDataOriginal = nil
 			return m, nil
 		}
-		if m.readOnly {
+		if m.readOnlyForContext(m.actionCtx.context) {
 			m.setStatusMessage(readOnlyBlockedMessage("Secret Editor"), true)
 			return m, scheduleStatusClear()
 		}
@@ -207,7 +207,7 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 			m.configMapDataOriginal = nil
 			return m, nil
 		}
-		if m.readOnly {
+		if m.readOnlyForContext(m.actionCtx.context) {
 			m.setStatusMessage(readOnlyBlockedMessage("ConfigMap Editor"), true)
 			return m, scheduleStatusClear()
 		}
@@ -248,7 +248,7 @@ func (m Model) handleAutoSyncKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter", "ctrl+s":
-		if m.readOnly {
+		if m.readOnlyForContext(m.actionCtx.context) {
 			m.setStatusMessage(readOnlyBlockedMessage("Auto Sync"), true)
 			return m, scheduleStatusClear()
 		}
@@ -372,7 +372,7 @@ func (m Model) handleLabelEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.labelAnnotationsOriginal = nil
 			return m, nil
 		}
-		if m.readOnly {
+		if m.readOnlyForContext(m.actionCtx.context) {
 			m.setStatusMessage(readOnlyBlockedMessage("Labels / Annotations"), true)
 			return m, scheduleStatusClear()
 		}

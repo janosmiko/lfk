@@ -196,7 +196,7 @@ func (m Model) executeActionDefault(actionLabel string) (tea.Model, tea.Cmd) {
 		// of executeAction only checks the static mutatingActions set,
 		// which doesn't know about user-defined labels; this is the
 		// last chance to refuse.
-		if m.readOnly && !ca.ReadOnlySafe {
+		if m.readOnlyForContext(m.actionCtx.context) && !ca.ReadOnlySafe {
 			m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
 			return m, scheduleStatusClear()
 		}

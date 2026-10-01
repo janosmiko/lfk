@@ -77,11 +77,7 @@ func newWKCtx(m *Model) *wkCtx {
 	// (update_actions.go). Read c.sel.ClusterName directly rather than calling
 	// effectiveContext(), which re-runs selectedMiddleItem() and would undo
 	// the once-per-call row resolution this struct exists for.
-	roCtx := m.nav.Context
-	if c.sel != nil && c.sel.ClusterName != "" {
-		roCtx = c.sel.ClusterName
-	}
-	c.readOnly = m.readOnlyForContext(roCtx)
+	c.readOnly = m.readOnlyForRow(c.sel)
 	return c
 }
 

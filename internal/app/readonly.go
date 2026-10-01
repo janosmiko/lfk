@@ -174,6 +174,17 @@ func (m Model) readOnlyForContext(ctx string) bool {
 	return ui.ResolveReadOnly(ctx, false)
 }
 
+// readOnlyForRow resolves read-only against the row's own source cluster. In
+// union mode nav.Context is the sentinel, so m.readOnly alone misses a
+// read-only member.
+func (m Model) readOnlyForRow(sel *model.Item) bool {
+	ctx := m.nav.Context
+	if sel != nil && sel.ClusterName != "" {
+		ctx = sel.ClusterName
+	}
+	return m.readOnlyForContext(ctx)
+}
+
 // bulkReadOnlyContext returns the first target context that would make a
 // mutating bulk action illegal. Bulk union actions are all-or-nothing at the
 // dispatcher. Individual handlers should not partially mutate a mixed
