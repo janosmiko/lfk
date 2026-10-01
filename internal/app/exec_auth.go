@@ -14,6 +14,8 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+const execAuthMaxAttempts = 3
+
 type execAuthDoneMsg struct {
 	context string
 	err     error
@@ -85,6 +87,19 @@ func (c *execAuthCmd) Run() error {
 	if err != nil {
 		return c.fail(fmt.Errorf("kubectl not found: %w", err))
 	}
+	for attempt := 1; ; attempt++ {
+		err = c.newKubectlCmd(bin).Run()
+		if err == nil {
+			return nil
+		}
+		if attempt == execAuthMaxAttempts {
+			return c.fail(err)
+		}
+		_, _ = fmt.Fprintf(c.stdout, "\n%v\nAttempt %d/%d\n", err, attempt+1, execAuthMaxAttempts)
+	}
+}
+
+func (c *execAuthCmd) newKubectlCmd(bin string) *exec.Cmd {
 	// The timeout also counts the time spent at the plugin prompt, so keep it long.
 	cmd := exec.Command(bin, k8s.DemoKubectlArgs([]string{
 		"get", "--raw", "/version", "--context", c.kubectlContext, "--request-timeout=5m",
@@ -97,10 +112,7 @@ func (c *execAuthCmd) Run() error {
 	cmd.Stdout = io.Discard
 	// The plugin prompt goes to stderr, but tea's stderr is a capture pipe.
 	cmd.Stderr = c.stdout
-	if err := cmd.Run(); err != nil {
-		return c.fail(err)
-	}
-	return nil
+	return cmd
 }
 
 func (c *execAuthCmd) fail(err error) error {
