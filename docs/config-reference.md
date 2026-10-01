@@ -837,11 +837,18 @@ Template variables are substituted before execution:
 | `{namespace}` | Resource namespace |
 | `{context}` | Kubeconfig context name |
 | `{kind}` | Resource kind (e.g., "Pod", "Deployment") |
-| `{<ColumnKey>}` | Any column value from the resource (e.g., `{Node}`, `{IP}`) — case-insensitive |
+| `{<ColumnKey>}` | Any column value from the resource (e.g., `{Node}`, `{IP}`) |
+
+A column placeholder matches the exact column key, or the key in lowercase with spaces removed.
 
 Custom action commands are executed via `sh -c` with `KUBECONFIG` set in the environment. Interactive commands (like `ssh`) hand over the terminal to the subprocess.
 
 Substituted values are shell-quoted before insertion, so cluster data (context names, labels, image strings) containing shell metacharacters is passed literally and cannot inject commands. Quoting is transparent for normal argument use — `ssh {Node}` and `/tmp/{name}.log` work as written.
+
+**Do not wrap placeholders in quotes.** Extra quotes break the automatic quoting. Inside `"{name}"`, a `$(...)` in the value still runs. Inside `'{name}'`, the quotes cancel out and the value runs as shell code.
+
+- Bad: `echo "{name}"`
+- Good: `echo {name}`
 
 ## Pinned groups
 
