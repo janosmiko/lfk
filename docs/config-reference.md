@@ -837,7 +837,9 @@ Template variables are substituted before execution:
 | `{namespace}` | Resource namespace |
 | `{context}` | Kubeconfig context name |
 | `{kind}` | Resource kind (e.g., "Pod", "Deployment") |
-| `{<ColumnKey>}` | Any column value from the resource (e.g., `{Node}`, `{IP}`). Match the exact column key, or the key in lowercase with spaces removed |
+| `{<ColumnKey>}` | Any column value from the resource (e.g., `{Node}`, `{IP}`) |
+
+A column placeholder matches the exact column key, or the key in lowercase with spaces removed.
 
 Custom action commands are executed via `sh -c` with `KUBECONFIG` set in the environment. Interactive commands (like `ssh`) hand over the terminal to the subprocess.
 
