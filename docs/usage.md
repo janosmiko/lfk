@@ -247,9 +247,10 @@ The command bar follows the same rule. `:!` shell commands are blocked,
 because they run with the current context's kubeconfig. `:k` runs only
 read-only verbs (`get`, `describe`, `logs`, `top`, `explain`,
 `api-resources`, `api-versions`, `version`, `cluster-info`, `events`,
-`diff`, `auth can-i`, `config view|get-contexts|current-context`,
+`diff`, `auth can-i|whoami`, `config view|get-contexts|current-context`,
 `rollout status|history`). Other verbs and plugins are blocked. With
 `--context <name>`, the check uses that context.
+A write through `--kubeconfig`, `--server`, or `--cluster` is checked against the current context only.
 
 Read-only is per-context (and per-tab). The UI surfaces it in two places:
 

@@ -121,6 +121,7 @@ var kubectlGlobalFlagsWithValue = map[string]bool{
 	"--as":                    true,
 	"--as-group":              true,
 	"--as-uid":                true,
+	"--as-user-extra":         true,
 	"--cache-dir":             true,
 	"--certificate-authority": true,
 	"--client-certificate":    true,
@@ -128,6 +129,8 @@ var kubectlGlobalFlagsWithValue = map[string]bool{
 	"--cluster":               true,
 	"--context":               true,
 	"--kubeconfig":            true,
+	"--kuberc":                true,
+	"--log-flush-frequency":   true,
 	"--namespace":             true,
 	"-n":                      true,
 	"--password":              true,
@@ -140,6 +143,9 @@ var kubectlGlobalFlagsWithValue = map[string]bool{
 	"--token":                 true,
 	"--user":                  true,
 	"--username":              true,
+	"-v":                      true,
+	"--v":                     true,
+	"--vmodule":               true,
 }
 
 // argsFromVerb walks args, skipping leading kubectl global flags (and the

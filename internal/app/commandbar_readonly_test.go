@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,6 +29,25 @@ func TestCommandBarReadOnly_Kubectl(t *testing.T) {
 		{"k rollout undo deploy x", true},
 		{"k -n ns rollout pause deploy x", true},
 		{"k somepluginverb", true},
+		{"k --as-user-extra get delete pod x", true},
+		{"k --kuberc get delete pod x", true},
+		{"k -v get delete pod x", true},
+		{"k --v get delete pod x", true},
+		{"k --vmodule get delete pod x", true},
+		{"k --log-flush-frequency get delete pod x", true},
+		{"k --made-up-flag get delete pod x", true},
+		{"k --made-up-flag=1 get pods", true},
+		{"k -v=6 get pods", false},
+		{"k --v=6 get pods", false},
+		{"k -v 6 get pods", false},
+		{"k --insecure-skip-tls-verify get pods", false},
+		{"k --as-user-extra a=b get pods", false},
+		{"k get pods -o yaml", false},
+		{"k get pods -l a=b", false},
+		{"k get pods --all-namespaces", false},
+		{"k get pods -A", false},
+		{"k get pods -w", false},
+		{"k get pods -n ns -o wide", false},
 		{"k -n ns", true},
 		{"k get pods", false},
 		{"k -n ns get pods", false},
@@ -96,6 +116,23 @@ func TestCommandBarReadOnly_ExplicitContext(t *testing.T) {
 		r, cmd := m.executeCommandBarInput("k --context prod get pods")
 		assert.NotNil(t, cmd)
 		assert.Empty(t, r.(Model).statusMessage)
+	})
+	t.Run("last_context_wins", func(t *testing.T) {
+		for _, tc := range []struct {
+			in      string
+			blocked bool
+		}{
+			{"k delete pod x --context=dev --context=prod", true},
+			{"k delete pod x --context dev --context prod", true},
+			{"k delete pod x --context dev --context=prod", true},
+			{"k delete pod x --context=prod --context=dev", false},
+			{"k delete pod x --context prod --context dev", false},
+			{"k delete pod x --context=prod --context dev", false},
+		} {
+			m := baseModelWithFakeClient()
+			r, _ := m.executeCommandBarInput(tc.in)
+			assert.Equal(t, tc.blocked, strings.Contains(r.(Model).statusMessage, "Read-only mode"), tc.in)
+		}
 	})
 	t.Run("session_override_unlocks_target", func(t *testing.T) {
 		m := baseModelWithFakeClient()

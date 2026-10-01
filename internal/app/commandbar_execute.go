@@ -53,10 +53,10 @@ func (m Model) kubectlContext(displayName string) string {
 	return m.client.OriginalContextName(displayName)
 }
 
-// logCommandBarExec logs the program and context only. Arguments can carry
-// tokens, so they never reach the persisted log.
-func (m Model) logCommandBarExec(label, program string) {
-	logger.Info(label, "program", program, "context", m.nav.Context)
+// logCommandBarExec logs the context only. Command text can carry tokens,
+// including env assignments before the program name.
+func (m Model) logCommandBarExec(label string) {
+	logger.Info(label, "context", m.nav.Context)
 }
 
 func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
@@ -136,7 +136,7 @@ func (m Model) executeShellCommand(cmd string) tea.Cmd {
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command("sh", "-c", cmd)
 		c.Env = m.kubectlEnv()
-		m.logCommandBarExec("Running shell command", firstWordOf(cmd))
+		m.logCommandBarExec("Running shell command")
 		cols, rows := m.embeddedPTYSize()
 		return startPTYExecCmd(c, fmtPTYTitle("$ "+cmd), cols, rows)
 	}
@@ -735,7 +735,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command(kubectlPath, args...)
 		c.Env = m.kubectlEnv()
-		m.logCommandBarExec("Running kubectl command", "kubectl")
+		m.logCommandBarExec("Running kubectl command")
 		// PTY-mode commands don't route through tea.ExecProcess, so the
 		// namespace-cache invalidation that normally arrives via
 		// actionResultMsg won't fire here. That's acceptable because the
@@ -762,7 +762,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	c := exec.Command("sh", "-c", shellCmd)
 	c.Env = m.kubectlEnv()
 
-	m.logCommandBarExec("Running kubectl command", "kubectl")
+	m.logCommandBarExec("Running kubectl command")
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return actionResultMsg{err: err, invalidateNamespaceCache: affectsNamespaces}

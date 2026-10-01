@@ -20,6 +20,35 @@ var kubectlReadOnlySubcommands = map[string]map[string]bool{
 	"rollout": {"status": true, "history": true},
 }
 
+var kubectlGlobalBoolFlags = map[string]bool{
+	"--disable-compression": true, "--insecure-skip-tls-verify": true,
+	"--match-server-version": true, "--warnings-as-errors": true,
+	"-h": true, "--help": true,
+}
+
+// hasUnknownPreVerbFlag reports whether a dash token before the verb is not a
+// known kubectl global flag. A flag we cannot classify may consume the next
+// token, so the verb we read could be wrong.
+func hasUnknownPreVerbFlag(args []string) bool {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			return false
+		}
+		name, _, hasValue := strings.Cut(a, "=")
+		switch {
+		case kubectlGlobalFlagsWithValue[name]:
+			if !hasValue {
+				i++
+			}
+		case kubectlGlobalBoolFlags[name]:
+		default:
+			return true
+		}
+	}
+	return false
+}
+
 // isReadOnlyKubectl reports whether the kubectl args (without the kubectl or
 // k prefix) are on the read-only allowlist. Unknown verbs and plugins fail closed.
 func isReadOnlyKubectl(args []string) (verb string, ok bool) {
@@ -28,6 +57,9 @@ func isReadOnlyKubectl(args []string) (verb string, ok bool) {
 		return "", false
 	}
 	verb = rest[0]
+	if hasUnknownPreVerbFlag(args) {
+		return verb, false
+	}
 	if kubectlReadOnlyVerbs[verb] {
 		return verb, true
 	}
@@ -37,17 +69,18 @@ func isReadOnlyKubectl(args []string) (verb string, ok bool) {
 	return verb, false
 }
 
-// explicitKubectlContext returns the value of a --context flag, if any.
+// explicitKubectlContext returns the value of the last --context flag, which
+// is the one kubectl uses.
 func explicitKubectlContext(args []string) string {
+	last := ""
 	for i, a := range args {
 		if v, ok := strings.CutPrefix(a, "--context="); ok {
-			return v
-		}
-		if a == "--context" && i+1 < len(args) {
-			return args[i+1]
+			last = v
+		} else if a == "--context" && i+1 < len(args) {
+			last = args[i+1]
 		}
 	}
-	return ""
+	return last
 }
 
 // kubectlBlockedByReadOnly reports whether a command bar kubectl invocation

@@ -18,8 +18,8 @@ func TestCommandBar_LogsProgramAndContextNotArguments(t *testing.T) {
 
 	for _, mode := range []string{ui.TerminalModePTY, ui.TerminalModeExec} {
 		for _, tc := range []struct{ name, input, program string }{
-			{"shell", "! curl -H s3cr3t-placeholder-value host", "curl"},
-			{"kubectl", "k get pods --token s3cr3t-placeholder-value", "kubectl"},
+			{"shell", "! TOKEN=s3cr3t-placeholder-value curl host", "Running shell command"},
+			{"kubectl", "k get pods --token s3cr3t-placeholder-value", "Running kubectl command"},
 		} {
 			t.Run(mode+"/"+tc.name, func(t *testing.T) {
 				ui.ConfigTerminalMode = mode
@@ -39,6 +39,10 @@ func TestCommandBar_LogsProgramAndContextNotArguments(t *testing.T) {
 					return
 				}
 				assert.Contains(t, out, tc.program)
+				if tc.name == "shell" {
+					assert.NotContains(t, out, "curl")
+					assert.NotContains(t, out, "TOKEN")
+				}
 				assert.Contains(t, out, "prod-ctx")
 			})
 		}
