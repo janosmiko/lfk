@@ -9,7 +9,7 @@ import (
 var kubectlReadOnlyVerbs = map[string]bool{
 	"get": true, "describe": true, "logs": true, "top": true, "explain": true,
 	"api-resources": true, "api-versions": true, "version": true,
-	"cluster-info": true, "events": true, "diff": true,
+	"cluster-info": true, "events": true, "diff": true, "help": true, "options": true,
 }
 
 // kubectlReadOnlySubcommands lists the read-only subcommands of verbs that
@@ -152,7 +152,10 @@ func (m Model) navTargetReadOnly() bool {
 		return true
 	}
 	cur := m.client.CurrentContext()
-	return cur == "" || m.effectiveContextReadOnly(cur) || m.fallbackContextReadOnly()
+	if cur == "" {
+		return false
+	}
+	return m.effectiveContextReadOnly(cur) || m.fallbackContextReadOnly()
 }
 
 // fallbackContextReadOnly resolves read-only for the current-context field of
@@ -167,12 +170,16 @@ func (m Model) fallbackContextReadOnly() bool {
 		ctx = m.client.CurrentContext()
 	}
 	path := m.client.KubeconfigPathForContext(ctx)
+	// No path or no current-context means kubectl has no target to mutate.
 	if path == "" {
-		return true
+		return m.cliReadOnly || m.readOnly
 	}
 	cfg, err := clientcmd.LoadFromFile(path)
-	if err != nil || cfg.CurrentContext == "" {
+	if err != nil {
 		return true
+	}
+	if cfg.CurrentContext == "" {
+		return m.cliReadOnly || m.readOnly
 	}
 	return m.contextReadOnly(cfg.CurrentContext)
 }

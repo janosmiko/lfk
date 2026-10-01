@@ -404,3 +404,63 @@ func TestCommandBarReadOnly_PickerUsesSelectedFileCurrentContext(t *testing.T) {
 	require.Equal(t, "dev", m.client.CurrentContext())
 	assert.True(t, blockedFor(m, []string{"delete", "pod", "x"}))
 }
+
+func TestCommandBarReadOnly_NoFallbackContextUsesGlobalFlags(t *testing.T) {
+	plugin := []string{"fake", "x"}
+	cases := []struct {
+		name  string
+		model func(t *testing.T) Model
+	}{
+		{"file_without_current_context", func(t *testing.T) Model {
+			m := fallbackModel(t, writeKubeconfigFile(t, "a", "", "rw"))
+			m.nav.Context = "rw"
+			return m
+		}},
+		{"empty_path", func(t *testing.T) Model {
+			m := baseModelWithFakeClient()
+			m.client = &k8s.Client{}
+			require.Empty(t, m.client.KubeconfigPathForContext("test-ctx"))
+			m.nav.Context = "test-ctx"
+			return m
+		}},
+		{"picker_without_current_context", func(t *testing.T) Model {
+			m := fallbackModel(t, writeKubeconfigFile(t, "a", "", "rw"))
+			require.Empty(t, m.client.CurrentContext())
+			m.nav.Context = ""
+			return m
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+"/writable", func(t *testing.T) {
+			m := tc.model(t)
+			assert.False(t, blockedFor(m, plugin))
+			assert.False(t, blockedFor(m, []string{"delete", "pod", "x"}))
+			r, cmd := m.executeCommandBarInput("! kubectl delete pod x")
+			assert.NotNil(t, cmd)
+			assert.Empty(t, r.(Model).statusMessage)
+		})
+		t.Run(tc.name+"/cli_read_only", func(t *testing.T) {
+			m := tc.model(t)
+			m.cliReadOnly = true
+			assert.True(t, blockedFor(m, plugin))
+			assert.True(t, blockedFor(m, []string{"delete", "pod", "x"}))
+			r, _ := m.executeCommandBarInput("! kubectl delete pod x")
+			assert.Equal(t, readOnlyBlockedMessage("shell commands"), r.(Model).statusMessage)
+		})
+	}
+}
+
+func TestCommandBarReadOnly_LoadErrorStillBlocks(t *testing.T) {
+	m := fallbackModel(t, writeKubeconfigFile(t, "a", "rw", "rw"))
+	m.nav.Context = ""
+	require.NoError(t, os.Remove(m.client.KubeconfigPathForContext("rw")))
+	assert.True(t, blockedFor(m, []string{"fake", "x"}))
+	assert.True(t, blockedFor(m, []string{"delete", "pod", "x"}))
+}
+
+func TestKubectlBlockedByReadOnly_HelpAndOptionsAllowed(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.cliReadOnly, m.readOnly = true, true
+	assert.False(t, blockedFor(m, []string{"help"}))
+	assert.False(t, blockedFor(m, []string{"options"}))
+}
