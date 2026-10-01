@@ -64,6 +64,8 @@ func TestUnionDrillDown_KeepsReadOnlyForMember(t *testing.T) {
 					msg, blocked := m.actionBlockedReason(a.kind, a.label)
 					assert.True(t, blocked, a.label)
 					assert.Equal(t, readOnlyBlockedMessage(a.label), msg)
+					er, _ := m.executeAction(a.label)
+					assert.Equal(t, readOnlyBlockedMessage(a.label), er.(Model).statusMessage)
 				}
 			})
 		}
@@ -100,6 +102,8 @@ func TestJumpBack_RestoresReadOnlyOfSnapshotContext(t *testing.T) {
 			rm.actionCtx = actionContext{kind: "Pod", name: "x", namespace: "default", context: tc.from}
 			_, blocked := rm.actionBlockedReason("Pod", "Delete")
 			assert.Equal(t, tc.from == "prod", blocked)
+			er, _ := rm.executeAction("Delete")
+			assert.Equal(t, tc.from == "prod", er.(Model).statusMessage == readOnlyBlockedMessage("Delete"))
 		})
 	}
 }
@@ -199,7 +203,17 @@ func TestUnionRow_DirectForceDeleteHonorsMemberReadOnly(t *testing.T) {
 }
 
 func TestUnionRow_DirectDeleteEscalationHonorsMemberReadOnly(t *testing.T) {
-	m := unionMemberROModel(t, "prod")
-	r, _ := m.directActionDelete()
-	assert.NotEqual(t, overlayConfirmType, r.(Model).overlay)
+	for cluster, wantBlocked := range map[string]bool{"prod": true, "dev": false} {
+		t.Run(cluster, func(t *testing.T) {
+			m := unionMemberROModel(t, cluster)
+			r, _ := m.directActionDelete()
+			rm := r.(Model)
+			if wantBlocked {
+				assert.NotEqual(t, overlayConfirmType, rm.overlay)
+				assert.Equal(t, readOnlyBlockedMessage("Force Delete"), rm.statusMessage)
+			} else {
+				assert.Equal(t, overlayConfirmType, rm.overlay)
+			}
+		})
+	}
 }

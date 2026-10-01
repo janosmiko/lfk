@@ -63,6 +63,7 @@ func (m Model) openCaptureFromPseudo(it model.Item) (tea.Model, tea.Cmd) {
 	}
 	for _, e := range m.captureMgr.Entries() {
 		if e.ID == id {
+			m.actionCtx.context = e.Request.Context
 			m.captureOverlay = captureOverlayState{
 				targetKind: "Pod",
 				targetNS:   e.Request.Namespace,

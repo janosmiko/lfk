@@ -264,7 +264,7 @@ func (m Model) handleBatchLabelOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.C
 		// Belt-and-suspenders read-only gate: the dispatcher already blocks
 		// "Labels / Annotations" upstream, but a user who toggled RO on
 		// while this overlay was open could otherwise commit a mutation.
-		if m.readOnlyForContext(m.actionCtx.context) {
+		if _, ro := m.bulkReadOnlyContext(); ro {
 			m.overlay = overlayNone
 			m.setStatusMessage(readOnlyBlockedMessage("Labels / Annotations"), true)
 			return m, scheduleStatusClear()
