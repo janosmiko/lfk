@@ -205,7 +205,7 @@ func (m Model) executeActionDefault(actionLabel string) (tea.Model, tea.Cmd) {
 		// can interpolate user-controlled fields (env, annotations, secret
 		// names) that may contain tokens we should not echo into the log.
 		m.addLogEntry("DBG", fmt.Sprintf("custom action %q dispatched", actionLabel))
-		return m, m.execCustomAction(expandedCmd)
+		return m, m.execCustomAction(actionLabel, expandedCmd)
 	}
 	return m, nil
 }
