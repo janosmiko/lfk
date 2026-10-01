@@ -178,6 +178,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.nav.ResourceName = ""
 		if m.unionMode && !m.hasUnionDashboardMemberBreadcrumb() {
 			m.nav.Context = UnionContextSentinel
+			m.applyReadOnlyForContext(UnionContextSentinel)
 		}
 		if cached, ok := m.itemCache[m.navKey()]; ok {
 			m.setMiddleItems(cached)
@@ -199,6 +200,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.nav.OwnedName = ""
 			if m.unionMode && !m.hasUnionDashboardMemberBreadcrumb() {
 				m.nav.Context = UnionContextSentinel
+				m.applyReadOnlyForContext(UnionContextSentinel)
 			}
 		} else {
 			m.nav.Level = model.LevelOwned

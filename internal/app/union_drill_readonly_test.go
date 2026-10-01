@@ -68,3 +68,60 @@ func TestUnionDrillDown_KeepsReadOnlyForMember(t *testing.T) {
 		}
 	}
 }
+
+func TestJumpBack_RestoresReadOnlyOfSnapshotContext(t *testing.T) {
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"prod": true, "dev": false}
+
+	cases := []struct{ name, from, to string }{
+		{"back into read-only member", "prod", "dev"},
+		{"back into writable member", "dev", "prod"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := baseModelWithFakeClient()
+			m.client.AddTestContext("prod", "https://prod.example.local:6443")
+			m.client.AddTestContext("dev", "https://dev.example.local:6443")
+			m.unionMode = true
+			m.unionContexts = []string{"dev", "prod"}
+			m.nav.Level = model.LevelResources
+			m.nav.Context = tc.from
+			m.recomputeReadOnly(tc.from)
+			m.pushJumpHistory()
+
+			m.nav.Context = tc.to
+			m.recomputeReadOnly(tc.to)
+
+			r, _ := m.jumpBack()
+			rm := r.(Model)
+			require.Equal(t, tc.from, rm.nav.Context)
+			rm.actionCtx = actionContext{kind: "Pod", name: "x", namespace: "default", context: tc.from}
+			_, blocked := rm.actionBlockedReason("Pod", "Delete")
+			assert.Equal(t, tc.from == "prod", blocked)
+		})
+	}
+}
+
+func TestNavigateParent_UnionSentinelDropsMemberReadOnly(t *testing.T) {
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"prod": true}
+
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"dev", "prod"}
+	m.nav.Context = UnionContextSentinel
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "web", Kind: "Deployment", Namespace: "default", ClusterName: "prod"}}
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true}
+	m.setCursor(0)
+	r, _ := m.navigateChild()
+	m = r.(Model)
+	require.True(t, m.readOnly)
+
+	r, _ = m.navigateParent()
+	rm := r.(Model)
+	require.Equal(t, UnionContextSentinel, rm.nav.Context)
+	assert.Equal(t, rm.cliReadOnly, rm.readOnly)
+}

@@ -284,7 +284,20 @@ func (m *Model) refreshContextReadOnlyMarkers() {
 func (m *Model) enterUnionRowContext(sel *model.Item) {
 	if m.unionMode && sel.ClusterName != "" {
 		m.nav.Context = sel.ClusterName
-		m.recomputeReadOnly(sel.ClusterName)
+		m.applyReadOnlyForContext(sel.ClusterName)
+	}
+}
+
+// applyReadOnlyForContext re-resolves m.readOnly for a context entered or
+// restored by navigation. The union sentinel has no config of its own, so it
+// keeps only the CLI flag. The empty picker context is left untouched.
+func (m *Model) applyReadOnlyForContext(ctx string) {
+	switch ctx {
+	case "":
+	case UnionContextSentinel:
+		m.readOnly = m.cliReadOnly
+	default:
+		m.recomputeReadOnly(ctx)
 	}
 }
 

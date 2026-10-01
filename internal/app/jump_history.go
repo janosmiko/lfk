@@ -232,6 +232,7 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 	m.unfilteredMiddleItems = nil
 
 	m.nav = snap.nav
+	m.applyReadOnlyForContext(m.nav.Context)
 	m.leftItems = append([]model.Item(nil), snap.leftItems...)
 	m.leftItemsHistory = make([][]model.Item, len(snap.leftItemsHistory))
 	for i, hist := range snap.leftItemsHistory {
