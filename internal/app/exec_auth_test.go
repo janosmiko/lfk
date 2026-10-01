@@ -221,6 +221,7 @@ func TestExecAuthCmd_RunRetriesUntilSuccess(t *testing.T) {
 	c.SetStdin(strings.NewReader(""))
 	c.SetStdout(&out)
 	require.NoError(t, c.Run())
+	assert.Contains(t, out.String(), pluginFailLine)
 	assert.Contains(t, out.String(), "Login failed, retrying (attempt 2/3)")
 	assert.Contains(t, out.String(), "Login failed, retrying (attempt 3/3)")
 	assert.Equal(t, "3", runCount(t, counter))
@@ -236,6 +237,23 @@ func TestExecAuthCmd_RunFailsAfterMaxAttempts(t *testing.T) {
 	c.SetStdout(&out)
 	require.Error(t, c.Run())
 	assert.Equal(t, "3", runCount(t, counter))
+	assert.Contains(t, out.String(), "Press Enter to return to lfk")
+}
+
+func TestExecAuthCmd_RunUsesFreshStderrBufferPerAttempt(t *testing.T) {
+	counter := filepath.Join(t.TempDir(), "count")
+	fakeKubectl(t, `c="`+counter+`"
+n=$(cat "$c" 2>/dev/null || echo 0)
+n=$((n+1))
+echo $n > "$c"
+if [ "$n" -eq 1 ]; then echo "`+pluginFailLine+`" >&2; exit 1; fi
+if [ "$n" -eq 2 ]; then echo "Unable to connect to the server: i/o timeout" >&2; exit 1; fi`)
+	var out bytes.Buffer
+	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
+	c.SetStdin(strings.NewReader("\n"))
+	c.SetStdout(&out)
+	require.Error(t, c.Run())
+	assert.Equal(t, "2", runCount(t, counter))
 	assert.Contains(t, out.String(), "Press Enter to return to lfk")
 }
 
