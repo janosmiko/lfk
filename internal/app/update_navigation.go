@@ -569,9 +569,7 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		// Push history before switching scope, so jump-back restores the
 		// origin namespace/cluster scope rather than the Pod's.
 		m.pushJumpHistory()
-		if m.unionMode && sel.ClusterName != "" {
-			m.nav.Context = sel.ClusterName
-		}
+		m.enterUnionRowContext(sel)
 		m.allNamespaces = false
 		m.namespace = sel.Namespace
 		m.selectedNamespaces = map[string]bool{sel.Namespace: true}
@@ -587,9 +585,7 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	} else if !m.allNamespaces {
 		m.nav.Namespace = m.namespace
 	}
-	if m.unionMode && sel.ClusterName != "" {
-		m.nav.Context = sel.ClusterName
-	}
+	m.enterUnionRowContext(sel)
 	m.saveCurrentSession()
 	if m.nav.ResourceType.Kind == "Pod" {
 		m.nav.OwnedName = sel.Name
@@ -624,9 +620,7 @@ func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
 	if sel.Kind == "__security_affected_resource__" {
 		return m.jumpToFindingResource(sel)
 	}
-	if m.unionMode && sel.ClusterName != "" {
-		m.nav.Context = sel.ClusterName
-	}
+	m.enterUnionRowContext(sel)
 	if sel.Kind == "Pod" {
 		m.saveCursor()
 		m.nav.OwnedName = sel.Name

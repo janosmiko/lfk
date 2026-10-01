@@ -279,6 +279,15 @@ func (m *Model) refreshContextReadOnlyMarkers() {
 	m.itemCache[m.navKey()] = m.middleItems
 }
 
+// enterUnionRowContext switches nav.Context to the union row's cluster and
+// re-resolves read-only for it.
+func (m *Model) enterUnionRowContext(sel *model.Item) {
+	if m.unionMode && sel.ClusterName != "" {
+		m.nav.Context = sel.ClusterName
+		m.recomputeReadOnly(sel.ClusterName)
+	}
+}
+
 // recomputeReadOnly recalculates m.readOnly for the given context after a
 // nav.Context change. Call it from every site that mutates nav.Context so
 // CLI flag, per-context overrides, and config take effect on every
