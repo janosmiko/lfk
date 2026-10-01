@@ -2,6 +2,8 @@ package app
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +15,8 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+const execAuthMaxAttempts = 3
 
 type execAuthDoneMsg struct {
 	context string
@@ -85,6 +89,21 @@ func (c *execAuthCmd) Run() error {
 	if err != nil {
 		return c.fail(fmt.Errorf("kubectl not found: %w", err))
 	}
+	for attempt := 1; ; attempt++ {
+		var stderr bytes.Buffer
+		err = c.newKubectlCmd(bin, &stderr).Run()
+		if err == nil {
+			return nil
+		}
+		// Other failures, such as an unreachable cluster, would only wait out the long timeout again.
+		if attempt == execAuthMaxAttempts || !k8s.IsExecPluginExitError(errors.New(stderr.String())) {
+			return c.fail(err)
+		}
+		_, _ = fmt.Fprintf(c.stdout, "\nLogin failed, retrying (attempt %d/%d)\n", attempt+1, execAuthMaxAttempts)
+	}
+}
+
+func (c *execAuthCmd) newKubectlCmd(bin string, stderr io.Writer) *exec.Cmd {
 	// The timeout also counts the time spent at the plugin prompt, so keep it long.
 	cmd := exec.Command(bin, k8s.DemoKubectlArgs([]string{
 		"get", "--raw", "/version", "--context", c.kubectlContext, "--request-timeout=5m",
@@ -96,11 +115,8 @@ func (c *execAuthCmd) Run() error {
 	cmd.Stdin = c.stdin
 	cmd.Stdout = io.Discard
 	// The plugin prompt goes to stderr, but tea's stderr is a capture pipe.
-	cmd.Stderr = c.stdout
-	if err := cmd.Run(); err != nil {
-		return c.fail(err)
-	}
-	return nil
+	cmd.Stderr = io.MultiWriter(c.stdout, stderr)
+	return cmd
 }
 
 func (c *execAuthCmd) fail(err error) error {
