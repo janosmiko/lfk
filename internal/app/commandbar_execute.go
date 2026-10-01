@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -50,6 +51,12 @@ func (m Model) kubectlContext(displayName string) string {
 		return displayName
 	}
 	return m.client.OriginalContextName(displayName)
+}
+
+// logCommandBarExec logs the program and context only. Arguments can carry
+// tokens, so they never reach the persisted log.
+func (m Model) logCommandBarExec(label, program string) {
+	logger.Info(label, "program", program, "context", m.nav.Context)
 }
 
 func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
@@ -129,7 +136,7 @@ func (m Model) executeShellCommand(cmd string) tea.Cmd {
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command("sh", "-c", cmd)
 		c.Env = m.kubectlEnv()
-		logExecCmd("Running shell command", c)
+		m.logCommandBarExec("Running shell command", firstWordOf(cmd))
 		cols, rows := m.embeddedPTYSize()
 		return startPTYExecCmd(c, fmtPTYTitle("$ "+cmd), cols, rows)
 	}
@@ -728,7 +735,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command(kubectlPath, args...)
 		c.Env = m.kubectlEnv()
-		logExecCmd("Running kubectl command", c)
+		m.logCommandBarExec("Running kubectl command", "kubectl")
 		// PTY-mode commands don't route through tea.ExecProcess, so the
 		// namespace-cache invalidation that normally arrives via
 		// actionResultMsg won't fire here. That's acceptable because the
@@ -755,7 +762,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	c := exec.Command("sh", "-c", shellCmd)
 	c.Env = m.kubectlEnv()
 
-	logExecCmd("Running kubectl command", c)
+	m.logCommandBarExec("Running kubectl command", "kubectl")
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return actionResultMsg{err: err, invalidateNamespaceCache: affectsNamespaces}
