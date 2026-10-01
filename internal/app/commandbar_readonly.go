@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 var kubectlReadOnlyVerbs = map[string]bool{
@@ -153,7 +155,8 @@ func (m Model) navTargetReadOnly() bool {
 	}
 	cur := m.client.CurrentContext()
 	if cur == "" {
-		return false
+		// The file may have gained a current-context since lfk loaded it.
+		return m.fallbackContextReadOnly()
 	}
 	return m.effectiveContextReadOnly(cur) || m.fallbackContextReadOnly()
 }
@@ -172,14 +175,19 @@ func (m Model) fallbackContextReadOnly() bool {
 	path := m.client.KubeconfigPathForContext(ctx)
 	// No path or no current-context means kubectl has no target to mutate.
 	if path == "" {
-		return m.cliReadOnly || m.readOnly
+		return m.globalReadOnly()
 	}
 	cfg, err := clientcmd.LoadFromFile(path)
 	if err != nil {
 		return true
 	}
 	if cfg.CurrentContext == "" {
-		return m.cliReadOnly || m.readOnly
+		return m.globalReadOnly()
 	}
 	return m.contextReadOnly(cfg.CurrentContext)
+}
+
+// globalReadOnly is the read-only state that applies without a target context.
+func (m Model) globalReadOnly() bool {
+	return m.cliReadOnly || m.readOnly || ui.ResolveReadOnly("", false)
 }

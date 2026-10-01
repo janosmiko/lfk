@@ -450,6 +450,43 @@ func TestCommandBarReadOnly_NoFallbackContextUsesGlobalFlags(t *testing.T) {
 	}
 }
 
+func TestCommandBarReadOnly_PickerRereadsKubeconfigCurrentContext(t *testing.T) {
+	for _, tc := range []struct {
+		current string
+		blocked bool
+	}{{"ro", true}, {"rw", false}} {
+		t.Run(tc.current, func(t *testing.T) {
+			path := writeKubeconfigFile(t, "a", "", "rw", "ro")
+			m := fallbackModel(t, path)
+			m.nav.Context = ""
+			require.Empty(t, m.client.CurrentContext())
+			// Another terminal sets current-context after lfk loaded the file.
+			require.NoError(t, os.WriteFile(path, []byte(fmt.Sprintf(
+				"apiVersion: v1\nkind: Config\ncurrent-context: %s\nclusters:\n- name: c\n  cluster:\n    server: https://x.example.test:6443\ncontexts:\n- name: rw\n  context:\n    cluster: c\n    user: u\n- name: ro\n  context:\n    cluster: c\n    user: u\nusers:\n- name: u\n  user:\n    token: t\n", tc.current)), 0o600))
+			assert.Equal(t, tc.blocked, blockedFor(m, []string{"delete", "pod", "x"}))
+			r, cmd := m.executeCommandBarInput("! kubectl delete pod x")
+			if tc.blocked {
+				assert.Equal(t, readOnlyBlockedMessage("shell commands"), r.(Model).statusMessage)
+				return
+			}
+			assert.NotNil(t, cmd)
+			assert.Empty(t, r.(Model).statusMessage)
+		})
+	}
+}
+
+func TestCommandBarReadOnly_NoFallbackContextHonorsGlobalConfig(t *testing.T) {
+	prev := ui.ConfigReadOnly
+	t.Cleanup(func() { ui.ConfigReadOnly = prev })
+	ui.ConfigReadOnly = true
+
+	m := baseModelWithFakeClient()
+	m.client = &k8s.Client{}
+	m.nav.Context = ""
+	assert.True(t, blockedFor(m, []string{"delete", "pod", "x"}))
+	assert.True(t, blockedFor(m, []string{"fake", "x"}))
+}
+
 func TestCommandBarReadOnly_LoadErrorStillBlocks(t *testing.T) {
 	m := fallbackModel(t, writeKubeconfigFile(t, "a", "rw", "rw"))
 	m.nav.Context = ""
