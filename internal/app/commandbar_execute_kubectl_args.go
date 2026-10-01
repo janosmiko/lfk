@@ -30,21 +30,21 @@ func commandAffectsNamespaces(args []string) bool {
 	return false
 }
 
-// injectKubectlDefaults scans the args for --context, -n/--namespace, and
+// injectKubectlDefaults scans the args for -n/--namespace and
 // -A/--all-namespaces flags. If they are not present, it injects the current
-// context and namespace from the model. Subcommands that don't accept
+// namespace from the model. It always puts --context <current> first: kubectl
+// uses the last --context, so a real user flag still wins, while a fake one
+// (after "--", or the value of another flag) cannot fall back to the
+// kubeconfig current-context. Subcommands that don't accept
 // namespace flags (explain, api-resources, version, config, cordon, etc.)
 // have only --context injected — injecting -A or -n on those would cause
 // kubectl to reject the command with "unknown flag".
 func (m *Model) injectKubectlDefaults(args []string) []string {
-	hasContext := false
 	hasNamespace := false
 	hasAllNamespaces := false
 
 	for _, a := range args {
 		switch {
-		case a == "--context" || strings.HasPrefix(a, "--context="):
-			hasContext = true
 		case a == "-n" || a == "--namespace" || strings.HasPrefix(a, "--namespace="):
 			hasNamespace = true
 		case a == "-A" || a == "--all-namespaces":
@@ -52,12 +52,11 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 		}
 	}
 
-	result := make([]string, len(args))
-	copy(result, args)
-
-	if !hasContext && m.nav.Context != "" {
+	result := make([]string, 0, len(args)+4)
+	if m.nav.Context != "" {
 		result = append(result, "--context", m.kubectlContext(m.nav.Context))
 	}
+	result = append(result, args...)
 
 	if commandSupportsNamespaceFlags(args) && !hasNamespace && !hasAllNamespaces {
 		hasResourceNames := positionalArgCount(args) > 2

@@ -117,7 +117,7 @@ func TestCommandBarReadOnly_ExplicitContext(t *testing.T) {
 		assert.NotNil(t, cmd)
 		assert.Empty(t, r.(Model).statusMessage)
 	})
-	t.Run("last_context_wins", func(t *testing.T) {
+	t.Run("any_read_only_candidate_blocks", func(t *testing.T) {
 		for _, tc := range []struct {
 			in      string
 			blocked bool
@@ -125,9 +125,15 @@ func TestCommandBarReadOnly_ExplicitContext(t *testing.T) {
 			{"k delete pod x --context=dev --context=prod", true},
 			{"k delete pod x --context dev --context prod", true},
 			{"k delete pod x --context dev --context=prod", true},
-			{"k delete pod x --context=prod --context=dev", false},
-			{"k delete pod x --context prod --context dev", false},
-			{"k delete pod x --context=prod --context dev", false},
+			{"k delete pod x --context=prod --context=dev", true},
+			{"k delete pod x --context prod --context dev", true},
+			{"k delete pod x -- --context=prod", true},
+			{"k --user --context prod delete pod x", true},
+			{"k --context= delete pod x", true},
+			{"k delete pod x --context", true},
+			{"k delete pod x --context=dev --context=", true},
+			{"k delete pod x --context=dev --context=stage", false},
+			{"k get pods --context=prod", false},
 		} {
 			m := baseModelWithFakeClient()
 			r, _ := m.executeCommandBarInput(tc.in)
@@ -167,4 +173,26 @@ func TestCommandBarReadOnly_Shell(t *testing.T) {
 			assert.Empty(t, rm.statusMessage)
 		})
 	}
+}
+
+func TestInjectKubectlDefaults_AlwaysPinsContextAtFront(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "my-ctx"
+	for _, args := range [][]string{
+		{"get", "pods"},
+		{"delete", "pod", "x", "--", "--context=dev"},
+		{"--user", "--context", "delete", "pod", "x"},
+		{"--context=", "delete", "pod", "x"},
+	} {
+		got := m.injectKubectlDefaults(args)
+		assert.Equal(t, []string{"--context", "my-ctx"}, got[:2], args)
+		assert.Equal(t, args, got[2:2+len(args)], "user args follow the pin in order")
+	}
+}
+
+func TestInjectKubectlDefaults_ExplicitContextStillWinsByOrder(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "my-ctx"
+	got := m.injectKubectlDefaults([]string{"--context", "other", "get", "pods"})
+	assert.Equal(t, []string{"--context", "my-ctx", "--context", "other", "get", "pods"}, got[:6])
 }

@@ -69,22 +69,42 @@ func isReadOnlyKubectl(args []string) (verb string, ok bool) {
 	return verb, false
 }
 
-// explicitKubectlContext returns the value of the last --context flag, which
-// is the one kubectl uses.
-func explicitKubectlContext(args []string) string {
-	last := ""
+// kubectlContextCandidates returns every value that any --context token could
+// carry, wherever it sits in the args. Over-approximating is deliberate: kubectl
+// grammar (flag values, "--") makes the real target hard to parse.
+func kubectlContextCandidates(args []string) []string {
+	var out []string
 	for i, a := range args {
 		if v, ok := strings.CutPrefix(a, "--context="); ok {
-			last = v
-		} else if a == "--context" && i+1 < len(args) {
-			last = args[i+1]
+			out = append(out, v)
+		} else if a == "--context" {
+			if i+1 < len(args) {
+				out = append(out, args[i+1])
+			} else {
+				out = append(out, "")
+			}
 		}
 	}
-	return last
+	return out
+}
+
+func (m Model) contextReadOnly(ctx string) bool {
+	if ctx == "" || ctx == m.nav.Context || ctx == m.kubectlContext(m.nav.Context) {
+		return m.readOnlyForContext(m.nav.Context)
+	}
+	if m.cliReadOnly || m.readOnly {
+		return true
+	}
+	if v, set := m.contextROOverrides[ctx]; set {
+		return v
+	}
+	return ui.ResolveReadOnly(ctx, false)
 }
 
 // kubectlBlockedByReadOnly reports whether a command bar kubectl invocation
-// must be refused. It returns the verb for the status message.
+// must be refused. It blocks a non-allowlisted verb if the current context or
+// any --context candidate is read-only, or a candidate is empty (kubectl then
+// falls back to the kubeconfig current-context).
 func (m Model) kubectlBlockedByReadOnly(args []string) (string, bool) {
 	verb, ok := isReadOnlyKubectl(args)
 	if ok {
@@ -93,15 +113,13 @@ func (m Model) kubectlBlockedByReadOnly(args []string) (string, bool) {
 	if verb == "" {
 		verb = "command"
 	}
-	target := explicitKubectlContext(args)
-	if target == "" || target == m.nav.Context || target == m.kubectlContext(m.nav.Context) {
-		return verb, m.readOnlyForContext(m.nav.Context)
-	}
-	if m.cliReadOnly || m.readOnly {
+	if m.readOnlyForContext(m.nav.Context) {
 		return verb, true
 	}
-	if v, set := m.contextROOverrides[target]; set {
-		return verb, v
+	for _, c := range kubectlContextCandidates(args) {
+		if c == "" || m.contextReadOnly(c) {
+			return verb, true
+		}
 	}
-	return verb, ui.ResolveReadOnly(target, false)
+	return verb, false
 }
