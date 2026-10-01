@@ -2,6 +2,8 @@ package app
 
 import (
 	"strings"
+
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var kubectlReadOnlyVerbs = map[string]bool{
@@ -124,6 +126,10 @@ func (m Model) kubectlBlockedByReadOnly(args []string) (string, bool) {
 	if m.navTargetReadOnly() {
 		return verb, true
 	}
+	// kubectl passes plugins the raw argv and never applies --context to them.
+	if !kubectlBuiltinVerbs[firstNonFlagToken(args)] && m.fallbackContextReadOnly() {
+		return verb, true
+	}
 	for _, c := range kubectlContextCandidates(args) {
 		if c == "" || m.contextReadOnly(c) {
 			return verb, true
@@ -146,5 +152,27 @@ func (m Model) navTargetReadOnly() bool {
 		return true
 	}
 	cur := m.client.CurrentContext()
-	return cur == "" || m.effectiveContextReadOnly(cur)
+	return cur == "" || m.effectiveContextReadOnly(cur) || m.fallbackContextReadOnly()
+}
+
+// fallbackContextReadOnly resolves read-only for the current-context field of
+// the kubeconfig file kubectlEnv selects, which kubectl uses whenever --context
+// does not apply. Fails closed when that context cannot be determined.
+func (m Model) fallbackContextReadOnly() bool {
+	if m.client == nil {
+		return true
+	}
+	ctx := m.nav.Context
+	if ctx == "" {
+		ctx = m.client.CurrentContext()
+	}
+	path := m.client.KubeconfigPathForContext(ctx)
+	if path == "" {
+		return true
+	}
+	cfg, err := clientcmd.LoadFromFile(path)
+	if err != nil || cfg.CurrentContext == "" {
+		return true
+	}
+	return m.contextReadOnly(cfg.CurrentContext)
 }

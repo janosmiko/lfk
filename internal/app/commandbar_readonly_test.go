@@ -76,7 +76,8 @@ func TestCommandBarReadOnly_Kubectl(t *testing.T) {
 	for _, ro := range []string{"cli", "ctx", "none"} {
 		for _, tc := range cases {
 			t.Run(ro+"/"+tc.input, func(t *testing.T) {
-				m := baseModelWithFakeClient()
+				m := fallbackModel(t, writeKubeconfigFile(t, "a", "test-ctx", "test-ctx"))
+				m.nav.Context = "test-ctx"
 				switch ro {
 				case "cli":
 					m.cliReadOnly = true
@@ -238,8 +239,8 @@ func TestCommandBarReadOnly_EmptyNavContextUsesKubeconfigCurrent(t *testing.T) {
 		assert.Contains(t, r.(Model).statusMessage, "Read-only mode")
 	})
 	t.Run("current_context_writable_runs", func(t *testing.T) {
+		m := fallbackModel(t, writeKubeconfigFile(t, "a", "test-ctx", "test-ctx"))
 		ui.ConfigClusterReadOnly = nil
-		m := baseModelWithFakeClient()
 		m.nav.Context = ""
 		r, cmd := m.executeCommandBarInput("k delete pod x")
 		assert.NotNil(t, cmd)
@@ -331,4 +332,75 @@ func TestInjectKubectlDefaults_PluginVerbKeepsUserContext(t *testing.T) {
 	}
 	got := m.injectKubectlDefaults([]string{"get", "pods", "--context=other"})
 	assert.Equal(t, []string{"--context", "my-ctx"}, got[:2], "built-in verbs keep the front pin")
+}
+
+func writeKubeconfigFile(t *testing.T, name, current string, contexts ...string) string {
+	t.Helper()
+	var b strings.Builder
+	fmt.Fprintf(&b, "apiVersion: v1\nkind: Config\ncurrent-context: %s\nclusters:\n- name: c\n  cluster:\n    server: https://x.example.test:6443\ncontexts:\n", current)
+	if len(contexts) == 0 {
+		b.Reset()
+		fmt.Fprintf(&b, "apiVersion: v1\nkind: Config\ncurrent-context: %s\n", current)
+	}
+	for _, c := range contexts {
+		fmt.Fprintf(&b, "- name: %s\n  context:\n    cluster: c\n    user: u\n", c)
+	}
+	b.WriteString("users:\n- name: u\n  user:\n    token: t\n")
+	p := filepath.Join(t.TempDir(), name)
+	require.NoError(t, os.WriteFile(p, []byte(b.String()), 0o600))
+	return p
+}
+
+func fallbackModel(t *testing.T, paths ...string) Model {
+	t.Helper()
+	t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
+	client, err := k8s.NewClient("", nil, true, nil)
+	require.NoError(t, err)
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"ro": true}
+	m := baseModelWithFakeClient()
+	m.client = client
+	return m
+}
+
+func TestCommandBarReadOnly_PluginUsesFallbackContext(t *testing.T) {
+	plugins := [][]string{
+		{"fake", "x"},
+		{"fake", "--", "x"},
+		{"fake", "--name", "--context", "rw"},
+	}
+	t.Run("read_only_fallback_blocks", func(t *testing.T) {
+		m := fallbackModel(t, writeKubeconfigFile(t, "a", "ro", "rw", "ro"))
+		m.nav.Context = "rw"
+		for _, args := range plugins {
+			assert.True(t, blockedFor(m, args), args)
+		}
+		assert.False(t, blockedFor(m, []string{"get", "pods"}))
+		assert.False(t, blockedFor(m, []string{"delete", "pod", "x"}), "built-in verb is pinned to the writable nav")
+	})
+	t.Run("writable_fallback_allows", func(t *testing.T) {
+		m := fallbackModel(t, writeKubeconfigFile(t, "a", "rw", "rw", "ro"))
+		m.nav.Context = "rw"
+		for _, args := range plugins {
+			assert.False(t, blockedFor(m, args), args)
+		}
+	})
+	t.Run("unreadable_fallback_blocks", func(t *testing.T) {
+		m := fallbackModel(t, writeKubeconfigFile(t, "a", "rw", "rw"))
+		m.nav.Context = "rw"
+		require.NoError(t, os.Remove(m.client.KubeconfigPathForContext("rw")))
+		assert.True(t, blockedFor(m, []string{"fake", "x"}))
+	})
+}
+
+func TestCommandBarReadOnly_PickerUsesSelectedFileCurrentContext(t *testing.T) {
+	// Merged current-context is "dev" (writable), but the file that defines
+	// "dev" is the one kubectl reads, and its current-context is "ro".
+	a := writeKubeconfigFile(t, "a", "dev")
+	b := writeKubeconfigFile(t, "b", "ro", "dev", "ro")
+	m := fallbackModel(t, a, b)
+	m.nav.Context = ""
+	require.Equal(t, "dev", m.client.CurrentContext())
+	assert.True(t, blockedFor(m, []string{"delete", "pod", "x"}))
 }
