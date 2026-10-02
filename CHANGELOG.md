@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.3](https://github.com/janosmiko/lfk/compare/v0.19.2...v0.19.3) (2026-10-01)
+
+
+### Bug Fixes
+
+* expand custom-action placeholders in a single pass ([#834](https://github.com/janosmiko/lfk/issues/834)) ([f8154fa](https://github.com/janosmiko/lfk/commit/f8154fa21e6471299689f3fd4bbce3a233222adb))
+* honor member read-only state in the union view ([#835](https://github.com/janosmiko/lfk/issues/835)) ([a86ab25](https://github.com/janosmiko/lfk/commit/a86ab25bc0d8434f49cdee8624b5e662c5c52a5a))
+* retry exec plugin login up to 3 times ([#839](https://github.com/janosmiko/lfk/issues/839)) ([3b72771](https://github.com/janosmiko/lfk/commit/3b72771baed7057f0b21d8a52c05e0a5141e1f93))
+
 ## [0.19.2](https://github.com/janosmiko/lfk/compare/v0.19.1...v0.19.2) (2026-09-30)
 
 
