@@ -501,7 +501,7 @@ func TestPush3ExecCustomActionNoKubectl(t *testing.T) {
 		Label:   "test",
 		Command: "echo hello",
 	}
-	cmd := m.execCustomAction(ca.Command)
+	cmd := m.execCustomAction(ca.Label, ca.Command)
 	require.NotNil(t, cmd)
 }
 
@@ -830,7 +830,7 @@ func TestCovExecKubectlExplainRecursiveWithAPIVersion(t *testing.T) {
 
 func TestCovExecCustomActionReturnsCmd(t *testing.T) {
 	m := testModelExec()
-	cmd := m.execCustomAction("echo hello")
+	cmd := m.execCustomAction("test", "echo hello")
 	assert.NotNil(t, cmd)
 }
 
@@ -935,7 +935,7 @@ func TestFinal2ExecKubectlExplainRecursive(t *testing.T) {
 
 func TestFinal2ExecCustomAction(t *testing.T) {
 	m := baseFinalModel()
-	cmd := m.execCustomAction("echo hello")
+	cmd := m.execCustomAction("test", "echo hello")
 	assert.NotNil(t, cmd)
 }
 
