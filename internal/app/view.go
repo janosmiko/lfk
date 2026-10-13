@@ -22,35 +22,22 @@ import (
 //   - fullscreenMiddle / fullscreenDashboard → left=0, right=0, middle=full
 //   - hideLeftPane → left=0; middle widens from 51% to 58% of usable, right takes the rest
 //   - default → 12% / 51% / remainder (~37%) over (width - 6) usable cells (3 column borders)
+//
+// Dragged column borders override the left and right widths in the last two modes.
 func (m Model) explorerColumnWidths() (leftW, middleW, rightW int) {
 	usable := m.width - 6 // 3 columns x 2 border chars
 	switch {
 	case m.fullscreenDashboard || m.fullscreenMiddle:
 		return 0, m.width - 2, 0
-	case m.paneResize.active():
-		if !m.hideLeftPane {
-			leftW = max(10, usable*12/100)
-			if m.paneResize.leftPermille != 0 {
-				leftW = max(10, usable*m.paneResize.leftPermille/1000)
-			}
-		}
-		rightW = max(10, usable-leftW-max(10, usable*51/100))
-		if m.hideLeftPane {
-			rightW = max(10, usable-max(10, usable*58/100))
-		}
-		if m.paneResize.rightPermille != 0 {
-			rightW = max(10, usable*m.paneResize.rightPermille/1000)
-		}
-		return leftW, max(10, usable-leftW-rightW), rightW
 	case m.hideLeftPane:
 		middleW = max(10, usable*58/100)
 		rightW = max(10, usable-middleW)
-		return 0, middleW, rightW
+		return m.paneResize.apply(usable, 0, middleW, rightW)
 	default:
 		leftW = max(10, usable*12/100)
 		middleW = max(10, usable*51/100)
 		rightW = max(10, usable-leftW-middleW)
-		return leftW, middleW, rightW
+		return m.paneResize.apply(usable, leftW, middleW, rightW)
 	}
 }
 

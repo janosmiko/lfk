@@ -56,6 +56,12 @@ func isMousePress(msg tea.MouseMsg) bool {
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
+	// Runs before the mode and overlay early returns so a release always ends a drag.
+	next, dragCmd, dragHandled := m.handlePaneDrag(msg, mouse)
+	if dragHandled {
+		return next, dragCmd
+	}
+	m = next
 	// Trackpad momentum keeps emitting wheel ticks after the physical gesture
 	// ends. Drop the tail once the burst is no longer productive (a boundary
 	// was reached, the pointer moved to another pane, or a left/right
@@ -89,12 +95,6 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.overlay != overlayNone {
 		return m.handleOverlayMouse(msg)
 	}
-
-	next, dragCmd, dragHandled := m.handlePaneDrag(msg, mouse)
-	if dragHandled {
-		return next, dragCmd
-	}
-	m = next
 
 	switch mouse.Button {
 	case tea.MouseWheelUp:

@@ -174,7 +174,7 @@ func TestPaneResizeReleaseEndsDrag(t *testing.T) {
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)
 	m = motion(m, 30, 5)
-	m = release(m, 30, 5)
+	m = release(m, 30, 9)
 	assert.Equal(t, dividerNone, m.paneResize.drag)
 
 	before := m.paneResize
@@ -230,5 +230,88 @@ func TestPaneResizeMiddleRowClickStillSelects(t *testing.T) {
 	m := baseExplorerModel()
 	m = press(m, 40, 4)
 	assert.Equal(t, 1, m.cursor())
+	assert.Equal(t, dividerNone, m.paneResize.drag)
+}
+
+func widthsSum(m Model) (int, int, int, int) {
+	l, mid, r := m.explorerColumnWidths()
+	return l, mid, r, l + mid + r
+}
+
+func TestPaneResizeShrinkAfterExtremeLeftDrag(t *testing.T) {
+	m := baseExplorerModel()
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m = motion(m, 119, 5)
+	m = release(m, 119, 5)
+	m.width = 80
+	l, mid, r, sum := widthsSum(m)
+	assert.Equal(t, 74, sum)
+	assert.GreaterOrEqual(t, l, minPaneWidth)
+	assert.GreaterOrEqual(t, mid, minPaneWidth)
+	assert.GreaterOrEqual(t, r, minPaneWidth)
+}
+
+func TestPaneResizeShrinkAfterExtremeRightDrag(t *testing.T) {
+	m := baseExplorerModel()
+	_, middleEnd := m.columnBoundaries()
+	m = press(m, middleEnd-1, 5)
+	m = motion(m, 0, 5)
+	m = release(m, 0, 5)
+	m.width = 80
+	l, mid, r, sum := widthsSum(m)
+	assert.Equal(t, 74, sum)
+	assert.GreaterOrEqual(t, l, minPaneWidth)
+	assert.GreaterOrEqual(t, mid, minPaneWidth)
+	assert.GreaterOrEqual(t, r, minPaneWidth)
+}
+
+func TestPaneResizeSumEqualsUsable(t *testing.T) {
+	for _, hide := range []bool{false, true} {
+		for usable := 30; usable <= 300; usable++ {
+			for _, lp := range []int{0, 1, 100, 500, 999, 1000} {
+				for _, rp := range []int{0, 1, 100, 500, 999, 1000} {
+					if lp == 0 && rp == 0 {
+						continue
+					}
+					m := baseExplorerModel()
+					m.width = usable + 6
+					m.hideLeftPane = hide
+					m.paneResize.leftPermille, m.paneResize.rightPermille = lp, rp
+					l, mid, r, sum := widthsSum(m)
+					if sum != usable || min(mid, r) < minPaneWidth || (!hide && l < minPaneWidth) {
+						t.Fatalf("usable=%d hide=%v lp=%d rp=%d got %d/%d/%d", usable, hide, lp, rp, l, mid, r)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestPaneResizeStartAtTinyWidth(t *testing.T) {
+	m := baseExplorerModel()
+	m.width = 24
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m = motion(m, 5, 5)
+	l, mid, r := m.explorerColumnWidths()
+	assert.GreaterOrEqual(t, min(l, mid, r), minPaneWidth)
+}
+
+func TestPaneResizeFullscreenDuringDragEndsIt(t *testing.T) {
+	m := baseExplorerModel()
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m.fullscreenMiddle = true
+	m = motion(m, 30, 5)
+	assert.Equal(t, dividerNone, m.paneResize.drag)
+}
+
+func TestPaneResizeReleaseAfterOverlayOpensClearsDrag(t *testing.T) {
+	m := baseExplorerModel()
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m.overlay = overlayAction
+	m = release(m, 30, 5)
 	assert.Equal(t, dividerNone, m.paneResize.drag)
 }

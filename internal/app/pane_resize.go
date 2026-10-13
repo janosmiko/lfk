@@ -25,6 +25,29 @@ type paneResizeState struct {
 
 func (s paneResizeState) active() bool { return s.leftPermille != 0 || s.rightPermille != 0 }
 
+// apply swaps in the dragged left and right widths and makes the three sum to
+// usable. When they do not fit, left shrinks first, then right, down to the minimum.
+func (s paneResizeState) apply(usable, leftW, middleW, rightW int) (int, int, int) {
+	if !s.active() {
+		return leftW, middleW, rightW
+	}
+	if s.leftPermille != 0 && leftW > 0 {
+		leftW = max(minPaneWidth, usable*s.leftPermille/1000)
+	}
+	if s.rightPermille != 0 {
+		rightW = max(minPaneWidth, usable*s.rightPermille/1000)
+	}
+	excess := leftW + rightW + minPaneWidth - usable
+	if cut := min(max(excess, 0), max(leftW-minPaneWidth, 0)); cut > 0 {
+		leftW -= cut
+		excess -= cut
+	}
+	if cut := min(max(excess, 0), max(rightW-minPaneWidth, 0)); cut > 0 {
+		rightW -= cut
+	}
+	return leftW, max(minPaneWidth, usable-leftW-rightW), rightW
+}
+
 // widthToPermille rounds up so usable*p/1000 floors back to exactly w.
 func widthToPermille(w, usable int) int {
 	if usable <= 0 {
@@ -43,9 +66,16 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 		}
 		// A new press always clears a drag whose release was lost.
 		m.paneResize.drag = dividerNone
+		if m.mode != modeExplorer || m.overlay != overlayNone {
+			return m, nil, false
+		}
 		return m.startPaneDrag(mouse)
 	case tea.MouseMotionMsg:
 		if m.paneResize.drag == dividerNone {
+			return m, nil, false
+		}
+		if m.mode != modeExplorer || m.overlay != overlayNone {
+			m.paneResize.drag = dividerNone
 			return m, nil, false
 		}
 		return m.dragPaneTo(mouse.X), nil, true
@@ -86,6 +116,10 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 }
 
 func (m Model) dragPaneTo(x int) Model {
+	if m.fullscreenMiddle || m.fullscreenDashboard {
+		m.paneResize.drag = dividerNone
+		return m
+	}
 	leftW, middleW, rightW := m.explorerColumnWidths()
 	usable := m.width - 6
 	border := x - m.paneResize.grabOffset
