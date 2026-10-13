@@ -537,8 +537,7 @@ func (m Model) enterPreviewLogPod(ref podRef) (Model, tea.Cmd) {
 // right pane, matching the rightW-2 computation in clampPreviewScroll and
 // renderRightColumn so the scroll math and the renderer agree on wrap width.
 func (m Model) previewLogInnerWidth() int {
-	usable := m.width - 6
-	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
+	_, _, rightW := m.explorerColumnWidths()
 	return rightW - 2
 }
 

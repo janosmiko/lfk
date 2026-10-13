@@ -90,6 +90,12 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.handleOverlayMouse(msg)
 	}
 
+	next, dragCmd, dragHandled := m.handlePaneDrag(msg, mouse)
+	if dragHandled {
+		return next, dragCmd
+	}
+	m = next
+
 	switch mouse.Button {
 	case tea.MouseWheelUp:
 		return m.handleExplorerWheel(mouse.X, -3)

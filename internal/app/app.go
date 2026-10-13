@@ -29,9 +29,7 @@ type Model struct {
 	nav model.NavigationState // navigation state
 
 	// Column data.
-	leftItems   []model.Item
-	middleItems []model.Item
-	rightItems  []model.Item
+	leftItems, middleItems, rightItems []model.Item
 
 	// History stack for the left column: pushed on navigateChild, popped on navigateParent.
 	leftItemsHistory [][]model.Item
@@ -514,7 +512,8 @@ type Model struct {
 	// no-op.
 	mouseAvailable, mouseCaptured bool
 	// wheel tracks the active wheel-scroll burst for momentum-tail dropping (#524).
-	wheel wheelBurst
+	wheel      wheelBurst
+	paneResize paneResizeState
 
 	// Metrics content: rendered bar graph for the preview column.
 	metricsContent string

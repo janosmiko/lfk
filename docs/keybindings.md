@@ -1155,6 +1155,7 @@ or `Esc` to cancel.
 | Click middle pane (already-cursored row) | Drill into it (same as `Enter` / Right) |
 | Click right pane | Drill into the selected item |
 | Click table header | Sort by that column; click again toggles direction |
+| Drag column border | Resize the panes |
 | Right-click middle pane | Move cursor to clicked row and open action menu |
 | Right-click right pane | Open action menu for the currently selected item |
 | Right-click left pane | No-op |
