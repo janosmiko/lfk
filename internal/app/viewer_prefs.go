@@ -34,6 +34,39 @@ type ViewerPrefsState struct {
 	// viewerPrefBindings. A pointer to "" still marshals, which is what keeps
 	// explicit numeric distinct from never chosen.
 	MetricsSparkWindow *string `json:"metrics_spark_window,omitempty" yaml:"metrics_spark_window,omitempty"`
+	// Dragged explorer pane widths in permille of the usable width. Nil = never dragged.
+	ExplorerLeftPermille  *int `json:"explorer_left_permille,omitempty" yaml:"explorer_left_permille,omitempty"`
+	ExplorerRightPermille *int `json:"explorer_right_permille,omitempty" yaml:"explorer_right_permille,omitempty"`
+}
+
+// explorerPaneStartup is the persisted pane split NewModel seeds from.
+// ApplyViewerPrefs is its only writer.
+var explorerPaneStartup paneResizeState
+
+// validPanePermille rejects hand-edited values that could not come from a drag.
+func validPanePermille(l, r *int) (int, int, bool) {
+	if l == nil || r == nil || *l < 1 || *l > 999 || *r < 1 || *r > 999 || *l+*r >= 1000 {
+		return 0, 0, false
+	}
+	return *l, *r, true
+}
+
+// persistPanePrefs records the dragged widths, keeping every other key in the file.
+func persistPanePrefs(left, right int) {
+	path := viewerPrefsFilePath()
+	if path == "" {
+		return
+	}
+	withStateFileLock(path, func() {
+		s := loadViewerPrefsState()
+		if left > 0 {
+			s.ExplorerLeftPermille = &left
+		}
+		if right > 0 {
+			s.ExplorerRightPermille = &right
+		}
+		saveViewerPrefs(s)
+	})
 }
 
 // viewerPref names one persisted toggle. It indexes both viewerPrefBindings and
@@ -137,6 +170,10 @@ func ApplyViewerPrefs() {
 		if v := *b.field(&s); v != nil {
 			*b.global = *v
 		}
+	}
+	explorerPaneStartup = paneResizeState{}
+	if l, r, ok := validPanePermille(s.ExplorerLeftPermille, s.ExplorerRightPermille); ok {
+		explorerPaneStartup = paneResizeState{leftPermille: l, rightPermille: r}
 	}
 	if s.MetricsSparkWindow != nil {
 		ui.MetricsSparkStartupState = ui.ResolveMetricsSparkState(*s.MetricsSparkWindow)

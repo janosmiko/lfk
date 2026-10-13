@@ -21,6 +21,8 @@ type paneResizeState struct {
 	grabOffset    int // 0 or 1: which of the two border cells was grabbed
 	leftPermille  int
 	rightPermille int
+	// Permille values at press time, to tell whether the drag changed anything.
+	startLeft, startRight int
 }
 
 func (s paneResizeState) active() bool { return s.leftPermille != 0 || s.rightPermille != 0 }
@@ -84,6 +86,9 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 			return m, nil, false
 		}
 		m.paneResize.drag = dividerNone
+		if s := m.paneResize; s.leftPermille != s.startLeft || s.rightPermille != s.startRight {
+			persistPanePrefs(s.leftPermille, s.rightPermille)
+		}
 		return m, nil, true
 	}
 	return m, nil, false
@@ -112,6 +117,7 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 	if leftW > 0 {
 		m.paneResize.leftPermille = widthToPermille(leftW, usable)
 	}
+	m.paneResize.startLeft, m.paneResize.startRight = m.paneResize.leftPermille, m.paneResize.rightPermille
 	return m, nil, true
 }
 

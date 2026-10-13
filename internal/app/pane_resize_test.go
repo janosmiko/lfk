@@ -170,6 +170,7 @@ func TestPaneResizeTitleBarRowIsNotDivider(t *testing.T) {
 }
 
 func TestPaneResizeReleaseEndsDrag(t *testing.T) {
+	isolateViewerPrefs(t)
 	m := baseExplorerModel()
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)
@@ -197,6 +198,7 @@ func TestPaneResizeNormalPressClearsStaleDrag(t *testing.T) {
 }
 
 func TestPaneResizeKeepsProportionsOnTerminalResize(t *testing.T) {
+	isolateViewerPrefs(t)
 	m := baseExplorerModel()
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)
