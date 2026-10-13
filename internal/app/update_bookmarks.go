@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -379,6 +378,7 @@ func (m *Model) bookmarkDeleteCurrent() tea.Cmd {
 		return nil
 	}
 	target := filtered[m.overlayCursor]
+	prev := m.bookmarks
 	for i, bm := range m.bookmarks {
 		if bm.Slot == target.Slot {
 			m.bookmarks = removeBookmark(m.bookmarks, i)
@@ -386,7 +386,9 @@ func (m *Model) bookmarkDeleteCurrent() tea.Cmd {
 		}
 	}
 	if err := saveBookmarks(m.bookmarks); err != nil {
-		logger.Error("Failed to persist bookmarks after delete", "error", err, "slot", target.Slot)
+		m.bookmarks = prev
+		m.setStatusMessage("Failed to delete mark: "+err.Error(), true)
+		return scheduleStatusClear()
 	}
 	newFiltered := m.filteredBookmarks()
 	m.overlayCursor = clampOverlayCursor(m.overlayCursor, 0, len(newFiltered)-1)
@@ -403,6 +405,7 @@ func (m *Model) bookmarkDeleteAll() tea.Cmd {
 	if len(filtered) == 0 {
 		return nil
 	}
+	prev := m.bookmarks
 	if m.bookmarkFilter.Value == "" {
 		// Delete all bookmarks.
 		m.bookmarks = nil
@@ -422,7 +425,9 @@ func (m *Model) bookmarkDeleteAll() tea.Cmd {
 		m.bookmarks = remaining
 	}
 	if err := saveBookmarks(m.bookmarks); err != nil {
-		logger.Error("Failed to persist bookmarks after bulk delete", "error", err, "removed", len(filtered))
+		m.bookmarks = prev
+		m.setStatusMessage("Failed to delete marks: "+err.Error(), true)
+		return scheduleStatusClear()
 	}
 	m.overlayCursor = 0
 	count := len(filtered)

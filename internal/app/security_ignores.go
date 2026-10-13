@@ -48,18 +48,16 @@ func loadSecurityIgnores() *SecurityIgnoreState {
 // (fsynced tmp file, then rename) to prevent data loss if the process is
 // interrupted mid-write.
 func saveSecurityIgnores(state *SecurityIgnoreState) error {
-	path := stateFilePath(securityIgnoresFileName)
-	if path == "" {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
 	data, err := yaml.Marshal(state)
 	if err != nil {
 		return err
 	}
-	return writeFileDurable(path, data)
+	return writeStateFileGuarded[SecurityIgnoreState](securityIgnoresFileName, func(path string) error {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+		return writeFileDurable(path, data)
+	})
 }
 
 // saveSecurityIgnoresCmd wraps saveSecurityIgnores in a tea.Cmd so the

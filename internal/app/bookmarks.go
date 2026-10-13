@@ -38,8 +38,9 @@ func loadBookmarks() []model.Bookmark {
 	bakPath := path + ".bak"
 	if bm := loadBookmarksFromFile(bakPath); bm != nil {
 		logger.Info("Loaded bookmarks from backup file", "path", bakPath)
-		// Restore the primary file from backup.
-		if err := saveBookmarks(bm); err != nil {
+		// Restore the primary file from backup. The guarded save would refuse:
+		// the primary is the corrupt file being replaced.
+		if err := writeBookmarks(path, bm); err != nil {
 			logger.Error("Failed to restore bookmarks from backup", "error", err, "path", path)
 		}
 		return bm
@@ -70,11 +71,14 @@ func loadBookmarksFromFile(path string) []model.Bookmark {
 // saveBookmarks writes bookmarks to the YAML file on disk using an atomic
 // write (write to temp file, fsync, then rename) to prevent data loss if the
 // process is interrupted mid-write. A backup of the previous file is kept.
+// An unreadable or corrupt file is never overwritten.
 func saveBookmarks(bookmarks []model.Bookmark) error {
-	path := bookmarksFilePath()
-	if path == "" {
-		return nil
-	}
+	return writeStateFileGuarded[[]model.Bookmark]("bookmarks.yaml", func(path string) error {
+		return writeBookmarks(path, bookmarks)
+	})
+}
+
+func writeBookmarks(path string, bookmarks []model.Bookmark) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err

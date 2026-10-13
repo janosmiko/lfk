@@ -61,6 +61,12 @@ func loadStateFileStrict[T any](name string) (T, error) {
 // file. Under the file lock it first checks that any existing file reads and
 // decodes, and returns an error without chmod or write when it does not.
 func saveStateFileGuarded[T any](name string, v T) error {
+	return writeStateFileGuarded[T](name, func(string) error { return saveStateFile(name, v) })
+}
+
+// writeStateFileGuarded runs write under the file lock, only after any
+// existing file reads and decodes as T.
+func writeStateFileGuarded[T any](name string, write func(path string) error) error {
 	path, err := stateFilePathErr(name)
 	if err != nil {
 		return err
@@ -69,7 +75,7 @@ func saveStateFileGuarded[T any](name string, v T) error {
 		if _, err := loadStateFileStrict[T](name); err != nil {
 			return err
 		}
-		return saveStateFile(name, v)
+		return write(path)
 	})
 }
 
