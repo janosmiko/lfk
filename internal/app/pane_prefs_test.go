@@ -81,12 +81,10 @@ func TestPanePrefsStartupLoadsValid(t *testing.T) {
 
 func TestPanePrefsStartupRejectsInvalid(t *testing.T) {
 	one, big, neg, zero := 1000, 1000, -5, 0
-	half := 500
 	cases := map[string]ViewerPrefsState{
 		"left zero":      {ExplorerLeftPermille: &zero},
 		"left negative":  {ExplorerLeftPermille: &neg},
 		"right too big":  {ExplorerRightPermille: &big},
-		"sum":            {ExplorerLeftPermille: &half, ExplorerRightPermille: &half},
 		"left too big":   {ExplorerLeftPermille: &one},
 		"both one valid": {ExplorerLeftPermille: &zero, ExplorerRightPermille: &big},
 	}
@@ -106,6 +104,22 @@ func TestPanePrefsStartupDropsOnlyInvalidSide(t *testing.T) {
 	saveViewerPrefs(ViewerPrefsState{ExplorerLeftPermille: &bad, ExplorerRightPermille: &ok})
 	ApplyViewerPrefs()
 	assert.Equal(t, paneResizeState{rightPermille: 300}, explorerPaneStartup)
+}
+
+// A right width dragged while the left pane is hidden can push the saved pair
+// past 1000. Startup must keep both, and the layout must still fit.
+func TestPanePrefsStartupKeepsPairOverFullWidth(t *testing.T) {
+	isolateViewerPrefs(t)
+	t.Cleanup(func() { explorerPaneStartup = paneResizeState{} })
+	l, r := 300, 800
+	saveViewerPrefs(ViewerPrefsState{ExplorerLeftPermille: &l, ExplorerRightPermille: &r})
+	ApplyViewerPrefs()
+	assert.Equal(t, paneResizeState{leftPermille: 300, rightPermille: 800}, explorerPaneStartup)
+
+	usable := 100
+	lw, mw, rw := explorerPaneStartup.apply(usable, 20, 40, 40)
+	assert.Equal(t, usable, lw+mw+rw)
+	assert.GreaterOrEqual(t, mw, minPaneWidth)
 }
 
 func TestPanePrefsStartupAcceptsSingleValue(t *testing.T) {

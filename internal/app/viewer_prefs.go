@@ -44,17 +44,14 @@ type ViewerPrefsState struct {
 var explorerPaneStartup paneResizeState
 
 // validPanePermille rejects hand-edited values that could not come from a drag.
-// Each side is checked alone, since a drag with the left pane hidden stores only the right.
-// A pair that cannot fit together is dropped whole. 0 means unset.
+// Each side is checked alone: a right drag with the left pane hidden can push
+// the pair past 1000, and apply fits any pair to the screen. 0 means unset.
 func validPanePermille(l, r *int) (left, right int) {
 	if l != nil && *l >= 1 && *l <= 999 {
 		left = *l
 	}
 	if r != nil && *r >= 1 && *r <= 999 {
 		right = *r
-	}
-	if left+right >= 1000 {
-		return 0, 0
 	}
 	return left, right
 }
