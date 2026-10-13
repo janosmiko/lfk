@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -67,7 +68,7 @@ var errStateUnavailable = errors.New("state file is locked or unavailable")
 func updateStateFile(path string, fn func() error) error {
 	var fnErr error
 	if !withStateFileLock(path, func() { fnErr = fn() }) {
-		return errStateUnavailable
+		return fmt.Errorf("%w: %s", errStateUnavailable, path)
 	}
 	return fnErr
 }

@@ -45,7 +45,7 @@ func newPinnedState() *PinnedState {
 func savePinnedState(s *PinnedState) error { return savePinStateFile(pinnedFileName, s) }
 
 func savePinStateFile(name string, s *PinnedState) error {
-	return saveStateFile(name, s)
+	return saveStateFileGuarded(name, s)
 }
 
 // togglePinnedType adds or removes a resource-type key from the per-context

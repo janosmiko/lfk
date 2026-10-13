@@ -270,7 +270,7 @@ func (m *Model) migratePinnedScope(scope map[string][]string, key string, discov
 		}
 	}
 	scope[key] = out
-	if err := savePinnedState(m.pinnedState); err != nil {
+	if err := saveStateFile(pinnedFileName, m.pinnedState); err != nil {
 		logger.Warn("Failed to persist pinned-type migration", "error", err, "scope", key)
 	}
 }

@@ -48,13 +48,29 @@ func loadStateFileStrict[T any](name string) (T, error) {
 		return zero, nil
 	}
 	if err != nil {
-		return zero, fmt.Errorf("%s is unreadable: %w", name, err)
+		return zero, fmt.Errorf("%s is unreadable: %w", path, err)
 	}
 	var v T
 	if err := yaml.Unmarshal(data, &v); err != nil {
-		return zero, fmt.Errorf("%s is corrupt, fix or remove it: %w", name, err)
+		return zero, fmt.Errorf("%s is corrupt, fix or remove it: %w", path, err)
 	}
 	return v, nil
+}
+
+// saveStateFileGuarded is saveStateFile for user-action saves of a whole-state
+// file. Under the file lock it first checks that any existing file reads and
+// decodes, and returns an error without chmod or write when it does not.
+func saveStateFileGuarded[T any](name string, v T) error {
+	path, err := stateFilePathErr(name)
+	if err != nil {
+		return err
+	}
+	return updateStateFile(path, func() error {
+		if _, err := loadStateFileStrict[T](name); err != nil {
+			return err
+		}
+		return saveStateFile(name, v)
+	})
 }
 
 // reportPrefSaveErr shows a failed preference save in the status bar. It
