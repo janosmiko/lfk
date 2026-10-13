@@ -199,10 +199,9 @@ func checkLatestImageTag(pod *corev1.Pod, c corev1.Container) []security.Finding
 	if strings.Contains(img, "@sha256:") {
 		return nil
 	}
-	last := strings.LastIndex(img, "/")
 	rest := img
-	if last >= 0 {
-		rest = img[last+1:]
+	if _, after, ok := strings.CutLast(img, "/"); ok {
+		rest = after
 	}
 	_, after, ok := strings.Cut(rest, ":")
 	tag := ""

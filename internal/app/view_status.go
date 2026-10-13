@@ -289,10 +289,9 @@ func (m Model) statusBar() string {
 		if m.commandBarPreview != "" {
 			// Ghost preview mode: show typed text + ghost completion (dimmed) + cursor at end.
 			typed := m.commandBarInput.Value
-			lastSpace := strings.LastIndex(typed, " ")
 			partial := typed
-			if lastSpace >= 0 {
-				partial = typed[lastSpace+1:]
+			if _, after, ok := strings.CutLast(typed, " "); ok {
+				partial = after
 			}
 			ghost := m.commandBarPreview
 			lp := strings.ToLower(partial)

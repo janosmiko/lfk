@@ -165,11 +165,11 @@ func templateNameFromPath(path string) string {
 // into the file name, or "" for a hand-authored file or a cluster-scoped save.
 func templateNamespaceFromPath(path string) string {
 	base := templateBaseFromPath(path)
-	idx := strings.LastIndex(base, "__")
-	if idx < 0 {
+	ns, _, ok := strings.CutLast(base, "__")
+	if !ok {
 		return ""
 	}
-	if ns := base[:idx]; ns != clusterScopedSegment {
+	if ns != clusterScopedSegment {
 		return ns
 	}
 	return ""

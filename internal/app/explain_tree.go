@@ -251,8 +251,8 @@ func withExplainTreeDescFetch(mdl tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 // explainParentPath returns the schema path one level above path ("" at the
 // resource root).
 func explainParentPath(path string) string {
-	if idx := strings.LastIndex(path, "."); idx >= 0 {
-		return path[:idx]
+	if parent, _, ok := strings.CutLast(path, "."); ok {
+		return parent
 	}
 	return ""
 }

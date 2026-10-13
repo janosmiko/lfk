@@ -332,11 +332,10 @@ func matchesContainerFilter(line string, selectedContainers []string) bool {
 	}
 	prefix := line[1:closeBracket] // "pod/<podname>/<containername>"
 	// kubectl --prefix format uses slashes: pod/<podname>/<containername>
-	lastSlash := strings.LastIndex(prefix, "/")
-	if lastSlash < 0 {
+	_, containerName, ok := strings.CutLast(prefix, "/")
+	if !ok {
 		return true // unexpected format
 	}
-	containerName := prefix[lastSlash+1:]
 	return slices.Contains(selectedContainers, containerName)
 }
 
