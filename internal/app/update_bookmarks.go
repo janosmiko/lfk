@@ -327,12 +327,12 @@ func (m Model) saveBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		}
 	}
 	newBookmarks = append(newBookmarks, bm)
-	m.bookmarks = newBookmarks
 
-	if err := saveBookmarks(m.bookmarks); err != nil {
+	if err := saveBookmarks(newBookmarks); err != nil {
 		m.setStatusMessage("Failed to save mark: "+err.Error(), true)
 		return m, scheduleStatusClear()
 	}
+	m.bookmarks = newBookmarks
 	kind := "context-free"
 	if bm.IsContextAware() {
 		kind = "context-aware"

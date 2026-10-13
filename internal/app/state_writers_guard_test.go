@@ -87,6 +87,21 @@ func TestBookmarkDelete_SaveErrorIsShown(t *testing.T) {
 	}
 }
 
+func TestBookmarkAdd_SaveErrorRollsBack(t *testing.T) {
+	dir := useStateDir(t)
+	path := writeCorrupt(t, dir, "bookmarks.yaml")
+	m := baseFinalModel()
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+
+	res, _ := m.saveBookmark(model.Bookmark{Name: "bm2", Slot: "b"})
+
+	got := res.(Model)
+	assert.Equal(t, []model.Bookmark{{Name: "bm1", Slot: "a"}}, got.bookmarks)
+	assert.True(t, got.statusMessageErr)
+	assert.Contains(t, got.statusMessage, path)
+	assertUntouched(t, path)
+}
+
 func TestSecurityIgnoreSaveErr_ShowsReason(t *testing.T) {
 	m := baseFinalModel()
 	res, _ := m.updateSecurityIgnoresSaveErr(securityIgnoresSaveErrMsg{err: errors.New("/state/x.yaml is corrupt")})
