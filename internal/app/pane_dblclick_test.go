@@ -66,7 +66,7 @@ func TestPaneDoubleClickResetsLayoutAfterDrag(t *testing.T) {
 
 func TestPaneDoubleClickRemovesPrefKeysKeepsOthers(t *testing.T) {
 	path := isolateViewerPrefs(t)
-	persistViewerPref(prefLogWrap, true)
+	require.NoError(t, persistViewerPref(prefLogWrap, true))
 	clock := fakePaneClock(t)
 	m := draggedModel(t, clock)
 	require.NotNil(t, readPrefsFile(t, path).ExplorerLeftPermille)

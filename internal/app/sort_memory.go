@@ -65,6 +65,16 @@ func loadSortMemory() map[string]sortPref {
 	return sortMemoryFromState(loadStateFile[SortMemoryState](sortMemoryFileName))
 }
 
+// loadSortMemoryStrict is the read-modify-write loader: it fails on an
+// unreadable or corrupt file instead of returning an empty map.
+func loadSortMemoryStrict() (map[string]sortPref, error) {
+	s, err := loadStateFileStrict[SortMemoryState](sortMemoryFileName)
+	if err != nil {
+		return nil, err
+	}
+	return sortMemoryFromState(s), nil
+}
+
 // saveSortMemory writes remembered sort preferences to disk.
 func saveSortMemory(mem map[string]sortPref) error {
 	return saveStateFile(sortMemoryFileName, sortMemoryToState(mem))
@@ -80,35 +90,45 @@ func saveSortMemory(mem map[string]sortPref) error {
 // forgetSort from key and mouse handlers). The lock extends that across
 // processes, so a second lfk instance cannot drop the sort this one just
 // recorded. Do not call this from a background goroutine.
-func persistRememberedSort(key string, pref sortPref) {
-	path := sortMemoryFilePath()
-	if path == "" {
-		return
+func persistRememberedSort(key string, pref sortPref) error {
+	path, err := stateFilePathErr(sortMemoryFileName)
+	if err != nil {
+		return err
 	}
-	withStateFileLock(path, func() {
-		mem := loadSortMemory()
+	return updateStateFile(path, func() error {
+		mem, err := loadSortMemoryStrict()
+		if err != nil {
+			return err
+		}
 		mem[key] = pref
-		if err := saveSortMemory(mem); err != nil {
+		err = saveSortMemory(mem)
+		if err != nil {
 			logger.Error("Failed to persist sort memory", "error", err)
 		}
+		return err
 	})
 }
 
 // persistForgottenSort removes a single sort pref from disk (the sort-reset
-// action), leaving every other remembered sort intact. Best-effort.
-func persistForgottenSort(key string) {
-	path := sortMemoryFilePath()
-	if path == "" {
-		return
+// action), leaving every other remembered sort intact.
+func persistForgottenSort(key string) error {
+	path, err := stateFilePathErr(sortMemoryFileName)
+	if err != nil {
+		return err
 	}
-	withStateFileLock(path, func() {
-		mem := loadSortMemory()
+	return updateStateFile(path, func() error {
+		mem, err := loadSortMemoryStrict()
+		if err != nil {
+			return err
+		}
 		if _, ok := mem[key]; !ok {
-			return
+			return nil
 		}
 		delete(mem, key)
-		if err := saveSortMemory(mem); err != nil {
+		err = saveSortMemory(mem)
+		if err != nil {
 			logger.Error("Failed to persist sort memory", "error", err)
 		}
+		return err
 	})
 }

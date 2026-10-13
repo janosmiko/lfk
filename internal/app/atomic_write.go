@@ -28,6 +28,13 @@ import (
 // truncating its target — required for callers like the resource-export path
 // that write to a predictable filename in a directory the user controls.
 func writeFileDurable(path string, data []byte) error {
+	return writeFileReplace(path, data, true)
+}
+
+// writeFileReplace is writeFileDurable with the fsyncs optional: keypress-path
+// saves skip them (F_FULLFSYNC costs tens of ms on macOS) but keep the rename,
+// so a failed write never truncates the existing file.
+func writeFileReplace(path string, data []byte, durable bool) error {
 	dir := filepath.Dir(path)
 	f, err := os.CreateTemp(dir, filepath.Base(path)+".tmp.*")
 	if err != nil {
@@ -49,10 +56,12 @@ func writeFileDurable(path string, data []byte) error {
 	}
 	// Explicit Sync before rename: os.WriteFile closes without fsync, leaving a
 	// window where the rename survives a crash but the contents do not.
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		cleanup()
-		return err
+	if durable {
+		if err := f.Sync(); err != nil {
+			_ = f.Close()
+			cleanup()
+			return err
+		}
 	}
 	if err := f.Close(); err != nil {
 		cleanup()
@@ -61,6 +70,9 @@ func writeFileDurable(path string, data []byte) error {
 	if err := os.Rename(tmp, path); err != nil {
 		cleanup()
 		return err
+	}
+	if !durable {
+		return nil
 	}
 	// Fsync the parent dir so the rename itself is durable on crash. A failure
 	// here means the data is written but the dir entry may not survive a crash

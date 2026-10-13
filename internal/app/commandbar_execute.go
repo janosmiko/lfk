@@ -373,11 +373,13 @@ func (m Model) executeSortCommand(arg string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.sortColumnName = arg
-	m.rememberSort()
+	saveCmd := m.rememberSort()
 	m.sortMiddleItems()
 	m.clampCursor()
-	m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)
-	return m, scheduleStatusClear()
+	if saveCmd == nil {
+		m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)
+	}
+	return m, tea.Batch(scheduleStatusClear(), saveCmd)
 }
 
 // executeSetCommand handles the :set builtin command.

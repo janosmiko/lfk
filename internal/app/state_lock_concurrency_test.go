@@ -66,11 +66,11 @@ func assertWritesOnlyUnlocked(t *testing.T, path string, write func(), landed fu
 
 func TestPersistColumnPrefsEntry_WritesInsideTheLock(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+	_ = persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
 
 	assertWritesOnlyUnlocked(t, columnPrefsFilePath(),
 		func() {
-			persistColumnPrefsEntry("ctx\x00Later", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+			_ = persistColumnPrefsEntry("ctx\x00Later", persistedColumnPrefs{VisibleExtras: []string{"col"}})
 		},
 		func() bool {
 			_, ok := loadColumnPrefsState().Contexts["ctx"]["Later"]
@@ -80,11 +80,11 @@ func TestPersistColumnPrefsEntry_WritesInsideTheLock(t *testing.T) {
 
 func TestPersistForgottenColumnPrefs_DeletesInsideTheLock(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
-	persistColumnPrefsEntry("ctx\x00Doomed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+	_ = persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+	_ = persistColumnPrefsEntry("ctx\x00Doomed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
 
 	assertWritesOnlyUnlocked(t, columnPrefsFilePath(),
-		func() { persistForgottenColumnPrefs("ctx\x00Doomed") },
+		func() { _ = persistForgottenColumnPrefs("ctx\x00Doomed") },
 		func() bool {
 			_, ok := loadColumnPrefsState().Contexts["ctx"]["Doomed"]
 			return !ok
@@ -93,10 +93,10 @@ func TestPersistForgottenColumnPrefs_DeletesInsideTheLock(t *testing.T) {
 
 func TestPersistRememberedSort_WritesInsideTheLock(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
+	_ = persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
 
 	assertWritesOnlyUnlocked(t, sortMemoryFilePath(),
-		func() { persistRememberedSort("ctx\x00v1/later", sortPref{column: "AGE", ascending: false}) },
+		func() { _ = persistRememberedSort("ctx\x00v1/later", sortPref{column: "AGE", ascending: false}) },
 		func() bool {
 			_, ok := loadSortMemory()["ctx\x00v1/later"]
 			return ok
@@ -105,11 +105,11 @@ func TestPersistRememberedSort_WritesInsideTheLock(t *testing.T) {
 
 func TestPersistForgottenSort_DeletesInsideTheLock(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
-	persistRememberedSort("ctx\x00v1/doomed", sortPref{column: "AGE", ascending: false})
+	_ = persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
+	_ = persistRememberedSort("ctx\x00v1/doomed", sortPref{column: "AGE", ascending: false})
 
 	assertWritesOnlyUnlocked(t, sortMemoryFilePath(),
-		func() { persistForgottenSort("ctx\x00v1/doomed") },
+		func() { _ = persistForgottenSort("ctx\x00v1/doomed") },
 		func() bool {
 			_, ok := loadSortMemory()["ctx\x00v1/doomed"]
 			return !ok
@@ -154,11 +154,11 @@ func assertReadHappensInsideLock(t *testing.T, path string, write func(), addRiv
 
 func TestPersistColumnPrefsEntry_ReadsInsideTheLock(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+	_ = persistColumnPrefsEntry("ctx\x00Seed", persistedColumnPrefs{VisibleExtras: []string{"col"}})
 
 	assertReadHappensInsideLock(t, columnPrefsFilePath(),
 		func() {
-			persistColumnPrefsEntry("ctx\x00Mine", persistedColumnPrefs{VisibleExtras: []string{"col"}})
+			_ = persistColumnPrefsEntry("ctx\x00Mine", persistedColumnPrefs{VisibleExtras: []string{"col"}})
 		},
 		func() {
 			// Stands in for the other process's committed layout.
@@ -176,10 +176,10 @@ func TestPersistColumnPrefsEntry_ReadsInsideTheLock(t *testing.T) {
 
 func TestPersistRememberedSort_ReadsInsideTheLock(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
+	_ = persistRememberedSort("ctx\x00v1/seed", sortPref{column: "NAME", ascending: true})
 
 	assertReadHappensInsideLock(t, sortMemoryFilePath(),
-		func() { persistRememberedSort("ctx\x00v1/mine", sortPref{column: "AGE", ascending: false}) },
+		func() { _ = persistRememberedSort("ctx\x00v1/mine", sortPref{column: "AGE", ascending: false}) },
 		func() {
 			mem := loadSortMemory()
 			mem["ctx\x00v1/rival"] = sortPref{column: "AGE", ascending: true}

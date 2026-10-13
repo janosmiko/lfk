@@ -20,7 +20,7 @@ func (m Model) toggleObjectExplorerTree() (tea.Model, tea.Cmd) {
 		if rows := rt.visibleTreeRows(); rt.cursor >= 0 && rt.cursor < len(rows) {
 			topKey = rows[rt.cursor].Segs[0]
 		}
-		m.setViewerPref(prefObjectExplorerTree, false)
+		saveCmd := m.setViewerPref(prefObjectExplorerTree, false)
 		m.objectExplorerTree = false // this tab keeps it; the pref above seeds new ones
 		rt.tree = false
 		rt.treeRows = nil
@@ -37,14 +37,14 @@ func (m Model) toggleObjectExplorerTree() (tea.Model, tea.Cmd) {
 			}
 		}
 		m.clampObjectExplorerScroll()
-		return m, nil
+		return m, saveCmd
 	}
 
 	var flatKey string
 	if f, ok := rt.selected(); ok {
 		flatKey = f.Key
 	}
-	m.setViewerPref(prefObjectExplorerTree, true)
+	saveCmd := m.setViewerPref(prefObjectExplorerTree, true)
 	m.objectExplorerTree = true // this tab keeps it; the pref above seeds new ones
 	rt.tree = true
 	rt.rebuildTreeRows()
@@ -56,10 +56,15 @@ func (m Model) toggleObjectExplorerTree() (tea.Model, tea.Cmd) {
 	}
 	m.clampObjectExplorerScroll()
 	if len(rt.treeRows) >= model.DefaultObjectTreeRowLimit {
-		m.setStatusMessage("Tree truncated: drill in to see deeper levels", true)
+		const truncated = "Tree truncated: drill in to see deeper levels"
+		if saveCmd != nil {
+			m.setStatusMessage(m.statusMessage+" | "+truncated, true)
+			return m, saveCmd
+		}
+		m.setStatusMessage(truncated, true)
 		return m, scheduleStatusClear()
 	}
-	return m, nil
+	return m, saveCmd
 }
 
 // rebuildTreeRows re-flattens the subtree at the current path. Call after any

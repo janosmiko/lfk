@@ -3,6 +3,8 @@ package app
 import (
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -54,28 +56,30 @@ func (m *Model) currentSortKey() (string, bool) {
 // Several callers are value-receiver update handlers: this mutates the shared
 // backing map in place, so it must never reassign m.sortMemory (a replacement
 // would not propagate back to the caller's copy).
-func (m *Model) rememberSort() {
+func (m *Model) rememberSort() tea.Cmd {
 	key, ok := m.currentSortKey()
 	if !ok {
-		return
+		return nil
 	}
 	if m.sortMemory == nil {
 		m.sortMemory = make(map[string]sortPref)
 	}
 	pref := sortPref{column: m.sortColumnName, ascending: m.sortAscending}
 	m.sortMemory[key] = pref
-	persistRememberedSort(key, pref)
+	return m.reportPrefSaveErr(persistRememberedSort(key, pref))
 }
 
 // forgetSort drops any remembered sort for the resource kind currently in
 // view, so re-entering it falls back to the configured view default (or the
 // built-in default). Used by the explicit sort-reset action — reset means
 // "forget my customization", not "pin Name ascending forever".
-func (m *Model) forgetSort() {
-	if key, ok := m.currentSortKey(); ok {
-		delete(m.sortMemory, key)
-		persistForgottenSort(key)
+func (m *Model) forgetSort() tea.Cmd {
+	key, ok := m.currentSortKey()
+	if !ok {
+		return nil
 	}
+	delete(m.sortMemory, key)
+	return m.reportPrefSaveErr(persistForgottenSort(key))
 }
 
 // applyKindSortDefault sets m.sortColumnName and m.sortAscending for the given

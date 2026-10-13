@@ -69,18 +69,19 @@ func (m *Model) exportStripStep(delta int) {
 
 // exportStripToggle flips the highlighted category, re-strips the captured
 // document, and records the choice.
-func (m *Model) exportStripToggle() {
+func (m *Model) exportStripToggle() tea.Cmd {
 	cursor := m.exportTemplatePicker.stripCursor
 	if cursor < 0 || cursor >= len(k8s.TemplateCategories) {
-		return
+		return nil
 	}
 	cat := k8s.TemplateCategories[cursor]
 	m.exportTemplatePicker.strip[cat] = !m.exportTemplatePicker.strip[cat]
 	m.exportTemplatePicker.restrip()
-	saveExportStripPrefs(m.exportTemplatePicker.strip)
+	return m.reportPrefSaveErr(saveExportStripPrefs(m.exportTemplatePicker.strip))
 }
 
 func (m Model) handleExportStripKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg.String() {
 	case "esc", "q", exportStripKey:
 		m.closeExportStripPicker()
@@ -101,13 +102,13 @@ func (m Model) handleExportStripKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "G":
 		m.exportStripStep(len(k8s.TemplateCategories))
 	case "space", " ", "enter", "x":
-		m.exportStripToggle()
+		cmd = m.exportStripToggle()
 	case "r":
 		m.exportTemplatePicker.strip = k8s.DefaultTemplateStripSet()
 		m.exportTemplatePicker.restrip()
-		saveExportStripPrefs(m.exportTemplatePicker.strip)
+		cmd = m.reportPrefSaveErr(saveExportStripPrefs(m.exportTemplatePicker.strip))
 	}
-	return m, nil
+	return m, cmd
 }
 
 func exportStripHints() []ui.HintEntry {

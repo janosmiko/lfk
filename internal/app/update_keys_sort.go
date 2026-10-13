@@ -22,11 +22,7 @@ func (m Model) handleExplorerActionKeySortNext() (tea.Model, tea.Cmd, bool) {
 		idx = (idx + 1) % colCount
 		m.sortColumnName = ui.ActiveSortableColumns[idx]
 	}
-	m.rememberSort()
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+	return m.finishSortChange(m.rememberSort())
 }
 
 func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
@@ -44,11 +40,7 @@ func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
 		idx = (idx - 1 + colCount) % colCount
 		m.sortColumnName = ui.ActiveSortableColumns[idx]
 	}
-	m.rememberSort()
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+	return m.finishSortChange(m.rememberSort())
 }
 
 func (m Model) handleExplorerActionKeySortFlip() (tea.Model, tea.Cmd, bool) {
@@ -56,11 +48,7 @@ func (m Model) handleExplorerActionKeySortFlip() (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	m.sortAscending = !m.sortAscending
-	m.rememberSort()
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+	return m.finishSortChange(m.rememberSort())
 }
 
 func (m Model) handleExplorerActionKeySortReset() (tea.Model, tea.Cmd, bool) {
@@ -76,9 +64,16 @@ func (m Model) handleExplorerActionKeySortReset() (tea.Model, tea.Cmd, bool) {
 		m.sortColumnName = ui.ActiveSortableColumns[0]
 	}
 	m.sortAscending = true
-	m.forgetSort()
+	return m.finishSortChange(m.forgetSort())
+}
+
+// finishSortChange re-sorts after a sort change. A failed save (saveCmd
+// non-nil) keeps its error in the status bar instead of the "Sort:" label.
+func (m Model) finishSortChange(saveCmd tea.Cmd) (tea.Model, tea.Cmd, bool) {
 	m.sortMiddleItems()
 	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+	if saveCmd == nil {
+		m.setStatusMessage("Sort: "+m.sortModeName(), false)
+	}
+	return m, tea.Batch(m.loadPreview(), scheduleStatusClear(), saveCmd), true
 }

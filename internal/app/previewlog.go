@@ -347,7 +347,7 @@ func (m Model) updatePreviewLogRestart(msg previewLogRestartMsg) (tea.Model, tea
 // and cancels the stream on disable.
 func (m Model) handleExplorerToggleLogPreview() (tea.Model, tea.Cmd) {
 	m.fullLogPreview = !m.fullLogPreview
-	m.setViewerPref(prefLogPreviewLive, m.fullLogPreview)
+	saveCmd := m.setViewerPref(prefLogPreviewLive, m.fullLogPreview)
 	// Log preview is mutually exclusive with YAML preview and resource map.
 	m.fullYAMLPreview = false
 	m.mapView = false
@@ -358,14 +358,18 @@ func (m Model) handleExplorerToggleLogPreview() (tea.Model, tea.Cmd) {
 		if ref, ok := m.selectedPodForLogPreview(); ok {
 			m, readerCmd = m.enterPreviewLogPod(ref)
 		}
-		m.setStatusMessage("Live logs preview", false)
+		if saveCmd == nil {
+			m.setStatusMessage("Live logs preview", false)
+		}
 	} else {
 		m.cachePreviewLog()
 		m.cancelPreviewLogStream()
-		m.setStatusMessage("Details preview", false)
+		if saveCmd == nil {
+			m.setStatusMessage("Details preview", false)
+		}
 	}
 
-	return m, tea.Batch(m.loadPreview(), readerCmd, scheduleStatusClear())
+	return m, tea.Batch(m.loadPreview(), readerCmd, saveCmd, scheduleStatusClear())
 }
 
 // maybeRestartPreviewLog checks whether the currently-streaming pod differs

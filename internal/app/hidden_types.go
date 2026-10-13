@@ -40,7 +40,7 @@ func newHiddenTypesState() *HiddenTypesState {
 
 // saveHiddenTypesState writes hidden types to disk.
 func saveHiddenTypesState(s *HiddenTypesState) error {
-	return saveStateFile(hiddenTypesFileName, s)
+	return saveStateFileGuarded(hiddenTypesFileName, s)
 }
 
 // toggleHiddenType adds or removes a resource-type key from the per-context

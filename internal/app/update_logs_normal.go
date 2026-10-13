@@ -255,16 +255,16 @@ func (m Model) handleLogKeyF() Model {
 	return m
 }
 
-func (m Model) handleLogKeyTab() Model {
+func (m Model) handleLogKeyTab() (Model, tea.Cmd) {
 	m.logView.lineInput = ""
 	m.logView.wrap = !m.logView.wrap
-	m.setViewerPref(prefLogWrap, m.logView.wrap)
+	saveCmd := m.setViewerPref(prefLogWrap, m.logView.wrap)
 	// Re-pin to the bottom on toggle: maxScroll and topSkip both depend on
 	// wrap mode, so the previous values are stale. ensureLogCursorVisible
 	// snaps to the follow position when m.logView.follow is true and otherwise
 	// just clamps + clears the sub-line skip.
 	m.ensureLogCursorVisible()
-	return m
+	return m, saveCmd
 }
 
 func (m Model) handleLogKeyW() Model {
@@ -399,22 +399,22 @@ func (m Model) handleLogKeyN2() Model {
 	return m
 }
 
-func (m Model) handleLogKeyP() Model {
+func (m Model) handleLogKeyP() (Model, tea.Cmd) {
 	m.logView.lineInput = ""
 	m.logView.hidePrefixes = !m.logView.hidePrefixes
-	m.setViewerPref(prefLogShowPrefixes, !m.logView.hidePrefixes)
-	return m
+	saveCmd := m.setViewerPref(prefLogShowPrefixes, !m.logView.hidePrefixes)
+	return m, saveCmd
 }
 
-func (m Model) handleLogKeyP2() Model {
+func (m Model) handleLogKeyP2() (Model, tea.Cmd) {
 	m.logView.lineInput = ""
 	m.logView.previewVisible = !m.logView.previewVisible
-	m.setViewerPref(prefLogShowPreview, m.logView.previewVisible)
+	saveCmd := m.setViewerPref(prefLogShowPreview, m.logView.previewVisible)
 	m.logView.previewScroll = 0
 	// Effective viewer width changes when the panel toggles, so wrap-aware
 	// scroll/skip values need recomputing for the new geometry.
 	m.ensureLogCursorVisible()
-	return m
+	return m, saveCmd
 }
 
 // handleLogKeyJ2 scrolls the structured preview pane down by one body row.
@@ -456,11 +456,11 @@ func (m Model) handleLogKeyHash() Model {
 	return m
 }
 
-func (m Model) handleLogKeyS() Model {
+func (m Model) handleLogKeyS() (Model, tea.Cmd) {
 	m.logView.lineInput = ""
 	m.logView.timestamps = !m.logView.timestamps
-	m.setViewerPref(prefLogShowTimestamps, m.logView.timestamps)
-	return m
+	saveCmd := m.setViewerPref(prefLogShowTimestamps, m.logView.timestamps)
+	return m, saveCmd
 }
 
 func (m Model) handleLogKeyS2() (tea.Model, tea.Cmd) {

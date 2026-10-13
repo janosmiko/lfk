@@ -111,9 +111,9 @@ func TestPersistRememberedSortMerges(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
 	// Tab A persists a sort for deployments.
-	persistRememberedSort("prod\x00apps/v1/deployments", sortPref{column: "Ready", ascending: false})
+	_ = persistRememberedSort("prod\x00apps/v1/deployments", sortPref{column: "Ready", ascending: false})
 	// Tab B (different kind) persists its own sort; must not drop tab A's.
-	persistRememberedSort("prod\x00/v1/pods", sortPref{column: "Status", ascending: true})
+	_ = persistRememberedSort("prod\x00/v1/pods", sortPref{column: "Status", ascending: true})
 
 	got := loadSortMemory()
 	assert.Equal(t, map[string]sortPref{
@@ -125,10 +125,10 @@ func TestPersistRememberedSortMerges(t *testing.T) {
 func TestPersistForgottenSortRemovesOnlyTarget(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
-	persistRememberedSort("prod\x00apps/v1/deployments", sortPref{column: "Ready", ascending: false})
-	persistRememberedSort("prod\x00/v1/pods", sortPref{column: "Status", ascending: true})
+	_ = persistRememberedSort("prod\x00apps/v1/deployments", sortPref{column: "Ready", ascending: false})
+	_ = persistRememberedSort("prod\x00/v1/pods", sortPref{column: "Status", ascending: true})
 
-	persistForgottenSort("prod\x00/v1/pods")
+	_ = persistForgottenSort("prod\x00/v1/pods")
 
 	got := loadSortMemory()
 	assert.Equal(t, map[string]sortPref{

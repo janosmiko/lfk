@@ -101,7 +101,7 @@ func TestPersistViewerPref_WritesTheFileNotTheGlobal(t *testing.T) {
 	path := isolateViewerPrefs(t)
 
 	ui.ConfigLogWrap = false
-	persistViewerPref(prefLogWrap, true)
+	_ = persistViewerPref(prefLogWrap, true)
 
 	if ui.ConfigLogWrap {
 		t.Error("a keypress must not rewrite the startup seed")
@@ -126,7 +126,7 @@ func TestPersistViewerPref_EveryToggleRoundTrips(t *testing.T) {
 	want := make([]bool, len(viewerPrefBindings))
 	for i := range viewerPrefBindings {
 		want[i] = i%2 == 0
-		persistViewerPref(viewerPref(i), want[i])
+		_ = persistViewerPref(viewerPref(i), want[i])
 	}
 
 	for _, b := range viewerPrefBindings {
@@ -146,8 +146,8 @@ func TestPersistViewerPref_EveryToggleRoundTrips(t *testing.T) {
 func TestPersistViewerPref_MergesWithExistingFile(t *testing.T) {
 	isolateViewerPrefs(t)
 
-	persistViewerPref(prefLogWrap, true)
-	persistViewerPref(prefDiffViewerUnified, true)
+	_ = persistViewerPref(prefLogWrap, true)
+	_ = persistViewerPref(prefDiffViewerUnified, true)
 
 	ui.ConfigLogWrap = false
 	ui.ConfigDiffViewerUnified = false
@@ -182,7 +182,7 @@ func TestApplyViewerPrefs_MetricsSparkWindow_RoundTrips(t *testing.T) {
 	isolateMetricsSparkPref(t)
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute, 15 * time.Minute, time.Hour}
 
-	persistMetricsSparkPref(ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 1})
+	_ = persistMetricsSparkPref(ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 1})
 	ui.MetricsSparkStartupState = ui.MetricsSparkState{}
 
 	ApplyViewerPrefs()
@@ -197,7 +197,7 @@ func TestApplyViewerPrefs_MetricsSparkNumeric_RoundTripsAsExplicitNumeric(t *tes
 	isolateMetricsSparkPref(t)
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
 
-	persistMetricsSparkPref(ui.MetricsSparkState{})
+	_ = persistMetricsSparkPref(ui.MetricsSparkState{})
 	ui.MetricsSparkStartupState = ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 0}
 
 	ApplyViewerPrefs()
@@ -209,7 +209,7 @@ func TestApplyViewerPrefs_MetricsSparkWindow_NoLongerConfiguredFallsBackToNumeri
 	isolateMetricsSparkPref(t)
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute, 15 * time.Minute}
 
-	persistMetricsSparkPref(ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 1})
+	_ = persistMetricsSparkPref(ui.MetricsSparkState{Mode: ui.MetricsDisplaySpark, WindowIdx: 1})
 
 	ui.ConfigSparklineWindows = []time.Duration{5 * time.Minute}
 	ApplyViewerPrefs()

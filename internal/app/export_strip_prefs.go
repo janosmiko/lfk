@@ -37,13 +37,12 @@ func loadExportStripPrefs() k8s.TemplateStripSet {
 	return set
 }
 
-// saveExportStripPrefs records the tick state. Best-effort: losing a UI
-// preference is never worth failing a keypress over. Called from the single
-// Bubble Tea Update goroutine.
-func saveExportStripPrefs(set k8s.TemplateStripSet) {
-	path := exportStripPrefsFilePath()
-	if path == "" {
-		return
+// saveExportStripPrefs records the tick state. It refuses to write over a file
+// it cannot read. Called from the single Bubble Tea Update goroutine.
+func saveExportStripPrefs(set k8s.TemplateStripSet) error {
+	path, err := stateFilePathErr(exportStripPrefsFileName)
+	if err != nil {
+		return err
 	}
 	categories := make(map[string]bool, len(k8s.TemplateCategories))
 	for _, cat := range k8s.TemplateCategories {
@@ -52,13 +51,20 @@ func saveExportStripPrefs(set k8s.TemplateStripSet) {
 	data, err := yaml.Marshal(ExportStripPrefsState{Categories: categories})
 	if err != nil {
 		logger.Error("Failed to encode export strip prefs", "error", err)
-		return
+		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		logger.Error("Failed to create export strip prefs directory", "error", err, "path", path)
-		return
-	}
-	if err := writeFileDurable(path, data); err != nil {
-		logger.Error("Failed to persist export strip prefs", "error", err, "path", path)
-	}
+	return updateStateFile(path, func() error {
+		if _, err := loadStateFileStrict[ExportStripPrefsState](exportStripPrefsFileName); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			logger.Error("Failed to create export strip prefs directory", "error", err, "path", path)
+			return err
+		}
+		if err := writeFileDurable(path, data); err != nil {
+			logger.Error("Failed to persist export strip prefs", "error", err, "path", path)
+			return err
+		}
+		return nil
+	})
 }
