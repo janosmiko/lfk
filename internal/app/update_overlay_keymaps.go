@@ -37,8 +37,8 @@ func (m *Model) keymapsOverlayItems() []keymapItem {
 		raw := a.Key(ui.ActiveKeybindings)
 		group := string(a.Group)
 		key := ui.KeyChordDisplay(raw)
-		items = append(items, keymapItem{ //nolint:modernize // can't drop embedded label with named fields
-			OverlayListItem: ui.OverlayListItem{
+		items = append(items, keymapItem{
+			OverlayListItem: ui.OverlayListItem{ //nolint:modernize // can't drop embedded label with named fields
 				Name:        a.Label,
 				Description: group,
 				Badge:       keymapsBadge(group, key),

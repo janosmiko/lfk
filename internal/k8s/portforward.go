@@ -287,8 +287,8 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 				var resolvedPort string
 				if arrowIdx := strings.Index(line, " -> "); arrowIdx > 0 {
 					addrPart := line[:arrowIdx]
-					if lastColon := strings.LastIndex(addrPart, ":"); lastColon >= 0 {
-						resolvedPort = addrPart[lastColon+1:]
+					if _, after, ok := strings.CutLast(addrPart, ":"); ok {
+						resolvedPort = after
 					}
 				}
 				m.mu.Lock()

@@ -92,8 +92,8 @@ func sanitizeHeader(s string) string {
 
 // stripDomain removes a Windows domain prefix such as "CORP\jmiko".
 func stripDomain(username string) string {
-	if i := strings.LastIndex(username, `\`); i >= 0 {
-		return username[i+1:]
+	if _, after, ok := strings.CutLast(username, `\`); ok {
+		return after
 	}
 	return username
 }
