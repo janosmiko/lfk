@@ -246,7 +246,7 @@ func TestPaneResizeBareClickKeepsDefaultLayout(t *testing.T) {
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)
 	m = release(m, leftEnd-1, 5)
-	assert.Equal(t, paneResizeState{}, m.paneResize)
+	assert.False(t, m.paneResize.active())
 
 	m.width = 200
 	want := baseExplorerModel()
@@ -263,7 +263,7 @@ func TestPaneResizeBareClickRestoresPriorOverride(t *testing.T) {
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)
 	m = release(m, leftEnd-1, 5)
-	assert.Equal(t, paneResizeState{leftPermille: 250, rightPermille: 300}, m.paneResize)
+	assert.Equal(t, []int{250, 300}, []int{m.paneResize.leftPermille, m.paneResize.rightPermille})
 }
 
 func TestPaneResizeShrinkAfterExtremeLeftDrag(t *testing.T) {

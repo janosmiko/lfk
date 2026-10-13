@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -12,7 +14,13 @@ const (
 	dividerRight
 )
 
-const minPaneWidth = 10
+const (
+	minPaneWidth      = 10
+	doubleClickWindow = 400 * time.Millisecond
+)
+
+// paneClock is swapped in tests so double-click timing needs no sleeps.
+var paneClock = time.Now
 
 // paneResizeState holds the dragged column split. A permille of 0 means the
 // default width. Permille keeps the proportions across terminal resizes.
@@ -25,6 +33,9 @@ type paneResizeState struct {
 	startLeft, startRight int
 	// Overrides before the press, restored when the drag changed nothing.
 	priorLeft, priorRight int
+	// Last press on a divider, for double-click detection.
+	lastPressAt time.Time
+	lastPressOn paneDivider
 }
 
 func (s paneResizeState) active() bool { return s.leftPermille != 0 || s.rightPermille != 0 }
@@ -89,12 +100,19 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 		}
 		m.paneResize.drag = dividerNone
 		s := m.paneResize
-		if s.leftPermille != s.startLeft || s.rightPermille != s.startRight {
+		changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
+		if changed {
 			persistPanePrefs(s.leftPermille, s.rightPermille)
 		} else {
 			s.leftPermille, s.rightPermille = s.priorLeft, s.priorRight
 		}
-		m.paneResize = paneResizeState{leftPermille: s.leftPermille, rightPermille: s.rightPermille}
+		m.paneResize = paneResizeState{
+			leftPermille: s.leftPermille, rightPermille: s.rightPermille,
+			lastPressAt: s.lastPressAt, lastPressOn: s.lastPressOn,
+		}
+		if changed {
+			m.paneResize.lastPressOn = dividerNone
+		}
 		return m, nil, true
 	}
 	return m, nil, false
@@ -116,8 +134,15 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 		m.paneResize.drag = dividerRight
 		m.paneResize.grabOffset = mouse.X - (middleEnd - 1)
 	default:
+		m.paneResize.lastPressOn = dividerNone
 		return m, nil, false
 	}
+
+	now := paneClock()
+	if m.paneResize.lastPressOn == m.paneResize.drag && now.Sub(m.paneResize.lastPressAt) <= doubleClickWindow {
+		return m.resetPaneWidths(), nil, true
+	}
+	m.paneResize.lastPressAt, m.paneResize.lastPressOn = now, m.paneResize.drag
 	m.paneResize.priorLeft, m.paneResize.priorRight = m.paneResize.leftPermille, m.paneResize.rightPermille
 	// Pin the other pane so only the dragged border moves.
 	m.paneResize.rightPermille = widthToPermille(rightW, usable)
@@ -126,6 +151,17 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 	}
 	m.paneResize.startLeft, m.paneResize.startRight = m.paneResize.leftPermille, m.paneResize.rightPermille
 	return m, nil, true
+}
+
+// resetPaneWidths restores the default layout and forgets the saved split.
+func (m Model) resetPaneWidths() Model {
+	had := m.paneResize.active()
+	m.paneResize = paneResizeState{}
+	if had {
+		clearPanePrefs()
+		m = m.recomposeThemedContent()
+	}
+	return m
 }
 
 func (m Model) dragPaneTo(x int) Model {
