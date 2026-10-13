@@ -29,10 +29,12 @@ func isolateViewerPrefs(t *testing.T) string {
 	for i, b := range viewerPrefBindings {
 		saved[i] = *b.global
 	}
+	savedPanes := explorerPaneStartup
 	t.Cleanup(func() {
 		for i, b := range viewerPrefBindings {
 			*b.global = saved[i]
 		}
+		explorerPaneStartup = savedPanes
 	})
 	return filepath.Join(dir, "lfk", "viewer_prefs.yaml")
 }

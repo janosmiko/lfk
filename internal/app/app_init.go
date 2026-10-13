@@ -167,6 +167,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		discoveryRefreshedContexts: make(map[string]bool),
 		metricsLastFetch:           make(map[string]time.Time),
 		metricsSpark:               ui.MetricsSparkStartupState,
+		paneResize:                 explorerPaneStartup,
 		allGroupsExpanded:          true,
 		warningEventsOnly:          ui.ConfigEventsWarningsOnly,
 		eventGrouping:              ui.ConfigEventsGrouping,

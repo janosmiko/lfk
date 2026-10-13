@@ -34,6 +34,60 @@ type ViewerPrefsState struct {
 	// viewerPrefBindings. A pointer to "" still marshals, which is what keeps
 	// explicit numeric distinct from never chosen.
 	MetricsSparkWindow *string `json:"metrics_spark_window,omitempty" yaml:"metrics_spark_window,omitempty"`
+	// Dragged explorer pane widths in permille of the usable width. Nil = never dragged.
+	ExplorerLeftPermille  *int `json:"explorer_left_permille,omitempty" yaml:"explorer_left_permille,omitempty"`
+	ExplorerRightPermille *int `json:"explorer_right_permille,omitempty" yaml:"explorer_right_permille,omitempty"`
+}
+
+// explorerPaneStartup is the persisted pane split NewModel seeds from.
+// ApplyViewerPrefs is its only writer.
+var explorerPaneStartup paneResizeState
+
+// validPanePermille rejects hand-edited values that could not come from a drag.
+// Each side is checked alone: a right drag with the left pane hidden can push
+// the pair past 1000, and apply fits any pair to the screen. 0 means unset.
+func validPanePermille(l, r *int) (left, right int) {
+	if l != nil && *l >= 1 && *l <= 999 {
+		left = *l
+	}
+	if r != nil && *r >= 1 && *r <= 999 {
+		right = *r
+	}
+	return left, right
+}
+
+// clearPanePrefs drops the saved pane split and keeps every other key.
+func clearPanePrefs() {
+	path := viewerPrefsFilePath()
+	if path == "" {
+		return
+	}
+	withStateFileLock(path, func() {
+		s := loadViewerPrefsState()
+		if s.ExplorerLeftPermille == nil && s.ExplorerRightPermille == nil {
+			return
+		}
+		s.ExplorerLeftPermille, s.ExplorerRightPermille = nil, nil
+		saveViewerPrefs(s)
+	})
+}
+
+// persistPanePrefs records the dragged widths, keeping every other key in the file.
+func persistPanePrefs(left, right int) {
+	path := viewerPrefsFilePath()
+	if path == "" {
+		return
+	}
+	withStateFileLock(path, func() {
+		s := loadViewerPrefsState()
+		if left > 0 {
+			s.ExplorerLeftPermille = &left
+		}
+		if right > 0 {
+			s.ExplorerRightPermille = &right
+		}
+		saveViewerPrefs(s)
+	})
 }
 
 // viewerPref names one persisted toggle. It indexes both viewerPrefBindings and
@@ -138,6 +192,9 @@ func ApplyViewerPrefs() {
 			*b.global = *v
 		}
 	}
+	explorerPaneStartup = paneResizeState{}
+	l, r := validPanePermille(s.ExplorerLeftPermille, s.ExplorerRightPermille)
+	explorerPaneStartup = paneResizeState{leftPermille: l, rightPermille: r}
 	if s.MetricsSparkWindow != nil {
 		ui.MetricsSparkStartupState = ui.ResolveMetricsSparkState(*s.MetricsSparkWindow)
 	}
