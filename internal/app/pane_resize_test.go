@@ -240,7 +240,34 @@ func widthsSum(m Model) (int, int, int, int) {
 	return l, mid, r, l + mid + r
 }
 
+func TestPaneResizeBareClickKeepsDefaultLayout(t *testing.T) {
+	isolateViewerPrefs(t)
+	m := baseExplorerModel()
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m = release(m, leftEnd-1, 5)
+	assert.Equal(t, paneResizeState{}, m.paneResize)
+
+	m.width = 200
+	want := baseExplorerModel()
+	want.width = 200
+	wl, wm, wr := want.explorerColumnWidths()
+	l, mid, r := m.explorerColumnWidths()
+	assert.Equal(t, []int{wl, wm, wr}, []int{l, mid, r})
+}
+
+func TestPaneResizeBareClickRestoresPriorOverride(t *testing.T) {
+	isolateViewerPrefs(t)
+	m := baseExplorerModel()
+	m.paneResize = paneResizeState{leftPermille: 250, rightPermille: 300}
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m = release(m, leftEnd-1, 5)
+	assert.Equal(t, paneResizeState{leftPermille: 250, rightPermille: 300}, m.paneResize)
+}
+
 func TestPaneResizeShrinkAfterExtremeLeftDrag(t *testing.T) {
+	isolateViewerPrefs(t)
 	m := baseExplorerModel()
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)
@@ -255,6 +282,7 @@ func TestPaneResizeShrinkAfterExtremeLeftDrag(t *testing.T) {
 }
 
 func TestPaneResizeShrinkAfterExtremeRightDrag(t *testing.T) {
+	isolateViewerPrefs(t)
 	m := baseExplorerModel()
 	_, middleEnd := m.columnBoundaries()
 	m = press(m, middleEnd-1, 5)
@@ -310,6 +338,7 @@ func TestPaneResizeFullscreenDuringDragEndsIt(t *testing.T) {
 }
 
 func TestPaneResizeReleaseAfterOverlayOpensClearsDrag(t *testing.T) {
+	isolateViewerPrefs(t)
 	m := baseExplorerModel()
 	leftEnd, _ := m.columnBoundaries()
 	m = press(m, leftEnd-1, 5)

@@ -80,21 +80,40 @@ func TestPanePrefsStartupLoadsValid(t *testing.T) {
 }
 
 func TestPanePrefsStartupRejectsInvalid(t *testing.T) {
-	cases := map[string][2]int{
-		"zero":     {0, 300},
-		"negative": {-5, 300},
-		"too big":  {250, 1000},
-		"sum":      {500, 500},
+	one, big, neg, zero := 1000, 1000, -5, 0
+	half := 500
+	cases := map[string]ViewerPrefsState{
+		"left zero":      {ExplorerLeftPermille: &zero},
+		"left negative":  {ExplorerLeftPermille: &neg},
+		"right too big":  {ExplorerRightPermille: &big},
+		"sum":            {ExplorerLeftPermille: &half, ExplorerRightPermille: &half},
+		"left too big":   {ExplorerLeftPermille: &one},
+		"both one valid": {ExplorerLeftPermille: &zero, ExplorerRightPermille: &big},
 	}
-	for name, c := range cases {
+	for name, s := range cases {
 		t.Run(name, func(t *testing.T) {
 			isolateViewerPrefs(t)
-			t.Cleanup(func() { explorerPaneStartup = paneResizeState{} })
-			saveViewerPrefs(ViewerPrefsState{ExplorerLeftPermille: &c[0], ExplorerRightPermille: &c[1]})
+			saveViewerPrefs(s)
 			ApplyViewerPrefs()
 			assert.Equal(t, paneResizeState{}, explorerPaneStartup)
 		})
 	}
+}
+
+func TestPanePrefsStartupDropsOnlyInvalidSide(t *testing.T) {
+	isolateViewerPrefs(t)
+	bad, ok := -5, 300
+	saveViewerPrefs(ViewerPrefsState{ExplorerLeftPermille: &bad, ExplorerRightPermille: &ok})
+	ApplyViewerPrefs()
+	assert.Equal(t, paneResizeState{rightPermille: 300}, explorerPaneStartup)
+}
+
+func TestPanePrefsStartupAcceptsSingleValue(t *testing.T) {
+	isolateViewerPrefs(t)
+	r := 300
+	saveViewerPrefs(ViewerPrefsState{ExplorerRightPermille: &r})
+	ApplyViewerPrefs()
+	assert.Equal(t, paneResizeState{rightPermille: 300}, explorerPaneStartup)
 }
 
 func TestPanePrefsRoundTrip(t *testing.T) {

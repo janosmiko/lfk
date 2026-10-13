@@ -44,11 +44,19 @@ type ViewerPrefsState struct {
 var explorerPaneStartup paneResizeState
 
 // validPanePermille rejects hand-edited values that could not come from a drag.
-func validPanePermille(l, r *int) (int, int, bool) {
-	if l == nil || r == nil || *l < 1 || *l > 999 || *r < 1 || *r > 999 || *l+*r >= 1000 {
-		return 0, 0, false
+// Each side is checked alone, since a drag with the left pane hidden stores only the right.
+// A pair that cannot fit together is dropped whole. 0 means unset.
+func validPanePermille(l, r *int) (left, right int) {
+	if l != nil && *l >= 1 && *l <= 999 {
+		left = *l
 	}
-	return *l, *r, true
+	if r != nil && *r >= 1 && *r <= 999 {
+		right = *r
+	}
+	if left+right >= 1000 {
+		return 0, 0
+	}
+	return left, right
 }
 
 // persistPanePrefs records the dragged widths, keeping every other key in the file.
@@ -172,9 +180,8 @@ func ApplyViewerPrefs() {
 		}
 	}
 	explorerPaneStartup = paneResizeState{}
-	if l, r, ok := validPanePermille(s.ExplorerLeftPermille, s.ExplorerRightPermille); ok {
-		explorerPaneStartup = paneResizeState{leftPermille: l, rightPermille: r}
-	}
+	l, r := validPanePermille(s.ExplorerLeftPermille, s.ExplorerRightPermille)
+	explorerPaneStartup = paneResizeState{leftPermille: l, rightPermille: r}
 	if s.MetricsSparkWindow != nil {
 		ui.MetricsSparkStartupState = ui.ResolveMetricsSparkState(*s.MetricsSparkWindow)
 	}
