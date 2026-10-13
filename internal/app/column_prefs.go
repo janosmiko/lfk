@@ -43,6 +43,19 @@ func loadColumnPrefsState() ColumnPrefsState {
 	return s
 }
 
+// loadColumnPrefsStateStrict is the read-modify-write loader: it fails on an
+// unreadable or corrupt file instead of returning empty state.
+func loadColumnPrefsStateStrict() (ColumnPrefsState, error) {
+	s, err := loadStateFileStrict[ColumnPrefsState](columnPrefsFileName)
+	if err != nil {
+		return s, err
+	}
+	if s.Contexts == nil {
+		s.Contexts = map[string]map[string]persistedColumnPrefs{}
+	}
+	return s, nil
+}
+
 // saveColumnPrefsState writes the nested state to disk.
 func saveColumnPrefsState(s ColumnPrefsState) error {
 	return saveStateFile(columnPrefsFileName, s)
@@ -97,17 +110,20 @@ func persistColumnPrefsEntry(key string, p persistedColumnPrefs) error {
 	if !ok {
 		return nil
 	}
-	path := columnPrefsFilePath()
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(columnPrefsFileName)
+	if err != nil {
+		return err
 	}
 	return updateStateFile(path, func() error {
-		state := loadColumnPrefsState()
+		state, err := loadColumnPrefsStateStrict()
+		if err != nil {
+			return err
+		}
 		if state.Contexts[ctx] == nil {
 			state.Contexts[ctx] = map[string]persistedColumnPrefs{}
 		}
 		state.Contexts[ctx][kind] = p
-		err := saveColumnPrefsState(state)
+		err = saveColumnPrefsState(state)
 		if err != nil {
 			logger.Error("Failed to persist column prefs", "error", err)
 		}
@@ -122,12 +138,15 @@ func persistForgottenColumnPrefs(key string) error {
 	if !ok {
 		return nil
 	}
-	path := columnPrefsFilePath()
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(columnPrefsFileName)
+	if err != nil {
+		return err
 	}
 	return updateStateFile(path, func() error {
-		state := loadColumnPrefsState()
+		state, err := loadColumnPrefsStateStrict()
+		if err != nil {
+			return err
+		}
 		kinds, ok := state.Contexts[ctx]
 		if !ok {
 			return nil
@@ -139,7 +158,7 @@ func persistForgottenColumnPrefs(key string) error {
 		if len(kinds) == 0 {
 			delete(state.Contexts, ctx)
 		}
-		err := saveColumnPrefsState(state)
+		err = saveColumnPrefsState(state)
 		if err != nil {
 			logger.Error("Failed to persist column prefs", "error", err)
 		}

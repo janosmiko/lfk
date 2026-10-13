@@ -55,8 +55,13 @@ func (m Model) toggleObjectExplorerTree() (tea.Model, tea.Cmd) {
 		rt.cursorOnTreeSegs([]string{flatKey})
 	}
 	m.clampObjectExplorerScroll()
-	if saveCmd == nil && len(rt.treeRows) >= model.DefaultObjectTreeRowLimit {
-		m.setStatusMessage("Tree truncated: drill in to see deeper levels", true)
+	if len(rt.treeRows) >= model.DefaultObjectTreeRowLimit {
+		const truncated = "Tree truncated: drill in to see deeper levels"
+		if saveCmd != nil {
+			m.setStatusMessage(m.statusMessage+" | "+truncated, true)
+			return m, saveCmd
+		}
+		m.setStatusMessage(truncated, true)
 		return m, scheduleStatusClear()
 	}
 	return m, saveCmd

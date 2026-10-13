@@ -1,6 +1,9 @@
 package app
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -14,11 +17,44 @@ import (
 // stateFilePath returns "" when the state dir can't be resolved, so callers
 // degrade to a best-effort no-op instead of failing.
 func stateFilePath(name string) string {
-	dir, err := paths.StateDir()
+	path, err := stateFilePathErr(name)
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(dir, name)
+	return path
+}
+
+// stateFilePathErr is for write paths: a preference that cannot be saved must
+// tell the user why.
+func stateFilePathErr(name string) (string, error) {
+	dir, err := paths.StateDir()
+	if err != nil {
+		return "", fmt.Errorf("no state directory: %w", err)
+	}
+	return filepath.Join(dir, name), nil
+}
+
+// loadStateFileStrict is the loader for read-modify-write paths. A missing
+// file is empty state. Any other read error or a decode error is returned, so
+// the caller never saves over a file it could not read.
+func loadStateFileStrict[T any](name string) (T, error) {
+	var zero T
+	path, err := stateFilePathErr(name)
+	if err != nil {
+		return zero, err
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return zero, nil
+	}
+	if err != nil {
+		return zero, fmt.Errorf("%s is unreadable: %w", name, err)
+	}
+	var v T
+	if err := yaml.Unmarshal(data, &v); err != nil {
+		return zero, fmt.Errorf("%s is corrupt, fix or remove it: %w", name, err)
+	}
+	return v, nil
 }
 
 // reportPrefSaveErr shows a failed preference save in the status bar. It
@@ -58,9 +94,9 @@ func loadStateFile[T any](name string) T {
 // every keypress, and File.Sync costs tens of ms on macOS (F_FULLFSYNC). A
 // caller that needs durability calls writeFileDurable(stateFilePath(name), data).
 func saveStateFile[T any](name string, v T) error {
-	path := stateFilePath(name)
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(name)
+	if err != nil {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err

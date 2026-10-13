@@ -28,7 +28,7 @@ func TestExportStripPrefs_RoundTrip(t *testing.T) {
 	set := k8s.DefaultTemplateStripSet()
 	set[k8s.TemplateNamespace] = false
 	set[k8s.TemplateLabels] = true
-	saveExportStripPrefs(set)
+	require.NoError(t, saveExportStripPrefs(set))
 
 	assert.Equal(t, set, loadExportStripPrefs())
 }

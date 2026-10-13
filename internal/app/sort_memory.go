@@ -65,6 +65,16 @@ func loadSortMemory() map[string]sortPref {
 	return sortMemoryFromState(loadStateFile[SortMemoryState](sortMemoryFileName))
 }
 
+// loadSortMemoryStrict is the read-modify-write loader: it fails on an
+// unreadable or corrupt file instead of returning an empty map.
+func loadSortMemoryStrict() (map[string]sortPref, error) {
+	s, err := loadStateFileStrict[SortMemoryState](sortMemoryFileName)
+	if err != nil {
+		return nil, err
+	}
+	return sortMemoryFromState(s), nil
+}
+
 // saveSortMemory writes remembered sort preferences to disk.
 func saveSortMemory(mem map[string]sortPref) error {
 	return saveStateFile(sortMemoryFileName, sortMemoryToState(mem))
@@ -81,14 +91,17 @@ func saveSortMemory(mem map[string]sortPref) error {
 // processes, so a second lfk instance cannot drop the sort this one just
 // recorded. Do not call this from a background goroutine.
 func persistRememberedSort(key string, pref sortPref) error {
-	path := sortMemoryFilePath()
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(sortMemoryFileName)
+	if err != nil {
+		return err
 	}
 	return updateStateFile(path, func() error {
-		mem := loadSortMemory()
+		mem, err := loadSortMemoryStrict()
+		if err != nil {
+			return err
+		}
 		mem[key] = pref
-		err := saveSortMemory(mem)
+		err = saveSortMemory(mem)
 		if err != nil {
 			logger.Error("Failed to persist sort memory", "error", err)
 		}
@@ -99,17 +112,20 @@ func persistRememberedSort(key string, pref sortPref) error {
 // persistForgottenSort removes a single sort pref from disk (the sort-reset
 // action), leaving every other remembered sort intact.
 func persistForgottenSort(key string) error {
-	path := sortMemoryFilePath()
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(sortMemoryFileName)
+	if err != nil {
+		return err
 	}
 	return updateStateFile(path, func() error {
-		mem := loadSortMemory()
+		mem, err := loadSortMemoryStrict()
+		if err != nil {
+			return err
+		}
 		if _, ok := mem[key]; !ok {
 			return nil
 		}
 		delete(mem, key)
-		err := saveSortMemory(mem)
+		err = saveSortMemory(mem)
 		if err != nil {
 			logger.Error("Failed to persist sort memory", "error", err)
 		}

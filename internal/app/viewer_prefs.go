@@ -155,8 +155,10 @@ func newViewerPrefValues() viewerPrefValues {
 	return v
 }
 
+const viewerPrefsFileName = "viewer_prefs.yaml"
+
 func viewerPrefsFilePath() string {
-	return stateFilePath("viewer_prefs.yaml")
+	return stateFilePath(viewerPrefsFileName)
 }
 
 // loadViewerPrefsState reads the file, returning an all-nil state when it is
@@ -208,12 +210,15 @@ func ApplyViewerPrefs() {
 // instances share a state directory, and an unlocked merge lets the later
 // writer drop what the other recorded.
 func persistMetricsSparkPref(state ui.MetricsSparkState) error {
-	path := viewerPrefsFilePath()
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(viewerPrefsFileName)
+	if err != nil {
+		return err
 	}
 	return updateStateFile(path, func() error {
-		s := loadViewerPrefsState()
+		s, err := loadStateFileStrict[ViewerPrefsState](viewerPrefsFileName)
+		if err != nil {
+			return err
+		}
 		w := state.PersistedWindow()
 		s.MetricsSparkWindow = &w
 		return saveViewerPrefs(s)
@@ -262,12 +267,15 @@ func (m *Model) setViewerPref(p viewerPref, v bool) tea.Cmd {
 // It returns errStateUnavailable when the write waited out the lock budget and
 // was skipped, or the write error.
 func persistViewerPref(p viewerPref, v bool) error {
-	path := viewerPrefsFilePath()
-	if path == "" {
-		return nil
+	path, err := stateFilePathErr(viewerPrefsFileName)
+	if err != nil {
+		return err
 	}
 	return updateStateFile(path, func() error {
-		s := loadViewerPrefsState()
+		s, err := loadStateFileStrict[ViewerPrefsState](viewerPrefsFileName)
+		if err != nil {
+			return err
+		}
 		*viewerPrefBindings[p].field(&s) = &v
 		return saveViewerPrefs(s)
 	})

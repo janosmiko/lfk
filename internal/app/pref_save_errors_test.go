@@ -111,22 +111,6 @@ func TestPrefSave_SuccessIsSilent(t *testing.T) {
 	}
 }
 
-func TestPrefSave_NoStateDirIsSilent(t *testing.T) {
-	for _, w := range prefWriters() {
-		t.Run(w.name, func(t *testing.T) {
-			t.Setenv("LFK_STATE_DIR", "")
-			t.Setenv("XDG_STATE_HOME", "")
-			t.Setenv("HOME", "")
-			if stateFilePath("x") != "" {
-				t.Skip("state dir still resolves")
-			}
-			m, cmd := w.run()
-			assert.Nil(t, cmd)
-			assert.Empty(t, m.statusMessage)
-		})
-	}
-}
-
 func TestForgetSort_FailureShowsStatusError(t *testing.T) {
 	dir := useStateDir(t)
 	m := &Model{sortColumnName: "Name", sortAscending: true}
