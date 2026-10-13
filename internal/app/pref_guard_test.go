@@ -104,6 +104,25 @@ func TestWholeStateSave_UnreadableFileIsNeverOverwritten(t *testing.T) {
 	}
 }
 
+func TestPinnedMigration_CorruptFileIsNeverOverwritten(t *testing.T) {
+	const corrupt = "contexts: [unterminated\n\t- {{{"
+	m, dir := wholeSaveModel(t)
+	path := filepath.Join(dir, pinnedFileName)
+	require.NoError(t, os.WriteFile(path, []byte(corrupt), 0o640))
+
+	scope := map[string][]string{"prod": {"example.com"}}
+	m.migratePinnedScope(scope, "prod", []model.ResourceTypeEntry{
+		{Kind: "Gadget", APIGroup: "example.com", APIVersion: "v1", Resource: "gadgets"},
+	})
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, corrupt, string(data))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o640), info.Mode().Perm())
+}
+
 func TestWholeStateSave_MissingFileSaves(t *testing.T) {
 	for _, c := range wholeSaveCases() {
 		t.Run(c.name, func(t *testing.T) {
