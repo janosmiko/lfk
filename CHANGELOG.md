@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.4](https://github.com/janosmiko/lfk/compare/v0.19.3...v0.19.4) (2026-10-13)
+
+
+### Features
+
+* resize explorer panes by dragging column borders ([#848](https://github.com/janosmiko/lfk/issues/848)) ([19c96ae](https://github.com/janosmiko/lfk/commit/19c96aec2c13c582ac710dd8e0816e026676ae17))
+
+
+### Bug Fixes
+
+* show an error when a preference fails to save ([#849](https://github.com/janosmiko/lfk/issues/849)) ([33f8a74](https://github.com/janosmiko/lfk/commit/33f8a749b7af8fc080adbcb7c31cef45c9c6d0b1))
+
 ## [0.19.3](https://github.com/janosmiko/lfk/compare/v0.19.2...v0.19.3) (2026-10-06)
 
 
