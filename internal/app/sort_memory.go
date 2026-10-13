@@ -80,35 +80,39 @@ func saveSortMemory(mem map[string]sortPref) error {
 // forgetSort from key and mouse handlers). The lock extends that across
 // processes, so a second lfk instance cannot drop the sort this one just
 // recorded. Do not call this from a background goroutine.
-func persistRememberedSort(key string, pref sortPref) {
+func persistRememberedSort(key string, pref sortPref) error {
 	path := sortMemoryFilePath()
 	if path == "" {
-		return
+		return nil
 	}
-	withStateFileLock(path, func() {
+	return updateStateFile(path, func() error {
 		mem := loadSortMemory()
 		mem[key] = pref
-		if err := saveSortMemory(mem); err != nil {
+		err := saveSortMemory(mem)
+		if err != nil {
 			logger.Error("Failed to persist sort memory", "error", err)
 		}
+		return err
 	})
 }
 
 // persistForgottenSort removes a single sort pref from disk (the sort-reset
-// action), leaving every other remembered sort intact. Best-effort.
-func persistForgottenSort(key string) {
+// action), leaving every other remembered sort intact.
+func persistForgottenSort(key string) error {
 	path := sortMemoryFilePath()
 	if path == "" {
-		return
+		return nil
 	}
-	withStateFileLock(path, func() {
+	return updateStateFile(path, func() error {
 		mem := loadSortMemory()
 		if _, ok := mem[key]; !ok {
-			return
+			return nil
 		}
 		delete(mem, key)
-		if err := saveSortMemory(mem); err != nil {
+		err := saveSortMemory(mem)
+		if err != nil {
 			logger.Error("Failed to persist sort memory", "error", err)
 		}
+		return err
 	})
 }

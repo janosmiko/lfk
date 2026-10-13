@@ -647,11 +647,13 @@ func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
 		m.sortColumnName = clickedKey
 		m.sortAscending = true
 	}
-	m.rememberSort()
+	saveCmd := m.rememberSort()
 	m.sortMiddleItems()
 	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
+	if saveCmd == nil {
+		m.setStatusMessage("Sort: "+m.sortModeName(), false)
+	}
+	return m, tea.Batch(m.loadPreview(), scheduleStatusClear(), saveCmd)
 }
 
 // tabAtX returns the tab index at the given X coordinate in the tab bar,

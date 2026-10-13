@@ -65,7 +65,7 @@ func TestPersistViewerPref_ConcurrentWritersKeepEachOthersToggles(t *testing.T) 
 	wrote := make([]bool, numViewerPrefs)
 	var wg sync.WaitGroup
 	for i := range int(numViewerPrefs) {
-		wg.Go(func() { wrote[i] = persistViewerPref(viewerPref(i), true) })
+		wg.Go(func() { wrote[i] = persistViewerPref(viewerPref(i), true) == nil })
 	}
 	wg.Wait()
 

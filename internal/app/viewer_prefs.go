@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	tea "charm.land/bubbletea/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -206,46 +207,47 @@ func ApplyViewerPrefs() {
 // different window. Same locked read-modify-write as persistViewerPref: two lfk
 // instances share a state directory, and an unlocked merge lets the later
 // writer drop what the other recorded.
-func persistMetricsSparkPref(state ui.MetricsSparkState) {
+func persistMetricsSparkPref(state ui.MetricsSparkState) error {
 	path := viewerPrefsFilePath()
 	if path == "" {
-		return
+		return nil
 	}
-	withStateFileLock(path, func() {
+	return updateStateFile(path, func() error {
 		s := loadViewerPrefsState()
 		w := state.PersistedWindow()
 		s.MetricsSparkWindow = &w
-		saveViewerPrefs(s)
+		return saveViewerPrefs(s)
 	})
 }
 
-// saveViewerPrefs writes the state file. Best effort: losing a UI preference is
-// never worth failing a keypress over.
-func saveViewerPrefs(s ViewerPrefsState) {
+// saveViewerPrefs writes the state file.
+func saveViewerPrefs(s ViewerPrefsState) error {
 	path := viewerPrefsFilePath()
 	if path == "" {
-		return
+		return nil
 	}
 	data, err := yaml.Marshal(s)
 	if err != nil {
 		logger.Error("Failed to encode viewer prefs", "error", err)
-		return
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		logger.Error("Failed to create viewer prefs directory", "error", err, "path", path)
-		return
+		return err
 	}
 	if err := writeFileDurable(path, data); err != nil {
 		logger.Error("Failed to persist viewer prefs", "error", err, "path", path)
+		return err
 	}
+	return nil
 }
 
 // setViewerPref records a toggle for the rest of the session and for the next
 // start. Every viewer toggle handler goes through it, so the two halves cannot
-// drift apart.
-func (m *Model) setViewerPref(p viewerPref, v bool) {
+// drift apart. The caller must return the cmd: it carries the save error, if any.
+func (m *Model) setViewerPref(p viewerPref, v bool) tea.Cmd {
 	m.viewerPrefs[p] = v
-	_ = persistViewerPref(p, v)
+	return m.reportPrefSaveErr(persistViewerPref(p, v))
 }
 
 // persistViewerPref records one runtime toggle so the next start reopens the
@@ -257,16 +259,16 @@ func (m *Model) setViewerPref(p viewerPref, v bool) {
 // The load and the save sit inside one interprocess lock. Two lfk instances
 // share a state directory, so an unlocked merge lets the later writer drop a
 // toggle the other instance recorded between its read and its write.
-// It reports whether the toggle reached disk. A write that waits out the lock
-// budget is skipped, so the answer is not always yes.
-func persistViewerPref(p viewerPref, v bool) bool {
+// It returns errStateUnavailable when the write waited out the lock budget and
+// was skipped, or the write error.
+func persistViewerPref(p viewerPref, v bool) error {
 	path := viewerPrefsFilePath()
 	if path == "" {
-		return false
+		return nil
 	}
-	return withStateFileLock(path, func() {
+	return updateStateFile(path, func() error {
 		s := loadViewerPrefsState()
 		*viewerPrefBindings[p].field(&s) = &v
-		saveViewerPrefs(s)
+		return saveViewerPrefs(s)
 	})
 }

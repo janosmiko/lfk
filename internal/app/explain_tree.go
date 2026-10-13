@@ -64,23 +64,24 @@ type explainTreeState struct {
 func (m Model) toggleExplainTree() (tea.Model, tea.Cmd) {
 	if m.explainTree {
 		m.explainTreeWanted = false
-		m.setViewerPref(prefAPIExplorerTree, false)
+		saveCmd := m.setViewerPref(prefAPIExplorerTree, false)
 		m.restoreExplainFlatLevel()
-		return m, nil
+		return m, saveCmd
 	}
 	if m.explainTreeWanted {
 		// A tree fetch is already in flight (or a sticky re-entry pending):
 		// a second press cancels instead of firing a duplicate fetch. The
 		// in-flight result is dropped by the wanted guard on arrival.
 		m.explainTreeWanted = false
-		m.setViewerPref(prefAPIExplorerTree, false)
-		return m, nil
+		return m, m.setViewerPref(prefAPIExplorerTree, false)
 	}
 	m.explainTreeWanted = true
-	m.setViewerPref(prefAPIExplorerTree, true)
+	saveCmd := m.setViewerPref(prefAPIExplorerTree, true)
 	m.loading = true
-	m.setStatusMessage("Loading field tree...", false)
-	return m, m.execKubectlExplainTree(m.explainResource, m.explainAPIVersion, m.explainPath)
+	if saveCmd == nil {
+		m.setStatusMessage("Loading field tree...", false)
+	}
+	return m, tea.Batch(saveCmd, m.execKubectlExplainTree(m.explainResource, m.explainAPIVersion, m.explainPath))
 }
 
 // restoreExplainFlatLevel leaves tree mode and reinstates the flat field list

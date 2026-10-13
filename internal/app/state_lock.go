@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -57,4 +58,16 @@ func withStateFileLock(path string, fn func()) bool {
 
 	fn()
 	return true
+}
+
+var errStateUnavailable = errors.New("state file is locked or unavailable")
+
+// updateStateFile runs a locked read-modify-write and returns fn's error, or
+// errStateUnavailable when the lock was not taken and fn never ran.
+func updateStateFile(path string, fn func() error) error {
+	var fnErr error
+	if !withStateFileLock(path, func() { fnErr = fn() }) {
+		return errStateUnavailable
+	}
+	return fnErr
 }

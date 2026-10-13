@@ -215,14 +215,19 @@ func (m *Model) syncObjectExplorerLive() {
 // current state instead of waiting for the next watch tick.
 func (m Model) toggleObjectExplorerLive() (tea.Model, tea.Cmd) {
 	m.objectExplorerLive = !m.objectExplorerLive
-	m.setViewerPref(prefObjectExplorerLive, m.objectExplorerLive)
+	saveCmd := m.setViewerPref(prefObjectExplorerLive, m.objectExplorerLive)
+	label := "off"
 	if m.objectExplorerLive {
-		m.setStatusMessage("Object Explorer live refresh: on", false)
-		m.objectExplorerForceSync = true
-		return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
+		label = "on"
 	}
-	m.setStatusMessage("Object Explorer live refresh: off", false)
-	return m, scheduleStatusClear()
+	if saveCmd == nil {
+		m.setStatusMessage("Object Explorer live refresh: "+label, false)
+	}
+	if m.objectExplorerLive {
+		m.objectExplorerForceSync = true
+		return m, tea.Batch(m.refreshCurrentLevel(), saveCmd, scheduleStatusClear())
+	}
+	return m, tea.Batch(saveCmd, scheduleStatusClear())
 }
 
 // refreshObjectExplorer fetches the current resource list and applies the result

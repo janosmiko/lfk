@@ -238,8 +238,7 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLRefresh()
 	case kb.ToggleWrap:
 		m.yamlView.wrap = !m.yamlView.wrap
-		m.setViewerPref(prefYAMLViewerWrap, m.yamlView.wrap)
-		return m, nil
+		return m, m.setViewerPref(prefYAMLViewerWrap, m.yamlView.wrap)
 	case kb.ToggleFold:
 		return m.handleYAMLKeyFoldToggle()
 	case kb.ToggleFoldAll:

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	tea "charm.land/bubbletea/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -18,6 +19,16 @@ func stateFilePath(name string) string {
 		return ""
 	}
 	return filepath.Join(dir, name)
+}
+
+// reportPrefSaveErr shows a failed preference save in the status bar. It
+// returns nil when err is nil.
+func (m *Model) reportPrefSaveErr(err error) tea.Cmd {
+	if err == nil {
+		return nil
+	}
+	m.setStatusMessage("Could not save preference: "+err.Error(), true)
+	return scheduleStatusClear()
 }
 
 // loadStateFile returns the zero value on any failure: a hand-edited or

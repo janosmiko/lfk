@@ -3,6 +3,8 @@ package app
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
@@ -90,54 +92,58 @@ func loadColumnPrefs() columnPrefMaps {
 // lock extends that guarantee across processes: two lfk instances sharing a
 // state directory would otherwise read the same file and the later writer would
 // drop the layout the other one just committed.
-func persistColumnPrefsEntry(key string, p persistedColumnPrefs) {
+func persistColumnPrefsEntry(key string, p persistedColumnPrefs) error {
 	ctx, kind, ok := strings.Cut(key, "\x00")
 	if !ok {
-		return
+		return nil
 	}
 	path := columnPrefsFilePath()
 	if path == "" {
-		return
+		return nil
 	}
-	withStateFileLock(path, func() {
+	return updateStateFile(path, func() error {
 		state := loadColumnPrefsState()
 		if state.Contexts[ctx] == nil {
 			state.Contexts[ctx] = map[string]persistedColumnPrefs{}
 		}
 		state.Contexts[ctx][kind] = p
-		if err := saveColumnPrefsState(state); err != nil {
+		err := saveColumnPrefsState(state)
+		if err != nil {
 			logger.Error("Failed to persist column prefs", "error", err)
 		}
+		return err
 	})
 }
 
 // persistForgottenColumnPrefs removes one kind's column layout from disk (the
 // reset action or a total-clear commit), leaving every other entry intact.
-func persistForgottenColumnPrefs(key string) {
+func persistForgottenColumnPrefs(key string) error {
 	ctx, kind, ok := strings.Cut(key, "\x00")
 	if !ok {
-		return
+		return nil
 	}
 	path := columnPrefsFilePath()
 	if path == "" {
-		return
+		return nil
 	}
-	withStateFileLock(path, func() {
+	return updateStateFile(path, func() error {
 		state := loadColumnPrefsState()
 		kinds, ok := state.Contexts[ctx]
 		if !ok {
-			return
+			return nil
 		}
 		if _, ok := kinds[kind]; !ok {
-			return
+			return nil
 		}
 		delete(kinds, kind)
 		if len(kinds) == 0 {
 			delete(state.Contexts, ctx)
 		}
-		if err := saveColumnPrefsState(state); err != nil {
+		err := saveColumnPrefsState(state)
+		if err != nil {
 			logger.Error("Failed to persist column prefs", "error", err)
 		}
+		return err
 	})
 }
 
@@ -145,20 +151,19 @@ func persistForgottenColumnPrefs(key string) {
 // kind currently shown in the middle column. Called on Enter (commit) and R
 // (reset) from the column-toggle overlay — never on live-apply, so an Esc that
 // reverts the in-memory maps leaves the on-disk layout untouched.
-func (m *Model) persistColumnPrefs() {
+func (m *Model) persistColumnPrefs() tea.Cmd {
 	key := m.columnMemoryKey(m.middleColumnKind())
 	extras, ok := m.sessionColumns[key]
 	if !ok {
 		// No session entry means the layout was reset / cleared; drop it.
-		persistForgottenColumnPrefs(key)
-		return
+		return m.reportPrefSaveErr(persistForgottenColumnPrefs(key))
 	}
 	if extras == nil {
 		extras = []string{}
 	}
-	persistColumnPrefsEntry(key, persistedColumnPrefs{
+	return m.reportPrefSaveErr(persistColumnPrefsEntry(key, persistedColumnPrefs{
 		Order:          m.columnOrder[key],
 		VisibleExtras:  extras,
 		HiddenBuiltins: m.hiddenBuiltinColumns[key],
-	})
+	}))
 }

@@ -570,11 +570,11 @@ func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
 	// the overlay only touches in-memory maps. The on-disk layout is written
 	// here on commit so an Esc that reverts via the snapshot never leaks an
 	// uncommitted edit to disk.
-	m.persistColumnPrefs()
+	saveCmd := m.persistColumnPrefs()
 	m.overlay = overlayNone
 	m.columnToggleItems = nil
 	m.columnToggleSnapshot = columnToggleSnapshot{}
-	return m, nil
+	return m, saveCmd
 }
 
 func (m Model) handleColumnToggleKeyR() (tea.Model, tea.Cmd) {
@@ -589,12 +589,15 @@ func (m Model) handleColumnToggleKeyR() (tea.Model, tea.Cmd) {
 		delete(m.columnOrder, key)
 	}
 	// Drop the persisted layout too, so the reset survives a restart.
-	m.persistColumnPrefs()
+	saveCmd := m.persistColumnPrefs()
 	m.overlay = overlayNone
 	m.columnToggleItems = nil
 	// Match Enter: drop the snapshot so a future reopen can't restore stale
 	// pre-reset state.
 	m.columnToggleSnapshot = columnToggleSnapshot{}
+	if saveCmd != nil {
+		return m, saveCmd
+	}
 	m.setStatusMessage("Columns reset to default", false)
 	return m, scheduleStatusClear()
 }

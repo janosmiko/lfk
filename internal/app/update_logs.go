@@ -152,8 +152,8 @@ func (m Model) handleLogActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 	case kb.SeverityDown:
 		return m.severityStep(-1), nil, true
 	case kb.ToggleWrap:
-		ret := m.handleLogKeyTab()
-		return ret, nil, true
+		ret, cmd := m.handleLogKeyTab()
+		return ret, cmd, true
 	case kb.Search:
 		ret := m.handleLogKeySlash()
 		return ret, nil, true
@@ -164,11 +164,11 @@ func (m Model) handleLogActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 		ret := m.handleLogKeyN2()
 		return ret, nil, true
 	case kb.TogglePrefixes:
-		ret := m.handleLogKeyP()
-		return ret, nil, true
+		ret, cmd := m.handleLogKeyP()
+		return ret, cmd, true
 	case kb.TogglePreview:
-		ret := m.handleLogKeyP2()
-		return ret, nil, true
+		ret, cmd := m.handleLogKeyP2()
+		return ret, cmd, true
 	case "J":
 		if !m.logView.previewVisible {
 			return m, nil, false
@@ -185,8 +185,8 @@ func (m Model) handleLogActionKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool
 		ret := m.handleLogKeyHash()
 		return ret, nil, true
 	case kb.ToggleTimestamps:
-		ret := m.handleLogKeyS()
-		return ret, nil, true
+		ret, cmd := m.handleLogKeyS()
+		return ret, cmd, true
 	case "S":
 		ret, cmd := m.handleLogKeyS2()
 		return ret, cmd, true

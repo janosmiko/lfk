@@ -11,10 +11,12 @@ import (
 // the new mode has data to draw.
 func (m Model) handleMetricsSparkCycle() (Model, tea.Cmd) {
 	m.metricsSpark = m.metricsSpark.Next()
-	persistMetricsSparkPref(m.metricsSpark)
-	m.setStatusMessage("CPU/MEM: "+m.metricsSpark.Label(), false)
+	saveCmd := m.reportPrefSaveErr(persistMetricsSparkPref(m.metricsSpark))
+	if saveCmd == nil {
+		m.setStatusMessage("CPU/MEM: "+m.metricsSpark.Label(), false)
+	}
 
-	cmds := []tea.Cmd{scheduleStatusClear()}
+	cmds := []tea.Cmd{scheduleStatusClear(), saveCmd}
 	kind := m.dashboardMetricsKind()
 	if m.metricsSpark.Mode == ui.MetricsDisplaySpark {
 		// Bypass the throttle: the user just asked for this window, so a

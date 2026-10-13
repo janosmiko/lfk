@@ -32,12 +32,12 @@ func TestColumnPrefsFilePath(t *testing.T) {
 func TestColumnPrefsRoundTrip(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
-	persistColumnPrefsEntry("prod\x00Deployment", persistedColumnPrefs{
+	_ = persistColumnPrefsEntry("prod\x00Deployment", persistedColumnPrefs{
 		Order:          []string{"Name", "cpu", "Status"},
 		VisibleExtras:  []string{"cpu"},
 		HiddenBuiltins: []string{"Age"},
 	})
-	persistColumnPrefsEntry("dev\x00Pod", persistedColumnPrefs{
+	_ = persistColumnPrefsEntry("dev\x00Pod", persistedColumnPrefs{
 		Order:         []string{"Name", "Status"},
 		VisibleExtras: []string{},
 	})
@@ -78,8 +78,8 @@ func TestLoadColumnPrefsCorrupt(t *testing.T) {
 func TestPersistColumnPrefsEntryMerges(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
-	persistColumnPrefsEntry("prod\x00Deployment", persistedColumnPrefs{VisibleExtras: []string{"cpu"}})
-	persistColumnPrefsEntry("prod\x00Pod", persistedColumnPrefs{VisibleExtras: []string{"mem"}})
+	_ = persistColumnPrefsEntry("prod\x00Deployment", persistedColumnPrefs{VisibleExtras: []string{"cpu"}})
+	_ = persistColumnPrefsEntry("prod\x00Pod", persistedColumnPrefs{VisibleExtras: []string{"mem"}})
 
 	maps := loadColumnPrefs()
 	assert.Equal(t, []string{"cpu"}, maps.sessionColumns["prod\x00Deployment"])
@@ -89,10 +89,10 @@ func TestPersistColumnPrefsEntryMerges(t *testing.T) {
 func TestPersistForgottenColumnPrefsRemovesOnlyTarget(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
-	persistColumnPrefsEntry("prod\x00Deployment", persistedColumnPrefs{VisibleExtras: []string{"cpu"}})
-	persistColumnPrefsEntry("prod\x00Pod", persistedColumnPrefs{VisibleExtras: []string{"mem"}})
+	_ = persistColumnPrefsEntry("prod\x00Deployment", persistedColumnPrefs{VisibleExtras: []string{"cpu"}})
+	_ = persistColumnPrefsEntry("prod\x00Pod", persistedColumnPrefs{VisibleExtras: []string{"mem"}})
 
-	persistForgottenColumnPrefs("prod\x00Pod")
+	_ = persistForgottenColumnPrefs("prod\x00Pod")
 
 	maps := loadColumnPrefs()
 	_, hasDep := maps.sessionColumns["prod\x00Deployment"]
@@ -103,7 +103,7 @@ func TestPersistForgottenColumnPrefsRemovesOnlyTarget(t *testing.T) {
 
 func TestPersistForgottenColumnPrefsNoEntryIsNoop(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
-	persistForgottenColumnPrefs("prod\x00Deployment") // nothing persisted yet
+	_ = persistForgottenColumnPrefs("prod\x00Deployment") // nothing persisted yet
 	assert.Empty(t, loadColumnPrefs().sessionColumns)
 }
 
@@ -164,7 +164,7 @@ func TestColumnToggleEnterPersists(t *testing.T) {
 func TestColumnToggleResetPersists(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 
-	persistColumnPrefsEntry("prod\x00pod", persistedColumnPrefs{VisibleExtras: []string{"IP"}})
+	_ = persistColumnPrefsEntry("prod\x00pod", persistedColumnPrefs{VisibleExtras: []string{"IP"}})
 
 	m := baseModelCov()
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"}
@@ -190,7 +190,7 @@ func TestPersistColumnPrefs_ResetRemovesEntry(t *testing.T) {
 	key := m.columnMemoryKey(m.middleColumnKind())
 
 	// Commit then clear (mirrors the overlay's R reset path: maps emptied first).
-	persistColumnPrefsEntry(key, persistedColumnPrefs{VisibleExtras: []string{"cpu"}})
+	_ = persistColumnPrefsEntry(key, persistedColumnPrefs{VisibleExtras: []string{"cpu"}})
 	m.persistColumnPrefs() // sessionColumns has no key -> forgotten
 
 	assert.Empty(t, loadColumnPrefs().sessionColumns)
