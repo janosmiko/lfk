@@ -101,8 +101,9 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 		m.paneResize.drag = dividerNone
 		s := m.paneResize
 		changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
+		var cmd tea.Cmd
 		if changed {
-			persistPanePrefs(s.leftPermille, s.rightPermille)
+			cmd = m.reportPrefSaveErr(persistPanePrefs(s.leftPermille, s.rightPermille))
 		} else {
 			s.leftPermille, s.rightPermille = s.priorLeft, s.priorRight
 		}
@@ -113,7 +114,7 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 		if changed {
 			m.paneResize.lastPressOn = dividerNone
 		}
-		return m, nil, true
+		return m, cmd, true
 	}
 	return m, nil, false
 }
@@ -140,7 +141,8 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 
 	now := paneClock()
 	if m.paneResize.lastPressOn == m.paneResize.drag && now.Sub(m.paneResize.lastPressAt) <= doubleClickWindow {
-		return m.resetPaneWidths(), nil, true
+		m, cmd := m.resetPaneWidths()
+		return m, cmd, true
 	}
 	m.paneResize.lastPressAt, m.paneResize.lastPressOn = now, m.paneResize.drag
 	m.paneResize.priorLeft, m.paneResize.priorRight = m.paneResize.leftPermille, m.paneResize.rightPermille
@@ -154,14 +156,14 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 }
 
 // resetPaneWidths restores the default layout and forgets the saved split.
-func (m Model) resetPaneWidths() Model {
+func (m Model) resetPaneWidths() (Model, tea.Cmd) {
 	had := m.paneResize.active()
 	m.paneResize = paneResizeState{}
-	if had {
-		clearPanePrefs()
-		m = m.recomposeThemedContent()
+	if !had {
+		return m, nil
 	}
-	return m
+	cmd := m.reportPrefSaveErr(clearPanePrefs())
+	return m.recomposeThemedContent(), cmd
 }
 
 func (m Model) dragPaneTo(x int) Model {
