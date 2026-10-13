@@ -68,3 +68,23 @@ func TestSaveStateFile_TightensExistingPermissions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
 }
+
+// An in-place write truncates first, so a failed write would empty the file.
+// A rename swaps in a new inode and leaves the old one whole until it succeeds.
+func TestSaveStateFile_ReplacesByRename(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LFK_STATE_DIR", dir)
+	path := filepath.Join(dir, "fixture.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("value: old"), 0o600))
+	before, err := os.Stat(path)
+	require.NoError(t, err)
+
+	require.NoError(t, saveStateFile("fixture.yaml", stateFileFixture{Value: "x"}))
+
+	after, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.False(t, os.SameFile(before, after))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "no temp file left behind")
+}

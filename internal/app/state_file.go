@@ -106,7 +106,7 @@ func loadStateFile[T any](name string) T {
 	return v
 }
 
-// saveStateFile writes plainly, no fsync: several callers run inline on
+// saveStateFile renames a temp file into place but skips fsync: several callers run inline on
 // every keypress, and File.Sync costs tens of ms on macOS (F_FULLFSYNC). A
 // caller that needs durability calls writeFileDurable(stateFilePath(name), data).
 func saveStateFile[T any](name string, v T) error {
@@ -121,10 +121,5 @@ func saveStateFile[T any](name string, v T) error {
 	if err != nil {
 		return err
 	}
-	// os.WriteFile only applies the mode on create. Tighten an existing file
-	// from an older version or a manual copy before writing over it.
-	if err := os.Chmod(path, 0o600); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
+	return writeFileReplace(path, data, false)
 }
