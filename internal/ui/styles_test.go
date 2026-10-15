@@ -187,6 +187,12 @@ func TestStatusSeverity_FreeFormPhrases(t *testing.T) {
 		{"Upgrading cluster", sevProgressing},
 		{"Switchover in progress", sevProgressing},
 		{"Primary instance is being restarted in-place", sevProgressing},
+		// Longhorn volume robustness and state.
+		{"faulted", sevFailed},
+		{"attached", sevRunning},
+		{"attaching", sevProgressing},
+		{"detaching", sevProgressing},
+		{"detached", sevUnknown},
 		// Worst word wins within a phrase.
 		{"Healthy but degraded", sevFailed},
 		// Single unknown words classify too.

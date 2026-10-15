@@ -38,19 +38,47 @@ func TestDashboardPinnedRows_RendersInPinOrderNoHeader(t *testing.T) {
 	assert.Contains(t, out, "1 Degraded")
 }
 
-func TestDashboardPinnedRows_MultiDimensionSplitsIntoTwoRows(t *testing.T) {
+func TestDashboardPinnedRows_MultiDimensionGroupsUnderKindHeader(t *testing.T) {
 	apps := ui.BuildListSummary("Application", []model.Item{
 		{Kind: "Application", Columns: []model.KeyValue{{Key: "Health", Value: "Degraded"}, {Key: "Sync Status", Value: "OutOfSync"}}},
 	})
 	data := dashboardData{pinnedSummaries: []pinnedSummaryResult{
 		{index: 0, key: "argoproj.io/applications", displayName: "Applications", summary: apps},
 	}}
-	out := ansi.Strip(strings.Join(dashboardPinnedRows(nil, data, testDashboardWidths()), "\n"))
-	// The first row carries the kind label (Health dimension), the second the
-	// "Sync" dimension label - two rows, not a stacked block under one label.
-	assert.Contains(t, out, "Applications")
-	assert.Contains(t, out, "Sync")
-	assert.Less(t, strings.Index(out, "Applications"), strings.Index(out, "Sync"))
+	lines := dashboardPinnedRows(nil, data, testDashboardWidths())
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(ansi.Strip(l), " ")
+	}
+	// A bare "Sync" row under "Applications" read as an unrelated metric, so
+	// every dimension is a labeled tree branch under a kind header line.
+	assert.Len(t, lines, 5)
+	assert.Equal(t, "  Applications", lines[0])
+	assert.True(t, strings.HasPrefix(lines[1], "  ├ Health"), lines[1])
+	assert.True(t, strings.HasPrefix(lines[2], "  │"), "branch continues past the legend line: %q", lines[2])
+	assert.Contains(t, lines[2], "1 Degraded")
+	assert.True(t, strings.HasPrefix(lines[3], "  └ Sync"), lines[3])
+	assert.Contains(t, lines[4], "1 OutOfSync")
+	assert.NotContains(t, lines[4], "│")
+}
+
+func TestDashboardPinnedRows_SingleDimensionKeepsKindLabel(t *testing.T) {
+	jobs := ui.BuildListSummary("Job", []model.Item{{Kind: "Job", Status: "Complete"}})
+	data := dashboardData{pinnedSummaries: []pinnedSummaryResult{
+		{index: 0, key: "batch/jobs", displayName: "Jobs", summary: jobs},
+	}}
+	lines := dashboardPinnedRows(nil, data, testDashboardWidths())
+	assert.Len(t, lines, 2)
+	assert.True(t, strings.HasPrefix(ansi.Strip(lines[0]), "  Jobs "), "bar shares the kind label's line")
+}
+
+func TestMaxPinnedLabelWidth_MeasuresTreeLabels(t *testing.T) {
+	vols := ui.SummaryBar{Label: "Robustness", Total: 1, Buckets: []ui.SummaryBucket{{Value: "healthy", Count: 1}}}
+	state := ui.SummaryBar{Label: "State", Total: 1, Buckets: []ui.SummaryBucket{{Value: "attached", Count: 1}}}
+	data := dashboardData{pinnedSummaries: []pinnedSummaryResult{
+		{displayName: "Volumes", summary: ui.ListSummary{Total: 1, Bars: []ui.SummaryBar{vols, state}}},
+	}}
+	// The kind name sits on its own header line, so only "├ Robustness" counts.
+	assert.Equal(t, 12, maxPinnedLabelWidth(data))
 }
 
 func TestDashboardPinnedRows_ZeroTotalStillRenders(t *testing.T) {
