@@ -61,7 +61,7 @@ type summaryDimension struct {
 //   - Workloads (Deployment, StatefulSet, DaemonSet, ReplicaSet): the
 //     ready/desired replica ratio, since these carry no Status.
 //   - Flux & cert-manager resources: their "Ready" condition column.
-//   - Longhorn Volume: the Robustness and State columns.
+//   - Longhorn Volume: the Robustness column.
 //   - Any other kind: a generic .status.phase or .status.conditions rollup.
 //
 // Kinds without any dimension still get a count-only band (just the header);
@@ -86,10 +86,7 @@ func summaryDimensions(kind string, items []model.Item) []summaryDimension {
 		// Other CRDs are also named Volume, so only Longhorn's Robustness column opts in.
 		for _, it := range items {
 			if it.ColumnValue("Robustness") != "" {
-				return []summaryDimension{
-					{label: "Robustness", valueOf: columnValueFn("Robustness")},
-					{label: "State", valueOf: columnValueFn("State")},
-				}
+				return []summaryDimension{{label: "Robustness", valueOf: columnValueFn("Robustness")}}
 			}
 		}
 		return genericSummaryDimensions(items)
