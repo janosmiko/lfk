@@ -375,21 +375,20 @@ func TestBuildListSummary_LonghornVolumeRobustness(t *testing.T) {
 		longhornVolume("faulted", "detached"),
 	}
 	s := BuildListSummary("Volume", items)
-	// Only Robustness: a detached volume is idle, not unhealthy, so State
-	// would add a dashboard row that reads as a second health signal.
-	require.Len(t, s.Bars, 1)
-	rob := s.Bars[0]
+	require.Len(t, s.Bars, 2)
+	rob, st := s.Bars[0], s.Bars[1]
 	assert.Equal(t, "Robustness", rob.Label)
+	assert.Equal(t, "State", st.Label)
 	require.Len(t, rob.Buckets, 3)
 	// Worst-first: faulted and degraded sort ahead of healthy.
 	assert.Equal(t, "healthy", rob.Buckets[2].Value)
 	assert.Equal(t, 2, rob.Buckets[2].Count)
 	assert.Equal(t, "degraded", rob.Buckets[0].Value)
 	assert.Equal(t, "faulted", rob.Buckets[1].Value)
-	for _, b := range rob.Buckets {
+	for _, b := range append(rob.Buckets, st.Buckets...) {
 		assert.NotEqual(t, "NotReady", b.Value)
 	}
-	assert.Equal(t, 4, rob.Total)
+	assert.Equal(t, 4, st.Total)
 }
 
 func TestBuildListSummary_VolumeWithoutRobustnessStaysGeneric(t *testing.T) {
