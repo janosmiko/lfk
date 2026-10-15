@@ -76,7 +76,7 @@ func statusSeverity(status string) statusSev {
 // or "Jumping" never match a fragment.
 var phraseSeverityWords = map[string]statusSev{
 	"failed": sevFailed, "failing": sevFailed, "error": sevFailed,
-	"errored": sevFailed, "degraded": sevFailed, "unhealthy": sevFailed,
+	"errored": sevFailed, "faulted": sevFailed, "degraded": sevFailed, "unhealthy": sevFailed,
 	"pending": sevProgressing, "waiting": sevProgressing, "creating": sevProgressing,
 	"initializing": sevProgressing, "starting": sevProgressing, "setting": sevProgressing,
 	"upgrading": sevProgressing, "provisioning": sevProgressing, "progressing": sevProgressing,

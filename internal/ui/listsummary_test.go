@@ -353,6 +353,54 @@ func TestBuildListSummary_FluxReadyCondition(t *testing.T) {
 	assert.Equal(t, 2, bar.Buckets[1].Count)
 }
 
+func longhornVolume(robustness, state string) model.Item {
+	return model.Item{
+		Kind: "Volume",
+		Columns: []model.KeyValue{
+			{Key: "State", Value: state},
+			{Key: "Robustness", Value: robustness},
+		},
+		Conditions: []model.ConditionEntry{
+			{Type: "Scheduled", Status: "True"},
+			{Type: "OfflineRebuilding", Status: "False"},
+		},
+	}
+}
+
+func TestBuildListSummary_LonghornVolumeRobustness(t *testing.T) {
+	items := []model.Item{
+		longhornVolume("healthy", "attached"),
+		longhornVolume("healthy", "detached"),
+		longhornVolume("degraded", "attached"),
+		longhornVolume("faulted", "detached"),
+	}
+	s := BuildListSummary("Volume", items)
+	require.Len(t, s.Bars, 2)
+	rob, st := s.Bars[0], s.Bars[1]
+	assert.Equal(t, "Robustness", rob.Label)
+	assert.Equal(t, "State", st.Label)
+	require.Len(t, rob.Buckets, 3)
+	// Worst-first: faulted and degraded sort ahead of healthy.
+	assert.Equal(t, "healthy", rob.Buckets[2].Value)
+	assert.Equal(t, 2, rob.Buckets[2].Count)
+	assert.Equal(t, "degraded", rob.Buckets[0].Value)
+	assert.Equal(t, "faulted", rob.Buckets[1].Value)
+	for _, b := range append(rob.Buckets, st.Buckets...) {
+		assert.NotEqual(t, "NotReady", b.Value)
+	}
+	assert.Equal(t, 4, st.Total)
+}
+
+func TestBuildListSummary_VolumeWithoutRobustnessStaysGeneric(t *testing.T) {
+	items := []model.Item{
+		crdWithConditions(model.ConditionEntry{Type: "Ready", Status: "True"}),
+		crdWithConditions(model.ConditionEntry{Type: "Ready", Status: "False"}),
+	}
+	s := BuildListSummary("Volume", items)
+	require.Len(t, s.Bars, 1)
+	assert.Equal(t, "Status", s.Bars[0].Label)
+}
+
 func TestBuildListSummary_NoiseKindsHaveNoStatusBars(t *testing.T) {
 	// StorageClass/IngressClass/PriorityClass set Status to a "default"-class
 	// marker — not health — so they get no status bar (only a count-only band).
