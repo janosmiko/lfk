@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.5](https://github.com/janosmiko/lfk/compare/v0.19.4...v0.19.5) (2026-10-15)
+
+
+### Bug Fixes
+
+* roll up Longhorn volumes by robustness in the summary ([#852](https://github.com/janosmiko/lfk/issues/852)) ([817f695](https://github.com/janosmiko/lfk/commit/817f695a56bb5d8eff59d6e51799aff255e2f0b1))
+
 ## [0.19.4](https://github.com/janosmiko/lfk/compare/v0.19.3...v0.19.4) (2026-10-13)
 
 
