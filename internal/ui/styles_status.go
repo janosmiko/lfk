@@ -82,8 +82,9 @@ var phraseSeverityWords = map[string]statusSev{
 	"upgrading": sevProgressing, "provisioning": sevProgressing, "progressing": sevProgressing,
 	"progress": sevProgressing, "reconciling": sevProgressing, "restarting": sevProgressing,
 	"restarted": sevProgressing, "terminating": sevProgressing, "deleting": sevProgressing,
+	"attaching": sevProgressing, "detaching": sevProgressing,
 	"healthy": sevRunning, "ready": sevRunning, "running": sevRunning, "active": sevRunning,
-	"succeeded": sevDone, "completed": sevDone,
+	"attached": sevRunning, "succeeded": sevDone, "completed": sevDone,
 }
 
 // phraseSeverity classifies an unknown status string by scanning its words
