@@ -85,11 +85,11 @@ func dashboardPinnedRowLines(r pinnedSummaryResult, w dashboardWidths) []string 
 	case len(r.summary.Bars) == 0:
 		// Zero-total kind (e.g. 0 Jobs): still render a row - an empty bar
 		// and a "0" summary, the same shape as every other metric row.
-		bar := renderStackedBar(nil, 0, w.bar)
+		bar := stackedMetricBar(nil, 0, w.bar)
 		return dashboardMetricLines(label, bar, "0", w)
 	case len(r.summary.Bars) == 1:
 		dim := r.summary.Bars[0]
-		bar := renderStackedBar(pinnedBarSegments(dim), dim.Total, w.bar)
+		bar := stackedMetricBar(pinnedBarSegments(dim), dim.Total, w.bar)
 		return dashboardMetricLines(label, bar, pinnedSummaryLegend(dim), w)
 	default:
 		// A bare second row (e.g. "Sync" under "Applications") reads as an
@@ -101,9 +101,9 @@ func dashboardPinnedRowLines(r pinnedSummaryResult, w dashboardWidths) []string 
 			if i == last {
 				branch = "└ "
 			}
-			bar := renderStackedBar(pinnedBarSegments(dim), dim.Total, w.bar)
+			bar := stackedMetricBar(pinnedBarSegments(dim), dim.Total, w.bar)
 			rows := dashboardMetricLines(branch+dim.Label, bar, pinnedSummaryLegend(dim), w)
-			if i < last {
+			if i < last && len(rows) > 1 {
 				// The legend line starts with plain spaces: swap the branch
 				// column's space for a continuation bar.
 				rows[1] = "  │" + rows[1][3:]
