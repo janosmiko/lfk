@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -26,10 +27,8 @@ func pinnedRowLabel(r pinnedSummaryResult) string {
 	return r.key
 }
 
-// maxPinnedLabelWidth returns the widest label any pinned row will render:
-// each kind's own label plus every additional dimension's label (e.g. "Sync"
-// on the Argo Application row), so dashboardWidths can widen the shared label
-// column enough to keep every pinned row aligned with Nodes/Pods.
+// maxPinnedLabelWidth returns the widest pinned label (kind or "├ <dim>"), so
+// every pinned row's bar aligns with Nodes/Pods.
 func maxPinnedLabelWidth(data dashboardData) int {
 	maxW := 0
 	widen := func(s string) {
@@ -38,12 +37,13 @@ func maxPinnedLabelWidth(data dashboardData) int {
 		}
 	}
 	for _, r := range data.pinnedSummaries {
-		widen(pinnedRowLabel(r))
-		for i, bar := range r.summary.Bars {
-			if i == 0 {
-				continue // first dimension reuses the kind label, already measured
-			}
-			widen(bar.Label)
+		if len(r.summary.Bars) < 2 {
+			widen(pinnedRowLabel(r))
+			continue
+		}
+		// The kind name gets its own header line, outside the label column.
+		for _, bar := range r.summary.Bars {
+			widen("├ " + bar.Label)
 		}
 	}
 	return maxW
@@ -87,15 +87,28 @@ func dashboardPinnedRowLines(r pinnedSummaryResult, w dashboardWidths) []string 
 		// and a "0" summary, the same shape as every other metric row.
 		bar := renderStackedBar(nil, 0, w.bar)
 		return dashboardMetricLines(label, bar, "0", w)
+	case len(r.summary.Bars) == 1:
+		dim := r.summary.Bars[0]
+		bar := renderStackedBar(pinnedBarSegments(dim), dim.Total, w.bar)
+		return dashboardMetricLines(label, bar, pinnedSummaryLegend(dim), w)
 	default:
-		var out []string
+		// A bare second row (e.g. "Sync" under "Applications") reads as an
+		// unrelated metric, so group every dimension as a branch under the kind.
+		out := []string{ansi.Truncate("  "+ui.HelpKeyStyle.Render(label), w.content, "")}
+		last := len(r.summary.Bars) - 1
 		for i, dim := range r.summary.Bars {
-			rowLabel := label
-			if i > 0 {
-				rowLabel = dim.Label
+			branch := "├ "
+			if i == last {
+				branch = "└ "
 			}
 			bar := renderStackedBar(pinnedBarSegments(dim), dim.Total, w.bar)
-			out = append(out, dashboardMetricLines(rowLabel, bar, pinnedSummaryLegend(dim), w)...)
+			rows := dashboardMetricLines(branch+dim.Label, bar, pinnedSummaryLegend(dim), w)
+			if i < last {
+				// The legend line starts with plain spaces: swap the branch
+				// column's space for a continuation bar.
+				rows[1] = "  │" + rows[1][3:]
+			}
+			out = append(out, rows...)
 		}
 		return out
 	}
