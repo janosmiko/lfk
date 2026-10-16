@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -23,6 +24,74 @@ type metricBar struct {
 	cells   []barCell
 	width   int
 	suffix  string
+	// labels parallel cells ("" = none). tail labels the empty cells after
+	// the last segment. With neither set, one whole-bar summary is written.
+	labels []string
+	tail   string
+}
+
+// countLabels names each non-zero segment "<count> <name>".
+func countLabels(segments []struct {
+	count int
+	style lipgloss.Style
+}, names ...string,
+) []string {
+	labels := make([]string, len(segments))
+	for i, s := range segments {
+		if s.count > 0 {
+			labels[i] = fmt.Sprintf("%d %s", s.count, names[i])
+		}
+	}
+	return labels
+}
+
+func (b metricBar) withLabels(labels []string, tail string) metricBar {
+	b.labels, b.tail = labels, tail
+	return b
+}
+
+func (b metricBar) anchored() bool {
+	if b.tail != "" {
+		return true
+	}
+	for _, l := range b.labels {
+		if l != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func fitsIn(text string, room int) bool {
+	return utf8.RuneCountInString(text) == lipgloss.Width(text) && lipgloss.Width(text) <= room
+}
+
+// anchoredText writes each label at the first cell of its own region, or
+// reports false if any label does not fit there.
+func (b metricBar) anchoredText() (string, bool) {
+	runes := []rune(strings.Repeat(" ", b.width))
+	pos := 0
+	place := func(label string, room int) bool {
+		if label == "" {
+			return true
+		}
+		if !fitsIn(label, room) {
+			return false
+		}
+		copy(runes[pos:], []rune(label))
+		return true
+	}
+	for i, c := range b.cells {
+		n := min(c.n, b.width-pos)
+		if i < len(b.labels) && !place(b.labels[i], n) {
+			return "", false
+		}
+		pos += max(n, 0)
+	}
+	if !place(b.tail, b.width-pos) {
+		return "", false
+	}
+	return string(runes), true
 }
 
 func stackedMetricBar(segments []struct {
@@ -47,14 +116,26 @@ func percentMetricBar(used, total int64, width int) metricBar {
 	return b
 }
 
-// inline reports false when the text cannot fit or colors are off, so the
-// caller keeps the two-line layout.
+// inline reports false when any label cannot fit its region or colors are
+// off, so the caller keeps the two-line layout. text is only used for bars
+// without labels.
 func (b metricBar) inline(text string) (string, bool) {
-	if ui.ConfigNoColor || b.width <= 0 || utf8.RuneCountInString(text) != lipgloss.Width(text) ||
-		lipgloss.Width(text) > b.width {
+	if ui.ConfigNoColor || b.width <= 0 {
 		return "", false
 	}
-	runes := []rune(text + strings.Repeat(" ", b.width-lipgloss.Width(text)))
+	var runes []rune
+	if b.anchored() {
+		padded, ok := b.anchoredText()
+		if !ok {
+			return "", false
+		}
+		runes = []rune(padded)
+	} else {
+		if !fitsIn(text, b.width) {
+			return "", false
+		}
+		runes = []rune(text + strings.Repeat(" ", b.width-lipgloss.Width(text)))
+	}
 	filledText := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBase))
 	track := ui.NormalStyle.Background(lipgloss.Color(ui.ColorBarBg))
 

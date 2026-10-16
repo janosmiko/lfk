@@ -89,7 +89,7 @@ func dashboardPinnedRowLines(r pinnedSummaryResult, w dashboardWidths) []string 
 		return dashboardMetricLines(label, bar, "0", w)
 	case len(r.summary.Bars) == 1:
 		dim := r.summary.Bars[0]
-		bar := stackedMetricBar(pinnedBarSegments(dim), dim.Total, w.bar)
+		bar := pinnedMetricBar(dim, w.bar)
 		return dashboardMetricLines(label, bar, pinnedSummaryLegend(dim), w)
 	default:
 		// A bare second row (e.g. "Sync" under "Applications") reads as an
@@ -101,7 +101,7 @@ func dashboardPinnedRowLines(r pinnedSummaryResult, w dashboardWidths) []string 
 			if i == last {
 				branch = "└ "
 			}
-			bar := stackedMetricBar(pinnedBarSegments(dim), dim.Total, w.bar)
+			bar := pinnedMetricBar(dim, w.bar)
 			rows := dashboardMetricLines(branch+dim.Label, bar, pinnedSummaryLegend(dim), w)
 			if i < last && len(rows) > 1 {
 				// The legend line starts with plain spaces: swap the branch
@@ -130,6 +130,16 @@ func pinnedBarSegments(dim ui.SummaryBar) []struct {
 		segments[i].style = ui.StatusStyle(b.Value)
 	}
 	return segments
+}
+
+// pinnedMetricBar labels each bucket at its own segment.
+func pinnedMetricBar(dim ui.SummaryBar, width int) metricBar {
+	names := make([]string, len(dim.Buckets))
+	for i, b := range dim.Buckets {
+		names[i] = b.Value
+	}
+	segments := pinnedBarSegments(dim)
+	return stackedMetricBar(segments, dim.Total, width).withLabels(countLabels(segments, names...), "")
 }
 
 // pinnedSummaryLegend renders a dimension's bucket counts as a colored legend

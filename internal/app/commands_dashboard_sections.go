@@ -55,10 +55,10 @@ type dashboardWidths struct {
 }
 
 // dashboardMetricLines lays out one cluster metric. The summary is written
-// inside the bar so the row takes one line. If the summary is wider than the
-// bar, or colors are off, it falls back to two lines: label + bar, then the
-// summary on its own indented line, so a long breakdown never shrinks the bar
-// and is never cut. Lines are truncated to the column width so nothing wraps.
+// inside the bar on one line. Each bucket label starts at its own segment.
+// If any label overflows its segment, or colors are off, the row takes two
+// lines: bar, then the full summary indented below. Lines are truncated to
+// the column width so nothing wraps.
 func dashboardMetricLines(label string, bar metricBar, summary string, w dashboardWidths) []string {
 	// A label longer than the column (a long pinned CRD display name) is
 	// truncated here rather than just left-unpadded: leaving it full-length
@@ -396,6 +396,8 @@ func stackedBarCounts(segments []struct {
 		if seg.count > 0 && chars == 0 {
 			chars = 1
 		}
+		// The last segment absorbs the rounding remainder only when packed.
+		// Otherwise the shortfall is real headroom and must stay empty.
 		if i == len(segments)-1 && packed {
 			chars = width - used
 		}
@@ -420,7 +422,8 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{data.readyNodes, ui.StatusRunning},
 			{data.nodeCount - data.readyNodes, ui.StatusFailed},
 		}
-		nodeBar := stackedMetricBar(segments, data.nodeCount, w.bar)
+		nodeBar := stackedMetricBar(segments, data.nodeCount, w.bar).withLabels(
+			countLabels(segments, "Ready", "NotReady"), "")
 		lines = append(lines, dashboardMetricLines("Nodes", nodeBar, nodeSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
@@ -449,7 +452,12 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{podOther(data.pods), ui.DimStyle},
 		}
 		denom := podBarDenominator(data)
-		podBar := stackedMetricBar(segments, denom, w.bar)
+		tail := ""
+		if unalloc := podUnallocated(data); unalloc > 0 {
+			tail = fmt.Sprintf("%d Unallocated", unalloc)
+		}
+		podBar := stackedMetricBar(segments, denom, w.bar).withLabels(
+			countLabels(segments, "Running", "Pending", "Failed", "Succeeded", "Other"), tail)
 		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
 	// No trailing blank here: pinned rows (dashboardPinnedRows) render
