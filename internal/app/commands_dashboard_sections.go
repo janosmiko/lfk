@@ -54,21 +54,24 @@ type dashboardWidths struct {
 	content int // total content width. Inline rows are truncated to it as a safety net
 }
 
-// dashboardMetricLines lays out one cluster metric over two lines: the label +
-// bar on the first, and the status summary on its own indented line. Keeping
-// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
-// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
-// column width so a long summary can't wrap and tear the layout.
-func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
+// dashboardMetricLines lays out one cluster metric. The summary is written
+// inside the bar on one line. Each bucket label starts at its own segment.
+// If any label overflows its segment, or colors are off, the row takes two
+// lines: bar, then the full summary indented below. Lines are truncated to
+// the column width so nothing wraps.
+func dashboardMetricLines(label string, bar metricBar, summary string, w dashboardWidths) []string {
 	// A label longer than the column (a long pinned CRD display name) is
 	// truncated here rather than just left-unpadded: leaving it full-length
 	// would push that row's bar to a different column than every other row.
 	label = ui.Truncate(label, w.label)
 	pad := max(w.label-lipgloss.Width(label), 0)
-	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
+	prefix := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  "
+	if inline, ok := bar.inline(ansi.Strip(summary)); ok {
+		return []string{ansi.Truncate(prefix+inline, w.content, "")}
+	}
 	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
 	return []string{
-		ansi.Truncate(barLine, w.content, ""),
+		ansi.Truncate(prefix+bar.classic, w.content, ""),
 		ansi.Truncate(sumLine, w.content, ""),
 	}
 }
@@ -320,31 +323,28 @@ func renderBar(used, total int64, width int) string {
 	if total <= 0 {
 		return "[" + strings.Repeat("░", width) + "]  N/A"
 	}
-	pct := float64(used) / float64(total) * 100
-	if pct > 100 {
-		pct = 100
-	}
-	filled := int(pct / 100 * float64(width))
-	filled = min(filled, width)
-	empty := width - filled
+	filled, style, pct := barFill(used, total, width)
+	return "[" + style.Render(strings.Repeat("█", filled)) + strings.Repeat("░", width-filled) + "] " + formatBarPct(pct)
+}
 
-	filledStr := strings.Repeat("█", filled)
-	emptyStr := strings.Repeat("░", empty)
-
-	var style lipgloss.Style
+// barFill returns the filled cell count, its usage color, and the clamped percentage.
+func barFill(used, total int64, width int) (int, lipgloss.Style, float64) {
+	pct := min(float64(used)/float64(total)*100, 100)
+	filled := min(int(pct/100*float64(width)), width)
 	switch {
 	case pct >= 90:
-		style = ui.StatusFailed
+		return filled, ui.StatusFailed, pct
 	case pct >= 75:
-		style = ui.StatusProgressing
+		return filled, ui.StatusProgressing, pct
 	default:
-		style = ui.StatusRunning
+		return filled, ui.StatusRunning, pct
 	}
+}
 
-	// Pad the percentage to a fixed width ("  5%", " 14%", "100%") so bars
-	// placed side by side (per-node CPU/MEM) stay column-aligned regardless of
-	// the digit count.
-	return "[" + style.Render(filledStr) + emptyStr + "] " + fmt.Sprintf("%3.0f%%", pct)
+// formatBarPct pads the percentage to a fixed width ("  5%", " 14%", "100%") so
+// bars placed side by side (per-node CPU/MEM) stay column-aligned.
+func formatBarPct(pct float64) string {
+	return fmt.Sprintf("%3.0f%%", pct)
 }
 
 // renderStackedBar renders a stacked bar showing proportions of multiple segments.
@@ -356,6 +356,28 @@ func renderStackedBar(segments []struct {
 	if total <= 0 {
 		return "[" + strings.Repeat("░", width) + "]"
 	}
+	var barBuilder strings.Builder
+	used := 0
+	for i, chars := range stackedBarCounts(segments, total, width) {
+		barBuilder.WriteString(segments[i].style.Render(strings.Repeat("█", chars)))
+		used += chars
+	}
+	if used < width {
+		barBuilder.WriteString(strings.Repeat("░", width-used))
+	}
+	return "[" + barBuilder.String() + "]"
+}
+
+// stackedBarCounts returns the cell count of each segment.
+func stackedBarCounts(segments []struct {
+	count int
+	style lipgloss.Style
+}, total, width int,
+) []int {
+	counts := make([]int, len(segments))
+	if total <= 0 {
+		return counts
+	}
 	// When the segments fully pack the total, the last one absorbs the rounding
 	// remainder so no stray empty cells appear. When they sum to less than the
 	// total (e.g. scheduled pods below cluster pod capacity), the shortfall is
@@ -366,7 +388,6 @@ func renderStackedBar(segments []struct {
 		sumCounts += seg.count
 	}
 	packed := sumCounts >= total
-	var barBuilder strings.Builder
 	used := 0
 	for i, seg := range segments {
 		chars := int(float64(seg.count) / float64(total) * float64(width))
@@ -375,24 +396,16 @@ func renderStackedBar(segments []struct {
 		if seg.count > 0 && chars == 0 {
 			chars = 1
 		}
-		// Last segment absorbs the rounding remainder, but only when packed;
-		// otherwise the shortfall is real headroom and must stay empty.
+		// The last segment absorbs the rounding remainder only when packed.
+		// Otherwise the shortfall is real headroom and must stay empty.
 		if i == len(segments)-1 && packed {
 			chars = width - used
 		}
-		if chars < 0 {
-			chars = 0
-		}
-		if used+chars > width {
-			chars = width - used
-		}
-		barBuilder.WriteString(seg.style.Render(strings.Repeat("█", chars)))
+		chars = max(min(chars, width-used), 0)
+		counts[i] = chars
 		used += chars
 	}
-	if used < width {
-		barBuilder.WriteString(strings.Repeat("░", width-used))
-	}
-	return "[" + barBuilder.String() + "]"
+	return counts
 }
 
 // dashboardHeaderSection renders the cluster header, node, namespace, and pod sections.
@@ -409,7 +422,8 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{data.readyNodes, ui.StatusRunning},
 			{data.nodeCount - data.readyNodes, ui.StatusFailed},
 		}
-		nodeBar := renderStackedBar(segments, data.nodeCount, w.bar)
+		nodeBar := stackedMetricBar(segments, data.nodeCount, w.bar).withLabels(
+			countLabels(segments, "Ready", "NotReady"), "")
 		lines = append(lines, dashboardMetricLines("Nodes", nodeBar, nodeSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
@@ -438,7 +452,12 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{podOther(data.pods), ui.DimStyle},
 		}
 		denom := podBarDenominator(data)
-		podBar := renderStackedBar(segments, denom, w.bar)
+		tail := ""
+		if unalloc := podUnallocated(data); unalloc > 0 {
+			tail = fmt.Sprintf("%d Unallocated", unalloc)
+		}
+		podBar := stackedMetricBar(segments, denom, w.bar).withLabels(
+			countLabels(segments, "Running", "Pending", "Failed", "Succeeded", "Other"), tail)
 		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
 	// No trailing blank here: pinned rows (dashboardPinnedRows) render
@@ -462,12 +481,12 @@ func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWi
 	}
 	lines = append(lines, "")
 	if data.totalCPUAlloc > 0 {
-		cpuBar := renderBar(data.totalCPUUsed, data.totalCPUAlloc, w.bar)
+		cpuBar := percentMetricBar(data.totalCPUUsed, data.totalCPUAlloc, w.bar)
 		lines = append(lines, dashboardMetricLines("CPU", cpuBar, cpuSummaryStr(data), w)...)
 		lines = appendDashboardSparkline(lines, data.cpuSeries, w, spark)
 	}
 	if data.totalMemAlloc > 0 {
-		memBar := renderBar(data.totalMemUsed, data.totalMemAlloc, w.bar)
+		memBar := percentMetricBar(data.totalMemUsed, data.totalMemAlloc, w.bar)
 		lines = append(lines, dashboardMetricLines("Mem", memBar, memSummaryStr(data), w)...)
 		lines = appendDashboardSparkline(lines, data.memSeries, w, spark)
 	}

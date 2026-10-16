@@ -51,14 +51,12 @@ func TestDashboardPinnedRows_MultiDimensionGroupsUnderKindHeader(t *testing.T) {
 	}
 	// A bare "Sync" row under "Applications" read as an unrelated metric, so
 	// every dimension is a labeled tree branch under a kind header line.
-	assert.Len(t, lines, 5)
+	assert.Len(t, lines, 3)
 	assert.Equal(t, "  Applications", lines[0])
 	assert.True(t, strings.HasPrefix(lines[1], "  ├ Health"), lines[1])
-	assert.True(t, strings.HasPrefix(lines[2], "  │"), "branch continues past the legend line: %q", lines[2])
-	assert.Contains(t, lines[2], "1 Degraded")
-	assert.True(t, strings.HasPrefix(lines[3], "  └ Sync"), lines[3])
-	assert.Contains(t, lines[4], "1 OutOfSync")
-	assert.NotContains(t, lines[4], "│")
+	assert.Contains(t, lines[1], "[1 Degraded")
+	assert.True(t, strings.HasPrefix(lines[2], "  └ Sync"), lines[2])
+	assert.Contains(t, lines[2], "[1 OutOfSync")
 }
 
 func TestDashboardPinnedRows_SingleDimensionKeepsKindLabel(t *testing.T) {
@@ -67,7 +65,7 @@ func TestDashboardPinnedRows_SingleDimensionKeepsKindLabel(t *testing.T) {
 		{index: 0, key: "batch/jobs", displayName: "Jobs", summary: jobs},
 	}}
 	lines := dashboardPinnedRows(nil, data, testDashboardWidths())
-	assert.Len(t, lines, 2)
+	assert.Len(t, lines, 1)
 	assert.True(t, strings.HasPrefix(ansi.Strip(lines[0]), "  Jobs "), "bar shares the kind label's line")
 }
 
@@ -89,7 +87,7 @@ func TestDashboardPinnedRows_ZeroTotalStillRenders(t *testing.T) {
 	out := ansi.Strip(strings.Join(dashboardPinnedRows(nil, data, testDashboardWidths()), "\n"))
 	assert.Contains(t, out, "Jobs")
 	assert.Contains(t, out, "0")
-	assert.Contains(t, out, "░", "an empty bar still renders for a zero-total kind")
+	assert.Contains(t, out, "[0", "an empty bar still renders for a zero-total kind")
 }
 
 func TestDashboardPinnedRows_NotFoundAndError(t *testing.T) {
