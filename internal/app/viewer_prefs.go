@@ -57,26 +57,8 @@ func validPanePermille(l, r *int) (left, right int) {
 	return left, right
 }
 
-// clearPanePrefs drops the saved pane split and keeps every other key.
-func clearPanePrefs() error {
-	path, err := stateFilePathErr(viewerPrefsFileName)
-	if err != nil {
-		return err
-	}
-	return updateStateFile(path, func() error {
-		s, err := loadStateFileStrict[ViewerPrefsState](viewerPrefsFileName)
-		if err != nil {
-			return err
-		}
-		if s.ExplorerLeftPermille == nil && s.ExplorerRightPermille == nil {
-			return nil
-		}
-		s.ExplorerLeftPermille, s.ExplorerRightPermille = nil, nil
-		return saveViewerPrefs(s)
-	})
-}
-
-// persistPanePrefs records the dragged widths, keeping every other key in the file.
+// persistPanePrefs records the dragged widths, keeping every other key in the
+// file. A 0 drops that side's key.
 func persistPanePrefs(left, right int) error {
 	path, err := stateFilePathErr(viewerPrefsFileName)
 	if err != nil {
@@ -87,6 +69,7 @@ func persistPanePrefs(left, right int) error {
 		if err != nil {
 			return err
 		}
+		s.ExplorerLeftPermille, s.ExplorerRightPermille = nil, nil
 		if left > 0 {
 			s.ExplorerLeftPermille = &left
 		}

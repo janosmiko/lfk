@@ -98,9 +98,17 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 		if m.paneResize.drag == dividerNone {
 			return m, nil, false
 		}
+		dragged := m.paneResize.drag
 		m.paneResize.drag = dividerNone
 		s := m.paneResize
 		changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
+		// Drop the pin on the other pane, or a double-click on this border could
+		// not reset the layout to the default.
+		if dragged == dividerLeft {
+			s.rightPermille = s.priorRight
+		} else {
+			s.leftPermille = s.priorLeft
+		}
 		var cmd tea.Cmd
 		if changed {
 			cmd = m.reportPrefSaveErr(persistPanePrefs(s.leftPermille, s.rightPermille))
@@ -141,7 +149,7 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 
 	now := paneClock()
 	if m.paneResize.lastPressOn == m.paneResize.drag && now.Sub(m.paneResize.lastPressAt) <= doubleClickWindow {
-		m, cmd := m.resetPaneWidths()
+		m, cmd := m.resetPaneWidth(m.paneResize.drag)
 		return m, cmd, true
 	}
 	m.paneResize.lastPressAt, m.paneResize.lastPressOn = now, m.paneResize.drag
@@ -155,14 +163,21 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-// resetPaneWidths restores the default layout and forgets the saved split.
-func (m Model) resetPaneWidths() (Model, tea.Cmd) {
-	had := m.paneResize.active()
-	m.paneResize = paneResizeState{}
+// resetPaneWidth restores the default width of the pane on the outer side of
+// divider d and forgets its saved width. The other divider keeps its split.
+func (m Model) resetPaneWidth(d paneDivider) (Model, tea.Cmd) {
+	left, right := m.paneResize.leftPermille, m.paneResize.rightPermille
+	if d == dividerLeft {
+		left = 0
+	} else {
+		right = 0
+	}
+	had := left != m.paneResize.leftPermille || right != m.paneResize.rightPermille
+	m.paneResize = paneResizeState{leftPermille: left, rightPermille: right}
 	if !had {
 		return m, nil
 	}
-	cmd := m.reportPrefSaveErr(clearPanePrefs())
+	cmd := m.reportPrefSaveErr(persistPanePrefs(left, right))
 	return m.recomposeThemedContent(), cmd
 }
 

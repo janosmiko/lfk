@@ -29,16 +29,16 @@ func dragLeftTo(t *testing.T, m Model, x int) Model {
 	return motion(m, x, 5)
 }
 
-func TestPanePrefsReleasePersistsBothValues(t *testing.T) {
+func TestPanePrefsReleasePersistsOnlyDraggedSide(t *testing.T) {
 	path := isolateViewerPrefs(t)
 	m := dragLeftTo(t, baseExplorerModel(), 30)
 	m = release(m, 30, 5)
 
 	s := readPrefsFile(t, path)
 	require.NotNil(t, s.ExplorerLeftPermille)
-	require.NotNil(t, s.ExplorerRightPermille)
 	assert.Equal(t, m.paneResize.leftPermille, *s.ExplorerLeftPermille)
-	assert.Equal(t, m.paneResize.rightPermille, *s.ExplorerRightPermille)
+	assert.Zero(t, m.paneResize.rightPermille)
+	assert.Nil(t, s.ExplorerRightPermille)
 }
 
 func TestPanePrefsMotionDoesNotWrite(t *testing.T) {
