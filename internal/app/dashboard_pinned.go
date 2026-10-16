@@ -106,7 +106,7 @@ func dashboardPinnedRowLines(r pinnedSummaryResult, w dashboardWidths) []string 
 			if i < last && len(rows) > 1 {
 				// The legend line starts with plain spaces: swap the branch
 				// column's space for a continuation bar.
-				rows[1] = "  │" + rows[1][3:]
+				rows[1] = "  " + ui.HelpKeyStyle.Render("│") + rows[1][3:]
 			}
 			out = append(out, rows...)
 		}

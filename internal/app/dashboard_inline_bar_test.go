@@ -146,6 +146,7 @@ func TestDashboardPinnedRowLines_MultiDimTwoLineFallbackKeepsContinuation(t *tes
 
 	require.Len(t, rows, 5)
 	assert.True(t, strings.HasPrefix(stripANSI(rows[2]), "  │"), stripANSI(rows[2]))
+	assert.True(t, strings.HasPrefix(rows[2], "  "+ui.HelpKeyStyle.Render("│")), "continuation bar must match the branch color: %q", rows[2])
 	assert.Contains(t, stripANSI(rows[2]), "2 Healthy")
 }
 
