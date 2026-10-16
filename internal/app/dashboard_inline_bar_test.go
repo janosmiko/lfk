@@ -51,7 +51,7 @@ func TestDashboardMetricLines_LabelOverflowingItsSegmentFallsBack(t *testing.T) 
 	lines := dashboardMetricLines("Pods", inlineTestBar(20), inlineTestLegend, inlineTestWidths())
 
 	require.Len(t, lines, 2)
-	assert.Contains(t, stripANSI(lines[0]), "[████████████████░░░░]")
+	assert.Equal(t, "  Pods      [████████████████░░░░]", stripANSI(lines[0]))
 	assert.Contains(t, stripANSI(lines[1]), inlineTestLegend)
 }
 
@@ -90,7 +90,7 @@ func TestDashboardMetricLines_NoColorFallsBackToTwoLines(t *testing.T) {
 	lines := dashboardMetricLines("Pods", inlineTestBar(40), inlineTestLegend, inlineTestWidths())
 
 	require.Len(t, lines, 2)
-	assert.Contains(t, stripANSI(lines[0]), "█")
+	assert.Equal(t, "  Pods      ["+strings.Repeat("█", 32)+strings.Repeat("░", 8)+"]", stripANSI(lines[0]))
 	assert.Contains(t, stripANSI(lines[1]), inlineTestLegend)
 }
 
@@ -154,7 +154,7 @@ func TestDashboardHeaderSection_PodsLabelsAnchoredWithTail(t *testing.T) {
 	w.bar = 60
 	w.content = 120
 	data := dashboardData{
-		pods:        podStats{total: 180, running: 100, succeeded: 80},
+		pods:        podStats{total: 190, running: 100, succeeded: 90},
 		podCapacity: 400,
 	}
 	lines := dashboardHeaderSection(nil, data, w)
@@ -165,8 +165,8 @@ func TestDashboardHeaderSection_PodsLabelsAnchoredWithTail(t *testing.T) {
 			row = stripANSI(l)
 		}
 	}
-	// 60 cells: Running 15, Succeeded 12, empty tail 33.
-	assert.Contains(t, row, "[100 Running    80 Succeeded220 Unallocated"+strings.Repeat(" ", 18)+"]")
+	// 60 cells: Running 15, Succeeded 13, empty tail 32.
+	assert.Contains(t, row, "[100 Running    90 Succeeded 210 Unallocated"+strings.Repeat(" ", 17)+"]")
 }
 
 func TestDashboardHeaderSection_PodsSliverFallsBackToTwoLines(t *testing.T) {
@@ -174,13 +174,48 @@ func TestDashboardHeaderSection_PodsSliverFallsBackToTwoLines(t *testing.T) {
 	w.bar = 60
 	w.content = 120
 	data := dashboardData{
-		pods:        podStats{total: 182, running: 100, pending: 2, succeeded: 80},
+		pods:        podStats{total: 192, running: 100, pending: 2, succeeded: 90},
 		podCapacity: 400,
 	}
 	lines := dashboardHeaderSection(nil, data, w)
 
 	joined := stripANSI(strings.Join(lines, "\n"))
-	assert.Contains(t, joined, "100 Running · 2 Pending · 80 Succeeded · 218 Unallocated")
+	assert.Contains(t, joined, "100 Running · 2 Pending · 90 Succeeded · 208 Unallocated")
+	// 60 cells: Running 15, Pending 1, Succeeded 13, empty tail 31.
+	assert.Contains(t, joined, "  Pods      ["+strings.Repeat("█", 29)+strings.Repeat("░", 31)+"]")
+}
+
+func TestDashboardMetricLines_LabelFillingItsRegionNeedsTheBarEnd(t *testing.T) {
+	// 40 cells: Running 24, Done 8, empty tail 8. "20 Done!" fills Done exactly.
+	bar := stackedMetricBar(inlineTestSegments(), 100, 40).
+		withLabels([]string{"60 Running", "20 Done!"}, "")
+	lines := dashboardMetricLines("Pods", bar, "legend", inlineTestWidths())
+
+	require.Len(t, lines, 2)
+	assert.Equal(t, "  Pods      ["+strings.Repeat("█", 32)+strings.Repeat("░", 8)+"]", stripANSI(lines[0]))
+}
+
+func TestDashboardMetricLines_PackedLastSegmentTakesRoundingRemainder(t *testing.T) {
+	// 38 cells: Running 28, Done absorbs the remainder (10, not 9).
+	bar := stackedMetricBar(inlineTestSegments(), 80, 38).
+		withLabels([]string{"60 Running", "20 Donee!!"}, "")
+	lines := dashboardMetricLines("Pods", bar, "legend", inlineTestWidths())
+
+	require.Len(t, lines, 1)
+	assert.Contains(t, stripANSI(lines[0]), "[60 Running"+strings.Repeat(" ", 18)+"20 Donee!!]")
+}
+
+func TestDashboardHeaderSection_PodsWithoutHeadroomHaveNoTail(t *testing.T) {
+	w := inlineTestWidths()
+	w.bar = 60
+	w.content = 120
+	data := dashboardData{pods: podStats{total: 100, running: 60, succeeded: 40}}
+	lines := dashboardHeaderSection(nil, data, w)
+
+	joined := stripANSI(strings.Join(lines, "\n"))
+	assert.NotContains(t, joined, "Unallocated")
+	// 60 cells: Running 36, Succeeded 24.
+	assert.Contains(t, joined, "[60 Running"+strings.Repeat(" ", 26)+"40 Succeeded"+strings.Repeat(" ", 12)+"]")
 }
 
 func TestDashboardHeaderSection_NodesLabelsAnchored(t *testing.T) {

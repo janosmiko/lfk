@@ -50,18 +50,6 @@ func (b metricBar) withLabels(labels []string, tail string) metricBar {
 	return b
 }
 
-func (b metricBar) anchored() bool {
-	if b.tail != "" {
-		return true
-	}
-	for _, l := range b.labels {
-		if l != "" {
-			return true
-		}
-	}
-	return false
-}
-
 func fitsIn(text string, room int) bool {
 	return utf8.RuneCountInString(text) == lipgloss.Width(text) && lipgloss.Width(text) <= room
 }
@@ -75,7 +63,8 @@ func (b metricBar) anchoredText() (string, bool) {
 		if label == "" {
 			return true
 		}
-		if !fitsIn(label, room) {
+		// A gap cell must follow the label unless the region ends the bar.
+		if !fitsIn(label, room-min(1, b.width-pos-room)) {
 			return false
 		}
 		copy(runes[pos:], []rune(label))
@@ -124,7 +113,7 @@ func (b metricBar) inline(text string) (string, bool) {
 		return "", false
 	}
 	var runes []rune
-	if b.anchored() {
+	if len(b.labels) > 0 || b.tail != "" {
 		padded, ok := b.anchoredText()
 		if !ok {
 			return "", false
