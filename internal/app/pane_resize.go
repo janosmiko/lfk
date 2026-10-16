@@ -141,9 +141,17 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 // finishPaneDrag ends a drag and saves the split when it changed.
 func (m Model) finishPaneDrag() (Model, tea.Cmd) {
 	s := m.paneResize
+	dragged := s.drag
 	s.drag = dividerNone
 	level := s.dragLevel
 	changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
+	// Drop the pin on the other pane, or a double-click on this border could
+	// not reset the layout to the default.
+	if dragged == dividerLeft {
+		s.rightPermille = s.priorRight
+	} else {
+		s.leftPermille = s.priorLeft
+	}
 	var cmd tea.Cmd
 	switch {
 	case !changed:

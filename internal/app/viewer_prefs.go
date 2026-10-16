@@ -59,16 +59,14 @@ var paneLevelNames = map[model.Level]string{
 }
 
 // persistPaneWidthsPrefs records one level's split, keeping every other key.
+// A level with both sides 0 is dropped.
 func persistPaneWidthsPrefs(level model.Level, left, right int) error {
 	return updatePaneWidthsPref(level, func(m map[string]PaneWidthsPref, name string) {
+		if left == 0 && right == 0 {
+			delete(m, name)
+			return
+		}
 		m[name] = PaneWidthsPref{Left: left, Right: right}
-	})
-}
-
-// clearPaneWidthsPrefs drops one level's saved split.
-func clearPaneWidthsPrefs(level model.Level) error {
-	return updatePaneWidthsPref(level, func(m map[string]PaneWidthsPref, name string) {
-		delete(m, name)
 	})
 }
 

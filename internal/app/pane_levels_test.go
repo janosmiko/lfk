@@ -106,10 +106,10 @@ func TestPanePerLevelDoubleClickResetsOnlyCurrentLevel(t *testing.T) {
 	m = doubleClick(m, clock, leftEnd-1, 100*time.Millisecond)
 
 	assert.Equal(t, defaultWidths(120), widthsOf(m))
-	assert.NotContains(t, m.paneResize.levels, model.LevelResources)
+	assert.Zero(t, m.paneResize.levels[model.LevelResources][0])
 	assert.Equal(t, resTypes, m.paneResize.levels[model.LevelResourceTypes])
 	s := readPrefsFile(t, path)
-	assert.NotContains(t, s.ExplorerPaneWidths, "resources")
+	assert.Zero(t, s.ExplorerPaneWidths["resources"].Left)
 	assert.Contains(t, s.ExplorerPaneWidths, "resource_types")
 }
 
@@ -155,4 +155,64 @@ func TestPanePerLevelUndraggedLevelUsesDefault(t *testing.T) {
 		m.nav.Level = lvl
 		assert.Equal(t, defaultWidths(120), widthsOf(m), "level %d", lvl)
 	}
+}
+
+func dragRightTo(t *testing.T, m Model, x int) Model {
+	t.Helper()
+	_, middleEnd := m.columnBoundaries()
+	m = press(m, middleEnd-1, 5)
+	return release(motion(m, x, 5), x, 5)
+}
+
+func TestPanePerLevelDragSavesOnlyDraggedSide(t *testing.T) {
+	path := isolateViewerPrefs(t)
+	m := dragAndRelease(t, perLevelModel(), 33)
+
+	p := m.paneResize.levels[model.LevelResourceTypes]
+	assert.NotZero(t, p[0])
+	assert.Zero(t, p[1])
+	w := readPrefsFile(t, path).ExplorerPaneWidths["resource_types"]
+	assert.Equal(t, PaneWidthsPref{Left: p[0]}, w)
+
+	m = dragRightTo(t, m, 70)
+	p2 := m.paneResize.levels[model.LevelResourceTypes]
+	assert.Equal(t, p[0], p2[0])
+	assert.NotZero(t, p2[1])
+	w = readPrefsFile(t, path).ExplorerPaneWidths["resource_types"]
+	assert.Equal(t, PaneWidthsPref{Left: p2[0], Right: p2[1]}, w)
+}
+
+func TestPanePerLevelDoubleClickResetsOnlyClickedSide(t *testing.T) {
+	path := isolateViewerPrefs(t)
+	clock := fakePaneClock(t)
+	m := dragAndRelease(t, perLevelModel(), 33)
+	m = dragRightTo(t, m, 70)
+	p := m.paneResize.levels[model.LevelResourceTypes]
+	require.NotZero(t, p[0])
+	require.NotZero(t, p[1])
+	*clock = clock.Add(5 * time.Second)
+
+	leftEnd, _ := m.columnBoundaries()
+	m = doubleClick(m, clock, leftEnd-1, 100*time.Millisecond)
+
+	assert.Equal(t, [2]int{0, p[1]}, m.paneResize.levels[model.LevelResourceTypes])
+	w := readPrefsFile(t, path).ExplorerPaneWidths["resource_types"]
+	assert.Equal(t, PaneWidthsPref{Right: p[1]}, w)
+}
+
+func TestPanePerLevelResettingBothSidesDropsEntry(t *testing.T) {
+	path := isolateViewerPrefs(t)
+	clock := fakePaneClock(t)
+	m := dragAndRelease(t, perLevelModel(), 33)
+	m = dragRightTo(t, m, 70)
+	*clock = clock.Add(5 * time.Second)
+
+	leftEnd, middleEnd := m.columnBoundaries()
+	m = doubleClick(m, clock, leftEnd-1, 100*time.Millisecond)
+	*clock = clock.Add(5 * time.Second)
+	m = doubleClick(m, clock, middleEnd-1, 100*time.Millisecond)
+
+	assert.NotContains(t, m.paneResize.levels, model.LevelResourceTypes)
+	assert.NotContains(t, readPrefsFile(t, path).ExplorerPaneWidths, "resource_types")
+	assert.Equal(t, defaultWidths(120), widthsOf(m))
 }
