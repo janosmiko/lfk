@@ -32,12 +32,12 @@ func (m Model) explorerColumnWidths() (leftW, middleW, rightW int) {
 	case m.hideLeftPane:
 		middleW = max(10, usable*58/100)
 		rightW = max(10, usable-middleW)
-		return m.paneResize.apply(usable, 0, middleW, rightW)
+		return m.paneResize.at(m.nav.Level).apply(usable, 0, middleW, rightW)
 	default:
 		leftW = max(10, usable*12/100)
 		middleW = max(10, usable*51/100)
 		rightW = max(10, usable-leftW-middleW)
-		return m.paneResize.apply(usable, leftW, middleW, rightW)
+		return m.paneResize.at(m.nav.Level).apply(usable, leftW, middleW, rightW)
 	}
 }
 

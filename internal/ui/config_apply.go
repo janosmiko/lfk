@@ -386,6 +386,7 @@ func applyViewerDefaults(cfg configFile) {
 // globals.
 func applySessionDefaults(cfg configFile) {
 	applyBoolPtr(cfg.SplitPreview, &ConfigSplitPreview)
+	applyBoolPtr(cfg.PaneWidthsPerLevel, &ConfigPaneWidthsPerLevel)
 	applyBoolPtr(cfg.WatchMode, &ConfigWatchMode)
 	applyBoolPtr(cfg.WatchThrottle, &ConfigWatchThrottle)
 	applyBoolPtr(cfg.AllNamespaces, &ConfigAllNamespaces)

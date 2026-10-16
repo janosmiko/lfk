@@ -9,6 +9,10 @@ package ui
 // Default true (pane shown).
 var ConfigSplitPreview = true
 
+// ConfigPaneWidthsPerLevel makes dragged pane widths apply per navigation
+// level. Default false (one split for every level).
+var ConfigPaneWidthsPerLevel = false
+
 // ConfigWatchMode is the startup default for live watch/polling. Default true.
 var ConfigWatchMode = true
 

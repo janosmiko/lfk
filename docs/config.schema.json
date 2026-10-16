@@ -232,6 +232,11 @@
       "description": "Startup default for the split preview pane. Set false to start with the pane hidden.",
       "default": true
     },
+    "pane_widths_per_level": {
+      "type": "boolean",
+      "description": "Remember dragged pane widths per navigation level instead of one split for all levels.",
+      "default": false
+    },
     "watch_mode": {
       "type": "boolean",
       "description": "Startup default for live watch/polling. Set false to start with manual refresh.",

@@ -60,6 +60,7 @@ object_explorer:
 api_explorer:
   tree: true
 split_preview: false
+pane_widths_per_level: true
 watch_mode: false
 watch_throttle: false
 all_namespaces: false
@@ -248,6 +249,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigObjectExplorerTree, "object_explorer.tree")
 	assert.True(t, ConfigAPIExplorerTree, "api_explorer.tree")
 	assert.False(t, ConfigSplitPreview, "split_preview")
+	assert.True(t, ConfigPaneWidthsPerLevel, "pane_widths_per_level")
 	assert.False(t, ConfigWatchMode, "watch_mode")
 	assert.False(t, ConfigWatchThrottle, "watch_throttle")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
@@ -504,6 +506,7 @@ var wiringCoveredFields = map[string]string{
 	"object_explorer":            "TestLoadConfig_AllSettingsWired",
 	"api_explorer":               "TestLoadConfig_AllSettingsWired",
 	"split_preview":              "TestLoadConfig_AllSettingsWired",
+	"pane_widths_per_level":      "TestLoadConfig_AllSettingsWired",
 	"watch_mode":                 "TestLoadConfig_AllSettingsWired",
 	"watch_throttle":             "TestLoadConfig_AllSettingsWired",
 	"all_namespaces":             "TestLoadConfig_AllSettingsWired + TestLoadConfig_AllNamespacesExplicitFalseSetsFlag + TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset",
@@ -625,6 +628,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origObjectExplorerTree := ConfigObjectExplorerTree
 	origAPIExplorerTree := ConfigAPIExplorerTree
 	origSplitPreview := ConfigSplitPreview
+	origPaneWidthsPerLevel := ConfigPaneWidthsPerLevel
 	origWatchMode := ConfigWatchMode
 	origWatchThrottle := ConfigWatchThrottle
 	origAllNamespaces := ConfigAllNamespaces
@@ -731,6 +735,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigObjectExplorerTree = origObjectExplorerTree
 		ConfigAPIExplorerTree = origAPIExplorerTree
 		ConfigSplitPreview = origSplitPreview
+		ConfigPaneWidthsPerLevel = origPaneWidthsPerLevel
 		ConfigWatchMode = origWatchMode
 		ConfigWatchThrottle = origWatchThrottle
 		ConfigAllNamespaces = origAllNamespaces

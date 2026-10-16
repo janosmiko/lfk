@@ -1,9 +1,12 @@
 package app
 
 import (
+	"maps"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 type paneDivider int
@@ -36,6 +39,35 @@ type paneResizeState struct {
 	// Last press on a divider, for double-click detection.
 	lastPressAt time.Time
 	lastPressOn paneDivider
+	// With perLevel on, levels holds each level's saved split and the fields
+	// above are only the working pair of a drag. Never write through levels:
+	// Model copies share the map.
+	perLevel bool
+	levels   map[model.Level][2]int
+}
+
+// at returns the state with the split of level loaded, so apply and the drag
+// start see that level's widths. Outside per-level mode, or mid-drag, it is s.
+func (s paneResizeState) at(level model.Level) paneResizeState {
+	if !s.perLevel || s.drag != dividerNone {
+		return s
+	}
+	p := s.levels[level]
+	s.leftPermille, s.rightPermille = p[0], p[1]
+	return s
+}
+
+// withLevel returns a copy of the levels map with level set, or removed when
+// both values are 0.
+func (s paneResizeState) withLevel(level model.Level, left, right int) map[model.Level][2]int {
+	out := make(map[model.Level][2]int, len(s.levels)+1)
+	maps.Copy(out, s.levels)
+	if left == 0 && right == 0 {
+		delete(out, level)
+	} else {
+		out[level] = [2]int{left, right}
+	}
+	return out
 }
 
 func (s paneResizeState) active() bool { return s.leftPermille != 0 || s.rightPermille != 0 }
@@ -98,39 +130,44 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 		if m.paneResize.drag == dividerNone {
 			return m, nil, false
 		}
-		dragged := m.paneResize.drag
-		m.paneResize.drag = dividerNone
-		s := m.paneResize
-		changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
-		// Drop the pin on the other pane, or a double-click on this border could
-		// not reset the layout to the default.
-		if dragged == dividerLeft {
-			s.rightPermille = s.priorRight
-		} else {
-			s.leftPermille = s.priorLeft
-		}
-		var cmd tea.Cmd
-		if changed {
-			cmd = m.reportPrefSaveErr(persistPanePrefs(s.leftPermille, s.rightPermille))
-		} else {
-			s.leftPermille, s.rightPermille = s.priorLeft, s.priorRight
-		}
-		m.paneResize = paneResizeState{
-			leftPermille: s.leftPermille, rightPermille: s.rightPermille,
-			lastPressAt: s.lastPressAt, lastPressOn: s.lastPressOn,
-		}
-		if changed {
-			m.paneResize.lastPressOn = dividerNone
-		}
+		m, cmd := m.finishPaneDrag()
 		return m, cmd, true
 	}
 	return m, nil, false
+}
+
+// finishPaneDrag ends a drag and saves the split when it changed.
+func (m Model) finishPaneDrag() (Model, tea.Cmd) {
+	s := m.paneResize
+	s.drag = dividerNone
+	level := m.nav.Level
+	changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
+	var cmd tea.Cmd
+	switch {
+	case !changed:
+		s.leftPermille, s.rightPermille = s.priorLeft, s.priorRight
+	case s.perLevel:
+		s.levels = s.withLevel(level, s.leftPermille, s.rightPermille)
+		cmd = m.reportPrefSaveErr(persistPaneWidthsPrefs(level, s.leftPermille, s.rightPermille))
+	default:
+		cmd = m.reportPrefSaveErr(persistPanePrefs(s.leftPermille, s.rightPermille))
+	}
+	m.paneResize = paneResizeState{
+		leftPermille: s.leftPermille, rightPermille: s.rightPermille,
+		lastPressAt: s.lastPressAt, lastPressOn: s.lastPressOn,
+		perLevel: s.perLevel, levels: s.levels,
+	}
+	if changed {
+		m.paneResize.lastPressOn = dividerNone
+	}
+	return m, cmd
 }
 
 func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 	if mouse.Y <= 0 || m.fullscreenMiddle || m.fullscreenDashboard {
 		return m, nil, false
 	}
+	m.paneResize = m.paneResize.at(m.nav.Level)
 	leftW, _, rightW := m.explorerColumnWidths()
 	leftEnd, middleEnd := m.columnBoundaries()
 	usable := m.width - 6
@@ -165,6 +202,7 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 
 // resetPaneWidth restores the default width of the pane on the outer side of
 // divider d and forgets its saved width. The other divider keeps its split.
+// With per-level widths, only the current level's pair changes.
 func (m Model) resetPaneWidth(d paneDivider) (Model, tea.Cmd) {
 	left, right := m.paneResize.leftPermille, m.paneResize.rightPermille
 	if d == dividerLeft {
@@ -173,11 +211,18 @@ func (m Model) resetPaneWidth(d paneDivider) (Model, tea.Cmd) {
 		right = 0
 	}
 	had := left != m.paneResize.leftPermille || right != m.paneResize.rightPermille
-	m.paneResize = paneResizeState{leftPermille: left, rightPermille: right}
+	s := paneResizeState{leftPermille: left, rightPermille: right, perLevel: m.paneResize.perLevel, levels: m.paneResize.levels}
+	save := func() error { return persistPanePrefs(left, right) }
+	if s.perLevel {
+		level := m.nav.Level
+		s.levels = s.withLevel(level, left, right)
+		save = func() error { return persistPaneWidthsPrefs(level, left, right) }
+	}
+	m.paneResize = s
 	if !had {
 		return m, nil
 	}
-	cmd := m.reportPrefSaveErr(persistPanePrefs(left, right))
+	cmd := m.reportPrefSaveErr(save())
 	return m.recomposeThemedContent(), cmd
 }
 
