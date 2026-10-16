@@ -51,6 +51,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `object_explorer` | object | *(see Viewer Defaults)* | Object Explorer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `api_explorer` | object | *(see Viewer Defaults)* | API Explorer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `split_preview` | bool | `true` | Startup default for the split preview pane. Set to `false` to start with it hidden. |
+| `pane_widths_per_level` | bool | `false` | Remember dragged pane widths per navigation level. Default is one split for all levels. |
 | `watch_mode` | bool | `true` | Startup default for live watch/polling. Set to `false` to start with manual refresh. |
 | `watch_interval` | string | `2s` | Polling interval in watch mode. Go duration string, clamped to [500ms, 10m]. Override with `--watch-interval`. |
 | `background_watch_interval` | string | `10s` | Watch cadence while the window is unfocused or focused-idle. Same form and [500ms, 10m] clamp as `watch_interval`. Set equal to `watch_interval` to disable background throttling. |
@@ -1257,7 +1258,7 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `$XDG_STATE_HOME/lfk/pinned.yaml` | Per-context and per-union-set pinned CRD groups, managed via `p` key (default: `~/.local/state/lfk/pinned.yaml`) |
 | `$XDG_STATE_HOME/lfk/hidden_types.yaml` | Per-context and per-union-set hidden resource types, managed via the action menu (`x`) at the resource types level (default: `~/.local/state/lfk/hidden_types.yaml`) |
 | `$XDG_STATE_HOME/lfk/pinned_summaries.yaml` | Per-context and per-union-set resource-type summaries pinned to the cluster dashboard, managed via the action menu (default: `~/.local/state/lfk/pinned_summaries.yaml`) |
-| `$XDG_STATE_HOME/lfk/viewer_prefs.yaml` | Log, YAML, diff, describe, and explorer display toggles from their runtime keys, plus dragged pane widths, auto-managed; outranks the `log_viewer` and viewer-default config groups (default: `~/.local/state/lfk/viewer_prefs.yaml`) |
+| `$XDG_STATE_HOME/lfk/viewer_prefs.yaml` | Log, YAML, diff, describe, and explorer display toggles from their runtime keys, plus dragged pane widths (per level with `pane_widths_per_level`), auto-managed; outranks the `log_viewer` and viewer-default config groups (default: `~/.local/state/lfk/viewer_prefs.yaml`) |
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
 
 State files stored at the legacy `~/.config/lfk/` location are automatically migrated to the new XDG state directory on first access.

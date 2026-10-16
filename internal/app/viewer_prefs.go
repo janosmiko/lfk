@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -8,6 +9,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -38,6 +40,82 @@ type ViewerPrefsState struct {
 	// Dragged explorer pane widths in permille of the usable width. Nil = never dragged.
 	ExplorerLeftPermille  *int `json:"explorer_left_permille,omitempty" yaml:"explorer_left_permille,omitempty"`
 	ExplorerRightPermille *int `json:"explorer_right_permille,omitempty" yaml:"explorer_right_permille,omitempty"`
+	// Per-level pane widths by paneLevelKey key. Used only with pane_widths_per_level.
+	ExplorerPaneWidths map[string]PaneWidthsPref `json:"explorer_pane_widths,omitempty" yaml:"explorer_pane_widths,omitempty"`
+}
+
+// PaneWidthsPref is one level's dragged split in permille. 0 means unset.
+type PaneWidthsPref struct {
+	Left  int `json:"left,omitempty" yaml:"left,omitempty"`
+	Right int `json:"right,omitempty" yaml:"right,omitempty"`
+}
+
+func paneLevelKey(level model.Level) string {
+	switch level {
+	case model.LevelClusters:
+		return "clusters"
+	case model.LevelResourceTypes:
+		return "resource_types"
+	case model.LevelResources:
+		return "resources"
+	case model.LevelOwned:
+		return "owned"
+	case model.LevelContainers:
+		return "containers"
+	}
+	return ""
+}
+
+// withEntry returns a copy of m with k set to v, or removed when drop is true.
+func withEntry[K comparable, V any](m map[K]V, k K, v V, drop bool) map[K]V {
+	out := make(map[K]V, len(m)+1)
+	maps.Copy(out, m)
+	if drop {
+		delete(out, k)
+	} else {
+		out[k] = v
+	}
+	return out
+}
+
+// persistPaneWidthsPrefs records one level's split, keeping every other key.
+// A level with both sides 0 is dropped.
+func persistPaneWidthsPrefs(level model.Level, left, right int) error {
+	name := paneLevelKey(level)
+	if name == "" {
+		return nil
+	}
+	path, err := stateFilePathErr(viewerPrefsFileName)
+	if err != nil {
+		return err
+	}
+	return updateStateFile(path, func() error {
+		s, err := loadStateFileStrict[ViewerPrefsState](viewerPrefsFileName)
+		if err != nil {
+			return err
+		}
+		s.ExplorerPaneWidths = withEntry(s.ExplorerPaneWidths, name,
+			PaneWidthsPref{Left: left, Right: right}, left == 0 && right == 0)
+		return saveViewerPrefs(s)
+	})
+}
+
+// panePerLevelStartup builds the startup state from the per-level map.
+// Unknown level names and invalid values are dropped.
+func panePerLevelStartup(widths map[string]PaneWidthsPref) paneResizeState {
+	st := paneResizeState{perLevel: true}
+	for level := model.LevelClusters; level <= model.LevelContainers; level++ {
+		w := widths[paneLevelKey(level)]
+		l, r := validPanePermille(&w.Left, &w.Right)
+		if l == 0 && r == 0 {
+			continue
+		}
+		if st.levels == nil {
+			st.levels = map[model.Level][2]int{}
+		}
+		st.levels[level] = [2]int{l, r}
+	}
+	return st
 }
 
 // explorerPaneStartup is the persisted pane split NewModel seeds from.
@@ -185,8 +263,12 @@ func ApplyViewerPrefs() {
 		}
 	}
 	explorerPaneStartup = paneResizeState{}
-	l, r := validPanePermille(s.ExplorerLeftPermille, s.ExplorerRightPermille)
-	explorerPaneStartup = paneResizeState{leftPermille: l, rightPermille: r}
+	if ui.ConfigPaneWidthsPerLevel {
+		explorerPaneStartup = panePerLevelStartup(s.ExplorerPaneWidths)
+	} else {
+		l, r := validPanePermille(s.ExplorerLeftPermille, s.ExplorerRightPermille)
+		explorerPaneStartup = paneResizeState{leftPermille: l, rightPermille: r}
+	}
 	if s.MetricsSparkWindow != nil {
 		ui.MetricsSparkStartupState = ui.ResolveMetricsSparkState(*s.MetricsSparkWindow)
 	}

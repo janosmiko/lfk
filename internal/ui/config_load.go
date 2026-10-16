@@ -128,6 +128,9 @@ type configFile struct {
 	// SplitPreview is the startup default for the split preview pane (runtime
 	// toggle from the explorer). Default true (pane shown).
 	SplitPreview *bool `json:"split_preview" yaml:"split_preview"`
+	// PaneWidthsPerLevel remembers dragged pane widths per navigation level.
+	// Default false.
+	PaneWidthsPerLevel *bool `json:"pane_widths_per_level" yaml:"pane_widths_per_level"`
 	// WatchMode is the startup default for live watch/polling. Default true.
 	WatchMode *bool `json:"watch_mode" yaml:"watch_mode"`
 	// AllNamespaces is the startup default for the namespace scope: true shows

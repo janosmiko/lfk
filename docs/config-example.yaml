@@ -258,6 +258,7 @@ log_path: /tmp/lfk.log
 # watch_mode toggles live polling, all_namespaces sets the namespace scope
 # (unset, a pinned kubeconfig namespace wins). CLI/session scope overrides it.
 # split_preview: true
+# pane_widths_per_level: false  # remember dragged pane widths per level
 # watch_mode: true
 # all_namespaces: true
 
