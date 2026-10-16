@@ -73,6 +73,10 @@ func clearPaneWidthsPrefs(level model.Level) error {
 }
 
 func updatePaneWidthsPref(level model.Level, edit func(map[string]PaneWidthsPref, string)) error {
+	name, ok := paneLevelNames[level]
+	if !ok {
+		return nil
+	}
 	path, err := stateFilePathErr(viewerPrefsFileName)
 	if err != nil {
 		return err
@@ -84,7 +88,7 @@ func updatePaneWidthsPref(level model.Level, edit func(map[string]PaneWidthsPref
 		}
 		widths := make(map[string]PaneWidthsPref, len(s.ExplorerPaneWidths)+1)
 		maps.Copy(widths, s.ExplorerPaneWidths)
-		edit(widths, paneLevelNames[level])
+		edit(widths, name)
 		s.ExplorerPaneWidths = nil
 		if len(widths) > 0 {
 			s.ExplorerPaneWidths = widths

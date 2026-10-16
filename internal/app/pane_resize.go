@@ -44,6 +44,8 @@ type paneResizeState struct {
 	// Model copies share the map.
 	perLevel bool
 	levels   map[model.Level][2]int
+	// Level the current drag started on, so a level change mid-drag saves to the right one.
+	dragLevel model.Level
 }
 
 // at returns the state with the split of level loaded, so apply and the drag
@@ -140,7 +142,7 @@ func (m Model) handlePaneDrag(msg tea.MouseMsg, mouse tea.Mouse) (Model, tea.Cmd
 func (m Model) finishPaneDrag() (Model, tea.Cmd) {
 	s := m.paneResize
 	s.drag = dividerNone
-	level := m.nav.Level
+	level := s.dragLevel
 	changed := s.leftPermille != s.startLeft || s.rightPermille != s.startRight
 	var cmd tea.Cmd
 	switch {
@@ -168,6 +170,7 @@ func (m Model) startPaneDrag(mouse tea.Mouse) (Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 	m.paneResize = m.paneResize.at(m.nav.Level)
+	m.paneResize.dragLevel = m.nav.Level
 	leftW, _, rightW := m.explorerColumnWidths()
 	leftEnd, middleEnd := m.columnBoundaries()
 	usable := m.width - 6

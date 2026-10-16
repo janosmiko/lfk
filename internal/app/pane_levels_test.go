@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -118,4 +120,39 @@ func TestPanePerLevelMapIsNotSharedAcrossCopies(t *testing.T) {
 	m.nav.Level = model.LevelResources
 	_ = dragAndRelease(t, m, 40)
 	assert.NotContains(t, snapshot.paneResize.levels, model.LevelResources)
+}
+
+func TestPanePerLevelUnknownLevelIsNotPersisted(t *testing.T) {
+	path := isolateViewerPrefs(t)
+	require.NoError(t, persistPaneWidthsPrefs(model.LevelResources, 100, 200))
+	require.NoError(t, persistPaneWidthsPrefs(model.Level(99), 100, 200))
+
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(string(raw), "left:"), string(raw))
+	assert.Contains(t, readPrefsFile(t, path).ExplorerPaneWidths, "resources")
+}
+
+func TestPanePerLevelLevelChangeMidDragKeepsStartLevel(t *testing.T) {
+	path := isolateViewerPrefs(t)
+	m := perLevelModel()
+	leftEnd, _ := m.columnBoundaries()
+	m = press(m, leftEnd-1, 5)
+	m.nav.Level = model.LevelResources
+	m = release(motion(m, 33, 5), 33, 5)
+
+	assert.Contains(t, m.paneResize.levels, model.LevelResourceTypes)
+	assert.NotContains(t, m.paneResize.levels, model.LevelResources)
+	s := readPrefsFile(t, path)
+	assert.Contains(t, s.ExplorerPaneWidths, "resource_types")
+	assert.NotContains(t, s.ExplorerPaneWidths, "resources")
+}
+
+func TestPanePerLevelUndraggedLevelUsesDefault(t *testing.T) {
+	isolateViewerPrefs(t)
+	m := dragAndRelease(t, perLevelModel(), 33)
+	for _, lvl := range []model.Level{model.LevelClusters, model.LevelOwned, model.LevelContainers} {
+		m.nav.Level = lvl
+		assert.Equal(t, defaultWidths(120), widthsOf(m), "level %d", lvl)
+	}
 }
