@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.19.6](https://github.com/janosmiko/lfk/compare/v0.19.5...v0.19.6) (2026-10-16)
+
+
+### Features
+
+* draw dashboard bar labels inside their segments ([#857](https://github.com/janosmiko/lfk/issues/857)) ([12b4124](https://github.com/janosmiko/lfk/commit/12b41249a45155cf59e18c7775f97609a41b2e61))
+* remember pane widths per explorer level ([#860](https://github.com/janosmiko/lfk/issues/860)) ([64d0d89](https://github.com/janosmiko/lfk/commit/64d0d898e1c528c9c554a315d3625ee37943b999))
+
+
+### Bug Fixes
+
+* reset only the double-clicked pane border ([#859](https://github.com/janosmiko/lfk/issues/859)) ([6375231](https://github.com/janosmiko/lfk/commit/63752311553caaf6d86c5dbbc9ba00c064202f41))
+
 ## [0.19.5](https://github.com/janosmiko/lfk/compare/v0.19.4...v0.19.5) (2026-10-15)
 
 
