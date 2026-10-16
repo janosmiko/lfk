@@ -132,7 +132,7 @@ The three-pane explorer maps mouse clicks to navigation actions:
 | Middle pane (cursored row) | Drill into it (same as `Enter` / Right arrow) |
 | Right pane | Drill into the selected item |
 | Table header row | Sort by that column, click again to toggle direction |
-| Drag a column border | Resize the panes, remembered across restarts. Double-click resets them |
+| Drag a column border | Resize the panes, remembered across restarts. Double-click a border to reset it |
 | Right-click on middle pane | Move cursor to the clicked row and open the action menu |
 | Right-click on right pane | Open the action menu for the currently selected item |
 | Right-click on left pane | No-op |
