@@ -40,7 +40,7 @@ type ViewerPrefsState struct {
 	// Dragged explorer pane widths in permille of the usable width. Nil = never dragged.
 	ExplorerLeftPermille  *int `json:"explorer_left_permille,omitempty" yaml:"explorer_left_permille,omitempty"`
 	ExplorerRightPermille *int `json:"explorer_right_permille,omitempty" yaml:"explorer_right_permille,omitempty"`
-	// Per-level pane widths by paneLevelNames key. Used only with pane_widths_per_level.
+	// Per-level pane widths by paneLevelKey key. Used only with pane_widths_per_level.
 	ExplorerPaneWidths map[string]PaneWidthsPref `json:"explorer_pane_widths,omitempty" yaml:"explorer_pane_widths,omitempty"`
 }
 
@@ -50,29 +50,39 @@ type PaneWidthsPref struct {
 	Right int `json:"right,omitempty" yaml:"right,omitempty"`
 }
 
-var paneLevelNames = map[model.Level]string{
-	model.LevelClusters:      "clusters",
-	model.LevelResourceTypes: "resource_types",
-	model.LevelResources:     "resources",
-	model.LevelOwned:         "owned",
-	model.LevelContainers:    "containers",
+func paneLevelKey(level model.Level) string {
+	switch level {
+	case model.LevelClusters:
+		return "clusters"
+	case model.LevelResourceTypes:
+		return "resource_types"
+	case model.LevelResources:
+		return "resources"
+	case model.LevelOwned:
+		return "owned"
+	case model.LevelContainers:
+		return "containers"
+	}
+	return ""
+}
+
+// withEntry returns a copy of m with k set to v, or removed when drop is true.
+func withEntry[K comparable, V any](m map[K]V, k K, v V, drop bool) map[K]V {
+	out := make(map[K]V, len(m)+1)
+	maps.Copy(out, m)
+	if drop {
+		delete(out, k)
+	} else {
+		out[k] = v
+	}
+	return out
 }
 
 // persistPaneWidthsPrefs records one level's split, keeping every other key.
 // A level with both sides 0 is dropped.
 func persistPaneWidthsPrefs(level model.Level, left, right int) error {
-	return updatePaneWidthsPref(level, func(m map[string]PaneWidthsPref, name string) {
-		if left == 0 && right == 0 {
-			delete(m, name)
-			return
-		}
-		m[name] = PaneWidthsPref{Left: left, Right: right}
-	})
-}
-
-func updatePaneWidthsPref(level model.Level, edit func(map[string]PaneWidthsPref, string)) error {
-	name, ok := paneLevelNames[level]
-	if !ok {
+	name := paneLevelKey(level)
+	if name == "" {
 		return nil
 	}
 	path, err := stateFilePathErr(viewerPrefsFileName)
@@ -84,13 +94,8 @@ func updatePaneWidthsPref(level model.Level, edit func(map[string]PaneWidthsPref
 		if err != nil {
 			return err
 		}
-		widths := make(map[string]PaneWidthsPref, len(s.ExplorerPaneWidths)+1)
-		maps.Copy(widths, s.ExplorerPaneWidths)
-		edit(widths, name)
-		s.ExplorerPaneWidths = nil
-		if len(widths) > 0 {
-			s.ExplorerPaneWidths = widths
-		}
+		s.ExplorerPaneWidths = withEntry(s.ExplorerPaneWidths, name,
+			PaneWidthsPref{Left: left, Right: right}, left == 0 && right == 0)
 		return saveViewerPrefs(s)
 	})
 }
@@ -99,12 +104,16 @@ func updatePaneWidthsPref(level model.Level, edit func(map[string]PaneWidthsPref
 // Unknown level names and invalid values are dropped.
 func panePerLevelStartup(widths map[string]PaneWidthsPref) paneResizeState {
 	st := paneResizeState{perLevel: true}
-	for level, name := range paneLevelNames {
-		w := widths[name]
+	for level := model.LevelClusters; level <= model.LevelContainers; level++ {
+		w := widths[paneLevelKey(level)]
 		l, r := validPanePermille(&w.Left, &w.Right)
-		if l != 0 || r != 0 {
-			st.levels = st.withLevel(level, l, r)
+		if l == 0 && r == 0 {
+			continue
 		}
+		if st.levels == nil {
+			st.levels = map[model.Level][2]int{}
+		}
+		st.levels[level] = [2]int{l, r}
 	}
 	return st
 }

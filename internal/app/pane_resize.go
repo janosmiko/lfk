@@ -1,7 +1,6 @@
 package app
 
 import (
-	"maps"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -62,14 +61,7 @@ func (s paneResizeState) at(level model.Level) paneResizeState {
 // withLevel returns a copy of the levels map with level set, or removed when
 // both values are 0.
 func (s paneResizeState) withLevel(level model.Level, left, right int) map[model.Level][2]int {
-	out := make(map[model.Level][2]int, len(s.levels)+1)
-	maps.Copy(out, s.levels)
-	if left == 0 && right == 0 {
-		delete(out, level)
-	} else {
-		out[level] = [2]int{left, right}
-	}
-	return out
+	return withEntry(s.levels, level, [2]int{left, right}, left == 0 && right == 0)
 }
 
 func (s paneResizeState) active() bool { return s.leftPermille != 0 || s.rightPermille != 0 }

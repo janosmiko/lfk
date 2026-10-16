@@ -216,3 +216,24 @@ func TestPanePerLevelResettingBothSidesDropsEntry(t *testing.T) {
 	assert.NotContains(t, readPrefsFile(t, path).ExplorerPaneWidths, "resource_types")
 	assert.Equal(t, defaultWidths(120), widthsOf(m))
 }
+
+func TestPanePerLevelPersistKeepsOtherKeys(t *testing.T) {
+	path := isolateViewerPrefs(t)
+	l, r := 111, 222
+	require.NoError(t, saveViewerPrefs(ViewerPrefsState{
+		ExplorerLeftPermille:  &l,
+		ExplorerRightPermille: &r,
+		ExplorerPaneWidths:    map[string]PaneWidthsPref{"owned": {Left: 300, Right: 310}},
+	}))
+	require.NoError(t, persistPaneWidthsPrefs(model.LevelResources, 150, 0))
+
+	s := readPrefsFile(t, path)
+	require.NotNil(t, s.ExplorerLeftPermille)
+	require.NotNil(t, s.ExplorerRightPermille)
+	assert.Equal(t, 111, *s.ExplorerLeftPermille)
+	assert.Equal(t, 222, *s.ExplorerRightPermille)
+	assert.Equal(t, map[string]PaneWidthsPref{
+		"owned":     {Left: 300, Right: 310},
+		"resources": {Left: 150},
+	}, s.ExplorerPaneWidths)
+}
