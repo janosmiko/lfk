@@ -39,8 +39,9 @@ func loadBookmarks() []model.Bookmark {
 	if bm := loadBookmarksFromFile(bakPath); bm != nil {
 		logger.Info("Loaded bookmarks from backup file", "path", bakPath)
 		// Restore the primary file from backup. The guarded save would refuse:
-		// the primary is the corrupt file being replaced.
-		if err := writeBookmarks(path, bm); err != nil {
+		// the primary is the corrupt file being replaced. writeBookmarks is
+		// skipped because it would copy that corrupt file over the good backup.
+		if err := restoreBookmarks(path, bm); err != nil {
 			logger.Error("Failed to restore bookmarks from backup", "error", err, "path", path)
 		}
 		return bm
@@ -76,6 +77,17 @@ func saveBookmarks(bookmarks []model.Bookmark) error {
 	return writeStateFileGuarded[[]model.Bookmark]("bookmarks.yaml", func(path string) error {
 		return writeBookmarks(path, bookmarks)
 	})
+}
+
+func restoreBookmarks(path string, bookmarks []model.Bookmark) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(bookmarks)
+	if err != nil {
+		return err
+	}
+	return writeFileDurable(path, data)
 }
 
 func writeBookmarks(path string, bookmarks []model.Bookmark) error {
