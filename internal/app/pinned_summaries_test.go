@@ -411,6 +411,18 @@ func TestTogglePinnedSummary_UnpinSeedsOnlyCappedDefaults(t *testing.T) {
 	assert.Equal(t, []string{"batch/jobs"}, m.effectivePinnedSummaries())
 }
 
+func TestIsSummaryActive_OnlyCappedDefaults(t *testing.T) {
+	origMax := ui.ConfigMaxPinnedSummaries
+	ui.ConfigMaxPinnedSummaries = 2
+	t.Cleanup(func() { ui.ConfigMaxPinnedSummaries = origMax })
+
+	m := seedSummaryTestModel(t, allDefaultEntries())
+
+	assert.True(t, m.isSummaryActive(defaultPinnedSummaries[0]))
+	assert.True(t, m.isSummaryActive(defaultPinnedSummaries[1]))
+	assert.False(t, m.isSummaryActive(defaultPinnedSummaries[2]))
+}
+
 // TestTogglePinnedSummary_DefaultsDisabledNoSeed verifies an explicit
 // pinned_summaries: [] disables the seed entirely: the first pin is a plain
 // single-key pin, matching defaultPinsDisabled's contract.

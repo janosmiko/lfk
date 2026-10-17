@@ -107,7 +107,7 @@ func (m Model) isSummaryPinned(key string) bool {
 // is offered as "Unpin" and never blocked by the cap it hasn't actually hit
 // yet.
 func (m Model) isSummaryActive(key string) bool {
-	return m.isSummaryPinned(key) || (m.defaultsActiveForScope() && slices.Contains(defaultPinnedSummaries, key))
+	return m.isSummaryPinned(key) || (m.defaultsActiveForScope() && slices.Contains(cappedDefaultPinnedSummaries(), key))
 }
 
 // currentScopeSlice returns the active scope's raw persisted pin slice
@@ -168,7 +168,7 @@ func (m Model) defaultSeedDiscovery() []model.ResourceTypeEntry {
 // default must never become an explicit pin, since an explicit pin renders a
 // "(not installed)" placeholder the user never saw as a default (see
 // pinnedSummaryCmds' silentSkip). When there is no discovery data at all for
-// the scope, fall back to seeding all five - better to over-seed than to
+// the scope, fall back to seeding every capped default - better to over-seed than to
 // silently drop rows the user is currently looking at.
 func (m Model) seedDefaultPinnedSummaries() []string {
 	if !m.defaultsActiveForScope() {
