@@ -156,9 +156,13 @@
     },
     "pinned_summaries": {
       "type": ["array", "null"],
-      "maxItems": 10,
-      "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"batch/jobs\") whose status summaries render on the cluster dashboard. Also manageable in-app from the resource-type action menu. Max 10 per scope. Unset uses built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates). An explicit [] disables them.",
+      "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"batch/jobs\") whose status summaries render on the cluster dashboard. Also manageable in-app from the resource-type action menu. Capped per scope by max_pinned_summaries. Unset uses built-in defaults (Jobs, Deployments, Argo Applications, Flux Kustomizations, cert-manager Certificates). An explicit [] disables them.",
       "items": { "type": "string" }
+    },
+    "max_pinned_summaries": {
+      "type": "integer",
+      "description": "Maximum pinned dashboard summaries per scope. Zero or negative uses the default.",
+      "default": 30
     },
     "monitoring": {
       "type": ["object", "null"],

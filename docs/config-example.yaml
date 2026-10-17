@@ -643,13 +643,17 @@ filter_presets:
 # band shows) as inline rows on the cluster dashboard. Keys are
 # version-agnostic group/resource. Manage interactively from the action menu
 # ('x') at the resource types level (stored per-context or per named union
-# set in ~/.local/state/lfk/pinned_summaries.yaml). Max 10 per scope.
+# set in ~/.local/state/lfk/pinned_summaries.yaml). Capped per scope by
+# max_pinned_summaries (default 30).
 # Unset shows built-in defaults (Jobs, Deployments, Argo Applications, Flux
 # Kustomizations, cert-manager Certificates); set to [] to disable them.
 # pinned_summaries:
 #   - batch/jobs
 #   - argoproj.io/applications
 #   - /pods
+#
+# Maximum pinned dashboard summaries per scope. Zero or negative uses the default.
+# max_pinned_summaries: 30
 #
 # Legacy: pin whole CRD API groups. Still honored and expanded into member
 # types on load, but pinning individual types above is preferred.

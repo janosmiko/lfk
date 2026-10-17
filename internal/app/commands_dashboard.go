@@ -105,7 +105,7 @@ func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	// actually resolve.
 	silentSkip := false
 	if len(pins) == 0 && !defaultPinsDisabled() {
-		pins = defaultPinnedSummaries
+		pins = cappedDefaultPinnedSummaries()
 		silentSkip = true
 	}
 	scheduledPins := len(pins)

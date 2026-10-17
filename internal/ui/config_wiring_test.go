@@ -32,6 +32,7 @@ scrollback_lines: 8000
 pinned_groups: [karpenter.sh]
 pinned_types: [argoproj.io/applications]
 pinned_summaries: [batch/jobs, argoproj.io/applications]
+max_pinned_summaries: 12
 tips: false
 log_tail_lines: 250
 log_tail_lines_short: 7
@@ -227,6 +228,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, []string{"karpenter.sh"}, ConfigPinnedGroups, "pinned_groups")
 	assert.Equal(t, []string{"argoproj.io/applications"}, ConfigPinnedTypes, "pinned_types")
 	assert.Equal(t, []string{"batch/jobs", "argoproj.io/applications"}, ConfigPinnedSummaries, "pinned_summaries")
+	assert.Equal(t, 12, ConfigMaxPinnedSummaries, "max_pinned_summaries")
 	assert.False(t, ConfigTipsEnabled, "tips")
 	assert.Equal(t, 250, ConfigLogTailLines, "log_tail_lines")
 	assert.Equal(t, 7, ConfigLogTailLinesShort, "log_tail_lines_short")
@@ -421,6 +423,27 @@ func TestLoadConfig_KubeconfigIgnoreTrimsAndDropsBlanks(t *testing.T) {
 	assert.Equal(t, []string{"*.log", "*.tmp"}, ConfigKubeconfigIgnore)
 }
 
+func TestLoadConfig_MaxPinnedSummariesNonPositiveUsesDefault(t *testing.T) {
+	for name, yaml := range map[string]string{
+		"zero":     "max_pinned_summaries: 0\n",
+		"negative": "max_pinned_summaries: -5\n",
+		"unset":    "dashboard: true\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			restore := snapshotAllConfigGlobals(t)
+			defer restore()
+			ConfigMaxPinnedSummaries = 99
+
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			require.NoError(t, os.WriteFile(path, []byte(yaml), 0o600))
+
+			LoadConfig(path)
+
+			assert.Equal(t, MaxPinnedSummariesDefault, ConfigMaxPinnedSummaries)
+		})
+	}
+}
+
 func TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset(t *testing.T) {
 	restore := snapshotAllConfigGlobals(t)
 	defer restore()
@@ -492,6 +515,7 @@ var wiringCoveredFields = map[string]string{
 	"pinned_groups":              "TestLoadConfig_AllSettingsWired",
 	"pinned_types":               "TestLoadConfig_AllSettingsWired",
 	"pinned_summaries":           "TestLoadConfig_AllSettingsWired + TestLoadConfig_PinnedSummariesEmptyListSetsFlag + TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset",
+	"max_pinned_summaries":       "TestLoadConfig_AllSettingsWired + TestLoadConfig_MaxPinnedSummariesNonPositiveUsesDefault",
 	"monitoring":                 "TestLoadConfig_AllSettingsWired",
 	"tips":                       "TestLoadConfig_AllSettingsWired",
 	"log_tail_lines":             "TestLoadConfig_AllSettingsWired",
@@ -606,6 +630,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origPinnedTypes := ConfigPinnedTypes
 	origPinnedSummaries := ConfigPinnedSummaries
 	origPinnedSummariesSet := ConfigPinnedSummariesSet
+	origMaxPinnedSummaries := ConfigMaxPinnedSummaries
 	origUnionSets := ConfigUnionSets
 	origTips := ConfigTipsEnabled
 	origTail := ConfigLogTailLines
@@ -713,6 +738,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigPinnedTypes = origPinnedTypes
 		ConfigPinnedSummaries = origPinnedSummaries
 		ConfigPinnedSummariesSet = origPinnedSummariesSet
+		ConfigMaxPinnedSummaries = origMaxPinnedSummaries
 		ConfigUnionSets = origUnionSets
 		ConfigTipsEnabled = origTips
 		ConfigLogTailLines = origTail

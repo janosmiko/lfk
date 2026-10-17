@@ -17,8 +17,13 @@ import (
 const pinnedSummariesFileName = "pinned_summaries.yaml"
 
 // maxPinnedSummaries caps how many summaries one scope may pin: each pinned
-// kind is a full cluster-wide list call on every dashboard refresh.
-const maxPinnedSummaries = 10
+// kind is a full cluster-wide list call on every dashboard refresh. The
+// default is ui.MaxPinnedSummariesDefault, overridable via max_pinned_summaries.
+func maxPinnedSummaries() int { return ui.ConfigMaxPinnedSummaries }
+
+func cappedDefaultPinnedSummaries() []string {
+	return defaultPinnedSummaries[:min(len(defaultPinnedSummaries), maxPinnedSummaries())]
+}
 
 // defaultPinnedSummaries render when nothing is pinned anywhere (issue #525,
 // Task 10). CRD-backed entries are silently skipped when the cluster does not
@@ -53,7 +58,7 @@ func savePinnedSummariesState(s *PinnedState) error {
 
 // effectivePinnedSummaries merges config-level pinned summaries with the
 // active scope's state (context, or named union set), config first, deduped,
-// capped at maxPinnedSummaries. Order is pin order, which is also render
+// capped at maxPinnedSummaries(). Order is pin order, which is also render
 // order on the dashboard.
 func (m Model) effectivePinnedSummaries() []string {
 	seen := make(map[string]bool)
@@ -76,8 +81,8 @@ func (m Model) effectivePinnedSummaries() []string {
 			add(m.pinnedSummariesState.Contexts[m.nav.Context])
 		}
 	}
-	if len(merged) > maxPinnedSummaries {
-		merged = merged[:maxPinnedSummaries]
+	if limit := maxPinnedSummaries(); len(merged) > limit {
+		merged = merged[:limit]
 	}
 	return merged
 }
@@ -102,7 +107,7 @@ func (m Model) isSummaryPinned(key string) bool {
 // is offered as "Unpin" and never blocked by the cap it hasn't actually hit
 // yet.
 func (m Model) isSummaryActive(key string) bool {
-	return m.isSummaryPinned(key) || (m.defaultsActiveForScope() && slices.Contains(defaultPinnedSummaries, key))
+	return m.isSummaryPinned(key) || (m.defaultsActiveForScope() && slices.Contains(cappedDefaultPinnedSummaries(), key))
 }
 
 // currentScopeSlice returns the active scope's raw persisted pin slice
@@ -163,7 +168,7 @@ func (m Model) defaultSeedDiscovery() []model.ResourceTypeEntry {
 // default must never become an explicit pin, since an explicit pin renders a
 // "(not installed)" placeholder the user never saw as a default (see
 // pinnedSummaryCmds' silentSkip). When there is no discovery data at all for
-// the scope, fall back to seeding all five - better to over-seed than to
+// the scope, fall back to seeding every capped default - better to over-seed than to
 // silently drop rows the user is currently looking at.
 func (m Model) seedDefaultPinnedSummaries() []string {
 	if !m.defaultsActiveForScope() {
@@ -171,10 +176,10 @@ func (m Model) seedDefaultPinnedSummaries() []string {
 	}
 	discovered := m.defaultSeedDiscovery()
 	if len(discovered) == 0 {
-		return append([]string(nil), defaultPinnedSummaries...)
+		return append([]string(nil), cappedDefaultPinnedSummaries()...)
 	}
 	var resolved []string
-	for _, k := range defaultPinnedSummaries {
+	for _, k := range cappedDefaultPinnedSummaries() {
 		if _, ok := resolvePinnedSummaryEntry(discovered, k); ok {
 			resolved = append(resolved, k)
 		}
@@ -227,9 +232,9 @@ func (m Model) togglePinnedSummary() (tea.Model, tea.Cmd) {
 	// silently when config pins already fill the cap. isSummaryActive (not
 	// isSummaryPinned) so unpinning an already-active default is never
 	// blocked by the cap its own seed just filled.
-	if !m.isSummaryActive(key) && len(m.effectivePinnedSummaries()) >= maxPinnedSummaries {
+	if !m.isSummaryActive(key) && len(m.effectivePinnedSummaries()) >= maxPinnedSummaries() {
 		m.setScopePinnedSummaries(preSeed)
-		m.setStatusMessage(fmt.Sprintf("Pinned-summary limit reached (%d)", maxPinnedSummaries), true)
+		m.setStatusMessage(fmt.Sprintf("Pinned-summary limit reached (%d)", maxPinnedSummaries()), true)
 		return m, scheduleStatusClear()
 	}
 

@@ -132,6 +132,10 @@ func applyConfigOptions(cfg configFile) {
 		ConfigPinnedSummaries = cfg.PinnedSummaries
 		ConfigPinnedSummariesSet = true
 	}
+	ConfigMaxPinnedSummaries = cfg.MaxPinnedSummaries
+	if cfg.MaxPinnedSummaries <= 0 {
+		ConfigMaxPinnedSummaries = MaxPinnedSummariesDefault
+	}
 	if len(cfg.UnionSets) > 0 {
 		ConfigUnionSets = sanitizeUnionSets([]UnionSetConfig(cfg.UnionSets))
 	}
