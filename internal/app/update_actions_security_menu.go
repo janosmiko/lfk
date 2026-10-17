@@ -212,7 +212,7 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 // learns the rule did not persist to disk.
 func (m Model) updateSecurityIgnoresSaveErr(msg securityIgnoresSaveErrMsg) (tea.Model, tea.Cmd) {
 	logger.Info("Failed to save security ignores", "error", msg.err)
-	m.setStatusMessage("Failed to save ignore rule", true)
+	m.setStatusMessage("Failed to save ignore rule: "+msg.err.Error(), true)
 	return m, scheduleStatusClear()
 }
 

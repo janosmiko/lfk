@@ -270,3 +270,21 @@ func TestSaveLoadRoundTripNewFormat(t *testing.T) {
 	assert.Equal(t, original[1].Slot, loaded[1].Slot)
 	assert.False(t, loaded[1].IsContextAware())
 }
+
+func TestLoadBookmarks_RestoreKeepsBackupIntact(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	path := bookmarksFilePath()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	good := []byte("- name: keep\n  context: ctx\n")
+	require.NoError(t, os.WriteFile(path, []byte("not: [valid"), 0o600))
+	require.NoError(t, os.WriteFile(path+".bak", good, 0o600))
+
+	got := loadBookmarks()
+
+	require.Len(t, got, 1)
+	assert.Equal(t, "keep", got[0].Name)
+	bak, err := os.ReadFile(path + ".bak")
+	require.NoError(t, err)
+	assert.Equal(t, good, bak, "restore must not overwrite the backup with the corrupt primary")
+	assert.Len(t, loadBookmarksFromFile(path), 1)
+}

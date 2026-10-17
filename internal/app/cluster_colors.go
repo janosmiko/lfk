@@ -78,13 +78,6 @@ func saveClusterColors(colors map[string]string) error {
 			return fmt.Errorf("cluster colors: unknown color %q for context %q", color, ctx)
 		}
 	}
-	path := clusterColorsFilePath()
-	if path == "" {
-		return errors.New("cluster colors: cannot resolve state file path")
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
 	data, err := yaml.Marshal(clusterColorsState{
 		SchemaVersion: clusterColorsSchemaVersion,
 		Contexts:      colors,
@@ -92,5 +85,19 @@ func saveClusterColors(colors map[string]string) error {
 	if err != nil {
 		return err
 	}
-	return writeFileDurable(path, data)
+	return writeStateFileGuarded[clusterColorsState](clusterColorsFileName, func(path string) error {
+		// The loader ignores other schema versions, so the generic guard accepts
+		// a newer lfk's file and this save would silently replace it.
+		if existing, err := os.ReadFile(path); err == nil && len(existing) > 0 {
+			var s clusterColorsState
+			if yaml.Unmarshal(existing, &s) == nil && s.SchemaVersion != clusterColorsSchemaVersion {
+				return fmt.Errorf("cluster colors: %s has schema_version %d, expected %d; not overwriting",
+					path, s.SchemaVersion, clusterColorsSchemaVersion)
+			}
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+		return writeFileDurable(path, data)
+	})
 }

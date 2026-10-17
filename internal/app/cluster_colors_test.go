@@ -120,3 +120,18 @@ func TestSaveClusterColors_RejectsUnknownColor(t *testing.T) {
 	err := saveClusterColors(map[string]string{"prod": "chartreuse"})
 	assert.Error(t, err, "unknown colors must be rejected at save time so callers can surface a UI error")
 }
+
+func TestSaveClusterColors_RefusesNewerSchemaFile(t *testing.T) {
+	dir := withClusterColorsStateDir(t)
+	path := filepath.Join(dir, "lfk", "cluster-colors.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	orig := []byte("schema_version: 2\ncontexts:\n  prod: red\n")
+	require.NoError(t, os.WriteFile(path, orig, 0o644))
+
+	err := saveClusterColors(map[string]string{"dev": "red"})
+
+	require.Error(t, err)
+	got, readErr := os.ReadFile(path)
+	require.NoError(t, readErr)
+	assert.Equal(t, orig, got)
+}
