@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.7](https://github.com/janosmiko/lfk/compare/v0.19.6...v0.19.7) (2026-10-17)
+
+
+### Features
+
+* make the pinned-summary limit configurable, default 30 ([#862](https://github.com/janosmiko/lfk/issues/862)) ([b192593](https://github.com/janosmiko/lfk/commit/b19259309e61816e347b84f735ac068abd772285))
+
+
+### Bug Fixes
+
+* never overwrite corrupt bookmark, cluster color or ignore files ([#863](https://github.com/janosmiko/lfk/issues/863)) ([8be55d0](https://github.com/janosmiko/lfk/commit/8be55d0c4a5fe6bfe6bf3543ae0d7666e7188ebd))
+
 ## [0.19.6](https://github.com/janosmiko/lfk/compare/v0.19.5...v0.19.6) (2026-10-16)
 
 
