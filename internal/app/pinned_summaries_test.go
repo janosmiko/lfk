@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -503,4 +506,37 @@ func TestTogglePinnedSummary_LimitMessageUsesConfiguredValue(t *testing.T) {
 	m = mdl.(Model)
 	assert.Equal(t, "Pinned-summary limit reached (2)", m.statusMessage)
 	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], 2)
+}
+
+func TestLoadDashboardFor_DefaultsCappedAtMaxPinnedSummaries(t *testing.T) {
+	origMax := ui.ConfigMaxPinnedSummaries
+	ui.ConfigMaxPinnedSummaries = 2
+	t.Cleanup(func() { ui.ConfigMaxPinnedSummaries = origMax })
+
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.discoveredResources["test-ctx"] = allDefaultEntries()
+	m.scheduler.StopWorkers()
+	defer m.scheduler.Close()
+
+	cmd := m.loadDashboardFor("test-ctx")
+	require.NotNil(t, cmd)
+	batchMsg, ok := cmd().(tea.BatchMsg)
+	require.True(t, ok)
+	for _, sub := range batchMsg {
+		go func(c tea.Cmd) { _ = c() }(sub)
+	}
+
+	require.Eventually(t, func() bool {
+		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityLow) >= 8
+	}, 2*time.Second, 10*time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
+
+	var summaries []string
+	for _, e := range m.scheduler.QueueSnapshot() {
+		if strings.HasSuffix(e.Name, " summary") {
+			summaries = append(summaries, e.Name)
+		}
+	}
+	assert.ElementsMatch(t, []string{"Dashboard: Jobs summary", "Dashboard: Deployments summary"}, summaries)
 }
