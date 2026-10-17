@@ -395,6 +395,22 @@ func TestTogglePinnedSummary_UnpinActiveDefaultKeepsOthers(t *testing.T) {
 	}
 }
 
+func TestTogglePinnedSummary_UnpinSeedsOnlyCappedDefaults(t *testing.T) {
+	origMax := ui.ConfigMaxPinnedSummaries
+	ui.ConfigMaxPinnedSummaries = 2
+	t.Cleanup(func() { ui.ConfigMaxPinnedSummaries = origMax })
+
+	m := seedSummaryTestModel(t, allDefaultEntries())
+	m.setCursor(cursorIndexOfItem(&m, "Deployments"))
+	require.NotEqual(t, -1, cursorIndexOfItem(&m, "Deployments"))
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+
+	assert.Equal(t, []string{"batch/jobs"}, m.pinnedSummariesState.Contexts["prod"])
+	assert.Equal(t, []string{"batch/jobs"}, m.effectivePinnedSummaries())
+}
+
 // TestTogglePinnedSummary_DefaultsDisabledNoSeed verifies an explicit
 // pinned_summaries: [] disables the seed entirely: the first pin is a plain
 // single-key pin, matching defaultPinsDisabled's contract.
@@ -530,7 +546,6 @@ func TestLoadDashboardFor_DefaultsCappedAtMaxPinnedSummaries(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityLow) >= 8
 	}, 2*time.Second, 10*time.Millisecond)
-	time.Sleep(50 * time.Millisecond)
 
 	var summaries []string
 	for _, e := range m.scheduler.QueueSnapshot() {

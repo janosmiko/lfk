@@ -21,6 +21,10 @@ const pinnedSummariesFileName = "pinned_summaries.yaml"
 // default is ui.MaxPinnedSummariesDefault, overridable via max_pinned_summaries.
 func maxPinnedSummaries() int { return ui.ConfigMaxPinnedSummaries }
 
+func cappedDefaultPinnedSummaries() []string {
+	return defaultPinnedSummaries[:min(len(defaultPinnedSummaries), maxPinnedSummaries())]
+}
+
 // defaultPinnedSummaries render when nothing is pinned anywhere (issue #525,
 // Task 10). CRD-backed entries are silently skipped when the cluster does not
 // have the type - defaults must never show a "(not installed)" placeholder,
@@ -172,10 +176,10 @@ func (m Model) seedDefaultPinnedSummaries() []string {
 	}
 	discovered := m.defaultSeedDiscovery()
 	if len(discovered) == 0 {
-		return append([]string(nil), defaultPinnedSummaries...)
+		return append([]string(nil), cappedDefaultPinnedSummaries()...)
 	}
 	var resolved []string
-	for _, k := range defaultPinnedSummaries {
+	for _, k := range cappedDefaultPinnedSummaries() {
 		if _, ok := resolvePinnedSummaryEntry(discovered, k); ok {
 			resolved = append(resolved, k)
 		}
