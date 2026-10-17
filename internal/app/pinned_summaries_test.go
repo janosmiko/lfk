@@ -93,12 +93,12 @@ func TestEffectivePinnedSummaries_MergesConfigAndState(t *testing.T) {
 func TestEffectivePinnedSummaries_CapsAtMax(t *testing.T) {
 	m := Model{pinnedSummariesState: newPinnedState()}
 	m.nav.Context = "ctx-a"
-	keys := make([]string, 0, maxPinnedSummaries+3)
-	for i := range maxPinnedSummaries + 3 {
+	keys := make([]string, 0, maxPinnedSummaries()+3)
+	for i := range maxPinnedSummaries() + 3 {
 		keys = append(keys, fmt.Sprintf("group%d/things", i))
 	}
 	m.pinnedSummariesState.Contexts["ctx-a"] = keys
-	assert.Len(t, m.effectivePinnedSummaries(), maxPinnedSummaries)
+	assert.Len(t, m.effectivePinnedSummaries(), maxPinnedSummaries())
 }
 
 func TestIsSummaryPinned(t *testing.T) {
@@ -226,15 +226,15 @@ func TestTogglePinnedSummary_EnforcesCap(t *testing.T) {
 	m := hiddenTestModel(t)
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
 	m.pinnedSummariesState = newPinnedState()
-	keys := make([]string, 0, maxPinnedSummaries)
-	for i := range maxPinnedSummaries {
+	keys := make([]string, 0, maxPinnedSummaries())
+	for i := range maxPinnedSummaries() {
 		keys = append(keys, fmt.Sprintf("group%d/things", i))
 	}
 	m.pinnedSummariesState.Contexts[m.nav.Context] = keys
 
 	mdl, _ := m.togglePinnedSummary()
 	m = mdl.(Model)
-	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], maxPinnedSummaries, "cap rejects the 11th pin")
+	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], maxPinnedSummaries(), "cap rejects the pin past the limit")
 	assert.Contains(t, m.statusMessage, "limit reached", "rejection must be surfaced to the user")
 	assert.True(t, m.statusMessageErr)
 }
@@ -242,14 +242,14 @@ func TestTogglePinnedSummary_EnforcesCap(t *testing.T) {
 // TestTogglePinnedSummary_EnforcesCap_ConfigPinsCountTowardCap verifies the cap
 // check counts config-level pins too: effectivePinnedSummaries (what the
 // dashboard actually renders) merges config pins first, then state pins,
-// truncated to maxPinnedSummaries. A state-only count would let a new pin
+// truncated to maxPinnedSummaries(). A state-only count would let a new pin
 // through even though it can never render (issue: cap check ignored config
 // pins).
 func TestTogglePinnedSummary_EnforcesCap_ConfigPinsCountTowardCap(t *testing.T) {
 	t.Setenv("LFK_STATE_DIR", t.TempDir())
 	origConfig := ui.ConfigPinnedSummaries
-	keys := make([]string, 0, maxPinnedSummaries)
-	for i := range maxPinnedSummaries {
+	keys := make([]string, 0, maxPinnedSummaries())
+	for i := range maxPinnedSummaries() {
 		keys = append(keys, fmt.Sprintf("config-group%d/things", i))
 	}
 	ui.ConfigPinnedSummaries = keys
@@ -297,6 +297,9 @@ func TestTogglePinnedSummary_EnforcesCap_MixedConfigAndState(t *testing.T) {
 	origConfig := ui.ConfigPinnedSummaries
 	ui.ConfigPinnedSummaries = []string{"config-a/things", "config-b/things", "config-c/things"}
 	t.Cleanup(func() { ui.ConfigPinnedSummaries = origConfig })
+	origMax := ui.ConfigMaxPinnedSummaries
+	ui.ConfigMaxPinnedSummaries = 10
+	t.Cleanup(func() { ui.ConfigMaxPinnedSummaries = origMax })
 
 	m := hiddenTestModel(t)
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
@@ -483,4 +486,21 @@ func TestTogglePinnedSummary_SaveFailureRollsBackSeedAndToggle(t *testing.T) {
 	assert.Empty(t, m.pinnedSummariesState.Contexts["prod"], "save failure rolls back both the seed and the toggle")
 	assert.Contains(t, m.statusMessage, "Failed to save")
 	assert.NotNil(t, cmd)
+}
+
+func TestTogglePinnedSummary_LimitMessageUsesConfiguredValue(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+	orig := ui.ConfigMaxPinnedSummaries
+	ui.ConfigMaxPinnedSummaries = 2
+	t.Cleanup(func() { ui.ConfigMaxPinnedSummaries = orig })
+
+	m := hiddenTestModel(t)
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+	m.pinnedSummariesState = newPinnedState()
+	m.pinnedSummariesState.Contexts[m.nav.Context] = []string{"a.io/x", "b.io/y"}
+
+	mdl, _ := m.togglePinnedSummary()
+	m = mdl.(Model)
+	assert.Equal(t, "Pinned-summary limit reached (2)", m.statusMessage)
+	assert.Len(t, m.pinnedSummariesState.Contexts[m.nav.Context], 2)
 }

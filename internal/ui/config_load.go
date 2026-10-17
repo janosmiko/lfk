@@ -85,6 +85,9 @@ type configFile struct {
 	// ("group/resource") whose status summaries render on the cluster
 	// dashboard, merged with per-context state pinned in-app.
 	PinnedSummaries []string `json:"pinned_summaries" yaml:"pinned_summaries"`
+	// MaxPinnedSummaries caps pinned dashboard summaries per scope. Zero or
+	// negative falls back to MaxPinnedSummariesDefault.
+	MaxPinnedSummaries int `json:"max_pinned_summaries" yaml:"max_pinned_summaries"`
 	// Monitoring maps cluster context names to custom monitoring endpoint config.
 	// The special key "_global" applies to clusters without explicit config.
 	Monitoring map[string]model.MonitoringConfig `json:"monitoring" yaml:"monitoring"`

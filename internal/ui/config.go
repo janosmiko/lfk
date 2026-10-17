@@ -502,6 +502,14 @@ var ConfigPinnedSummaries []string
 // it empty.
 var ConfigPinnedSummariesSet bool
 
+// MaxPinnedSummariesDefault is the per-scope pinned-summary cap used when
+// max_pinned_summaries is unset or not positive.
+const MaxPinnedSummariesDefault = 30
+
+// ConfigMaxPinnedSummaries caps pinned dashboard summaries per scope. Set via
+// the `max_pinned_summaries:` config key.
+var ConfigMaxPinnedSummaries = MaxPinnedSummariesDefault
+
 // ConfigUnionSets holds named multi-cluster groups defined in config.
 // Resolved by --union-set into a list of contexts + optional namespace.
 // Empty by default. Populated by applyConfigOptions when union_sets is
