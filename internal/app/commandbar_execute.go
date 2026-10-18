@@ -30,10 +30,9 @@ func (m Model) kubectlEnv() []string {
 		if kubeconfigPath != "" {
 			env = append(env, "KUBECONFIG="+kubeconfigPath)
 		}
-		// KUBECTL_CONTEXT is consumed by the helper that runs `:!` shell
-		// commands and forwarded as kubectl's default context. It must be
-		// the kubeconfig's *original* name, not lfk's potentially
-		// disambiguated display name.
+		// kubectl ignores KUBECTL_CONTEXT. It is kept for user scripts and
+		// plugins that read it, and documented in docs/commands.md. The value
+		// is the kubeconfig's original context name, not lfk's display name.
 		if ctx != "" {
 			env = append(env, "KUBECTL_CONTEXT="+m.client.OriginalContextName(ctx))
 		}
@@ -76,7 +75,9 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	}
 	switch classified {
 	case cmdShell:
-		if m.navTargetReadOnly() {
+		// A bare kubectl in the shell ignores nav.Context and uses the
+		// current-context of the KUBECONFIG file kubectlEnv sets.
+		if m.navTargetReadOnly() || m.fallbackContextReadOnly() {
 			m.setStatusMessage(readOnlyBlockedMessage("shell commands"), true)
 			return m, scheduleStatusClear()
 		}
@@ -119,8 +120,7 @@ func extractShellCommand(input string) string {
 }
 
 // executeShellCommand runs an arbitrary shell command via sh -c.
-// It sets the KUBECONFIG environment variable from the client config
-// and logs the command before execution.
+// It sets the KUBECONFIG environment variable from the client config.
 //
 // In PTY terminal mode the command is launched inside lfk's embedded
 // vt10x terminal so the output flows in-place beside the rest of the
@@ -130,8 +130,6 @@ func (m Model) executeShellCommand(cmd string) tea.Cmd {
 	if cmd == "" {
 		return nil
 	}
-
-	m.addLogEntry("DBG", fmt.Sprintf("$ sh -c %q", cmd))
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command("sh", "-c", cmd)
@@ -729,7 +727,6 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 
 	args = m.injectKubectlDefaults(args)
 
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
 	args = k8s.DemoKubectlArgs(args)
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {

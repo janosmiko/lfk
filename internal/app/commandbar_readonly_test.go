@@ -211,6 +211,30 @@ func TestInjectKubectlDefaults_PluginVerbAppendsContext(t *testing.T) {
 	}
 }
 
+func TestCommandBarReadOnly_ShellUsesKubeconfigCurrentContext(t *testing.T) {
+	for _, tc := range []struct {
+		name, current string
+		blocked       bool
+	}{
+		{"read_only_current_context", "ro", true},
+		{"writable_current_context", "rw", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := fallbackModel(t, writeKubeconfigFile(t, "a", tc.current, "ro", "rw"))
+			m.nav.Context = "rw"
+			result, cmd := m.executeCommandBarInput("! kubectl delete pod x")
+			rm := result.(Model)
+			if tc.blocked {
+				assert.True(t, rm.statusMessageErr)
+				assert.Equal(t, readOnlyBlockedMessage("shell commands"), rm.statusMessage)
+				return
+			}
+			assert.NotNil(t, cmd)
+			assert.Empty(t, rm.statusMessage)
+		})
+	}
+}
+
 func TestCommandBarReadOnly_SubcommandMustFollowVerb(t *testing.T) {
 	for _, in := range []string{
 		"k rollout -l status restart deployment",
