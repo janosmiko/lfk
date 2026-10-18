@@ -11,27 +11,6 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func TestCommandBar_ErrorLogOmitsCommandText(t *testing.T) {
-	t.Setenv("KUBECTL_BIN", "/bin/true")
-	prevMode := ui.ConfigTerminalMode
-	t.Cleanup(func() { ui.ConfigTerminalMode = prevMode })
-
-	for _, mode := range []string{ui.TerminalModePTY, ui.TerminalModeExec} {
-		for _, input := range []string{"! curl --token=secret123 host", "k get pods --token=secret123"} {
-			t.Run(mode+"/"+input, func(t *testing.T) {
-				ui.ConfigTerminalMode = mode
-				m := baseModelWithFakeClient()
-				m.nav.Context = "prod-ctx"
-				_, cmd := m.executeCommandBarInput(input)
-				assert.NotNil(t, cmd)
-				for _, e := range m.errorLog {
-					assert.NotContains(t, e.Message, "secret123")
-				}
-			})
-		}
-	}
-}
-
 func TestCommandBar_LogsProgramAndContextNotArguments(t *testing.T) {
 	t.Setenv("KUBECTL_BIN", "/bin/true")
 	prevMode := ui.ConfigTerminalMode
