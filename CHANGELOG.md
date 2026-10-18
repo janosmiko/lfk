@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.8](https://github.com/janosmiko/lfk/compare/v0.19.7...v0.19.8) (2026-10-18)
+
+
+### Bug Fixes
+
+* block mutating command bar commands on read-only clusters ([#865](https://github.com/janosmiko/lfk/issues/865)) ([47c94e0](https://github.com/janosmiko/lfk/commit/47c94e0fc4c8ce94ebcadbbcee861e2fb138c126))
+
 ## [0.19.7](https://github.com/janosmiko/lfk/compare/v0.19.6...v0.19.7) (2026-10-17)
 
 
