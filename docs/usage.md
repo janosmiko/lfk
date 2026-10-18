@@ -243,6 +243,17 @@ taint, label/annotation edits, secret/configmap edits, paste-apply, and
 template create. Listing, describing, viewing logs, viewing YAML, diff,
 and other read paths still work.
 
+The command bar follows the same rule. `:!` shell commands are blocked,
+because they run with the current context's kubeconfig. `:k` runs only
+read-only verbs (`get`, `describe`, `logs`, `top`, `explain`,
+`api-resources`, `api-versions`, `version`, `cluster-info`, `events`,
+`diff`, `help`, `options`, `auth can-i|whoami`, `config view|get-contexts|current-context`,
+`rollout status|history`). Other verbs and plugins are blocked. With
+`--context <name>`, the check uses that context. At the cluster picker, the
+check uses the kubeconfig current-context. Plugins are also blocked when
+that current-context is read-only. A write through `--kubeconfig`,
+`--server`, or `--cluster` is checked against the current context only.
+
 Read-only is per-context (and per-tab). The UI surfaces it in two places:
 
 - **Inside a context** (any level deeper than the cluster picker): the

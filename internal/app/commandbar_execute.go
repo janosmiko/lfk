@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -29,10 +30,9 @@ func (m Model) kubectlEnv() []string {
 		if kubeconfigPath != "" {
 			env = append(env, "KUBECONFIG="+kubeconfigPath)
 		}
-		// KUBECTL_CONTEXT is consumed by the helper that runs `:!` shell
-		// commands and forwarded as kubectl's default context. It must be
-		// the kubeconfig's *original* name, not lfk's potentially
-		// disambiguated display name.
+		// kubectl ignores KUBECTL_CONTEXT. It is kept for user scripts and
+		// plugins that read it, and documented in docs/commands.md. The value
+		// is the kubeconfig's original context name, not lfk's display name.
 		if ctx != "" {
 			env = append(env, "KUBECTL_CONTEXT="+m.client.OriginalContextName(ctx))
 		}
@@ -52,6 +52,12 @@ func (m Model) kubectlContext(displayName string) string {
 	return m.client.OriginalContextName(displayName)
 }
 
+// logCommandBarExec logs the context only. Command text can carry tokens,
+// including env assignments before the program name.
+func (m Model) logCommandBarExec(label string) {
+	logger.Info(label, "context", m.nav.Context)
+}
+
 func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	input = strings.TrimSpace(input)
 	if input == "" {
@@ -69,6 +75,12 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	}
 	switch classified {
 	case cmdShell:
+		// A bare kubectl in the shell ignores nav.Context and uses the
+		// current-context of the KUBECONFIG file kubectlEnv sets.
+		if m.navTargetReadOnly() || m.fallbackContextReadOnly() {
+			m.setStatusMessage(readOnlyBlockedMessage("shell commands"), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.executeShellCommand(extractShellCommand(input))
 	case cmdBuiltin:
 		return m.executeBuiltinCommand(input)
@@ -85,6 +97,10 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if verb, blocked := m.kubectlBlockedByReadOnly(fields); blocked {
+			m.setStatusMessage(readOnlyBlockedMessage("kubectl "+verb), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.executeKubectlCommand(input)
 	case cmdResourceJump:
 		return m.executeResourceJump(input)
@@ -104,8 +120,7 @@ func extractShellCommand(input string) string {
 }
 
 // executeShellCommand runs an arbitrary shell command via sh -c.
-// It sets the KUBECONFIG environment variable from the client config
-// and logs the command before execution.
+// It sets the KUBECONFIG environment variable from the client config.
 //
 // In PTY terminal mode the command is launched inside lfk's embedded
 // vt10x terminal so the output flows in-place beside the rest of the
@@ -116,12 +131,10 @@ func (m Model) executeShellCommand(cmd string) tea.Cmd {
 		return nil
 	}
 
-	m.addLogEntry("DBG", fmt.Sprintf("$ sh -c %q", cmd))
-
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command("sh", "-c", cmd)
 		c.Env = m.kubectlEnv()
-		logExecCmd("Running shell command", c)
+		m.logCommandBarExec("Running shell command")
 		cols, rows := m.embeddedPTYSize()
 		return startPTYExecCmd(c, fmtPTYTitle("$ "+cmd), cols, rows)
 	}
@@ -714,13 +727,12 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 
 	args = m.injectKubectlDefaults(args)
 
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
 	args = k8s.DemoKubectlArgs(args)
 
 	if ui.ConfigTerminalMode == ui.TerminalModePTY {
 		c := exec.Command(kubectlPath, args...)
 		c.Env = m.kubectlEnv()
-		logExecCmd("Running kubectl command", c)
+		m.logCommandBarExec("Running kubectl command")
 		// PTY-mode commands don't route through tea.ExecProcess, so the
 		// namespace-cache invalidation that normally arrives via
 		// actionResultMsg won't fire here. That's acceptable because the
@@ -747,7 +759,7 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	c := exec.Command("sh", "-c", shellCmd)
 	c.Env = m.kubectlEnv()
 
-	logExecCmd("Running kubectl command", c)
+	m.logCommandBarExec("Running kubectl command")
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return actionResultMsg{err: err, invalidateNamespaceCache: affectsNamespaces}
