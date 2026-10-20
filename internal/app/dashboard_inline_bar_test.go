@@ -111,6 +111,23 @@ func TestDashboardMetricLines_ZeroTotalBar(t *testing.T) {
 	assert.Contains(t, stripANSI(lines[0]), "[0")
 }
 
+func TestDashboardMetricLines_LabelOnDarkSegmentUsesTextColor(t *testing.T) {
+	segs := []struct {
+		count int
+		style lipgloss.Style
+	}{{5, ui.StatusRunning}, {5, ui.DimStyle}}
+	bar := stackedMetricBar(segs, 10, 40).withLabels([]string{"5 Running", "5 Complete"}, "")
+	lines := dashboardMetricLines("Jobs", bar, "", inlineTestWidths())
+
+	require.Len(t, lines, 1)
+	dark := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorFile)).
+		Background(ui.DimStyle.GetForeground()).Render("5 Complete" + strings.Repeat(" ", 10))
+	light := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBase)).
+		Background(ui.StatusRunning.GetForeground()).Render("5 Running" + strings.Repeat(" ", 11))
+	assert.Contains(t, lines[0], dark)
+	assert.Contains(t, lines[0], light)
+}
+
 func TestDashboardPinnedRowLines_MultiDimOneLineRows(t *testing.T) {
 	r := pinnedSummaryResult{
 		key:         "applications",

@@ -125,7 +125,6 @@ func (b metricBar) inline(text string) (string, bool) {
 		}
 		runes = []rune(text + strings.Repeat(" ", b.width-lipgloss.Width(text)))
 	}
-	filledText := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorBase))
 	track := ui.NormalStyle.Background(lipgloss.Color(ui.ColorBarBg))
 
 	var sb strings.Builder
@@ -136,7 +135,8 @@ func (b metricBar) inline(text string) (string, bool) {
 			continue
 		}
 		bg := c.style.GetForeground()
-		sb.WriteString(filledText.Background(bg).Render(string(runes[pos : pos+n])))
+		filled := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ReadableTextOn(bg))).Background(bg)
+		sb.WriteString(filled.Render(string(runes[pos : pos+n])))
 		pos += n
 	}
 	if pos < b.width {
