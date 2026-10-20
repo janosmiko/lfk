@@ -100,6 +100,10 @@ type OverlayListConfig struct {
 	// (e.g. the AutoSync overlay's ON/OFF switches).
 	CursorHighlightWidth int
 
+	// Hover, when non-nil, is the item index under the mouse pointer. The
+	// cursor row keeps its selection style.
+	Hover *int
+
 	// Height, when > 0, locks the rendered output to exactly this many
 	// lines. Padding with blank lines when content is shorter,
 	// truncating when longer. Use this to keep the surrounding overlay
@@ -235,6 +239,8 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			if pad := itemWidth - lipgloss.Width(row); pad > 0 {
 				row += OverlayDimStyle.Render(strings.Repeat(" ", pad))
 			}
+		} else if cfg.Hover != nil && *cfg.Hover == i {
+			row = HoverStyle.Width(itemWidth).Render(Truncate(itemPlainLine(it, cfg, hasActive), itemWidth))
 		} else {
 			// Truncated to the item area for the same reason as the cursor
 			// row: the component owns the no-wider-than-innerW invariant;

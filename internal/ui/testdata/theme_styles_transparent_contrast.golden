@@ -1,6 +1,7 @@
 ActiveColumnStyle "\x1b[38;2;211;224;252m╭───╮\x1b[m\n\x1b[38;2;211;224;252m│\x1b[m x \x1b[38;2;211;224;252m│\x1b[m\n\x1b[38;2;211;224;252m╰───╯\x1b[m"
 InactiveColumnStyle "\x1b[38;2;78;85;117m╭───╮\x1b[m\n\x1b[38;2;78;85;117m│\x1b[m x \x1b[38;2;78;85;117m│\x1b[m\n\x1b[38;2;78;85;117m╰───╯\x1b[m"
 SelectedStyle "\x1b[1;38;2;0;0;0;48;2;122;162;247mx\x1b[m"
+HoverStyle "\x1b[38;2;217;223;249;48;2;57;70;106mx\x1b[m"
 NormalStyle "\x1b[38;2;217;223;249mx\x1b[m"
 DimStyle "\x1b[38;2;221;223;233mx\x1b[m"
 BarDimStyle "\x1b[38;2;221;223;233mx\x1b[m"

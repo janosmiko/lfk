@@ -28,8 +28,8 @@ func (m Model) handleMouseToggleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 
 // toggleMouseCapture suspends or resumes mouse reporting at runtime. When
 // suspended the terminal regains the mouse, so the user can select text,
-// copy, and use native scrollback. Resuming re-enables cell-motion capture
-// (the same mode main.go installs at startup). It is a no-op with an
+// copy, and use native scrollback. Resuming re-enables capture (View declares
+// the mouse mode on every render). It is a no-op with an
 // explanatory message when mouse capture was never available.
 func (m Model) toggleMouseCapture() (tea.Model, tea.Cmd) {
 	if !m.mouseAvailable {
@@ -62,6 +62,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return next, dragCmd
 	}
 	m = next
+	if _, isMotion := msg.(tea.MouseMotionMsg); isMotion && mouse.Button == tea.MouseNone {
+		return m.handleHover(mouse), nil
+	}
+	// A press, release or wheel tick can reshape the list under the pointer.
+	m.hover = hoverState{}
 	// Trackpad momentum keeps emitting wheel ticks after the physical gesture
 	// ends. Drop the tail once the burst is no longer productive (a boundary
 	// was reached, the pointer moved to another pane, or a left/right

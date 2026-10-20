@@ -90,6 +90,7 @@ func (m Model) renderOverlay(background string) string {
 		overlayH = 3
 	}
 
+	m.recordOverlayGeom(content, overlayW, overlayH)
 	content = ui.FillLinesBg(content, overlayW-4, ui.SurfaceBg)
 	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle, overlayW), overlayH).Render(content)
 	bg := ui.PadToHeight(background, m.height)

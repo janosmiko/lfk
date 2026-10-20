@@ -64,10 +64,11 @@ func (m Model) updateImpl(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.updateWindowSize(msg)
+	case tea.KeyPressMsg:
+		m.hover = hoverState{}
+		return m.handleKey(msg)
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
-	case tea.KeyPressMsg:
-		return m.handleKey(msg)
 	case keymapsChordMsg:
 		return m.replayKeymapsChord(msg)
 	case tea.PasteMsg:

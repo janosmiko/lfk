@@ -75,7 +75,7 @@ func (m Model) View() tea.View {
 	v.AltScreen = true
 	v.ReportFocus = true
 	if m.mouseCaptured {
-		v.MouseMode = tea.MouseModeCellMotion
+		v.MouseMode = tea.MouseModeAllMotion
 	}
 	return v
 }
@@ -90,6 +90,7 @@ func (m Model) renderView() string {
 	// globals, so the whole pass has to be exclusive. See ui.RenderMu.
 	ui.RenderMu.Lock()
 	defer ui.RenderMu.Unlock()
+	setOverlayGeom(overlayListGeom{})
 
 	// Sync nyan mode state to UI globals for rendering.
 	ui.NyanMode = m.nyanMode
@@ -442,6 +443,7 @@ func (m Model) viewExplorer() string {
 	// Build columns.
 	middleHeader := m.middleColumnHeader()
 	var middleCol string
+	ui.ActiveHoverRow = m.explorerHoverRow()
 	switch m.nav.Level {
 	case model.LevelResources, model.LevelOwned, model.LevelContainers:
 		if m.middleTableRenderer != nil {
@@ -459,6 +461,7 @@ func (m Model) viewExplorer() string {
 		}
 		middleCol = ui.RenderColumn(header, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, true, m.loading, m.spinner.View(), middleErrMsg)
 	}
+	ui.ActiveHoverRow = -1
 	// Clear sort indicator so it doesn't appear in right column (children) tables.
 	ui.ActiveSortColumnName = ""
 	middleCol = ui.PadToHeight(middleCol, contentHeight)

@@ -81,6 +81,9 @@ var (
 	NormalStyle   lipgloss.Style
 	DimStyle      lipgloss.Style
 
+	// HoverStyle marks the row under the mouse pointer.
+	HoverStyle lipgloss.Style
+
 	// BarDimStyle is DimStyle but with bar background (for status bar hints).
 	BarDimStyle lipgloss.Style
 

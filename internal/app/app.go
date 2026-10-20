@@ -508,9 +508,9 @@ type Model struct {
 	// capture was enabled at startup (no --no-mouse flag and config allows
 	// it). mouseCaptured tracks the current runtime state so the toggle
 	// keybinding can suspend capture for native terminal text selection and
-	// later re-enable it. When mouse was never available the toggle is a
-	// no-op.
+	// later re-enable it. When mouse was never available the toggle is a no-op.
 	mouseAvailable, mouseCaptured bool
+	hover                         hoverState
 	// wheel tracks the active wheel-scroll burst for momentum-tail dropping (#524).
 	wheel      wheelBurst
 	paneResize paneResizeState

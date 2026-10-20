@@ -63,6 +63,7 @@ func renderActionOverlay(m Model) (string, int) {
 	cfg := ui.OverlayListConfig{
 		Title:           "Actions",
 		Cursor:          m.overlayCursor,
+		Hover:           m.hoverFor(hoverAction),
 		ShowStatus:      true,
 		ShowDescription: true,
 	}
@@ -756,6 +757,7 @@ func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 	return ui.RenderOverlayList(listItems, ui.OverlayListConfig{
 		Title:            "Select Namespace",
 		Cursor:           m.overlayCursor,
+		Hover:            m.hoverFor(hoverNamespace),
 		Filterable:       true,
 		Filter:           m.overlayFilter.Value,
 		FilterActive:     m.nsFilterMode,

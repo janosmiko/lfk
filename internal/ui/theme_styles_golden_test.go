@@ -37,6 +37,7 @@ func themeStyleTable() []struct {
 		{"ActiveColumnStyle", &ActiveColumnStyle},
 		{"InactiveColumnStyle", &InactiveColumnStyle},
 		{"SelectedStyle", &SelectedStyle},
+		{"HoverStyle", &HoverStyle},
 		{"NormalStyle", &NormalStyle},
 		{"DimStyle", &DimStyle},
 		{"BarDimStyle", &BarDimStyle},
