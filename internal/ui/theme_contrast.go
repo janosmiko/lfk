@@ -2,8 +2,10 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 
+	"charm.land/lipgloss/v2"
 	"github.com/lucasb-eyer/go-colorful"
 )
 
@@ -29,6 +31,22 @@ func contrastRatio(l1, l2 float64) float64 {
 	lighter := math.Max(l1, l2)
 	darker := math.Min(l1, l2)
 	return (lighter + 0.05) / (darker + 0.05)
+}
+
+// ReadableTextOn returns the theme base or text color, whichever contrasts
+// more with bg. Fills like a bar segment can be light or dark in any theme.
+func ReadableTextOn(bg color.Color) string {
+	lum := func(c color.Color) (float64, bool) {
+		cc, ok := colorful.MakeColor(c)
+		return relativeLuminance(cc.R, cc.G, cc.B), ok
+	}
+	lBg, okBg := lum(bg)
+	lBase, okBase := lum(lipgloss.Color(ColorBase))
+	lText, okText := lum(lipgloss.Color(ColorFile))
+	if okBg && okBase && okText && contrastRatio(lText, lBg) > contrastRatio(lBase, lBg) {
+		return ColorFile
+	}
+	return ColorBase
 }
 
 // rowTintBgBlend is how far a row-tint background moves from the theme base

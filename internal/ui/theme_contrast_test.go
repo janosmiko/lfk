@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/lucasb-eyer/go-colorful"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -495,4 +496,9 @@ func TestApplyThemeHonoursContrastKnob(t *testing.T) {
 	target := 1.0 + 0.175*20.0
 	assert.GreaterOrEqual(t, ratio, target-0.15,
 		"shifted text ratio %g should meet WCAG target %g", ratio, target)
+}
+
+func TestReadableTextOn(t *testing.T) {
+	assert.Equal(t, ColorFile, ReadableTextOn(lipgloss.Color(ColorDimmed)), "dark fill")
+	assert.Equal(t, ColorBase, ReadableTextOn(lipgloss.Color("#9ece6a")), "light fill")
 }
