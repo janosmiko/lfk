@@ -43,6 +43,7 @@ type columnToggleState struct {
 	sessionColumns       map[string][]string // kind -> ordered visible extra column keys (session-only)
 	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
 	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved, Name is implicit)
+	pinnedOrder          pinnedOrderState    // pinned-summaries order overlay (dashboard)
 }
 
 // captureColumnToggleSnapshot deep-copies the current per-kind column

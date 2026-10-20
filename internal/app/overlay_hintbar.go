@@ -284,6 +284,8 @@ func (m Model) overlayHintBarEditor() string {
 		return m.overlayHintBarOverlayLabelEditor()
 	case overlayColumnToggle:
 		return m.overlayHintBarOverlayColumnToggle()
+	case overlayPinnedOrder:
+		return m.overlayHintBarOverlayPinnedOrder()
 	case overlayKeymaps:
 		if m.keymapsFilterMode {
 			return m.renderHints([]ui.HintEntry{

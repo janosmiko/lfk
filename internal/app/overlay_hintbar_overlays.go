@@ -403,6 +403,15 @@ func (m Model) overlayHintBarOverlayColumnToggle() string {
 	})
 }
 
+func (m Model) overlayHintBarOverlayPinnedOrder() string {
+	return m.renderHints([]ui.HintEntry{
+		{Key: "j/k", Desc: "move"},
+		{Key: "J/K", Desc: "reorder"},
+		{Key: "Enter", Desc: "save"},
+		{Key: "Esc", Desc: "cancel"},
+	})
+}
+
 // overlayHintBarOverlayRightsizing returns the hint bar entries for
 // the right-sizing overlay. Loading state shows only "esc cancel"
 // since the other actions need data; loaded state shows y/r/esc plus

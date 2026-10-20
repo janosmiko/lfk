@@ -62,6 +62,7 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	m.logView.podFilterText = ""
 	m.logView.containerFilterText = ""
 	m.columnToggleFilter = ""
+	m.pinnedOrder = pinnedOrderState{}
 	// Drop any pending bulk-action snapshot — closing the overlay (Ctrl+C
 	// or toggle key) abandons the action, so a later single-item action
 	// must not be misrouted through the stale selection.
@@ -96,7 +97,7 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.ThemeSelector
 	case overlayFilterPreset:
 		return key == kb.FilterPresets
-	case overlayColumnToggle:
+	case overlayColumnToggle, overlayPinnedOrder:
 		return key == kb.ColumnToggle
 	case overlayQuotaDashboard:
 		return key == kb.QuotaDashboard
@@ -277,6 +278,9 @@ func (m Model) handleOverlayKeyTertiary(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 		return mdl, cmd, true
 	case overlayColumnToggle:
 		mdl, cmd := m.handleColumnToggleKey(msg)
+		return mdl, cmd, true
+	case overlayPinnedOrder:
+		mdl, cmd := m.handlePinnedOrderKey(msg)
 		return mdl, cmd, true
 	case overlayPasteConfirm:
 		mdl, cmd := m.handlePasteConfirmKey(msg)

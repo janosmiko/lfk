@@ -78,7 +78,7 @@ chords, which all start with `g`; re-point the ones you use at the new prefix.
 | `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) |
 | `F` | Cycle layout: hide sidebar -> fullscreen -> restore (dashboards toggle fullscreen) |
 | `M` | Toggle resource relationship map view |
-| `,` | Column visibility toggle (show / hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
+| `,` | Column visibility toggle (show / hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below). Cluster dashboard: [pinned summaries order](#pinned-summaries-order-overlay) |
 | `p` | Pin / unpin resource type (at resource types level) |
 | `H` | Toggle rarely used and hidden resource types |
 | `I` | API Explorer (browse resource structure interactively) |
@@ -794,6 +794,18 @@ If you apply a completely empty selection (no built-ins, no extras), the
 overlay interprets it as "reset to defaults for this kind" rather than
 leaving the table empty. To render only built-ins with zero extras, keep
 at least one built-in column checked when you press Enter.
+
+## Pinned Summaries Order Overlay
+
+If the cursor is on the cluster dashboard entry, press `,` to reorder its pinned summaries.
+Config pins (`pinned_summaries`) are listed first, tagged `config`, and stay locked.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate down / up |
+| `J` / `K` | Move the current entry down / up |
+| `Enter` | Save the order |
+| `Esc` / `q` | Close without saving |
 
 ## Inline Editors (Secret / ConfigMap / labels and annotations)
 
