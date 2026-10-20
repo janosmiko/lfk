@@ -275,3 +275,30 @@ func TestNamespaceOverlayHoverFollowsRealPath(t *testing.T) {
 	assert.Equal(t, plainLines[y-1], lines[y-1])
 	assert.Equal(t, stripANSI(plainLines[y+1]), stripANSI(lines[y+1]))
 }
+
+func TestNamespaceOverlayRowsBelowVisibleListResolveToNothing(t *testing.T) {
+	m := baseExplorerModel()
+	m.height = 24
+	m.overlay = overlayNamespace
+	for i := range 30 {
+		m.overlayItems = append(m.overlayItems, model.Item{Name: "ns-" + string(rune('a'+i%26)) + string(rune('a'+i/26))})
+	}
+	m.mouseAvailable, m.mouseCaptured = true, true
+	view := m.renderView()
+	x, y := screenPos(t, view, "ns-a")
+
+	visible := namespaceOverlayVisibleRows(m.namespaceOverlayH(), 30)
+	require.Equal(t, 12, visible)
+	last, below := y+visible-1, y+visible
+	assert.Equal(t, hoverState{surface: hoverNamespace, idx: visible - 1}, m.hoverAt(x, last))
+	assert.Equal(t, visible-1, m.overlayItemIndexAt(last-(boxTop(t, m)+2)))
+	assert.Equal(t, hoverState{}, m.hoverAt(x, below))
+	assert.Equal(t, -1, m.overlayItemIndexAt(below-(boxTop(t, m)+2)))
+}
+
+func boxTop(t *testing.T, m Model) int {
+	t.Helper()
+	box, ok := m.centeredOverlayBox()
+	require.True(t, ok)
+	return box.y
+}

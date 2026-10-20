@@ -451,10 +451,17 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 			}
 		case e.itemIdx == ActiveHoverRow && isActive:
 			line = FormatItemPlain(item, width)
+			if ActiveHighlightQuery != "" {
+				line = highlightNameSelectedOver(line, ActiveHighlightQuery, HoverStyle)
+			}
 			if lineWidth := lipgloss.Width(line); lineWidth < width {
 				line += strings.Repeat(" ", width-lineWidth)
 			}
-			line = HoverStyle.MaxWidth(width).Render(line)
+			if ActiveHighlightQuery != "" {
+				line = RenderOverPrestyled(line, HoverStyle)
+			} else {
+				line = HoverStyle.MaxWidth(width).Render(line)
+			}
 		case e.itemIdx == cursor && cursor >= 0:
 			// Parent column highlight (dimmer than active selection).
 			line = FormatItemNameOnlyPlain(item, width)

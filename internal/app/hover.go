@@ -101,7 +101,7 @@ func (m Model) recordOverlayGeom(content string, ow, oh int) {
 		g.rowCount, g.firstRowY = g.total, g.box.y+2+2
 	case overlayNamespace:
 		g.total = len(m.filteredOverlayItems())
-		g.rowCount, g.firstRowY = min(15, g.total), g.box.y+2+4
+		g.rowCount, g.firstRowY = namespaceOverlayVisibleRows(m.namespaceOverlayH(), g.total), g.box.y+2+4
 		g.scroll = ui.OverlayNsScroll
 	default:
 		return

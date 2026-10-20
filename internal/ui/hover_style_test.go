@@ -59,3 +59,20 @@ func TestRenderTableHoverRow(t *testing.T) {
 	onCursor := RenderTable("NAME", items, 0, 100, 20, false, "", "")
 	assert.Equal(t, plain, onCursor, "hover on the cursor row changes nothing")
 }
+
+func TestColumnHoverRowKeepsSearchHighlight(t *testing.T) {
+	prevHover, prevQuery := ActiveHoverRow, ActiveHighlightQuery
+	t.Cleanup(func() { ActiveHoverRow, ActiveHighlightQuery = prevHover, prevQuery })
+	items := []model.Item{{Name: "alpha"}, {Name: "bravo"}, {Name: "charlie"}}
+	render := func() string {
+		return RenderColumn("H", items, 0, 40, 10, true, false, "", "")
+	}
+
+	ActiveHoverRow, ActiveHighlightQuery = 1, ""
+	noQuery := render()
+	ActiveHighlightQuery = "rav"
+	withQuery := render()
+
+	hoveredLine := func(out string) string { return strings.Split(out, "\n")[2] }
+	assert.NotEqual(t, hoveredLine(noQuery), hoveredLine(withQuery), "match highlight must reach the hovered row")
+}

@@ -141,6 +141,15 @@ func (m Model) activateOverlayItemAt(innerY int) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
+func (m Model) namespaceOverlayH() int { return min(20, m.height-6) }
+
+// namespaceOverlayVisibleRows is the item count the namespace list draws in an
+// overlay of height overlayH. Render, click and hover must share it.
+func namespaceOverlayVisibleRows(overlayH, n int) int {
+	contentH := max(overlayH-2, 1)
+	return min(max(contentH-overlayListChromeFilterable(), 1), max(n, 1))
+}
+
 // overlayItemIndexAt maps inner-content row innerY to an item index for the
 // action and namespace overlays, or -1 when the row is not an item.
 func (m Model) overlayItemIndexAt(innerY int) int {
@@ -159,7 +168,7 @@ func (m Model) overlayItemIndexAt(innerY int) int {
 		// scroll-above row, it uses a scrollbar column.
 		const itemsStartRow = 4
 		items := m.filteredOverlayItems()
-		visibleCount := min(15, len(items))
+		visibleCount := namespaceOverlayVisibleRows(m.namespaceOverlayH(), len(items))
 		rowInItems := innerY - itemsStartRow
 		if rowInItems < 0 || rowInItems >= visibleCount {
 			return -1
