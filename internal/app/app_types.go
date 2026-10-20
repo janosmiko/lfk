@@ -90,6 +90,7 @@ const (
 	overlayAutoSync
 	overlayFinalizerSearch
 	overlayColumnToggle
+	overlayPinnedOrder
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
 	overlayClusterColor // pick a color tint for the highlighted cluster row

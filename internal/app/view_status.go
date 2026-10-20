@@ -536,6 +536,9 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 		if m.metricsSparkAvailable() {
 			hints = append(hints, ui.HintEntry{Key: kb.MetricsSparkCycle, Desc: "cpu/mem view"})
 		}
+		if sel.Extra == "__overview__" {
+			hints = append(hints, ui.HintEntry{Key: kb.ColumnToggle, Desc: "reorder pins"})
+		}
 		return append(hints,
 			ui.HintEntry{Key: kb.NewTab, Desc: "new tab"},
 			ui.HintEntry{Key: helpHintKey(kb), Desc: "help"},

@@ -576,11 +576,18 @@ func (m Model) handleKeyCommandBar() (Model, tea.Cmd) {
 	return m, m.ensureNamespaceCacheFresh()
 }
 
-func (m Model) handleKeyColumnToggle() Model {
+func (m Model) handleKeyColumnToggle() (Model, tea.Cmd) {
+	if m.nav.Level == model.LevelResourceTypes {
+		sel := m.selectedMiddleItem()
+		if sel != nil && sel.Extra == "__overview__" {
+			return m.openPinnedOrder()
+		}
+		return m, nil
+	}
 	if m.nav.Level >= model.LevelResources {
 		m.openColumnToggle()
 	}
-	return m
+	return m, nil
 }
 
 func (m Model) handleKeySecretToggle() (tea.Model, tea.Cmd) {

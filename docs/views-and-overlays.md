@@ -95,6 +95,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayLogContainerSelect` | container key in fullscreen logs | Container picker within log mode.                                                                                                                                                                                    |
 | `overlayFinalizerSearch`    | `Ctrl+G`                         | Pick a finalizer to remove.                                                                                                                                                                                          |
 | `overlayColumnToggle`       | `,`                              | Show / hide table columns per kind.                                                                                                                                                                                  |
+| `overlayPinnedOrder`        | `,` on cluster dashboard         | Reorder pinned summaries.                                                                                                                                                                                            |
 | `overlayClusterColor`       | `L` (Shift+L) at cluster picker  | Pick a background tint for the highlighted cluster row.                                                                                                                                                              |
 
 ### Navigators (jump-driven)

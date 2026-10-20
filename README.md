@@ -347,7 +347,7 @@ Inside the namespace selector:
 | `/` | Search and jump to a match |
 | `n` / `N` | Next / previous match |
 | `.` | Quick filter presets |
-| `,` | Column visibility and order |
+| `,` | Column visibility and order (dashboard: pinned summaries) |
 | `>` / `<` / `=` / `-` | Sort by next / previous column, flip direction, reset |
 
 ### Views
