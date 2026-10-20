@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.10](https://github.com/janosmiko/lfk/compare/v0.19.9...v0.19.10) (2026-10-20)
+
+
+### Features
+
+* highlight the list row under the mouse pointer ([#878](https://github.com/janosmiko/lfk/issues/878)) ([57b7672](https://github.com/janosmiko/lfk/commit/57b76721ed6a9df414d150ec5283abb49033e0ba))
+
 ## [0.19.9](https://github.com/janosmiko/lfk/compare/v0.19.8...v0.19.9) (2026-10-20)
 
 
