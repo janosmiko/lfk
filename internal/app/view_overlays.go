@@ -90,6 +90,7 @@ func (m Model) renderOverlay(background string) string {
 		overlayH = 3
 	}
 
+	m.recordOverlayGeom(content, overlayW, overlayH)
 	content = ui.FillLinesBg(content, overlayW-4, ui.SurfaceBg)
 	overlay := ui.BoxHeight(ui.BoxWidth(ui.OverlayStyle, overlayW), overlayH).Render(content)
 	bg := ui.PadToHeight(background, m.height)
@@ -108,7 +109,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		// "shrink" back to its declared size when a filter narrows the
 		// list.
 		overlayW := min(60, m.width-10)
-		overlayH := min(20, m.height-6)
+		overlayH := m.namespaceOverlayH()
 		return renderNamespaceOverlay(m, m.filteredOverlayItems(), overlayH), overlayW, overlayH, true
 	case overlayAction:
 		content, w := renderActionOverlay(m)

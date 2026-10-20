@@ -118,8 +118,9 @@ shift+click):
 - **CLI flag:** `lfk --no-mouse`
 - **Config file:** Add `mouse: false` to `~/.config/lfk/config.yaml`
 
-By default, lfk captures mouse input for click navigation, scroll, and tab
-switching.
+By default, lfk captures mouse input for click navigation, scroll, tab
+switching, and hover highlight on the middle pane, action menu, and namespace
+selector rows.
 
 ### Explorer click semantics
 

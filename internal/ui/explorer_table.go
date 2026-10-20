@@ -577,6 +577,40 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 		selected := isItemSelected(item)
 
+		// Plain-cell row under one row-wide style, for the cursor and hover rows.
+		styledRow := func(style lipgloss.Style) string {
+			restarts := item.Restarts
+			if hasRestarts {
+				restarts = plainRestartsCell(item, anyRecentRestart)
+			}
+			markerPrefix := ""
+			if wantMarker {
+				markerPrefix = "  "
+				if selected {
+					markerPrefix = selectionMarker
+				}
+			}
+			tilePrefix := ""
+			if tileW > 0 {
+				// The tile must re-assert the style after its own SGR reset,
+				// or the highlight dies for the rest of the row.
+				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, style)
+			}
+			row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, restarts, item.Status, LiveAge(item),
+				nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
+			highlighted := ActiveHighlightQuery != ""
+			if highlighted {
+				row = highlightNameSelectedOver(row, ActiveHighlightQuery, style)
+			}
+			if lineW := lipgloss.Width(row); lineW < width {
+				row += strings.Repeat(" ", width-lineW)
+			}
+			if highlighted {
+				return RenderOverPrestyled(row, style)
+			}
+			return style.MaxWidth(width).Render(row)
+		}
+
 		if i == cursor {
 			cursorRestarts := item.Restarts
 			if hasRestarts {
@@ -625,36 +659,9 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					selStyle = mergeRowTintIntoSelected(selStyle, tint)
 				}
 			}
-			markerPrefix := ""
-			if wantMarker {
-				markerPrefix = "  "
-				if selected {
-					markerPrefix = selectionMarker
-				}
-			}
-			tilePrefix := ""
-			if tileW > 0 {
-				// Cursor row: the tile must re-assert the selection style
-				// after its own SGR reset, or the highlight dies for the
-				// rest of the row.
-				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, selStyle)
-			}
-			row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
-				nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
-			highlighted := false
-			if ActiveHighlightQuery != "" {
-				row = highlightNameSelectedOver(row, ActiveHighlightQuery, selStyle)
-				highlighted = true
-			}
-			lineW := lipgloss.Width(row)
-			if lineW < width {
-				row += strings.Repeat(" ", width-lineW)
-			}
-			if highlighted {
-				b.WriteString(RenderOverPrestyled(row, selStyle))
-			} else {
-				b.WriteString(selStyle.MaxWidth(width).Render(row))
-			}
+			b.WriteString(styledRow(selStyle))
+		} else if i == ActiveHoverRow {
+			b.WriteString(styledRow(HoverStyle))
 		} else {
 			var rendered string
 			if ActiveRowCache != nil {

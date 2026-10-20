@@ -123,39 +123,63 @@ func (m Model) dispatchOverlayWheel(button tea.MouseButton) (tea.Model, tea.Cmd)
 // clickable row. The caller should swallow it (no dismiss) so a stray
 // click on the title or padding doesn't close the overlay.
 func (m Model) activateOverlayItemAt(innerY int) (tea.Model, tea.Cmd, bool) {
+	idx := m.overlayItemIndexAt(innerY)
+	if idx < 0 {
+		return m, nil, false
+	}
+	m.overlayCursor = idx
 	switch m.overlay {
 	case overlayAction:
-		// Inner rows: 0=title, 1=title-padding, 2..N+1=items.
-		idx := innerY - 2
-		if idx < 0 || idx >= len(m.overlayItems) {
-			return m, nil, false
-		}
-		m.overlayCursor = idx
 		mdl, cmd := m.executeAction(m.overlayItems[idx].Name)
 		return mdl, cmd, true
-
 	case overlayNamespace:
-		// Inner rows: 0=title, 1=title-padding, 2=filter, 3=blank
-		// (from "\n\n"), 4=scroll-above row, 5..5+visible-1=items.
-		const itemsStartRow = 5
-		items := m.filteredOverlayItems()
-		visibleCount := min(15, len(items))
-		rowInItems := innerY - itemsStartRow
-		if rowInItems < 0 || rowInItems >= visibleCount {
-			return m, nil, false
-		}
-		idx := ui.OverlayNsScroll + rowInItems
-		if idx < 0 || idx >= len(items) {
-			return m, nil, false
-		}
-		m.overlayCursor = idx
 		// Hand off to the overlay's normal Enter handler so the same
 		// "apply selection and close" path runs as keyboard activation.
 		mdl, cmd := m.handleOverlayKey(tea.KeyPressMsg{Code: tea.KeyEnter})
 		return mdl, cmd, true
 	}
-
 	return m, nil, false
+}
+
+func (m Model) namespaceOverlayH() int { return min(20, m.height-6) }
+
+// namespaceOverlayVisibleRows is the item count the namespace list draws in an
+// overlay of height overlayH. Render, click and hover must share it.
+func namespaceOverlayVisibleRows(overlayH, n int) int {
+	contentH := max(overlayH-2, 1)
+	return min(max(contentH-overlayListChromeFilterable(), 1), max(n, 1))
+}
+
+// overlayItemIndexAt maps inner-content row innerY to an item index for the
+// action and namespace overlays, or -1 when the row is not an item.
+func (m Model) overlayItemIndexAt(innerY int) int {
+	switch m.overlay {
+	case overlayAction:
+		// Inner rows: 0=title, 1=title-padding, 2..N+1=items.
+		idx := innerY - 2
+		if idx < 0 || idx >= len(m.overlayItems) {
+			return -1
+		}
+		return idx
+
+	case overlayNamespace:
+		// Inner rows: 0=title, 1=title-padding, 2=filter, 3=blank
+		// (from "\n\n"), 4..4+visible-1=items. The list draws no
+		// scroll-above row, it uses a scrollbar column.
+		const itemsStartRow = 4
+		items := m.filteredOverlayItems()
+		visibleCount := namespaceOverlayVisibleRows(m.namespaceOverlayH(), len(items))
+		rowInItems := innerY - itemsStartRow
+		if rowInItems < 0 || rowInItems >= visibleCount {
+			return -1
+		}
+		idx := ui.OverlayNsScroll + rowInItems
+		if idx < 0 || idx >= len(items) {
+			return -1
+		}
+		return idx
+	}
+	return -1
 }
 
 // overlayBoundingBox holds the screen-space rectangle for a centered
@@ -189,6 +213,11 @@ func (m Model) centeredOverlayBox() (overlayBoundingBox, bool) {
 	if !ok {
 		return overlayBoundingBox{}, false
 	}
+	return m.overlayBoxFor(content, ow, oh), true
+}
+
+// overlayBoxFor computes the screen rectangle of rendered overlay content.
+func (m Model) overlayBoxFor(content string, ow, oh int) overlayBoundingBox {
 	if ow < 10 {
 		ow = 10
 	}
@@ -219,5 +248,5 @@ func (m Model) centeredOverlayBox() (overlayBoundingBox, bool) {
 	if y < 0 {
 		y = 0
 	}
-	return overlayBoundingBox{x: x, y: y, w: visualW, h: visualH}, true
+	return overlayBoundingBox{x: x, y: y, w: visualW, h: visualH}
 }

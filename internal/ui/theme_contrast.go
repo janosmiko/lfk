@@ -71,6 +71,22 @@ func blendHex(base, tint string, amount float64) string {
 	return fmt.Sprintf("#%02x%02x%02x", uint8(c.R*255), uint8(c.G*255), uint8(c.B*255))
 }
 
+// hoverBgBlend is how far the hover background moves from Base toward
+// SelectedBg: visible, yet clearly weaker than the selected row.
+const hoverBgBlend = 0.25
+
+// derivedHoverBg returns the hover row background, or "" when either color
+// is not a valid hex (no-color mode).
+func derivedHoverBg(t Theme) string {
+	if _, err := colorful.Hex(t.Base); err != nil {
+		return ""
+	}
+	if _, err := colorful.Hex(t.SelectedBg); err != nil {
+		return ""
+	}
+	return blendHex(t.Base, t.SelectedBg, hoverBgBlend)
+}
+
 // derivedParentHighlightBg blends Border toward Base until bold Text over it
 // clears the WCAG AA large-text floor (3.0:1). Border skips fg-readability
 // enforcement because it also has a decorative role on column outlines, so

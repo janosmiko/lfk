@@ -161,6 +161,10 @@ func buildThemeStyles(t Theme) {
 		Foreground(lipgloss.Color(t.SelectedFg)).
 		Background(lipgloss.Color(t.SelectedBg))
 
+	HoverStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(t.Text)).
+		Background(lipgloss.Color(derivedHoverBg(t)))
+
 	NormalStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Text)).
 		Background(baseBg)

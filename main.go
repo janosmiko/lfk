@@ -319,7 +319,7 @@ func runTUI(opts app.StartupOptions) error {
 		func() { p.Kill(); p.Wait() },
 		func() { os.Exit(0) },
 	))
-	p = tea.NewProgram(m)
+	p = tea.NewProgram(m, tea.WithFilter(app.MouseHoverFilter))
 
 	// ErrProgramKilled is expected when the watchdog force-quits. Treat it
 	// as a clean exit rather than surfacing it as a startup failure.

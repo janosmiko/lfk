@@ -64,6 +64,11 @@ var ActiveCollapsedCategories map[string]bool
 // A value of -1 means "no persistent scroll, calculate from scratch".
 var ActiveMiddleScroll int
 
+// ActiveHoverRow is the middle-column row under the mouse pointer, or -1.
+// The app sets it only around the middle column render. The cursor row keeps
+// its selection style.
+var ActiveHoverRow = -1
+
 // ActiveRowCache and ActiveTableLayout, when non-nil, let RenderTable reuse
 // pre-rendered row strings and pre-computed column widths across calls.
 // TableRenderer owns the lifetime — it sets these before each RenderTable
@@ -443,6 +448,19 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				line = RenderOverPrestyled(line, ActiveSelectedStyle(e.itemIdx))
 			} else {
 				line = ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line)
+			}
+		case e.itemIdx == ActiveHoverRow && isActive:
+			line = FormatItemPlain(item, width)
+			if ActiveHighlightQuery != "" {
+				line = highlightNameSelectedOver(line, ActiveHighlightQuery, HoverStyle)
+			}
+			if lineWidth := lipgloss.Width(line); lineWidth < width {
+				line += strings.Repeat(" ", width-lineWidth)
+			}
+			if ActiveHighlightQuery != "" {
+				line = RenderOverPrestyled(line, HoverStyle)
+			} else {
+				line = HoverStyle.MaxWidth(width).Render(line)
 			}
 		case e.itemIdx == cursor && cursor >= 0:
 			// Parent column highlight (dimmer than active selection).

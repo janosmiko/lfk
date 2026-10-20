@@ -63,6 +63,7 @@ func renderActionOverlay(m Model) (string, int) {
 	cfg := ui.OverlayListConfig{
 		Title:           "Actions",
 		Cursor:          m.overlayCursor,
+		Hover:           m.hoverFor(hoverAction),
 		ShowStatus:      true,
 		ShowDescription: true,
 	}
@@ -727,7 +728,7 @@ func padRight(s string, width int) string {
 // resolving rows correctly.
 func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 	contentH := max(height-2, 1)
-	maxVisible := min(max(contentH-overlayListChromeFilterable(), 1), max(len(items), 1))
+	maxVisible := namespaceOverlayVisibleRows(height, len(items))
 	// VimScrollOff gives sticky scrolloff behaviour. Stateless cursor-only
 	// math pinned the cursor to viewport edges, making scroll-up look like
 	// the list was shifting instead of the cursor moving.
@@ -756,6 +757,7 @@ func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 	return ui.RenderOverlayList(listItems, ui.OverlayListConfig{
 		Title:            "Select Namespace",
 		Cursor:           m.overlayCursor,
+		Hover:            m.hoverFor(hoverNamespace),
 		Filterable:       true,
 		Filter:           m.overlayFilter.Value,
 		FilterActive:     m.nsFilterMode,

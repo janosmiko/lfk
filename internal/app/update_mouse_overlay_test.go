@@ -419,15 +419,15 @@ func TestOverlayMouseClickNamespaceItemSetsCursorAndApplies(t *testing.T) {
 
 	// Namespace overlay layout (RenderNamespaceOverlay):
 	//   inner rows: 0=title, 1=title-pad, 2=filter, 3=blank,
-	//               4=scroll-above, 5..=items.
+	//               4..=items (no scroll-above row).
 	// box.y for namespace overlay (ow=60, oh=20 -> visualW=62, visualH=22):
 	//   box.y = (40 - 22) / 2 = 9
 	// Inner row 0 = box.y + 2 = 11.
-	// Item 1 ("default") is at inner row 6, screen y = 11 + 6 = 17.
+	// Item 1 ("default") is at inner row 5, screen y = 11 + 5 = 16.
 	ret, _ := m.handleMouse(tea.MouseClickMsg{
 		Button: tea.MouseLeft,
 		X:      60, // inside the namespace overlay box
-		Y:      17, // item index 1 ("default")
+		Y:      16, // item index 1 ("default")
 	})
 	result := ret.(Model)
 	assert.Equal(t, overlayNone, result.overlay,

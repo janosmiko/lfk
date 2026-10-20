@@ -24,6 +24,7 @@ func applyNoColorTheme() {
 
 	ActiveColumnStyle = ActiveColumnStyle.Bold(true)
 	SelectedStyle = SelectedStyle.Reverse(true)
+	HoverStyle = HoverStyle.Underline(true)
 	DimStyle = DimStyle.Faint(true)
 	BarDimStyle = BarDimStyle.Faint(true)
 	CategoryBarStyle = CategoryBarStyle.Underline(true)

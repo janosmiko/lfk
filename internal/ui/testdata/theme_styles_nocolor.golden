@@ -1,6 +1,7 @@
 ActiveColumnStyle "╭───╮\n│ \x1b[1mx\x1b[m │\n╰───╯"
 InactiveColumnStyle "╭───╮\n│ x │\n╰───╯"
 SelectedStyle "\x1b[1;7mx\x1b[m"
+HoverStyle "\x1b[4;4mx\x1b[m"
 NormalStyle "x"
 DimStyle "\x1b[2mx\x1b[m"
 BarDimStyle "\x1b[2mx\x1b[m"
