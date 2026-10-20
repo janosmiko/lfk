@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.9](https://github.com/janosmiko/lfk/compare/v0.19.8...v0.19.9) (2026-10-20)
+
+
+### Features
+
+* reorder pinned dashboard summaries with , ([#877](https://github.com/janosmiko/lfk/issues/877)) ([dbc20dd](https://github.com/janosmiko/lfk/commit/dbc20dd755ab074451af6e689da56e6bf6bcac55))
+
+
+### Bug Fixes
+
+* keep dashboard bar labels readable on dark segments ([#875](https://github.com/janosmiko/lfk/issues/875)) ([4d3888f](https://github.com/janosmiko/lfk/commit/4d3888f4bf397045df25a0485e9b441a8aa9a06b))
+
 ## [0.19.8](https://github.com/janosmiko/lfk/compare/v0.19.7...v0.19.8) (2026-10-18)
 
 
