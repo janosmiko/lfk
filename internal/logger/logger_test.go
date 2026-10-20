@@ -4,6 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -102,6 +103,34 @@ func TestStderrCapture(t *testing.T) {
 
 	// Close should not panic.
 	sc.Close()
+}
+
+// An exec credential plugin still running at quit holds an inherited copy
+// of the pipe's write end, so EOF never comes until it exits.
+func TestStderrCapture_CloseDoesNotWaitOnChildHoldingPipe(t *testing.T) {
+	old := closeDrainTimeout
+	closeDrainTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { closeDrainTimeout = old })
+
+	sc := NewStderrCapture()
+	child := exec.Command("sleep", "5")
+	child.Stderr = sc.Writer()
+	require.NoError(t, child.Start())
+	t.Cleanup(func() {
+		_ = child.Process.Kill()
+		_ = child.Wait()
+	})
+
+	done := make(chan struct{})
+	go func() {
+		sc.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close blocked on a child process holding the pipe open")
+	}
 }
 
 func TestStderrCaptureMultipleMessages(t *testing.T) {

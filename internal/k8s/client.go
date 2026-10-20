@@ -194,6 +194,9 @@ type Client struct {
 	// Read via informerSnapshot.
 	informers *informerCache
 
+	// shutdownOnce makes the bounded informer wait happen once across calls.
+	shutdownOnce sync.Once
+
 	// securityManager dispatches finding fetches across registered
 	// SecuritySource adapters (Trivy Operator, Heuristic, PolicyReport,
 	// Falco). Set at startup by the app layer via SetSecurityManager but
@@ -319,17 +322,33 @@ func (c *Client) SetInformerCacheMode(mode InformerCacheMode) {
 	}
 }
 
+// shutdownStopTimeout caps how long Shutdown waits for informers. Reflectors
+// blocked in an exec credential plugin ignore stop channels.
+var shutdownStopTimeout = time.Second
+
 // Shutdown closes any background watches the client started (informer cache,
 // future stream subscribers). Idempotent and safe to call from a defer in
-// main.go even when no informers were ever started.
+// main.go even when no informers were ever started. Waits at most
+// shutdownStopTimeout once, so informer goroutines may still be running on return.
 func (c *Client) Shutdown() {
 	if c.demoTicker != nil {
 		c.demoTicker.Stop()
 	}
 	_, infs := c.informerSnapshot()
-	if infs != nil {
-		infs.Stop()
+	if infs == nil {
+		return
 	}
+	c.shutdownOnce.Do(func() {
+		done := make(chan struct{})
+		go func() {
+			infs.Stop()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(shutdownStopTimeout):
+		}
+	})
 }
 
 // ApplyManifest decodes a (possibly multi-document) YAML manifest and

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/janosmiko/lfk/internal/paths"
 )
@@ -132,13 +133,21 @@ func (sc *StderrCapture) Writer() *os.File {
 	return f
 }
 
+// closeDrainTimeout caps how long Close waits for the pipe to reach EOF.
+var closeDrainTimeout = 250 * time.Millisecond
+
 // Close shuts down the capture. Call after restoring the original os.Stderr.
 func (sc *StderrCapture) Close() {
 	if sc.w != nil {
 		_ = sc.w.Close()
 	}
+	// A still-running exec plugin holds a copy of the write end, so EOF can
+	// lag by seconds. Closing r below unblocks the read loop instead.
 	if sc.done != nil {
-		<-sc.done
+		select {
+		case <-sc.done:
+		case <-time.After(closeDrainTimeout):
+		}
 	}
 	if sc.r != nil {
 		_ = sc.r.Close()

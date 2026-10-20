@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -76,6 +78,44 @@ func TestUpdate_FreezesModelWhileShuttingDown(t *testing.T) {
 	_, cmd = m.Update(shutdownCompleteMsg{})
 	require.NotNil(t, cmd, "completion must dispatch quit")
 	assert.Equal(t, tea.Quit(), cmd())
+}
+
+// A worker stuck in a call that ignores its context (an exec credential
+// plugin holding client-go's getCreds mutex) must not hold up the drain.
+func TestDrainShutdown_DoesNotWaitOnStuckWorker(t *testing.T) {
+	old := shutdownDrainTimeout
+	shutdownDrainTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { shutdownDrainTimeout = old })
+
+	m := baseModelWithFakeClient()
+	m.tabs = []TabState{{}}
+	m.nav.Context = "test-ctx"
+	m.scheduler = scheduler.New(0)
+	m.scheduler.StartWorkers()
+
+	started := make(chan struct{})
+	block := make(chan struct{})
+	t.Cleanup(func() { close(block) })
+	cmd := m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindResourceList, "List Pods", "default",
+		func(context.Context) tea.Msg {
+			close(started)
+			<-block
+			return nil
+		})
+	require.NotNil(t, cmd)
+	go cmd()
+	<-started
+
+	done := make(chan struct{})
+	go func() {
+		m.drainShutdown()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("drainShutdown blocked on a worker stuck past the drain timeout")
+	}
 }
 
 // beginShutdown invokes the registered notifier exactly once so main can

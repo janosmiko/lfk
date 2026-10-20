@@ -12,6 +12,9 @@ import (
 // shutdown notice advertises.
 const ForceQuitGracePeriod = 10 * time.Second
 
+// shutdownDrainTimeout caps how long the drain waits for scheduler workers.
+var shutdownDrainTimeout = time.Second
+
 // shutdownState groups the graceful-quit fields so they live together
 // without pushing the main Model struct over the file-length cap (the
 // same pattern whoCanState uses). It is embedded in Model, so the quit
@@ -90,16 +93,23 @@ func (m Model) shutdownDrainCmd() tea.Cmd {
 	}
 }
 
-// drainShutdown blocks until the worker pools and informer caches have
-// fully stopped. Each wait here can take seconds when a cluster is
-// unreachable, so it runs off the UI goroutine (see shutdownDrainCmd)
-// behind the graceful-shutdown notice. signalShutdown must have run first
-// so the goroutines this waits on are already cancelled and exit promptly.
+// drainShutdown stops the worker pools and informer caches in parallel. Both
+// waits are bounded: a worker or reflector stuck in an exec credential
+// plugin ignores cancellation. signalShutdown must run first.
 func (m *Model) drainShutdown() {
-	if m.scheduler != nil {
-		m.scheduler.StopWorkers()
-	}
+	deadline := time.After(shutdownDrainTimeout)
+	workersDone := make(chan struct{})
+	go func() {
+		if m.scheduler != nil {
+			m.scheduler.StopWorkers()
+		}
+		close(workersDone)
+	}()
 	if m.client != nil {
 		m.client.Shutdown()
+	}
+	select {
+	case <-workersDone:
+	case <-deadline:
 	}
 }

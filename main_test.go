@@ -46,6 +46,27 @@ func TestArmForceQuit_KillsThenExitsAfterGrace(t *testing.T) {
 	}
 }
 
+// A kill that never returns (p.Wait stuck) must not stop exit from running.
+func TestArmForceQuit_ExitsWhenKillBlocks(t *testing.T) {
+	old := forceQuitKillTimeout
+	forceQuitKillTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { forceQuitKillTimeout = old })
+
+	exited := make(chan struct{})
+	block := make(chan struct{})
+	t.Cleanup(func() { close(block) })
+	armForceQuit(10*time.Millisecond,
+		func() { <-block },
+		func() { close(exited) },
+	)()
+
+	select {
+	case <-exited:
+	case <-time.After(time.Second):
+		t.Fatal("exit not called while kill blocks")
+	}
+}
+
 // validatePprofAddr must refuse every bind-all or non-loopback form of
 // LFK_PPROF_ADDR: the pprof endpoint exposes process internals (heap,
 // goroutines, env strings) and must never be reachable off-box.
