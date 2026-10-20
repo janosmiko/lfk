@@ -86,6 +86,16 @@ func TestHoverClearedByWheelAndClick(t *testing.T) {
 	assert.Equal(t, 3, got.cursor(), "click still selects the hovered row")
 }
 
+func TestHoverClearedByPaneDividerDrag(t *testing.T) {
+	m := hoverTestModel()
+	leftEnd, _ := m.columnBoundaries()
+	m.hover = hoverState{surface: hoverExplorer, idx: 3}
+
+	m = press(m, leftEnd-1, 5)
+	require.Equal(t, dividerLeft, m.paneResize.drag)
+	assert.Equal(t, hoverState{}, m.hover)
+}
+
 func TestHoverIgnoredWithoutMouseCapture(t *testing.T) {
 	m := hoverTestModel()
 	x, y := rowY(t, m, 3)

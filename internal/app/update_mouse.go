@@ -59,6 +59,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// Runs before the mode and overlay early returns so a release always ends a drag.
 	next, dragCmd, dragHandled := m.handlePaneDrag(msg, mouse)
 	if dragHandled {
+		next.hover = hoverState{}
 		return next, dragCmd
 	}
 	m = next
