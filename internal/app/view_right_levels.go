@@ -10,18 +10,12 @@ import (
 func (m Model) renderRightResourceTypes(width, height int) string {
 	sel := m.selectedMiddleItem()
 	if sel != nil && sel.Extra == "__overview__" {
-		if m.isUnionSentinel() {
-			return m.renderUnionDashboardMembers(width, height)
-		}
 		if m.dashboardPreview == "" {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading cluster dashboard...")
 		}
 		return m.dashboardPreview
 	}
 	if sel != nil && sel.Extra == "__monitoring__" {
-		if m.isUnionSentinel() {
-			return m.renderUnionDashboardMembers(width, height)
-		}
 		if m.monitoringPreview == "" {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading monitoring dashboard...")
 		}
@@ -40,16 +34,6 @@ func (m Model) renderRightResourceTypes(width, height int) string {
 		return m.renderRightDefault(width, height)
 	}
 	return m.renderRightDefault(width, height)
-}
-
-func (m Model) renderUnionDashboardMembers(width, height int) string {
-	if len(m.rightItems) == 0 {
-		if m.loading || m.previewLoading {
-			return ui.DimStyle.Render(m.spinner.View() + " Loading contexts...")
-		}
-		return ui.DimStyle.Render("No union contexts found")
-	}
-	return ui.RenderColumn("CONTEXT", m.rightItems, -1, width, height, false, m.loading, m.spinner.View(), "")
 }
 
 func (m Model) renderRightClusters(width, height int) string {

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -646,6 +647,9 @@ func monitoringAlertTable(lines []string, alerts []k8s.AlertInfo) []string {
 
 	header := fmt.Sprintf("  %-10s %-12s %-14s %-12s",
 		"STATE", "SEVERITY", "SINCE", "NAMESPACE")
+	if slices.ContainsFunc(alerts, func(a k8s.AlertInfo) bool { return a.Context != "" }) {
+		header += " CONTEXT"
+	}
 	lines = append(lines, ui.DimStyle.Bold(true).Render(header))
 	lines = append(lines, "")
 
@@ -694,7 +698,11 @@ func renderAlertRow(a k8s.AlertInfo) string {
 	sinceCol := ui.DimStyle.Render(fmt.Sprintf("%-14s", sinceStr))
 	nsCol := ui.DimStyle.Render(fmt.Sprintf("%-12s", ui.SanitizeTerminalText(a.Labels["namespace"])))
 
-	return fmt.Sprintf("  %s %s %s %s", stateStr, sevStr, sinceCol, nsCol)
+	row := fmt.Sprintf("  %s %s %s %s", stateStr, sevStr, sinceCol, nsCol)
+	if a.Context != "" {
+		row += " " + ui.DimStyle.Render(ui.SanitizeTerminalText(a.Context))
+	}
+	return row
 }
 
 // renderAlertLabels renders the label lines for a single alert.

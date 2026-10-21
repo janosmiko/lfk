@@ -711,10 +711,11 @@ func dashboardInlineEventsSection(lines []string, warningEvents []model.Item, w 
 		if f.count != "" && f.count != "1" {
 			countLabel = ui.DimStyle.Render(fmt.Sprintf("(x%s) ", f.count))
 		}
-		line := fmt.Sprintf("  %s %s %s%s %s",
+		line := fmt.Sprintf("  %s %s %s%s%s %s",
 			ui.StatusProgressing.Render("⚠"),
 			ui.DimStyle.Render(fmt.Sprintf("%-4s", ev.Age)),
 			countLabel,
+			eventClusterTag(ev),
 			ui.StatusFailed.Render(f.reason+":"),
 			ui.NormalStyle.Render(f.object))
 		lines = append(lines, line)
@@ -756,7 +757,7 @@ func dashboardEventsColumn(allWarningEvents []model.Item) []string {
 			ui.StatusProgressing.Render("⚠"),
 			ui.DimStyle.Render(fmt.Sprintf("%-4s", ev.Age)),
 			countLabel,
-			nsLabel,
+			eventClusterTag(ev)+nsLabel,
 			ui.StatusFailed.Render(f.reason+":"),
 			ui.NormalStyle.Render(f.object))
 		eventLines = append(eventLines, line)

@@ -222,7 +222,7 @@ func (m Model) updateEventTimeline(msg eventTimelineMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
-	if msg.context == m.dashboardPreviewTargetContext() {
+	if m.dashboardMsgWanted(msg.context, unionDashboardCluster) {
 		// The dashboard fan-out is the preview load clearRight() armed the flag
 		// for. Leaving it armed keeps the 10 FPS spinner loop re-rendering the
 		// whole screen for as long as the user parks here (#646).
@@ -245,7 +245,7 @@ func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 }
 
 func (m Model) updateMonitoringDashboard(msg monitoringDashboardMsg) Model {
-	if msg.context == m.dashboardPreviewTargetContext() {
+	if m.dashboardMsgWanted(msg.context, unionDashboardMonitoring) {
 		m.previewLoading = false
 		if m.monitoringData == nil {
 			m.monitoringData = make(map[string]monitoringData)
@@ -254,6 +254,9 @@ func (m Model) updateMonitoringDashboard(msg monitoringDashboardMsg) Model {
 		// dashboard in place via recomposeMonitoring without re-querying.
 		m.monitoringData[msg.context] = monitoringData{alerts: msg.alerts, errMsg: msg.errMsg}
 		m.monitoringPreview = msg.content
+		if _, ok := m.unionAggregateMode(); ok {
+			m = m.recomposeMonitoring()
+		}
 	}
 	return m
 }

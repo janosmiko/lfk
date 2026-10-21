@@ -42,7 +42,7 @@ func dashboardAccKey(kctx string, gen uint64) string {
 // (context, gen) is evicted — otherwise navigating away mid-refresh
 // would leak partial entries in m.dashboardAcc forever.
 func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) {
-	if msg.context != m.dashboardPreviewTargetContext() || msg.gen != m.requestGen {
+	if !m.dashboardMsgWanted(msg.context, unionDashboardCluster) || msg.gen != m.requestGen {
 		// Drop any partial accumulator left behind for this stale
 		// (context, gen). The guarded m.dashboardAcc init lets us skip
 		// the delete when the map is nil (test fixtures).
