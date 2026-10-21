@@ -331,6 +331,10 @@ func runTUI(opts app.StartupOptions) error {
 	return nil
 }
 
+// forceQuitKillTimeout bounds how long armForceQuit waits for kill, since
+// Program.Wait can block behind a stuck goroutine.
+var forceQuitKillTimeout = 2 * time.Second
+
 // armForceQuit returns a notifier that, once invoked, force-terminates the
 // process if it has not exited within grace. It kills the Bubble Tea
 // program first (restoring the terminal) and then exits. kill and exit are
@@ -345,7 +349,15 @@ func armForceQuit(grace time.Duration, kill, exit func()) func() {
 	return func() {
 		go func() {
 			time.Sleep(grace)
-			kill()
+			killed := make(chan struct{})
+			go func() {
+				kill()
+				close(killed)
+			}()
+			select {
+			case <-killed:
+			case <-time.After(forceQuitKillTimeout):
+			}
 			exit()
 		}()
 	}
