@@ -228,7 +228,10 @@ func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 		// whole screen for as long as the user parks here (#646).
 		m.previewLoading = false
 		if _, agg := m.unionAggregateMode(); agg && msg.content != "" {
-			delete(m.dashboardData, msg.context)
+			if m.dashboardData == nil {
+				m.dashboardData = make(map[string]dashboardData)
+			}
+			m.dashboardData[msg.context] = dashboardData{disabled: true}
 			return m.recomposeDashboard()
 		}
 		if msg.content != "" {

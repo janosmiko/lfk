@@ -60,6 +60,7 @@ type dashboardData struct {
 	totalMemAlloc   int64
 	nodeMetricsErr  error
 	nodesErr        error
+	disabled        bool
 	pinnedSummaries []pinnedSummaryResult
 
 	// cpuSeries and memSeries hold cluster-wide usage history for the

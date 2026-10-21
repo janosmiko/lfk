@@ -241,4 +241,10 @@ func TestUpdateDashboardLoaded_AggregateKeepsAggregateOnMemberOverride(t *testin
 	assert.NotContains(t, view, "Cluster dashboard disabled")
 	assert.Contains(t, view, "MEMBERS")
 	assert.Contains(t, view, "ok green")
+	assert.Contains(t, view, "blue disabled")
+	assert.NotContains(t, view, "blue loading")
+	assert.Equal(t, 7, got.dashboardData["green"].pods.total)
+
+	replaced := got.updateDashboardLoaded(dashboardLoadedMsg{context: "blue", data: memberDash(1, 1, 3)})
+	assert.Contains(t, stripANSI(replaced.dashboardPreview), "ok blue")
 }

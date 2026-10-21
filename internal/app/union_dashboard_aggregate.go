@@ -16,6 +16,7 @@ const (
 	unionMemberOK unionMemberState = iota
 	unionMemberLoading
 	unionMemberError
+	unionMemberDisabled
 )
 
 type unionMember struct {
@@ -34,6 +35,9 @@ func mergeMemberDashboards(contexts []string, byCtx map[string]dashboardData) (d
 		switch {
 		case !ok:
 			members = append(members, unionMember{ctx: kctx, state: unionMemberLoading})
+			continue
+		case d.disabled:
+			members = append(members, unionMember{ctx: kctx, state: unionMemberDisabled})
 			continue
 		case d.nodesErr != nil:
 			members = append(members, unionMember{ctx: kctx, state: unionMemberError, err: d.nodesErr})
@@ -98,6 +102,8 @@ func unionMemberLines(members []unionMember) []string {
 		switch mem.state {
 		case unionMemberError:
 			lines = append(lines, ui.StatusFailed.Render("  x "+name+": "+ui.SanitizeTerminalText(mem.err.Error())))
+		case unionMemberDisabled:
+			lines = append(lines, ui.DimStyle.Render("  - "+name+" disabled"))
 		case unionMemberLoading:
 			lines = append(lines, ui.DimStyle.Render("  ... "+name+" loading"))
 		default:
