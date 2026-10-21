@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.12](https://github.com/janosmiko/lfk/compare/v0.19.11...v0.19.12) (2026-10-21)
+
+
+### Features
+
+* aggregate union cluster and monitoring dashboards ([#885](https://github.com/janosmiko/lfk/issues/885)) ([89b0164](https://github.com/janosmiko/lfk/commit/89b016445fd6389c4eefce97b8a12c58381ec0fd))
+* remember namespace scope per cluster (opt-in) ([#884](https://github.com/janosmiko/lfk/issues/884)) ([b3bd1e7](https://github.com/janosmiko/lfk/commit/b3bd1e7a5d39fd20bc4448d887cc123eda3dec30))
+
 ## [0.19.11](https://github.com/janosmiko/lfk/compare/v0.19.10...v0.19.11) (2026-10-21)
 
 
