@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.11](https://github.com/janosmiko/lfk/compare/v0.19.10...v0.19.11) (2026-10-21)
+
+
+### Bug Fixes
+
+* bound quit time when exec credential plugin fails ([#881](https://github.com/janosmiko/lfk/issues/881)) ([340f33c](https://github.com/janosmiko/lfk/commit/340f33cf3344d0bb3b4a0b98e9218db99a8c7674))
+* **deps:** bump Go to 1.27.3 for GO-2026-6809 ([#883](https://github.com/janosmiko/lfk/issues/883)) ([47f1257](https://github.com/janosmiko/lfk/commit/47f12571f0355bfe38f822d8385bc9d465fd2347))
+
 ## [0.19.10](https://github.com/janosmiko/lfk/compare/v0.19.9...v0.19.10) (2026-10-20)
 
 
