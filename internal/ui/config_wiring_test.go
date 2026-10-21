@@ -65,6 +65,7 @@ pane_widths_per_level: true
 watch_mode: false
 watch_throttle: false
 all_namespaces: false
+remember_namespaces: true
 events:
   warnings_only: false
   grouping: false
@@ -256,6 +257,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigWatchThrottle, "watch_throttle")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
 	assert.True(t, ConfigAllNamespacesSet, "all_namespaces (set flag)")
+	assert.True(t, ConfigRememberNamespaces, "remember_namespaces")
 	assert.False(t, ConfigEventsWarningsOnly, "events.warnings_only")
 	assert.False(t, ConfigEventsGrouping, "events.grouping")
 	assert.Equal(t, 9, ConfigScrollOff, "scrolloff")
@@ -458,6 +460,18 @@ func TestLoadConfig_PinnedSummariesAbsentKeyLeavesFlagUnset(t *testing.T) {
 	assert.Empty(t, ConfigPinnedSummaries)
 }
 
+func TestLoadConfig_RememberNamespacesDefaultFalse(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("dashboard: true\n"), 0o600))
+
+	LoadConfig(path)
+
+	assert.False(t, ConfigRememberNamespaces, "an absent key must keep the feature off")
+}
+
 // TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset verifies the key
 // being absent from the config file leaves ConfigAllNamespacesSet false, so
 // resolveStartupAllNamespaces falls through to a kubeconfig-pinned namespace.
@@ -534,6 +548,7 @@ var wiringCoveredFields = map[string]string{
 	"watch_mode":                 "TestLoadConfig_AllSettingsWired",
 	"watch_throttle":             "TestLoadConfig_AllSettingsWired",
 	"all_namespaces":             "TestLoadConfig_AllSettingsWired + TestLoadConfig_AllNamespacesExplicitFalseSetsFlag + TestLoadConfig_AllNamespacesAbsentKeyLeavesFlagUnset",
+	"remember_namespaces":        "TestLoadConfig_AllSettingsWired + TestLoadConfig_RememberNamespacesDefaultFalse",
 	"events":                     "TestLoadConfig_AllSettingsWired",
 	"scrolloff":                  "TestLoadConfig_AllSettingsWired",
 	"confirm_on_exit":            "TestLoadConfig_AllSettingsWired",
@@ -658,6 +673,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origWatchThrottle := ConfigWatchThrottle
 	origAllNamespaces := ConfigAllNamespaces
 	origAllNamespacesSet := ConfigAllNamespacesSet
+	origRememberNamespaces := ConfigRememberNamespaces
 	origEventsWarn := ConfigEventsWarningsOnly
 	origEventsGroup := ConfigEventsGrouping
 	origScrollOff := ConfigScrollOff
@@ -766,6 +782,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigWatchThrottle = origWatchThrottle
 		ConfigAllNamespaces = origAllNamespaces
 		ConfigAllNamespacesSet = origAllNamespacesSet
+		ConfigRememberNamespaces = origRememberNamespaces
 		ConfigEventsWarningsOnly = origEventsWarn
 		ConfigEventsGrouping = origEventsGroup
 		ConfigScrollOff = origScrollOff

@@ -21,9 +21,12 @@ func effectiveStartupResource(opts StartupOptions) string {
 // NewModel: no saved workspace, so a synthetic one-tab session is built.
 func applyStartupResource(sess *SessionState, resource, contextName, defaultNS string, allNamespaces bool) *SessionState {
 	if sess == nil {
-		tab := SessionTab{Context: contextName, AllNamespaces: allNamespaces, ResourceType: resource}
-		if !allNamespaces {
-			tab.Namespace = defaultNS
+		tab := SessionTab{Context: contextName, ResourceType: resource}
+		if !applyRememberedToSessionTab(&tab, contextName) {
+			tab.AllNamespaces = allNamespaces
+			if !allNamespaces {
+				tab.Namespace = defaultNS
+			}
 		}
 		return &SessionState{Context: contextName, Tabs: []SessionTab{tab}}
 	}

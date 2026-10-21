@@ -141,6 +141,8 @@ type configFile struct {
 	// The --namespace CLI flag and per-bookmark/session scope override this.
 	// Default true.
 	AllNamespaces *bool `json:"all_namespaces" yaml:"all_namespaces"`
+	// RememberNamespaces restores the last namespace scope per context. Default false.
+	RememberNamespaces *bool `json:"remember_namespaces" yaml:"remember_namespaces"`
 	// Events holds startup-default toggles for the events view.
 	Events *EventsConfig `json:"events" yaml:"events"`
 	// ScrollOff is the number of lines to keep visible above/below the cursor.

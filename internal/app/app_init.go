@@ -243,7 +243,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			tab.AllNamespaces = false
 			tab.Namespace = opts.Namespaces[0]
 			tab.SelectedNamespaces = opts.Namespaces
-		} else {
+		} else if !applyRememberedToSessionTab(&tab, contextName) {
 			tab.AllNamespaces = startupAllNamespaces
 			if !startupAllNamespaces {
 				tab.Namespace = defaultNS

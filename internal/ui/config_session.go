@@ -25,6 +25,10 @@ var ConfigAllNamespaces = true
 // at all. Absent, a kubeconfig context that pins a namespace wins instead.
 var ConfigAllNamespacesSet bool
 
+// ConfigRememberNamespaces restores the last namespace scope per context.
+// Default false.
+var ConfigRememberNamespaces = false
+
 // ConfigEventsWarningsOnly is the startup default for the events view's
 // warning-only filter. Default true.
 var ConfigEventsWarningsOnly = true

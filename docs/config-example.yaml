@@ -261,6 +261,7 @@ log_path: /tmp/lfk.log
 # pane_widths_per_level: false  # remember dragged pane widths per level
 # watch_mode: true
 # all_namespaces: true
+# remember_namespaces: false  # restore the last namespace scope per context
 
 # ─── Events ──────────────────────────────────────────────────────────────────
 # Startup defaults for the events view.

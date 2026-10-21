@@ -334,6 +334,7 @@ func (m Model) executeContextCommand(arg string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	oldCtx := m.nav.Context
+	m.rememberScope(oldCtx)
 	m.nav.Context = arg
 	m.invalidateOrphanCacheForContext(oldCtx)
 	m.recomputeReadOnly(arg)

@@ -648,6 +648,9 @@ func (m *Model) rescopeNamespaceForContext(ctxName string) {
 	m.savedNsSelectionNegated = false
 	m.nsSelectionModified = false
 	m.previousNsScope = nil
+	if m.restoreRememberedScope(ctxName) {
+		return
+	}
 	if resolveStartupAllNamespaces(m.client, ctxName) {
 		m.allNamespaces = true
 		// The A-toggle only resolves the new context's default namespace when
