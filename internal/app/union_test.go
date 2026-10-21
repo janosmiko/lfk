@@ -1705,7 +1705,13 @@ func TestUnionDashboardPreviewAggregatesInsteadOfListingMembers(t *testing.T) {
 
 	require.NotNil(t, m.loadPreview())
 	assert.Empty(t, m.rightItems, "the types-level preview is the aggregate, not a member list")
-	assert.NotEmpty(t, m.scheduler.QueueSnapshot(), "every member's sections are queued")
+	targets := map[string]bool{}
+	for _, e := range m.scheduler.QueueSnapshot() {
+		targets[e.Target] = true
+	}
+	for _, ctx := range []string{"blue", "green"} {
+		assert.True(t, targets[ctx+"#nodes"], "member %s sections must be queued", ctx)
+	}
 }
 
 func TestUnionDashboardNavigateChildOpensMemberList(t *testing.T) {
