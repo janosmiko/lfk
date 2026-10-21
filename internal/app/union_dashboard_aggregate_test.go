@@ -230,3 +230,15 @@ func TestRenderUnionClusterPreview_LoadingUntilFirstMember(t *testing.T) {
 	m = m.recomposeDashboard()
 	assert.Contains(t, stripANSI(m.renderRightResourceTypes(80, 20)), "Loading cluster dashboard")
 }
+
+func TestUpdateDashboardLoaded_AggregateKeepsAggregateOnMemberOverride(t *testing.T) {
+	m := unionTypesModel("__overview__")
+	m.dashboardData = map[string]dashboardData{"green": memberDash(2, 2, 7)}
+
+	got := m.updateDashboardLoaded(dashboardLoadedMsg{context: "blue", content: "Cluster dashboard disabled"})
+
+	view := stripANSI(got.dashboardPreview)
+	assert.NotContains(t, view, "Cluster dashboard disabled")
+	assert.Contains(t, view, "MEMBERS")
+	assert.Contains(t, view, "ok green")
+}
