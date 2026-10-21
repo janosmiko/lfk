@@ -142,14 +142,16 @@ func fetchDashboardNodes(ctx context.Context, kctx string, client *k8s.Client) d
 	nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
 		Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
 	}, true)
-	if err == nil {
-		data.nodeItems = nodeItems
-		data.nodeCount = len(nodeItems)
-		data.podCapacity = sumPodCapacity(nodeItems)
-		for _, n := range nodeItems {
-			if model.NodeReady(n.Status) {
-				data.readyNodes++
-			}
+	if err != nil {
+		data.nodesErr = err
+		return data
+	}
+	data.nodeItems = nodeItems
+	data.nodeCount = len(nodeItems)
+	data.podCapacity = sumPodCapacity(nodeItems)
+	for _, n := range nodeItems {
+		if model.NodeReady(n.Status) {
+			data.readyNodes++
 		}
 	}
 	return data
@@ -205,6 +207,9 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 		acc.nodeCount = partial.nodeCount
 		acc.readyNodes = partial.readyNodes
 		acc.podCapacity = partial.podCapacity
+		acc.nodesErr = nil
+	} else if partial.nodesErr != nil {
+		acc.nodesErr = partial.nodesErr
 	}
 	if partial.pods.total > 0 {
 		acc.pods = partial.pods
