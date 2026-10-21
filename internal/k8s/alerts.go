@@ -20,6 +20,7 @@ type AlertInfo struct {
 	Since       time.Time
 	Labels      map[string]string
 	GrafanaURL  string // optional dashboard link
+	Context     string // kube context, set only when merging several clusters
 }
 
 // prometheusAlertsResponse is the JSON structure returned by the Prometheus /api/v1/alerts endpoint.

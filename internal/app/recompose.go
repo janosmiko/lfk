@@ -21,6 +21,12 @@ func (m Model) recomposeThemedContent() Model {
 // active context. Called on data load, fullscreen toggle, and window resize so
 // the bars always fit the available space.
 func (m Model) recomposeDashboard() Model {
+	if mode, ok := m.unionAggregateMode(); ok {
+		if mode == unionDashboardCluster && anyMemberLoaded(m.unionContexts, m.dashboardData) {
+			m.dashboardPreview, m.dashboardEventsPreview = m.composeUnionDashboard()
+		}
+		return m
+	}
 	ctx := m.dashboardPreviewTargetContext()
 	if data, ok := m.dashboardData[ctx]; ok {
 		m.dashboardPreview, m.dashboardEventsPreview = m.composeDashboard(data)
@@ -31,6 +37,12 @@ func (m Model) recomposeDashboard() Model {
 // recomposeMonitoring re-renders monitoringPreview from the retained alert data
 // for the active context. No-op when no data is loaded for that context.
 func (m Model) recomposeMonitoring() Model {
+	if mode, ok := m.unionAggregateMode(); ok {
+		if mode == unionDashboardMonitoring && anyMemberLoaded(m.unionContexts, m.monitoringData) {
+			m.monitoringPreview = composeUnionMonitoring(m.unionContexts, m.monitoringData)
+		}
+		return m
+	}
 	ctx := m.dashboardPreviewTargetContext()
 	if data, ok := m.monitoringData[ctx]; ok {
 		m.monitoringPreview = composeMonitoring(ctx, data.alerts, data.errMsg)

@@ -60,7 +60,7 @@ For the complete schema, available tile colors, and namespace precedence, see [c
 
 - **Drill-down** — selecting a resource follows it into its own cluster, where navigation, dashboards, and actions behave like a normal single-cluster session. Going back returns to the merged table.
 - **Merged-level actions** — read-only actions (logs, describe, YAML, events) always work. Mutating actions are limited to deleting a Pod, restarting a workload (Deployment, StatefulSet, DaemonSet), and port-forwarding (Pod, Service, Deployment, StatefulSet, DaemonSet). Drill into a resource to do anything else.
-- **Dashboards** — the Cluster and Monitoring dashboards list the member clusters instead of aggregating. Open a member to see its dashboard.
+- **Dashboards** — the Cluster dashboard sums nodes, pods, and resources across members and tags warning events with their context. The Monitoring dashboard merges alerts, tagged by context. Failed members are listed with their error. Press Enter to open one member's dashboard.
 - **Can-I RBAC browser** — `U` checks permissions across every member cluster at once.
 - **Bookmarks and pinned groups** — available for named union sets. Ad-hoc `--union-context` sessions have no saved name, so they cannot pin CRD groups or use context-aware bookmarks.
 - **Sessions** — union view is always started explicitly. lfk never reopens it automatically on the next launch.

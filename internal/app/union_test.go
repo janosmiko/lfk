@@ -1692,7 +1692,7 @@ func TestProcessCanIRulesUnionMarksMixedVerbs(t *testing.T) {
 	assert.True(t, pods.HasAnyAllowedOrMixedVerb())
 }
 
-func TestUnionDashboardPreviewShowsMembersInRightPane(t *testing.T) {
+func TestUnionDashboardPreviewAggregatesInsteadOfListingMembers(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.unionMode = true
 	m.unionContexts = []string{"blue", "green"}
@@ -1701,20 +1701,17 @@ func TestUnionDashboardPreviewShowsMembersInRightPane(t *testing.T) {
 	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
 	m.middleItems = []model.Item{{Name: "Cluster", Kind: "__overview__", Extra: "__overview__"}}
 	m.setCursor(0)
+	m.scheduler = scheduler.New(0)
 
-	cmd := m.loadPreview()
-	require.NotNil(t, cmd)
-	result, _ := m.Update(cmd())
-	rm := result.(Model)
-
-	require.Len(t, rm.rightItems, 2)
-	assert.Equal(t, "blue", rm.rightItems[0].Name)
-	assert.Equal(t, unionDashboardMemberItemKind, rm.rightItems[0].Kind)
-	assert.Equal(t, string(unionDashboardCluster), rm.rightItems[0].Extra)
-	assert.Equal(t, "blue", rm.rightItems[0].ClusterName)
-	assert.Equal(t, "blue", rm.rightItems[0].ClusterColor)
-	assert.Contains(t, rm.rightItems[0].Status, "cloud-cd")
-	assert.Equal(t, "green", rm.rightItems[1].Name)
+	require.NotNil(t, m.loadPreview())
+	assert.Empty(t, m.rightItems, "the types-level preview is the aggregate, not a member list")
+	targets := map[string]bool{}
+	for _, e := range m.scheduler.QueueSnapshot() {
+		targets[e.Target] = true
+	}
+	for _, ctx := range []string{"blue", "green"} {
+		assert.True(t, targets[ctx+"#nodes"], "member %s sections must be queued", ctx)
+	}
 }
 
 func TestUnionDashboardNavigateChildOpensMemberList(t *testing.T) {

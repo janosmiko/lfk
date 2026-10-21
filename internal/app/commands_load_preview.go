@@ -100,25 +100,17 @@ func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
 // loadPreviewResourceTypes handles preview loading at the resource types level.
 func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	if sel.Extra == "__overview__" {
+		if !ui.ConfigDashboard {
+			return nil
+		}
 		if m.isUnionSentinel() {
-			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardCluster, m.namespace)
-			gen := m.requestGen
-			return func() tea.Msg {
-				return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
-			}
+			return m.loadUnionDashboardAggregate(unionDashboardCluster)
 		}
-		if ui.ConfigDashboard {
-			return m.loadDashboard()
-		}
-		return nil
+		return m.loadDashboard()
 	}
 	if sel.Extra == "__monitoring__" {
 		if m.isUnionSentinel() {
-			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardMonitoring, m.namespace)
-			gen := m.requestGen
-			return func() tea.Msg {
-				return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
-			}
+			return m.loadUnionDashboardAggregate(unionDashboardMonitoring)
 		}
 		return m.loadMonitoringDashboard()
 	}
