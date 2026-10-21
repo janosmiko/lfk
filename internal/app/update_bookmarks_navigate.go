@@ -11,6 +11,7 @@ import (
 // gocyclo/length caps.
 func (m *Model) applyBookmarkContextSwitch(target bookmarkTarget) {
 	oldCtx := m.nav.Context
+	m.rememberScope(oldCtx)
 	m.nav.Context = target.context
 	if oldCtx != target.context {
 		m.invalidateOrphanCacheForContext(oldCtx)

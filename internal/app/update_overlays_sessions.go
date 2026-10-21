@@ -305,7 +305,8 @@ func (m Model) switchToSession(name string) (tea.Model, tea.Cmd) {
 		state = &s
 	}
 
-	m.saveCurrentSession() // persist the session we're leaving
+	m.rememberAllTabScopes() // the switch replaces every tab, not just the active one
+	m.saveCurrentSession()   // persist the session we're leaving
 	m.activeSession = name
 	if err := saveActiveSessionName(name); err != nil {
 		logger.Warn("Failed to persist active session", "session", name, "error", err)

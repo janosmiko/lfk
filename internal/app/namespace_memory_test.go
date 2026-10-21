@@ -280,3 +280,65 @@ func TestRememberScope_CorruptFileNotOverwritten(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "contexts: [not a map", string(data))
 }
+
+func TestApplyStartupResource_NoSessionUsesRememberedScope(t *testing.T) {
+	rememberedStaging(t, rememberTestModel(t, true))
+
+	got := applyStartupResource(nil, "deploy", "staging", "pinned", false)
+
+	tab := got.Tabs[0]
+	assert.Equal(t, "remembered", tab.Namespace)
+	assert.Equal(t, []string{"other", "remembered"}, tab.SelectedNamespaces)
+	assert.Equal(t, "deploy", tab.ResourceType)
+}
+
+func TestApplyStartupResource_NoSessionToggleOffUsesDefault(t *testing.T) {
+	rememberedStaging(t, rememberTestModel(t, true))
+	ui.ConfigRememberNamespaces = false
+
+	got := applyStartupResource(nil, "deploy", "staging", "pinned", false)
+
+	assert.Equal(t, "pinned", got.Tabs[0].Namespace)
+}
+
+func TestBookmarkContextSwitch_RemembersLeavingScope(t *testing.T) {
+	m := rememberTestModel(t, true)
+	m.namespace = "team-a"
+
+	m.applyBookmarkContextSwitch(bookmarkTarget{kind: bookmarkTargetContext, context: "staging"})
+
+	scope, ok := loadRememberedScope("test-ctx")
+	require.True(t, ok)
+	assert.Equal(t, "team-a", scope.namespace)
+}
+
+func TestBookmarkContextSwitch_ToggleOffWritesNoFile(t *testing.T) {
+	m := rememberTestModel(t, false)
+	m.namespace = "team-a"
+
+	m.applyBookmarkContextSwitch(bookmarkTarget{kind: bookmarkTargetContext, context: "staging"})
+
+	assert.False(t, rememberedFileExists(t))
+}
+
+func TestSwitchToSession_RemembersLeavingScope(t *testing.T) {
+	m := rememberTestModel(t, true)
+	m.namespace = "team-a"
+	m.activeSession = "other"
+
+	m.switchToSession("") //nolint:errcheck // only the file side effect matters
+
+	scope, ok := loadRememberedScope("test-ctx")
+	require.True(t, ok)
+	assert.Equal(t, "team-a", scope.namespace)
+}
+
+func TestSwitchToSession_ToggleOffWritesNoFile(t *testing.T) {
+	m := rememberTestModel(t, false)
+	m.namespace = "team-a"
+	m.activeSession = "other"
+
+	m.switchToSession("") //nolint:errcheck // only the file side effect matters
+
+	assert.False(t, rememberedFileExists(t))
+}
