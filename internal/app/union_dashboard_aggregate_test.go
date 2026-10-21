@@ -248,3 +248,20 @@ func TestUpdateDashboardLoaded_AggregateKeepsAggregateOnMemberOverride(t *testin
 	replaced := got.updateDashboardLoaded(dashboardLoadedMsg{context: "blue", data: memberDash(1, 1, 3)})
 	assert.Contains(t, stripANSI(replaced.dashboardPreview), "ok blue")
 }
+
+func TestHandleDashboardPartial_ReloadClearsDisabledMember(t *testing.T) {
+	m := unionTypesModel("__overview__")
+	m.requestGen = 3
+	m = m.updateDashboardLoaded(dashboardLoadedMsg{context: "blue", content: "Cluster dashboard disabled"})
+	require.True(t, m.dashboardData["blue"].disabled)
+
+	m, cmd := m.handleDashboardPartial(dashboardPartialMsg{context: "blue", gen: 3, key: "nodes", total: 1, data: memberDash(1, 1, 3)})
+	require.NotNil(t, cmd)
+	loaded, ok := cmd().(dashboardLoadedMsg)
+	require.True(t, ok)
+	m = m.updateDashboardLoaded(loaded)
+
+	view := stripANSI(m.dashboardPreview)
+	assert.Contains(t, view, "ok blue")
+	assert.NotContains(t, view, "blue disabled")
+}

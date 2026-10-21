@@ -67,6 +67,7 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 		// them, so carrying them over would duplicate every pinned row.
 		seed := m.dashboardData[msg.context]
 		seed.pinnedSummaries = nil
+		seed.disabled = false
 		acc = &dashboardAccumulator{
 			gen: msg.gen, received: make(map[string]bool),
 			expected: msg.total, startedAt: time.Now(), data: seed,
