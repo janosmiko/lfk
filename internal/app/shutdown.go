@@ -58,6 +58,7 @@ func (m Model) beginShutdown() (tea.Model, tea.Cmd) {
 	// Persist the session synchronously on the UI goroutine: keeping it off
 	// the drain goroutine avoids racing with a late Update-driven save.
 	m.saveCurrentSession()
+	m.rememberAllTabScopes()
 	m.overlay = overlayShuttingDown
 	m.shuttingDown = true
 	return m, m.shutdownDrainCmd()
