@@ -727,9 +727,7 @@ type Model struct {
 	unionMode     bool
 	unionContexts []string // contexts to query in union mode
 	unionSetName  string   // configured union_sets entry currently active, when any
-	// unionStartedFromPicker is true when the user entered union mode from the
-	// cluster picker, so back-navigation can return to the picker and clear the
-	// union state. CLI-started union sessions keep the old no-parent behavior.
+	// unionStartedFromPicker: back-navigation returns to the picker. CLI-started unions have no parent.
 	unionStartedFromPicker bool
 	// unionContextColors maps each unionContexts entry to its configured
 	// color (from the union_sets per-cluster `color:` field). Drives the
@@ -738,6 +736,8 @@ type Model struct {
 	// pick deliberate per-set palette without mutating the global state.
 	unionContextColors  map[string]string
 	pendingUnionSetName string // namespace picker is choosing for this union set
+	// pendingUnionContexts: marked picker contexts awaiting a namespace (pendingUnionSetName == adHocUnionPending)
+	pendingUnionContexts []string
 
 	// Session persistence: restores navigation state across restarts.
 	pendingSession                    *SessionState      // loaded session waiting to be applied after contexts load

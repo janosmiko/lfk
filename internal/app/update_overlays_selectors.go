@@ -24,6 +24,12 @@ func (m Model) applyPendingUnionSetNamespace(item model.Item) (tea.Model, tea.Cm
 		m.setStatusMessage("Union set requires one namespace", true)
 		return m, scheduleStatusClear()
 	}
+	if m.pendingUnionSetName == adHocUnionPending {
+		m.overlayFilter.Clear()
+		m.nsFilterMode = false
+		m.overlay = overlayNone
+		return m.activateAdHocUnion(item.Name)
+	}
 	setName := m.pendingUnionSetName
 	set, ok := m.findUnionSetConfig(setName)
 	if !ok {
@@ -89,6 +95,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		}
 		m.overlayFilter.Clear()
 		m.pendingUnionSetName = ""
+		m.pendingUnionContexts = nil
 		// Restore the parent overlay (e.g. RBAC) when the namespace
 		// selector was opened from inside it; otherwise close fully.
 		if m.previousOverlay != overlayNone {

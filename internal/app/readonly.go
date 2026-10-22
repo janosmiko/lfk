@@ -306,7 +306,7 @@ func (m *Model) applyReadOnlyForContext(ctx string) {
 	switch ctx {
 	case "":
 	case UnionContextSentinel:
-		m.readOnly = m.cliReadOnly
+		m.readOnly = m.cliReadOnly || m.contextROOverrides[UnionContextSentinel]
 	default:
 		m.recomputeReadOnly(ctx)
 	}
@@ -427,8 +427,9 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 	// cluster-picker [RO] marker in sync. Keyed by context, so unlocking one
 	// context never leaks read-write state into another. The union sentinel
 	// is skipped: it is not a real context and each member keeps its own
-	// policy via readOnlyForContext.
-	if !m.isUnionSentinel() && m.nav.Context != "" {
+	// policy via readOnlyForContext. Only an ad-hoc union stores its lock
+	// under the sentinel, so back-navigation restores it.
+	if (!m.isUnionSentinel() || m.isAdHocUnion()) && m.nav.Context != "" {
 		if m.contextROOverrides == nil {
 			m.contextROOverrides = make(map[string]bool)
 		}

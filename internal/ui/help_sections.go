@@ -143,7 +143,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 		{
 			title: "Multi-Selection",
 			bindings: []helpEntry{
-				{kb.ToggleSelect, "Toggle selection on current item"},
+				{kb.ToggleSelect, "Toggle selection on current item (cluster picker: mark for union)"},
 				{kb.SelectRange, "Select range from anchor to cursor"},
 				{kb.SelectAll, "Select / deselect all visible items"},
 				{"esc", "Clear selection"},
@@ -178,7 +178,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 			title: "Modes & Settings",
 			bindings: []helpEntry{
 				{kb.WatchMode, "Toggle watch mode (auto-refresh)"},
-				{kb.ReadOnlyToggle, "Toggle read-only mode"},
+				{kb.ReadOnlyToggle, "Toggle read-only mode (picker-made union starts locked)"},
 				{kb.ClusterColorPicker, "Cluster color picker (cluster picker only)"},
 				{kb.ThemeSelector, "Switch color scheme"},
 				{kb.TerminalToggle, "Cycle terminal mode (pty/exec/mux)"},
