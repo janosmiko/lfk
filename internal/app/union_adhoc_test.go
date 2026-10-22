@@ -271,3 +271,28 @@ func TestAdHoc_UIMarkerOverlayTitleAndHints(t *testing.T) {
 	hint := stripANSI(rm.overlayHintBarSelector())
 	assert.NotContains(t, hint, "exclude")
 }
+
+func TestAdHoc_TabSwitchKeepsEachTabsLock(t *testing.T) {
+	am := activeAdHoc(t)
+	am.saveCurrentTab()
+	am.unionLocked = false // another tab unlocked its own union
+	am.readOnly = false
+	am.loadTab(am.activeTab)
+	assert.True(t, am.readOnly)
+	am.applyReadOnlyForContext(UnionContextSentinel)
+	assert.True(t, am.readOnly, "tab A stays locked after drill-and-back")
+}
+
+func TestAdHoc_BookmarkUnionTargetKeepsLockForAdHoc(t *testing.T) {
+	am := activeAdHoc(t)
+	am.applyBookmarkContextSwitch(bookmarkTarget{
+		kind: bookmarkTargetUnionSet, context: UnionContextSentinel,
+		unionContexts: []string{"a", "b"}, unionNamespace: "ns", unionStartedFromRow: true,
+	})
+	assert.True(t, am.readOnly)
+	am.applyBookmarkContextSwitch(bookmarkTarget{
+		kind: bookmarkTargetUnionSet, context: UnionContextSentinel, unionSetName: "s",
+		unionContexts: []string{"a", "b"}, unionNamespace: "ns", unionStartedFromRow: true,
+	})
+	assert.False(t, am.readOnly)
+}

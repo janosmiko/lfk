@@ -424,7 +424,11 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 	if m.isAdHocUnion() {
 		m.unionLocked = !m.unionLocked
 		m.applyReadOnlyForContext(m.nav.Context)
-		m.setStatusMessage("Read-only mode: "+map[bool]string{true: "ON", false: "OFF"}[m.readOnly], false)
+		state := "OFF"
+		if m.readOnly {
+			state = "ON"
+		}
+		m.setStatusMessage("Read-only mode: "+state, false)
 		return m, scheduleStatusClear()
 	}
 	m.readOnly = !m.readOnly
