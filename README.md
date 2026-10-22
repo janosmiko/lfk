@@ -172,7 +172,7 @@ Cloudsmith is a hosted package management service that stores and serves package
 
 - Multi-tab workspace with `t` / `]` / `[`: [keybindings.md](docs/keybindings.md#tabs)
 - Merged kubeconfig from `~/.kube/config`, `~/.kube/config.d/*`, and `KUBECONFIG_DIR`: [usage.md](docs/usage.md#kubeconfig-directory)
-- Union view merging several clusters into one table: [union-context.md](docs/union-context.md)
+- Union view merging several clusters into one table, also from the cluster picker with `Space` marks: [union-context.md](docs/union-context.md)
 - Cluster Dashboard on entering a context: [config-reference.md](docs/config-reference.md#top-level-fields)
 - Monitoring dashboard with Prometheus and Alertmanager alerts, `@`: [config-reference.md](docs/config-reference.md#monitoring)
 - Local kind, k3d, and minikube clusters with `Ctrl+N`: [keybindings.md](docs/keybindings.md#local-clusters-manager)

@@ -312,6 +312,8 @@ When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y`, `Y`, and
 | `Ctrl+A` | Select / deselect all visible items |
 | `Esc` | Clear selection |
 
+At the cluster picker, `Space` marks a context (max 8) and `Enter` with 2+ marks asks for a namespace, then opens a union view. See [union-context.md](union-context.md#from-the-cluster-picker).
+
 When items are selected, press `x` to open the bulk action menu (delete, force delete, scale, restart, diff).
 
 See [Keymaps Overlay](#keymaps-overlay) for the `?` key.
@@ -1094,6 +1096,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 | Key | Action |
 |---|---|
 | `Ctrl+R` (inside a context) | Toggle read-only mode for the current tab. Recorded as a session override for that context, so it survives re-entry and stays in sync with the picker's `[RO]` marker; does not write to config and never leaks across contexts. Blocked when `--read-only` is set. |
+| `Ctrl+R` (in a union opened from the picker) | Unlock or lock the union. It starts read-only and the choice survives drill-down and back. Blocked when `--read-only` is set. |
 | `Ctrl+R` (at the cluster picker) | Toggle the `[RO]` marker on the highlighted context row. Stored as a session override that wins over per-context config and is honored on context entry. Blocked when `--read-only` is set (the CLI flag forces every context RO). |
 
 The `[RO]` badge appears in the title bar only when you're inside a
