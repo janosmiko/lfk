@@ -217,8 +217,8 @@ func (m Model) enterUnion(setName string, contexts []string, colors map[string]s
 	m.nav.OwnedName = ""
 	m.nav.Namespace = ""
 	m.invalidateOrphanCacheForContext(oldCtx)
-	m.setUnionLock(locked)
-	m.readOnly = m.cliReadOnly || locked
+	m.unionLocked = locked
+	m.applyReadOnlyForContext(UnionContextSentinel)
 	if len(m.tabs) > m.activeTab {
 		m.tabs[m.activeTab].readOnly = m.readOnly
 	}
@@ -259,6 +259,7 @@ func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	activeUnionSet := m.unionSetName
 	m.unionMode = false
 	m.unionStartedFromPicker = false
+	m.unionLocked = false
 	m.unionSetName = ""
 	m.unionContexts = nil
 	m.unionContextColors = nil

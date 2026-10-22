@@ -160,15 +160,65 @@ func activeAdHoc(t *testing.T) Model {
 	return r.(Model)
 }
 
-func TestAdHoc_CtrlRUnlocksAndSurvivesDrillAndBack(t *testing.T) {
+func toggleRO(m Model) Model {
+	r, _ := m.handleKeyReadOnlyToggle()
+	return r.(Model)
+}
+
+func TestAdHoc_CtrlRToggleSurvivesBackNav(t *testing.T) {
 	am := activeAdHoc(t)
-	r, _ := am.handleKeyReadOnlyToggle()
-	um := r.(Model)
+	um := toggleRO(am)
 	assert.False(t, um.readOnly)
 	um.applyReadOnlyForContext(UnionContextSentinel)
 	assert.False(t, um.readOnly, "unlock must survive back-nav")
-	r, _ = um.handleKeyReadOnlyToggle()
+	lm := toggleRO(um)
+	assert.True(t, lm.readOnly)
+	lm.applyReadOnlyForContext(UnionContextSentinel)
+	assert.True(t, lm.readOnly, "re-lock must survive back-nav")
+}
+
+func TestAdHoc_BookmarkJumpKeepsLock(t *testing.T) {
+	am := activeAdHoc(t)
+	am.applyBookmarkContextSwitch(bookmarkTarget{context: UnionContextSentinel})
+	assert.True(t, am.readOnly)
+}
+
+func TestAdHoc_BackFromMemberDashboardKeepsLock(t *testing.T) {
+	am := activeAdHoc(t)
+	am.nav.Context = "a"
+	am.readOnly = false
+	r, _ := am.navigateParentToUnionDashboardMembers()
 	assert.True(t, r.(Model).readOnly)
+}
+
+func TestAdHoc_ExitThenNamedSetIsReadWrite(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	set := ui.UnionSetConfig{Name: "s", Namespace: "ns", Contexts: []ui.UnionSetContextConfig{{Context: "a"}, {Context: "b"}}}
+	ui.ConfigUnionSets = []ui.UnionSetConfig{set}
+	am := activeAdHoc(t)
+	back, _ := am.navigateParent()
+	r, _ := back.(Model).activateUnionSet(set, "ns")
+	nm := r.(Model)
+	nm.applyReadOnlyForContext(UnionContextSentinel)
+	assert.False(t, nm.readOnly)
+}
+
+func TestAdHoc_DrillIntoNonROMemberStaysReadOnly(t *testing.T) {
+	am := activeAdHoc(t)
+	am.enterUnionRowContext(&model.Item{Name: "pod", ClusterName: "a"})
+	assert.Equal(t, "a", am.nav.Context)
+	assert.True(t, am.readOnly)
+}
+
+func TestAdHoc_CtrlRInDrilledMemberUnlocksUnion(t *testing.T) {
+	am := activeAdHoc(t)
+	am.enterUnionRowContext(&model.Item{Name: "pod", ClusterName: "a"})
+	um := toggleRO(am)
+	assert.False(t, um.readOnly)
+	um.nav.Context = UnionContextSentinel
+	um.applyReadOnlyForContext(UnionContextSentinel)
+	assert.False(t, um.readOnly, "merged level stays unlocked after back")
 }
 
 func TestAdHoc_LockSurvivesDrillAndBackWhenNeverToggled(t *testing.T) {

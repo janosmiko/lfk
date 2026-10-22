@@ -242,7 +242,7 @@ type Model struct {
 	// readOnly blocks mutating actions for the active tab (mirrors the active
 	// TabState.readOnly, re-evaluated on context/tab switch). cliReadOnly is
 	// the --read-only startup value, sticky so context switches can't drop it.
-	readOnly, cliReadOnly bool
+	readOnly, cliReadOnly, unionLocked bool // unionLocked: ad-hoc union read-only lock (union_adhoc.go)
 	// contextROOverrides holds session-scoped per-context read-only state set
 	// by the user via Ctrl+R on a row in the cluster picker. A present entry
 	// wins over per-context and global config when entering that context;
@@ -727,17 +727,18 @@ type Model struct {
 	unionMode     bool
 	unionContexts []string // contexts to query in union mode
 	unionSetName  string   // configured union_sets entry currently active, when any
-	// unionStartedFromPicker: back-navigation returns to the picker. CLI-started unions have no parent.
+	// unionStartedFromPicker is true when the user entered union mode from the
+	// cluster picker, so back-navigation can return to the picker and clear the
+	// union state. CLI-started union sessions keep the old no-parent behavior.
 	unionStartedFromPicker bool
 	// unionContextColors maps each unionContexts entry to its configured
 	// color (from the union_sets per-cluster `color:` field). Drives the
 	// 1-cell row tile in the merged view. Distinct from the global
 	// clusterColors map (which feeds the cluster picker) so users can
 	// pick deliberate per-set palette without mutating the global state.
-	unionContextColors  map[string]string
-	pendingUnionSetName string // namespace picker is choosing for this union set
-	// pendingUnionContexts: marked picker contexts awaiting a namespace (pendingUnionSetName == adHocUnionPending)
-	pendingUnionContexts []string
+	unionContextColors   map[string]string
+	pendingUnionSetName  string   // namespace picker is choosing for this union set
+	pendingUnionContexts []string // marked picker contexts awaiting a namespace
 
 	// Session persistence: restores navigation state across restarts.
 	pendingSession                    *SessionState      // loaded session waiting to be applied after contexts load

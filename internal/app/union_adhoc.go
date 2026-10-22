@@ -26,20 +26,7 @@ func (m Model) markedContexts() []string {
 }
 
 func (m Model) isAdHocUnion() bool {
-	return m.isUnionSentinel() && m.unionSetName == "" && m.unionStartedFromPicker
-}
-
-// setUnionLock records the ad-hoc union read-only lock so back-navigation
-// (applyReadOnlyForContext) restores it. Named and CLI unions never lock.
-func (m *Model) setUnionLock(locked bool) {
-	if !locked {
-		delete(m.contextROOverrides, UnionContextSentinel)
-		return
-	}
-	if m.contextROOverrides == nil {
-		m.contextROOverrides = make(map[string]bool)
-	}
-	m.contextROOverrides[UnionContextSentinel] = true
+	return m.unionMode && m.unionSetName == "" && m.unionStartedFromPicker
 }
 
 func unionStatusLabel(setName string, contexts []string) string {
