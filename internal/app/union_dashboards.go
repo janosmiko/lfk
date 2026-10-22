@@ -202,7 +202,7 @@ func (m Model) navigateParentToUnionDashboardMembers() (tea.Model, tea.Cmd) {
 	m.nav.OwnedName = ""
 	m.nav.Namespace = ""
 	m.invalidateOrphanCacheForContext(oldCtx)
-	m.readOnly = m.cliReadOnly
+	m.applyReadOnlyForContext(UnionContextSentinel)
 	m.applyPinnedTypes()
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""

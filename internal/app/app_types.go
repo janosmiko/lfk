@@ -540,6 +540,7 @@ type TabState struct {
 	// readOnly blocks all mutating actions for this tab. Re-evaluated on
 	// context switch from CLI flag, per-context config, and global config.
 	readOnly               bool
+	unionLocked            bool
 	requestGen             uint64
 	selectedItems          map[string]bool
 	selectionAnchor        int // anchor index for region selection (-1 = unset)

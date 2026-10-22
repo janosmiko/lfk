@@ -755,7 +755,7 @@ func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 		listItems[i] = ui.OverlayListItem{Name: it.Name, Active: active, ActiveMarker: marker}
 	}
 	return ui.RenderOverlayList(listItems, ui.OverlayListConfig{
-		Title:            "Select Namespace",
+		Title:            m.namespaceOverlayTitle(),
 		Cursor:           m.overlayCursor,
 		Hover:            m.hoverFor(hoverNamespace),
 		Filterable:       true,

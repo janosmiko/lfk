@@ -266,6 +266,11 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 	m.cancelAndReset()
 	m.requestGen++
 	m.reclaimStaleBgWork()
+	if m.nav.Level == model.LevelClusters {
+		if marked := m.markedContexts(); len(marked) >= 2 {
+			return m.openAdHocNamespacePicker(marked)
+		}
+	}
 	m.clearSelection()
 
 	// Reset scroll positions when navigating to a new level.

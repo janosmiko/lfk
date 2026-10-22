@@ -56,6 +56,14 @@ union_sets:
 
 For the complete schema, available tile colors, and namespace precedence, see [config-reference.md](config-reference.md#union-sets).
 
+## From the cluster picker
+
+- `Space` marks or unmarks a context. The status bar shows the marked count. Union set rows cannot be marked.
+- `Enter` with 2 or more marks opens a namespace prompt that lists the clusters. `Esc` cancels and keeps the marks.
+- At most 8 clusters. A 9th mark is refused.
+- The union starts read-only. `Ctrl+R` unlocks it. `--read-only` stays absolute.
+- No pins or bookmarks, because the union has no saved name.
+
 ## Working in a union view
 
 - **Drill-down** — selecting a resource follows it into its own cluster, where navigation, dashboards, and actions behave like a normal single-cluster session. Going back returns to the merged table.

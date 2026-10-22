@@ -306,7 +306,7 @@ func (m *Model) applyReadOnlyForContext(ctx string) {
 	switch ctx {
 	case "":
 	case UnionContextSentinel:
-		m.readOnly = m.cliReadOnly
+		m.readOnly = m.cliReadOnly || m.unionLocked
 	default:
 		m.recomputeReadOnly(ctx)
 	}
@@ -336,7 +336,7 @@ func (m *Model) recomputeReadOnly(ctx string) {
 	// because recomputeReadOnly is already called at every switch point;
 	// keep it before the read-only early-returns so it always runs.
 	m.recomputeHideSecurityBadges(ctx)
-	if m.cliReadOnly {
+	if m.cliReadOnly || (m.unionMode && m.unionLocked) {
 		m.readOnly = true
 		return
 	}
@@ -419,6 +419,16 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 	}
 	if m.cliReadOnly {
 		m.setStatusMessage("--read-only forces all contexts read-only", true)
+		return m, scheduleStatusClear()
+	}
+	if m.isAdHocUnion() {
+		m.unionLocked = !m.unionLocked
+		m.applyReadOnlyForContext(m.nav.Context)
+		state := "OFF"
+		if m.readOnly {
+			state = "ON"
+		}
+		m.setStatusMessage("Read-only mode: "+state, false)
 		return m, scheduleStatusClear()
 	}
 	m.readOnly = !m.readOnly

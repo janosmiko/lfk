@@ -142,6 +142,9 @@ func (m Model) handleExplorerNavKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bo
 	if mdl, cmd, handled := m.handleExplorerJumpKey(msg); handled {
 		return mdl, cmd, true
 	}
+	if mdl, cmd, handled := m.handleClusterMarkKey(msg); handled {
+		return mdl, cmd, true
+	}
 	if mdl, handled := m.handleExplorerSelectionKey(msg); handled {
 		return mdl, nil, true
 	}
