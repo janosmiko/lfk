@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.13](https://github.com/janosmiko/lfk/compare/v0.19.12...v0.19.13) (2026-10-22)
+
+
+### Features
+
+* build a union view from marked contexts in the cluster picker ([#887](https://github.com/janosmiko/lfk/issues/887)) ([65806a5](https://github.com/janosmiko/lfk/commit/65806a566aab1983233535ead005cff4293db213))
+
 ## [0.19.12](https://github.com/janosmiko/lfk/compare/v0.19.11...v0.19.12) (2026-10-21)
 
 
