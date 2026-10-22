@@ -296,3 +296,19 @@ func TestAdHoc_BookmarkUnionTargetKeepsLockForAdHoc(t *testing.T) {
 	})
 	assert.False(t, am.readOnly)
 }
+
+func TestAdHoc_CtrlCClearsPendingUnionAndKeepsMarks(t *testing.T) {
+	rm := markTwo(t)
+	r, _ := rm.handleOverlayKey(keyMsg("ctrl+c"))
+	cm := r.(Model)
+	assert.Equal(t, overlayNone, cm.overlay)
+	assert.Empty(t, cm.pendingUnionSetName)
+	assert.Empty(t, cm.pendingUnionContexts)
+	assert.Len(t, cm.selectedItems, 2)
+
+	cm.overlay = overlayNamespace
+	cm.overlayItems = []model.Item{{Name: "kube-system"}}
+	cm.overlayCursor = 0
+	r, _ = cm.handleNamespaceOverlayKey(keyMsg("enter"))
+	assert.False(t, r.(Model).unionMode)
+}
