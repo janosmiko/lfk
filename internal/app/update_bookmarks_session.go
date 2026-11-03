@@ -105,7 +105,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 
 	m.nav.Context = navCtx
 	if m.unionMode {
-		m.applyReadOnlyForContext(UnionContextSentinel)
+		m.readOnly = m.cliReadOnly
 	} else {
 		m.recomputeReadOnly(discoveryCtx)
 	}

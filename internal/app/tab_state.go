@@ -116,7 +116,6 @@ func (m *Model) saveCurrentTab() {
 	t.objectExplorerLive = m.objectExplorerLive
 	t.objectExplorerTree = m.objectExplorerTree
 	t.readOnly = m.readOnly
-	t.unionLocked = m.unionLocked
 	t.requestGen = m.requestGen
 	t.selectedItems = copyMapStringBool(m.selectedItems)
 	t.selectionAnchor = m.selectionAnchor
@@ -265,7 +264,6 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.objectExplorerLive = t.objectExplorerLive
 	m.objectExplorerTree = t.objectExplorerTree
 	m.readOnly = t.readOnly
-	m.unionLocked = t.unionLocked
 	m.requestGen = t.requestGen
 	m.selectedItems = copyMapStringBool(t.selectedItems)
 	m.selectionAnchor = t.selectionAnchor
@@ -516,7 +514,6 @@ func (m *Model) cloneCurrentTab() TabState {
 		objectExplorerLive:      m.objectExplorerLive,
 		objectExplorerTree:      m.objectExplorerTree,
 		readOnly:                m.readOnly,
-		unionLocked:             m.unionLocked,
 		requestGen:              m.requestGen,
 		selectedItems:           copyMapStringBool(m.selectedItems),
 		selectionAnchor:         m.selectionAnchor,

@@ -56,19 +56,11 @@ union_sets:
 
 For the complete schema, available tile colors, and namespace precedence, see [config-reference.md](config-reference.md#union-sets).
 
-## From the cluster picker
-
-- `Space` marks or unmarks a context. The status bar shows the marked count. Union set rows cannot be marked.
-- `Enter` with 2 or more marks opens a namespace prompt that lists the clusters. `Esc` cancels and keeps the marks.
-- At most 8 clusters. A 9th mark is refused.
-- The union starts read-only. `Ctrl+R` unlocks it. `--read-only` stays absolute.
-- No pins or bookmarks, because the union has no saved name.
-
 ## Working in a union view
 
 - **Drill-down** — selecting a resource follows it into its own cluster, where navigation, dashboards, and actions behave like a normal single-cluster session. Going back returns to the merged table.
 - **Merged-level actions** — read-only actions (logs, describe, YAML, events) always work. Mutating actions are limited to deleting a Pod, restarting a workload (Deployment, StatefulSet, DaemonSet), and port-forwarding (Pod, Service, Deployment, StatefulSet, DaemonSet). Drill into a resource to do anything else.
-- **Dashboards** — the Cluster dashboard sums nodes, pods, and resources across members and tags warning events with their context. The Monitoring dashboard merges alerts, tagged by context. Failed members are listed with their error. Press Enter to open one member's dashboard.
+- **Dashboards** — the Cluster and Monitoring dashboards list the member clusters instead of aggregating. The preview pane shows the selected member's dashboard. Enter switches to that cluster.
 - **Can-I RBAC browser** — `U` checks permissions across every member cluster at once.
 - **Bookmarks and pinned groups** — available for named union sets. Ad-hoc `--union-context` sessions have no saved name, so they cannot pin CRD groups or use context-aware bookmarks.
 - **Sessions** — union view is always started explicitly. lfk never reopens it automatically on the next launch.
