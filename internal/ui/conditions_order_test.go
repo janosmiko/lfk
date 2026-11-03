@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -39,5 +40,8 @@ func TestRenderResourceSummary_ConditionsNewestFirst(t *testing.T) {
 
 	view := stripANSI(RenderResourceSummary(item, "", 100, 60))
 
-	assert.Less(t, strings.Index(view, "Drifted"), strings.Index(view, "Consolidatable"))
+	drifted, consolidatable := strings.Index(view, "Drifted"), strings.Index(view, "Consolidatable")
+	require.GreaterOrEqual(t, drifted, 0)
+	require.GreaterOrEqual(t, consolidatable, 0)
+	assert.Less(t, drifted, consolidatable)
 }
