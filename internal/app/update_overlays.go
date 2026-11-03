@@ -56,6 +56,7 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	m.keymapsFilterMode = false
 	m.keymapsFilter.Clear()
 	m.overlayFilter.Clear()
+	m.pendingUnionSetName = ""
 	m.bookmarkFilter.Clear()
 	m.templateFilter.Clear()
 	m.schemeFilter.Clear()
