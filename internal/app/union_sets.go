@@ -196,17 +196,11 @@ func (m Model) activateUnionSet(set ui.UnionSetConfig, namespace string) (tea.Mo
 		return m, scheduleStatusClear()
 	}
 
-	return m.enterUnion(set.Name, contexts, colors, namespace, false)
-}
-
-// enterUnion switches the current tab to a union view. setName is empty for an
-// ad-hoc union, which starts read-only when locked is true.
-func (m Model) enterUnion(setName string, contexts []string, colors map[string]string, namespace string, locked bool) (tea.Model, tea.Cmd) {
 	m.saveCursor()
 	oldCtx := m.nav.Context
 	m.unionMode = true
 	m.unionStartedFromPicker = true
-	m.unionSetName = setName
+	m.unionSetName = set.Name
 	m.unionContexts = contexts
 	m.unionContextColors = colors
 	m.pendingUnionSetName = ""
@@ -217,8 +211,7 @@ func (m Model) enterUnion(setName string, contexts []string, colors map[string]s
 	m.nav.OwnedName = ""
 	m.nav.Namespace = ""
 	m.invalidateOrphanCacheForContext(oldCtx)
-	m.unionLocked = locked
-	m.applyReadOnlyForContext(UnionContextSentinel)
+	m.readOnly = m.cliReadOnly
 	if len(m.tabs) > m.activeTab {
 		m.tabs[m.activeTab].readOnly = m.readOnly
 	}
@@ -243,7 +236,7 @@ func (m Model) enterUnion(setName string, contexts []string, colors map[string]s
 		m.setMiddleItems(nil)
 		m.loading = true
 	}
-	m.setStatusMessage(unionStatusLabel(setName, contexts), false)
+	m.setStatusMessage("Union set: "+set.Name, false)
 	m.saveCurrentSession()
 
 	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
@@ -259,7 +252,6 @@ func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	activeUnionSet := m.unionSetName
 	m.unionMode = false
 	m.unionStartedFromPicker = false
-	m.unionLocked = false
 	m.unionSetName = ""
 	m.unionContexts = nil
 	m.unionContextColors = nil

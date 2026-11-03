@@ -26,19 +26,17 @@ func (m *Model) applyBookmarkContextSwitch(target bookmarkTarget) {
 		m.allNamespaces = false
 		m.namespace = target.unionNamespace
 		m.selectedNamespaces = map[string]bool{target.unionNamespace: true}
-		m.unionLocked = target.unionSetName == "" && target.unionStartedFromRow
-		m.applyReadOnlyForContext(UnionContextSentinel)
+		m.readOnly = m.cliReadOnly
 	case bookmarkTargetContext:
 		m.unionMode = false
 		m.unionStartedFromPicker = false
-		m.unionLocked = false
 		m.unionSetName = ""
 		m.unionContexts = nil
 		m.unionContextColors = nil
 		m.recomputeReadOnly(target.context)
 	default:
 		if target.context == UnionContextSentinel {
-			m.applyReadOnlyForContext(UnionContextSentinel)
+			m.readOnly = m.cliReadOnly
 		} else {
 			m.recomputeReadOnly(target.context)
 		}
