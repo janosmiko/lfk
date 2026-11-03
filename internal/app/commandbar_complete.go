@@ -396,9 +396,18 @@ func extractCRDNames(m *Model) []string {
 }
 
 // resourceTypeItems returns the list of resource type items regardless of the
-// current navigation level. The resource types are at different positions in
-// the left-column stack depending on how deep the user has navigated.
+// current navigation level. Discovery metadata for the active context is
+// authoritative: the navigation columns can still describe the context the
+// user switched away from (notably after `:ctx` while viewing resources), and
+// command completion must not offer or reject CRDs based on that stale list.
 func (m *Model) resourceTypeItems() []model.Item {
+	if ctx := m.discoveryContext(); ctx != "" {
+		if entries := m.discoveredResources[ctx]; len(entries) > 0 {
+			return model.BuildSidebarItems(entries)
+		}
+	}
+	// The resource types are at different positions in the left-column
+	// stack depending on how deep the user has navigated.
 	switch m.nav.Level {
 	case model.LevelResourceTypes:
 		// At resource types level, middleItems ARE the resource types.

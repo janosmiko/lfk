@@ -340,7 +340,25 @@ func (m Model) executeContextCommand(arg string) (tea.Model, tea.Cmd) {
 	m.recomputeReadOnly(arg)
 	m.rescopeNamespaceForContext(arg)
 	m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
+	// At the resource-list level the left column holds the resource types for
+	// the context we just left. Rebuild it from the destination's discovery
+	// snapshot now so backing out to the resource-type screen shows that
+	// cluster's CRDs instead of the previous one's list.
+	if m.nav.Level == model.LevelResources {
+		m.leftItems = m.resourceTypeItems()
+	}
 	cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
+	// Refresh discovery for the destination context. Without this, a context
+	// opened through :ctx keeps whatever snapshot the previous context had
+	// until the user backs out to (or re-enters) the resource-type screen, so
+	// CRDs that exist only in the destination were missing from command-bar
+	// completion. shouldFireDiscoveryFor deduplicates against an in-flight
+	// request and skips contexts already refreshed this session, where the
+	// cached discoveredResources entry is current.
+	if m.shouldFireDiscoveryFor(arg) {
+		m.markDiscoveryStarted(arg)
+		cmds = append(cmds, m.discoverAPIResources(arg))
+	}
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
@@ -498,6 +516,10 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
 		return m, scheduleStatusClear()
 	}
+	// Parent navigation rebuilds middleItems from the column snapshot, which
+	// may still belong to the context the user switched away from. Resolve
+	// the jump against the active context's discovered resource set instead.
+	m.setMiddleItems(m.resourceTypeItems())
 
 	// Check if the input looks like a full CRD selector: "resource.api-group"
 	// (e.g. "clusters.cluster.x-k8s.io"). Extract the group part for disambiguation.
