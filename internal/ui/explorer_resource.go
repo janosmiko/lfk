@@ -302,7 +302,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 		typeWidth = min(typeWidth, 22)
 
-		for _, cond := range item.Conditions {
+		for _, cond := range conditionsByRecency(item.Conditions) {
 			if len(lines) >= height {
 				break
 			}
