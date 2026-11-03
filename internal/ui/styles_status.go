@@ -48,7 +48,8 @@ func statusSeverity(status string) statusSev {
 		"Healthy/OutOfSync", "Missing/OutOfSync", "Suspended/OutOfSync",
 		"OutOfSync",
 		"Pending-install", "Pending-upgrade", "Pending-rollback", "Uninstalling",
-		"Warning":
+		"Warning",
+		"Drifted", "Disrupting", "Rebooting", "Launching", "Registering":
 		return sevProgressing
 	case "Normal":
 		return sevNormal
@@ -59,7 +60,8 @@ func statusSeverity(status string) statusSev {
 		"SecretSyncedError", "SecretMissing", "MissingProviderSecret",
 		model.MissingRefStatus,
 		"UpdateFailed", "FailedScheduling",
-		"InvalidStoreConfiguration", "InvalidProviderConfig", "ValidationFailed":
+		"InvalidStoreConfiguration", "InvalidProviderConfig", "ValidationFailed",
+		"RegistrationUnhealthy":
 		return sevFailed
 	default:
 		if status == "" {

@@ -165,6 +165,13 @@ func TestStatusSeverity_Established(t *testing.T) {
 	assert.Equal(t, StatusSeverityRank("Running"), StatusSeverityRank("Established"))
 }
 
+func TestStatusSeverity_Karpenter(t *testing.T) {
+	for _, s := range []string{"Drifted", "Disrupting", "Rebooting", "Launching", "Registering", "Initializing"} {
+		assert.Equal(t, sevProgressing, statusSeverity(s), s)
+	}
+	assert.Equal(t, sevFailed, statusSeverity("RegistrationUnhealthy"))
+}
+
 // --- statusSeverity: free-form phrases ---
 
 // Operators that break the CamelCase-phase convention (e.g. CloudNativePG's
