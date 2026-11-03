@@ -88,7 +88,7 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 		populateClusterTrustBundle(ti, spec)
 
 	default:
-		populateGenericCRDResource(ti, status)
+		populateCRDResource(ti, obj, kind, status)
 	}
 }
 
