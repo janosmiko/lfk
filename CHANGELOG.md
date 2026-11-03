@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.13](https://github.com/janosmiko/lfk/compare/v0.19.12...v0.19.13) (2026-11-03)
+
+
+### Features
+
+* build a union view from marked contexts in the cluster picker ([#887](https://github.com/janosmiko/lfk/issues/887)) ([65806a5](https://github.com/janosmiko/lfk/commit/65806a566aab1983233535ead005cff4293db213))
+* list conditions newest transition first in the details pane ([#900](https://github.com/janosmiko/lfk/issues/900)) ([490dd27](https://github.com/janosmiko/lfk/commit/490dd27e707f1b7c7311a7d086ff7df661815ff6))
+* show Karpenter drift and disruption status ([#899](https://github.com/janosmiko/lfk/issues/899)) ([81e4e52](https://github.com/janosmiko/lfk/commit/81e4e52b902ec12fd2ece95aa1be04879f5f3cda))
+
+
+### Reverts
+
+* union dashboards and ad-hoc union picker ([#901](https://github.com/janosmiko/lfk/issues/901)) ([96158b0](https://github.com/janosmiko/lfk/commit/96158b052d8ee2811c3af22bd45bfdd949d58316))
+
 ## [0.19.12](https://github.com/janosmiko/lfk/compare/v0.19.11...v0.19.12) (2026-10-21)
 
 
