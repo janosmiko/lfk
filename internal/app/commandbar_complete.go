@@ -443,6 +443,13 @@ func (m *Model) cachedResourceNames(resourceType, namespace string) []string {
 	return nil
 }
 
+// commandBarNamesFetchedMsg carries async resource names for command bar completion.
+type commandBarNamesFetchedMsg struct {
+	cacheKey string
+	names    []string
+	err      error
+}
+
 // fetchCommandBarResourceNames creates a tea.Cmd that fetches resource names
 // for the given resource type and namespace, returning them as a message.
 func (m Model) fetchCommandBarResourceNames(resourceType, namespace string) tea.Cmd {
@@ -469,7 +476,7 @@ func (m Model) fetchCommandBarResourceNames(resourceType, namespace string) tea.
 	return func() tea.Msg {
 		items, err := client.GetResources(context.Background(), kctx, namespace, rt, false)
 		if err != nil {
-			return commandBarNamesFetchedMsg{cacheKey: cacheKey, names: nil}
+			return commandBarNamesFetchedMsg{cacheKey: cacheKey, err: err}
 		}
 		names := make([]string, 0, len(items))
 		for _, item := range items {

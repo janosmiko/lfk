@@ -400,6 +400,9 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateFinalizerRemoveResult(msg)
 		return mdl, cmd, true
 	case commandBarNamesFetchedMsg:
+		if msg.err != nil {
+			return m.commandBarNamesFailed(msg.cacheKey), nil, true
+		}
 		if m.commandBarNameCache == nil {
 			m.commandBarNameCache = make(map[string][]string)
 		}

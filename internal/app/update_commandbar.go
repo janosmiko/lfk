@@ -155,6 +155,23 @@ func (m Model) commandBarScrollSuggestions(key string, amount int) (tea.Model, t
 	return m, nil
 }
 
+// commandBarNamesFailed leaves a failed lookup uncached so the next keystroke
+// retries it. It skips a refresh: that would refetch at once and loop on a hard error.
+func (m Model) commandBarNamesFailed(cacheKey string) Model {
+	if m.commandBarNameLoading != cacheKey {
+		return m
+	}
+	m.commandBarNameLoading = ""
+	kept := make([]ui.Suggestion, 0, len(m.commandBarSuggestions))
+	for _, s := range m.commandBarSuggestions {
+		if s.Category != "status" {
+			kept = append(kept, s)
+		}
+	}
+	m.commandBarSuggestions = kept
+	return m
+}
+
 // commandBarActionableSuggestionCount returns the number of suggestions
 // that are not status placeholders (e.g., "loading...").
 func (m Model) commandBarActionableSuggestionCount() int {
