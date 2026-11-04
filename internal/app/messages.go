@@ -693,12 +693,6 @@ type finalizerRemoveResultMsg struct {
 	errors    []string
 }
 
-// commandBarNamesFetchedMsg carries async resource names for command bar completion.
-type commandBarNamesFetchedMsg struct {
-	cacheKey string
-	names    []string
-}
-
 // previewSecretDataLoadedMsg carries lazily-fetched secret data for the hover
 // preview pane at LevelResources. The gen field guards against stale responses;
 // handlers must discard messages where gen != m.requestGen.

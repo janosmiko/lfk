@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,6 +121,22 @@ func TestCommandBarNamesFetched_KeepsSelectionInRange(t *testing.T) {
 	m = ret.(Model)
 
 	assert.Less(t, m.commandBarSelectedSuggestion, len(m.commandBarSuggestions))
+}
+
+func TestCommandBarNamesFetched_FailureRetriesOnNextRefresh(t *testing.T) {
+	m := argoNameFetch(t)
+	key := m.commandBarNameLoading
+
+	ret, cmd := m.updateImpl(commandBarNamesFetchedMsg{cacheKey: key, err: errors.New("forbidden")})
+	m = ret.(Model)
+
+	assert.NotContains(t, m.commandBarNameCache, key)
+	assert.Empty(t, m.commandBarNameLoading)
+	assert.False(t, hasSuggestion(m.commandBarSuggestions, "loading..."))
+	assert.Nil(t, cmd, "a failure must not refetch by itself")
+
+	m, cmd = m.commandBarRefreshSuggestions()
+	assert.NotNil(t, cmd, "the next refresh retries the lookup")
 }
 
 func TestCommandBarNamesFetched_OlderFetchKeepsNewerInFlight(t *testing.T) {
