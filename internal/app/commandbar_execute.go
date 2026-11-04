@@ -543,11 +543,34 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	if !m.selectVisibleItem(target) {
-		m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
-		return m, scheduleStatusClear()
+	if ret, cmd, ok := m.openMiddleItem(target); ok {
+		return ret, cmd
 	}
-	return m.navigateChild()
+	m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
+	return m, scheduleStatusClear()
+}
+
+// openMiddleItem reveals target first: the cursor indexes visibleMiddleItems() (#905).
+// navigateChild deletes the saved copy of a filter dropped here, so it is put back.
+func (m Model) openMiddleItem(target model.Item) (tea.Model, tea.Cmd, bool) {
+	if !m.allGroupsExpanded && target.Category != "" {
+		m.expandedGroup = target.Category
+	}
+	if m.focusMiddleItem(&target) {
+		ret, cmd := m.navigateChild()
+		return ret, cmd, true
+	}
+	key, hidden := m.navKey(), savedFilter{text: m.filterText, broad: m.filterBroadMode}
+	m.resetFilterForTypeSwitch()
+	if !m.focusMiddleItem(&target) {
+		return m, nil, false
+	}
+	ret, cmd := m.navigateChild()
+	if nm, ok := ret.(Model); ok && hidden.text != "" {
+		nm.filterMemory[key] = hidden
+		ret = nm
+	}
+	return ret, cmd, true
 }
 
 // ensureAtResourceTypesLevel navigates parent until reaching
@@ -615,8 +638,11 @@ func (m Model) navigateToSelector(kind string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	for _, item := range m.middleItems {
-		if (item.Kind == kind || item.Extra == kind) && m.selectVisibleItem(item) {
-			return m.navigateChild()
+		if item.Kind != kind && item.Extra != kind {
+			continue
+		}
+		if ret, cmd, ok := m.openMiddleItem(item); ok {
+			return ret, cmd
 		}
 	}
 	m.setStatusMessage("Resource not found: "+kind, true)

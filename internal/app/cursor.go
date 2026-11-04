@@ -482,19 +482,6 @@ func (m *Model) focusMiddleItem(target *model.Item) bool {
 	return false
 }
 
-// selectVisibleItem opens target's group and drops a hiding filter first:
-// the cursor indexes visibleMiddleItems(), not middleItems (#905).
-func (m *Model) selectVisibleItem(target model.Item) bool {
-	if !m.allGroupsExpanded && target.Category != "" {
-		m.expandedGroup = target.Category
-	}
-	if m.focusMiddleItem(&target) {
-		return true
-	}
-	m.resetFilterForTypeSwitch()
-	return m.focusMiddleItem(&target)
-}
-
 // selectionKey generates a unique key for an item used in the selectedItems
 // map. It delegates to model.Item.SelectionKey so the app's selection store
 // and the ui renderer's selected-row check share one key derivation and

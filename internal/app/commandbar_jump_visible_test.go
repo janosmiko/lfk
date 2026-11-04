@@ -59,9 +59,24 @@ func TestExecuteResourceJump_FilterHidingTargetOpensTarget(t *testing.T) {
 	assert.Equal(t, "applications", m.nav.ResourceType.Resource)
 }
 
+func TestExecuteResourceJump_FilterHidingTargetRestoredOnBack(t *testing.T) {
+	m := collapsedSidebarModel()
+	m.allGroupsExpanded = true
+	m.filterText = "pods"
+
+	got, _ := m.executeResourceJump("applications")
+	m = got.(Model)
+	require.Equal(t, model.LevelResources, m.nav.Level)
+
+	got, _ = m.navigateParent()
+	m = got.(Model)
+	assert.Equal(t, "pods", m.filterText)
+}
+
 func TestExecuteMonitoringCommand_FilterHidingDashboardOpensMonitoring(t *testing.T) {
 	m := collapsedSidebarModel()
 	m.filterText = "pods"
+	listKey := m.navKey()
 
 	got, _ := m.executeMonitoringCommand()
 	m = got.(Model)
@@ -70,4 +85,5 @@ func TestExecuteMonitoringCommand_FilterHidingDashboardOpensMonitoring(t *testin
 	require.NotNil(t, sel)
 	assert.Equal(t, "__monitoring__", sel.Extra)
 	assert.True(t, m.fullscreenDashboard)
+	assert.Equal(t, "pods", m.filterMemory[listKey].text, "filter stays saved for the resource-type list")
 }
