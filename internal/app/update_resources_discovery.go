@@ -46,6 +46,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 		logger.Warn("Could not persist discovery cache", "context", msg.context, "error", err)
 	}
 	merged := model.BuildSidebarItems(entries)
+	var barCmd tea.Cmd
 	// If the user is at LevelClusters and hovering this context, refresh
 	// the right-pane preview so the discovered list replaces the seed
 	// fallback that was emitted synchronously when loadPreviewClusters ran.
@@ -60,6 +61,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 		// LevelResourceTypes find the sidebar items correctly.
 		rtCacheKey := m.nav.Context
 		m.itemCache[rtCacheKey] = merged
+		m, barCmd = m.commandBarRefreshAsync()
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
 			//
@@ -102,19 +104,19 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 		}
 	}
 	if mdl, cmd, handled := m.replayBookmarkAfterDiscovery(msg.context); handled {
-		return mdl, cmd
+		return mdl, tea.Batch(cmd, barCmd)
 	} else {
 		m = mdl
 	}
 	if mdl, cmd, handled := m.resumeDeferredSessionRestore(msg.context, entries, merged); handled {
-		return mdl, cmd
+		return mdl, tea.Batch(cmd, barCmd)
 	} else {
 		m = mdl
 	}
 	// Discovery landed without a list load to wait on, so the resource-type
 	// sidebar is the finished restore. Let the explorer paint.
 	m.finishSessionRestoreForContext(isCurrentContext)
-	return m, nil
+	return m, barCmd
 }
 
 // replayBookmarkAfterDiscovery replays a bookmark queued waiting on this

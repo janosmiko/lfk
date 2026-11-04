@@ -78,6 +78,7 @@ func (m Model) commandBarHandleEsc() (tea.Model, tea.Cmd) {
 		m.commandBarSuggestions = nil
 		m.commandBarSelectedSuggestion = 0
 		m.commandBarPreview = ""
+		m.commandBarDismissed = true
 		return m, nil
 	}
 	return m.commandBarClose(), nil
@@ -197,6 +198,7 @@ func (m Model) commandBarEnter() (tea.Model, tea.Cmd) {
 		m.commandBarPreview = ""
 		m.commandBarSuggestions = nil
 		m.commandBarSelectedSuggestion = 0
+		m.commandBarDismissed = true
 		return m, nil
 	}
 
@@ -227,21 +229,43 @@ func (m *Model) commandBarCycleSuggestion(delta int) {
 
 func (m Model) commandBarRefreshSuggestions() (Model, tea.Cmd) {
 	oldLoading := m.commandBarNameLoading
+	m.commandBarDismissed = false
 	m.commandBarSuggestions = m.generateCommandBarSuggestions()
 	m.commandBarSelectedSuggestion = 0
 	m.commandBarPreview = ""
 
 	// If a new async fetch was triggered, add a loading placeholder and fire the fetch.
 	if m.commandBarNameLoading != "" && m.commandBarNameLoading != oldLoading {
-		m.commandBarSuggestions = append(m.commandBarSuggestions,
-			ui.Suggestion{Text: "loading...", Category: "status"})
 		// Parse cache key to get namespace and resource type.
 		parts := strings.SplitN(m.commandBarNameLoading, "/", 3)
 		if len(parts) == 3 {
-			return m, m.fetchCommandBarResourceNames(parts[2], parts[1])
+			if cmd := m.fetchCommandBarResourceNames(parts[2], parts[1]); cmd != nil {
+				m.commandBarSuggestions = append(m.commandBarSuggestions,
+					ui.Suggestion{Text: "loading...", Category: "status"})
+				return m, cmd
+			}
 		}
+		// No fetch started (type not discovered yet): clear the key so a later refresh retries.
+		m.commandBarNameLoading = ""
 	}
 	return m, nil
+}
+
+// commandBarRefreshAsync refreshes suggestions when async data lands. A list
+// the user closed stays closed, and the row picked with Tab stays picked.
+func (m Model) commandBarRefreshAsync() (Model, tea.Cmd) {
+	if !m.commandBarActive || m.commandBarDismissed {
+		return m, nil
+	}
+	picked := m.commandBarPreview
+	m, cmd := m.commandBarRefreshSuggestions()
+	for i, s := range m.commandBarSuggestions {
+		if picked != "" && s.Text == picked {
+			m.commandBarSelectedSuggestion, m.commandBarPreview = i, picked
+			break
+		}
+	}
+	return m, cmd
 }
 
 // commandBarApplySuggestion replaces the current partial word in the input
