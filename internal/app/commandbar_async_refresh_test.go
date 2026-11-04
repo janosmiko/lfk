@@ -27,6 +27,17 @@ func argoCommandBar(t *testing.T, input string) Model {
 	return m
 }
 
+// argoNameFetch opens the bar on "argo" with discovery in place, so a name fetch is in flight.
+func argoNameFetch(t *testing.T) Model {
+	t.Helper()
+	m := argoCommandBar(t, "kubectl get configmaps ")
+	m.discoveredResources["argo"] = argoDiscoveryMsg().entries
+	m, cmd := m.commandBarRefreshSuggestions()
+	require.NotNil(t, cmd)
+	require.NotEmpty(t, m.commandBarNameLoading)
+	return m
+}
+
 func argoDiscoveryMsg() apiResourceDiscoveryMsg {
 	return apiResourceDiscoveryMsg{
 		context: "argo",
@@ -77,7 +88,8 @@ func TestUpdateAPIResourceDiscovery_KeepsCycledSelection(t *testing.T) {
 
 func TestUpdateAPIResourceDiscovery_DispatchesStartedNameFetch(t *testing.T) {
 	m := argoCommandBar(t, "kubectl get configmaps ")
-	m.commandBarNameLoading = "" // the resolved name changed, so no fetch is in flight for it
+	require.Empty(t, m.commandBarNameLoading, "no fetch can start before discovery")
+	require.False(t, hasSuggestion(m.commandBarSuggestions, "loading..."))
 
 	m, cmd := m.updateAPIResourceDiscovery(argoDiscoveryMsg())
 
@@ -87,9 +99,8 @@ func TestUpdateAPIResourceDiscovery_DispatchesStartedNameFetch(t *testing.T) {
 }
 
 func TestCommandBarNamesFetched_KeepsDismissedSuggestionsClosed(t *testing.T) {
-	m := argoCommandBar(t, "kubectl get configmaps ")
+	m := argoNameFetch(t)
 	key := m.commandBarNameLoading
-	require.NotEmpty(t, key)
 	got, _ := m.commandBarHandleEsc()
 	m = got.(Model)
 
@@ -100,7 +111,7 @@ func TestCommandBarNamesFetched_KeepsDismissedSuggestionsClosed(t *testing.T) {
 }
 
 func TestCommandBarNamesFetched_KeepsSelectionInRange(t *testing.T) {
-	m := argoCommandBar(t, "kubectl get configmaps ")
+	m := argoNameFetch(t)
 	key := m.commandBarNameLoading
 	m.commandBarSuggestions = []ui.Suggestion{{Text: "a"}, {Text: "b"}, {Text: "c"}, {Text: "d"}}
 	m.commandBarSelectedSuggestion = 3
@@ -112,10 +123,8 @@ func TestCommandBarNamesFetched_KeepsSelectionInRange(t *testing.T) {
 }
 
 func TestCommandBarNamesFetched_OlderFetchKeepsNewerInFlight(t *testing.T) {
-	m := argoCommandBar(t, "kubectl get configmaps ")
-	m.discoveredResources["argo"] = argoDiscoveryMsg().entries
+	m := argoNameFetch(t)
 	newer := m.commandBarNameLoading
-	require.NotEmpty(t, newer)
 
 	ret, cmd := m.updateImpl(commandBarNamesFetchedMsg{cacheKey: "argo/default/secrets", names: []string{"s-1"}})
 	m = ret.(Model)

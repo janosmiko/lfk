@@ -236,13 +236,17 @@ func (m Model) commandBarRefreshSuggestions() (Model, tea.Cmd) {
 
 	// If a new async fetch was triggered, add a loading placeholder and fire the fetch.
 	if m.commandBarNameLoading != "" && m.commandBarNameLoading != oldLoading {
-		m.commandBarSuggestions = append(m.commandBarSuggestions,
-			ui.Suggestion{Text: "loading...", Category: "status"})
 		// Parse cache key to get namespace and resource type.
 		parts := strings.SplitN(m.commandBarNameLoading, "/", 3)
 		if len(parts) == 3 {
-			return m, m.fetchCommandBarResourceNames(parts[2], parts[1])
+			if cmd := m.fetchCommandBarResourceNames(parts[2], parts[1]); cmd != nil {
+				m.commandBarSuggestions = append(m.commandBarSuggestions,
+					ui.Suggestion{Text: "loading...", Category: "status"})
+				return m, cmd
+			}
 		}
+		// No fetch started (type not discovered yet): clear the key so a later refresh retries.
+		m.commandBarNameLoading = ""
 	}
 	return m, nil
 }
