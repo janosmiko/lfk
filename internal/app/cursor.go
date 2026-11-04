@@ -464,11 +464,11 @@ func (m *Model) nextResourceTypeCursorItem() *model.Item {
 }
 
 // focusMiddleItem moves the cursor onto the item matching target (by
-// Name/Kind/Extra) in the current visible list. No-op when target is nil or
-// the item is no longer present.
-func (m *Model) focusMiddleItem(target *model.Item) {
+// Name/Kind/Extra) in the current visible list. Returns false when target is
+// nil or the item is not visible.
+func (m *Model) focusMiddleItem(target *model.Item) bool {
 	if target == nil {
-		return
+		return false
 	}
 	visible := m.visibleMiddleItems()
 	for i := range visible {
@@ -476,9 +476,10 @@ func (m *Model) focusMiddleItem(target *model.Item) {
 			visible[i].Kind == target.Kind &&
 			visible[i].Extra == target.Extra {
 			m.setCursor(i)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // selectionKey generates a unique key for an item used in the selectedItems

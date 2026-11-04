@@ -510,13 +510,9 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	}
 
 	// Collect all matches so we can detect ambiguity.
-	type match struct {
-		index int
-		item  model.Item
-	}
-	var matches []match
+	var matches []model.Item
 
-	for i, item := range m.middleItems {
+	for _, item := range m.middleItems {
 		// Skip dashboard pseudo-items — they are not real resource types.
 		if item.Extra == "__overview__" || item.Extra == "__monitoring__" {
 			continue
@@ -526,7 +522,7 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 		itemKind := strings.ToLower(item.Kind)
 
 		if resourceNameMatches(resolved, targetGroup, itemResource, itemName, itemKind, groupFromExtra(item.Extra)) {
-			matches = append(matches, match{index: i, item: item})
+			matches = append(matches, item)
 		}
 	}
 
@@ -535,32 +531,46 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// If exactly one match, navigate to it.
-	if len(matches) == 1 {
-		m.setCursor(matches[0].index)
-		return m.navigateChild()
-	}
-
-	// Multiple matches: pick the one that best matches the group if specified,
-	// otherwise pick the first (the fuzzy finder should have disambiguated).
+	// Several matches: prefer an exact group match when a group was given,
+	// otherwise take the first (the fuzzy finder should have disambiguated).
+	target := matches[0]
 	if targetGroup != "" {
-		// Prefer exact group match.
-		for _, mm := range matches {
-			parts := strings.Split(mm.item.Extra, "/")
+		for _, item := range matches {
+			parts := strings.Split(item.Extra, "/")
 			if len(parts) >= 3 && strings.ToLower(parts[0]) == targetGroup {
-				m.setCursor(mm.index)
-				return m.navigateChild()
+				target = item
+				break
 			}
 		}
-		// Fallback: first match.
-		m.setCursor(matches[0].index)
-		return m.navigateChild()
 	}
+	if ret, cmd, ok := m.openMiddleItem(target); ok {
+		return ret, cmd
+	}
+	m.setStatusMessage(fmt.Sprintf("Resource type not found: %s", name), true)
+	return m, scheduleStatusClear()
+}
 
-	// Ambiguous — pick first match. The completion layer should have shown
-	// all candidates so the user could pick the right one before pressing Enter.
-	m.setCursor(matches[0].index)
-	return m.navigateChild()
+// openMiddleItem reveals target first: the cursor indexes visibleMiddleItems() (#905).
+// navigateChild deletes the saved copy of a filter dropped here, so it is put back.
+func (m Model) openMiddleItem(target model.Item) (tea.Model, tea.Cmd, bool) {
+	if !m.allGroupsExpanded && target.Category != "" {
+		m.expandedGroup = target.Category
+	}
+	if m.focusMiddleItem(&target) {
+		ret, cmd := m.navigateChild()
+		return ret, cmd, true
+	}
+	key, hidden := m.navKey(), savedFilter{text: m.filterText, broad: m.filterBroadMode}
+	m.resetFilterForTypeSwitch()
+	if !m.focusMiddleItem(&target) {
+		return m, nil, false
+	}
+	ret, cmd := m.navigateChild()
+	if nm, ok := ret.(Model); ok && hidden.text != "" {
+		nm.filterMemory[key] = hidden
+		ret = nm
+	}
+	return ret, cmd, true
 }
 
 // ensureAtResourceTypesLevel navigates parent until reaching
@@ -627,10 +637,12 @@ func (m Model) navigateToSelector(kind string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Resource not found: "+kind, true)
 		return m, scheduleStatusClear()
 	}
-	for i, item := range m.middleItems {
-		if item.Kind == kind || item.Extra == kind {
-			m.setCursor(i)
-			return m.navigateChild()
+	for _, item := range m.middleItems {
+		if item.Kind != kind && item.Extra != kind {
+			continue
+		}
+		if ret, cmd, ok := m.openMiddleItem(item); ok {
+			return ret, cmd
 		}
 	}
 	m.setStatusMessage("Resource not found: "+kind, true)
