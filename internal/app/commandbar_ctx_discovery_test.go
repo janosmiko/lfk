@@ -58,6 +58,31 @@ func TestExecuteContextCommand_SkipsDiscoveryAlreadyRefreshed(t *testing.T) {
 	assert.False(t, m.discoveringContexts["argo"])
 }
 
+func TestUpdateAPIResourceDiscovery_RefreshesOpenCommandBar(t *testing.T) {
+	withKubeCacheDir(t)
+	m := ctxSwitchModel()
+	delete(m.discoveredResources, "argo")
+	got, _ := m.executeContextCommand("argo")
+	m = got.(Model)
+
+	m.commandBarActive = true
+	m.commandBarInput.Value = "app"
+	m.commandBarSuggestions = m.generateCommandBarSuggestions()
+	require.False(t, hasSuggestion(m.commandBarSuggestions, "applications.argoproj.io"))
+	m.commandBarSelectedSuggestion = 7 // past the end of the new list
+
+	m, _ = m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{
+		context: "argo",
+		entries: []model.ResourceTypeEntry{{
+			Kind: "Application", APIGroup: "argoproj.io", APIVersion: "v1alpha1",
+			Resource: "applications", Namespaced: true,
+		}},
+	})
+
+	assert.True(t, hasSuggestion(m.commandBarSuggestions, "applications.argoproj.io"))
+	assert.Less(t, m.commandBarSelectedSuggestion, len(m.commandBarSuggestions))
+}
+
 func TestExecuteResourceJump_FindsCRDAfterContextSwitch(t *testing.T) {
 	m := ctxSwitchModel()
 	got, _ := m.executeContextCommand("argo")

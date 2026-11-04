@@ -60,6 +60,11 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 		// LevelResourceTypes find the sidebar items correctly.
 		rtCacheKey := m.nav.Context
 		m.itemCache[rtCacheKey] = merged
+		if m.commandBarActive {
+			m.commandBarSuggestions = m.generateCommandBarSuggestions()
+			m.commandBarSelectedSuggestion = 0
+			m.commandBarPreview = ""
+		}
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
 			//
