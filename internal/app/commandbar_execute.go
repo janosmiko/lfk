@@ -572,29 +572,6 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	return m, scheduleStatusClear()
 }
 
-// openMiddleItem reveals target first: the cursor indexes visibleMiddleItems() (#905).
-// navigateChild deletes the saved copy of a filter dropped here, so it is put back.
-func (m Model) openMiddleItem(target model.Item) (tea.Model, tea.Cmd, bool) {
-	if !m.allGroupsExpanded && target.Category != "" {
-		m.expandedGroup = target.Category
-	}
-	if m.focusMiddleItem(&target) {
-		ret, cmd := m.navigateChild()
-		return ret, cmd, true
-	}
-	key, hidden := m.navKey(), savedFilter{text: m.filterText, broad: m.filterBroadMode}
-	m.resetFilterForTypeSwitch()
-	if !m.focusMiddleItem(&target) {
-		return m, nil, false
-	}
-	ret, cmd := m.navigateChild()
-	if nm, ok := ret.(Model); ok && hidden.text != "" {
-		nm.filterMemory[key] = hidden
-		ret = nm
-	}
-	return ret, cmd, true
-}
-
 // ensureAtResourceTypesLevel navigates parent until reaching
 // model.LevelResourceTypes. Returns the updated model and true on
 // success. If the level drops below that threshold (cluster level)
