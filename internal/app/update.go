@@ -404,7 +404,9 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 			m.commandBarNameCache = make(map[string][]string)
 		}
 		m.commandBarNameCache[msg.cacheKey] = msg.names
-		m.commandBarNameLoading = ""
+		if m.commandBarNameLoading == msg.cacheKey {
+			m.commandBarNameLoading = ""
+		}
 		mdl, cmd := m.commandBarRefreshAsync()
 		return mdl, cmd, true
 	case yamlClipboardMsg:

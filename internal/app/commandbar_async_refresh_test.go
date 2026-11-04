@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -19,6 +20,7 @@ func argoCommandBar(t *testing.T, input string) Model {
 	delete(m.discoveredResources, "argo")
 	got, _ := m.executeContextCommand("argo")
 	m = got.(Model)
+	m.client = k8s.NewTestClient(nil, nil) // a nil client makes every name fetch a nil cmd
 	m.commandBarActive = true
 	m.commandBarInput.Value = input
 	m, _ = m.commandBarRefreshSuggestions()
@@ -107,4 +109,17 @@ func TestCommandBarNamesFetched_KeepsSelectionInRange(t *testing.T) {
 	m = ret.(Model)
 
 	assert.Less(t, m.commandBarSelectedSuggestion, len(m.commandBarSuggestions))
+}
+
+func TestCommandBarNamesFetched_OlderFetchKeepsNewerInFlight(t *testing.T) {
+	m := argoCommandBar(t, "kubectl get configmaps ")
+	m.discoveredResources["argo"] = argoDiscoveryMsg().entries
+	newer := m.commandBarNameLoading
+	require.NotEmpty(t, newer)
+
+	ret, cmd := m.updateImpl(commandBarNamesFetchedMsg{cacheKey: "argo/default/secrets", names: []string{"s-1"}})
+	m = ret.(Model)
+
+	assert.Equal(t, newer, m.commandBarNameLoading)
+	assert.Nil(t, cmd, "the in-flight fetch must not start again")
 }
