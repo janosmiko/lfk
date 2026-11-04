@@ -6,6 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynfake "k8s.io/client-go/dynamic/fake"
+	fake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -126,17 +131,50 @@ func TestCommandBarNamesFetched_KeepsSelectionInRange(t *testing.T) {
 func TestCommandBarNamesFetched_FailureRetriesOnNextRefresh(t *testing.T) {
 	m := argoNameFetch(t)
 	key := m.commandBarNameLoading
+	m.commandBarSuggestions = append([]ui.Suggestion{{Text: "-o"}}, m.commandBarSuggestions...)
 
 	ret, cmd := m.updateImpl(commandBarNamesFetchedMsg{cacheKey: key, err: errors.New("forbidden")})
 	m = ret.(Model)
 
 	assert.NotContains(t, m.commandBarNameCache, key)
 	assert.Empty(t, m.commandBarNameLoading)
-	assert.False(t, hasSuggestion(m.commandBarSuggestions, "loading..."))
+	assert.Equal(t, []ui.Suggestion{{Text: "-o"}}, m.commandBarSuggestions)
 	assert.Nil(t, cmd, "a failure must not refetch by itself")
 
 	m, cmd = m.commandBarRefreshSuggestions()
 	assert.NotNil(t, cmd, "the next refresh retries the lookup")
+}
+
+func TestCommandBarNamesFetched_OlderFailureKeepsNewerLoading(t *testing.T) {
+	m := argoNameFetch(t)
+	newer := m.commandBarNameLoading
+
+	ret, _ := m.updateImpl(commandBarNamesFetchedMsg{cacheKey: "argo/default/secrets", err: errors.New("forbidden")})
+	m = ret.(Model)
+
+	assert.Equal(t, newer, m.commandBarNameLoading)
+	assert.True(t, hasSuggestion(m.commandBarSuggestions, "loading..."))
+}
+
+func TestFetchCommandBarResourceNames_ReportsListError(t *testing.T) {
+	m := argoCommandBar(t, "")
+	m.discoveredResources["argo"] = argoDiscoveryMsg().entries
+	forbidden := func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("forbidden")
+	}
+	cs := fake.NewClientset()
+	cs.PrependReactor("list", "*", forbidden)
+	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{{Version: "v1", Resource: "configmaps"}: "ConfigMapList"})
+	dyn.PrependReactor("list", "*", forbidden)
+	m.client = k8s.NewTestClient(cs, dyn)
+
+	cmd := m.fetchCommandBarResourceNames("configmaps", "default")
+	require.NotNil(t, cmd)
+	msg := cmd().(commandBarNamesFetchedMsg)
+
+	assert.Error(t, msg.err)
+	assert.Nil(t, msg.names)
 }
 
 func TestCommandBarNamesFetched_OlderFetchKeepsNewerInFlight(t *testing.T) {
