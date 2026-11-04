@@ -695,6 +695,7 @@ type Model struct {
 
 	// Command bar state.
 	commandBarActive             bool
+	commandBarDismissed          bool // Esc or Enter closed the list: async refreshes must not reopen it
 	commandBarInput              TextInput
 	commandBarSuggestions        []ui.Suggestion
 	commandBarSelectedSuggestion int

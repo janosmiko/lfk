@@ -405,11 +405,8 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		}
 		m.commandBarNameCache[msg.cacheKey] = msg.names
 		m.commandBarNameLoading = ""
-		// Refresh suggestions if command bar is still active.
-		if m.commandBarActive {
-			m.commandBarSuggestions = m.generateCommandBarSuggestions()
-		}
-		return m, nil, true
+		mdl, cmd := m.commandBarRefreshAsync()
+		return mdl, cmd, true
 	case yamlClipboardMsg:
 		mdl, cmd := m.updateYamlClipboard(msg)
 		return mdl, cmd, true

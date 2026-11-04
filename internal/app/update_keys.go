@@ -564,6 +564,7 @@ func (m Model) handleKeySearch() Model {
 
 func (m Model) handleKeyCommandBar() (Model, tea.Cmd) {
 	m.commandBarActive = true
+	m.commandBarDismissed = false
 	m.commandBarInput.Clear()
 	m.commandBarSuggestions = nil
 	m.commandBarSelectedSuggestion = 0
