@@ -38,6 +38,7 @@ func node(name, uid string, labels map[string]string) *corev1.Node {
 			NodeInfo: corev1.NodeSystemInfo{
 				KubeletVersion:          "v1.31.2",
 				OSImage:                 "Ubuntu 22.04.4 LTS",
+				KernelVersion:           "6.8.0-45-generic",
 				ContainerRuntimeVersion: "containerd://1.7.20",
 				Architecture:            "amd64",
 				OperatingSystem:         "linux",

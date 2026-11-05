@@ -524,7 +524,7 @@ func blockedColumnsForMode() map[string]bool {
 		"QoS": true, "Priority Class": true,
 		"Health": true, "Sync": true, "Dest NS": true,
 		"Sync Message": true, "Sync Errors": true,
-		"OS": true, "Runtime": true,
+		"OS": true, "Kernel": true, "Runtime": true,
 		"Hostname": true, "InternalIP": true, "ExternalIP": true,
 		"Source":      true,
 		"Description": true, "References": true,
