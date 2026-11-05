@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.15](https://github.com/janosmiko/lfk/compare/v0.19.14...v0.19.15) (2026-11-05)
+
+
+### Bug Fixes
+
+* leave fullscreen dashboard on goto jumps ([#911](https://github.com/janosmiko/lfk/issues/911)) ([f586cf4](https://github.com/janosmiko/lfk/commit/f586cf4ed3e411318c9ade3f40d633f7849ea8a8))
+
 ## [0.19.14](https://github.com/janosmiko/lfk/compare/v0.19.13...v0.19.14) (2026-11-05)
 
 
