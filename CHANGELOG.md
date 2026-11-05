@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.14](https://github.com/janosmiko/lfk/compare/v0.19.13...v0.19.14) (2026-11-05)
+
+
+### Features
+
+* show kernel version in nodes view ([#910](https://github.com/janosmiko/lfk/issues/910)) ([4a34fa0](https://github.com/janosmiko/lfk/commit/4a34fa090af80fb889ee23bda4feb0da47c68503))
+
+
+### Bug Fixes
+
+* not updating crds when changing ctx in command mode ([#904](https://github.com/janosmiko/lfk/issues/904)) ([c689464](https://github.com/janosmiko/lfk/commit/c689464407779bc3ac4aa81f53f55978c82d5d05))
+* retry a command bar name lookup after it fails ([#909](https://github.com/janosmiko/lfk/issues/909)) ([8a5a9d2](https://github.com/janosmiko/lfk/commit/8a5a9d2253da9be16e4a11e5fe3530d90c322c5a))
+* select the visible row for resource and dashboard jumps ([#906](https://github.com/janosmiko/lfk/issues/906)) ([578de6f](https://github.com/janosmiko/lfk/commit/578de6fb51df66204c83b0d4c7cc1ed240d9e95b))
+
 ## [0.19.13](https://github.com/janosmiko/lfk/compare/v0.19.12...v0.19.13) (2026-11-03)
 
 
