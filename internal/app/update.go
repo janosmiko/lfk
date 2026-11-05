@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/creack/pty"
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -34,7 +35,20 @@ func isContextCanceled(err error) bool {
 // Update handles messages and re-arms the spinner loop centrally.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	mdl, cmd := m.updateImpl(msg)
-	return armSpinner(mdl, cmd)
+	return armSpinner(dropStaleDashboardFullscreen(mdl), cmd)
+}
+
+// dropStaleDashboardFullscreen clears the fullscreen dashboard once the user
+// has left the resource-types level (goto chords, command bar jumps,
+// bookmarks). Without it the dashboard keeps covering the list they jumped to.
+func dropStaleDashboardFullscreen(mdl tea.Model) tea.Model {
+	m, ok := mdl.(Model)
+	if !ok || !m.fullscreenDashboard || m.nav.Level == model.LevelResourceTypes {
+		return mdl
+	}
+	m.fullscreenDashboard = false
+	m.previewScroll = 0
+	return m.recomposeDashboard()
 }
 
 // updateImpl is the real message handler; Update wraps it to re-arm the spinner.
