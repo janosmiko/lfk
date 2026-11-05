@@ -1046,6 +1046,7 @@ func TestPopulateResourceDetails_Node(t *testing.T) {
 					"nodeInfo": map[string]any{
 						"kubeletVersion":          "v1.29.0",
 						"osImage":                 "Ubuntu 22.04 LTS",
+						"kernelVersion":           "6.8.0-45-generic",
 						"containerRuntimeVersion": "containerd://1.7.0",
 					},
 				},
@@ -1057,6 +1058,7 @@ func TestPopulateResourceDetails_Node(t *testing.T) {
 				"Mem Alloc":  "16Gi",
 				"Version":    "v1.29.0",
 				"OS":         "Ubuntu 22.04 LTS",
+				"Kernel":     "6.8.0-45-generic",
 				"Runtime":    "containerd://1.7.0",
 				"Taints":     "node-role.kubernetes.io/control-plane:NoSchedule",
 			},

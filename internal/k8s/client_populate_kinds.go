@@ -118,6 +118,9 @@ func populateNodeStatus(ti *model.Item, status map[string]any) {
 		if v, ok := nodeInfo["osImage"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "OS", Value: v})
 		}
+		if v, ok := nodeInfo["kernelVersion"].(string); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Kernel", Value: v})
+		}
 		if v, ok := nodeInfo["containerRuntimeVersion"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Runtime", Value: v})
 		}
