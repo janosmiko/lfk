@@ -375,6 +375,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// set up the navigation column structure, and return a fetch command.
 	if needsLoad {
 		m.tabs[idx].needsLoad = false
+		// A session-restored tab carries its sort memory but no resolved sort
+		// (buildSessionTabState leaves the fields zero), and only the active
+		// tab resolves it during restore. Resolve it here the same way, or
+		// every other restored tab opens unsorted (issue #913).
+		m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 		m.applyPinnedTypes()
 
 		// Rebuild security state for the restored context so the Security sidebar
