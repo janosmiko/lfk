@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.16](https://github.com/janosmiko/lfk/compare/v0.19.15...v0.19.16) (2026-11-07)
+
+
+### Bug Fixes
+
+* restore the remembered sort on every session-restored tab ([#914](https://github.com/janosmiko/lfk/issues/914)) ([b909538](https://github.com/janosmiko/lfk/commit/b909538fc41d27dfc098e89873237b2d7a495d10)), closes [#913](https://github.com/janosmiko/lfk/issues/913)
+
 ## [0.19.15](https://github.com/janosmiko/lfk/compare/v0.19.14...v0.19.15) (2026-11-05)
 
 
