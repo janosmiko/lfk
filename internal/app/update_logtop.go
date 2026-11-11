@@ -194,9 +194,8 @@ func (m Model) handleLogTopFilterKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.logTop.filterInput.Right()
 		return m, nil
 	default:
-		k := msg.String()
-		if len(k) == 1 && k[0] >= 32 && k[0] < 127 {
-			m.logTop.filterInput.Insert(k)
+		if isTypedText(msg.Text) {
+			m.logTop.filterInput.Insert(msg.Text)
 		} else {
 			return m, nil
 		}
@@ -241,9 +240,8 @@ func (m Model) handleLogTopSearchKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.logTop.searchInput.Right()
 		return m, nil
 	default:
-		k := msg.String()
-		if len(k) == 1 && k[0] >= 32 && k[0] < 127 {
-			m.logTop.searchInput.Insert(k)
+		if isTypedText(msg.Text) {
+			m.logTop.searchInput.Insert(msg.Text)
 		} else {
 			return m, nil
 		}
