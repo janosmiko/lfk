@@ -214,8 +214,8 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyPressMsg) (newM tea.Model, c
 		activeInput.Down()
 		return m, nil
 	default:
-		if len(keyStr) == 1 && keyStr[0] >= 32 && keyStr[0] < 127 {
-			activeInput.Insert(keyStr)
+		if isTypedText(msg.Text) {
+			activeInput.Insert(msg.Text)
 		}
 		return m, nil
 	}
@@ -309,8 +309,8 @@ func (m Model) handleConfigMapEditorEditKey(msg tea.KeyPressMsg) (newM tea.Model
 		activeInput.Down()
 		return m, nil
 	default:
-		if len(keyStr) == 1 && keyStr[0] >= 32 && keyStr[0] < 127 {
-			activeInput.Insert(keyStr)
+		if isTypedText(msg.Text) {
+			activeInput.Insert(msg.Text)
 		}
 		return m, nil
 	}
@@ -419,8 +419,8 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyPressMsg, currentKeys []strin
 		activeInput.Down()
 		return m, nil
 	default:
-		if len(keyStr) == 1 && keyStr[0] >= 32 && keyStr[0] < 127 {
-			activeInput.Insert(keyStr)
+		if isTypedText(msg.Text) {
+			activeInput.Insert(msg.Text)
 		}
 		return m, nil
 	}

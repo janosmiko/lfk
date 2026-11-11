@@ -1,6 +1,11 @@
 package app
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+
+	"github.com/charmbracelet/x/ansi"
+)
 
 // TextInput is a simple readline-style text input with cursor positioning.
 // It supports insert, delete, word-delete, and cursor movement operations.
@@ -18,8 +23,9 @@ func (t *TextInput) Insert(s string) {
 // Backspace deletes the character before the cursor.
 func (t *TextInput) Backspace() {
 	if t.Cursor > 0 {
-		t.Value = t.Value[:t.Cursor-1] + t.Value[t.Cursor:]
-		t.Cursor--
+		_, n := utf8.DecodeLastRuneInString(t.Value[:t.Cursor])
+		t.Value = t.Value[:t.Cursor-n] + t.Value[t.Cursor:]
+		t.Cursor -= n
 	}
 }
 
@@ -85,55 +91,64 @@ func (t *TextInput) LineEnd() {
 // Left moves the cursor one position to the left.
 func (t *TextInput) Left() {
 	if t.Cursor > 0 {
-		t.Cursor--
+		_, n := utf8.DecodeLastRuneInString(t.Value[:t.Cursor])
+		t.Cursor -= n
 	}
 }
 
 // Right moves the cursor one position to the right.
 func (t *TextInput) Right() {
 	if t.Cursor < len(t.Value) {
-		t.Cursor++
+		_, n := utf8.DecodeRuneInString(t.Value[t.Cursor:])
+		t.Cursor += n
 	}
 }
 
-// Up moves the cursor to the same byte-column on the previous
+// cellOffset maps display column col to a rune-aligned byte offset in
+// line. Wide runes (CJK) take two terminal cells.
+func cellOffset(line string, col int) int {
+	w := 0
+	for i, r := range line {
+		rw := ansi.StringWidth(string(r))
+		if w+rw > col {
+			return i
+		}
+		w += rw
+	}
+	return len(line)
+}
+
+// Up moves the cursor to the same display column on the previous
 // `\n`-delimited line. No-op when already on the first line.
 // If the previous line is shorter than the current column, lands at
 // its end. Used by the multi-line edit pane (Secret/ConfigMap/Label
 // editors) so arrow-up navigates between hard-wrapped lines.
 func (t *TextInput) Up() {
 	lineStart := strings.LastIndex(t.Value[:t.Cursor], "\n") + 1
-	col := t.Cursor - lineStart
 	if lineStart == 0 {
 		return // already on first line
 	}
+	col := ansi.StringWidth(t.Value[lineStart:t.Cursor])
 	prevLineEnd := lineStart - 1 // index of the '\n'
 	prevLineStart := strings.LastIndex(t.Value[:prevLineEnd], "\n") + 1
-	prevLineLen := prevLineEnd - prevLineStart
-	if col > prevLineLen {
-		col = prevLineLen
-	}
-	t.Cursor = prevLineStart + col
+	t.Cursor = prevLineStart + cellOffset(t.Value[prevLineStart:prevLineEnd], col)
 }
 
-// Down moves the cursor to the same byte-column on the next
+// Down moves the cursor to the same display column on the next
 // `\n`-delimited line. No-op when already on the last line.
 func (t *TextInput) Down() {
 	lineStart := strings.LastIndex(t.Value[:t.Cursor], "\n") + 1
-	col := t.Cursor - lineStart
+	col := ansi.StringWidth(t.Value[lineStart:t.Cursor])
 	nextNL := strings.Index(t.Value[t.Cursor:], "\n")
 	if nextNL == -1 {
 		return // no next line
 	}
 	nextLineStart := t.Cursor + nextNL + 1
-	nextLineLen := len(t.Value) - nextLineStart
+	nextLineEnd := len(t.Value)
 	if idx := strings.Index(t.Value[nextLineStart:], "\n"); idx != -1 {
-		nextLineLen = idx
+		nextLineEnd = nextLineStart + idx
 	}
-	if col > nextLineLen {
-		col = nextLineLen
-	}
-	t.Cursor = nextLineStart + col
+	t.Cursor = nextLineStart + cellOffset(t.Value[nextLineStart:nextLineEnd], col)
 }
 
 // Set replaces the entire value and moves the cursor to the end.

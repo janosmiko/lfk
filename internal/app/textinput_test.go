@@ -466,3 +466,56 @@ func TestStringFilterInput_DeleteLine(t *testing.T) {
 	sfi.DeleteLine()
 	assert.Equal(t, "", s)
 }
+
+func TestTextInput_MultibyteBackspace(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("aж")
+	ti.Backspace()
+	assert.Equal(t, "a", ti.Value)
+	assert.Equal(t, 1, ti.Cursor)
+}
+
+func TestTextInput_MultibyteLeftRight(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("жя")
+	ti.Left()
+	assert.Equal(t, "ж", ti.CursorLeft())
+	ti.Left()
+	assert.Equal(t, 0, ti.Cursor)
+	ti.Right()
+	assert.Equal(t, "ж", ti.CursorLeft())
+	ti.Right()
+	assert.Equal(t, len(ti.Value), ti.Cursor)
+}
+
+func TestTextInput_MultibyteUpDownKeepsRuneColumn(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("жяб\nabc")
+	ti.Up() // column 3 on "abc" -> end of "жяб"
+	assert.Equal(t, "жяб", ti.CursorLeft())
+	ti.Left() // column 2
+	ti.Down()
+	assert.Equal(t, "жяб\nab", ti.CursorLeft())
+
+	ti.Set("abc\nжяб")
+	ti.Left() // column 2 on "жяб"
+	ti.Up()
+	assert.Equal(t, "ab", ti.CursorLeft())
+}
+
+func TestTextInput_UpDownKeepsDisplayColumnForWideRunes(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("界界界\nabcdef")
+	ti.Up() // column 6 on "abcdef" -> end of "界界界" (6 cells)
+	assert.Equal(t, "界界界", ti.CursorLeft())
+	ti.Down()
+	assert.Equal(t, "界界界\nabcdef", ti.CursorLeft())
+
+	ti.Set("abc\n界界")
+	ti.Up() // column 4 -> clamps to end of "abc"
+	assert.Equal(t, "abc", ti.CursorLeft())
+	ti.Set("abcd\n界界")
+	ti.Left() // column 2, after the first wide rune
+	ti.Up()
+	assert.Equal(t, "ab", ti.CursorLeft())
+}
