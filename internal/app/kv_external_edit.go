@@ -2,10 +2,12 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -32,7 +34,11 @@ func (m Model) beginSecretExternalEdit() (tea.Model, tea.Cmd) {
 	m.confirmAction = key
 	m.pendingAction = externalEditSecretAction
 	m.confirmTitle = "Edit in $EDITOR"
-	m.confirmQuestion = fmt.Sprintf("Write the decoded value of %s to a temp file in plain text? Editor swap or undo files can keep a copy.", key)
+	where := "on disk"
+	if editTempRoot() != "" {
+		where = "in RAM (/dev/shm)"
+	}
+	m.confirmQuestion = fmt.Sprintf("Write the decoded value of %s in plain text to a temp file %s? Editor swap or undo files can keep a copy.", key, where)
 	m.blast.reset()
 	m.deps.reset()
 	m.overlay = overlayConfirm
@@ -102,27 +108,89 @@ func (m Model) updateKVExternalEdit(msg kvExternalEditMsg) (tea.Model, tea.Cmd) 
 // result as a kvExternalEditMsg. sensitive turns off editor copies
 // (swap, undo, backup) for editors that support it.
 func editValueInEditor(target overlayKind, key, value string, sensitive bool) tea.Cmd {
-	dir, path, err := writeEditTempFile(key, value)
+	e := &valueEdit{target: target, key: key, orig: value, sensitive: sensitive}
+	return tea.Exec(e, e.result)
+}
+
+// result covers bubbletea failing to release the terminal, in which
+// case Run never ran and e.msg is empty.
+func (e *valueEdit) result(err error) tea.Msg {
+	if e.msg == (kvExternalEditMsg{}) {
+		return kvExternalEditMsg{overlay: e.target, key: e.key, err: err}
+	}
+	return e.msg
+}
+
+// valueEdit writes the temp file only when bubbletea runs the editor, so
+// a command that never runs leaves no plain-text file behind.
+type valueEdit struct {
+	target         overlayKind
+	key, orig      string
+	sensitive      bool
+	stdin          io.Reader
+	stdout, stderr io.Writer
+	msg            kvExternalEditMsg
+}
+
+func (e *valueEdit) SetStdin(r io.Reader)  { e.stdin = r }
+func (e *valueEdit) SetStdout(w io.Writer) { e.stdout = w }
+func (e *valueEdit) SetStderr(w io.Writer) { e.stderr = w }
+
+// Run reports every outcome through e.msg. The callback ignores the
+// returned error.
+func (e *valueEdit) Run() error {
+	root := editTempRoot()
+	sweepStaleEditDirs(root, time.Now().Add(-staleEditDirAge))
+	dir, path, err := writeEditTempFile(root, e.key, e.orig)
 	if err != nil {
-		return func() tea.Msg {
-			return kvExternalEditMsg{overlay: target, key: key, err: err}
+		e.msg = kvExternalEditMsg{overlay: e.target, key: e.key, err: err}
+		return err
+	}
+	argv := editorArgv(editorCommand(), path, e.sensitive)
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = e.stdin, e.stdout, e.stderr
+	e.msg = finishEditTempFile(dir, path, e.target, e.key, e.orig, cmd.Run())
+	return nil
+}
+
+// editorArgv puts the no-copy flags before the user's own args, so a
+// "--" in $EDITOR cannot turn them into file names.
+func editorArgv(editor []string, path string, sensitive bool) []string {
+	argv := []string{editor[0]}
+	if sensitive {
+		argv = append(argv, noCopyEditorArgs(editor[0])...)
+	}
+	argv = append(argv, editor[1:]...)
+	return append(argv, path)
+}
+
+// staleEditDirAge is long, because another lfk can still have its editor open.
+const staleEditDirAge = 24 * time.Hour
+
+// sweepStaleEditDirs removes temp dirs left behind when lfk was killed
+// while the editor was open.
+func sweepStaleEditDirs(root string, before time.Time) {
+	if root == "" {
+		root = os.TempDir()
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	for _, ent := range entries {
+		if !ent.IsDir() || !strings.HasPrefix(ent.Name(), "lfk-edit-") {
+			continue
+		}
+		if fi, err := ent.Info(); err == nil && fi.ModTime().Before(before) {
+			_ = os.RemoveAll(filepath.Join(root, ent.Name()))
 		}
 	}
-	editor := editorCommand()
-	args := append([]string{}, editor[1:]...)
-	if sensitive {
-		args = append(args, noCopyEditorArgs(editor[0])...)
-	}
-	cmd := exec.Command(editor[0], append(args, path)...)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return finishEditTempFile(dir, path, target, key, value, err)
-	})
 }
 
 // writeEditTempFile writes value to a 0600 file in a fresh 0700 dir. The
 // file is named after the key so the editor picks the right file type.
-func writeEditTempFile(key, value string) (dir, path string, err error) {
-	dir, err = os.MkdirTemp(editTempRoot(), "lfk-edit-*")
+func writeEditTempFile(root, key, value string) (dir, path string, err error) {
+	dir, err = os.MkdirTemp(root, "lfk-edit-*")
 	if err != nil {
 		return "", "", fmt.Errorf("creating temp dir: %w", err)
 	}
@@ -136,7 +204,7 @@ func writeEditTempFile(key, value string) (dir, path string, err error) {
 
 // finishEditTempFile reads the edited file and removes the temp dir on
 // every path, so a decoded Secret value does not stay on disk.
-func finishEditTempFile(dir, path string, target overlayKind, key, orig string, editorErr error) tea.Msg {
+func finishEditTempFile(dir, path string, target overlayKind, key, orig string, editorErr error) kvExternalEditMsg {
 	defer func() { _ = os.RemoveAll(dir) }()
 	if editorErr != nil {
 		return kvExternalEditMsg{overlay: target, key: key, err: fmt.Errorf("editor: %w", editorErr)}
@@ -181,11 +249,21 @@ func keepTrailingNewline(orig, edited string) string {
 }
 
 // noCopyEditorArgs turns off swap, shada/viminfo, undo and backup files.
-// Plain vi is left out: busybox vi and nvi reject -n.
+// The name is resolved through symlinks, because vi is often vim
+// (vi -> vim.basic). Real vi is left out: busybox vi and nvi reject -n.
 func noCopyEditorArgs(editor string) []string {
-	switch filepath.Base(editor) {
-	case "vim", "nvim":
-		return []string{"-n", "-i", "NONE", "-c", "set noundofile nobackup nowritebackup"}
+	if p, err := exec.LookPath(editor); err == nil {
+		if real, err := filepath.EvalSymlinks(p); err == nil {
+			editor = real
+		}
+	}
+	name := strings.TrimSuffix(filepath.Base(editor), ".exe")
+	if name == "vim" || name == "nvim" || strings.HasPrefix(name, "vim.") {
+		return []string{
+			"-n", "-i", "NONE",
+			"--cmd", "set nomodeline",
+			"-c", "set noundofile nobackup nowritebackup noswapfile",
+		}
 	}
 	return nil
 }
