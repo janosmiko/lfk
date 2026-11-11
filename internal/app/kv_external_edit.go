@@ -1,13 +1,16 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
-	"time"
+	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -19,10 +22,14 @@ const externalEditSecretAction = "Edit Secret Value"
 // kvExternalEditMsg carries a value edited in $EDITOR back to the K/V
 // editor that opened it.
 type kvExternalEditMsg struct {
-	overlay overlayKind
-	key     string
-	value   string
-	err     error
+	// owner is the *model.SecretData or *model.ConfigMapData that was open
+	// when the editor started. A reload swaps the pointer, so a late result
+	// cannot land in another resource that has the same key.
+	owner      any
+	key        string
+	value      string
+	err        error
+	cleanupErr error
 }
 
 func (m Model) beginSecretExternalEdit() (tea.Model, tea.Cmd) {
@@ -36,7 +43,7 @@ func (m Model) beginSecretExternalEdit() (tea.Model, tea.Cmd) {
 	m.confirmTitle = "Edit in $EDITOR"
 	where := "on disk"
 	if editTempRoot() != "" {
-		where = "in RAM (/dev/shm)"
+		where = "in /dev/shm (memory that can swap to disk)"
 	}
 	m.confirmQuestion = fmt.Sprintf("Write the decoded value of %s in plain text to a temp file %s? Editor swap or undo files can keep a copy.", key, where)
 	m.blast.reset()
@@ -55,7 +62,7 @@ func (m Model) commitSecretExternalEdit() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	return m, editValueInEditor(overlaySecretEditor, key, value, true)
+	return m, editValueInEditor(m.secretData, key, value, true)
 }
 
 func (m Model) clearSecretExternalEditConfirm() Model {
@@ -73,42 +80,49 @@ func (m Model) beginConfigMapExternalEdit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	key := visible[m.configMapCursor]
-	return m, editValueInEditor(overlayConfigMapEditor, key, m.configMapData.Data[key], false)
+	return m, editValueInEditor(m.configMapData, key, m.configMapData.Data[key], false)
 }
 
 // updateKVExternalEdit stores the edited value as a pending change. The
 // user saves it with Enter, like an inline edit.
 func (m Model) updateKVExternalEdit(msg kvExternalEditMsg) (tea.Model, tea.Cmd) {
+	m = m.applyKVExternalEdit(msg)
+	if msg.cleanupErr != nil {
+		m.setStatusMessage("Temp file not removed, delete it by hand: "+msg.cleanupErr.Error(), true)
+	}
+	return m, scheduleStatusClear()
+}
+
+func (m Model) applyKVExternalEdit(msg kvExternalEditMsg) Model {
 	if msg.err != nil {
 		m.setStatusMessage("Edit in $EDITOR failed: "+msg.err.Error(), true)
-		return m, scheduleStatusClear()
+		return m
 	}
 	var data map[string]string
 	switch {
-	case msg.overlay == overlaySecretEditor && m.overlay == overlaySecretEditor && m.secretData != nil:
+	case m.overlay == overlaySecretEditor && m.secretData != nil && msg.owner == any(m.secretData):
 		data = m.secretData.Data
-	case msg.overlay == overlayConfigMapEditor && m.overlay == overlayConfigMapEditor && m.configMapData != nil:
+	case m.overlay == overlayConfigMapEditor && m.configMapData != nil && msg.owner == any(m.configMapData):
 		data = m.configMapData.Data
 	}
 	old, ok := data[msg.key]
-	if !ok {
-		m.setStatusMessage("Editor closed or key removed, edit of "+msg.key+" discarded", true)
-		return m, scheduleStatusClear()
-	}
-	if old == msg.value {
+	switch {
+	case !ok:
+		m.setStatusMessage("Editor closed, reloaded or key removed, edit of "+msg.key+" discarded", true)
+	case old == msg.value:
 		m.setStatusMessage("No changes to "+msg.key, false)
-		return m, scheduleStatusClear()
+	default:
+		data[msg.key] = msg.value
+		m.setStatusMessage("Updated "+msg.key+", press enter to save", false)
 	}
-	data[msg.key] = msg.value
-	m.setStatusMessage("Updated "+msg.key+", press enter to save", false)
-	return m, scheduleStatusClear()
+	return m
 }
 
 // editValueInEditor opens value in the user's editor and returns the
 // result as a kvExternalEditMsg. sensitive turns off editor copies
 // (swap, undo, backup) for editors that support it.
-func editValueInEditor(target overlayKind, key, value string, sensitive bool) tea.Cmd {
-	e := &valueEdit{target: target, key: key, orig: value, sensitive: sensitive}
+func editValueInEditor(owner any, key, value string, sensitive bool) tea.Cmd {
+	e := &valueEdit{base: kvExternalEditMsg{owner: owner, key: key}, orig: value, sensitive: sensitive}
 	return tea.Exec(e, e.result)
 }
 
@@ -116,7 +130,9 @@ func editValueInEditor(target overlayKind, key, value string, sensitive bool) te
 // case Run never ran and e.msg is empty.
 func (e *valueEdit) result(err error) tea.Msg {
 	if e.msg == (kvExternalEditMsg{}) {
-		return kvExternalEditMsg{overlay: e.target, key: e.key, err: err}
+		msg := e.base
+		msg.err = err
+		return msg
 	}
 	return e.msg
 }
@@ -124,8 +140,8 @@ func (e *valueEdit) result(err error) tea.Msg {
 // valueEdit writes the temp file only when bubbletea runs the editor, so
 // a command that never runs leaves no plain-text file behind.
 type valueEdit struct {
-	target         overlayKind
-	key, orig      string
+	base           kvExternalEditMsg
+	orig           string
 	sensitive      bool
 	stdin          io.Reader
 	stdout, stderr io.Writer
@@ -140,16 +156,17 @@ func (e *valueEdit) SetStderr(w io.Writer) { e.stderr = w }
 // returned error.
 func (e *valueEdit) Run() error {
 	root := editTempRoot()
-	sweepStaleEditDirs(root, time.Now().Add(-staleEditDirAge))
-	dir, path, err := writeEditTempFile(root, e.key, e.orig)
+	sweepStaleEditDirs(root)
+	dir, path, err := writeEditTempFile(root, e.base.key, e.orig)
 	if err != nil {
-		e.msg = kvExternalEditMsg{overlay: e.target, key: e.key, err: err}
+		e.msg = e.base
+		e.msg.err = err
 		return err
 	}
 	argv := editorArgv(editorCommand(), path, e.sensitive)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = e.stdin, e.stdout, e.stderr
-	e.msg = finishEditTempFile(dir, path, e.target, e.key, e.orig, cmd.Run())
+	e.msg = finishEditTempFile(dir, path, e.base, e.orig, cmd.Run())
 	return nil
 }
 
@@ -164,12 +181,12 @@ func editorArgv(editor []string, path string, sensitive bool) []string {
 	return append(argv, path)
 }
 
-// staleEditDirAge is long, because another lfk can still have its editor open.
-const staleEditDirAge = 24 * time.Hour
+const editDirPrefix = "lfk-edit-"
 
 // sweepStaleEditDirs removes temp dirs left behind when lfk was killed
-// while the editor was open.
-func sweepStaleEditDirs(root string, before time.Time) {
+// while the editor was open. A dir name holds the pid of the lfk that
+// made it, and a dir is kept while that process is alive.
+func sweepStaleEditDirs(root string) {
 	if root == "" {
 		root = os.TempDir()
 	}
@@ -178,19 +195,35 @@ func sweepStaleEditDirs(root string, before time.Time) {
 		return
 	}
 	for _, ent := range entries {
-		if !ent.IsDir() || !strings.HasPrefix(ent.Name(), "lfk-edit-") {
+		rest, ok := strings.CutPrefix(ent.Name(), editDirPrefix)
+		if !ok || !ent.IsDir() {
 			continue
 		}
-		if fi, err := ent.Info(); err == nil && fi.ModTime().Before(before) {
+		pidStr, _, _ := strings.Cut(rest, "-")
+		if pid, err := strconv.Atoi(pidStr); err == nil && !processAlive(pid) {
 			_ = os.RemoveAll(filepath.Join(root, ent.Name()))
 		}
 	}
 }
 
+// processAlive errs toward true, so a reused pid only keeps a stale dir.
+func processAlive(pid int) bool {
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = p.Release() }()
+	if runtime.GOOS == "windows" {
+		return true // FindProcess fails on Windows when the process is gone.
+	}
+	err = p.Signal(syscall.Signal(0))
+	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
 // writeEditTempFile writes value to a 0600 file in a fresh 0700 dir. The
 // file is named after the key so the editor picks the right file type.
 func writeEditTempFile(root, key, value string) (dir, path string, err error) {
-	dir, err = os.MkdirTemp(root, "lfk-edit-*")
+	dir, err = os.MkdirTemp(root, fmt.Sprintf("%s%d-*", editDirPrefix, os.Getpid()))
 	if err != nil {
 		return "", "", fmt.Errorf("creating temp dir: %w", err)
 	}
@@ -204,20 +237,24 @@ func writeEditTempFile(root, key, value string) (dir, path string, err error) {
 
 // finishEditTempFile reads the edited file and removes the temp dir on
 // every path, so a decoded Secret value does not stay on disk.
-func finishEditTempFile(dir, path string, target overlayKind, key, orig string, editorErr error) kvExternalEditMsg {
-	defer func() { _ = os.RemoveAll(dir) }()
+func finishEditTempFile(dir, path string, base kvExternalEditMsg, orig string, editorErr error) (msg kvExternalEditMsg) {
+	msg = base
+	defer func() { msg.cleanupErr = os.RemoveAll(dir) }()
 	if editorErr != nil {
-		return kvExternalEditMsg{overlay: target, key: key, err: fmt.Errorf("editor: %w", editorErr)}
+		msg.err = fmt.Errorf("editor: %w", editorErr)
+		return msg
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return kvExternalEditMsg{overlay: target, key: key, err: fmt.Errorf("reading temp file: %w", err)}
+		msg.err = fmt.Errorf("reading temp file: %w", err)
+		return msg
 	}
-	return kvExternalEditMsg{overlay: target, key: key, value: keepTrailingNewline(orig, string(b))}
+	msg.value = keepTrailingNewline(orig, string(b))
+	return msg
 }
 
-// editTempRoot prefers /dev/shm (RAM-backed on Linux) so the value never
-// reaches a disk. Other systems use the per-user temp dir.
+// editTempRoot prefers /dev/shm (tmpfs on Linux), which keeps the value
+// off disk unless the system swaps. Other systems use the per-user temp dir.
 func editTempRoot() string {
 	if fi, err := os.Stat("/dev/shm"); err == nil && fi.IsDir() {
 		return "/dev/shm"

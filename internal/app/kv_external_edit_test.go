@@ -2,11 +2,12 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,42 +87,57 @@ func TestConfigMapEditor_ShiftEStartsEditorWithoutConfirm(t *testing.T) {
 func TestUpdateKVExternalEdit(t *testing.T) {
 	t.Run("edited value becomes a pending change", func(t *testing.T) {
 		m := configMapEditorModel()
-		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{overlay: overlayConfigMapEditor, key: "application.yml", value: "server:\n  port: 9090\n"})
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.configMapData, key: "application.yml", value: "server:\n  port: 9090\n"})
 		r := ret.(Model)
 		assert.Equal(t, "server:\n  port: 9090\n", r.configMapData.Data["application.yml"])
 		assert.True(t, r.configMapDataDirty())
 	})
 	t.Run("secret value becomes a pending change", func(t *testing.T) {
 		m := secretEditorModel()
-		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{overlay: overlaySecretEditor, key: "password", value: "new"})
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.secretData, key: "password", value: "new"})
 		r := ret.(Model)
 		assert.Equal(t, "new", r.secretData.Data["password"])
 		assert.True(t, r.secretDataDirty())
 	})
 	t.Run("unchanged value leaves the editor clean", func(t *testing.T) {
 		m := configMapEditorModel()
-		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{overlay: overlayConfigMapEditor, key: "application.yml", value: "server:\n  port: 8080\n"})
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.configMapData, key: "application.yml", value: "server:\n  port: 8080\n"})
 		r := ret.(Model)
 		assert.False(t, r.configMapDataDirty())
 	})
 	t.Run("editor closed meanwhile drops the result", func(t *testing.T) {
 		m := configMapEditorModel()
 		m.overlay = overlayNone
-		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{overlay: overlayConfigMapEditor, key: "application.yml", value: "x"})
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.configMapData, key: "application.yml", value: "x"})
 		assert.Equal(t, "server:\n  port: 8080\n", ret.(Model).configMapData.Data["application.yml"])
 	})
 	t.Run("deleted key drops the result", func(t *testing.T) {
 		m := configMapEditorModel()
-		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{overlay: overlayConfigMapEditor, key: "gone", value: "x"})
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.configMapData, key: "gone", value: "x"})
 		_, ok := ret.(Model).configMapData.Data["gone"]
 		assert.False(t, ok)
 	})
 	t.Run("editor error leaves the value and reports it", func(t *testing.T) {
 		m := configMapEditorModel()
-		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{overlay: overlayConfigMapEditor, key: "application.yml", err: errors.New("boom")})
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.configMapData, key: "application.yml", err: errors.New("boom")})
 		r := ret.(Model)
 		assert.Equal(t, "server:\n  port: 8080\n", r.configMapData.Data["application.yml"])
 		assert.True(t, r.statusMessageErr)
+	})
+	t.Run("result for a reloaded resource with the same key is dropped", func(t *testing.T) {
+		m := secretEditorModel()
+		launched := m.secretData
+		m.secretData = &model.SecretData{Keys: []string{"password"}, Data: map[string]string{"password": "other"}}
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: launched, key: "password", value: "new"})
+		assert.Equal(t, "other", ret.(Model).secretData.Data["password"])
+	})
+	t.Run("failed temp cleanup is reported", func(t *testing.T) {
+		m := configMapEditorModel()
+		ret, _ := m.updateKVExternalEdit(kvExternalEditMsg{owner: m.configMapData, key: "application.yml", value: "x", cleanupErr: errors.New("busy")})
+		r := ret.(Model)
+		assert.Equal(t, "x", r.configMapData.Data["application.yml"], "the edit still applies")
+		assert.True(t, r.statusMessageErr)
+		assert.Contains(t, r.statusMessage, "Temp file not removed")
 	})
 }
 
@@ -185,21 +201,27 @@ func TestEditorArgv_NoCopyFlagsBeforeUserArgs(t *testing.T) {
 }
 
 func TestSweepStaleEditDirs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses true as a short-lived process")
+	}
+	exited := exec.Command("true")
+	require.NoError(t, exited.Run())
+	deadPid := exited.Process.Pid
+
 	root := t.TempDir()
-	old := filepath.Join(root, "lfk-edit-old")
-	fresh := filepath.Join(root, "lfk-edit-new")
-	other := filepath.Join(root, "other-old")
-	for _, d := range []string{old, fresh, other} {
+	dead := filepath.Join(root, fmt.Sprintf("lfk-edit-%d-123", deadPid))
+	live := filepath.Join(root, fmt.Sprintf("lfk-edit-%d-456", os.Getpid()))
+	noPid := filepath.Join(root, "lfk-edit-abc")
+	other := filepath.Join(root, fmt.Sprintf("other-%d-1", deadPid))
+	for _, d := range []string{dead, live, noPid, other} {
 		require.NoError(t, os.Mkdir(d, 0o700))
 	}
-	past := time.Now().Add(-48 * time.Hour)
-	require.NoError(t, os.Chtimes(old, past, past))
-	require.NoError(t, os.Chtimes(other, past, past))
 
-	sweepStaleEditDirs(root, time.Now().Add(-staleEditDirAge))
+	sweepStaleEditDirs(root)
 
-	assert.NoDirExists(t, old)
-	assert.DirExists(t, fresh)
+	assert.NoDirExists(t, dead)
+	assert.DirExists(t, live, "a running lfk can still have its editor open")
+	assert.DirExists(t, noPid)
 	assert.DirExists(t, other)
 }
 
@@ -210,10 +232,10 @@ func TestValueEdit_RunEditsAndRemovesTempFile(t *testing.T) {
 	out := t.TempDir()
 	seenValue, seenPath := filepath.Join(out, "value"), filepath.Join(out, "path")
 	t.Setenv("KUBE_EDITOR", `sh -c 'cat "$1" > `+seenValue+`; printf %s "$1" > `+seenPath+`; printf new > "$1"' sh`)
-	e := &valueEdit{target: overlaySecretEditor, key: "password", orig: "s3cret", sensitive: true}
+	e := &valueEdit{base: kvExternalEditMsg{key: "password"}, orig: "s3cret", sensitive: true}
 	require.NoError(t, e.Run())
 
-	assert.Equal(t, kvExternalEditMsg{overlay: overlaySecretEditor, key: "password", value: "new"}, e.msg)
+	assert.Equal(t, kvExternalEditMsg{key: "password", value: "new"}, e.msg)
 	v, err := os.ReadFile(seenValue)
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", string(v), "editor got the decoded value")
@@ -224,9 +246,10 @@ func TestValueEdit_RunEditsAndRemovesTempFile(t *testing.T) {
 }
 
 func TestValueEdit_ResultWhenRunNeverRan(t *testing.T) {
-	e := &valueEdit{target: overlaySecretEditor, key: "password"}
+	owner := &model.SecretData{}
+	e := &valueEdit{base: kvExternalEditMsg{owner: owner, key: "password"}}
 	msg := e.result(errors.New("release terminal")).(kvExternalEditMsg)
-	assert.Equal(t, overlaySecretEditor, msg.overlay)
+	assert.Same(t, owner, msg.owner)
 	assert.Equal(t, "password", msg.key)
 	assert.Error(t, msg.err)
 }
@@ -236,7 +259,7 @@ func TestValueEdit_RunReportsTempFileError(t *testing.T) {
 	if editTempRoot() != "" {
 		t.Skip("/dev/shm is used instead of TMPDIR")
 	}
-	e := &valueEdit{target: overlayConfigMapEditor, key: "k", orig: "v"}
+	e := &valueEdit{base: kvExternalEditMsg{key: "k"}, orig: "v"}
 	assert.Error(t, e.Run())
 	assert.Error(t, e.result(nil).(kvExternalEditMsg).err)
 }
@@ -245,17 +268,20 @@ func TestWriteEditTempFile_PrivateAndRemoved(t *testing.T) {
 	dir, path, err := writeEditTempFile(t.TempDir(), "app.yml", "a: 1\n")
 	require.NoError(t, err)
 
-	di, err := os.Stat(dir)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o700), di.Mode().Perm())
-	fi, err := os.Stat(path)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	if runtime.GOOS != "windows" { // Windows reports 0777/0666 and uses ACLs
+		di, err := os.Stat(dir)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o700), di.Mode().Perm())
+		fi, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	}
 	assert.Equal(t, "app.yml", filepath.Base(path))
+	assert.Contains(t, filepath.Base(dir), fmt.Sprintf("lfk-edit-%d-", os.Getpid()))
 
 	require.NoError(t, os.WriteFile(path, []byte("a: 2\n"), 0o600))
-	msg := finishEditTempFile(dir, path, overlayConfigMapEditor, "app.yml", "a: 1\n", nil)
-	assert.Equal(t, kvExternalEditMsg{overlay: overlayConfigMapEditor, key: "app.yml", value: "a: 2\n"}, msg)
+	msg := finishEditTempFile(dir, path, kvExternalEditMsg{key: "app.yml"}, "a: 1\n", nil)
+	assert.Equal(t, kvExternalEditMsg{key: "app.yml", value: "a: 2\n"}, msg)
 	_, err = os.Stat(dir)
 	assert.True(t, os.IsNotExist(err), "temp dir must be removed after reading")
 }
@@ -263,7 +289,7 @@ func TestWriteEditTempFile_PrivateAndRemoved(t *testing.T) {
 func TestFinishEditTempFile_EditorErrorStillRemovesDir(t *testing.T) {
 	dir, path, err := writeEditTempFile(t.TempDir(), "password", "s3cret")
 	require.NoError(t, err)
-	msg := finishEditTempFile(dir, path, overlaySecretEditor, "password", "s3cret", errors.New("exit 1"))
+	msg := finishEditTempFile(dir, path, kvExternalEditMsg{key: "password"}, "s3cret", errors.New("exit 1"))
 	assert.Error(t, msg.err)
 	_, err = os.Stat(dir)
 	assert.True(t, os.IsNotExist(err))
