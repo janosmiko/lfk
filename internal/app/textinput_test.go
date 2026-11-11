@@ -502,3 +502,20 @@ func TestTextInput_MultibyteUpDownKeepsRuneColumn(t *testing.T) {
 	ti.Up()
 	assert.Equal(t, "ab", ti.CursorLeft())
 }
+
+func TestTextInput_UpDownKeepsDisplayColumnForWideRunes(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("界界界\nabcdef")
+	ti.Up() // column 6 on "abcdef" -> end of "界界界" (6 cells)
+	assert.Equal(t, "界界界", ti.CursorLeft())
+	ti.Down()
+	assert.Equal(t, "界界界\nabcdef", ti.CursorLeft())
+
+	ti.Set("abc\n界界")
+	ti.Up() // column 4 -> clamps to end of "abc"
+	assert.Equal(t, "abc", ti.CursorLeft())
+	ti.Set("abcd\n界界")
+	ti.Left() // column 2, after the first wide rune
+	ti.Up()
+	assert.Equal(t, "ab", ti.CursorLeft())
+}
