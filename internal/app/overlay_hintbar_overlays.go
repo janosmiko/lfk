@@ -193,6 +193,7 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 		{Key: "v", Desc: "toggle"},
 		{Key: "V", Desc: "all"},
 		{Key: "e", Desc: "edit"},
+		{Key: "E", Desc: "$EDITOR"},
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: kvCopyHintDesc(m)},
 		{Key: "␣", Desc: "select"},
@@ -243,6 +244,7 @@ func (m Model) overlayHintBarOverlayConfigMapEditor() string {
 	return m.renderHints([]ui.HintEntry{
 		{Key: "jk", Desc: "nav"},
 		{Key: "e", Desc: "edit"},
+		{Key: "E", Desc: "$EDITOR"},
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: kvCopyHintDesc(m)},
 		{Key: "␣", Desc: "select"},

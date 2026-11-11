@@ -819,6 +819,7 @@ enters edit mode for the selected (or new) entry.
 |---|---|
 | `j` / `k` | Move cursor up / down |
 | `e` | Edit selected key/value |
+| `E` | Edit selected value in `$KUBE_EDITOR` or `$EDITOR` (Secret and ConfigMap only) |
 | `a` | Add a new key/value entry |
 | `y` | Copy value (opens the format picker if rows are selected) |
 | `Space` | Toggle selection on the current row |
@@ -831,6 +832,8 @@ enters edit mode for the selected (or new) entry.
 `y` copies the cursor row's value when nothing is selected. It opens the format picker automatically when one or more rows are selected, so you don't silently copy a single value while ignoring the marked bundle.
 
 `Space` auto-advances the cursor after toggling, and works across non-adjacent rows.
+
+`E` writes the value to a temp file named after the key, so the editor picks the file type. After the editor exits, the value becomes a pending change, and `Enter` saves it. For a Secret, lfk asks first, because the temp file holds the decoded value in plain text. lfk puts the file on `/dev/shm` when it exists and deletes it after reading. For `vim` and `nvim`, lfk also turns off swap, undo, and backup files. Other editors can keep their own copies.
 
 The Labels/Annotations editor additionally has a `Tab` binding in the list
 view to switch between the labels pane and the annotations pane. Switching
