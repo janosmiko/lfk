@@ -1,6 +1,9 @@
 package app
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // TextInput is a simple readline-style text input with cursor positioning.
 // It supports insert, delete, word-delete, and cursor movement operations.
@@ -18,8 +21,9 @@ func (t *TextInput) Insert(s string) {
 // Backspace deletes the character before the cursor.
 func (t *TextInput) Backspace() {
 	if t.Cursor > 0 {
-		t.Value = t.Value[:t.Cursor-1] + t.Value[t.Cursor:]
-		t.Cursor--
+		_, n := utf8.DecodeLastRuneInString(t.Value[:t.Cursor])
+		t.Value = t.Value[:t.Cursor-n] + t.Value[t.Cursor:]
+		t.Cursor -= n
 	}
 }
 
@@ -85,55 +89,63 @@ func (t *TextInput) LineEnd() {
 // Left moves the cursor one position to the left.
 func (t *TextInput) Left() {
 	if t.Cursor > 0 {
-		t.Cursor--
+		_, n := utf8.DecodeLastRuneInString(t.Value[:t.Cursor])
+		t.Cursor -= n
 	}
 }
 
 // Right moves the cursor one position to the right.
 func (t *TextInput) Right() {
 	if t.Cursor < len(t.Value) {
-		t.Cursor++
+		_, n := utf8.DecodeRuneInString(t.Value[t.Cursor:])
+		t.Cursor += n
 	}
 }
 
-// Up moves the cursor to the same byte-column on the previous
+// runeOffset returns the byte offset of the col-th rune in line, or
+// len(line) when the line is shorter. Up/Down use it so the cursor
+// never lands inside a multibyte character.
+func runeOffset(line string, col int) int {
+	for i := range line {
+		if col == 0 {
+			return i
+		}
+		col--
+	}
+	return len(line)
+}
+
+// Up moves the cursor to the same rune-column on the previous
 // `\n`-delimited line. No-op when already on the first line.
 // If the previous line is shorter than the current column, lands at
 // its end. Used by the multi-line edit pane (Secret/ConfigMap/Label
 // editors) so arrow-up navigates between hard-wrapped lines.
 func (t *TextInput) Up() {
 	lineStart := strings.LastIndex(t.Value[:t.Cursor], "\n") + 1
-	col := t.Cursor - lineStart
 	if lineStart == 0 {
 		return // already on first line
 	}
+	col := utf8.RuneCountInString(t.Value[lineStart:t.Cursor])
 	prevLineEnd := lineStart - 1 // index of the '\n'
 	prevLineStart := strings.LastIndex(t.Value[:prevLineEnd], "\n") + 1
-	prevLineLen := prevLineEnd - prevLineStart
-	if col > prevLineLen {
-		col = prevLineLen
-	}
-	t.Cursor = prevLineStart + col
+	t.Cursor = prevLineStart + runeOffset(t.Value[prevLineStart:prevLineEnd], col)
 }
 
-// Down moves the cursor to the same byte-column on the next
+// Down moves the cursor to the same rune-column on the next
 // `\n`-delimited line. No-op when already on the last line.
 func (t *TextInput) Down() {
 	lineStart := strings.LastIndex(t.Value[:t.Cursor], "\n") + 1
-	col := t.Cursor - lineStart
+	col := utf8.RuneCountInString(t.Value[lineStart:t.Cursor])
 	nextNL := strings.Index(t.Value[t.Cursor:], "\n")
 	if nextNL == -1 {
 		return // no next line
 	}
 	nextLineStart := t.Cursor + nextNL + 1
-	nextLineLen := len(t.Value) - nextLineStart
+	nextLineEnd := len(t.Value)
 	if idx := strings.Index(t.Value[nextLineStart:], "\n"); idx != -1 {
-		nextLineLen = idx
+		nextLineEnd = nextLineStart + idx
 	}
-	if col > nextLineLen {
-		col = nextLineLen
-	}
-	t.Cursor = nextLineStart + col
+	t.Cursor = nextLineStart + runeOffset(t.Value[nextLineStart:nextLineEnd], col)
 }
 
 // Set replaces the entire value and moves the cursor to the end.
