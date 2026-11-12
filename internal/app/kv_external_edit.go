@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -30,6 +32,19 @@ type kvExternalEditMsg struct {
 	value      string
 	err        error
 	cleanupErr error
+	// quick marks an editor that returned within a second, which is how a
+	// GUI editor without its wait flag behaves.
+	quick bool
+}
+
+// refuseBinaryExternalEdit blocks values a text editor can re-encode on
+// save, which would corrupt them without a visible change.
+func (m Model) refuseBinaryExternalEdit(key, value string) (Model, bool) {
+	if utf8.ValidString(value) && !strings.ContainsRune(value, 0) {
+		return m, false
+	}
+	m.setStatusMessage(key+" is binary, not opened in $EDITOR", true)
+	return m, true
 }
 
 func (m Model) beginSecretExternalEdit() (tea.Model, tea.Cmd) {
@@ -38,6 +53,9 @@ func (m Model) beginSecretExternalEdit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	key := visible[m.secretCursor]
+	if m, refused := m.refuseBinaryExternalEdit(key, m.secretData.Data[key]); refused {
+		return m, scheduleStatusClear()
+	}
 	m.confirmAction = key
 	m.pendingAction = externalEditSecretAction
 	m.confirmTitle = "Edit in $EDITOR"
@@ -80,6 +98,9 @@ func (m Model) beginConfigMapExternalEdit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	key := visible[m.configMapCursor]
+	if m, refused := m.refuseBinaryExternalEdit(key, m.configMapData.Data[key]); refused {
+		return m, scheduleStatusClear()
+	}
 	return m, editValueInEditor(m.configMapData, key, m.configMapData.Data[key], false)
 }
 
@@ -109,6 +130,8 @@ func (m Model) applyKVExternalEdit(msg kvExternalEditMsg) Model {
 	switch {
 	case !ok:
 		m.setStatusMessage("Editor closed, reloaded or key removed, edit of "+msg.key+" discarded", true)
+	case old == msg.value && msg.quick:
+		m.setStatusMessage("No changes to "+msg.key+". A GUI editor needs its wait flag, like code --wait", false)
 	case old == msg.value:
 		m.setStatusMessage("No changes to "+msg.key, false)
 	default:
@@ -166,8 +189,20 @@ func (e *valueEdit) Run() error {
 	argv := editorArgv(editorCommand(), path, e.sensitive)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = e.stdin, e.stdout, e.stderr
-	e.msg = finishEditTempFile(dir, path, e.base, e.orig, cmd.Run())
+	start := time.Now()
+	editorErr := cmd.Run()
+	e.msg = finishEditTempFile(dir, path, e.base, e.orig, editorErr)
+	e.msg.quick = time.Since(start) < time.Second
 	return nil
+}
+
+// sweepStaleEditDirsCmd runs the sweep at startup, so a value left by a
+// killed lfk does not wait for the next external edit.
+func sweepStaleEditDirsCmd(root string) tea.Cmd {
+	return func() tea.Msg {
+		sweepStaleEditDirs(root)
+		return nil
+	}
 }
 
 // editorArgv puts the no-copy flags before the user's own args, so a

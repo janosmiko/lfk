@@ -235,7 +235,7 @@ func TestValueEdit_RunEditsAndRemovesTempFile(t *testing.T) {
 	e := &valueEdit{base: kvExternalEditMsg{key: "password"}, orig: "s3cret", sensitive: true}
 	require.NoError(t, e.Run())
 
-	assert.Equal(t, kvExternalEditMsg{key: "password", value: "new"}, e.msg)
+	assert.Equal(t, kvExternalEditMsg{key: "password", value: "new", quick: true}, e.msg)
 	v, err := os.ReadFile(seenValue)
 	require.NoError(t, err)
 	assert.Equal(t, "s3cret", string(v), "editor got the decoded value")
@@ -293,4 +293,48 @@ func TestFinishEditTempFile_EditorErrorStillRemovesDir(t *testing.T) {
 	assert.Error(t, msg.err)
 	_, err = os.Stat(dir)
 	assert.True(t, os.IsNotExist(err))
+}
+
+func TestExternalEdit_RefusesBinaryValue(t *testing.T) {
+	for _, value := range []string{"\xff\xfe", "a\x00b"} {
+		s := secretEditorModel()
+		s.secretData.Data["password"] = value
+		ret, _ := s.handleSecretEditorKey(runeKey('E'))
+		r := ret.(Model)
+		assert.Equal(t, overlaySecretEditor, r.overlay, "no plain-text confirm for %q", value)
+		assert.True(t, r.statusMessageErr)
+		assert.Contains(t, r.statusMessage, "binary")
+
+		c := configMapEditorModel()
+		c.configMapData.Data["application.yml"] = value
+		ret, _ = c.handleConfigMapEditorKey(runeKey('E'))
+		assert.True(t, ret.(Model).statusMessageErr)
+		assert.Contains(t, ret.(Model).statusMessage, "binary")
+	}
+}
+
+func TestUpdateKVExternalEdit_QuickReturnHintsAtWaitFlag(t *testing.T) {
+	m := configMapEditorModel()
+	msg := kvExternalEditMsg{owner: m.configMapData, key: "application.yml", value: "server:\n  port: 8080\n"}
+
+	ret, _ := m.updateKVExternalEdit(msg)
+	assert.NotContains(t, ret.(Model).statusMessage, "--wait")
+
+	msg.quick = true
+	ret, _ = m.updateKVExternalEdit(msg)
+	assert.Contains(t, ret.(Model).statusMessage, "--wait")
+}
+
+func TestSweepStaleEditDirsCmd(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses true as a short-lived process")
+	}
+	exited := exec.Command("true")
+	require.NoError(t, exited.Run())
+	root := t.TempDir()
+	dead := filepath.Join(root, fmt.Sprintf("lfk-edit-%d-1", exited.Process.Pid))
+	require.NoError(t, os.Mkdir(dead, 0o700))
+
+	assert.Nil(t, sweepStaleEditDirsCmd(root)())
+	assert.NoDirExists(t, dead)
 }
