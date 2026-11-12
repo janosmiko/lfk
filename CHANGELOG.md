@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.19.17](https://github.com/janosmiko/lfk/compare/v0.19.16...v0.19.17) (2026-11-12)
+
+
+### Features
+
+* edit a Secret or ConfigMap value in $EDITOR with shift+e ([#928](https://github.com/janosmiko/lfk/issues/928)) ([74d6f77](https://github.com/janosmiko/lfk/commit/74d6f771ec81b3ae6b2963ef23d6dcc9a56ee871))
+
+
+### Bug Fixes
+
+* **deps:** bump Go toolchain to go1.27.4 for GO-2026-6859 ([#926](https://github.com/janosmiko/lfk/issues/926)) ([33b588d](https://github.com/janosmiko/lfk/commit/33b588d559c1e8d677a978fdfe72af86ae63c94b))
+* insert space and non-ASCII text in editor and Log Top inputs ([#925](https://github.com/janosmiko/lfk/issues/925)) ([e7d55db](https://github.com/janosmiko/lfk/commit/e7d55dbe57870f763f00e4bbdc48860c9f23c937))
+
 ## [0.19.16](https://github.com/janosmiko/lfk/compare/v0.19.15...v0.19.16) (2026-11-07)
 
 
