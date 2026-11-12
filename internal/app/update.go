@@ -553,6 +553,9 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case templateApplyMsg:
 		mdl, cmd := m.updateTemplateApply(msg)
 		return mdl, cmd, true
+	case kvExternalEditMsg:
+		mdl, cmd := m.updateKVExternalEdit(msg)
+		return mdl, cmd, true
 	}
 	return m.updateExecAndLogResultMsg(msg)
 }

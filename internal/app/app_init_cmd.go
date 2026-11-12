@@ -19,6 +19,7 @@ func (m Model) Init() tea.Cmd {
 		// startup on it serialises a clientcmd.ClientConfig() call per
 		// kubeconfig context; see the comment on discoveryCachePreloadCmd.
 		discoveryCachePreloadCmd(m.reqCtx, m.client),
+		sweepStaleEditDirsCmd(editTempRoot()),
 	}
 	if m.stderrChan != nil {
 		cmds = append(cmds, m.waitForStderr())

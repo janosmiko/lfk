@@ -67,6 +67,8 @@ func (m Model) handleSecretEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		// Edit selected value.
 		return m.handleSecretEditorKeyE()
+	case "E":
+		return m.beginSecretExternalEdit()
 	case "a":
 		// Add new key-value pair. Clear the / search so the newly-added
 		// row is visible (it likely won't match an existing query).
@@ -167,6 +169,8 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 	case "e":
 		// Edit selected value.
 		return m.handleConfigMapEditorKeyE()
+	case "E":
+		return m.beginConfigMapExternalEdit()
 	case "a":
 		// Add new key-value pair. Clear search so the new row is visible.
 		m.resetEditorSearch()
