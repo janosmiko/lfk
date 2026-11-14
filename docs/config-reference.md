@@ -827,8 +827,11 @@ custom_actions:
 | `key` | Yes | Shortcut key in the action menu |
 | `description` | No | Description shown next to the action |
 | `read_only_safe` | No | When `true`, available in read-only mode. Defaults to `false`. |
+| `background` | No | When `true`, runs without suspending the TUI. Defaults to `false`. |
 
 Set `read_only_safe: true` for view-only commands (e.g. `kubectl describe`, `kubectl logs`).
+
+A `background` action has no terminal, so do not set it on interactive commands (e.g. `ssh`, `kubectl exec -it`).
 
 ### Template variables
 

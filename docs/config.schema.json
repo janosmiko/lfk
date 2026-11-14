@@ -608,6 +608,11 @@
           "type": "boolean",
           "description": "Declare the action does not change cluster state, so it stays available in read-only mode. Defaults to false (treated as mutating).",
           "default": false
+        },
+        "background": {
+          "type": "boolean",
+          "description": "Run the command without suspending the TUI. A failure opens its output in a viewer.",
+          "default": false
         }
       }
     },

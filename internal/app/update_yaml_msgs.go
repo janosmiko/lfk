@@ -108,6 +108,18 @@ func (m Model) updateActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
 
+// A failed command can still have changed the cluster, so the list refreshes on every branch.
+func (m Model) updateCustomActionFailed(msg customActionFailedMsg) (tea.Model, tea.Cmd) {
+	refresh := m.refreshCurrentLevel()
+	typing := m.filterActive || m.searchActive || m.commandBarActive
+	if m.currentTabUID() != msg.owner || m.mode != modeExplorer || m.overlay != overlayNone || typing {
+		m.setStatusMessage(msg.title, true)
+		return m, tea.Batch(refresh, scheduleStatusClear())
+	}
+	mdl, cmd := m.updateDescribeLoaded(describeLoadedMsg{title: msg.title, content: msg.output})
+	return mdl, tea.Batch(refresh, cmd)
+}
+
 func (m Model) updateYamlClipboard(msg yamlClipboardMsg) (tea.Model, tea.Cmd) {
 	// Pure-error path (content empty): surface the error and stop.
 	// Partial-success path (content present + err set) falls through to

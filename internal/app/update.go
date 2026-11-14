@@ -398,6 +398,9 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case actionResultMsg:
 		mdl, cmd := m.updateActionResult(msg)
 		return mdl, cmd, true
+	case customActionFailedMsg:
+		mdl, cmd := m.updateCustomActionFailed(msg)
+		return mdl, cmd, true
 	case commandBarResultMsg:
 		mdl, cmd := m.updateCommandBarResult(msg)
 		return mdl, cmd, true
