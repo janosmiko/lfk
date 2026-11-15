@@ -308,14 +308,21 @@ func (m Model) toggleCronJobSuspend() tea.Cmd {
 	})
 }
 
-func (m Model) execCustomAction(label, expandedCmd string) tea.Cmd {
+func (m Model) execCustomAction(ca ui.CustomAction, expandedCmd string) tea.Cmd {
+	label := ca.Label
 	ctx := m.actionCtx.context
 	if ctx == "" {
 		ctx = m.nav.Context
 	}
-	cmd := exec.Command("sh", "-c", expandedCmd)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+	env := append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logger.Info("Running custom action", "action", label, "context", ctx)
+
+	if ca.Background {
+		return m.backgroundCustomAction(ca, expandedCmd, ctx, env)
+	}
+
+	cmd := exec.Command("sh", "-c", expandedCmd)
+	cmd.Env = env
 
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {

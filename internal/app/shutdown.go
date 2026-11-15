@@ -81,6 +81,9 @@ func (m *Model) signalShutdown() {
 	m.cancelAllTabLogStreams()
 	m.closeAllExecPTYs()
 	m.cancelInFlightRequests()
+	if m.quitCancel != nil {
+		m.quitCancel()
+	}
 }
 
 // shutdownDrainCmd runs drainShutdown on a background goroutine and emits

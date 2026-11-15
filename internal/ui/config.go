@@ -478,6 +478,8 @@ type CustomAction struct {
 	// in read-only mode unless the user explicitly opts in. Set to true for
 	// view-only commands (port-forward listings, "kubectl describe", etc.).
 	ReadOnlySafe bool `json:"read_only_safe" yaml:"read_only_safe"`
+	// Background runs the command without suspending the TUI.
+	Background bool `json:"background" yaml:"background"`
 }
 
 // ConfigCustomActions maps resource kinds to user-defined custom actions.

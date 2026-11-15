@@ -71,6 +71,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	model.ShowRareResources = ui.ConfigShowRareTypes
 
 	reqCtx, reqCancel := context.WithCancel(context.Background())
+	quitCtx, quitCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	pinnedSummariesSt := loadPinnedSummariesState()
 	hiddenSt := loadHiddenTypesState()
@@ -178,6 +179,8 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		logReaderInFlight:          make(map[chan string]bool),
 		reqCtx:                     reqCtx,
 		reqCancel:                  reqCancel,
+		quitCtx:                    quitCtx,
+		quitCancel:                 quitCancel,
 		middleTableRenderer:        ui.NewTableRenderer(),
 		tabs: []TabState{{
 			uid:                        nextTabUID(),

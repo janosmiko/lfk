@@ -278,11 +278,12 @@ func collectLiteralExecCalls(t *testing.T, root string) []execCallSite {
 // since whole-module type-checking is a meaningfully heavier and slower
 // addition than this guard warrants for shapes no current call site uses.
 var externalBinaryLookupAllowlist = map[string]map[string]bool{
-	filepath.Join("internal", "k8s", "kubectl_path.go"):       {"kubectl": true},
-	filepath.Join("internal", "app", "commands_exec_helm.go"): {"helm": true, "sh": true},
-	filepath.Join("internal", "app", "commands_exec_misc.go"): {"trivy": true, "sh": true},
-	filepath.Join("internal", "app", "commandbar_execute.go"): {"sh": true},
-	filepath.Join("internal", "app", "commands.go"):           {"sh": true},
+	filepath.Join("internal", "k8s", "kubectl_path.go"):             {"kubectl": true},
+	filepath.Join("internal", "app", "commands_exec_helm.go"):       {"helm": true, "sh": true},
+	filepath.Join("internal", "app", "commands_exec_misc.go"):       {"trivy": true, "sh": true},
+	filepath.Join("internal", "app", "commandbar_execute.go"):       {"sh": true},
+	filepath.Join("internal", "app", "commands.go"):                 {"sh": true},
+	filepath.Join("internal", "app", "custom_action_background.go"): {"sh": true},
 }
 
 // TestNoUnguardedExternalBinaryLookup walks the module for every

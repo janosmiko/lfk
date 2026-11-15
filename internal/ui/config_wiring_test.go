@@ -115,6 +115,7 @@ custom_actions:
       command: echo ping
       key: ctrl+z
       description: ping the pod
+      background: true
 filter_presets:
   Pod:
     - name: Pending
@@ -338,6 +339,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	require.NotNil(t, ConfigViews["deployment"])
 	require.Contains(t, ConfigCustomActions, "Pod", "custom_actions")
 	assert.Equal(t, "Ping", ConfigCustomActions["Pod"][0].Label)
+	assert.True(t, ConfigCustomActions["Pod"][0].Background, "custom_actions background")
 	require.Contains(t, ConfigFilterPresets, "pod", "filter_presets")
 	assert.Equal(t, "Pending", ConfigFilterPresets["pod"][0].Match.Status)
 	assert.Equal(t, "Deployment", ConfigGotoTargets["gx"].Kind, "goto_targets")

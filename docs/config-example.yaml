@@ -555,6 +555,11 @@ custom_actions:
 #     command: "kubectl exec -it {name} -n {namespace} --context {context} -- tcpdump -i any -w /tmp/capture.pcap"
 #     key: "T"
 #     description: "Capture network traffic"
+#   - label: "Mark Reviewed"
+#     command: "kubectl label pod {name} -n {namespace} --context {context} reviewed=true --overwrite"
+#     key: "M"
+#     description: "Label the pod without suspending the TUI"
+#     background: true
 # Deployment:
 #   - label: "Rollout History"
 #     command: "kubectl rollout history deployment/{name} -n {namespace} --context {context}"

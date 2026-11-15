@@ -396,8 +396,8 @@ type Model struct {
 	// Context cancellation for in-flight API requests. Cancelled on every
 	// navigation change so stale requests are aborted early instead of
 	// running to completion.
-	reqCtx    context.Context
-	reqCancel context.CancelFunc
+	reqCtx, quitCtx       context.Context // quitCtx only ends at quit
+	reqCancel, quitCancel context.CancelFunc
 
 	// Tab support.
 	tabs      []TabState
