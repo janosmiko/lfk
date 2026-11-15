@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.18](https://github.com/janosmiko/lfk/compare/v0.19.17...v0.19.18) (2026-11-15)
+
+
+### Features
+
+* run custom actions in the background ([#931](https://github.com/janosmiko/lfk/issues/931)) ([bb0143f](https://github.com/janosmiko/lfk/commit/bb0143f487684d86722af6c25c3f568354359e1d))
+
 ## [0.19.17](https://github.com/janosmiko/lfk/compare/v0.19.16...v0.19.17) (2026-11-12)
 
 
