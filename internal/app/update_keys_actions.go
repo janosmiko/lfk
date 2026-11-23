@@ -707,15 +707,8 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 		return m, scheduleStatusClear(), true
 	}
 	if m.activeFilterPreset != nil {
-		// Clear the active filter preset and restore the full list.
-		name := m.activeFilterPreset.Name
-		m.activeFilterPreset = nil
-		m.setMiddleItems(m.unfilteredMiddleItems)
-		m.unfilteredMiddleItems = nil
-		m.setCursor(0)
-		m.clampCursor()
-		m.setStatusMessage("Filter cleared: "+name, false)
-		return m, tea.Batch(scheduleStatusClear(), m.loadPreview()), true
+		mdl, cmd := m.clearFilterPreset()
+		return mdl, cmd, true
 	}
 	// Open the filter preset overlay. Orphan presets require a context-wide
 	// scan and are omitted at the union sentinel. Other quick filters remain

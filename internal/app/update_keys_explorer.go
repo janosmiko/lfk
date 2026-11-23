@@ -263,17 +263,7 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 		return m, m.loadPreview()
 	}
 	if m.activeFilterPreset != nil {
-		// Mirror handleExplorerActionKeyFilterPresets so Esc and a second
-		// press of `.` are interchangeable: drop the preset, restore the
-		// pre-filter list, and tell the user which preset was cleared.
-		name := m.activeFilterPreset.Name
-		m.activeFilterPreset = nil
-		m.setMiddleItems(m.unfilteredMiddleItems)
-		m.unfilteredMiddleItems = nil
-		m.setCursor(0)
-		m.clampCursor()
-		m.setStatusMessage("Filter cleared: "+name, false)
-		return m, tea.Batch(scheduleStatusClear(), m.loadPreview())
+		return m.clearFilterPreset()
 	}
 	if m.fullscreenDashboard {
 		m.fullscreenDashboard = false

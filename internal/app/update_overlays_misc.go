@@ -129,6 +129,22 @@ func (m Model) handleFilterPresetOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea
 	return m, nil
 }
 
+// clearFilterPreset drops the active preset, restores the full list, and keeps
+// the cursor on the row that was selected in the filtered list.
+func (m Model) clearFilterPreset() (tea.Model, tea.Cmd) {
+	var name, ns, extra, kind, cluster string
+	if sel := m.selectedMiddleItem(); sel != nil {
+		name, ns, extra, kind, cluster = sel.Name, sel.Namespace, sel.Extra, sel.Kind, sel.ClusterName
+	}
+	presetName := m.activeFilterPreset.Name
+	m.activeFilterPreset = nil
+	m.setMiddleItems(m.unfilteredMiddleItems)
+	m.unfilteredMiddleItems = nil
+	m.restoreCursorAfterLoad(name, ns, extra, kind, cluster)
+	m.setStatusMessage("Filter cleared: "+presetName, false)
+	return m, tea.Batch(scheduleStatusClear(), m.loadPreview())
+}
+
 // applyFilterPreset applies a filter preset to the middle items and closes the overlay.
 func (m Model) applyFilterPreset(preset FilterPreset) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
