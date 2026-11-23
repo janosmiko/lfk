@@ -21,13 +21,13 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `J` / `K` | Scroll preview pane down / up |
 | `o` / `O` | Jump to owner/controller / open Object Explorer |
 | `c` | Jump to a pod's resource claim, cycling through multiple claims on repeated presses |
-| `Backspace` | Jump back through teleport history |
+| `Backspace` | Jump back through navigation history |
 
 In the Events list, `z` toggles event grouping instead of expand/collapse.
 
 `x`, at the resource types level, also lets you pin or unpin the selected type's dashboard summary through the action menu. Pin, hide, and summary choices are saved per cluster context, or per union set.
 
-Teleport history records owner, port-forward, orphan, finding, and mark jumps. Hierarchical `h`/`l` navigation does not push a history entry.
+Navigation history is a stack. Every move to another level or object pushes an entry: `h`/`l`, mouse clicks, and owner, port-forward, orphan, finding, and mark jumps. Cursor moves and tab switches do not.
 
 ## Goto navigation
 
@@ -1423,7 +1423,7 @@ keybindings:
   preview_up: "K"        # Scroll preview up
   jump_owner: "o"        # Jump to owner
   jump_claim: "c"        # Jump to resource claim (cycles on repeated presses)
-  jump_back: "backspace"     # Jump back through teleport history
+  jump_back: "backspace"     # Jump back through navigation history
   toggle_rare: "H"       # Toggle rarely used resource types in the sidebar
 
   # Views and Modes

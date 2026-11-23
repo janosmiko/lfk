@@ -118,7 +118,11 @@ func cloneNavSnapshots(src []navSnapshot) []navSnapshot {
 // must be called by every "teleport" site BEFORE it mutates navigation state,
 // so jump_back can restore the user's origin.
 func (m *Model) pushJumpHistory() {
-	m.jumpBackStack = append(m.jumpBackStack, m.captureNavSnapshot())
+	m.pushNavSnapshot(m.captureNavSnapshot())
+}
+
+func (m *Model) pushNavSnapshot(snap navSnapshot) {
+	m.jumpBackStack = append(m.jumpBackStack, snap)
 	if len(m.jumpBackStack) > jumpHistoryCap {
 		m.jumpBackStack = m.jumpBackStack[len(m.jumpBackStack)-jumpHistoryCap:]
 	}
@@ -319,4 +323,40 @@ func (m Model) jumpBack() (tea.Model, tea.Cmd) {
 	cmd := m.restoreNavSnapshot(snap)
 	m.saveCurrentSession()
 	return m, cmd
+}
+
+// trackNavHistory runs a key or click handler and records the origin on the
+// jump-back stack when the handler moved to another location, so plain
+// drill-in and drill-out navigation is walkable with JumpBack too.
+func (m Model) trackNavHistory(handle func(Model) (tea.Model, tea.Cmd)) (tea.Model, tea.Cmd) {
+	// The handler rewrites these globals, so read the origin's values first.
+	middleScroll, leftScroll := ui.ActiveMiddleScroll, ui.ActiveLeftScroll
+	mdl, cmd := handle(m)
+	after, ok := mdl.(Model)
+	if !ok || sameNavLocation(m.nav, after.nav) {
+		return mdl, cmd
+	}
+	// A tab switch swaps in another tab's nav and stack, and a jump back
+	// pops the stack. Neither is a move away from the origin.
+	if after.activeTab != m.activeTab || len(after.tabs) != len(m.tabs) ||
+		len(after.jumpBackStack) < len(m.jumpBackStack) {
+		return mdl, cmd
+	}
+	// Teleports push their own origin before they move.
+	if n := len(after.jumpBackStack); n > 0 && sameNavLocation(after.jumpBackStack[n-1].nav, m.nav) {
+		return mdl, cmd
+	}
+	// ponytail: the snapshot is taken after the handler ran, from slices it
+	// shares with after. Snapshot before the handler if navigation ever starts
+	// writing item slices in place.
+	snap := m.captureNavSnapshot()
+	snap.middleScroll, snap.leftScroll = middleScroll, leftScroll
+	after.pushNavSnapshot(snap)
+	return after, cmd
+}
+
+func sameNavLocation(a, b model.NavigationState) bool {
+	return a.Level == b.Level && a.Context == b.Context &&
+		a.ResourceType.ResourceRef() == b.ResourceType.ResourceRef() &&
+		a.ResourceName == b.ResourceName && a.OwnedName == b.OwnedName
 }
