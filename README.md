@@ -82,6 +82,10 @@ LFK is Apache-2.0 and stays free. I build it in my free time, and the tools it t
 
 Sponsorship pays for the IDE licenses and AI assistants that go into development. More of it buys more hours for LFK.
 
+Thank you to the people who sponsor LFK:
+
+<a href="https://github.com/Knapock"><img src="https://github.com/Knapock.png" width="48" alt="Knapock"></a>
+
 Money is not the only way to help. Star the repo, file a good bug report, or tell one colleague who lives in `kubectl`.
 
 Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
