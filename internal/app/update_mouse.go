@@ -111,7 +111,7 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if !isMousePress(msg) {
 			return m, nil
 		}
-		return m.handleMouseClick(mouse.X, mouse.Y)
+		return m.trackNavHistory(func(m Model) (tea.Model, tea.Cmd) { return m.handleMouseClick(mouse.X, mouse.Y) })
 	case tea.MouseRight:
 		if !isMousePress(msg) {
 			return m, nil

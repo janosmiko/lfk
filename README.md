@@ -324,7 +324,7 @@ Inside the namespace selector:
 |---|---|
 | `0` / `1` / `2` | Clusters / resource types / resources level, both ways |
 | `o` | Owner or controller of the selected resource |
-| `Backspace` | Back through teleport history |
+| `Backspace` | Back through navigation history |
 | `g` + key | Goto resource type (press `g` to open the goto menu) |
 | `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase context-aware, uppercase context-free) |
 | `\` / `A` | Namespace selector / toggle all-namespaces |

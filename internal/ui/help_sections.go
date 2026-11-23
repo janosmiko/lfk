@@ -82,7 +82,7 @@ func explorerHelpSections(kb Keybindings) []helpSection {
 				{kb.LevelCluster + "/" + kb.LevelTypes + "/" + kb.LevelResources, "Jump to cluster/type/resource level"},
 				{kb.JumpOwner, "Jump to owner/controller"},
 				{kb.JumpClaim, "Jump to resource claim (repeat to cycle)"},
-				{kb.JumpBack, "Jump back through teleport history"},
+				{kb.JumpBack, "Jump back through navigation history"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down / up"},
 				{kb.ExpandCollapse, "Expand / collapse all groups (Events: group duplicates)"},
 			},
