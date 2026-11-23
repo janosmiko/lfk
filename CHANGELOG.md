@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.20](https://github.com/janosmiko/lfk/compare/v0.19.19...v0.19.20) (2026-11-23)
+
+
+### Bug Fixes
+
+* record plain navigation in jump-back history ([#942](https://github.com/janosmiko/lfk/issues/942)) ([ae08d64](https://github.com/janosmiko/lfk/commit/ae08d648e8e12a4aa380e2f6a154df0a0134cc22))
+* refresh flake vendorHash after bubbletea 2.1.2 and x/ansi bumps ([#949](https://github.com/janosmiko/lfk/issues/949)) ([d7a54d4](https://github.com/janosmiko/lfk/commit/d7a54d4dd0300ccf01daf8a0762badfab2d557e2))
+
 ## [0.19.19](https://github.com/janosmiko/lfk/compare/v0.19.18...v0.19.19) (2026-11-23)
 
 
