@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.19](https://github.com/janosmiko/lfk/compare/v0.19.18...v0.19.19) (2026-11-23)
+
+
+### Bug Fixes
+
+* keep cursor on selected row when clearing a quick filter ([#939](https://github.com/janosmiko/lfk/issues/939)) ([0a930f6](https://github.com/janosmiko/lfk/commit/0a930f639ba6604385a3d377b1bf4210ae8d5a6e))
+* refresh flake vendorHash after lipgloss 2.1.1 bump ([#940](https://github.com/janosmiko/lfk/issues/940)) ([a97ab33](https://github.com/janosmiko/lfk/commit/a97ab33abfeab65df2aa1be4fb37d68a3f6b8ac5))
+
 ## [0.19.18](https://github.com/janosmiko/lfk/compare/v0.19.17...v0.19.18) (2026-11-15)
 
 
