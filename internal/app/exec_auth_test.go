@@ -303,6 +303,26 @@ func TestExecAuth_EscCancels(t *testing.T) {
 	assert.Contains(t, m.statusMessage, "R")
 }
 
+func TestExecAuth_CtrlCCancelsLogin(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	got, _ := m.Update(keyMsg("ctrl+c"))
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Empty(t, m.execAuth.context)
+	assert.Empty(t, m.pendingAction)
+	assert.Empty(t, m.confirmTitle)
+	assert.Empty(t, m.confirmQuestion)
+
+	got, _, _ = m.handleExplorerDirectActionKeys(tea.KeyPressMsg{Code: 'R', Text: "R"})
+	m = got.(Model)
+	m = openLoginBox(t, m, "test-ctx")
+	assert.Equal(t, overlayConfirm, m.overlay, "R must bring the login back")
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+}
+
 func TestExecAuth_EnterRunsLogin(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelResourceTypes

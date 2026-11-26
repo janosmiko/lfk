@@ -22,6 +22,9 @@ func (m Model) handleOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+C should mirror Esc/cancel semantics so users never
 	// accidentally drop a tab while interacting with an overlay.
 	if msg.String() == "ctrl+c" {
+		if m.pendingAction == execAuthLoginAction {
+			return m.cancelExecAuthLogin()
+		}
 		return m.closeCurrentOverlay()
 	}
 	if m.overlay == overlayExportTemplate {
