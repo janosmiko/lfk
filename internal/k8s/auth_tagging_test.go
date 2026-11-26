@@ -4,10 +4,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -141,4 +144,48 @@ func closeResp(resp *http.Response) {
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
+}
+
+func TestExecPluginForContext(t *testing.T) {
+	const kubecfg = `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://127.0.0.1:1
+  name: c
+contexts:
+- context: {cluster: c, user: execu}
+  name: exec-ctx
+- context: {cluster: c, user: tokenu}
+  name: token-ctx
+current-context: exec-ctx
+users:
+- name: execu
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: /opt/homebrew/bin/aws
+      args: [eks, get-token, --profile, dev]
+      env:
+      - {name: AWS_CONFIG_FILE, value: /x}
+- name: tokenu
+  user:
+    token: abc
+`
+	path := filepath.Join(t.TempDir(), "config")
+	require.NoError(t, os.WriteFile(path, []byte(kubecfg), 0o600))
+	c, err := NewClient(path, nil, true, nil)
+	require.NoError(t, err)
+
+	info, ok := c.ExecPluginForContext("exec-ctx")
+	require.True(t, ok)
+	assert.Equal(t, "/opt/homebrew/bin/aws", info.Command)
+	assert.Equal(t, "dev", info.AWSProfile)
+	assert.Equal(t, []string{"AWS_CONFIG_FILE=/x"}, info.Env)
+
+	_, ok = c.ExecPluginForContext("token-ctx")
+	assert.False(t, ok)
+	_, ok = c.ExecPluginForContext("missing")
+	assert.False(t, ok)
 }

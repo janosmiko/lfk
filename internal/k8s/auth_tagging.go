@@ -68,6 +68,28 @@ func awsProfileFromExec(exec *clientcmdapi.ExecConfig) string {
 	return ""
 }
 
+// ExecPluginInfo is the exec credential plugin config of a kubeconfig user.
+type ExecPluginInfo struct {
+	Command    string   // as written in the kubeconfig
+	Env        []string // "NAME=value"
+	AWSProfile string   // "" if none
+}
+
+// ExecPluginForContext returns the exec plugin config for a context. ok is
+// false when the context has no exec plugin or its rest config fails to build.
+func (c *Client) ExecPluginForContext(displayName string) (ExecPluginInfo, bool) {
+	cfg, err := c.restConfigForContext(displayName)
+	if err != nil || cfg.ExecProvider == nil {
+		return ExecPluginInfo{}, false
+	}
+	exec := cfg.ExecProvider
+	env := make([]string, 0, len(exec.Env))
+	for _, e := range exec.Env {
+		env = append(env, e.Name+"="+e.Value)
+	}
+	return ExecPluginInfo{Command: exec.Command, Env: env, AWSProfile: awsProfileFromExec(exec)}, true
+}
+
 // isExecCredentialError reports whether err is a failure to acquire credentials
 // from a kubeconfig exec plugin (expired AWS SSO, missing VPN, gke auth plugin
 // not logged in, etc). client-go surfaces these as
@@ -102,8 +124,8 @@ func IsExecPluginExitError(err error) bool {
 	return strings.Contains(s, "exec: executable ") && strings.Contains(s, " failed with exit code ")
 }
 
-// isAWSCommand reports whether the exec plugin command is the AWS CLI.
-func isAWSCommand(command string) bool {
+// IsAWSCommand reports whether the exec plugin command is the AWS CLI.
+func IsAWSCommand(command string) bool {
 	return filepath.Base(command) == "aws"
 }
 
@@ -135,7 +157,7 @@ func (rt *credTaggingRoundTripper) logCredentialFailure(err error) {
 	if rt.command != "" {
 		args = append(args, "plugin", rt.command)
 	}
-	if isAWSCommand(rt.command) {
+	if IsAWSCommand(rt.command) {
 		msg = "cluster authentication failed: AWS credentials/SSO unavailable"
 		// The profile comes from the kubeconfig; strip control characters so a
 		// crafted/odd profile name can't corrupt the log line or in-app overlay.
