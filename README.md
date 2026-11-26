@@ -85,6 +85,7 @@ Sponsorship pays for the IDE licenses and AI assistants that go into development
 Thank you to the people who sponsor LFK:
 
 <a href="https://github.com/Knapock"><img src="https://github.com/Knapock.png" width="48" alt="Knapock"></a>
+<a href="https://github.com/havinhphu188"><img src="https://github.com/havinhphu188.png" width="48" alt="havinhphu188"></a>
 
 Money is not the only way to help. Star the repo, file a good bug report, or tell one colleague who lives in `kubectl`.
 
