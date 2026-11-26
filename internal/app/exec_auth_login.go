@@ -29,14 +29,14 @@ func resolveLoginCommand(ctx, kubectlCtx string, info k8s.ExecPluginInfo, hasInf
 	isSSO func(awsBin, profile string, env []string) bool,
 ) loginCommand {
 	if cmd := ui.ConfigClusterLoginCommand[ctx]; cmd != "" {
-		return loginCommand{display: cmd, argv: []string{"sh", "-c", cmd}}
+		return loginCommand{display: ui.SanitizeTerminalText(cmd), argv: []string{"sh", "-c", cmd}}
 	}
 	if hasInfo && k8s.IsAWSCommand(info.Command) && isSSO(info.Command, info.AWSProfile, info.Env) {
 		argv := []string{info.Command, "sso", "login"}
 		display := "aws sso login"
 		if info.AWSProfile != "" {
 			argv = append(argv, "--profile", info.AWSProfile)
-			p := info.AWSProfile
+			p := ui.SanitizeTerminalText(info.AWSProfile)
 			if !safeShellWord.MatchString(p) {
 				p = shellQuote(p)
 			}
@@ -45,7 +45,7 @@ func resolveLoginCommand(ctx, kubectlCtx string, info k8s.ExecPluginInfo, hasInf
 		return loginCommand{display: display, argv: argv, env: info.Env}
 	}
 	return loginCommand{
-		display: "kubectl get --raw /version --context " + kubectlCtx,
+		display: "kubectl get --raw /version --context " + ui.SanitizeTerminalText(kubectlCtx),
 		argv: k8s.DemoKubectlArgs([]string{
 			"get", "--raw", "/version", "--context", kubectlCtx, "--request-timeout=5m",
 		}),

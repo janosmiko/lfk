@@ -136,3 +136,47 @@ done
 		t.Error("expected false for missing binary")
 	}
 }
+
+func TestResolveLoginCommandDisplayHasNoControlChars(t *testing.T) {
+	hasCtl := func(s string) bool {
+		for _, r := range s {
+			if r < 0x20 || r == 0x7f {
+				return true
+			}
+		}
+		return false
+	}
+	yes := func(string, string, []string) bool { return true }
+	profile := "x\x1b[2Jfake\nline\r"
+	ctxName := "kc\x1b[2Jtx"
+	tests := []struct {
+		name     string
+		override string
+		info     k8s.ExecPluginInfo
+		hasInfo  bool
+		kctx     string
+		wantArg  string
+		argIdx   int
+	}{
+		{"profile with ESC and newline", "", k8s.ExecPluginInfo{Command: "aws", AWSProfile: profile}, true, "k", profile, 4},
+		{"kubectl context with ESC", "", k8s.ExecPluginInfo{}, false, ctxName, ctxName, 4},
+		{"override with ESC", "echo \x1b[2J", k8s.ExecPluginInfo{}, false, "k", "echo \x1b[2J", 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			old := ui.ConfigClusterLoginCommand
+			t.Cleanup(func() { ui.ConfigClusterLoginCommand = old })
+			ui.ConfigClusterLoginCommand = map[string]string{}
+			if tt.override != "" {
+				ui.ConfigClusterLoginCommand["ctx"] = tt.override
+			}
+			got := resolveLoginCommand("ctx", tt.kctx, tt.info, tt.hasInfo, yes)
+			if got.argv[tt.argIdx] != tt.wantArg {
+				t.Errorf("argv[%d] = %q, want raw %q", tt.argIdx, got.argv[tt.argIdx], tt.wantArg)
+			}
+			if hasCtl(got.display) {
+				t.Errorf("display has control bytes: %q", got.display)
+			}
+		})
+	}
+}
