@@ -148,9 +148,13 @@ func (m *Model) closeAllExecPTYs() {
 func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// If process has exited, any key returns to explorer.
 	if m.execDone != nil && m.execDone.Load() {
+		res, isLogin := m.execAuthPTYResult()
 		m.cleanupExecPTY()
 		m.execEscPressed = false
 		m.mode = modeExplorer
+		if isLogin {
+			return m.updateExecAuthDone(res)
+		}
 		return m, nil
 	}
 
@@ -160,6 +164,9 @@ func (m Model) handleExecKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+]":
 			// Double Ctrl+] exits the terminal.
+			if m.execAuthPTYFocused() {
+				return m.leaveExecAuthPTY(func(m Model) (tea.Model, tea.Cmd) { return m, nil })
+			}
 			m.cleanupExecPTY()
 			m.mode = modeExplorer
 			return m, nil
@@ -287,6 +294,9 @@ func (m Model) execSwitchTab(target int) (tea.Model, tea.Cmd) {
 	if len(m.tabs) <= 1 {
 		return m, nil
 	}
+	if m.execAuthPTYFocused() {
+		return m.leaveExecAuthPTY(func(m Model) (tea.Model, tea.Cmd) { return m.execSwitchTab(target) })
+	}
 	m.saveCurrentTab()
 	if cmd := m.loadTab(target); cmd != nil {
 		return m, cmd
@@ -311,6 +321,9 @@ func (m Model) execNewTab() (tea.Model, tea.Cmd) {
 	if len(m.tabs) >= 9 {
 		m.setStatusMessage("Max 9 tabs", true)
 		return m, scheduleStatusClear()
+	}
+	if m.execAuthPTYFocused() {
+		return m.leaveExecAuthPTY(Model.execNewTab)
 	}
 	m.saveCurrentTab()
 	newTab := m.cloneCurrentTab()

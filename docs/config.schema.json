@@ -724,6 +724,10 @@
           "type": "boolean",
           "description": "Override the global read_only setting for this context."
         },
+        "login_command": {
+          "type": "string",
+          "description": "Command that logs in to this cluster when its credential plugin fails. Runs through sh -c."
+        },
         "security": { "$ref": "#/definitions/securityConfig" },
         "k8s_client_qps": {
           "type": "integer",

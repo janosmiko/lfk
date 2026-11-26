@@ -312,7 +312,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	oldCtx := m.nav.Context
 	m.rememberScope(oldCtx)
 	m.nav.Context = sel.Name
-	delete(m.execAuthTried, sel.Name)
+	delete(m.execAuth.tried, sel.Name)
 	m.invalidateOrphanCacheForContext(oldCtx)
 	m.recomputeReadOnly(sel.Name)
 	m.rescopeNamespaceForContext(sel.Name)

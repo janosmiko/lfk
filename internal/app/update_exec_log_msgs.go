@@ -26,6 +26,12 @@ func (m Model) updateExecPTYTick(msg execPTYTickMsg) (tea.Model, tea.Cmd) {
 	if msg.ptmx != m.execPTY || m.mode != modeExec {
 		return m, nil
 	}
+	// A failed login keeps ticking so the user reads the error first.
+	if res, ok := m.execAuthPTYResult(); ok && res.err == nil {
+		m.cleanupExecPTY()
+		m.mode = modeExplorer
+		return m.updateExecAuthDone(res)
+	}
 	// Continue ticking to refresh the terminal view.
 	return m, m.scheduleExecTick()
 }
@@ -46,6 +52,9 @@ func (m Model) updateExecPTYExit(msg execPTYExitMsg) Model {
 }
 
 func (m Model) updateExecPTYStart(msg execPTYStartMsg) (tea.Model, tea.Cmd) {
+	if msg.cmd == m.execAuth.ptyCmd && msg.cmd != nil {
+		m.execAuth.ptmx = msg.ptmx
+	}
 	m.execPTY = msg.ptmx
 	m.execTerm = msg.term
 	m.execTitle = msg.title

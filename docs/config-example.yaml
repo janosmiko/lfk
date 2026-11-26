@@ -402,12 +402,13 @@ resource_columns:
 
 # ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
 # Override settings per kubeconfig context name.
-# Supports per-cluster views, resource_columns (deprecated), read_only, security,
-# and k8s_client_qps / k8s_client_burst.
+# Supports per-cluster views, resource_columns (deprecated), read_only, login_command,
+# security, and k8s_client_qps / k8s_client_burst.
 # Per-cluster overrides take precedence over the matching global setting.
 clusters:
 # my-prod-cluster:
 #   read_only: true                       # lock production against mutations
+#   login_command: "aws sso login --profile prod"  # run when the credential plugin fails
 #   k8s_client_qps: 200                   # raise the rate ceiling on a big cluster
 #   k8s_client_burst: 400
 #   security:

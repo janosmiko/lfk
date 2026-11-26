@@ -227,9 +227,14 @@ The walk never descends into a `.git` directory, and that is not configurable.
 
 ## Exec credential plugins
 
-If a kubeconfig exec plugin needs terminal input (for example kubelogin with
-`--grant-type=password`), lfk suspends, shows the prompt, and resumes after you
-answer. This needs `kubectl` on `PATH`.
+If a kubeconfig exec plugin fails in the explorer, lfk asks before it logs in. The box shows the
+login command. For an AWS SSO profile, lfk runs `aws sso login`. For other plugins,
+lfk runs `kubectl` so the plugin can show its prompt. This needs `kubectl` on
+`PATH`. To use a different command, set `clusters.<context>.login_command`.
+
+In `pty` terminal mode, the login runs inside lfk. In other modes, and always on
+Windows, lfk suspends while the login runs. If the login fails, lfk asks again,
+up to 3 attempts.
 
 lfk prompts once per context. To retry, press refresh or open the context again from
 the context list. This works when the plugin caches the token it gets (kubelogin

@@ -31,6 +31,7 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 	switch m.pendingAction {
 	case model.ActionLabelQuarantine, model.ActionLabelRestore:
 		notes = quarantineConfirmNotes(m.quarantine, podHasController(m.actionCtx.raw))
+	case execAuthLoginAction:
 	default:
 		notes = confirmCostNotes(m.buildConfirmCost(showsPolicy, m.pendingAction == "Drain"))
 	}
@@ -54,7 +55,7 @@ func (m Model) renderOverlayConfirm() (string, int, int, bool) {
 		Notes:       notes,
 		WrapWidth:   w - 4,
 	})
-	if len(notes) > 0 {
+	if len(notes) > 0 || m.pendingAction == execAuthLoginAction {
 		// Measure the wrapped result rather than guessing rows on top of a
 		// base height. Guessing left several blank rows under the text.
 		h = min(max(h, lipgloss.Height(content)), m.height-6)

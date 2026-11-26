@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -24,7 +25,7 @@ func discoveryFailure(t *testing.T, m Model, ctx string) Model {
 	t.Helper()
 	mdl, cmd := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{context: ctx, err: errPluginExit})
 	require.NotNil(t, cmd)
-	require.True(t, mdl.execAuthTried[ctx], "guard must be set for %s", ctx)
+	require.True(t, mdl.execAuth.tried[ctx], "guard must be set for %s", ctx)
 	return mdl
 }
 
@@ -58,7 +59,7 @@ func TestExecAuth_NoSuspend(t *testing.T) {
 				tt.mod(&m)
 			}
 			assert.Nil(t, m.maybeExecAuth(tt.ctx, tt.err))
-			assert.False(t, m.execAuthTried[tt.ctx])
+			assert.False(t, m.execAuth.tried[tt.ctx])
 		})
 	}
 }
@@ -69,11 +70,11 @@ func TestExecAuth_HooksIgnoreOtherContextAndClusterLevel(t *testing.T) {
 	m.nav.Level = model.LevelResourceTypes
 
 	mdl, _ := m.updateResourcesLoaded(resourcesLoadedMsg{gen: 1, context: "other-ctx", err: errPluginExit})
-	assert.Empty(t, mdl.(Model).execAuthTried)
+	assert.Empty(t, mdl.(Model).execAuth.tried)
 
 	m.nav.Level = model.LevelClusters
 	mdl, _ = m.updateNamespacesLoaded(namespacesLoadedMsg{context: "test-ctx", err: errPluginExit})
-	assert.Empty(t, mdl.(Model).execAuthTried)
+	assert.Empty(t, mdl.(Model).execAuth.tried)
 }
 
 func TestExecAuth_HooksSetGuardForCurrentContext(t *testing.T) {
@@ -82,13 +83,13 @@ func TestExecAuth_HooksSetGuardForCurrentContext(t *testing.T) {
 	base.nav.Level = model.LevelResourceTypes
 
 	m, _ := base.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{context: "test-ctx", err: errPluginExit})
-	assert.True(t, m.execAuthTried["test-ctx"], "discovery hook")
+	assert.True(t, m.execAuth.tried["test-ctx"], "discovery hook")
 
 	mdl, _ := base.updateResourcesLoaded(resourcesLoadedMsg{gen: 1, context: "test-ctx", err: errPluginExit})
-	assert.True(t, mdl.(Model).execAuthTried["test-ctx"], "resources hook")
+	assert.True(t, mdl.(Model).execAuth.tried["test-ctx"], "resources hook")
 
 	mdl, _ = base.updateNamespacesLoaded(namespacesLoadedMsg{context: "test-ctx", err: errPluginExit})
-	assert.True(t, mdl.(Model).execAuthTried["test-ctx"], "namespaces hook")
+	assert.True(t, mdl.(Model).execAuth.tried["test-ctx"], "namespaces hook")
 }
 
 func TestExecAuthDone_RepeatedFailureDoesNotLoop(t *testing.T) {
@@ -116,18 +117,18 @@ func TestExecAuth_ResourcesLoadedErrorSuspends(t *testing.T) {
 	m.requestGen = 1
 	mdl, cmd := m.updateResourcesLoaded(resourcesLoadedMsg{gen: 1, context: "test-ctx", err: errPluginExit})
 	assert.NotNil(t, cmd)
-	assert.True(t, mdl.(Model).execAuthTried["test-ctx"])
+	assert.True(t, mdl.(Model).execAuth.tried["test-ctx"])
 }
 
 func TestExecAuth_DiscoverySuccessKeepsGuardRefreshClears(t *testing.T) {
 	m := basePush80Model()
-	m.execAuthTried = map[string]bool{"test-ctx": true}
+	m.execAuth.tried = map[string]bool{"test-ctx": true}
 	mdl, _ := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{context: "test-ctx"})
-	assert.True(t, mdl.execAuthTried["test-ctx"])
+	assert.True(t, mdl.execAuth.tried["test-ctx"])
 
-	m.execAuthTried = map[string]bool{"test-ctx": true}
+	m.execAuth.tried = map[string]bool{"test-ctx": true}
 	got, _, _ := m.handleExplorerDirectActionKeys(tea.KeyPressMsg{Code: 'R', Text: "R"})
-	assert.False(t, got.(Model).execAuthTried["test-ctx"])
+	assert.False(t, got.(Model).execAuth.tried["test-ctx"])
 }
 
 func TestExecAuth_CachedDiscoveryDoesNotRearmPrompt(t *testing.T) {
@@ -158,24 +159,29 @@ func TestExecAuthDone_SuccessQueuesDiscovery(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "discovery must be queued after successful auth")
+	assert.Contains(t, got.(Model).statusMessage, "Authenticated to test-ctx", "the refresh must not hide it")
 }
 
 func TestExecAuthDone_ErrorKeepsGuard(t *testing.T) {
 	m := basePush80Model()
-	m.execAuthTried = map[string]bool{"test-ctx": true}
+	m.execAuth.tried = map[string]bool{"test-ctx": true}
 	got, _ := m.updateExecAuthDone(execAuthDoneMsg{context: "test-ctx", err: errors.New("boom")})
-	assert.True(t, got.(Model).execAuthTried["test-ctx"])
+	assert.True(t, got.(Model).execAuth.tried["test-ctx"])
 	assert.True(t, got.(Model).statusMessageErr)
+}
+
+func kubectlLogin() loginCommand {
+	return resolveLoginCommand("ctx-a", "ctx-a", k8s.ExecPluginInfo{}, false, nil)
 }
 
 func TestExecAuthCmd_RunSuccess(t *testing.T) {
 	argvPath := fakeKubectl(t, "echo 'Password: ' >&2")
 	var out bytes.Buffer
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
+	c := &execAuthCmd{context: "ctx-a", login: kubectlLogin()}
 	c.SetStdin(strings.NewReader(""))
 	c.SetStdout(&out)
 	require.NoError(t, c.Run())
-	assert.Contains(t, out.String(), "lfk: ctx-a auth plugin needs input")
+	assert.Contains(t, out.String(), "lfk: logging in to ctx-a: kubectl get --raw /version --context ctx-a")
 	assert.Contains(t, out.String(), "Password:", "plugin stderr must reach the stdout writer")
 	assert.NotContains(t, out.String(), "Press Enter")
 	argv, err := os.ReadFile(argvPath)
@@ -187,7 +193,7 @@ func TestExecAuthCmd_RunFailureWaitsForEnter(t *testing.T) {
 	fakeKubectl(t, "exit 1")
 	var out bytes.Buffer
 	in := strings.NewReader("\nrest")
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
+	c := &execAuthCmd{context: "ctx-a", login: kubectlLogin()}
 	c.SetStdin(in)
 	c.SetStdout(&out)
 	require.Error(t, c.Run())
@@ -213,96 +219,265 @@ func runCount(t *testing.T, counter string) string {
 	return strings.TrimSpace(string(got))
 }
 
-func TestExecAuthCmd_RunRetriesUntilSuccess(t *testing.T) {
-	counter := filepath.Join(t.TempDir(), "count")
-	fakeKubectl(t, countingScript(counter, 3, pluginFailLine))
-	var out bytes.Buffer
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
-	c.SetStdin(strings.NewReader(""))
-	c.SetStdout(&out)
-	require.NoError(t, c.Run())
-	assert.Contains(t, out.String(), pluginFailLine)
-	assert.Contains(t, out.String(), "Login failed, retrying (attempt 2/3)")
-	assert.Contains(t, out.String(), "Login failed, retrying (attempt 3/3)")
-	assert.Equal(t, "3", runCount(t, counter))
-	assert.NotContains(t, out.String(), "Press Enter")
-}
-
-func TestExecAuthCmd_RunFailsAfterMaxAttempts(t *testing.T) {
+func TestExecAuthCmd_RunSingleAttempt(t *testing.T) {
 	counter := filepath.Join(t.TempDir(), "count")
 	fakeKubectl(t, countingScript(counter, 100, pluginFailLine))
 	var out bytes.Buffer
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
-	c.SetStdin(strings.NewReader("\n"))
-	c.SetStdout(&out)
-	require.Error(t, c.Run())
-	assert.Equal(t, "3", runCount(t, counter))
-	assert.Contains(t, out.String(), "Press Enter to return to lfk")
-}
-
-func TestExecAuthCmd_RunUsesFreshStderrBufferPerAttempt(t *testing.T) {
-	counter := filepath.Join(t.TempDir(), "count")
-	fakeKubectl(t, `c="`+counter+`"
-n=$(cat "$c" 2>/dev/null || echo 0)
-n=$((n+1))
-echo $n > "$c"
-if [ "$n" -eq 1 ]; then echo "`+pluginFailLine+`" >&2; exit 1; fi
-if [ "$n" -eq 2 ]; then echo "Unable to connect to the server: i/o timeout" >&2; exit 1; fi`)
-	var out bytes.Buffer
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
-	c.SetStdin(strings.NewReader("\n"))
-	c.SetStdout(&out)
-	require.Error(t, c.Run())
-	assert.Equal(t, "2", runCount(t, counter))
-	assert.Contains(t, out.String(), "Press Enter to return to lfk")
-}
-
-func TestExecAuthCmd_RunDoesNotRetryNonPluginFailure(t *testing.T) {
-	counter := filepath.Join(t.TempDir(), "count")
-	fakeKubectl(t, countingScript(counter, 100, "Unable to connect to the server: dial tcp: i/o timeout"))
-	var out bytes.Buffer
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
+	c := &execAuthCmd{context: "ctx-a", login: kubectlLogin()}
 	c.SetStdin(strings.NewReader("\n"))
 	c.SetStdout(&out)
 	require.Error(t, c.Run())
 	assert.Equal(t, "1", runCount(t, counter))
+	assert.Contains(t, out.String(), pluginFailLine)
 	assert.Contains(t, out.String(), "Press Enter to return to lfk")
-	assert.NotContains(t, out.String(), "retrying")
+}
+
+func TestExecAuthCmd_RunPassesLoginEnvAndStdout(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "login")
+	require.NoError(t, os.WriteFile(bin, []byte("#!/bin/sh\necho \"code $1 $AWS_PROFILE $KUBECTL_CONTEXT\"\n"), 0o755))
+	var out bytes.Buffer
+	c := &execAuthCmd{context: "ctx-a", kubectlContext: "orig-a", login: loginCommand{
+		display: "login", argv: []string{bin, "ABCD"}, env: []string{"AWS_PROFILE=dev"},
+	}}
+	c.SetStdin(strings.NewReader(""))
+	c.SetStdout(&out)
+	require.NoError(t, c.Run())
+	assert.Contains(t, out.String(), "code ABCD dev orig-a", "a login prints its device code on stdout")
+}
+
+func TestExecAuthCmd_EmptyArgvErrors(t *testing.T) {
+	_, err := (&execAuthCmd{context: "ctx-a"}).newLoginCmd()
+	require.Error(t, err)
+}
+
+func TestExecAuth_NamespaceErrorKeepsLoginBox(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	got, _ := m.Update(namespacesLoadedMsg{context: "test-ctx", err: errPluginExit, silent: true})
+	m = got.(Model)
+	assert.Equal(t, overlayConfirm, m.overlay)
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+	assert.Equal(t, "test-ctx", m.execAuth.context)
+}
+
+func TestExecAuth_StaleStateDoesNotBlockPrompt(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+	m.overlay = overlayNone // some other path closed the box
+
+	delete(m.execAuth.tried, "test-ctx") // the user presses R
+	m = openLoginBox(t, m, "test-ctx")
+	assert.Equal(t, overlayConfirm, m.overlay)
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+	assert.Equal(t, 1, m.execAuth.attempt)
+	assert.True(t, m.execAuth.tried["test-ctx"], "a stale state must not respawn the resolver")
+}
+
+func TestExecAuth_NoPromptOutsideExplorer(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		set  func(*Model)
+	}{
+		{"exec mode", func(m *Model) { m.mode = modeExec }},
+		{"logs mode", func(m *Model) { m.mode = modeLogs }},
+		{"overlay open", func(m *Model) { m.overlay = overlayNamespace }},
+		{"command bar typing", func(m *Model) { m.commandBarActive = true }},
+		{"filter typing", func(m *Model) { m.filterActive = true }},
+		{"search typing", func(m *Model) { m.searchActive = true }},
+		{"error log open", func(m *Model) { m.overlayErrorLog = true }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := basePush80Model()
+			m.nav.Level = model.LevelResourceTypes
+			tt.set(&m)
+			assert.Nil(t, m.maybeExecAuth("test-ctx", errPluginExit))
+			assert.False(t, m.execAuth.tried["test-ctx"], "the next load must ask again")
+		})
+	}
+}
+
+func TestExecAuth_PromptAfterLeavingExplorerIsDropped(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	cmd := m.maybeExecAuth("test-ctx", errPluginExit)
+	require.NotNil(t, cmd)
+	m.mode = modeExec
+	got, _ := m.Update(cmd())
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Empty(t, m.execAuth.context)
+	assert.False(t, m.execAuth.tried["test-ctx"])
+}
+
+// openLoginBox drives a plugin failure on the current context through the
+// background resolve and feeds the result back, as the program would.
+func openLoginBox(t *testing.T, m Model, ctx string) Model {
+	t.Helper()
+	cmd := m.maybeExecAuth(ctx, errPluginExit)
+	require.NotNil(t, cmd)
+	msg := cmd()
+	require.IsType(t, execAuthPromptMsg{}, msg, "must ask first, not suspend")
+	got, _ := m.Update(msg)
+	return got.(Model)
+}
+
+func loginBoxText(m Model) string {
+	return strings.Join(strings.Fields(confirmBox(m)), " ")
+}
+
+func TestExecAuth_OpensConfirmInsteadOfSuspending(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	assert.Equal(t, overlayConfirm, m.overlay)
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+	view := stripANSI(m.View().Content)
+	assert.Contains(t, view, "Login required")
+	assert.Contains(t, view, "test-ctx")
+	assert.Contains(t, loginBoxText(m), "test-ctx needs login. Run: kubectl get --raw /version --context test-ctx")
+	assert.NotContains(t, loginBoxText(m), "attempt")
+}
+
+func TestExecAuth_SkipsWhenOverlayOpen(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	cmd := m.maybeExecAuth("test-ctx", errPluginExit)
+	require.NotNil(t, cmd)
+	m.overlay = overlayConfirm
+	m.pendingAction = "Delete"
+	got, _ := m.Update(cmd())
+	m = got.(Model)
+	assert.Equal(t, "Delete", m.pendingAction)
+	assert.False(t, m.execAuth.tried["test-ctx"], "the next load must ask again")
+	assert.Empty(t, m.execAuth.context)
+}
+
+func TestExecAuth_EscCancels(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	got, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Empty(t, m.pendingAction)
+	assert.Empty(t, m.execAuth.context)
+	assert.True(t, m.execAuth.tried["test-ctx"])
+	assert.Contains(t, m.statusMessage, "R")
+}
+
+func TestExecAuth_CtrlCCancelsLogin(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	got, _ := m.Update(keyMsg("ctrl+c"))
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Empty(t, m.execAuth.context)
+	assert.Empty(t, m.pendingAction)
+	assert.Empty(t, m.confirmTitle)
+	assert.Empty(t, m.confirmQuestion)
+
+	got, _, _ = m.handleExplorerDirectActionKeys(tea.KeyPressMsg{Code: 'R', Text: "R"})
+	m = got.(Model)
+	m = openLoginBox(t, m, "test-ctx")
+	assert.Equal(t, overlayConfirm, m.overlay, "R must bring the login back")
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+}
+
+func TestExecAuth_EnterRunsLogin(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	got, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = got.(Model)
+	require.NotNil(t, cmd)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Empty(t, m.pendingAction)
+	assert.Equal(t, "test-ctx", m.execAuth.context)
+	assert.Equal(t, 1, m.execAuth.attempt)
+}
+
+func TestExecAuthDone_FailureReopensBoxUntilMax(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	for _, want := range []string{"attempt 2/3", "attempt 3/3"} {
+		got, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		got, _ = got.(Model).updateExecAuthDone(execAuthDoneMsg{context: "test-ctx", err: errors.New("exit status 1")})
+		m = got.(Model)
+		require.Equal(t, overlayConfirm, m.overlay, want)
+		assert.Contains(t, loginBoxText(m), "Login failed. Retry? ("+want+")")
+	}
+
+	got, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	got, _ = got.(Model).updateExecAuthDone(execAuthDoneMsg{context: "test-ctx", err: errors.New("exit status 1")})
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Contains(t, m.statusMessage, "Auth failed: ")
+	assert.True(t, m.statusMessageErr)
+	assert.Empty(t, m.execAuth.context)
+}
+
+func TestExecAuthDone_ConfirmAfterContextSwitch(t *testing.T) {
+	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
+	m.nav.Context = "a"
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "a")
+	m.nav.Context = "b"
+
+	got, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	gen := got.(Model).requestGen
+	got, _ = got.(Model).updateExecAuthDone(execAuthDoneMsg{context: "a"})
+	m = got.(Model)
+	assert.Contains(t, m.statusMessage, "Authenticated to a")
+	assert.Equal(t, gen, m.requestGen)
+	assert.Empty(t, m.scheduler.QueueSnapshot(), "no refresh for b")
+	assert.Empty(t, m.execAuth.context)
 }
 
 func TestExecAuth_NilGuardMapSetOnFailedLoad(t *testing.T) {
 	m := basePush80Model()
-	m.execAuthTried = nil
+	m.execAuth.tried = nil
 	m.requestGen = 1
 	mdl, _ := m.updateResourcesLoaded(resourcesLoadedMsg{gen: 1, context: "test-ctx", err: errPluginExit})
-	assert.True(t, mdl.(Model).execAuthTried["test-ctx"])
+	assert.True(t, mdl.(Model).execAuth.tried["test-ctx"])
 
-	m.execAuthTried = nil
+	m.execAuth.tried = nil
 	m.nav.Level = model.LevelResourceTypes
 	mdl, _ = m.updateNamespacesLoaded(namespacesLoadedMsg{context: "test-ctx", err: errPluginExit})
-	assert.True(t, mdl.(Model).execAuthTried["test-ctx"])
+	assert.True(t, mdl.(Model).execAuth.tried["test-ctx"])
 }
 
 func TestExecAuth_LoadSuccessKeepsGuard(t *testing.T) {
 	m := basePush80Model()
 	m.requestGen = 1
-	m.execAuthTried = map[string]bool{"test-ctx": true}
+	m.execAuth.tried = map[string]bool{"test-ctx": true}
 	mdl, _ := m.updateResourcesLoaded(resourcesLoadedMsg{gen: 1, context: "test-ctx"})
-	assert.True(t, mdl.(Model).execAuthTried["test-ctx"])
+	assert.True(t, mdl.(Model).execAuth.tried["test-ctx"])
 }
 
 func TestExecAuth_NavigateChildClusterClearsGuard(t *testing.T) {
 	m := basePush80Model()
-	m.execAuthTried = map[string]bool{"cluster-a": true}
+	m.execAuth.tried = map[string]bool{"cluster-a": true}
 	got, _ := m.navigateChildCluster(&model.Item{Name: "cluster-a"})
-	assert.False(t, got.(Model).execAuthTried["cluster-a"])
+	assert.False(t, got.(Model).execAuth.tried["cluster-a"])
 }
 
 func TestExecAuthCmd_NoKubeconfigKeepsInheritedEnv(t *testing.T) {
 	t.Setenv("KUBECONFIG", "/inherited/kubeconfig")
 	out := filepath.Join(t.TempDir(), "env")
 	fakeKubectl(t, `printf '%s' "$KUBECONFIG" > `+out)
-	c := &execAuthCmd{context: "ctx-a", kubectlContext: "ctx-a"}
+	c := &execAuthCmd{context: "ctx-a", login: kubectlLogin()}
 	c.SetStdin(strings.NewReader(""))
 	c.SetStdout(io.Discard)
 	require.NoError(t, c.Run())

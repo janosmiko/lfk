@@ -712,6 +712,9 @@ func (m Model) dispatchWheelKey(key string) (tea.Model, tea.Cmd) {
 
 // switchToTab saves the current tab and loads the target tab.
 func (m Model) switchToTab(tab int) (tea.Model, tea.Cmd) {
+	if m.execAuthPTYFocused() {
+		return m.leaveExecAuthPTY(func(m Model) (tea.Model, tea.Cmd) { return m.switchToTab(tab) })
+	}
 	m.saveCurrentTab()
 	if cmd := m.loadTab(tab); cmd != nil {
 		return m, cmd

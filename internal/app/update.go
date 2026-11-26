@@ -386,6 +386,9 @@ func (m Model) updateResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateExecAuthDone(msg)
 		return mdl, cmd, true
 	}
+	if msg, ok := msg.(execAuthPromptMsg); ok {
+		return m.updateExecAuthPrompt(msg), nil, true
+	}
 	if mdl, cmd, ok := m.updateActionResultMsg(msg); ok {
 		return mdl, cmd, true
 	}
