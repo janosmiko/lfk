@@ -64,10 +64,11 @@ func (m Model) execAuthBusy() bool {
 	return (m.overlay == overlayConfirm && m.pendingAction == execAuthLoginAction) || m.execAuth.running
 }
 
-// execAuthCanPrompt keeps the box off viewers and live shells, where it
-// would take the user's keystrokes.
+// execAuthCanPrompt keeps the box off viewers, live shells and text inputs,
+// where it would take the user's keystrokes.
 func (m Model) execAuthCanPrompt() bool {
-	return m.mode == modeExplorer && m.overlay == overlayNone && !m.execAuthBusy()
+	typing := m.commandBarActive || m.filterActive || m.searchActive || m.overlayErrorLog
+	return m.mode == modeExplorer && m.overlay == overlayNone && !typing && !m.execAuthBusy()
 }
 
 func (m Model) updateExecAuthPrompt(msg execAuthPromptMsg) Model {

@@ -285,6 +285,10 @@ func TestExecAuth_NoPromptOutsideExplorer(t *testing.T) {
 		{"exec mode", func(m *Model) { m.mode = modeExec }},
 		{"logs mode", func(m *Model) { m.mode = modeLogs }},
 		{"overlay open", func(m *Model) { m.overlay = overlayNamespace }},
+		{"command bar typing", func(m *Model) { m.commandBarActive = true }},
+		{"filter typing", func(m *Model) { m.filterActive = true }},
+		{"search typing", func(m *Model) { m.searchActive = true }},
+		{"error log open", func(m *Model) { m.overlayErrorLog = true }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			m := basePush80Model()
