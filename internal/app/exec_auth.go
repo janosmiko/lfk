@@ -2,8 +2,6 @@ package app
 
 import (
 	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,36 +16,106 @@ import (
 
 const execAuthMaxAttempts = 3
 
+const execAuthLoginAction = "__exec_auth_login__"
+
+type execAuthState struct {
+	tried   map[string]bool // contexts already offered a login
+	context string          // context of the open box or running login, "" when idle
+	cmd     loginCommand
+	attempt int // 1-based attempt about to run
+}
+
+type execAuthPromptMsg struct {
+	context string
+	cmd     loginCommand
+}
+
 type execAuthDoneMsg struct {
 	context string
 	err     error
 }
 
-// maybeExecAuth suspends lfk once per context so an exec credential plugin
-// can prompt on the real terminal. Returns nil when the error is not a
-// plugin exit failure, the context is not the current one (hovering a
-// context also loads), or the context was already tried.
+// maybeExecAuth offers a login once per context, and only for the current
+// context (hovering a context also loads). The cmd resolves the login off
+// the Update goroutine, since the SSO check spawns aws.
 func (m *Model) maybeExecAuth(ctx string, err error) tea.Cmd {
 	if !k8s.IsExecPluginExitError(err) || ctx == "" || ctx == UnionContextSentinel ||
 		ctx != m.nav.Context || m.nav.Level == model.LevelClusters ||
-		m.demoMode || m.execAuthTried[ctx] {
+		m.demoMode || m.execAuth.tried[ctx] {
 		return nil
 	}
-	if m.execAuthTried == nil {
-		m.execAuthTried = make(map[string]bool)
+	if m.execAuth.tried == nil {
+		m.execAuth.tried = make(map[string]bool)
 	}
-	m.execAuthTried[ctx] = true
+	m.execAuth.tried[ctx] = true
+	client, kubectlCtx := m.client, m.kubectlContext(ctx)
+	return func() tea.Msg {
+		info, ok := client.ExecPluginForContext(ctx)
+		return execAuthPromptMsg{context: ctx, cmd: resolveLoginCommand(ctx, kubectlCtx, info, ok, awsProfileIsSSO)}
+	}
+}
+
+func (m Model) updateExecAuthPrompt(msg execAuthPromptMsg) Model {
+	// Clearing the guard lets the next failed load ask again.
+	if m.overlay != overlayNone || m.execAuth.context != "" || msg.context != m.nav.Context {
+		delete(m.execAuth.tried, msg.context)
+		return m
+	}
+	m.execAuth.context, m.execAuth.cmd, m.execAuth.attempt = msg.context, msg.cmd, 1
+	return m.openExecAuthConfirm()
+}
+
+func (m Model) openExecAuthConfirm() Model {
+	q := ui.SanitizeTerminalText(m.execAuth.context) + " needs login. Run: " + m.execAuth.cmd.display
+	if m.execAuth.attempt > 1 {
+		q = fmt.Sprintf("Login failed. Retry? (attempt %d/%d) %s", m.execAuth.attempt, execAuthMaxAttempts, q)
+	}
+	m.pendingAction = execAuthLoginAction
+	m.confirmAction = ""
+	m.confirmTitle = "Login required"
+	m.confirmQuestion = q
+	m.blast.reset()
+	m.deps.reset()
+	m.overlay = overlayConfirm
+	return m
+}
+
+func (m Model) clearExecAuthConfirm() Model {
+	m.overlay = overlayNone
+	m.pendingAction = ""
+	m.confirmTitle = ""
+	m.confirmQuestion = ""
+	return m
+}
+
+func (m Model) cancelExecAuthLogin() (tea.Model, tea.Cmd) {
+	m = m.clearExecAuthConfirm()
+	ctx := m.execAuth.context
+	m.execAuth = execAuthState{tried: m.execAuth.tried}
+	m.setStatusMessage(fmt.Sprintf("Login to %s skipped, press %s to ask again",
+		ui.SanitizeTerminalText(ctx), ui.ActiveKeybindings.Refresh), false)
+	return m, scheduleStatusClear()
+}
+
+func (m Model) startExecAuthLogin() (tea.Model, tea.Cmd) {
+	m = m.clearExecAuthConfirm()
+	ctx := m.execAuth.context
 	cmd := &execAuthCmd{
-		context:        ctx,
-		kubectlContext: m.kubectlContext(ctx),
-		kubeconfig:     m.client.KubeconfigPathForContext(ctx),
+		context:    ctx,
+		login:      m.execAuth.cmd,
+		kubeconfig: m.client.KubeconfigPathForContext(ctx),
 	}
-	return tea.Exec(cmd, func(err error) tea.Msg {
+	return m, tea.Exec(cmd, func(err error) tea.Msg {
 		return execAuthDoneMsg{context: ctx, err: err}
 	})
 }
 
 func (m Model) updateExecAuthDone(msg execAuthDoneMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil && msg.context == m.execAuth.context && m.execAuth.attempt < execAuthMaxAttempts {
+		m.execAuth.attempt++
+		return m.openExecAuthConfirm(), nil
+	}
+	m.execAuth = execAuthState{tried: m.execAuth.tried}
 	if msg.err != nil {
 		m.setErrorFromErr("Auth failed: ", msg.err)
 		return m, scheduleStatusClear()
@@ -68,15 +136,15 @@ func (m Model) updateExecAuthDone(msg execAuthDoneMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// execAuthCmd runs kubectl, not in-process client-go, because client-go
-// caches os.Stderr per authenticator and that is a capture pipe here.
+// execAuthCmd runs the login out of process, not through client-go, because
+// client-go caches os.Stderr per authenticator and that is a capture pipe here.
 type execAuthCmd struct {
-	context        string
-	kubectlContext string
-	kubeconfig     string
-	stdin          io.Reader
-	stdout         io.Writer
-	stderr         io.Writer
+	context    string
+	login      loginCommand
+	kubeconfig string
+	stdin      io.Reader
+	stdout     io.Writer
+	stderr     io.Writer
 }
 
 func (c *execAuthCmd) SetStdin(r io.Reader)  { c.stdin = r }
@@ -84,39 +152,41 @@ func (c *execAuthCmd) SetStdout(w io.Writer) { c.stdout = w }
 func (c *execAuthCmd) SetStderr(w io.Writer) { c.stderr = w }
 
 func (c *execAuthCmd) Run() error {
-	_, _ = fmt.Fprintf(c.stdout, "lfk: %s auth plugin needs input\n", ui.SanitizeTerminalText(c.context))
-	bin, err := k8s.KubectlPath()
+	_, _ = fmt.Fprintf(c.stdout, "lfk: logging in to %s: %s\n", ui.SanitizeTerminalText(c.context), c.login.display)
+	cmd, err := c.newLoginCmd()
 	if err != nil {
-		return c.fail(fmt.Errorf("kubectl not found: %w", err))
+		return c.fail(err)
 	}
-	for attempt := 1; ; attempt++ {
-		var stderr bytes.Buffer
-		err = c.newKubectlCmd(bin, &stderr).Run()
-		if err == nil {
-			return nil
-		}
-		// Other failures, such as an unreachable cluster, would only wait out the long timeout again.
-		if attempt == execAuthMaxAttempts || !k8s.IsExecPluginExitError(errors.New(stderr.String())) {
-			return c.fail(err)
-		}
-		_, _ = fmt.Fprintf(c.stdout, "\nLogin failed, retrying (attempt %d/%d)\n", attempt+1, execAuthMaxAttempts)
+	if err := cmd.Run(); err != nil {
+		return c.fail(err)
 	}
+	return nil
 }
 
-func (c *execAuthCmd) newKubectlCmd(bin string, stderr io.Writer) *exec.Cmd {
-	// The timeout also counts the time spent at the plugin prompt, so keep it long.
-	cmd := exec.Command(bin, k8s.DemoKubectlArgs([]string{
-		"get", "--raw", "/version", "--context", c.kubectlContext, "--request-timeout=5m",
-	})...)
+func (c *execAuthCmd) newLoginCmd() (*exec.Cmd, error) {
+	bin, args := c.login.argv[0], c.login.argv[1:]
+	if c.login.kubectl {
+		p, err := k8s.KubectlPath()
+		if err != nil {
+			return nil, fmt.Errorf("kubectl not found: %w", err)
+		}
+		bin, args = p, c.login.argv
+	}
+	cmd := exec.Command(bin, args...)
 	cmd.Env = os.Environ()
 	if c.kubeconfig != "" {
 		cmd.Env = append(cmd.Env, "KUBECONFIG="+c.kubeconfig)
 	}
+	cmd.Env = append(cmd.Env, c.login.env...)
 	cmd.Stdin = c.stdin
-	cmd.Stdout = io.Discard
+	// kubectl prints only the version JSON, a login prints its device code.
+	cmd.Stdout = c.stdout
+	if c.login.kubectl {
+		cmd.Stdout = io.Discard
+	}
 	// The plugin prompt goes to stderr, but tea's stderr is a capture pipe.
-	cmd.Stderr = io.MultiWriter(c.stdout, stderr)
-	return cmd
+	cmd.Stderr = c.stdout
+	return cmd, nil
 }
 
 func (c *execAuthCmd) fail(err error) error {

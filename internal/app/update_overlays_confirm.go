@@ -33,6 +33,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		if m.pendingAction == externalEditSecretAction {
 			return m.commitSecretExternalEdit()
 		}
+		if m.pendingAction == execAuthLoginAction {
+			return m.startExecAuthLogin()
+		}
 		// Read-only safety net: if RO was toggled on while a confirm overlay
 		// was already showing, refuse to commit the mutation.
 		if m.pendingActionBlockedByReadOnly() {
@@ -144,6 +147,9 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		}
 		if m.pendingAction == externalEditSecretAction {
 			return m.clearSecretExternalEditConfirm(), nil
+		}
+		if m.pendingAction == execAuthLoginAction {
+			return m.cancelExecAuthLogin()
 		}
 		// A cancelled taint-apply returns to the still-alive editor so
 		// the staged marks are not lost.
