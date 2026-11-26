@@ -189,3 +189,15 @@ users:
 	_, ok = c.ExecPluginForContext("missing")
 	assert.False(t, ok)
 }
+
+func TestIsAWSCommand(t *testing.T) {
+	for cmd, want := range map[string]bool{
+		"aws":                   true,
+		"/opt/homebrew/bin/aws": true,
+		"aws.exe":               true,
+		"aws-iam-authenticator": false,
+		"kubelogin":             false,
+	} {
+		assert.Equal(t, want, IsAWSCommand(cmd), cmd)
+	}
+}

@@ -126,7 +126,7 @@ func IsExecPluginExitError(err error) bool {
 
 // IsAWSCommand reports whether the exec plugin command is the AWS CLI.
 func IsAWSCommand(command string) bool {
-	return filepath.Base(command) == "aws"
+	return strings.TrimSuffix(filepath.Base(command), ".exe") == "aws"
 }
 
 // credTaggingRoundTripper wraps a context's REST transport so a credential
