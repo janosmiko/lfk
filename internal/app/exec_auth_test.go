@@ -277,12 +277,36 @@ func TestExecAuth_StaleStateDoesNotBlockPrompt(t *testing.T) {
 	assert.True(t, m.execAuth.tried["test-ctx"], "a stale state must not respawn the resolver")
 }
 
-func TestExecAuth_SkipsWhenOverlayAlreadyOpen(t *testing.T) {
+func TestExecAuth_NoPromptOutsideExplorer(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		set  func(*Model)
+	}{
+		{"exec mode", func(m *Model) { m.mode = modeExec }},
+		{"logs mode", func(m *Model) { m.mode = modeLogs }},
+		{"overlay open", func(m *Model) { m.overlay = overlayNamespace }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := basePush80Model()
+			m.nav.Level = model.LevelResourceTypes
+			tt.set(&m)
+			assert.Nil(t, m.maybeExecAuth("test-ctx", errPluginExit))
+			assert.False(t, m.execAuth.tried["test-ctx"], "the next load must ask again")
+		})
+	}
+}
+
+func TestExecAuth_PromptAfterLeavingExplorerIsDropped(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelResourceTypes
-	m.overlay = overlayNamespace
-	assert.Nil(t, m.maybeExecAuth("test-ctx", errPluginExit))
-	assert.False(t, m.execAuth.tried["test-ctx"], "the next load must ask again")
+	cmd := m.maybeExecAuth("test-ctx", errPluginExit)
+	require.NotNil(t, cmd)
+	m.mode = modeExec
+	got, _ := m.Update(cmd())
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Empty(t, m.execAuth.context)
+	assert.False(t, m.execAuth.tried["test-ctx"])
 }
 
 // openLoginBox drives a plugin failure on the current context through the

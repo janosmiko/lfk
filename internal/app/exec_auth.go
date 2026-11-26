@@ -67,7 +67,7 @@ func (m Model) execAuthBusy() bool {
 // execAuthCanPrompt keeps the box off viewers and live shells, where it
 // would take the user's keystrokes.
 func (m Model) execAuthCanPrompt() bool {
-	return m.overlay == overlayNone && !m.execAuthBusy()
+	return m.mode == modeExplorer && m.overlay == overlayNone && !m.execAuthBusy()
 }
 
 func (m Model) updateExecAuthPrompt(msg execAuthPromptMsg) Model {
