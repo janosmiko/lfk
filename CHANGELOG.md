@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.21](https://github.com/janosmiko/lfk/compare/v0.19.20...v0.19.21) (2026-11-26)
+
+
+### Features
+
+* ask before cluster login and run it inside lfk ([#951](https://github.com/janosmiko/lfk/issues/951)) ([bac9e07](https://github.com/janosmiko/lfk/commit/bac9e07039a0fcea15522060d948d98048278a44))
+
 ## [0.19.20](https://github.com/janosmiko/lfk/compare/v0.19.19...v0.19.20) (2026-11-23)
 
 
