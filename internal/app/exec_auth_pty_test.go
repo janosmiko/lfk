@@ -56,7 +56,7 @@ func TestExecAuthPTY_SuccessClosesAndRefreshes(t *testing.T) {
 
 	assert.Equal(t, modeExplorer, m.mode)
 	assert.Nil(t, m.execPTY)
-	assert.Equal(t, "Refreshing...", m.statusMessage, "success on the current context refreshes")
+	assert.Contains(t, m.statusMessage, "Authenticated to test-ctx")
 	assert.Empty(t, m.execAuth.context)
 	assert.Nil(t, m.execAuth.ptyCmd)
 }
@@ -101,6 +101,27 @@ func TestExecAuthPTY_TabSwitchCancels(t *testing.T) {
 
 	got, _ := m.Update(keyMsg("ctrl+]"))
 	got, _ = got.(Model).Update(keyMsg("]"))
+	m = got.(Model)
+
+	assert.Equal(t, 1, m.activeTab)
+	assert.Empty(t, m.execAuth.context)
+	assert.Nil(t, m.execAuth.ptmx)
+	assert.Nil(t, m.tabs[0].execPTY, "the login must not stay in a background tab")
+}
+
+func TestExecAuthPTY_TabClickCancels(t *testing.T) {
+	m := startLoginPTY(t, "sleep 5")
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+	x := -1
+	for i := 0; i < m.width && x < 0; i++ {
+		if m.tabAtX(i) == 1 {
+			x = i
+		}
+	}
+	require.GreaterOrEqual(t, x, 0, "tab 2 must be on the tab bar")
+
+	got, _ := m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: x, Y: 1})
 	m = got.(Model)
 
 	assert.Equal(t, 1, m.activeTab)

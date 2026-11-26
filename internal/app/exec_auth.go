@@ -126,14 +126,17 @@ func (m Model) updateExecAuthDone(msg execAuthDoneMsg) (tea.Model, tea.Cmd) {
 		m.setErrorFromErr("Auth failed: ", msg.err)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage("Authenticated to "+ui.SanitizeTerminalText(msg.context), false)
+	done := "Authenticated to " + ui.SanitizeTerminalText(msg.context)
 	cmds := []tea.Cmd{scheduleStatusClear()}
 	if msg.context != m.nav.Context {
+		m.setStatusMessage(done, false)
 		return m, cmds[0]
 	}
 	// The guard stays set: a plugin that caches no token would loop otherwise.
 	mdl, cmd := m.directActionRefresh()
 	m = mdl.(Model)
+	// Set after the refresh, since it replaces the status with "Refreshing...".
+	m.setStatusMessage(done, false)
 	cmds = append(cmds, cmd)
 	if m.shouldFireDiscoveryFor(msg.context) {
 		m.markDiscoveryStarted(msg.context)

@@ -159,6 +159,7 @@ func TestExecAuthDone_SuccessQueuesDiscovery(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "discovery must be queued after successful auth")
+	assert.Contains(t, got.(Model).statusMessage, "Authenticated to test-ctx", "the refresh must not hide it")
 }
 
 func TestExecAuthDone_ErrorKeepsGuard(t *testing.T) {
