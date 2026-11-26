@@ -603,6 +603,16 @@ var ConfigShowRareTypes bool
 // A value here takes precedence over ConfigReadOnly for that specific context.
 var ConfigClusterReadOnly = map[string]bool{}
 
+// ConfigClusterLoginCommand maps context names to the shell command that logs
+// in when the cluster's credential plugin fails. Blank values are not stored.
+var ConfigClusterLoginCommand = map[string]string{}
+
+func setClusterLoginCommand(ctx, cmd string) {
+	if cmd = strings.TrimSpace(cmd); cmd != "" {
+		ConfigClusterLoginCommand[ctx] = cmd
+	}
+}
+
 // ResolveReadOnly returns the effective read-only state for a given context.
 // Precedence: CLI flag > per-context config > global config.
 func ResolveReadOnly(context string, cliFlag bool) bool {

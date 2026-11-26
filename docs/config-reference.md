@@ -390,6 +390,7 @@ Currently supported per-cluster overrides:
 | `views` | map[string]object | Per-resource-type view overrides for this cluster. Same format as the global `views`. Wins over global `views` for matching keys. |
 | `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. **Deprecated** — use `views` instead. |
 | `read_only` | bool | Per-context read-only override. Same semantics as the top-level `read_only`. |
+| `login_command` | string | Command that logs in to this cluster when its credential plugin fails. Runs through `sh -c`. |
 | `security` | object | Per-context security override (`enabled` and/or `sources`). Same semantics as the top-level `security`; wins over it for this context. |
 | `k8s_client_qps` | int | Per-context foreground API client QPS override. Wins over the global `scheduler.k8s_client_qps`. See [API client rate limits](#api-client-rate-limits). |
 | `k8s_client_burst` | int | Per-context foreground API client burst override. Wins over the global `scheduler.k8s_client_burst`. |

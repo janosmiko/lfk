@@ -457,6 +457,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 	if len(cfg.Clusters) > 0 {
 		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
 		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))
+		ConfigClusterLoginCommand = make(map[string]string, len(cfg.Clusters))
 		ConfigClusterSecurityEnabled = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecurityHideBadges = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecuritySources = make(map[string]map[string]bool, len(cfg.Clusters))
@@ -473,6 +474,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			if cc.ReadOnly != nil {
 				ConfigClusterReadOnly[ctx] = *cc.ReadOnly
 			}
+			setClusterLoginCommand(ctx, cc.LoginCommand)
 			if cc.K8sClientQPS != nil && *cc.K8sClientQPS > 0 {
 				ConfigClusterK8sClientQPS[ctx] = *cc.K8sClientQPS
 			}
