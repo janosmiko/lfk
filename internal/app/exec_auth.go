@@ -23,6 +23,8 @@ type execAuthState struct {
 	context string          // context of the open box or running login, "" when idle
 	cmd     loginCommand
 	attempt int // 1-based attempt about to run
+	ptyCmd  *exec.Cmd
+	ptmx    *os.File // set once ptyCmd runs in the embedded terminal
 }
 
 type execAuthPromptMsg struct {
@@ -105,6 +107,9 @@ func (m Model) startExecAuthLogin() (tea.Model, tea.Cmd) {
 		login:      m.execAuth.cmd,
 		kubeconfig: m.client.KubeconfigPathForContext(ctx),
 	}
+	if execAuthUsesPTY() {
+		return m.startExecAuthPTY(cmd)
+	}
 	return m, tea.Exec(cmd, func(err error) tea.Msg {
 		return execAuthDoneMsg{context: ctx, err: err}
 	})
@@ -113,6 +118,7 @@ func (m Model) startExecAuthLogin() (tea.Model, tea.Cmd) {
 func (m Model) updateExecAuthDone(msg execAuthDoneMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil && msg.context == m.execAuth.context && m.execAuth.attempt < execAuthMaxAttempts {
 		m.execAuth.attempt++
+		m.execAuth.ptyCmd, m.execAuth.ptmx = nil, nil
 		return m.openExecAuthConfirm(), nil
 	}
 	m.execAuth = execAuthState{tried: m.execAuth.tried}
