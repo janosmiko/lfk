@@ -144,6 +144,25 @@ func TestExecAuthPTY_StartFailureOpensRetryBox(t *testing.T) {
 	m = got.(Model)
 	require.Equal(t, overlayConfirm, m.overlay)
 	assert.Contains(t, loginBoxText(m), "attempt 2/3")
+	assert.True(t, m.statusMessageErr)
+	assert.Contains(t, m.statusMessage, "failed to start PTY", "the user must see why")
+}
+
+// tea.Exec sends its result from a goroutine, so a queued prompt can land first.
+func TestExecAuth_PromptDuringTeaExecLoginIsDropped(t *testing.T) {
+	withTerminalMode(t, ui.TerminalModeExec)
+	m := basePush80Model()
+	m.nav.Context = "a"
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "a")
+	got, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = got.(Model)
+	m.nav.Context = "b"
+
+	got, _ = m.Update(execAuthPromptMsg{context: "b", cmd: loginCommand{argv: []string{"true"}, display: "true"}})
+	m = got.(Model)
+	assert.Equal(t, overlayNone, m.overlay)
+	assert.Equal(t, "a", m.execAuth.context, "the running login keeps its state")
 }
 
 func TestExecAuthPTY_ExecModeUsesTeaExec(t *testing.T) {

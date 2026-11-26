@@ -235,15 +235,54 @@ func TestExecAuthCmd_RunSingleAttempt(t *testing.T) {
 func TestExecAuthCmd_RunPassesLoginEnvAndStdout(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "login")
-	require.NoError(t, os.WriteFile(bin, []byte("#!/bin/sh\necho \"code $1 $AWS_PROFILE\"\n"), 0o755))
+	require.NoError(t, os.WriteFile(bin, []byte("#!/bin/sh\necho \"code $1 $AWS_PROFILE $KUBECTL_CONTEXT\"\n"), 0o755))
 	var out bytes.Buffer
-	c := &execAuthCmd{context: "ctx-a", login: loginCommand{
+	c := &execAuthCmd{context: "ctx-a", kubectlContext: "orig-a", login: loginCommand{
 		display: "login", argv: []string{bin, "ABCD"}, env: []string{"AWS_PROFILE=dev"},
 	}}
 	c.SetStdin(strings.NewReader(""))
 	c.SetStdout(&out)
 	require.NoError(t, c.Run())
-	assert.Contains(t, out.String(), "code ABCD dev", "a login prints its device code on stdout")
+	assert.Contains(t, out.String(), "code ABCD dev orig-a", "a login prints its device code on stdout")
+}
+
+func TestExecAuthCmd_EmptyArgvErrors(t *testing.T) {
+	_, err := (&execAuthCmd{context: "ctx-a"}).newLoginCmd()
+	require.Error(t, err)
+}
+
+func TestExecAuth_NamespaceErrorKeepsLoginBox(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+
+	got, _ := m.Update(namespacesLoadedMsg{context: "test-ctx", err: errPluginExit, silent: true})
+	m = got.(Model)
+	assert.Equal(t, overlayConfirm, m.overlay)
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+	assert.Equal(t, "test-ctx", m.execAuth.context)
+}
+
+func TestExecAuth_StaleStateDoesNotBlockPrompt(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m = openLoginBox(t, m, "test-ctx")
+	m.overlay = overlayNone // some other path closed the box
+
+	delete(m.execAuth.tried, "test-ctx") // the user presses R
+	m = openLoginBox(t, m, "test-ctx")
+	assert.Equal(t, overlayConfirm, m.overlay)
+	assert.Equal(t, execAuthLoginAction, m.pendingAction)
+	assert.Equal(t, 1, m.execAuth.attempt)
+	assert.True(t, m.execAuth.tried["test-ctx"], "a stale state must not respawn the resolver")
+}
+
+func TestExecAuth_SkipsWhenOverlayAlreadyOpen(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m.overlay = overlayNamespace
+	assert.Nil(t, m.maybeExecAuth("test-ctx", errPluginExit))
+	assert.False(t, m.execAuth.tried["test-ctx"], "the next load must ask again")
 }
 
 // openLoginBox drives a plugin failure on the current context through the

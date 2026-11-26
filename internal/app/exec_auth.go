@@ -2,6 +2,7 @@ package app
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +23,8 @@ type execAuthState struct {
 	tried   map[string]bool // contexts already offered a login
 	context string          // context of the open box or running login, "" when idle
 	cmd     loginCommand
-	attempt int // 1-based attempt about to run
+	attempt int  // 1-based attempt about to run
+	running bool // a login runs until its execAuthDoneMsg or a cancel
 	ptyCmd  *exec.Cmd
 	ptmx    *os.File // set once ptyCmd runs in the embedded terminal
 }
@@ -43,7 +45,7 @@ type execAuthDoneMsg struct {
 func (m *Model) maybeExecAuth(ctx string, err error) tea.Cmd {
 	if !k8s.IsExecPluginExitError(err) || ctx == "" || ctx == UnionContextSentinel ||
 		ctx != m.nav.Context || m.nav.Level == model.LevelClusters ||
-		m.demoMode || m.execAuth.tried[ctx] {
+		m.demoMode || m.execAuth.tried[ctx] || !m.execAuthCanPrompt() {
 		return nil
 	}
 	if m.execAuth.tried == nil {
@@ -57,9 +59,27 @@ func (m *Model) maybeExecAuth(ctx string, err error) tea.Cmd {
 	}
 }
 
+// execAuthBusy reports whether the login box is on screen or a login runs.
+func (m Model) execAuthBusy() bool {
+	return (m.overlay == overlayConfirm && m.pendingAction == execAuthLoginAction) || m.execAuth.running
+}
+
+// execAuthCanPrompt keeps the box off viewers and live shells, where it
+// would take the user's keystrokes.
+func (m Model) execAuthCanPrompt() bool {
+	return m.overlay == overlayNone && !m.execAuthBusy()
+}
+
 func (m Model) updateExecAuthPrompt(msg execAuthPromptMsg) Model {
+	// A path that closes overlays without a cancel leaves the state behind.
+	if m.execAuth.context != "" && !m.execAuthBusy() {
+		m.execAuth = execAuthState{tried: m.execAuth.tried}
+		if m.pendingAction == execAuthLoginAction {
+			m.pendingAction, m.confirmTitle, m.confirmQuestion = "", "", ""
+		}
+	}
 	// Clearing the guard lets the next failed load ask again.
-	if m.overlay != overlayNone || m.execAuth.context != "" || msg.context != m.nav.Context {
+	if !m.execAuthCanPrompt() || msg.context != m.nav.Context {
 		delete(m.execAuth.tried, msg.context)
 		return m
 	}
@@ -103,10 +123,12 @@ func (m Model) startExecAuthLogin() (tea.Model, tea.Cmd) {
 	m = m.clearExecAuthConfirm()
 	ctx := m.execAuth.context
 	cmd := &execAuthCmd{
-		context:    ctx,
-		login:      m.execAuth.cmd,
-		kubeconfig: m.client.KubeconfigPathForContext(ctx),
+		context:        ctx,
+		kubectlContext: m.kubectlContext(ctx),
+		login:          m.execAuth.cmd,
+		kubeconfig:     m.client.KubeconfigPathForContext(ctx),
 	}
+	m.execAuth.running = true
 	if execAuthUsesPTY() {
 		return m.startExecAuthPTY(cmd)
 	}
@@ -118,8 +140,9 @@ func (m Model) startExecAuthLogin() (tea.Model, tea.Cmd) {
 func (m Model) updateExecAuthDone(msg execAuthDoneMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil && msg.context == m.execAuth.context && m.execAuth.attempt < execAuthMaxAttempts {
 		m.execAuth.attempt++
-		m.execAuth.ptyCmd, m.execAuth.ptmx = nil, nil
-		return m.openExecAuthConfirm(), nil
+		m.execAuth.running, m.execAuth.ptyCmd, m.execAuth.ptmx = false, nil, nil
+		m.setErrorFromErr("Login failed: ", msg.err)
+		return m.openExecAuthConfirm(), scheduleStatusClear()
 	}
 	m.execAuth = execAuthState{tried: m.execAuth.tried}
 	if msg.err != nil {
@@ -148,12 +171,13 @@ func (m Model) updateExecAuthDone(msg execAuthDoneMsg) (tea.Model, tea.Cmd) {
 // execAuthCmd runs the login out of process, not through client-go, because
 // client-go caches os.Stderr per authenticator and that is a capture pipe here.
 type execAuthCmd struct {
-	context    string
-	login      loginCommand
-	kubeconfig string
-	stdin      io.Reader
-	stdout     io.Writer
-	stderr     io.Writer
+	context        string
+	kubectlContext string // kubeconfig's original context name
+	login          loginCommand
+	kubeconfig     string
+	stdin          io.Reader
+	stdout         io.Writer
+	stderr         io.Writer
 }
 
 func (c *execAuthCmd) SetStdin(r io.Reader)  { c.stdin = r }
@@ -173,6 +197,9 @@ func (c *execAuthCmd) Run() error {
 }
 
 func (c *execAuthCmd) newLoginCmd() (*exec.Cmd, error) {
+	if len(c.login.argv) == 0 {
+		return nil, errors.New("no login command")
+	}
 	bin, args := c.login.argv[0], c.login.argv[1:]
 	if c.login.kubectl {
 		p, err := k8s.KubectlPath()
@@ -185,6 +212,9 @@ func (c *execAuthCmd) newLoginCmd() (*exec.Cmd, error) {
 	cmd.Env = os.Environ()
 	if c.kubeconfig != "" {
 		cmd.Env = append(cmd.Env, "KUBECONFIG="+c.kubeconfig)
+	}
+	if c.kubectlContext != "" {
+		cmd.Env = append(cmd.Env, "KUBECTL_CONTEXT="+c.kubectlContext)
 	}
 	cmd.Env = append(cmd.Env, c.login.env...)
 	cmd.Stdin = c.stdin

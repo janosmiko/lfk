@@ -20,7 +20,6 @@ func (m Model) startExecAuthPTY(c *execAuthCmd) (tea.Model, tea.Cmd) {
 	ctx := c.context
 	cmd, err := c.newLoginCmd()
 	if err != nil {
-		m.setErrorFromErr("Auth failed: ", err)
 		return m.updateExecAuthDone(execAuthDoneMsg{context: ctx, err: err})
 	}
 	m.execAuth.ptyCmd = cmd
