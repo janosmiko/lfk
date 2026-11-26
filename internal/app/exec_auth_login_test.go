@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -96,6 +97,9 @@ func TestResolveLoginCommand(t *testing.T) {
 }
 
 func TestAWSProfileIsSSO(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture")
+	}
 	dir := t.TempDir()
 	fake := filepath.Join(dir, "aws")
 	script := `#!/bin/sh
