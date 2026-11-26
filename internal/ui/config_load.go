@@ -604,6 +604,9 @@ type clusterConfig struct {
 	// context only. Useful for marking specific clusters (e.g. "prod") as
 	// read-only while leaving others mutable.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+	// LoginCommand runs through sh -c when this cluster's credential plugin
+	// fails.
+	LoginCommand string `json:"login_command" yaml:"login_command"`
 	// Security, when set, overrides the global security settings for this
 	// context only — e.g. disabling the dashboard on a cluster where the
 	// kubeconfig credential plugin is noisy, or enabling only specific

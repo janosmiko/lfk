@@ -180,6 +180,7 @@ union_sets:
 clusters:
   ctx1:
     read_only: true
+    login_command: "aws sso login --profile prod"
     k8s_client_qps: 33
     k8s_client_burst: 66
     resource_columns:
@@ -348,6 +349,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 
 	// Per-cluster overrides (clusters.<ctx>.*).
 	assert.True(t, ConfigClusterReadOnly["ctx1"], "clusters.read_only")
+	assert.Equal(t, "aws sso login --profile prod", ConfigClusterLoginCommand["ctx1"], "clusters.login_command")
 	assert.Equal(t, 33, ConfigClusterK8sClientQPS["ctx1"], "clusters.k8s_client_qps")
 	assert.Equal(t, 66, ConfigClusterK8sClientBurst["ctx1"], "clusters.k8s_client_burst")
 	assert.Equal(t, []string{"IP", "Node"}, ConfigClusterResourceColumns["ctx1"]["pod"], "clusters.resource_columns")
@@ -720,6 +722,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origClusterSecSources := ConfigClusterSecuritySources
 	origClusterQPS := ConfigClusterK8sClientQPS
 	origClusterBurst := ConfigClusterK8sClientBurst
+	origClusterLogin := ConfigClusterLoginCommand
 	origGotoTargets := ConfigGotoTargets
 	origWhichKeyEnabled := ConfigWhichKeyEnabled
 	origWhichKeyDelayMs := ConfigWhichKeyDelayMs
@@ -829,6 +832,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigClusterSecuritySources = origClusterSecSources
 		ConfigClusterK8sClientQPS = origClusterQPS
 		ConfigClusterK8sClientBurst = origClusterBurst
+		ConfigClusterLoginCommand = origClusterLogin
 		ConfigGotoTargets = origGotoTargets
 		ConfigWhichKeyEnabled = origWhichKeyEnabled
 		ConfigWhichKeyDelayMs = origWhichKeyDelayMs
@@ -895,4 +899,18 @@ func TestLoadConfig_FieldManagerRemovedKeyClearsTheOverride(t *testing.T) {
 		assert.Empty(t, k8s.FieldManagerOverride, "reload with %q", second)
 		assert.True(t, strings.HasPrefix(k8s.FieldManager(), "lfk:"), "got %q", k8s.FieldManager())
 	}
+}
+
+func TestClusterLoginCommandBlankIgnored(t *testing.T) {
+	restore := snapshotAllConfigGlobals(t)
+	defer restore()
+
+	cfg := configFile{Clusters: map[string]clusterConfig{
+		"blank": {LoginCommand: "  "},
+		"set":   {LoginCommand: " aws sso login "},
+	}}
+	applyConfigMaps(cfg, map[string]string{})
+
+	assert.NotContains(t, ConfigClusterLoginCommand, "blank")
+	assert.Equal(t, "aws sso login", ConfigClusterLoginCommand["set"])
 }

@@ -509,7 +509,10 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	}
 	if msg.err != nil {
 		m.err = msg.err
-		m.overlay = overlayNone
+		// Opening a context loads namespaces too, and that fails while the login box is open.
+		if m.pendingAction != execAuthLoginAction {
+			m.overlay = overlayNone
+		}
 		m.setErrorFromErr("Warning: ", msg.err)
 		authCmd := m.maybeExecAuth(msg.context, msg.err)
 		return m, tea.Batch(scheduleStatusClear(), authCmd)

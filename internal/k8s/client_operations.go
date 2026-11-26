@@ -460,7 +460,7 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	}
 	if cfg.ExecProvider != nil {
 		// Bubble Tea owns stdin, so a plugin prompt would hang unseen. The
-		// plugin fails fast and lfk suspends to run kubectl for the prompt.
+		// plugin fails fast, then lfk asks the user and runs a login command.
 		ep := *cfg.ExecProvider
 		ep.InteractiveMode = clientcmdapi.NeverExecInteractiveMode
 		cfg.ExecProvider = &ep
